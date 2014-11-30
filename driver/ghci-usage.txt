@@ -22,3 +22,6 @@ Full details can be found in the User's Guide, an online copy of which
 can be found here:
 
     http://www.haskell.org/ghc/docs/latest/html/users_guide/
+
+If you *really* want to see every option, then you can pass
+'--show-options' to ghci.

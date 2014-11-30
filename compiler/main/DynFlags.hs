@@ -2195,15 +2195,18 @@ flagsPackage = package_flags
 -- See Note [Supporting CLI completion]
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
-    defFlag "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
+    defFlag "n"
+      (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
   , defFlag "cpp"      (NoArg (setExtensionFlag Opt_Cpp))
   , defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , defFlag "#include"
-         (HasArg (\s -> do addCmdlineHCInclude s
-                           addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect"))
+      (HasArg (\s -> do
+         addCmdlineHCInclude s
+         addWarn ("-#include and INCLUDE pragmas are " ++
+                  "deprecated: They no longer have any effect")))
   , defFlag "v"        (OptIntSuffix setVerbosity)
 
-  , defGhcFlag "j"        (OptIntSuffix (\n -> upd (\d -> d {parMakeCount = n})))
+  , defGhcFlag "j"     (OptIntSuffix (\n -> upd (\d -> d {parMakeCount = n})))
   , defFlag "sig-of"   (sepArg setSigOf)
 
     -- RTS options -------------------------------------------------------------
@@ -2217,12 +2220,14 @@ dynamic_flags = [
   , defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
   , defGhcFlag "parallel"       (NoArg (addWay WayPar))
   , defGhcFlag "gransim"        (NoArg (addWay WayGran))
-  , defGhcFlag "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
+  , defGhcFlag "smp"
+      (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
   , defGhcFlag "debug"          (NoArg (addWay WayDebug))
   , defGhcFlag "ndp"            (NoArg (addWay WayNDP))
   , defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
 
-  , defGhcFlag "ticky"          (NoArg (setGeneralFlag Opt_Ticky >> addWay WayDebug))
+  , defGhcFlag "ticky"
+      (NoArg (setGeneralFlag Opt_Ticky >> addWay WayDebug))
 
     -- -ticky enables ticky-ticky code generation, and also implies -debug which
     -- is required to get the RTS ticky support.
@@ -2244,38 +2249,60 @@ dynamic_flags = [
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
-  , defFlag "pgmlo"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
-  , defFlag "pgmlc"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
-  , defFlag "pgmL"           (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
-  , defFlag "pgmP"           (hasArg setPgmP)
-  , defFlag "pgmF"           (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
-  , defFlag "pgmc"           (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
-  , defFlag "pgms"           (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
-  , defFlag "pgma"           (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
-  , defFlag "pgml"           (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
-  , defFlag "pgmdll"         (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
-  , defFlag "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
-  , defFlag "pgmlibtool"     (hasArg (\f -> alterSettings (\s -> s { sPgm_libtool = f})))
+  , defFlag "pgmlo"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
+  , defFlag "pgmlc"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
+  , defFlag "pgmL"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
+  , defFlag "pgmP"
+      (hasArg setPgmP)
+  , defFlag "pgmF"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
+  , defFlag "pgmc"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
+  , defFlag "pgms"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
+  , defFlag "pgma"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
+  , defFlag "pgml"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
+  , defFlag "pgmdll"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
+  , defFlag "pgmwindres"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
+  , defFlag "pgmlibtool"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_libtool = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
-  , defFlag "optlo"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
-  , defFlag "optlc"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
-  , defFlag "optL"           (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
-  , defFlag "optP"           (hasArg addOptP)
-  , defFlag "optF"           (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
-  , defFlag "optc"           (hasArg addOptc)
-  , defFlag "opta"           (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
-  , defFlag "optl"           (hasArg addOptl)
-  , defFlag "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
+  , defFlag "optlo"
+      (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
+  , defFlag "optlc"
+      (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
+  , defFlag "optL"
+      (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
+  , defFlag "optP"
+      (hasArg addOptP)
+  , defFlag "optF"
+      (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
+  , defFlag "optc"
+      (hasArg addOptc)
+  , defFlag "opta"
+      (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
+  , defFlag "optl"
+      (hasArg addOptl)
+  , defFlag "optwindres"
+      (hasArg (\f ->
+        alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
 
   , defGhcFlag "split-objs"
-         (NoArg (if can_split
-                 then setGeneralFlag Opt_SplitObjs
-                 else addWarn "ignoring -fsplit-objs"))
+      (NoArg (if can_split
+                then setGeneralFlag Opt_SplitObjs
+                else addWarn "ignoring -fsplit-objs"))
 
         -------- ghc -M -----------------------------------------------------
-  , defGhcFlag "dep-suffix"     (hasArg addDepSuffix)
-  , defGhcFlag "dep-makefile"   (hasArg setDepMakefile)
+  , defGhcFlag "dep-suffix"               (hasArg addDepSuffix)
+  , defGhcFlag "dep-makefile"             (hasArg setDepMakefile)
   , defGhcFlag "include-pkg-deps"         (noArg (setDepIncludePkgDeps True))
   , defGhcFlag "exclude-module"           (hasArg addDepExcludeMod)
 
@@ -2331,7 +2358,8 @@ dynamic_flags = [
   , defGhcFlag "keep-tmp-files"   (NoArg (setGeneralFlag Opt_KeepTmpFiles))
 
         ------- Miscellaneous ----------------------------------------------
-  , defGhcFlag "no-auto-link-packages" (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
+  , defGhcFlag "no-auto-link-packages"
+      (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
   , defGhcFlag "no-hs-main"     (NoArg (setGeneralFlag Opt_NoHsMain))
   , defGhcFlag "with-rtsopts"   (HasArg setRtsOpts)
   , defGhcFlag "rtsopts"        (NoArg (setRtsOptsEnabled RtsOptsAll))
@@ -2349,8 +2377,8 @@ dynamic_flags = [
   , defGhcFlag "ticky-LNE"         (NoArg (setGeneralFlag Opt_Ticky_LNE))
   , defGhcFlag "ticky-dyn-thunk"   (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
         ------- recompilation checker --------------------------------------
-  , defGhcFlag "recomp"    (NoArg (do unSetGeneralFlag Opt_ForceRecomp
-                                      deprecate "Use -fno-force-recomp instead"))
+  , defGhcFlag "recomp"   (NoArg (do unSetGeneralFlag Opt_ForceRecomp
+                                     deprecate "Use -fno-force-recomp instead"))
   , defGhcFlag "no-recomp" (NoArg (do setGeneralFlag Opt_ForceRecomp
                                       deprecate "Use -fforce-recomp instead"))
 
@@ -2369,15 +2397,16 @@ dynamic_flags = [
   -- Suppress all that is suppressable in core dumps.
   -- Except for uniques, as some simplifier phases introduce new varibles that
   -- have otherwise identical names.
-  , defGhcFlag "dsuppress-all" (NoArg $ do setGeneralFlag Opt_SuppressCoercions
-                                           setGeneralFlag Opt_SuppressVarKinds
-                                           setGeneralFlag Opt_SuppressModulePrefixes
-                                           setGeneralFlag Opt_SuppressTypeApplications
-                                           setGeneralFlag Opt_SuppressIdInfo
-                                           setGeneralFlag Opt_SuppressTypeSignatures)
+  , defGhcFlag "dsuppress-all"
+      (NoArg $ do setGeneralFlag Opt_SuppressCoercions
+                  setGeneralFlag Opt_SuppressVarKinds
+                  setGeneralFlag Opt_SuppressModulePrefixes
+                  setGeneralFlag Opt_SuppressTypeApplications
+                  setGeneralFlag Opt_SuppressIdInfo
+                  setGeneralFlag Opt_SuppressTypeSignatures)
 
         ------ Debugging ----------------------------------------------------
-  , defGhcFlag "dstg-stats"     (NoArg (setGeneralFlag Opt_StgStats))
+  , defGhcFlag "dstg-stats"              (NoArg (setGeneralFlag Opt_StgStats))
 
   , defGhcFlag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
   , defGhcFlag "ddump-cmm-raw"           (setDumpFlag Opt_D_dump_cmm_raw)
@@ -2396,7 +2425,8 @@ dynamic_flags = [
   , defGhcFlag "ddump-asm-liveness"      (setDumpFlag Opt_D_dump_asm_liveness)
   , defGhcFlag "ddump-asm-regalloc"      (setDumpFlag Opt_D_dump_asm_regalloc)
   , defGhcFlag "ddump-asm-conflicts"     (setDumpFlag Opt_D_dump_asm_conflicts)
-  , defGhcFlag "ddump-asm-regalloc-stages" (setDumpFlag Opt_D_dump_asm_regalloc_stages)
+  , defGhcFlag "ddump-asm-regalloc-stages"
+      (setDumpFlag Opt_D_dump_asm_regalloc_stages)
   , defGhcFlag "ddump-asm-stats"         (setDumpFlag Opt_D_dump_asm_stats)
   , defGhcFlag "ddump-asm-expanded"      (setDumpFlag Opt_D_dump_asm_expanded)
   , defGhcFlag "ddump-llvm"            (NoArg (do setObjTarget HscLlvm
@@ -2412,7 +2442,8 @@ dynamic_flags = [
   , defGhcFlag "ddump-parsed"            (setDumpFlag Opt_D_dump_parsed)
   , defGhcFlag "ddump-rn"                (setDumpFlag Opt_D_dump_rn)
   , defGhcFlag "ddump-simpl"             (setDumpFlag Opt_D_dump_simpl)
-  , defGhcFlag "ddump-simpl-iterations"  (setDumpFlag Opt_D_dump_simpl_iterations)
+  , defGhcFlag "ddump-simpl-iterations"
+      (setDumpFlag Opt_D_dump_simpl_iterations)
   , defGhcFlag "ddump-spec"              (setDumpFlag Opt_D_dump_spec)
   , defGhcFlag "ddump-prep"              (setDumpFlag Opt_D_dump_prep)
   , defGhcFlag "ddump-stg"               (setDumpFlag Opt_D_dump_stg)
@@ -2441,28 +2472,38 @@ dynamic_flags = [
                                                     setVerboseCore2Core))
   , defGhcFlag "dverbose-stg2stg"        (setDumpFlag Opt_D_verbose_stg2stg)
   , defGhcFlag "ddump-hi"                (setDumpFlag Opt_D_dump_hi)
-  , defGhcFlag "ddump-minimal-imports"   (NoArg (setGeneralFlag Opt_D_dump_minimal_imports))
+  , defGhcFlag "ddump-minimal-imports"
+      (NoArg (setGeneralFlag Opt_D_dump_minimal_imports))
   , defGhcFlag "ddump-vect"              (setDumpFlag Opt_D_dump_vect)
-  , defGhcFlag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
+  , defGhcFlag "ddump-hpc"
+      (setDumpFlag Opt_D_dump_ticked) -- back compat
   , defGhcFlag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , defGhcFlag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
   , defGhcFlag "ddump-mod-map"           (setDumpFlag Opt_D_dump_mod_map)
-  , defGhcFlag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
+  , defGhcFlag "ddump-view-pattern-commoning"
+      (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , defGhcFlag "ddump-to-file"           (NoArg (setGeneralFlag Opt_DumpToFile))
   , defGhcFlag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
   , defGhcFlag "ddump-rtti"              (setDumpFlag Opt_D_dump_rtti)
-  , defGhcFlag "dcore-lint"              (NoArg (setGeneralFlag Opt_DoCoreLinting))
-  , defGhcFlag "dstg-lint"               (NoArg (setGeneralFlag Opt_DoStgLinting))
-  , defGhcFlag "dcmm-lint"               (NoArg (setGeneralFlag Opt_DoCmmLinting))
-  , defGhcFlag "dasm-lint"               (NoArg (setGeneralFlag Opt_DoAsmLinting))
+  , defGhcFlag "dcore-lint"
+      (NoArg (setGeneralFlag Opt_DoCoreLinting))
+  , defGhcFlag "dstg-lint"
+      (NoArg (setGeneralFlag Opt_DoStgLinting))
+  , defGhcFlag "dcmm-lint"
+      (NoArg (setGeneralFlag Opt_DoCmmLinting))
+  , defGhcFlag "dasm-lint"
+      (NoArg (setGeneralFlag Opt_DoAsmLinting))
   , defGhcFlag "dshow-passes"            (NoArg (do forceRecompile
                                                     setVerbosity $ Just 2))
-  , defGhcFlag "dfaststring-stats"       (NoArg (setGeneralFlag Opt_D_faststring_stats))
-  , defGhcFlag "dno-llvm-mangler"        (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
+  , defGhcFlag "dfaststring-stats"
+      (NoArg (setGeneralFlag Opt_D_faststring_stats))
+  , defGhcFlag "dno-llvm-mangler"
+      (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
-  , defGhcFlag "msse"         (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
+  , defGhcFlag "msse"
+      (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
   , defGhcFlag "mavx"         (noArg (\d -> d{ avx = True }))
   , defGhcFlag "mavx2"        (noArg (\d -> d{ avx2 = True }))
   , defGhcFlag "mavx512cd"    (noArg (\d -> d{ avx512cd = True }))
@@ -2492,39 +2533,65 @@ dynamic_flags = [
                 -- If the number is missing, use 1
 
 
-  , defFlag "fmax-relevant-binds"         (intSuffix (\n d -> d{ maxRelevantBinds = Just n }))
-  , defFlag "fno-max-relevant-binds"      (noArg (\d -> d{ maxRelevantBinds = Nothing }))
-  , defFlag "fsimplifier-phases"          (intSuffix (\n d -> d{ simplPhases = n }))
-  , defFlag "fmax-simplifier-iterations"  (intSuffix (\n d -> d{ maxSimplIterations = n }))
-  , defFlag "fsimpl-tick-factor"          (intSuffix (\n d -> d{ simplTickFactor = n }))
-  , defFlag "fspec-constr-threshold"      (intSuffix (\n d -> d{ specConstrThreshold = Just n }))
-  , defFlag "fno-spec-constr-threshold"   (noArg (\d -> d{ specConstrThreshold = Nothing }))
-  , defFlag "fspec-constr-count"          (intSuffix (\n d -> d{ specConstrCount = Just n }))
-  , defFlag "fno-spec-constr-count"       (noArg (\d -> d{ specConstrCount = Nothing }))
-  , defFlag "fspec-constr-recursive"      (intSuffix (\n d -> d{ specConstrRecursive = n }))
-  , defFlag "fliberate-case-threshold"    (intSuffix (\n d -> d{ liberateCaseThreshold = Just n }))
-  , defFlag "fno-liberate-case-threshold" (noArg (\d -> d{ liberateCaseThreshold = Nothing }))
-  , defFlag "frule-check"                 (sepArg (\s d -> d{ ruleCheck = Just s }))
-  , defFlag "fcontext-stack"              (intSuffix (\n d -> d{ ctxtStkDepth = n }))
-  , defFlag "ftype-function-depth"        (intSuffix (\n d -> d{ tyFunStkDepth = n }))
-  , defFlag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
-  , defFlag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
-  , defFlag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
+  , defFlag "fmax-relevant-binds"
+      (intSuffix (\n d -> d{ maxRelevantBinds = Just n }))
+  , defFlag "fno-max-relevant-binds"
+      (noArg (\d -> d{ maxRelevantBinds = Nothing }))
+  , defFlag "fsimplifier-phases"
+      (intSuffix (\n d -> d{ simplPhases = n }))
+  , defFlag "fmax-simplifier-iterations"
+      (intSuffix (\n d -> d{ maxSimplIterations = n }))
+  , defFlag "fsimpl-tick-factor"
+      (intSuffix (\n d -> d{ simplTickFactor = n }))
+  , defFlag "fspec-constr-threshold"
+      (intSuffix (\n d -> d{ specConstrThreshold = Just n }))
+  , defFlag "fno-spec-constr-threshold"
+      (noArg (\d -> d{ specConstrThreshold = Nothing }))
+  , defFlag "fspec-constr-count"
+      (intSuffix (\n d -> d{ specConstrCount = Just n }))
+  , defFlag "fno-spec-constr-count"
+      (noArg (\d -> d{ specConstrCount = Nothing }))
+  , defFlag "fspec-constr-recursive"
+      (intSuffix (\n d -> d{ specConstrRecursive = n }))
+  , defFlag "fliberate-case-threshold"
+      (intSuffix (\n d -> d{ liberateCaseThreshold = Just n }))
+  , defFlag "fno-liberate-case-threshold"
+      (noArg (\d -> d{ liberateCaseThreshold = Nothing }))
+  , defFlag "frule-check"
+      (sepArg (\s d -> d{ ruleCheck = Just s }))
+  , defFlag "fcontext-stack"
+      (intSuffix (\n d -> d{ ctxtStkDepth = n }))
+  , defFlag "ftype-function-depth"
+      (intSuffix (\n d -> d{ tyFunStkDepth = n }))
+  , defFlag "fstrictness-before"
+      (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
+  , defFlag "ffloat-lam-args"
+      (intSuffix (\n d -> d{ floatLamArgs = Just n }))
+  , defFlag "ffloat-all-lams"
+      (noArg (\d -> d{ floatLamArgs = Nothing }))
 
-  , defFlag "fhistory-size"               (intSuffix (\n d -> d{ historySize = n }))
+  , defFlag "fhistory-size"           (intSuffix (\n d -> d{ historySize = n }))
 
-  , defFlag "funfolding-creation-threshold" (intSuffix   (\n d -> d {ufCreationThreshold = n}))
-  , defFlag "funfolding-use-threshold"      (intSuffix   (\n d -> d {ufUseThreshold = n}))
-  , defFlag "funfolding-fun-discount"       (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
-  , defFlag "funfolding-dict-discount"      (intSuffix   (\n d -> d {ufDictDiscount = n}))
-  , defFlag "funfolding-keeness-factor"     (floatSuffix (\n d -> d {ufKeenessFactor = n}))
+  , defFlag "funfolding-creation-threshold"
+      (intSuffix   (\n d -> d {ufCreationThreshold = n}))
+  , defFlag "funfolding-use-threshold"
+      (intSuffix   (\n d -> d {ufUseThreshold = n}))
+  , defFlag "funfolding-fun-discount"
+      (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
+  , defFlag "funfolding-dict-discount"
+      (intSuffix   (\n d -> d {ufDictDiscount = n}))
+  , defFlag "funfolding-keeness-factor"
+      (floatSuffix (\n d -> d {ufKeenessFactor = n}))
 
   , defFlag "fmax-worker-args" (intSuffix (\n d -> d {maxWorkerArgs = n}))
 
   , defGhciFlag "fghci-hist-size" (intSuffix (\n d -> d {ghciHistSize = n}))
-  , defGhcFlag "fmax-inline-alloc-size"      (intSuffix (\n d -> d{ maxInlineAllocSize = n }))
-  , defGhcFlag "fmax-inline-memcpy-insns"    (intSuffix (\n d -> d{ maxInlineMemcpyInsns = n }))
-  , defGhcFlag "fmax-inline-memset-insns"    (intSuffix (\n d -> d{ maxInlineMemsetInsns = n }))
+  , defGhcFlag "fmax-inline-alloc-size"
+      (intSuffix (\n d -> d{ maxInlineAllocSize = n }))
+  , defGhcFlag "fmax-inline-memcpy-insns"
+      (intSuffix (\n d -> d{ maxInlineMemcpyInsns = n }))
+  , defGhcFlag "fmax-inline-memset-insns"
+      (intSuffix (\n d -> d{ maxInlineMemsetInsns = n }))
 
         ------ Profiling ----------------------------------------------------
 
@@ -2533,31 +2600,44 @@ dynamic_flags = [
   , defGhcFlag "no-auto-all" (noArg (\d -> d { profAuto = NoProfAuto } ))
   , defGhcFlag "auto"        (noArg (\d -> d { profAuto = ProfAutoExports } ))
   , defGhcFlag "no-auto"     (noArg (\d -> d { profAuto = NoProfAuto } ))
-  , defGhcFlag "caf-all"     (NoArg (setGeneralFlag Opt_AutoSccsOnIndividualCafs))
-  , defGhcFlag "no-caf-all"  (NoArg (unSetGeneralFlag Opt_AutoSccsOnIndividualCafs))
+  , defGhcFlag "caf-all"
+      (NoArg (setGeneralFlag Opt_AutoSccsOnIndividualCafs))
+  , defGhcFlag "no-caf-all"
+      (NoArg (unSetGeneralFlag Opt_AutoSccsOnIndividualCafs))
 
         -- NEW profiling flags
-  , defGhcFlag "fprof-auto"          (noArg (\d -> d { profAuto = ProfAutoAll } ))
-  , defGhcFlag "fprof-auto-top"      (noArg (\d -> d { profAuto = ProfAutoTop } ))
-  , defGhcFlag "fprof-auto-exported" (noArg (\d -> d { profAuto = ProfAutoExports } ))
-  , defGhcFlag "fprof-auto-calls"    (noArg (\d -> d { profAuto = ProfAutoCalls } ))
-  , defGhcFlag "fno-prof-auto"       (noArg (\d -> d { profAuto = NoProfAuto } ))
+  , defGhcFlag "fprof-auto"
+      (noArg (\d -> d { profAuto = ProfAutoAll } ))
+  , defGhcFlag "fprof-auto-top"
+      (noArg (\d -> d { profAuto = ProfAutoTop } ))
+  , defGhcFlag "fprof-auto-exported"
+      (noArg (\d -> d { profAuto = ProfAutoExports } ))
+  , defGhcFlag "fprof-auto-calls"
+      (noArg (\d -> d { profAuto = ProfAutoCalls } ))
+  , defGhcFlag "fno-prof-auto"
+      (noArg (\d -> d { profAuto = NoProfAuto } ))
 
         ------ Compiler flags -----------------------------------------------
 
   , defGhcFlag "fasm"             (NoArg (setObjTarget HscAsm))
   , defGhcFlag "fvia-c"           (NoArg
-         (addWarn "The -fvia-c flag does nothing; it will be removed in a future GHC release"))
+         (addWarn $ "The -fvia-c flag does nothing; " ++
+                    "it will be removed in a future GHC release"))
   , defGhcFlag "fvia-C"           (NoArg
-         (addWarn "The -fvia-C flag does nothing; it will be removed in a future GHC release"))
+         (addWarn $ "The -fvia-C flag does nothing; " ++
+                    "it will be removed in a future GHC release"))
   , defGhcFlag "fllvm"            (NoArg (setObjTarget HscLlvm))
 
   , defFlag "fno-code"         (NoArg (do upd $ \d -> d{ ghcLink=NoLink }
                                           setTarget HscNothing))
   , defFlag "fbyte-code"       (NoArg (setTarget HscInterpreted))
   , defFlag "fobject-code"     (NoArg (setTargetWithPlatform defaultHscTarget))
-  , defFlag "fglasgow-exts"    (NoArg (enableGlasgowExts >> deprecate "Use individual extensions instead"))
-  , defFlag "fno-glasgow-exts" (NoArg (disableGlasgowExts >> deprecate "Use individual extensions instead"))
+  , defFlag "fglasgow-exts"
+      (NoArg (do enableGlasgowExts
+                 deprecate "Use individual extensions instead"))
+  , defFlag "fno-glasgow-exts"
+      (NoArg (do disableGlasgowExts
+                 deprecate "Use individual extensions instead"))
 
         ------ Safe Haskell flags -------------------------------------------
   , defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2579,8 +2659,14 @@ dynamic_flags = [
  ++ map (mkFlag turnOff "XNo"  unSetExtensionFlag) xFlags
  ++ map (mkFlag turnOn  "X"    setLanguage) languageFlags
  ++ map (mkFlag turnOn  "X"    setSafeHaskell) safeHaskellFlags
- ++ [ defFlag "XGenerics"       (NoArg (deprecate "it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support."))
-    , defFlag "XNoGenerics"     (NoArg (deprecate "it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support.")) ]
+ ++ [ defFlag "XGenerics"
+        (NoArg (deprecate $
+                  "it does nothing; look into -XDefaultSignatures " ++
+                  "and -XDeriveGeneric for generic programming support."))
+    , defFlag "XNoGenerics"
+        (NoArg (deprecate $
+                  "it does nothing; look into -XDefaultSignatures and " ++
+                  "-XDeriveGeneric for generic programming support.")) ]
 
 -- See Note [Supporting CLI completion]
 package_flags :: [Flag (CmdLineP DynFlags)]
@@ -2597,23 +2683,25 @@ package_flags = [
   , defFlag "package-conf"          (HasArg $ \path -> do
                                        addPkgConfRef (PkgConfFile path)
                                        deprecate "Use -package-db instead")
-  , defFlag "no-user-package-conf"  (NoArg $ do
-                                       removeUserPkgConf
-                                       deprecate "Use -no-user-package-db instead")
+  , defFlag "no-user-package-conf"
+      (NoArg $ do removeUserPkgConf
+                  deprecate "Use -no-user-package-db instead")
 
-  , defGhcFlag "package-name"       (HasArg $ \name -> do
-                                       upd (setPackageKey name)
-                                       deprecate "Use -this-package-key instead")
-  , defGhcFlag "this-package-key"      (hasArg setPackageKey)
+  , defGhcFlag "package-name"      (HasArg $ \name -> do
+                                      upd (setPackageKey name)
+                                      deprecate "Use -this-package-key instead")
+  , defGhcFlag "this-package-key"   (hasArg setPackageKey)
   , defFlag "package-id"            (HasArg exposePackageId)
   , defFlag "package"               (HasArg exposePackage)
   , defFlag "package-key"           (HasArg exposePackageKey)
   , defFlag "hide-package"          (HasArg hidePackage)
   , defFlag "hide-all-packages"     (NoArg (setGeneralFlag Opt_HideAllPackages))
   , defFlag "ignore-package"        (HasArg ignorePackage)
-  , defFlag "syslib"                (HasArg (\s -> do exposePackage s
-                                                      deprecate "Use -package instead"))
-  , defFlag "distrust-all-packages" (NoArg (setGeneralFlag Opt_DistrustAllPackages))
+  , defFlag "syslib"
+      (HasArg (\s -> do exposePackage s
+                        deprecate "Use -package instead"))
+  , defFlag "distrust-all-packages"
+      (NoArg (setGeneralFlag Opt_DistrustAllPackages))
   , defFlag "trust"                 (HasArg trustPackage)
   , defFlag "distrust"              (HasArg distrustPackage)
   ]
@@ -2648,17 +2736,29 @@ data FlagSpec flag
            -- ^ In which ghc mode the flag has effect
        }
 
-flagSpec :: (String, flag, (TurnOnFlag -> DynP ())) -> FlagSpec flag
-flagSpec (name, flag, act) = FlagSpec name flag act AllModes
+-- | Define a new flag.
+flagSpec :: String -> flag -> FlagSpec flag
+flagSpec name flag = flagSpec' name flag nop
 
-flagGhciSpec :: (String, flag, (TurnOnFlag -> DynP ())) -> FlagSpec flag
-flagGhciSpec (name, flag, act) = FlagSpec name flag act OnlyGhci
+-- | Define a new flag with an effect.
+flagSpec' :: String -> flag -> (TurnOnFlag -> DynP ()) -> FlagSpec flag
+flagSpec' name flag act = FlagSpec name flag act AllModes
 
-flagHiddenSpec :: (String, flag, (TurnOnFlag -> DynP ())) -> FlagSpec flag
-flagHiddenSpec (name, flag, act) = FlagSpec name flag act HiddenFlag
+-- | Define a new flag for GHCi.
+flagGhciSpec :: String -> flag -> FlagSpec flag
+flagGhciSpec name flag = flagGhciSpec' name flag nop
 
-flagHiddenSpec' :: String -> flag -> FlagSpec flag
-flagHiddenSpec' name flag = flagHiddenSpec (name, flag, nop)
+-- | Define a new flag for GHCi with an effect.
+flagGhciSpec' :: String -> flag -> (TurnOnFlag -> DynP ()) -> FlagSpec flag
+flagGhciSpec' name flag act = FlagSpec name flag act OnlyGhci
+
+-- | Define a new flag invisible to CLI completion.
+flagHiddenSpec :: String -> flag -> FlagSpec flag
+flagHiddenSpec name flag = flagHiddenSpec' name flag nop
+
+-- | Define a new flag invisible to CLI completion with an effect.
+flagHiddenSpec' :: String -> flag -> (TurnOnFlag -> DynP ()) -> FlagSpec flag
+flagHiddenSpec' name flag act = FlagSpec name flag act HiddenFlag
 
 mkFlag :: TurnOnFlag            -- ^ True <=> it should be turned on
        -> String                -- ^ The flag prefix
@@ -2670,7 +2770,8 @@ mkFlag turn_on flagPrefix f (FlagSpec name flag extra_action mode)
 
 deprecatedForExtension :: String -> TurnOnFlag -> DynP ()
 deprecatedForExtension lang turn_on
-    = deprecate ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ " #-} instead")
+    = deprecate ("use -X"  ++ flag ++
+                 " or pragma {-# LANGUAGE " ++ flag ++ " #-} instead")
     where
       flag | turn_on    = lang
            | otherwise = "No"++lang
@@ -2690,59 +2791,61 @@ fWarningFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
-  flagSpec ( "warn-amp",                         Opt_WarnAMP,
-    \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
-  flagSpec ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
-  flagSpec ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
-  flagSpec ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
-  flagSpec ( "warn-dodgy-exports",               Opt_WarnDodgyExports, nop ),
-  flagSpec ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, nop ),
-  flagSpec ( "warn-dodgy-imports",               Opt_WarnDodgyImports, nop ),
-  flagSpec ( "warn-empty-enumerations",          Opt_WarnEmptyEnumerations, nop ),
-  flagSpec ( "warn-context-quantification",      Opt_WarnContextQuantification, nop ),
-  flagSpec ( "warn-duplicate-constraints",       Opt_WarnDuplicateConstraints, nop ),
-  flagSpec ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, nop ),
-  flagSpec ( "warn-hi-shadowing",                Opt_WarnHiShadows, nop ),
-  flagSpec ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude, nop ),
-  flagSpec ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns, nop ),
-  flagSpec ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd, nop ),
-  flagSpec ( "warn-incomplete-uni-patterns",     Opt_WarnIncompleteUniPatterns, nop ),
-  flagSpec ( "warn-inline-rule-shadowing",       Opt_WarnInlineRuleShadowing, nop ),
-  flagSpec ( "warn-identities",                  Opt_WarnIdentities, nop ),
-  flagSpec ( "warn-missing-fields",              Opt_WarnMissingFields, nop ),
-  flagSpec ( "warn-missing-import-lists",        Opt_WarnMissingImportList, nop ),
-  flagSpec ( "warn-missing-local-sigs",          Opt_WarnMissingLocalSigs, nop ),
-  flagSpec ( "warn-missing-methods",             Opt_WarnMissingMethods, nop ),
-  flagSpec ( "warn-missing-signatures",          Opt_WarnMissingSigs, nop ),
-  flagSpec ( "warn-missing-exported-sigs",       Opt_WarnMissingExportedSigs, nop ),
-  flagSpec ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism, nop ),
-  flagSpec ( "warn-name-shadowing",              Opt_WarnNameShadowing, nop ),
-  flagSpec ( "warn-orphans",                     Opt_WarnOrphans, nop ),
-  flagSpec ( "warn-overflowed-literals",         Opt_WarnOverflowedLiterals, nop ),
-  flagSpec ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, nop ),
-  flagSpec ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
-  flagSpec ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
-  flagSpec ( "warn-trustworthy-safe",            Opt_WarnTrustworthySafe, nop ),
-  flagSpec ( "warn-tabs",                        Opt_WarnTabs, nop ),
-  flagSpec ( "warn-type-defaults",               Opt_WarnTypeDefaults, nop ),
-  flagSpec ( "warn-typed-holes",                 Opt_WarnTypedHoles, nop ),
-  flagSpec ( "warn-partial-type-signatures",     Opt_WarnPartialTypeSignatures, nop ),
-  flagSpec ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
-  flagSpec ( "warn-unsafe",                      Opt_WarnUnsafe, setWarnUnsafe ),
-  flagSpec ( "warn-unsupported-calling-conventions", Opt_WarnUnsupportedCallingConventions, nop ),
-  flagSpec ( "warn-unsupported-llvm-version",    Opt_WarnUnsupportedLlvmVersion, nop ),
-  flagSpec ( "warn-unused-binds",                Opt_WarnUnusedBinds, nop ),
-  flagSpec ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, nop ),
-  flagSpec ( "warn-unused-imports",              Opt_WarnUnusedImports, nop ),
-  flagSpec ( "warn-unused-matches",              Opt_WarnUnusedMatches, nop ),
-  flagSpec ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, nop ),
-  flagSpec ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, nop ) ]
+  flagSpec "warn-alternative-layout-rule-transitional"
+                                      Opt_WarnAlternativeLayoutRuleTransitional,
+  flagSpec' "warn-amp"                        Opt_WarnAMP
+    (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
+  flagSpec "warn-auto-orphans"                Opt_WarnAutoOrphans,
+  flagSpec "warn-deprecations"                Opt_WarnWarningsDeprecations,
+  flagSpec "warn-deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "warn-dodgy-exports"               Opt_WarnDodgyExports,
+  flagSpec "warn-dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
+  flagSpec "warn-dodgy-imports"               Opt_WarnDodgyImports,
+  flagSpec "warn-empty-enumerations"          Opt_WarnEmptyEnumerations,
+  flagSpec "warn-context-quantification"      Opt_WarnContextQuantification,
+  flagSpec "warn-duplicate-constraints"       Opt_WarnDuplicateConstraints,
+  flagSpec "warn-duplicate-exports"           Opt_WarnDuplicateExports,
+  flagSpec "warn-hi-shadowing"                Opt_WarnHiShadows,
+  flagSpec "warn-implicit-prelude"            Opt_WarnImplicitPrelude,
+  flagSpec "warn-incomplete-patterns"         Opt_WarnIncompletePatterns,
+  flagSpec "warn-incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
+  flagSpec "warn-incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
+  flagSpec "warn-inline-rule-shadowing"       Opt_WarnInlineRuleShadowing,
+  flagSpec "warn-identities"                  Opt_WarnIdentities,
+  flagSpec "warn-missing-fields"              Opt_WarnMissingFields,
+  flagSpec "warn-missing-import-lists"        Opt_WarnMissingImportList,
+  flagSpec "warn-missing-local-sigs"          Opt_WarnMissingLocalSigs,
+  flagSpec "warn-missing-methods"             Opt_WarnMissingMethods,
+  flagSpec "warn-missing-signatures"          Opt_WarnMissingSigs,
+  flagSpec "warn-missing-exported-sigs"       Opt_WarnMissingExportedSigs,
+  flagSpec "warn-monomorphism-restriction"    Opt_WarnMonomorphism,
+  flagSpec "warn-name-shadowing"              Opt_WarnNameShadowing,
+  flagSpec "warn-orphans"                     Opt_WarnOrphans,
+  flagSpec "warn-overflowed-literals"         Opt_WarnOverflowedLiterals,
+  flagSpec "warn-overlapping-patterns"        Opt_WarnOverlappingPatterns,
+  flagSpec "warn-pointless-pragmas"           Opt_WarnPointlessPragmas,
+  flagSpec' "warn-safe"                       Opt_WarnSafe setWarnSafe,
+  flagSpec "warn-trustworthy-safe"            Opt_WarnTrustworthySafe,
+  flagSpec "warn-tabs"                        Opt_WarnTabs,
+  flagSpec "warn-type-defaults"               Opt_WarnTypeDefaults,
+  flagSpec "warn-typed-holes"                 Opt_WarnTypedHoles,
+  flagSpec "warn-partial-type-signatures"     Opt_WarnPartialTypeSignatures,
+  flagSpec "warn-unrecognised-pragmas"        Opt_WarnUnrecognisedPragmas,
+  flagSpec' "warn-unsafe"                     Opt_WarnUnsafe setWarnUnsafe,
+  flagSpec "warn-unsupported-calling-conventions"
+                                         Opt_WarnUnsupportedCallingConventions,
+  flagSpec "warn-unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
+  flagSpec "warn-unused-binds"                Opt_WarnUnusedBinds,
+  flagSpec "warn-unused-do-bind"              Opt_WarnUnusedDoBind,
+  flagSpec "warn-unused-imports"              Opt_WarnUnusedImports,
+  flagSpec "warn-unused-matches"              Opt_WarnUnusedMatches,
+  flagSpec "warn-warnings-deprecations"       Opt_WarnWarningsDeprecations,
+  flagSpec "warn-wrong-do-bind"               Opt_WarnWrongDoBind]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlags :: [FlagSpec GeneralFlag]
 negatableFlags = [
-  flagGhciSpec ( "ignore-dot-ghci",              Opt_IgnoreDotGhci, nop ) ]
+  flagGhciSpec "ignore-dot-ghci"              Opt_IgnoreDotGhci ]
 
 -- | These @-d\<blah\>@ flags can all be reversed with @-dno-\<blah\>@
 dFlags :: [FlagSpec GeneralFlag]
@@ -2750,14 +2853,14 @@ dFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec ( "ppr-case-as-let",            Opt_PprCaseAsLet,               nop),
-  flagSpec ( "suppress-coercions",         Opt_SuppressCoercions,          nop),
-  flagSpec ( "suppress-idinfo",            Opt_SuppressIdInfo,             nop),
-  flagSpec ( "suppress-module-prefixes",   Opt_SuppressModulePrefixes,     nop),
-  flagSpec ( "suppress-type-applications", Opt_SuppressTypeApplications,   nop),
-  flagSpec ( "suppress-type-signatures",   Opt_SuppressTypeSignatures,     nop),
-  flagSpec ( "suppress-uniques",           Opt_SuppressUniques,            nop),
-  flagSpec ( "suppress-var-kinds",         Opt_SuppressVarKinds,           nop)]
+  flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
+  flagSpec "suppress-coercions"         Opt_SuppressCoercions,
+  flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
+  flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
+  flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
+  flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
+  flagSpec "suppress-uniques"           Opt_SuppressUniques,
+  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec GeneralFlag]
@@ -2765,78 +2868,79 @@ fFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagGhciSpec ( "break-on-error",               Opt_BreakOnError, nop ),
-  flagGhciSpec ( "break-on-exception",           Opt_BreakOnException, nop ),
-  flagSpec ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
-  flagSpec ( "call-arity",                       Opt_CallArity, nop ),
-  flagSpec ( "case-merge",                       Opt_CaseMerge, nop ),
-  flagSpec ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
-  flagSpec ( "cmm-sink",                         Opt_CmmSink, nop ),
-  flagSpec ( "cse",                              Opt_CSE, nop ),
-  flagSpec ( "defer-type-errors",                Opt_DeferTypeErrors, nop ),
-  flagSpec ( "defer-typed-holes",                Opt_DeferTypedHoles, nop ),
-  flagSpec ( "dicts-cheap",                      Opt_DictsCheap, nop ),
-  flagSpec ( "dicts-strict",                     Opt_DictsStrict, nop ),
-  flagSpec ( "dmd-tx-dict-sel",                  Opt_DmdTxDictSel, nop ),
-  flagSpec ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
-  flagSpec ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion, nop ),
-  flagSpec ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),
-  flagSpec ( "embed-manifest",                   Opt_EmbedManifest, nop ),
-  flagSpec ( "enable-rewrite-rules",             Opt_EnableRewriteRules, nop ),
-  flagSpec ( "error-spans",                      Opt_ErrorSpans, nop ),
-  flagSpec ( "excess-precision",                 Opt_ExcessPrecision, nop ),
-  flagSpec ( "expose-all-unfoldings",            Opt_ExposeAllUnfoldings, nop ),
-  flagSpec ( "ext-core",                         Opt_EmitExternalCore,
-      \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
-  flagSpec ( "flat-cache",                       Opt_FlatCache, nop ),
-  flagSpec ( "float-in",                         Opt_FloatIn, nop ),
-  flagSpec ( "force-recomp",                     Opt_ForceRecomp, nop ),
-  flagSpec ( "full-laziness",                    Opt_FullLaziness, nop ),
-  flagSpec ( "fun-to-thunk",                     Opt_FunToThunk, nop ),
-  flagSpec ( "gen-manifest",                     Opt_GenManifest, nop ),
-  flagSpec ( "ghci-history",                     Opt_GhciHistory, nop ),
-  flagSpec ( "ghci-sandbox",                     Opt_GhciSandbox, nop ),
-  flagSpec ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
-  flagSpec ( "hpc",                              Opt_Hpc, nop ),
-  flagSpec ( "hpc-no-auto",                      Opt_Hpc_No_Auto, nop ),
-  flagSpec ( "ignore-asserts",                   Opt_IgnoreAsserts, nop ),
-  flagSpec ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, nop ),
-  flagGhciSpec ( "implicit-import-qualified",    Opt_ImplicitImportQualified, nop ),
-  flagSpec ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
-  flagSpec ( "kill-absence",                     Opt_KillAbsence, nop),
-  flagSpec ( "kill-one-shot",                    Opt_KillOneShot, nop),
-  flagSpec ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
-  flagSpec ( "liberate-case",                    Opt_LiberateCase, nop ),
-  flagHiddenSpec' "llvm-pass-vectors-in-regs"    Opt_LlvmPassVectorsInRegisters,
-  flagHiddenSpec' "llvm-tbaa"                    Opt_LlvmTBAA,
-  flagSpec ( "loopification",                    Opt_Loopification, nop ),
-  flagSpec ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, nop ),
-  flagSpec ( "omit-yields",                      Opt_OmitYields, nop ),
-  flagSpec ( "pedantic-bottoms",                 Opt_PedanticBottoms, nop ),
-  flagSpec ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
-  flagGhciSpec ( "print-bind-contents",          Opt_PrintBindContents, nop ),
-  flagGhciSpec ( "print-bind-result",            Opt_PrintBindResult, nop ),
-  flagGhciSpec ( "print-evld-with-show",         Opt_PrintEvldWithShow, nop ),
-  flagSpec ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
-  flagSpec ( "print-explicit-kinds",             Opt_PrintExplicitKinds, nop ),
-  flagSpec ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
-  flagSpec ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
-  flagSpec ( "regs-graph",                       Opt_RegsGraph, nop ),
-  flagSpec ( "regs-iterative",                   Opt_RegsIterative, nop ),
-  flagSpec ( "rewrite-rules",                    Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
-  flagSpec ( "shared-implib",                    Opt_SharedImplib, nop ),
-  flagSpec ( "simple-list-literals",             Opt_SimpleListLiterals, nop ),
-  flagSpec ( "spec-constr",                      Opt_SpecConstr, nop ),
-  flagSpec ( "specialise",                       Opt_Specialise, nop ),
-  flagSpec ( "specialise-aggressively",          Opt_SpecialiseAggressively, nop ),
-  flagSpec ( "static-argument-transformation",   Opt_StaticArgumentTransformation, nop ),
-  flagSpec ( "strictness",                       Opt_Strictness, nop ),
-  flagSpec ( "use-rpaths",                       Opt_RPath, nop ),
-  flagSpec ( "write-interface",                  Opt_WriteInterface, nop ),
-  flagSpec ( "unbox-small-strict-fields",        Opt_UnboxSmallStrictFields, nop ),
-  flagSpec ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
-  flagSpec ( "vectorisation-avoidance",          Opt_VectorisationAvoidance, nop ),
-  flagSpec ( "vectorise",                        Opt_Vectorise, nop )
+  flagGhciSpec "break-on-error"               Opt_BreakOnError,
+  flagGhciSpec "break-on-exception"           Opt_BreakOnException,
+  flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
+  flagSpec "call-arity"                       Opt_CallArity,
+  flagSpec "case-merge"                       Opt_CaseMerge,
+  flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
+  flagSpec "cmm-sink"                         Opt_CmmSink,
+  flagSpec "cse"                              Opt_CSE,
+  flagSpec "defer-type-errors"                Opt_DeferTypeErrors,
+  flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
+  flagSpec "dicts-cheap"                      Opt_DictsCheap,
+  flagSpec "dicts-strict"                     Opt_DictsStrict,
+  flagSpec "dmd-tx-dict-sel"                  Opt_DmdTxDictSel,
+  flagSpec "do-eta-reduction"                 Opt_DoEtaReduction,
+  flagSpec "do-lambda-eta-expansion"          Opt_DoLambdaEtaExpansion,
+  flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
+  flagSpec "embed-manifest"                   Opt_EmbedManifest,
+  flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
+  flagSpec "error-spans"                      Opt_ErrorSpans,
+  flagSpec "excess-precision"                 Opt_ExcessPrecision,
+  flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
+  flagSpec' "ext-core"                        Opt_EmitExternalCore
+    (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
+  flagSpec "flat-cache"                       Opt_FlatCache,
+  flagSpec "float-in"                         Opt_FloatIn,
+  flagSpec "force-recomp"                     Opt_ForceRecomp,
+  flagSpec "full-laziness"                    Opt_FullLaziness,
+  flagSpec "fun-to-thunk"                     Opt_FunToThunk,
+  flagSpec "gen-manifest"                     Opt_GenManifest,
+  flagSpec "ghci-history"                     Opt_GhciHistory,
+  flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
+  flagSpec "helpful-errors"                   Opt_HelpfulErrors,
+  flagSpec "hpc"                              Opt_Hpc,
+  flagSpec "hpc-no-auto"                      Opt_Hpc_No_Auto,
+  flagSpec "ignore-asserts"                   Opt_IgnoreAsserts,
+  flagSpec "ignore-interface-pragmas"         Opt_IgnoreInterfacePragmas,
+  flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
+  flagSpec "irrefutable-tuples"               Opt_IrrefutableTuples,
+  flagSpec "kill-absence"                     Opt_KillAbsence,
+  flagSpec "kill-one-shot"                    Opt_KillOneShot,
+  flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
+  flagSpec "liberate-case"                    Opt_LiberateCase,
+  flagHiddenSpec "llvm-pass-vectors-in-regs"  Opt_LlvmPassVectorsInRegisters,
+  flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
+  flagSpec "loopification"                    Opt_Loopification,
+  flagSpec "omit-interface-pragmas"           Opt_OmitInterfacePragmas,
+  flagSpec "omit-yields"                      Opt_OmitYields,
+  flagSpec "pedantic-bottoms"                 Opt_PedanticBottoms,
+  flagSpec "pre-inlining"                     Opt_SimplPreInlining,
+  flagGhciSpec "print-bind-contents"          Opt_PrintBindContents,
+  flagGhciSpec "print-bind-result"            Opt_PrintBindResult,
+  flagGhciSpec "print-evld-with-show"         Opt_PrintEvldWithShow,
+  flagSpec "print-explicit-foralls"           Opt_PrintExplicitForalls,
+  flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
+  flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
+  flagSpec "prof-count-entries"               Opt_ProfCountEntries,
+  flagSpec "regs-graph"                       Opt_RegsGraph,
+  flagSpec "regs-iterative"                   Opt_RegsIterative,
+  flagSpec' "rewrite-rules"                   Opt_EnableRewriteRules
+    (useInstead "enable-rewrite-rules"),
+  flagSpec "shared-implib"                    Opt_SharedImplib,
+  flagSpec "simple-list-literals"             Opt_SimpleListLiterals,
+  flagSpec "spec-constr"                      Opt_SpecConstr,
+  flagSpec "specialise"                       Opt_Specialise,
+  flagSpec "specialise-aggressively"          Opt_SpecialiseAggressively,
+  flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
+  flagSpec "strictness"                       Opt_Strictness,
+  flagSpec "use-rpaths"                       Opt_RPath,
+  flagSpec "write-interface"                  Opt_WriteInterface,
+  flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
+  flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
+  flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
+  flagSpec "vectorise"                        Opt_Vectorise
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -2844,39 +2948,39 @@ fLangFlags :: [FlagSpec ExtensionFlag]
 fLangFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
-  flagSpec ( "th",                               Opt_TemplateHaskell,
-    \on -> deprecatedForExtension "TemplateHaskell" on
-        >> checkTemplateHaskellOk on ),
-  flagSpec ( "fi",                               Opt_ForeignFunctionInterface,
-    deprecatedForExtension "ForeignFunctionInterface" ),
-  flagSpec ( "ffi",                              Opt_ForeignFunctionInterface,
-    deprecatedForExtension "ForeignFunctionInterface" ),
-  flagSpec ( "arrows",                           Opt_Arrows,
-    deprecatedForExtension "Arrows" ),
-  flagSpec ( "implicit-prelude",                 Opt_ImplicitPrelude,
-    deprecatedForExtension "ImplicitPrelude" ),
-  flagSpec ( "bang-patterns",                    Opt_BangPatterns,
-    deprecatedForExtension "BangPatterns" ),
-  flagSpec ( "monomorphism-restriction",         Opt_MonomorphismRestriction,
-    deprecatedForExtension "MonomorphismRestriction" ),
-  flagSpec ( "mono-pat-binds",                   Opt_MonoPatBinds,
-    deprecatedForExtension "MonoPatBinds" ),
-  flagSpec ( "extended-default-rules",           Opt_ExtendedDefaultRules,
-    deprecatedForExtension "ExtendedDefaultRules" ),
-  flagSpec ( "implicit-params",                  Opt_ImplicitParams,
-    deprecatedForExtension "ImplicitParams" ),
-  flagSpec ( "scoped-type-variables",            Opt_ScopedTypeVariables,
-    deprecatedForExtension "ScopedTypeVariables" ),
-  flagSpec ( "parr",                             Opt_ParallelArrays,
-    deprecatedForExtension "ParallelArrays" ),
-  flagSpec ( "PArr",                             Opt_ParallelArrays,
-    deprecatedForExtension "ParallelArrays" ),
-  flagSpec ( "allow-overlapping-instances",      Opt_OverlappingInstances,
-    deprecatedForExtension "OverlappingInstances" ),
-  flagSpec ( "allow-undecidable-instances",      Opt_UndecidableInstances,
-    deprecatedForExtension "UndecidableInstances" ),
-  flagSpec ( "allow-incoherent-instances",       Opt_IncoherentInstances,
-    deprecatedForExtension "IncoherentInstances" )
+  flagSpec' "th"                              Opt_TemplateHaskell
+    (\on -> deprecatedForExtension "TemplateHaskell" on
+         >> checkTemplateHaskellOk on),
+  flagSpec' "fi"                              Opt_ForeignFunctionInterface
+    (deprecatedForExtension "ForeignFunctionInterface"),
+  flagSpec' "ffi"                             Opt_ForeignFunctionInterface
+    (deprecatedForExtension "ForeignFunctionInterface"),
+  flagSpec' "arrows"                          Opt_Arrows
+    (deprecatedForExtension "Arrows"),
+  flagSpec' "implicit-prelude"                Opt_ImplicitPrelude
+    (deprecatedForExtension "ImplicitPrelude"),
+  flagSpec' "bang-patterns"                   Opt_BangPatterns
+    (deprecatedForExtension "BangPatterns"),
+  flagSpec' "monomorphism-restriction"        Opt_MonomorphismRestriction
+    (deprecatedForExtension "MonomorphismRestriction"),
+  flagSpec' "mono-pat-binds"                  Opt_MonoPatBinds
+    (deprecatedForExtension "MonoPatBinds"),
+  flagSpec' "extended-default-rules"          Opt_ExtendedDefaultRules
+    (deprecatedForExtension "ExtendedDefaultRules"),
+  flagSpec' "implicit-params"                 Opt_ImplicitParams
+    (deprecatedForExtension "ImplicitParams"),
+  flagSpec' "scoped-type-variables"           Opt_ScopedTypeVariables
+    (deprecatedForExtension "ScopedTypeVariables"),
+  flagSpec' "parr"                            Opt_ParallelArrays
+    (deprecatedForExtension "ParallelArrays"),
+  flagSpec' "PArr"                            Opt_ParallelArrays
+    (deprecatedForExtension "ParallelArrays"),
+  flagSpec' "allow-overlapping-instances"     Opt_OverlappingInstances
+    (deprecatedForExtension "OverlappingInstances"),
+  flagSpec' "allow-undecidable-instances"     Opt_UndecidableInstances
+    (deprecatedForExtension "UndecidableInstances"),
+  flagSpec' "allow-incoherent-instances"      Opt_IncoherentInstances
+    (deprecatedForExtension "IncoherentInstances")
   ]
 
 supportedLanguages :: [String]
@@ -2896,8 +3000,8 @@ supportedLanguagesAndExtensions =
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlags :: [FlagSpec Language]
 languageFlags = [
-  flagSpec ( "Haskell98",   Haskell98, nop ),
-  flagSpec ( "Haskell2010", Haskell2010, nop )
+  flagSpec "Haskell98"   Haskell98,
+  flagSpec "Haskell2010" Haskell2010
   ]
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
@@ -2905,7 +3009,7 @@ languageFlags = [
 -- features can be used.
 safeHaskellFlags :: [FlagSpec SafeHaskellMode]
 safeHaskellFlags = [mkF Sf_Unsafe, mkF Sf_Trustworthy, mkF Sf_Safe]
-    where mkF flag = flagSpec (show flag, flag, nop)
+    where mkF flag = flagSpec (show flag) flag
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]
@@ -2913,117 +3017,120 @@ xFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec ( "AllowAmbiguousTypes",              Opt_AllowAmbiguousTypes, nop),
-  flagSpec ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
-  flagSpec ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, nop ),
-  flagSpec ( "Arrows",                           Opt_Arrows, nop ),
-  flagSpec ( "AutoDeriveTypeable",               Opt_AutoDeriveTypeable, nop ),
-  flagSpec ( "BangPatterns",                     Opt_BangPatterns, nop ),
-  flagSpec ( "BinaryLiterals",                   Opt_BinaryLiterals, nop ),
-  flagSpec ( "CApiFFI",                          Opt_CApiFFI, nop ),
-  flagSpec ( "CPP",                              Opt_Cpp, nop ),
-  flagSpec ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, nop ),
-  flagSpec ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
-  flagSpec ( "DataKinds",                        Opt_DataKinds, nop ),
-  flagSpec ( "DatatypeContexts",                 Opt_DatatypeContexts,
-             \ turn_on -> when turn_on
-                      $ deprecate $ "It was widely considered a misfeature, " ++
-                                    "and has been removed from the Haskell language." ),
-  flagSpec ( "DefaultSignatures",                Opt_DefaultSignatures, nop ),
-  flagSpec ( "DeriveAnyClass",                   Opt_DeriveAnyClass, nop ),
-  flagSpec ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, nop ),
-  flagSpec ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
-  flagSpec ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),
-  flagSpec ( "DeriveGeneric",                    Opt_DeriveGeneric, nop ),
-  flagSpec ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
-  flagSpec ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, nop ),
-  flagSpec ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, nop ),
-  flagSpec ( "DoRec",                            Opt_RecursiveDo,
-                    deprecatedForExtension "RecursiveDo" ),
-  flagSpec ( "EmptyCase",                        Opt_EmptyCase, nop ),
-  flagSpec ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
-  flagSpec ( "ExistentialQuantification",        Opt_ExistentialQuantification, nop ),
-  flagSpec ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
-  flagSpec ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
-  flagSpec ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
-  flagSpec ( "FlexibleContexts",                 Opt_FlexibleContexts, nop ),
-  flagSpec ( "FlexibleInstances",                Opt_FlexibleInstances, nop ),
-  flagSpec ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
-  flagSpec ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
-  flagSpec ( "GADTSyntax",                       Opt_GADTSyntax, nop ),
-  flagSpec ( "GADTs",                            Opt_GADTs, nop ),
-  flagSpec ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
-  flagSpec ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving,
-                                         setGenDeriving ),
-  flagSpec ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
-  flagSpec ( "ImplicitPrelude",                  Opt_ImplicitPrelude, nop ),
-  flagSpec ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
-  flagSpec ( "IncoherentInstances",              Opt_IncoherentInstances, setIncoherentInsts  ),
-  flagSpec ( "InstanceSigs",                     Opt_InstanceSigs, nop ),
-  flagSpec ( "InterruptibleFFI",                 Opt_InterruptibleFFI, nop ),
-  flagSpec ( "JavaScriptFFI",                    Opt_JavaScriptFFI, nop ),
-  flagSpec ( "KindSignatures",                   Opt_KindSignatures, nop ),
-  flagSpec ( "LambdaCase",                       Opt_LambdaCase, nop ),
-  flagSpec ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
-  flagSpec ( "MagicHash",                        Opt_MagicHash, nop ),
-  flagSpec ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
-  flagSpec ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
-  flagSpec ( "MonoPatBinds",                     Opt_MonoPatBinds,
-              \ turn_on -> when turn_on
-                         $ deprecate "Experimental feature now removed; has no effect" ),
-  flagSpec ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, nop ),
-  flagSpec ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, nop ),
-  flagSpec ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
-  flagSpec ( "NPlusKPatterns",                   Opt_NPlusKPatterns, nop ),
-  flagSpec ( "NamedFieldPuns",                   Opt_RecordPuns, nop ),
-  flagSpec ( "NamedWildcards",                   Opt_NamedWildcards, nop ),
-  flagSpec ( "NegativeLiterals",                 Opt_NegativeLiterals, nop ),
-  flagSpec ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
-  flagSpec ( "NullaryTypeClasses",               Opt_NullaryTypeClasses,
-                                 deprecatedForExtension "MultiParamTypeClasses" ),
-  flagSpec ( "NumDecimals",                      Opt_NumDecimals, nop),
-  flagSpec ( "OverlappingInstances",             Opt_OverlappingInstances, setOverlappingInsts),
-  flagSpec ( "OverloadedLists",                  Opt_OverloadedLists, nop),
-  flagSpec ( "OverloadedStrings",                Opt_OverloadedStrings, nop ),
-  flagSpec ( "PackageImports",                   Opt_PackageImports, nop ),
-  flagSpec ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
-  flagSpec ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
-  flagSpec ( "PartialTypeSignatures",            Opt_PartialTypeSignatures, nop ),
-  flagSpec ( "PatternGuards",                    Opt_PatternGuards, nop ),
-  flagSpec ( "PatternSignatures",                Opt_ScopedTypeVariables,
-                                deprecatedForExtension "ScopedTypeVariables" ),
-  flagSpec ( "PatternSynonyms",                  Opt_PatternSynonyms, nop ),
-  flagSpec ( "PolyKinds",                        Opt_PolyKinds, nop ),
-  flagSpec ( "PolymorphicComponents",            Opt_RankNTypes, nop),
-  flagSpec ( "PostfixOperators",                 Opt_PostfixOperators, nop ),
-  flagSpec ( "QuasiQuotes",                      Opt_QuasiQuotes, nop ),
-  flagSpec ( "Rank2Types",                       Opt_RankNTypes, nop),
-  flagSpec ( "RankNTypes",                       Opt_RankNTypes, nop ),
-  flagSpec ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
-  flagSpec ( "RecordPuns",                       Opt_RecordPuns,
-                         deprecatedForExtension "NamedFieldPuns" ),
-  flagSpec ( "RecordWildCards",                  Opt_RecordWildCards, nop ),
-  flagSpec ( "RecursiveDo",                      Opt_RecursiveDo, nop ),
-  flagSpec ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
-  flagSpec ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
-                 \ turn_on -> unless turn_on
-                              $ deprecate "You can't turn off RelaxedPolyRec any more" ),
-  flagSpec ( "RoleAnnotations",                  Opt_RoleAnnotations, nop ),
-  flagSpec ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
-  flagSpec ( "StandaloneDeriving",               Opt_StandaloneDeriving, nop ),
-  flagSpec ( "TemplateHaskell",                  Opt_TemplateHaskell,
-                              checkTemplateHaskellOk ),
-  flagSpec ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
-  flagSpec ( "TransformListComp",                Opt_TransformListComp, nop ),
-  flagSpec ( "TupleSections",                    Opt_TupleSections, nop ),
-  flagSpec ( "TypeFamilies",                     Opt_TypeFamilies, nop ),
-  flagSpec ( "TypeOperators",                    Opt_TypeOperators, nop ),
-  flagSpec ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, nop ),
-  flagSpec ( "UnboxedTuples",                    Opt_UnboxedTuples, nop ),
-  flagSpec ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
-  flagSpec ( "UnicodeSyntax",                    Opt_UnicodeSyntax, nop ),
-  flagSpec ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
-  flagSpec ( "ViewPatterns",                     Opt_ViewPatterns, nop )
+  flagSpec "AllowAmbiguousTypes"              Opt_AllowAmbiguousTypes,
+  flagSpec "AlternativeLayoutRule"            Opt_AlternativeLayoutRule,
+  flagSpec "AlternativeLayoutRuleTransitional"
+                                          Opt_AlternativeLayoutRuleTransitional,
+  flagSpec "Arrows"                           Opt_Arrows,
+  flagSpec "AutoDeriveTypeable"               Opt_AutoDeriveTypeable,
+  flagSpec "BangPatterns"                     Opt_BangPatterns,
+  flagSpec "BinaryLiterals"                   Opt_BinaryLiterals,
+  flagSpec "CApiFFI"                          Opt_CApiFFI,
+  flagSpec "CPP"                              Opt_Cpp,
+  flagSpec "ConstrainedClassMethods"          Opt_ConstrainedClassMethods,
+  flagSpec "ConstraintKinds"                  Opt_ConstraintKinds,
+  flagSpec "DataKinds"                        Opt_DataKinds,
+  flagSpec' "DatatypeContexts"                Opt_DatatypeContexts
+    (\ turn_on -> when turn_on $
+         deprecate $ "It was widely considered a misfeature, " ++
+                     "and has been removed from the Haskell language."),
+  flagSpec "DefaultSignatures"                Opt_DefaultSignatures,
+  flagSpec "DeriveAnyClass"                   Opt_DeriveAnyClass,
+  flagSpec "DeriveDataTypeable"               Opt_DeriveDataTypeable,
+  flagSpec "DeriveFoldable"                   Opt_DeriveFoldable,
+  flagSpec "DeriveFunctor"                    Opt_DeriveFunctor,
+  flagSpec "DeriveGeneric"                    Opt_DeriveGeneric,
+  flagSpec "DeriveTraversable"                Opt_DeriveTraversable,
+  flagSpec "DisambiguateRecordFields"         Opt_DisambiguateRecordFields,
+  flagSpec "DoAndIfThenElse"                  Opt_DoAndIfThenElse,
+  flagSpec' "DoRec"                           Opt_RecursiveDo
+    (deprecatedForExtension "RecursiveDo"),
+  flagSpec "EmptyCase"                        Opt_EmptyCase,
+  flagSpec "EmptyDataDecls"                   Opt_EmptyDataDecls,
+  flagSpec "ExistentialQuantification"        Opt_ExistentialQuantification,
+  flagSpec "ExplicitForAll"                   Opt_ExplicitForAll,
+  flagSpec "ExplicitNamespaces"               Opt_ExplicitNamespaces,
+  flagSpec "ExtendedDefaultRules"             Opt_ExtendedDefaultRules,
+  flagSpec "FlexibleContexts"                 Opt_FlexibleContexts,
+  flagSpec "FlexibleInstances"                Opt_FlexibleInstances,
+  flagSpec "ForeignFunctionInterface"         Opt_ForeignFunctionInterface,
+  flagSpec "FunctionalDependencies"           Opt_FunctionalDependencies,
+  flagSpec "GADTSyntax"                       Opt_GADTSyntax,
+  flagSpec "GADTs"                            Opt_GADTs,
+  flagSpec "GHCForeignImportPrim"             Opt_GHCForeignImportPrim,
+  flagSpec' "GeneralizedNewtypeDeriving"      Opt_GeneralizedNewtypeDeriving
+                                              setGenDeriving,
+  flagSpec "ImplicitParams"                   Opt_ImplicitParams,
+  flagSpec "ImplicitPrelude"                  Opt_ImplicitPrelude,
+  flagSpec "ImpredicativeTypes"               Opt_ImpredicativeTypes,
+  flagSpec' "IncoherentInstances"             Opt_IncoherentInstances
+                                              setIncoherentInsts,
+  flagSpec "InstanceSigs"                     Opt_InstanceSigs,
+  flagSpec "InterruptibleFFI"                 Opt_InterruptibleFFI,
+  flagSpec "JavaScriptFFI"                    Opt_JavaScriptFFI,
+  flagSpec "KindSignatures"                   Opt_KindSignatures,
+  flagSpec "LambdaCase"                       Opt_LambdaCase,
+  flagSpec "LiberalTypeSynonyms"              Opt_LiberalTypeSynonyms,
+  flagSpec "MagicHash"                        Opt_MagicHash,
+  flagSpec "MonadComprehensions"              Opt_MonadComprehensions,
+  flagSpec "MonoLocalBinds"                   Opt_MonoLocalBinds,
+  flagSpec' "MonoPatBinds"                    Opt_MonoPatBinds
+    (\ turn_on -> when turn_on $
+         deprecate "Experimental feature now removed; has no effect"),
+  flagSpec "MonomorphismRestriction"          Opt_MonomorphismRestriction,
+  flagSpec "MultiParamTypeClasses"            Opt_MultiParamTypeClasses,
+  flagSpec "MultiWayIf"                       Opt_MultiWayIf,
+  flagSpec "NPlusKPatterns"                   Opt_NPlusKPatterns,
+  flagSpec "NamedFieldPuns"                   Opt_RecordPuns,
+  flagSpec "NamedWildcards"                   Opt_NamedWildcards,
+  flagSpec "NegativeLiterals"                 Opt_NegativeLiterals,
+  flagSpec "NondecreasingIndentation"         Opt_NondecreasingIndentation,
+  flagSpec' "NullaryTypeClasses"              Opt_NullaryTypeClasses
+    (deprecatedForExtension "MultiParamTypeClasses"),
+  flagSpec "NumDecimals"                      Opt_NumDecimals,
+  flagSpec' "OverlappingInstances"            Opt_OverlappingInstances
+                                              setOverlappingInsts,
+  flagSpec "OverloadedLists"                  Opt_OverloadedLists,
+  flagSpec "OverloadedStrings"                Opt_OverloadedStrings,
+  flagSpec "PackageImports"                   Opt_PackageImports,
+  flagSpec "ParallelArrays"                   Opt_ParallelArrays,
+  flagSpec "ParallelListComp"                 Opt_ParallelListComp,
+  flagSpec "PartialTypeSignatures"            Opt_PartialTypeSignatures,
+  flagSpec "PatternGuards"                    Opt_PatternGuards,
+  flagSpec' "PatternSignatures"               Opt_ScopedTypeVariables
+    (deprecatedForExtension "ScopedTypeVariables"),
+  flagSpec "PatternSynonyms"                  Opt_PatternSynonyms,
+  flagSpec "PolyKinds"                        Opt_PolyKinds,
+  flagSpec "PolymorphicComponents"            Opt_RankNTypes,
+  flagSpec "PostfixOperators"                 Opt_PostfixOperators,
+  flagSpec "QuasiQuotes"                      Opt_QuasiQuotes,
+  flagSpec "Rank2Types"                       Opt_RankNTypes,
+  flagSpec "RankNTypes"                       Opt_RankNTypes,
+  flagSpec "RebindableSyntax"                 Opt_RebindableSyntax,
+  flagSpec' "RecordPuns"                      Opt_RecordPuns
+    (deprecatedForExtension "NamedFieldPuns"),
+  flagSpec "RecordWildCards"                  Opt_RecordWildCards,
+  flagSpec "RecursiveDo"                      Opt_RecursiveDo,
+  flagSpec "RelaxedLayout"                    Opt_RelaxedLayout,
+  flagSpec' "RelaxedPolyRec"                  Opt_RelaxedPolyRec
+    (\ turn_on -> unless turn_on $
+         deprecate "You can't turn off RelaxedPolyRec any more"),
+  flagSpec "RoleAnnotations"                  Opt_RoleAnnotations,
+  flagSpec "ScopedTypeVariables"              Opt_ScopedTypeVariables,
+  flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
+  flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
+                                              checkTemplateHaskellOk,
+  flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
+  flagSpec "TransformListComp"                Opt_TransformListComp,
+  flagSpec "TupleSections"                    Opt_TupleSections,
+  flagSpec "TypeFamilies"                     Opt_TypeFamilies,
+  flagSpec "TypeOperators"                    Opt_TypeOperators,
+  flagSpec "TypeSynonymInstances"             Opt_TypeSynonymInstances,
+  flagSpec "UnboxedTuples"                    Opt_UnboxedTuples,
+  flagSpec "UndecidableInstances"             Opt_UndecidableInstances,
+  flagSpec "UnicodeSyntax"                    Opt_UnicodeSyntax,
+  flagSpec "UnliftedFFITypes"                 Opt_UnliftedFFITypes,
+  flagSpec "ViewPatterns"                     Opt_ViewPatterns
   ]
 
 defaultFlags :: Settings -> [GeneralFlag]
@@ -3340,7 +3447,8 @@ checkTemplateHaskellOk turn_on
                     _        -> addErr msg
   | otherwise = return ()
   where
-    msg = "Template Haskell requires GHC with interpreter support\n    Perhaps you are using a stage-1 compiler?"
+    msg = "Template Haskell requires GHC with interpreter support\n    " ++
+          "Perhaps you are using a stage-1 compiler?"
 #endif
 
 {- **********************************************************************
