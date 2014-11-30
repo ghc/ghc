@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
 module CostCentre (
         CostCentre(..), CcName, IsCafCC(..),
@@ -325,4 +324,3 @@ instance Binary CostCentre where
     -- ok, because we only need the SrcSpan when declaring the
     -- CostCentre in the original module, it is not used by importing
     -- modules.
-\end{code}

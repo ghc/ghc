@@ -1,7 +1,4 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\begin{code}
+-- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 {-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
@@ -9,13 +6,13 @@
 
 {-
  This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
- 
+
   - Traverses the STG program collecting the cost centres. These are required
     to declare the cost centres at the start of code generation.
- 
+
     Note: because of cross-module unfolding, some of these cost centres may be
     from other modules.
- 
+
   - Puts on CAF cost-centres if the user has asked for individual CAF
     cost-centres.
 -}
@@ -281,4 +278,3 @@ collectCCS ccs
  = MassageM $ \_mod_name (local_ccs, extern_ccs, ccss)
               -> ASSERT(not (noCCSAttached ccs))
                        ((local_ccs, extern_ccs, ccs : ccss), ())
-\end{code}
