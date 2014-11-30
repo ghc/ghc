@@ -1,11 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+-- (c) The University of Glasgow 2006
+-- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+--
+-- Storage manager representation of closures
 
-Storage manager representation of closures
-
-\begin{code}
 {-# LANGUAGE CPP,GeneralizedNewtypeDeriving #-}
 
 module SMRep (
@@ -61,16 +58,15 @@ import FastString
 import Data.Char( ord )
 import Data.Word
 import Data.Bits
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Words and bytes
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Word offset, or word count
 type WordOff = Int
 
@@ -98,11 +94,7 @@ wordsToBytes dflags n = fromIntegral (wORD_SIZE dflags) * n
 bytesToWordsRoundUp :: DynFlags -> ByteOff -> WordOff
 bytesToWordsRoundUp dflags n = (n + word_size - 1) `quot` word_size
  where word_size = wORD_SIZE dflags
-\end{code}
-
-StgWord is a type representing an StgWord on the target platform.
-
-\begin{code}
+-- StgWord is a type representing an StgWord on the target platform.
 -- A Word64 is large enough to hold a Word for either a 32bit or 64bit platform
 newtype StgWord = StgWord Word64
     deriving (Eq, Bits)
@@ -148,15 +140,15 @@ hALF_WORD_SIZE :: DynFlags -> ByteOff
 hALF_WORD_SIZE dflags = platformWordSize (targetPlatform dflags) `shiftR` 1
 hALF_WORD_SIZE_IN_BITS :: DynFlags -> Int
 hALF_WORD_SIZE_IN_BITS dflags = platformWordSize (targetPlatform dflags) `shiftL` 2
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[SMRep-datatype]{@SMRep@---storage manager representation}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A description of the layout of a closure.  Corresponds directly
 -- to the closure types in includes/rts/storage/ClosureTypes.h.
 data SMRep
@@ -478,8 +470,8 @@ rET_SMALL   = RET_SMALL
 rET_BIG     = RET_BIG
 aRG_GEN     = ARG_GEN
 aRG_GEN_BIG = ARG_GEN_BIG
-\end{code}
 
+{-
 Note [Static NoCaf constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we know that a top-level binding 'x' is not Caffy (ie no CAFs are
@@ -492,13 +484,13 @@ Currently we don't do this; instead we treat nullary constructors
 as non-Caffy, and the others as potentially Caffy.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
              Pretty printing of SMRep and friends
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Outputable ClosureTypeInfo where
    ppr = pprTypeInfo
 
@@ -552,4 +544,3 @@ stringToWord8s s = map (fromIntegral . ord) s
 pprWord8String :: [Word8] -> SDoc
 -- Debug printing.  Not very clever right now.
 pprWord8String ws = text (show ws)
-\end{code}
