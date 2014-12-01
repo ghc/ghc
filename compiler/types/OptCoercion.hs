@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow 2006
-%
+-- (c) The University of Glasgow 2006
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module OptCoercion ( optCoercion, checkAxInstCo ) where
@@ -27,13 +24,13 @@ import Unify
 import ListSetOps
 import InstEnv
 import Control.Monad   ( zipWithM )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                  Optimising coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Subtle shadowing in coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,8 +64,8 @@ checks that opt_co4 can avoid. This is a big win because Phantom coercions
 rarely appear within non-phantom coercions -- only in some TyConAppCos
 and some AxiomInstCos. We handle these cases specially by calling
 opt_co2.
+-}
 
-\begin{code}
 optCoercion :: CvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
@@ -517,8 +514,7 @@ fireTransRule _rule _co1 _co2 res
   = -- pprTrace ("Trans rule fired: " ++ _rule) (vcat [ppr _co1, ppr _co2, ppr res]) $
     Just res
 
-\end{code}
-
+{-
 Note [Conflict checking with AxiomInstCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following type family and axiom:
@@ -573,8 +569,8 @@ that (Id Int) and (Id Bool) are Surely Apart, as they're headed by type
 families. At the time of writing, I (Richard Eisenberg) couldn't think of
 a way of detecting this any more efficient than just building the optimised
 coercion and checking.
+-}
 
-\begin{code}
 -- | Check to make sure that an AxInstCo is internally consistent.
 -- Returns the conflicting branch, if it exists
 -- See Note [Conflict checking with AxiomInstCo]
@@ -720,8 +716,8 @@ etaTyConAppCo_maybe tc co
 
   | otherwise
   = Nothing
-\end{code}
 
+{-
 Note [Eta for AppCo]
 ~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -742,4 +738,4 @@ because if g is well-kinded then
   kind (s1 t2) = kind (s2 t2)
 and these two imply
   kind s1 = kind s2
-
+-}

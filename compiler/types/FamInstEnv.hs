@@ -1,10 +1,7 @@
-%
-% (c) The University of Glasgow 2006
-%
+-- (c) The University of Glasgow 2006
+--
+-- FamInstEnv: Type checked family instance declarations
 
-FamInstEnv: Type checked family instance declarations
-
-\begin{code}
 {-# LANGUAGE CPP, GADTs #-}
 
 module FamInstEnv (
@@ -57,13 +54,13 @@ import Pair
 import SrcLoc
 import NameSet
 import FastString
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
           Type checked family instance heads
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [FamInsts and CoAxioms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,8 +76,8 @@ Note [FamInsts and CoAxioms]
 
     - The LHS of the CoAxiom is always of form F ty1 .. tyn
       where F is a type family
+-}
 
-\begin{code}
 data FamInst  -- See Note [FamInsts and CoAxioms]
   = FamInst { fi_axiom  :: CoAxiom Unbranched  -- The new coercion axiom introduced
                                                -- by this family instance
@@ -111,10 +108,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
 data FamFlavor
   = SynFamilyInst         -- A synonym family
   | DataFamilyInst TyCon  -- A data family, with its representation TyCon
-\end{code}
 
-
-\begin{code}
 -- Obtain the axiom of a family instance
 famInstAxiom :: FamInst -> CoAxiom Unbranched
 famInstAxiom = fi_axiom
@@ -148,15 +142,15 @@ dataFamInstRepTyCon fi
   = case fi_flavor fi of
        DataFamilyInst tycon -> tycon
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Pretty printing
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance NamedThing FamInst where
    getName = coAxiomName . fi_axiom
 
@@ -213,8 +207,8 @@ pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
 
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
-\end{code}
 
+{-
 Note [Lazy axiom match]
 ~~~~~~~~~~~~~~~~~~~~~~~
 It is Vitally Important that mkImportedFamInst is *lazy* in its axiom
@@ -229,8 +223,8 @@ readiness has been achieved when some other code pulls on the axiom in the
 FamInst. Thus, we pattern match on the axiom lazily (in the where clause,
 not in the parameter list) and we assert the consistency of names there
 also.
+-}
 
-\begin{code}
 -- Make a family instance representation from the information found in an
 -- interface file.  In particular, we get the rough match info from the iface
 -- (instead of computing it here).
@@ -262,13 +256,13 @@ mkImportedFamInst fam mb_tcs axiom
                   , ax' == axiom
                   -> DataFamilyInst tc
                 _ -> SynFamilyInst
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 FamInstEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [FamInstEnv]
 ~~~~~~~~~~~~~~~~~
@@ -307,8 +301,8 @@ Then we get a data type for each instance, and an axiom:
 These two axioms for T, one with one pattern, one with two.  The reason
 for this eta-reduction is decribed in TcInstDcls
    Note [Eta reduction for data family axioms]
+-}
 
-\begin{code}
 type FamInstEnv = UniqFM FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
 
@@ -395,13 +389,13 @@ identicalFamInst (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
         tvs2 = mkVarSet (coAxBranchTyVars br2)
         lhs1 = coAxBranchLHS br1
         lhs2 = coAxBranchLHS br2
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Compatibility
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Apartness]
 ~~~~~~~~~~~~~~~~
@@ -472,8 +466,7 @@ find a branch that matches the target, but then we make sure that the target
 is apart from every previous *incompatible* branch. We don't check the
 branches that are compatible with the matching branch, because they are either
 irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
-
-\begin{code}
+-}
 
 -- See Note [Compatibility]
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
@@ -503,23 +496,22 @@ computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
     mk_incomps :: CoAxBranch -> [CoAxBranch] -> [CoAxBranch]
     mk_incomps br = filter (not . compatibleBranches br)
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
            Constructing axioms
     These functions are here because tidyType / tcUnifyTysFG
     are not available in CoAxiom
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Tidy axioms when we build them]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We print out axioms and don't want to print stuff like
     F k k a b = ...
 Instead we must tidy those kind variables.  See Trac #7524.
+-}
 
-\begin{code}
 -- all axiom roles are Nominal, as this is only used with type families
 mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> [Type]  -- LHS patterns
@@ -568,13 +560,13 @@ mkSingleCoAxiom ax_name tvs fam_tc lhs_tys rhs_ty
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
   where
     branch = mkCoAxBranch tvs lhs_tys rhs_ty (getSrcSpan ax_name)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Looking up a family instance
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @lookupFamInstEnv@ looks up in a @FamInstEnv@, using a one-way match.
 Multiple matches are only possible in case of type families (not data
@@ -592,8 +584,7 @@ desugared to
   coe :Co:R42T a :: T [a] ~ :R42T a
 
 we return the matching instance '(FamInst{.., fi_tycon = :R42T}, Int)'.
-
-\begin{code}
+-}
 
 -- when matching a type family application, we get a FamInst,
 -- and the list of types the axiom should be applied to
@@ -648,8 +639,8 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
 
     noSubst = panic "lookupFamInstEnvConflicts noSubst"
     new_branch = coAxiomSingleBranch new_axiom
-\end{code}
 
+{-
 Note [Family instance overlap conflicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - In the case of data family instances, any overlap is fundamentally a
@@ -663,8 +654,8 @@ Note [Family instance overlap conflicts]
   These two overlap on (F Int Int) but then both RHSs are Int,
   so all is well. We require that they are syntactically equal;
   anything else would be difficult to test for at this stage.
+-}
 
-\begin{code}
 ------------------------------------------------------------
 -- Might be a one-way match or a unifier
 type MatchFun =  FamInst                -- The FamInst template
@@ -733,8 +724,7 @@ lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
   =  lookup_fam_inst_env' match_fun home_ie fam tys
   ++ lookup_fam_inst_env' match_fun pkg_ie  fam tys
 
-\end{code}
-
+{-
 Note [Over-saturated matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's ok to look up an over-saturated type constructor.  E.g.
@@ -759,8 +749,7 @@ We handle data families and type families separately here:
    instance, because the breakdown might be different for each
    instance.  Why?  Because of eta reduction; see Note [Eta reduction
    for data family axioms] in TcInstDcls.
-
-\begin{code}
+-}
 
 -- checks if one LHS is dominated by a list of other branches
 -- in other words, if an application would match the first LHS, it is guaranteed
@@ -778,18 +767,18 @@ isDominatedBy branch branches
       lhs = coAxBranchLHS branch
       match (CoAxBranch { cab_tvs = tvs, cab_lhs = tys })
         = isJust $ tcMatchTys (mkVarSet tvs) tys lhs
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Choosing an axiom application
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The lookupFamInstEnv function does a nice job for *open* type families,
 but we also need to handle closed ones when normalising a type:
+-}
 
-\begin{code}
 reduceTyFamApp_maybe :: FamInstEnvs
                      -> Role              -- Desired role of result coercion
                      -> TyCon -> [Type]
@@ -878,16 +867,15 @@ findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = inc
 
 -- fail if no branches left
 findBranch [] _ _ = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Looking up a family instance
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 topNormaliseType :: FamInstEnvs -> Type -> Type
 topNormaliseType env ty = case topNormaliseType_maybe env ty of
                             Just (_co, ty') -> ty'
@@ -1000,13 +988,13 @@ normaliseType env role (ForAllTy tyvar ty1)
     in  (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
 normaliseType _  role ty@(TyVarTy _)
   = (Refl role ty,ty)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               Flattening
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Flattening]
 ~~~~~~~~~~~~~~~~~
@@ -1019,8 +1007,7 @@ taking care to preserve sharing. That is, the type (Either (F a b) (F a b)) shou
 flatten to (Either c c), never (Either c d).
 
 Defined here because of module dependencies.
-
-\begin{code}
+-}
 
 type FlattenMap = TypeMap TyVar
 
@@ -1101,5 +1088,3 @@ allTyVarsInTy = go
                            unitVarSet tv `unionVarSet`
                            (go ty) -- don't remove tv
     go (LitTy {})        = emptyVarSet
-
-\end{code}

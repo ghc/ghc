@@ -1,11 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+-- (c) The University of Glasgow 2006
+-- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+--
+-- The @Class@ datatype
 
-The @Class@ datatype
-
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module Class (
@@ -38,17 +35,17 @@ import BooleanFormula (BooleanFormula)
 
 import Data.Typeable (Typeable)
 import qualified Data.Data as Data
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Class-basic]{@Class@: basic definition}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A @Class@ corresponds to a Greek kappa in the static semantics:
+-}
 
-\begin{code}
 data Class
   = Class {
         classTyCon :: TyCon,    -- The data type constructor for
@@ -108,8 +105,8 @@ defMethSpecOfDefMeth meth
         NoDefMeth       -> NoDM
         DefMeth _       -> VanillaDM
         GenDefMeth _    -> GenericDM
-\end{code}
 
+{-
 Note [Associated type defaults]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following is an example of associated type defaults:
@@ -142,8 +139,8 @@ Note that
    the default Type rhs
 
 The @mkClass@ function fills in the indirect superclasses.
+-}
 
-\begin{code}
 mkClass :: [TyVar]
         -> [([TyVar], [TyVar])]
         -> [PredType] -> [Id]
@@ -165,8 +162,8 @@ mkClass tyvars fds super_classes superdict_sels at_stuff
             classOpStuff = op_stuff,
             classMinimalDef = mindef,
             classTyCon   = tycon }
-\end{code}
 
+{-
 Note [Associated type tyvar names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The TyCon of an associated type should use the same variable names as its
@@ -186,15 +183,15 @@ Having the same variables for class and tycon is also used in checkValidRoles
 (in TcTyClsDecls) when checking a class's roles.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[Class-selectors]{@Class@: simple selectors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The rest of these functions are just simple selectors.
+-}
 
-\begin{code}
 classArity :: Class -> Arity
 classArity clas = length (classTyVars clas)
         -- Could memoise this
@@ -240,18 +237,17 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
                          classSCTheta = sc_theta, classSCSels = sc_sels,
                          classATStuff = ats, classOpStuff = op_stuff})
   = (tyvars, fundeps, sc_theta, sc_sels, ats, op_stuff)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Class-instances]{Instance declarations for @Class@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We compare @Classes@ by their keys (which include @Uniques@).
+-}
 
-\begin{code}
 instance Eq Class where
     c1 == c2 = classKey c1 == classKey c2
     c1 /= c2 = classKey c1 /= classKey c2
@@ -262,9 +258,7 @@ instance Ord Class where
     c1 >= c2 = classKey c1 >= classKey c2
     c1 >  c2 = classKey c1 >  classKey c2
     compare c1 c2 = classKey c1 `compare` classKey c2
-\end{code}
 
-\begin{code}
 instance Uniquable Class where
     getUnique c = classKey c
 
@@ -291,4 +285,3 @@ instance Data.Data Class where
     toConstr _   = abstractConstr "Class"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "Class"
-\end{code}

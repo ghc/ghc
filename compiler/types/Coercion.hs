@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow 2006
-%
+-- (c) The University of Glasgow 2006
 
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 -- | Module for (a) type kinds and (b) type coercions,
@@ -110,15 +107,15 @@ import ListSetOps
 
 import qualified Data.Data as Data hiding ( TyCon )
 import Control.Arrow ( first )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
             Coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
 -- of two types.
 
@@ -215,8 +212,8 @@ instance Binary LeftOrRight where
 pickLR :: LeftOrRight -> (a,a) -> a
 pickLR CLeft  (l,_) = l
 pickLR CRight (_,r) = r
-\end{code}
 
+{-
 Note [Refl invariant]
 ~~~~~~~~~~~~~~~~~~~~~
 Coercions have the following invariant
@@ -490,13 +487,13 @@ necessary for soundness, but this choice removes ambiguity.
 
 The rules here also dictate what the parameters to mkTyConAppCo.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Coercion variables}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 coVarName :: CoVar -> Name
 coVarName = varName
 
@@ -515,10 +512,7 @@ isCoVarType ty      -- Tests for t1 ~# t2, the unboxed equality
       Just (tc,tys) -> (tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey)
                        && tys `lengthAtLeast` 2
       Nothing       -> False
-\end{code}
 
-
-\begin{code}
 tyCoVarsOfCo :: Coercion -> VarSet
 -- Extracts type and coercion variables from a coercion
 tyCoVarsOfCo (Refl _ ty)           = tyVarsOfType ty
@@ -575,15 +569,15 @@ coercionSize (InstCo co ty)        = 1 + coercionSize co + typeSize ty
 coercionSize (SubCo co)            = 1 + coercionSize co
 coercionSize (AxiomRuleCo _ tys cos) = 1 + sum (map typeSize tys)
                                          + sum (map coercionSize cos)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                             Tidying coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tidyCo :: TidyEnv -> Coercion -> Coercion
 tidyCo env@(_, subst) co
   = go co
@@ -616,21 +610,21 @@ tidyCo env@(_, subst) co
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Pretty-printing coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @pprCo@ is the standard @Coercion@ printer; the overloaded @ppr@
 function is defined to use this.  @pprParendCo@ is the same, except it
 puts parens around the type, except for the atomic cases.
 @pprParendCo@ works just by setting the initial context precedence
 very high.
+-}
 
-\begin{code}
 instance Outputable Coercion where
   ppr = pprCo
 
@@ -718,9 +712,7 @@ ppr_forall_co p ty
     (tvs,  rho) = split1 [] ty
     split1 tvs (ForAllCo tv ty) = split1 (tv:tvs) ty
     split1 tvs ty               = (reverse tvs, ty)
-\end{code}
 
-\begin{code}
 pprCoAxiom :: CoAxiom br -> SDoc
 pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = hang (ptext (sLit "axiom") <+> ppr ax <+> dcolon)
@@ -746,15 +738,15 @@ pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
           | otherwise
           = ptext (sLit "in") <+>
               quotes (ppr (nameModule name))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Functions over Kinds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | This breaks a 'Coercion' with type @T A B C ~ T D E F@ into
 -- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @E ~ F@. Hence:
 --
@@ -827,13 +819,13 @@ isReflCo _                 = False
 isReflCo_maybe :: Coercion -> Maybe Type
 isReflCo_maybe (Refl _ ty)       = Just ty
 isReflCo_maybe _                 = Nothing
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
             Building coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Role twiddling functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -883,8 +875,8 @@ So, that's why this function is exported from this module.
 One might ask: shouldn't downgradeRole_maybe just use setNominalRole_maybe as appropriate?
 I (Richard E.) have decided not to do this, because upgrading a role is bizarre and
 a caller should have to ask for this behavior explicitly.
+-}
 
-\begin{code}
 mkCoVarCo :: CoVar -> Coercion
 -- cv :: s ~# t
 mkCoVarCo cv
@@ -1215,15 +1207,15 @@ mkCoCast c g
     [_reflk, g1, g2] = decomposeCo 3 g
             -- Remember, (~#) :: forall k. k -> k -> *
             -- so it takes *three* arguments, not two
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
             Newtypes
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | If @co :: T ts ~ rep_ty@ then:
 --
 -- > instNewTyCon_maybe T ts = Just (rep_ty, co)
@@ -1276,16 +1268,15 @@ topNormaliseNewType_maybe ty
 
        | otherwise              -- No progress
        = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Equality of coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Determines syntactic equality of coercions
 coreEqCoercion :: Coercion -> Coercion -> Bool
 coreEqCoercion co1 co2 = coreEqCoercion2 rn_env co1 co2
@@ -1334,15 +1325,15 @@ coreEqCoercion2 env (AxiomRuleCo a1 ts1 cs1) (AxiomRuleCo a2 ts2 cs2)
   = a1 == a2 && all2 (eqTypeX env) ts1 ts2 && all2 (coreEqCoercion2 env) cs1 cs2
 
 coreEqCoercion2 _ _ _ = False
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Substitution of coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A substitution of 'Coercion's for 'CoVar's (OR 'TyVar's, when
 --   doing a \"lifting\" substitution)
 type CvSubstEnv = VarEnv Coercion
@@ -1501,14 +1492,14 @@ lookupTyVar (CvSubst _ tenv _) tv = lookupVarEnv tenv tv
 
 lookupCoVar :: CvSubst -> Var  -> Maybe Coercion
 lookupCoVar (CvSubst _ _ cenv) v = lookupVarEnv cenv v
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    "Lifting" substitution
            [(TyVar,Coercion)] -> Type -> Coercion
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Lifting coercions over types: liftCoSubst]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1551,8 +1542,8 @@ Happily we can do this because we know that all kind coercions
    subst_kind: LiftCoSubst -> Kind -> Kind
 that expects a Refl coercion (or something equivalent to Refl)
 when it looks up a kind variable.
+-}
 
-\begin{code}
 -- ----------------------------------------------------
 -- See Note [Lifting coercions over types: liftCoSubst]
 -- ----------------------------------------------------
@@ -1604,8 +1595,7 @@ ty_co_subst subst role ty
     lift_phantom ty = mkUnivCo Phantom (liftCoSubstLeft  subst ty)
                                        (liftCoSubstRight subst ty)
 
-\end{code}
-
+{-
 Note [liftCoSubstTyVar]
 ~~~~~~~~~~~~~~~~~~~~~~~
 This function can fail (i.e., return Nothing) for two separate reasons:
@@ -1622,8 +1612,8 @@ you find that liftCoSubst is doing weird things (like leaving out-of-scope
 variables lying around), disable coercion optimization (bypassing matchAxiom)
 and use downgradeRole instead of downgradeRole_maybe. The panic will then happen,
 and you may learn something useful.
+-}
 
-\begin{code}
 liftCoSubstTyVar :: LiftCoSubst -> Role -> TyVar -> Maybe Coercion
 liftCoSubstTyVar (LCS _ cenv) r tv
   = do { co <- lookupVarEnv cenv tv
@@ -1680,9 +1670,7 @@ subst_kind subst@(LCS _ cenv) kind
         pFst co_kind
       | otherwise
       = TyVarTy kv
-\end{code}
 
-\begin{code}
 -- | 'liftCoMatch' is sort of inverse to 'liftCoSubst'.  In particular, if
 --   @liftCoMatch vars ty co == Just s@, then @tyCoSubst s ty == co@.
 --   That is, it matches a type against a coercion of the same
@@ -1759,15 +1747,15 @@ pushRefl (Refl r (TyConApp tc tys))
   = Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
 pushRefl (Refl r (ForAllTy tv ty)) = Just (ForAllCo tv (Refl r ty))
 pushRefl _                          = Nothing
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
             Sequencing on coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 seqCo :: Coercion -> ()
 seqCo (Refl eq ty)              = eq `seq` seqType ty
 seqCo (TyConAppCo eq tc cos)    = eq `seq` tc `seq` seqCos cos
@@ -1787,14 +1775,13 @@ seqCo (AxiomRuleCo _ ts cs)     = seqTypes ts `seq` seqCos cs
 seqCos :: [Coercion] -> ()
 seqCos []       = ()
 seqCos (co:cos) = seqCo co `seq` seqCos cos
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              The kind of a type, and of a coercion
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Computing a coercion kind and role]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1808,8 +1795,8 @@ sub-tree again.  This was part of the problem in Trac #9233.
 Solution: compute both together; hence coercionKindRole.  We keep a
 separate coercionKind function because it's a bit more efficient if
 the kind is all you want.
+-}
 
-\begin{code}
 coercionType :: Coercion -> Type
 coercionType co = case coercionKindRole co of
                     (Pair ty1 ty2, r) -> mkCoercionType r ty1 ty2
@@ -1906,8 +1893,7 @@ coercionRole = snd . coercionKindRole
   -- and role of its argument. Luckily, laziness should generally avoid
   -- the need for computing kinds in other cases.
 
-\end{code}
-
+{-
 Note [Nested InstCos]
 ~~~~~~~~~~~~~~~~~~~~~
 In Trac #5631 we found that 70% of the entire compilation time was
@@ -1922,18 +1908,18 @@ But this is a *quadratic* algorithm, and the blew up Trac #5631.
 So it's very important to do the substitution simultaneously.
 
 cf Type.applyTys (which in fact we call here)
+-}
 
-
-\begin{code}
 applyCo :: Type -> Coercion -> Type
 -- Gives the type of (e co) where e :: (a~b) => ty
 applyCo ty co | Just ty' <- coreView ty = applyCo ty' co
 applyCo (FunTy _ ty) _ = ty
 applyCo _            _ = panic "applyCo"
-\end{code}
 
+{-
 Note [Kind coercions]
 ~~~~~~~~~~~~~~~~~~~~~
 Kind coercions are only of the form: Refl kind. They are only used to
 instantiate kind polymorphic type constructors in TyConAppCo. Remember
 that kind instantiation only happens with TyConApp, not AppTy.
+-}

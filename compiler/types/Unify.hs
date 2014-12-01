@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow 2006
-%
+-- (c) The University of Glasgow 2006
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module Unify (
@@ -38,14 +35,13 @@ import Control.Monad (liftM, ap)
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
 #endif
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Matching
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 Matching is much tricker than you might think.
@@ -68,9 +64,8 @@ Matching is much tricker than you might think.
    where x is the template type variable.  Then we do not want to
    bind x to a/b!  This is a kind of occurs check.
    The necessary locals accumulate in the RnEnv2.
+-}
 
-
-\begin{code}
 data MatchEnv
   = ME  { me_tmpls :: VarSet    -- Template variables
         , me_env   :: RnEnv2    -- Renaming envt for nested foralls
@@ -141,11 +136,9 @@ ruleMatchTyX :: MatchEnv
          -> Maybe TvSubstEnv
 
 ruleMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2      -- Rename for export
-\end{code}
 
-Now the internals of matching
+-- Now the internals of matching
 
-\begin{code}
 match :: MatchEnv       -- For the most part this is pushed downwards
       -> TvSubstEnv     -- Substitution so far:
                         --   Domain is subset of template tyvars
@@ -239,14 +232,13 @@ matchList _  subst []     []     = Just subst
 matchList fn subst (a:as) (b:bs) = do { subst' <- fn subst a b
                                       ; matchList fn subst' as bs }
 matchList _  _     _      _      = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 GADTs
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Pruning dead case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -312,8 +304,8 @@ drop more and more dead code.
 For now we implement a very simple test: type variables match
 anything, type functions (incl newtypes) match anything, and only
 distinct data types fail to match.  We can elaborate later.
+-}
 
-\begin{code}
 typesCantMatch :: [(Type,Type)] -> Bool
 typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
   where
@@ -348,14 +340,13 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 --      foralls
 --      look through newtypes
 --      take account of tyvar bindings (EQ example above)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Unification
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Fine-grained unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -433,8 +424,8 @@ it will look like these do *not* overlap, causing disaster. See Trac #9371.
 In usages of tcUnifyTys outside of family instances, we always use tcUnifyTys,
 which can't tell the difference between MaybeApart and SurelyApart, so those
 usages won't notice this design choice.
+-}
 
-\begin{code}
 tcUnifyTy :: Type -> Type       -- All tyvars are bindable
           -> Maybe TvSubst      -- A regular one-shot (idempotent) substitution
 -- Simple unification of two types; all type variables are bindable
@@ -473,14 +464,13 @@ tcUnifyTysFG bind_fn tys1 tys2
 
         -- Find the fixed point of the resulting non-idempotent substitution
         ; return (niFixTvSubst subst) }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Non-idempotent substitution
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Non-idempotent substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -508,8 +498,8 @@ This happened, for example, in Trac #9106.
 
 This is the reason for extending env with [f:k -> f:*], in the
 definition of env' in niFixTvSubst
+-}
 
-\begin{code}
 niFixTvSubst :: TvSubstEnv -> TvSubst
 -- Find the idempotent fixed point of the non-idempotent substitution
 -- See Note [Finding the substitution fixpoint]
@@ -545,15 +535,15 @@ niSubstTvSet subst tvs
     get tv = case lookupVarEnv subst tv of
                Nothing -> unitVarSet tv
                Just ty -> niSubstTvSet subst (tyVarsOfType ty)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 The workhorse
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 unify :: TvSubstEnv     -- An existing substitution to extend
       -> Type -> Type   -- Types to be unified, and witness of their equality
       -> UM TvSubstEnv          -- Just the extended substitution,
@@ -684,30 +674,29 @@ bindTv subst tv ty      -- ty is not a type variable
             Skolem -> maybeApart subst -- See Note [Unification with skolems]
             BindMe -> return $ extendVarEnv subst tv ty
         }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Binding decisions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data BindFlag
   = BindMe      -- A regular type variable
 
   | Skolem      -- This type variable is a skolem constant
                 -- Don't bind it; it only matches itself
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Unification monad
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
                          -> UnifyResultM a }
 
@@ -740,4 +729,3 @@ maybeApart subst = UM (\_tv_fn -> MaybeApart subst)
 
 surelyApart :: UM a
 surelyApart = UM (\_tv_fn -> SurelyApart)
-\end{code}

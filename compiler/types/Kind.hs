@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow 2006-2012
-%
+-- (c) The University of Glasgow 2006-2012
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module Kind (
         -- * Main data type
@@ -57,13 +54,13 @@ import Outputable
 import Maybes( orElse )
 import Util
 import FastString
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Functions over Kinds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Kind Constraint and kind *]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,8 +85,8 @@ See Trac #7451.
 Bottom line: although '*' and 'Constraint' are distinct TyCons, with
 distinct uniques, they are treated as equal at all times except
 during type inference.  Hence cmpTc treats them as equal.
+-}
 
-\begin{code}
 -- | Essentially 'funResultTy' on kinds handling pi-types too
 kindFunResult :: SDoc -> Kind -> KindOrType -> Kind
 kindFunResult _ (FunTy _ res)     _   = res
@@ -302,4 +299,3 @@ kiVarsOfKind = tyVarsOfType
 
 kiVarsOfKinds :: [Kind] -> VarSet
 kiVarsOfKinds = tyVarsOfTypes
-\end{code}

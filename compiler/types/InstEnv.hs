@@ -1,12 +1,12 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[InstEnv]{Utilities for typechecking instance declarations}
 
 The bits common to TcInstDcls and TcDeriv.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module InstEnv (
@@ -51,16 +51,14 @@ import Data.Maybe       ( isJust, isNothing )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid
 #endif
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The key types}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- | Is this instance an orphan?  If it is not an orphan, contains an 'OccName'
 -- witnessing the instance's non-orphanhood.
@@ -90,7 +88,7 @@ instance Binary IsOrphan where
                 n <- get bh
                 return $ NotOrphan n
 
-data ClsInst 
+data ClsInst
   = ClsInst {   -- Used for "rough matching"; see Note [Rough-match field]
                 -- INVARIANT: is_tcs = roughMatchTcs is_tys
                is_cls_nm :: Name  -- Class name
@@ -101,7 +99,7 @@ data ClsInst
                                         -- See Note [Template tyvars are fresh]
              , is_cls  :: Class         -- The real class
              , is_tys  :: [Type]        -- Full arg types (mentioning is_tvs)
-                -- INVARIANT: is_dfun Id has type 
+                -- INVARIANT: is_dfun Id has type
                 --      forall is_tvs. (...) => is_cls is_tys
                 -- (modulo alpha conversion)
 
@@ -127,11 +125,11 @@ fuzzyClsInstCmp x y =
     cmp (Nothing, Just _) = LT
     cmp (Just _, Nothing) = GT
     cmp (Just x, Just y) = stableNameCmp x y
-\end{code}
 
+{-
 Note [Template tyvars are fresh]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The is_tvs field of a ClsInst has *completely fresh* tyvars.  
+The is_tvs field of a ClsInst has *completely fresh* tyvars.
 That is, they are
   * distinct from any other ClsInst
   * distinct from any tyvars free in predicates that may
@@ -150,7 +148,7 @@ which is a total waste of time if it has no chance of matching
 So the Name, [Maybe Name] fields allow us to say "definitely
 does not match", based only on the Name.
 
-In is_tcs, 
+In is_tcs,
     Nothing  means that this type arg is a type variable
 
     (Just n) means that this type arg is a
@@ -163,8 +161,8 @@ In is_tcs,
 Note [Proper-match fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The is_tvs, is_cls, is_tys fields are simply cached values, pulled
-out (lazily) from the dfun id. They are cached here simply so 
-that we don't need to decompose the DFunId each time we want 
+out (lazily) from the dfun id. They are cached here simply so
+that we don't need to decompose the DFunId each time we want
 to match it.  The hope is that the fast-match fields mean
 that we often never poke the proper-match fields.
 
@@ -188,8 +186,8 @@ being equal to
   * the SrcSpan of
   * the instance head type of
   * the InstDecl used to construct the Instance.
+-}
 
-\begin{code}
 instanceDFunId :: ClsInst -> DFunId
 instanceDFunId = is_dfun
 
@@ -199,9 +197,7 @@ tidyClsInstDFun tidy_dfun ispec
 
 instanceRoughTcs :: ClsInst -> [Maybe Name]
 instanceRoughTcs = is_tcs
-\end{code}
 
-\begin{code}
 instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
@@ -311,13 +307,12 @@ roughMatchTcs tys = map rough tys
 
 instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
--- possibly be instantiated to actual, nor vice versa; 
+-- possibly be instantiated to actual, nor vice versa;
 -- False is non-committal
 instanceCantMatch (Just t : ts) (Just a : as) = t/=a || instanceCantMatch ts as
 instanceCantMatch _             _             =  False  -- Safe
-\end{code}
 
-
+{-
 Note [Overlapping instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overlap is permitted, but only in such a way that one can make
@@ -415,7 +410,7 @@ Old hugs had this same bug.  Here's how we fixed it: like GHC, the
 list of instances for a given class is ordered, so that more specific
 instances come before more generic ones.  For example, the instance
 list for C might contain:
-    ..., C Int, ..., C a, ...  
+    ..., C Int, ..., C a, ...
 When we go to look for a `C Int' instance we'll get that one first.
 But what if we go looking for a `C b' (`b' is unconstrained)?  We'll
 pass the `C Int' instance, and keep going.  But if `b' is
@@ -434,18 +429,18 @@ this test.  Suppose the instance envt had
 (still most specific first)
 Now suppose we are looking for (C x y Int), where x and y are unconstrained.
         C x y Int  doesn't match the template {a,b} C a a b
-but neither does 
+but neither does
         C a a b  match the template {x,y} C x y Int
 But still x and y might subsequently be unified so they *do* match.
 
 Simple story: unify, don't match.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 InstEnv, ClsInstEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A @ClsInstEnv@ all the instances of that class.  The @Id@ inside a
 ClsInstEnv mapping is the dfun for that instance.
@@ -457,8 +452,8 @@ If class C maps to a list containing the item ([a,b], [t1,t2,t3], dfun), then
 or, to put it another way, we have
 
         instance (...) => C t1 t2 t3,  witnessed by dfun
+-}
 
-\begin{code}
 ---------------------------------------------------
 type InstEnv = UniqFM ClsInstEnv        -- Maps Class to instances for that class
 
@@ -472,7 +467,7 @@ data InstEnvs = InstEnvs {
         ie_visible :: VisibleOrphanModules
     }
 
-newtype ClsInstEnv 
+newtype ClsInstEnv
   = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
 instance Outputable ClsInstEnv where
@@ -555,14 +550,13 @@ identicalInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = tvs1
   && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
   && isJust (tcMatchTys (mkVarSet tvs1) tys1 tys2)
   && isJust (tcMatchTys (mkVarSet tvs2) tys2 tys1)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Looking up an instance
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since
 the env is kept ordered, the first match must be the only one.  The
@@ -614,9 +608,8 @@ of the target constraint (C ty1 .. tyn). The search works like this.
 
  * If only one candidate remains, pick it. Otherwise if all remaining
    candidates are incoherent, pick an arbitrary candidate. Otherwise fail.
+-}
 
-
-\begin{code}
 type DFunInstType = Maybe Type
         -- Just ty   => Instantiate with this type
         -- Nothing   => Instantiate with any type of this tyvar's kind
@@ -624,13 +617,13 @@ type DFunInstType = Maybe Type
 
 type InstMatch = (ClsInst, [DFunInstType])
 
-type ClsInstLookupResult 
+type ClsInstLookupResult
      = ( [InstMatch]     -- Successful matches
        , [ClsInst]       -- These don't match but do unify
        , Bool)           -- True if error condition caused by
                          -- SafeHaskell condition.
-\end{code}
 
+{-
 Note [DFunInstType: instantiating types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A successful match is a ClsInst, together with the types at which
@@ -640,11 +633,11 @@ might have some tyvars that *only* appear in arguments
         dfun :: forall a b. C a b, Ord b => D [a]
 When we match this against D [ty], we return the instantiating types
         [Just ty, Nothing]
-where the 'Nothing' indicates that 'b' can be freely instantiated.  
-(The caller instantiates it to a flexi type variable, which will 
+where the 'Nothing' indicates that 'b' can be freely instantiated.
+(The caller instantiates it to a flexi type variable, which will
  presumably later become fixed via functional dependencies.)
+-}
 
-\begin{code}
 -- |Look up an instance in the given instance environment. The given class application must match exactly
 -- one instance and the match may not contain any flexi type variables.  If the lookup is unsuccessful,
 -- yield 'Left errorMessage'.
@@ -654,7 +647,7 @@ lookupUniqueInstEnv :: InstEnvs
                     -> Either MsgDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
   = case lookupInstEnv instEnv cls tys of
-      ([(inst, inst_tys)], _, _) 
+      ([(inst, inst_tys)], _, _)
              | noFlexiVar -> Right (inst, inst_tys')
              | otherwise  -> Left $ ptext (sLit "flexible type variable:") <+>
                                     (ppr $ mkTyConApp (classTyCon cls) tys)
@@ -835,8 +828,8 @@ insert_overlapping new_item (old_item : old_items)
        -- marked as overlappable.
        -- Latest change described in: Trac #9242.
        -- Previous change: Trac #3877, Dec 10.
-\end{code}
 
+{-
 Note [Incoherent instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For some classes, the choice of a particular instance does not matter, any one
@@ -882,23 +875,23 @@ incoherent instances as long as there are are others.
 
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         Binding decisions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instanceBindFun :: TyVar -> BindFlag
 instanceBindFun tv | isTcTyVar tv && isOverlappableTyVar tv = Skolem
                    | otherwise                              = BindMe
    -- Note [Binding when looking up instances]
-\end{code}
 
+{-
 Note [Binding when looking up instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When looking up in the instance environment, or family-instance environment,
-we are careful about multiple matches, as described above in 
+we are careful about multiple matches, as described above in
 Note [Overlapping instances]
 
 The key_tys can contain skolem constants, and we can guarantee that those
@@ -918,3 +911,4 @@ We do this only for isOverlappableTyVar skolems.  For example we reject
         g :: forall a => [a] -> Int
         g x = op x
 on the grounds that the correct instance depends on the instantiation of 'a'
+-}

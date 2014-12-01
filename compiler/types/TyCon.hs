@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 The @TyCon@ datatype
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module TyCon(
@@ -111,8 +111,8 @@ import Constants
 import Util
 import qualified Data.Data as Data
 import Data.Typeable (Typeable)
-\end{code}
 
+{-
 -----------------------------------------------
         Notes about type families
 -----------------------------------------------
@@ -298,13 +298,13 @@ it's worth noting that (~#)'s parameters are at role N. Promoted data
 constructors' type arguments are at role R. All kind arguments are at role
 N.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{The data type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | TyCons represent type constructors. Type constructors are introduced by things such as:
 --
 -- 1) Data declarations: @data Foo = ...@ creates the @Foo@ type constructor of kind @*@
@@ -620,13 +620,11 @@ data AlgTyConRhs
                              -- again check Trac #1072.
     }
 
-\end{code}
-
+{-
 Note [AbstractTyCon and type equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TODO
-
-\begin{code}
+-}
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -722,8 +720,8 @@ data FamTyConFlav
 
    -- | Built-in type family used by the TypeNats solver
    | BuiltInSynFamTyCon BuiltInSynFamily
-\end{code}
 
+{-
 Note [Closed type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 * In an open type family you can add new instances later.  This is the
@@ -848,11 +846,11 @@ so the coercion tycon CoT must have
         kind:    T ~ []
  and    arity:   0
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{PrimRep}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [rep swamp]
 
@@ -909,8 +907,8 @@ This means to turn an ArgRep/PrimRep into a CmmType requires DynFlags.
 
 On the other hand, CmmType includes some "nonsense" values, such as
 CmmType GcPtrCat W32 on a 64-bit machine.
+-}
 
-\begin{code}
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
 -- and store values of this type.
@@ -978,21 +976,21 @@ primElemRepSizeB Word32ElemRep = 4
 primElemRepSizeB Word64ElemRep = 8
 primElemRepSizeB FloatElemRep  = 4
 primElemRepSizeB DoubleElemRep = 8
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{TyCon Construction}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note: the TyCon constructors all take a Kind as one argument, even though
 they could, in principle, work out their Kind from their other arguments.
 But to do so they need functions from Types, and that makes a nasty
 module mutual-recursion.  And they aren't called from many places.
 So we compromise, and move their Kind calculation to the call site.
+-}
 
-\begin{code}
 -- | Given the name of the function type constructor and it's kind, create the
 -- corresponding 'TyCon'. It is reccomended to use 'TypeRep.funTyCon' if you want
 -- this functionality
@@ -1151,9 +1149,7 @@ mkPromotedTyCon tc kind
         tyConKind   = kind,
         ty_con      = tc
   }
-\end{code}
 
-\begin{code}
 isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
@@ -1458,14 +1454,13 @@ isImplicitTyCon (SynonymTyCon {})                                   = False
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
 tyConCType_maybe _ = Nothing
-\end{code}
 
-
+{-
 -----------------------------------------------
 --      Expand type-constructor applications
 -----------------------------------------------
+-}
 
-\begin{code}
 tcExpandTyCon_maybe, coreExpandTyCon_maybe
         :: TyCon
         -> [tyco]                 -- ^ Arguments to 'TyCon'
@@ -1501,9 +1496,7 @@ expand tvs rhs tys
         GT -> Nothing
    where
      n_tvs = length tvs
-\end{code}
 
-\begin{code}
 -- | As 'tyConDataCons_maybe', but returns the empty list of constructors if no constructors
 -- could be found
 tyConDataCons :: TyCon -> [DataCon]
@@ -1554,9 +1547,6 @@ tyConRoles tc
   where
     const_role r = replicate (tyConArity tc) r
 
-\end{code}
-
-\begin{code}
 -- | Extract the bound type variables and type expansion of a type synonym 'TyCon'. Panics if the
 -- 'TyCon' is not a synonym
 newTyConRhs :: TyCon -> ([TyVar], Type)
@@ -1591,18 +1581,14 @@ newTyConCo tc = case newTyConCo_maybe tc of
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
 tyConPrimRep tc = ASSERT(not (isUnboxedTupleTyCon tc)) PtrRep
-\end{code}
 
-\begin{code}
 -- | Find the \"stupid theta\" of the 'TyCon'. A \"stupid theta\" is the context to the left of
 -- an algebraic type declaration, e.g. @Eq a@ in the declaration @data Eq a => T a ...@
 tyConStupidTheta :: TyCon -> [PredType]
 tyConStupidTheta (AlgTyCon {algTcStupidTheta = stupid}) = stupid
 tyConStupidTheta (TupleTyCon {})                        = []
 tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)
-\end{code}
 
-\begin{code}
 -- | Extract the 'TyVar's bound by a vanilla type synonym
 -- and the corresponding (unsubstituted) right hand side.
 synTyConDefn_maybe :: TyCon -> Maybe ([TyVar], Type)
@@ -1621,9 +1607,7 @@ synTyConRhs_maybe _                               = Nothing
 famTyConFlav_maybe :: TyCon -> Maybe FamTyConFlav
 famTyConFlav_maybe (FamilyTyCon {famTcFlav = flav}) = Just flav
 famTyConFlav_maybe _                                = Nothing
-\end{code}
 
-\begin{code}
 -- | If the given 'TyCon' has a /single/ data constructor, i.e. it is a @data@ type with one
 -- alternative, a tuple type or a @newtype@ then that constructor is returned. If the 'TyCon'
 -- has more than one constructor, or represents a primitive or function type constructor then
@@ -1640,9 +1624,7 @@ tyConSingleAlgDataCon_maybe :: TyCon -> Maybe DataCon
 tyConSingleAlgDataCon_maybe (TupleTyCon {dataCon = c})                            = Just c
 tyConSingleAlgDataCon_maybe (AlgTyCon {algTcRhs = DataTyCon { data_cons = [c] }}) = Just c
 tyConSingleAlgDataCon_maybe _                                                     = Nothing
-\end{code}
 
-\begin{code}
 -- | Is this 'TyCon' that for a class instance?
 isClassTyCon :: TyCon -> Bool
 isClassTyCon (AlgTyCon {algTcParent = ClassTyCon _}) = True
@@ -1693,21 +1675,20 @@ tyConFamilyCoercion_maybe tc
   = case tyConParent tc of
       FamInstTyCon co _ _ -> Just co
       _                   -> Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TyCon-instances]{Instance declarations for @TyCon@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @TyCon@s are compared by comparing their @Unique@s.
 
 The strictness analyser needs @Ord@. It is a lexicographic order with
 the property @(a<=b) || (b<=a)@.
+-}
 
-\begin{code}
 instance Eq TyCon where
     a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
     a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
@@ -1743,13 +1724,12 @@ instance Data.Data TyCon where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "TyCon"
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
            Walking over recursive TyCons
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Expanding newtypes and products]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1779,8 +1759,8 @@ We sometimes want to do the same for product types, so that the
 strictness analyser doesn't unbox infinitely deeply.
 
 The function that manages this is checkRecTc.
+-}
 
-\begin{code}
 newtype RecTcChecker = RC NameSet
 
 initRecTc :: RecTcChecker
@@ -1795,4 +1775,3 @@ checkRecTc (RC rec_nts) tc
   | otherwise                     = Just (RC (extendNameSet rec_nts tc_name))
   where
     tc_name = tyConName tc
-\end{code}

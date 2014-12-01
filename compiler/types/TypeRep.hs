@@ -1,7 +1,7 @@
- | %
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1998
+
 \section[TypeRep]{Type - friends' interface}
 
 Note [The Type-related module hierarchy]
@@ -13,8 +13,8 @@ Note [The Type-related module hierarchy]
   Kind     imports TysPrim ( mainly for primitive kinds )
   Type     imports Kind
   Coercion imports Type
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# OPTIONS_HADDOCK hide #-}
 -- We expose the relevant stuff from this module via the Type module
@@ -82,17 +82,15 @@ import DynFlags
 -- libraries
 import Data.List( mapAccumL, partition )
 import qualified Data.Data        as Data hiding ( TyCon )
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The data type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 -- | The key representation of types within the compiler
 
 -- If you edit this type, you may need to update the GHC formalism
@@ -163,8 +161,8 @@ type Kind = Type
 --
 -- > TyConApp SuperKindTyCon ...
 type SuperKind = Type
-\end{code}
 
+{-
 Note [The kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The kinds
@@ -219,8 +217,8 @@ is encoded like this:
 
 -------------------------------------
                 Note [PredTy]
+-}
 
-\begin{code}
 -- | A type of the form @p@ of kind @Constraint@ represents a value whose type is
 -- the Haskell predicate @p@, where a predicate is what occurs before
 -- the @=>@ in a Haskell type.
@@ -245,8 +243,8 @@ type PredType = Type
 
 -- | A collection of 'PredType's
 type ThetaType = [PredType]
-\end{code}
 
+{-
 (We don't support TREX records yet, but the setup is designed
 to expand to allow them.)
 
@@ -259,16 +257,16 @@ The predicate really does turn into a real extra argument to the
 function.  If the argument has type (p :: Constraint) then the predicate p is
 represented by evidence of type p.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
             Simple constructors
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These functions are here so that they can be used by TysPrim,
 which in turn is imported by Type
+-}
 
-\begin{code}
 mkTyVarTy  :: TyVar   -> Type
 mkTyVarTy  = TyVarTy
 
@@ -278,11 +276,9 @@ mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []
-\end{code}
 
-Some basic functions, put here to break loops eg with the pretty printer
+-- Some basic functions, put here to break loops eg with the pretty printer
 
-\begin{code}
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind (TyConApp tc []) = tc `hasKey` liftedTypeKindTyConKey
 isLiftedTypeKind _                = False
@@ -297,16 +293,15 @@ isTypeVar v = isTKVar v && not (isSuperKind (varType v))
 
 isKindVar :: Var -> Bool
 isKindVar v = isTKVar v && isSuperKind (varType v)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Free variables of types and coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
 -- tyVarsOfType returns only the free variables of a type
@@ -336,13 +331,13 @@ varSetElemsKvsFirst set
   = kvs ++ tvs
   where
     (kvs, tvs) = partition isKindVar (varSetElems set)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         TyThing
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Despite the fact that DataCon has to be imported via a hi-boot route,
 this module seems the right place for TyThing, because it's needed for
@@ -355,8 +350,8 @@ as ATyCon.  You can tell the difference, and get to the class, with
    isClassTyCon :: TyCon -> Bool
    tyConClass_maybe :: TyCon -> Maybe Class
 The Class and its associated TyCon have the same Name.
+-}
 
-\begin{code}
 -- | A typecheckable-thing, essentially anything that has a name
 data TyThing
   = AnId     Id
@@ -387,17 +382,15 @@ instance NamedThing TyThing where       -- Can't put this with the type
   getName (ACoAxiom cc) = getName cc
   getName (AConLike cl) = getName cl
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Substitutions
       Data type defined here to avoid unnecessary mutual recursion
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Type substitution
 --
 -- #tvsubst_invariant#
@@ -425,8 +418,8 @@ type TvSubstEnv = TyVarEnv Type
         -- in the middle of matching, and unification (see Types.Unify)
         -- So you have to look at the context to know if it's idempotent or
         -- apply-once or whatever
-\end{code}
 
+{-
 Note [Apply Once]
 ~~~~~~~~~~~~~~~~~
 We use TvSubsts to instantiate things, and we might instantiate
@@ -472,13 +465,13 @@ This invariant has several crucial consequences:
 
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                    Pretty-printing types
 
        Defined very early because of debug printing in assertions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @pprType@ is the standard @Type@ printer; the overloaded @ppr@ function is
 defined to use this.  @pprParendType@ is the same, except it puts
@@ -499,8 +492,8 @@ meaning          (a :+: (T b)) -> c
 Maybe operator applications should bind a bit less tightly?
 
 Anyway, that's the current story, and it is used consistently for Type and HsType
+-}
 
-\begin{code}
 data TyPrec   -- See Note [Prededence in types]
 
   = TopPrec         -- No parens
@@ -667,8 +660,8 @@ pprTvBndr tv
   | otherwise             = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
              where
                kind = tyVarKind tv
-\end{code}
 
+{-
 Note [When to print foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Mostly we want to print top-level foralls when (and only when) the user specifies
@@ -704,8 +697,8 @@ remember to parenthesise the operator, thus
    (~>) a b -> b
 
 See Trac #2766.
+-}
 
-\begin{code}
 pprTypeApp :: TyCon -> [Type] -> SDoc
 pprTypeApp tc tys = pprTyTcApp TopPrec tc tys
         -- We have to use ppr on the TyCon (not its name)
@@ -827,17 +820,17 @@ pprArrowChain :: TyPrec -> [SDoc] -> SDoc
 pprArrowChain _ []         = empty
 pprArrowChain p (arg:args) = maybeParen p FunPrec $
                              sep [arg, sep (map (arrow <+>) args)]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{TidyType}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Tidying is here because it has a special case for FlatSkol
+-}
 
-\begin{code}
 -- | This tidies up a type for printing in an error message, or in
 -- an interface file.
 --
@@ -936,4 +929,3 @@ tidyOpenKind = tidyOpenType
 
 tidyKind :: TidyEnv -> Kind -> Kind
 tidyKind = tidyType
-\end{code}

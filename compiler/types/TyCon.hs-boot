@@ -1,4 +1,3 @@
-\begin{code}
 module TyCon where
 
 import Name (Name)
@@ -11,4 +10,3 @@ tyConUnique         :: TyCon -> Unique
 isTupleTyCon        :: TyCon -> Bool
 isUnboxedTupleTyCon :: TyCon -> Bool
 isFunTyCon          :: TyCon -> Bool
-\end{code}

@@ -1,11 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
+-- (c) The University of Glasgow 2006
+-- (c) The GRASP/AQUA Project, Glasgow University, 1998
+--
+-- Type - public interface
 
-Type - public interface
-
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -180,9 +177,7 @@ import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
 
 infixr 3 `mkFunTy`      -- Associates to the right
-\end{code}
 
-\begin{code}
 -- $type_classification
 -- #type_classification#
 --
@@ -237,15 +232,15 @@ infixr 3 `mkFunTy`      -- Associates to the right
 -- this module will automatically convert a source into a representation type
 -- if they are spotted, to the best of it's abilities. If you don't want this
 -- to happen, use the equivalent functions from the "TcType" module.
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Type representation
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 {-# INLINE coreView #-}
 coreView :: Type -> Maybe Type
 -- ^ In Core, we \"look through\" non-recursive newtypes and 'PredTypes': this
@@ -293,20 +288,20 @@ expandTypeSynonyms ty
     go (AppTy t1 t2)   = mkAppTy (go t1) (go t2)
     go (FunTy t1 t2)   = FunTy (go t1) (go t2)
     go (ForAllTy tv t) = ForAllTy tv (go t)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Constructor-specific functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 ---------------------------------------------------------------------
                                 TyVarTy
                                 ~~~~~~~
-\begin{code}
+-}
+
 -- | Attempts to obtain the type variable underlying a 'Type', and panics with the
 -- given message if this is not a type variable type. See also 'getTyVar_maybe'
 getTyVar :: String -> Type -> TyVar
@@ -332,17 +327,16 @@ allDistinctTyVars tkvs = go emptyVarSet tkvs
              Nothing -> False
              Just tv | tv `elemVarSet` so_far -> False
                      | otherwise -> go (so_far `extendVarSet` tv) tys
-\end{code}
 
-
+{-
 ---------------------------------------------------------------------
                                 AppTy
                                 ~~~~~
 We need to be pretty careful with AppTy to make sure we obey the
 invariant that a TyConApp is always visibly so.  mkAppTy maintains the
 invariant: use it.
+-}
 
-\begin{code}
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
@@ -409,13 +403,11 @@ splitAppTys ty = split ty ty []
                                                (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty _                     args = (orig_ty, args)
 
-\end{code}
-
-
+{-
                       LitTy
                       ~~~~~
+-}
 
-\begin{code}
 mkNumLitTy :: Integer -> Type
 mkNumLitTy n = LitTy (NumTyLit n)
 
@@ -434,14 +426,12 @@ isStrLitTy ty | Just ty1 <- tcView ty = isStrLitTy ty1
 isStrLitTy (LitTy (StrTyLit s)) = Just s
 isStrLitTy _                    = Nothing
 
-\end{code}
-
-
+{-
 ---------------------------------------------------------------------
                                 FunTy
                                 ~~~~~
+-}
 
-\begin{code}
 mkFunTy :: Type -> Type -> Type
 -- ^ Creates a function type from the given argument and result type
 mkFunTy arg res = FunTy arg res
@@ -505,13 +495,13 @@ funArgTy :: Type -> Type
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (FunTy arg _res)  = arg
 funArgTy ty                = pprPanic "funArgTy" (ppr ty)
-\end{code}
 
+{-
 ---------------------------------------------------------------------
                                 TyConApp
                                 ~~~~~~~~
+-}
 
-\begin{code}
 -- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
@@ -579,9 +569,8 @@ newTyConInstRhs tycon tys
       applyTysX tvs rhs tys
   where
     (tvs, rhs) = newTyConEtadRhs tycon
-\end{code}
 
-
+{-
 ---------------------------------------------------------------------
                                 SynTy
                                 ~~~~~
@@ -614,8 +603,8 @@ less than the Arity (as it would otherwise be for a function type like
 As a result, ReprArity is always strictly positive if Arity is. This
 is important because it allows us to distinguish at runtime between a
 thunk and a function takes a nullary unboxed tuple as an argument!
+-}
 
-\begin{code}
 type UnaryType = Type
 
 data RepType = UbxTupleRep [UnaryType] -- INVARIANT: never an empty list (see Note [Nullary unboxed tuple])
@@ -704,8 +693,8 @@ isVoidTy :: Type -> Bool
 isVoidTy ty = case repType ty of
                 UnaryRep (TyConApp tc _) -> isVoidRep (tyConPrimRep tc)
                 _                        -> False
-\end{code}
 
+{-
 Note [AppTy rep]
 ~~~~~~~~~~~~~~~~
 Types of the form 'f a' must be of kind *, not #, so we are guaranteed
@@ -716,8 +705,8 @@ in TypeRep.
 ---------------------------------------------------------------------
                                 ForAllTy
                                 ~~~~~~~~
+-}
 
-\begin{code}
 mkForAllTy :: TyVar -> Type -> Type
 mkForAllTy tyvar ty
   = ForAllTy tyvar ty
@@ -772,14 +761,14 @@ splitForAllTys ty = split ty ty []
 -- | Equivalent to @snd . splitForAllTys@
 dropForAlls :: Type -> Type
 dropForAlls ty = snd (splitForAllTys ty)
-\end{code}
 
+{-
 -- (mkPiType now in CoreUtils)
 
 applyTy, applyTys
 ~~~~~~~~~~~~~~~~~
+-}
 
-\begin{code}
 -- | Instantiate a forall type with one or more type arguments.
 -- Used when we have a polymorphic function applied to type args:
 --
@@ -839,22 +828,21 @@ applyTysX tvs body_ty arg_tys
              (drop n_tvs arg_tys)
   where
     n_tvs = length tvs
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                          Pred
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Predicates on PredType
+-}
 
-\begin{code}
 isPredTy :: Type -> Bool
   -- NB: isPredTy is used when printing types, which can happen in debug printing
   --     during type checking of not-fully-zonked types.  So it's not cool to say
-  --     isConstraintKind (typeKind ty) because absent zonking the type might 
+  --     isConstraintKind (typeKind ty) because absent zonking the type might
   --     be ill-kinded, and typeKind crashes
   --     Hence the rather tiresome story here
 isPredTy ty = go ty []
@@ -897,12 +885,13 @@ isIPPred_maybe ty =
      guard (isIPTyCon tc)
      x <- isStrLitTy t1
      return (x,t2)
-\end{code}
 
+{-
 Make PredTypes
 
 --------------------- Equality types ---------------------------------
-\begin{code}
+-}
+
 -- | Creates a type equality predicate
 mkEqPred :: Type -> Type -> PredType
 mkEqPred ty1 ty2
@@ -931,10 +920,9 @@ mkReprPrimEqPred ty1  ty2
     TyConApp eqReprPrimTyCon [k, ty1, ty2]
   where
     k = typeKind ty1
-\end{code}
 
---------------------- Dictionary types ---------------------------------
-\begin{code}
+-- --------------------- Dictionary types ---------------------------------
+
 mkClassPred :: Class -> [Type] -> PredType
 mkClassPred clas tys = TyConApp (classTyCon clas) tys
 
@@ -948,8 +936,8 @@ isDictLikeTy ty = case splitTyConApp_maybe ty of
         Just (tc, tys) | isClassTyCon tc -> True
                        | isTupleTyCon tc -> all isDictLikeTy tys
         _other                           -> False
-\end{code}
 
+{-
 Note [Dictionary-like types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Being "dictionary-like" means either a dictionary type or a tuple thereof.
@@ -981,8 +969,8 @@ constraints build tuples.
 
 
 Decomposing PredType
+-}
 
-\begin{code}
 data PredTree = ClassPred Class [Type]
               | EqPred Type Type
               | TuplePred [PredType]
@@ -998,9 +986,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, tys) | isTupleTyCon tc
                    -> TuplePred tys
     _ -> IrredPred ev_ty
-\end{code}
 
-\begin{code}
 getClassPredTys :: PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of
         Just (clas, tys) -> (clas, tys)
@@ -1035,15 +1021,14 @@ getEqPredRole ty
         | tc `hasKey` coercibleTyConKey -> Representational
       _ -> pprPanic "getEqPredRole" (ppr ty)
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Size
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 typeSize :: Type -> Int
 typeSize (LitTy {})      = 1
 typeSize (TyVarTy {})    = 1
@@ -1051,16 +1036,15 @@ typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
 typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Type families}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkFamilyTyConApp :: TyCon -> [Type] -> Type
 -- ^ Given a family instance TyCon and its arg types, return the
 -- corresponding family type.  E.g:
@@ -1098,15 +1082,15 @@ pprSourceTyCon tycon
   = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
   | otherwise
   = ppr tycon
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Liftedness}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | See "Type#type_classification" for what an unlifted type is
 isUnLiftedType :: Type -> Bool
         -- isUnLiftedType returns True for forall'd unlifted types:
@@ -1145,34 +1129,29 @@ isClosedAlgType ty
       Just (tc, ty_args) | isAlgTyCon tc && not (isFamilyTyCon tc)
              -> ASSERT2( ty_args `lengthIs` tyConArity tc, ppr ty ) True
       _other -> False
-\end{code}
 
-\begin{code}
 -- | Computes whether an argument (or let right hand side) should
 -- be computed strictly or lazily, based only on its type.
 -- Currently, it's just 'isUnLiftedType'.
 
 isStrictType :: Type -> Bool
 isStrictType = isUnLiftedType
-\end{code}
 
-\begin{code}
 isPrimitiveType :: Type -> Bool
 -- ^ Returns true of types that are opaque to Haskell.
 isPrimitiveType ty = case splitTyConApp_maybe ty of
                         Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
                                               isPrimTyCon tc
                         _                  -> False
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Sequencing on types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 seqType :: Type -> ()
 seqType (LitTy n)         = n `seq` ()
 seqType (TyVarTy tv)      = tv `seq` ()
@@ -1184,17 +1163,16 @@ seqType (ForAllTy tv ty)  = seqType (tyVarKind tv) `seq` seqType ty
 seqTypes :: [Type] -> ()
 seqTypes []       = ()
 seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Comparison for types
         (We don't use instances so that we know where it happens)
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 eqKind :: Kind -> Kind -> Bool
 -- Watch out for horrible hack: See Note [Comparison with OpenTypeKind]
 eqKind = eqType
@@ -1230,11 +1208,9 @@ eqTyVarBndrs env (tv1:tvs1) (tv2:tvs2)
  | eqTypeX env (tyVarKind tv1) (tyVarKind tv2)
  = eqTyVarBndrs (rnBndr2 env tv1 tv2) tvs1 tvs2
 eqTyVarBndrs _ _ _= Nothing
-\end{code}
 
-Now here comes the real worker
+-- Now here comes the real worker
 
-\begin{code}
 cmpType :: Type -> Type -> Ordering
 -- Watch out for horrible hack: See Note [Comparison with OpenTypeKind]
 cmpType t1 t2 = cmpTypeX rn_env t1 t2
@@ -1305,7 +1281,7 @@ cmpTc :: TyCon -> TyCon -> Ordering
 --
 -- Also we treat OpenTypeKind as equal to either * or #
 -- See Note [Comparison with OpenTypeKind]
-cmpTc tc1 tc2 
+cmpTc tc1 tc2
   | u1 == openTypeKindTyConKey, isSubOpenTypeKindKey u2 = EQ
   | u2 == openTypeKindTyConKey, isSubOpenTypeKindKey u1 = EQ
   | otherwise = nu1 `compare` nu2
@@ -1314,14 +1290,14 @@ cmpTc tc1 tc2
     nu1 = if u1==constraintKindTyConKey then liftedTypeKindTyConKey else u1
     u2  = tyConUnique tc2
     nu2 = if u2==constraintKindTyConKey then liftedTypeKindTyConKey else u2
-\end{code}
 
+{-
 Note [Comparison with OpenTypeKind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In PrimOpWrappers we have things like
    PrimOpWrappers.mkWeak# = /\ a b c. Prim.mkWeak# a b c
 where
-   Prim.mkWeak# :: forall (a:Open) b c. a -> b -> c 
+   Prim.mkWeak# :: forall (a:Open) b c. a -> b -> c
                                      -> State# RealWorld -> (# State# RealWorld, Weak# b #)
 Now, eta reduction will turn the definition into
      PrimOpWrappers.mkWeak# = Prim.mkWeak#
@@ -1351,13 +1327,13 @@ kinds are compatible.
 --   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv2) `thenCmp`
 --     cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Type substitutions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 emptyTvSubstEnv :: TvSubstEnv
 emptyTvSubstEnv = emptyVarEnv
 
@@ -1497,15 +1473,15 @@ instance Outputable TvSubst where
     = brackets $ sep[ ptext (sLit "TvSubst"),
                       nest 2 (ptext (sLit "In scope:") <+> ppr ins),
                       nest 2 (ptext (sLit "Type env:") <+> ppr tenv) ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Performing type or kind substitutions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Type substitution making use of an 'TvSubst' that
 -- is assumed to be open, see 'zipOpenTvSubst'
 substTyWith :: [TyVar] -> [Type] -> Type -> Type
@@ -1621,8 +1597,8 @@ cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq
   where
     tv' = setVarUnique tv uniq  -- Simply set the unique; the kind
                                 -- has no type variables to worry about
-\end{code}
 
+{-
 ----------------------------------------------------
 -- Kind Stuff
 
@@ -1631,26 +1607,26 @@ Kinds
 
 For the description of subkinding in GHC, see
   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeType#Kinds
+-}
 
-\begin{code}
 type MetaKindVar = TyVar  -- invariant: MetaKindVar will always be a
                           -- TcTyVar with details MetaTv (TauTv ...) ...
 -- meta kind var constructors and functions are in TcType
 
 type SimpleKind = Kind
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         The kind of a type
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 typeKind :: Type -> Kind
 typeKind orig_ty = go orig_ty
   where
-    
+
     go ty@(TyConApp tc tys)
       | isPromotedTyCon tc
       = ASSERT( tyConArity tc == length tys ) superKind
@@ -1679,8 +1655,8 @@ typeLiteralKind l =
   case l of
     NumTyLit _ -> typeNatKind
     StrTyLit _ -> typeSymbolKind
-\end{code}
 
+{-
 Kind inference
 ~~~~~~~~~~~~~~
 During kind inference, a kind variable unifies only with
@@ -1704,3 +1680,4 @@ When unifying two internal type variables, we collect their kind constraints by
 finding the GLB of the two.  Since the partial order is a tree, they only
 have a glb if one is a sub-kind of the other.  In that case, we bind the
 less-informative one to the more informative one.  Neat, eh?
+-}

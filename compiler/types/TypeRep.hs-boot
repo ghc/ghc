@@ -1,4 +1,3 @@
-\begin{code}
 module TypeRep where
 
 import Outputable (Outputable)
@@ -11,5 +10,3 @@ type Kind = Type
 type SuperKind = Type
 
 instance Outputable Type
-\end{code}
-
