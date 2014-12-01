@@ -475,7 +475,7 @@ mk_forall_ty exp  tvs  ty                 = HsForAllTy exp Nothing (mkHsQTvs tvs
         -- Even if tvs is empty, we still make a HsForAll!
         -- In the Implicit case, this signals the place to do implicit quantification
         -- In the Explicit case, it prevents implicit quantification    
-        --      (see the sigtype production in Parser.y.pp)
+        --      (see the sigtype production in Parser.y)
         --      so that (forall. ty) isn't implicitly quantified
 
 plus :: HsExplicitFlag -> HsExplicitFlag -> HsExplicitFlag

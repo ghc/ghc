@@ -166,7 +166,7 @@ rnExpr (HsQuasiQuoteE qq)
 
 ---------------------------------------------
 --      Sections
--- See Note [Parsing sections] in Parser.y.pp
+-- See Note [Parsing sections] in Parser.y
 rnExpr (HsPar (L loc (section@(SectionL {}))))
   = do  { (section', fvs) <- rnSection section
         ; return (HsPar (L loc section'), fvs) }
@@ -339,7 +339,7 @@ arrowFail e
        ; return (hsHoleExpr, emptyFVs) }
 
 ----------------------
--- See Note [Parsing sections] in Parser.y.pp
+-- See Note [Parsing sections] in Parser.y
 rnSection :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 rnSection section@(SectionR op expr)
   = do  { (op', fvs_op)     <- rnLExpr op
