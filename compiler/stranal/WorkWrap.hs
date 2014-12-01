@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
+-}
+
 {-# LANGUAGE CPP #-}
 module WorkWrap ( wwTopBinds ) where
 
@@ -26,8 +26,8 @@ import FamInstEnv
 import MonadUtils
 
 #include "HsVersions.h"
-\end{code}
 
+{-
 We take Core bindings whose binders have:
 
 \begin{enumerate}
@@ -53,26 +53,26 @@ then only one worker/wrapper doing both transformations is produced;
 these workers/wrappers (this is where we get STRICTNESS and CPR pragma
 info for exported values).
 \end{enumerate}
+-}
 
-\begin{code}
 wwTopBinds :: DynFlags -> FamInstEnvs -> UniqSupply -> CoreProgram -> CoreProgram
 
 wwTopBinds dflags fam_envs us top_binds
   = initUs_ us $ do
     top_binds' <- mapM (wwBind dflags fam_envs) top_binds
     return (concat top_binds')
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[wwBind-wwExpr]{@wwBind@ and @wwExpr@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @wwBind@ works on a binding, trying each \tr{(binder, expr)} pair in
 turn.  Non-recursive case first, then recursive...
+-}
 
-\begin{code}
 wwBind  :: DynFlags
         -> FamInstEnvs
         -> CoreBind
@@ -92,14 +92,14 @@ wwBind dflags fam_envs (Rec pairs)
   where
     do_one (binder, rhs) = do new_rhs <- wwExpr dflags fam_envs rhs
                               tryWW dflags fam_envs Recursive binder new_rhs
-\end{code}
 
+{-
 @wwExpr@ basically just walks the tree, looking for appropriate
 annotations that can be used. Remember it is @wwBind@ that does the
 matching by looking for strict arguments of the correct type.
 @wwExpr@ is a version that just returns the ``Plain'' Tree.
+-}
 
-\begin{code}
 wwExpr :: DynFlags -> FamInstEnvs -> CoreExpr -> UniqSM CoreExpr
 
 wwExpr _      _ e@(Type {}) = return e
@@ -131,13 +131,13 @@ wwExpr dflags fam_envs (Case expr binder ty alts) = do
     ww_alt (con, binders, rhs) = do
         new_rhs <- wwExpr dflags fam_envs rhs
         return (con, binders, new_rhs)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[tryWW]{@tryWW@: attempt a worker/wrapper pair}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @tryWW@ just accumulates arguments, converts strictness info from the
 front-end into the proper form, then calls @mkWwBodies@ to do
@@ -262,8 +262,8 @@ it appears in the first place in the defining module.
 At one stage I tried making the wrapper inlining always-active, and
 that had a very bad effect on nofib/imaginary/x2n1; a wrapper was
 inlined before the specialisation fired.
+-}
 
-\begin{code}
 tryWW   :: DynFlags
         -> FamInstEnvs
         -> RecFlag
@@ -405,8 +405,8 @@ get_one_shots (Lam b e)
   | otherwise = get_one_shots e
 get_one_shots (Tick _ e) = get_one_shots e
 get_one_shots _          = []
-\end{code}
 
+{-
 Note [Do not split void functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this rather common form of binding:
@@ -451,8 +451,8 @@ Notice that x certainly has the CPR property now!
 In fact, splitThunk uses the function argument w/w splitting
 function, so that if x's demand is deeper (say U(U(L,L),L))
 then the splitting will go deeper too.
+-}
 
-\begin{code}
 -- See Note [Thunk splitting]
 -- splitThunk converts the *non-recursive* binding
 --      x = e
@@ -474,4 +474,3 @@ splitThunk dflags fam_envs is_rec fn_id rhs
        ; if useful then ASSERT2( isNonRec is_rec, ppr fn_id ) -- The thunk must be non-recursive
                    return res
                    else return [(fn_id, rhs)] }
-\end{code}

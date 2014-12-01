@@ -1,12 +1,12 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+
 
                         -----------------
                         A demand analysis
                         -----------------
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module DmdAnal ( dmdAnalProgram ) where
@@ -35,15 +35,15 @@ import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Top level stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 dmdAnalProgram dflags fam_envs binds
   = do {
@@ -75,13 +75,13 @@ dmdAnalTopBind sigs (Rec pairs)
     (sigs', _, pairs')  = dmdFix TopLevel sigs pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The analyser itself}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Ensure demand is strict]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,8 +98,8 @@ b) More important, consider
 c) The application rule wouldn't be right either
    Evaluating (f x) in a L demand does *not* cause
    evaluation of f in a C(L) demand!
+-}
 
-\begin{code}
 -- If e is complicated enough to become a thunk, its contents will be evaluated
 -- at most once, so oneify it.
 dmdTransformThunkDmd :: CoreExpr -> Demand -> Demand
@@ -366,8 +366,8 @@ dmdAnalAlt env dmd (con,bndrs,rhs)
                        idType (head bndrs) `eqType` realWorldStatePrimTy
     in
     (final_alt_ty, (con, bndrs', rhs'))
-\end{code}
 
+{-
 Note [Aggregated demand for cardinality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use different strategies for strictness and usage/cardinality to
@@ -424,8 +424,8 @@ in this case.
 
 In other words, for locally-bound lambdas we can infer
 one-shotness.
+-}
 
-\begin{code}
 addDataConPatDmds :: AltCon -> [Var] -> DmdType -> DmdType
 -- See Note [Add demands for strict constructors]
 addDataConPatDmds DEFAULT    _ dmd_ty = dmd_ty
@@ -438,8 +438,8 @@ addDataConPatDmds (DataAlt con) bndrs dmd_ty
                                    (filter isId bndrs)
                                    (dataConRepStrictness con)
                     , isMarkedStrict s ]
-\end{code}
 
+{-
 Note [Add demands for strict constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this program (due to Roman):
@@ -472,13 +472,13 @@ if X is monomorphic, and has an UNPACK pragma, then this optimisation
 is even more important.  We don't want the wrapper to rebox an unboxed
 argument, and pass an Int to $wfoo!
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                     Demand transformer
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dmdTransform :: AnalEnv         -- The strictness environment
              -> Id              -- The function
              -> CleanDemand     -- The demand on the function
@@ -508,15 +508,14 @@ dmdTransform env var dmd
 
   | otherwise                                    -- Local non-letrec-bound thing
   = unitVarDmd var (mkOnceUsedDmd dmd)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Bindings}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- Recursive bindings
 dmdFix :: TopLevelFlag
@@ -653,8 +652,8 @@ unpackTrivial (Cast e _)              = unpackTrivial e
 unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
 unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
 unpackTrivial _                       = Nothing
-\end{code}
 
+{-
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -697,13 +696,13 @@ the whole function gets the CPR property if we do.
 So for the demand on the body of a RHS we use a product demand if it's
 a product type.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Strictness signatures and types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 unitVarDmd :: Var -> Demand -> DmdType
 unitVarDmd var dmd
   = DmdType (unitVarEnv var dmd) [] topRes
@@ -738,15 +737,15 @@ addLazyFVs dmd_ty lazy_fvs
         -- which floats out of the defn for h.  Without the modifyEnv, that
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
-\end{code}
 
+{-
 Note [Do not strictify the argument dictionaries of a dfun]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The typechecker can tie recursive knots involving dfuns, so we do the
 conservative thing and refrain from strictifying a dfun's argument
 dictionaries.
+-}
 
-\begin{code}
 annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- The returned env has the var deleted
 -- The returned var is annotated with demand info
@@ -796,8 +795,8 @@ annotateLamIdBndr env arg_of_dfun dmd_ty one_shot id
 deleteFVs :: DmdType -> [Var] -> DmdType
 deleteFVs (DmdType fvs dmds res) bndrs
   = DmdType (delVarEnvList fvs bndrs) dmds res
-\end{code}
 
+{-
 Note [CPR for sum types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment we do not do CPR for let-bindings that
@@ -991,13 +990,13 @@ Then if <body> uses 'y', then transitively it uses 'x', and we must not
 forget that fact, otherwise we might make 'x' absent when it isn't.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Strictness signatures}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type DFunFlag = Bool  -- indicates if the lambda being considered is in the
                       -- sequence of lambdas at the top of the RHS of a dfun
 notArgOfDfun :: DFunFlag
@@ -1124,8 +1123,7 @@ dumpStrSig binds = vcat (map printId ids)
   printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
              | otherwise       = empty
 
-\end{code}
-
+{-
 Note [Initial CPR for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CPR is initialized for a lambda binder in an optimistic manner, i.e,
@@ -1185,3 +1183,4 @@ of the Id, and start from "bottom".  Nowadays the Id can have a current
 strictness, because interface files record strictness for nested bindings.
 To know when we are in the first iteration, we look at the ae_virgin
 field of the AnalEnv.
+-}

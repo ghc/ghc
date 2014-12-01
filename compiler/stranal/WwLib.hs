@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section[WwLib]{A library for the ``worker\/wrapper'' back-end to the strictness analyser}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[WwLib]{A library for the ``worker\/wrapper'' back-end to the strictness analyser}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
@@ -38,14 +38,13 @@ import Util
 import Outputable
 import DynFlags
 import FastString
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[mkWrapperAndWorker]{@mkWrapperAndWorker@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Here's an example.  The original function is:
 
@@ -100,15 +99,15 @@ same, we ``revise'' the strictness info, so that we won't propagate
 the unusable strictness-info into the interfaces.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{The worker wrapper core}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @mkWwBodies@ is called when doing the worker\/wrapper split inside a module.
+-}
 
-\begin{code}
 mkWwBodies :: DynFlags
            -> FamInstEnvs
            -> Type                                  -- Type of original function
@@ -165,8 +164,7 @@ mkWwBodies dflags fam_envs fun_ty demands res_info one_shots
       | otherwise
       = False
 
-\end{code}
-
+{-
 Note [Always do CPR w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 At one time we refrained from doing CPR w/w for thunks, on the grounds that
@@ -180,11 +178,11 @@ property, but now doesn't and there a cascade of disaster.  A good example
 is Trac #5920.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Making wrapper args}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 During worker-wrapper stuff we may end up with an unlifted thing
 which we want to let-bind without losing laziness.  So we
@@ -196,8 +194,8 @@ add a void argument.  E.g.
         f  = /\ a -> \x y z -> fw realworld
 
 We use the state-token type which generates no code.
+-}
 
-\begin{code}
 mkWorkerArgs :: DynFlags -> [Var]
              -> OneShotInfo  -- Whether all arguments are one-shot
              -> Type    -- Type of body
@@ -216,8 +214,8 @@ mkWorkerArgs dflags args all_one_shot res_ty
 
       -- see Note [All One-Shot Arguments of a Worker]
       newArg = setIdOneShotInfo voidArgId all_one_shot
-\end{code}
 
+{-
 Note [Protecting the last value argument]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the user writes (\_ -> E), they might be intentionally disallowing
@@ -255,11 +253,11 @@ If we made the void-arg one-shot we might inline an expensive
 computation for y, which would be terrible!
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Coercion stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We really want to "look through" coerces.
 Reason: I've seen this situation:
@@ -285,8 +283,8 @@ Now we'll inline f to get
 
 Now we'll see that fw has arity 1, and will arity expand
 the \x to get what we want.
+-}
 
-\begin{code}
 -- mkWWargs just does eta expansion
 -- is driven off the function type and arity.
 -- It chomps bites off foralls, arrows, newtypes
@@ -356,8 +354,8 @@ mk_wrap_arg uniq ty dmd one_shot
   = mkSysLocal (fsLit "w") uniq ty
        `setIdDemandInfo` dmd
        `setIdOneShotInfo` one_shot
-\end{code}
 
+{-
 Note [Freshen type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Wen we do a worker/wrapper split, we must not use shadowed names,
@@ -369,13 +367,13 @@ variables *are* mentioned in <blah>, so we must substitute.
 
 That's why we carry the TvSubst through mkWWargs
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Strictness stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkWWstr :: DynFlags
         -> FamInstEnvs
         -> [Var]                                -- Wrapper args; have their demand info on them
@@ -397,8 +395,7 @@ mkWWstr dflags fam_envs (arg : args) = do
     (useful2, args2, wrap_fn2, work_fn2) <- mkWWstr dflags fam_envs args
     return (useful1 || useful2, args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
-\end{code}
-
+{-
 Note [Unpacking arguments with product and polymorphic demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The argument is unpacked in a case if it has a product type and has a
@@ -425,8 +422,8 @@ to unbox its second argument.  This actually happened in GHC's onwn
 source code, in Packages.applyPackageFlag, which ended up un-boxing
 the enormous DynFlags tuple, and being strict in the
 as-yet-un-filled-in pkgState files.
+-}
 
-\begin{code}
 ----------------------
 -- mkWWstr_one wrap_arg = (useful, work_args, wrap_fn, work_fn)
 --   *  wrap_fn assumes wrap_arg is in scope,
@@ -494,15 +491,15 @@ mkWWstr_one dflags fam_envs arg
         -- If the wrapper argument is a one-shot lambda, then
         -- so should (all) the corresponding worker arguments be
         -- This bites when we do w/w on a case join point
-    set_worker_arg_info worker_arg demand 
+    set_worker_arg_info worker_arg demand
       = worker_arg `setIdDemandInfo`  demand
                    `setIdOneShotInfo` one_shot
 
 ----------------------
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
-\end{code}
 
+{-
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 By using unsafeCoerce, it is possible to make the number of demands fail to
@@ -510,11 +507,11 @@ match the number of constructor arguments; this happened in Trac #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
          Type scrutiny that is specfic to demand analysis
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Do not unpack class dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -535,8 +532,8 @@ Moreover, dictinoaries can have a lot of fields, so unpacking them can
 increase closure sizes.
 
 Conclusion: don't unpack dictionaries.
+-}
 
-\begin{code}
 deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
@@ -586,14 +583,13 @@ findTypeShape fam_envs ty
 
   | otherwise
   = TsUnk
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{CPR stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 @mkWWcpr@ takes the worker/wrapper pair produced from the strictness
@@ -603,9 +599,8 @@ tuple and re-produces the correct structured output.
 
 The non-CPR results appear ordered in the unboxed tuple as if by a
 left-to-right traversal of the result structure.
+-}
 
-
-\begin{code}
 mkWWcpr :: FamInstEnvs
         -> Type                              -- function body type
         -> DmdResult                         -- CPR analysis results
@@ -671,8 +666,8 @@ mkUnpackCase scrut co uniq boxing_con unpk_args body
   where
     casted_scrut = scrut `mkCast` co
     bndr = mk_ww_local uniq (exprType casted_scrut)
-\end{code}
 
+{-
 Note [non-algebraic or open body type warning]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -711,11 +706,11 @@ including the case itself in the cost centre, since it is morally
 part of the function (post transformation) anyway.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Utilities}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Absent errors]
 ~~~~~~~~~~~~~~~~~~~~
@@ -738,8 +733,8 @@ every primitive type, so the function is partial.
     is dead code, which is fragile, and indeed failed when
     profiling is on, which disables various optimisations.  So
     using a literal will do.]
+-}
 
-\begin{code}
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
   | not (isUnLiftedType arg_ty)
@@ -773,4 +768,3 @@ sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
 mk_ww_local :: Unique -> Type -> Id
 mk_ww_local uniq ty = mkSysLocal (fsLit "ww") uniq ty
-\end{code}
