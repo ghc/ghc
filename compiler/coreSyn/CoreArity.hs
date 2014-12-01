@@ -822,6 +822,23 @@ Note that SCCs are not treated specially by etaExpand.  If we have
         etaExpand 2 (\x -> scc "foo" e)
         = (\xy -> (scc "foo" e) y)
 So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
+
+Note [Eta expansion and source notes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+CorePrep puts floatable ticks outside of value applications, but not
+type applications. As a result we might be trying to eta-expand an
+expression like
+
+  (src<...> v) @a
+
+which we want to lead to code like
+
+  \x -> src<...> v @a x
+
+This means that we need to look through type applications and be ready
+to re-add floats on the top.
+
 -}
 
 -- | @etaExpand n us e ty@ returns an expression with
@@ -854,13 +871,21 @@ etaExpand n orig_expr
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
                       | otherwise = Lam v (go (n-1) body)
-    go n (Cast expr co) = Cast (go n expr) co
-    go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
-                          etaInfoAbs etas (etaInfoApp subst' expr etas)
-                        where
-                            in_scope = mkInScopeSet (exprFreeVars expr)
-                            (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
-                            subst' = mkEmptySubst in_scope'
+    go n (Cast expr co)           = Cast (go n expr) co
+    go n expr
+      = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
+        retick $ etaInfoAbs etas (etaInfoApp subst' sexpr etas)
+      where
+          in_scope = mkInScopeSet (exprFreeVars expr)
+          (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
+          subst' = mkEmptySubst in_scope'
+
+          -- Find ticks behind type apps.
+          -- See Note [Eta expansion and source notes]
+          (expr', args) = collectArgs expr
+          (ticks, expr'') = stripTicksTop tickishFloatable expr'
+          sexpr = foldl App expr'' args
+          retick expr = foldr mkTick expr ticks
 
                                 -- Wrapper    Unwrapper
 --------------

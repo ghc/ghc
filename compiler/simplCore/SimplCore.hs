@@ -20,7 +20,8 @@ import Rules            ( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize )
+import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize,
+                          mkTicks, stripTicksTop )
 import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult )
 import Simplify         ( simplTopBinds, simplExpr )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
@@ -821,9 +822,28 @@ could be eliminated.  But I don't think it's very common
 and it's dangerous to do this fiddling in STG land
 because we might elminate a binding that's mentioned in the
 unfolding for something.
+
+Note [Indirection zapping and ticks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unfortunately this is another place where we need a special case for
+ticks. The following happens quite regularly:
+
+        x_local = <expression>
+        x_exported = tick<x> x_local
+
+Which we want to become:
+
+        x_exported =  tick<x> <expression>
+
+As it makes no sense to keep the tick and the expression on separate
+bindings. Note however that that this might increase the ticks scoping
+over the execution of x_local, so we can only do this for floatable
+ticks. More often than not, other references will be unfoldings of
+x_exported, and therefore carry the tick anyway.
 -}
 
-type IndEnv = IdEnv Id          -- Maps local_id -> exported_id
+type IndEnv = IdEnv (Id, [Tickish Var]) -- Maps local_id -> exported_id, ticks
 
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds
@@ -832,8 +852,9 @@ shortOutIndirections binds
   | otherwise             = [Rec (flattenBinds binds')] -- for this no_need_to_flatten stuff
   where
     ind_env            = makeIndEnv binds
-    exp_ids            = varSetElems ind_env    -- These exported Ids are the subjects
-    exp_id_set         = mkVarSet exp_ids       -- of the indirection-elimination
+    -- These exported Ids are the subjects  of the indirection-elimination
+    exp_ids            = map fst $ varEnvElts ind_env
+    exp_id_set         = mkVarSet exp_ids
     no_need_to_flatten = all (null . specInfoRules . idSpecialisation) exp_ids
     binds'             = concatMap zap binds
 
@@ -841,10 +862,12 @@ shortOutIndirections binds
     zap (Rec pairs)       = [Rec (concatMap zapPair pairs)]
 
     zapPair (bndr, rhs)
-        | bndr `elemVarSet` exp_id_set             = []
-        | Just exp_id <- lookupVarEnv ind_env bndr = [(transferIdInfo exp_id bndr, rhs),
-                                                      (bndr, Var exp_id)]
-        | otherwise                                = [(bndr,rhs)]
+        | bndr `elemVarSet` exp_id_set = []
+        | Just (exp_id, ticks) <- lookupVarEnv ind_env bndr
+                                       = [(transferIdInfo exp_id bndr,
+                                           mkTicks ticks rhs),
+                                          (bndr, Var exp_id)]
+        | otherwise                    = [(bndr,rhs)]
 
 makeIndEnv :: [CoreBind] -> IndEnv
 makeIndEnv binds
@@ -855,8 +878,10 @@ makeIndEnv binds
     add_bind (Rec pairs)              env = foldr add_pair env pairs
 
     add_pair :: (Id,CoreExpr) -> IndEnv -> IndEnv
-    add_pair (exported_id, Var local_id) env
-        | shortMeOut env exported_id local_id = extendVarEnv env local_id exported_id
+    add_pair (exported_id, exported) env
+        | (ticks, Var local_id) <- stripTicksTop tickishFloatable exported
+        , shortMeOut env exported_id local_id
+        = extendVarEnv env local_id (exported_id, ticks)
     add_pair _ env = env
 
 -----------------

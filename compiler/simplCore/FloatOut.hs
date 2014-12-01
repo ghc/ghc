@@ -280,18 +280,20 @@ floatExpr lam@(Lam (TB _ lam_spec) _)
     (add_to_stats fs floats, floats, mkLams bndrs body') }
 
 floatExpr (Tick tickish expr)
-  | tickishScoped tickish
+  | tickish `tickishScopesLike` SoftScope -- not scoped, can just float
   = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
-    let
-        -- Annotate bindings floated outwards past an scc expression
+    (fs, floating_defns, Tick tickish expr') }
+
+  | not (tickishCounts tickish) || tickishCanSplit tickish
+  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
+    let -- Annotate bindings floated outwards past an scc expression
         -- with the cc.  We mark that cc as "duplicated", though.
         annotated_defns = wrapTick (mkNoCount tickish) floating_defns
     in
     (fs, annotated_defns, Tick tickish expr') }
 
-  | otherwise  -- not scoped, can just float
-  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
-    (fs, floating_defns, Tick tickish expr') }
+  | otherwise
+  = pprPanic "floatExpr tick" (ppr tickish)
 
 floatExpr (Cast expr co)
   = case (floatExpr expr) of { (fs, floating_defns, expr') ->

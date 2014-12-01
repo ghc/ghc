@@ -328,6 +328,9 @@ calcUnfoldingGuidance
         :: DynFlags
         -> CoreExpr    -- Expression to look at
         -> UnfoldingGuidance
+calcUnfoldingGuidance dflags (Tick t expr)
+  | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
+  = calcUnfoldingGuidance dflags expr
 calcUnfoldingGuidance dflags expr
   = case sizeExpr dflags (iUnbox bOMB_OUT_SIZE) val_bndrs body of
       TooBig -> UnfNever
@@ -576,6 +579,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
         | otherwise                      = size_up arg  `addSizeNSD`
                                            size_up_app fun (arg:args) voids
     size_up_app (Var fun)     args voids = size_up_call fun args voids
+    size_up_app (Tick _ expr) args voids = size_up_app expr args voids
     size_up_app other         args voids = size_up other `addSizeN` (length args - voids)
 
     ------------
@@ -623,8 +627,9 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     isRealWorldId id = idType id `eqType` realWorldStatePrimTy
 
     -- an expression of type State# RealWorld must be a variable
-    isRealWorldExpr (Var id) = isRealWorldId id
-    isRealWorldExpr _        = False
+    isRealWorldExpr (Var id)   = isRealWorldId id
+    isRealWorldExpr (Tick _ e) = isRealWorldExpr e
+    isRealWorldExpr _          = False
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int

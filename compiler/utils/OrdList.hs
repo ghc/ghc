@@ -9,6 +9,7 @@ Provide trees (of instructions), so that lists of instructions
 can be appended in linear time.
 -}
 
+{-# LANGUAGE CPP #-}
 module OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
@@ -16,6 +17,10 @@ module OrdList (
 ) where
 
 import Outputable
+
+#if __GLASGOW_HASKELL__ < 709
+import Data.Monoid ( Monoid(..) )
+#endif
 
 infixl 5  `appOL`
 infixl 5  `snocOL`
@@ -32,6 +37,11 @@ data OrdList a
 
 instance Outputable a => Outputable (OrdList a) where
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
+
+instance Monoid (OrdList a) where
+  mempty = nilOL
+  mappend = appOL
+  mconcat = concatOL
 
 nilOL    :: OrdList a
 isNilOL  :: OrdList a -> Bool

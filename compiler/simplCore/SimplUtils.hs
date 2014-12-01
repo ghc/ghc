@@ -63,6 +63,7 @@ import FastString
 import Pair
 
 import Control.Monad    ( when )
+import Data.List        ( partition )
 
 {-
 ************************************************************************
@@ -961,9 +962,10 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
         -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
         -- so substituting rhs inside a lambda doesn't change the occ info.
         -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)              = True
-    canInlineInLam (Lam b e)            = isRuntimeVar b || canInlineInLam e
-    canInlineInLam _                    = False
+    canInlineInLam (Lit _)    = True
+    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
+    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
+    canInlineInLam _          = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
@@ -1183,6 +1185,10 @@ mkLam bndrs body cont
       = mkLam' dflags (bndrs ++ bndrs1) body1
       where
         (bndrs1, body1) = collectBinders body
+
+    mkLam' dflags bndrs (Tick t expr)
+      | tickishFloatable t
+      = mkTick t <$> mkLam' dflags bndrs expr
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
@@ -1643,13 +1649,16 @@ defeats combineIdenticalAlts (see Trac #7360).
 combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
 -- See Note [Combine identical alternatives]
 combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
-  | all isDeadBinder bndrs1                     -- Remember the default
-  , length filtered_alts < length con_alts      -- alternative comes first
+  | all isDeadBinder bndrs1    -- Remember the default
+  , not (null eliminated_alts) -- alternative comes first
   = do  { tick (AltMerge case_bndr)
-        ; return ((DEFAULT, [], rhs1) : filtered_alts) }
+        ; return ((DEFAULT, [], mkTicks (concat tickss) rhs1) : filtered_alts) }
   where
-    filtered_alts = filterOut identical_to_alt1 con_alts
-    identical_to_alt1 (_con,bndrs,rhs) = all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1
+    (eliminated_alts, filtered_alts) = partition identical_to_alt1 con_alts
+    cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2
+    identical_to_alt1 (_con,bndrs,rhs)
+      = all isDeadBinder bndrs && rhs `cheapEqTicked` rhs1
+    tickss = map (fst . stripTicks tickishFloatable . thirdOf3) eliminated_alts
 
 combineIdenticalAlts _ alts = return alts
 
@@ -1701,7 +1710,8 @@ mkCase, mkCase1, mkCase2
 
 mkCase dflags scrut outer_bndr alts_ty ((DEFAULT, _, deflt_rhs) : outer_alts)
   | gopt Opt_CaseMerge dflags
-  , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
+  , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
+       <- stripTicksTop tickishFloatable deflt_rhs
   , inner_scrut_var == outer_bndr
   = do  { tick (CaseMerge outer_bndr)
 
@@ -1725,7 +1735,8 @@ mkCase dflags scrut outer_bndr alts_ty ((DEFAULT, _, deflt_rhs) : outer_alts)
                 -- When we merge, we must ensure that e1 takes
                 -- precedence over e2 as the value for A!
 
-        ; mkCase1 dflags scrut outer_bndr alts_ty merged_alts
+        ; fmap (mkTicks ticks) $
+          mkCase1 dflags scrut outer_bndr alts_ty merged_alts
         }
         -- Warning: don't call mkCase recursively!
         -- Firstly, there's no point, because inner alts have already had
@@ -1742,17 +1753,24 @@ mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
 mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
-       ; return (re_cast scrut rhs1) }
+       ; return (mkTicks ticks $ re_cast scrut rhs1) }
   where
+    ticks = concatMap (fst . stripTicks tickishFloatable . thirdOf3) (tail alts)
     identity_alt (con, args, rhs) = check_eq rhs con args
 
-    check_eq (Cast rhs co) con args         = not (any (`elemVarSet` tyCoVarsOfCo co) args)
-        {- See Note [RHS casts] -}            && check_eq rhs con args
-    check_eq (Lit lit) (LitAlt lit') _      = lit == lit'
-    check_eq (Var v)   _ _ | v == case_bndr = True
-    check_eq (Var v)   (DataAlt con) []     = v == dataConWorkId con   -- Optimisation only
-    check_eq rhs       (DataAlt con) args   = rhs `cheapEqExpr` mkConApp con (arg_tys ++ varsToCoreExprs args)
-    check_eq _ _ _ = False
+    check_eq (Cast rhs co) con        args
+      = not (any (`elemVarSet` tyCoVarsOfCo co) args) && check_eq rhs con args
+        -- See Note [RHS casts]
+    check_eq (Lit lit)  (LitAlt lit') _    = lit == lit'
+    check_eq (Var v) _ _  | v == case_bndr = True
+    check_eq (Var v)    (DataAlt con) []   = v == dataConWorkId con
+                                             -- Optimisation only
+    check_eq (Tick t e) alt           args = tickishFloatable t &&
+                                             check_eq e alt args
+    check_eq rhs        (DataAlt con) args = cheapEqExpr' tickishFloatable rhs $
+                                             mkConApp con (arg_tys ++
+                                                           varsToCoreExprs args)
+    check_eq _          _             _    = False
 
     arg_tys = map Type (tyConAppArgs (idType case_bndr))
 

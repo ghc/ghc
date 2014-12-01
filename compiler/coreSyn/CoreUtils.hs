@@ -12,7 +12,7 @@ Utility functions on @Core@ syntax
 module CoreUtils (
         -- * Constructing expressions
         mkCast,
-        mkTick, mkTickNoHNF, tickHNFArgs,
+        mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
         mkAltExpr,
 
@@ -33,14 +33,17 @@ module CoreUtils (
         CoreStats(..), coreBindsStats,
 
         -- * Equality
-        cheapEqExpr, eqExpr,
+        cheapEqExpr, cheapEqExpr', eqExpr,
 
         -- * Eta reduction
         tryEtaReduce,
 
         -- * Manipulating data constructors and types
         applyTypeToArgs, applyTypeToArg,
-        dataConRepInstPat, dataConRepFSInstPat
+        dataConRepInstPat, dataConRepFSInstPat,
+
+        -- * Working with ticks
+        stripTicksTop, stripTicksTopE, stripTicksTopT, stripTicks,
     ) where
 
 #include "HsVersions.h"
@@ -70,7 +73,13 @@ import Maybes
 import Platform
 import Util
 import Pair
+import Data.Function       ( on )
 import Data.List
+import Control.Applicative
+#if __GLASGOW_HASKELL__ < 709
+import Data.Traversable    ( traverse )
+#endif
+import OrdList
 
 {-
 ************************************************************************
@@ -211,6 +220,9 @@ mkCast (Cast expr co2) co
                    , ptext (sLit "co:") <+> ppr co ]) )
     mkCast expr (mkTransCo co2 co)
 
+mkCast (Tick t expr) co
+   = Tick t (mkCast expr co)
+
 mkCast expr co
   = let Pair from_ty _to_ty = coercionKind co in
 --    if to_ty `eqType` from_ty
@@ -222,48 +234,84 @@ mkCast expr co
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
 mkTick :: Tickish Id -> CoreExpr -> CoreExpr
+mkTick t orig_expr = mkTick' id id orig_expr
+ where
+  -- Some ticks (cost-centres) can be split in two, with the
+  -- non-counting part having laxer placement properties.
+  canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
 
-mkTick t (Var x)
-  | isFunTy (idType x) = Tick t (Var x)
-  | otherwise
-  = if tickishCounts t
-       then if tickishScoped t && tickishCanSplit t
-               then Tick (mkNoScope t) (Var x)
-               else Tick t (Var x)
-       else Var x
+  mkTick' :: (CoreExpr -> CoreExpr) -- ^ apply after adding tick (float through)
+          -> (CoreExpr -> CoreExpr) -- ^ apply before adding tick (float with)
+          -> CoreExpr               -- ^ current expression
+          -> CoreExpr
+  mkTick' top rest expr = case expr of
 
-mkTick t (Cast e co)
-  = Cast (mkTick t e) co -- Move tick inside cast
+    -- Cost centre ticks should never be reordered relative to each
+    -- other. Therefore we can stop whenever two collide.
+    Tick t2 e
+      | ProfNote{} <- t2, ProfNote{} <- t -> top $ Tick t $ rest expr
 
-mkTick _ (Coercion co) = Coercion co
+    -- Otherwise we assume that ticks of different placements float
+    -- through each other.
+      | tickishPlace t2 /= tickishPlace t -> mkTick' (top . Tick t2) rest e
 
-mkTick t (Lit l)
-  | not (tickishCounts t) = Lit l
+    -- For annotations this is where we make sure to not introduce
+    -- redundant ticks.
+      | tickishContains t t2              -> mkTick' top rest e
+      | tickishContains t2 t              -> orig_expr
+      | otherwise                         -> mkTick' top (rest . Tick t2) e
 
-mkTick t expr@(App f arg)
-  | not (isRuntimeArg arg) = App (mkTick t f) arg
-  | isSaturatedConApp expr
-    = if not (tickishCounts t)
-         then tickHNFArgs t expr
-         else if tickishScoped t && tickishCanSplit t
-                 then Tick (mkNoScope t) (tickHNFArgs (mkNoCount t) expr)
-                 else Tick t expr
+    -- Ticks don't care about types, so we just float all ticks
+    -- through them. Note that it's not enough to check for these
+    -- cases top-level. While mkTick will never produce Core with type
+    -- expressions below ticks, such constructs can be the result of
+    -- unfoldings. We therefore make an effort to put everything into
+    -- the right place no matter what we start with.
+    Cast e co   -> mkTick' (top . flip Cast co) rest e
+    Coercion co -> Coercion co
 
-mkTick t (Lam x e)
-     -- if this is a type lambda, or the tick does not count entries,
-     -- then we can push the tick inside:
-  | not (isRuntimeVar x) || not (tickishCounts t) = Lam x (mkTick t e)
-     -- if it is both counting and scoped, we split the tick into its
-     -- two components, keep the counting tick on the outside of the lambda
-     -- and push the scoped tick inside.  The point of this is that the
-     -- counting tick can probably be floated, and the lambda may then be
-     -- in a position to be beta-reduced.
-  | tickishScoped t && tickishCanSplit t
-         = Tick (mkNoScope t) (Lam x (mkTick (mkNoCount t) e))
-     -- just a counting tick: leave it on the outside
-  | otherwise        = Tick t (Lam x e)
+    Lam x e
+      -- Always float through type lambdas. Even for non-type lambdas,
+      -- floating is allowed for all but the most strict placement rule.
+      | not (isRuntimeVar x) || tickishPlace t /= PlaceRuntime
+      -> mkTick' (top . Lam x) rest e
 
-mkTick t other = Tick t other
+      -- If it is both counting and scoped, we split the tick into its
+      -- two components, often allowing us to keep the counting tick on
+      -- the outside of the lambda and push the scoped tick inside.
+      -- The point of this is that the counting tick can probably be
+      -- floated, and the lambda may then be in a position to be
+      -- beta-reduced.
+      | canSplit
+      -> top $ Tick (mkNoScope t) $ rest $ Lam x $ mkTick (mkNoCount t) e
+
+    App f arg
+      -- Always float through type applications.
+      | not (isRuntimeArg arg)
+      -> mkTick' (top . flip App arg) rest f
+
+      -- We can also float through constructor applications, placement
+      -- permitting. Again we can split.
+      | isSaturatedConApp expr && (tickishPlace t==PlaceCostCentre || canSplit)
+      -> if tickishPlace t == PlaceCostCentre
+         then top $ rest $ tickHNFArgs t expr
+         else top $ Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
+
+    Var x
+      | not (isFunTy (idType x)) && tickishPlace t == PlaceCostCentre
+      -> orig_expr
+      | canSplit
+      -> top $ Tick (mkNoScope t) $ rest expr
+
+    Lit{}
+      | tickishPlace t == PlaceCostCentre
+      -> orig_expr
+
+    -- Catch-all: Annotate where we stand
+    _any -> top $ Tick t $ rest expr
+
+mkTicks :: [Tickish Id] -> CoreExpr -> CoreExpr
+mkTicks ticks expr = foldr mkTick expr ticks
 
 isSaturatedConApp :: CoreExpr -> Bool
 isSaturatedConApp e = go e []
@@ -285,6 +333,48 @@ tickHNFArgs t e = push t e
   push t (App f (Type u)) = App (push t f) (Type u)
   push t (App f arg) = App (push t f) (mkTick t arg)
   push _t e = e
+
+-- | Strip ticks satisfying a predicate from top of an expression
+stripTicksTop :: (Tickish Id -> Bool) -> Expr b -> ([Tickish Id], Expr b)
+stripTicksTop p = go []
+  where go ts (Tick t e) | p t = go (t:ts) e
+        go ts other            = (reverse ts, other)
+
+-- | Strip ticks satisfying a predicate from top of an expression,
+-- returning the remaining expresion
+stripTicksTopE :: (Tickish Id -> Bool) -> Expr b -> Expr b
+stripTicksTopE p = go
+  where go (Tick t e) | p t = go e
+        go other            = other
+
+-- | Strip ticks satisfying a predicate from top of an expression,
+-- returning the ticks
+stripTicksTopT :: (Tickish Id -> Bool) -> Expr b -> [Tickish Id]
+stripTicksTopT p = go []
+  where go ts (Tick t e) | p t = go (t:ts) e
+        go ts _                = ts
+
+-- | Completely strip ticks satisfying a predicate from an
+-- expression. Note this is O(n) in the size of the expression!
+stripTicks :: (Tickish Id -> Bool) -> Expr b -> ([Tickish Id], Expr b)
+stripTicks p expr = (fromOL ticks, expr')
+  where (ticks, expr') = go expr
+        -- Note that  OrdList (Tickish Id) is a Monoid, which makes
+        -- ((,) (OrdList (Tickish Id))) an Applicative.
+        go (App e a)        = App <$> go e <*> go a
+        go (Lam b e)        = Lam b <$> go e
+        go (Let b e)        = Let <$> go_bs b <*> go e
+        go (Case e b t as)  = Case <$> go e <*> pure b <*> pure t
+                                   <*> traverse go_a as
+        go (Cast e c)       = Cast <$> go e <*> pure c
+        go (Tick t e)
+          | p t             = let (ts, e') = go e in (t `consOL` ts, e')
+          | otherwise       = Tick t <$> go e
+        go other            = pure other
+        go_bs (NonRec b e)  = NonRec b <$> go e
+        go_bs (Rec bs)      = Rec <$> traverse go_b bs
+        go_b (b, e)         = (,) <$> pure b <*> go e
+        go_a (c,bs,e)       = (,,) <$> pure c <*> pure bs <*> go e
 
 {-
 ************************************************************************
@@ -541,18 +631,21 @@ saturating them.
 
 Note [Tick trivial]
 ~~~~~~~~~~~~~~~~~~~
-Ticks are not trivial.  If we treat "tick<n> x" as trivial, it will be
-inlined inside lambdas and the entry count will be skewed, for
-example.  Furthermore "scc<n> x" will turn into just "x" in mkTick.
+
+Ticks are only trivial if they are pure annotations. If we treat
+"tick<n> x" as trivial, it will be inlined inside lambdas and the
+entry count will be skewed, for example.  Furthermore "scc<n> x" will
+turn into just "x" in mkTick.
 -}
 
 exprIsTrivial :: CoreExpr -> Bool
 exprIsTrivial (Var _)          = True        -- See Note [Variables are trivial]
-exprIsTrivial (Type _)        = True
+exprIsTrivial (Type _)         = True
 exprIsTrivial (Coercion _)     = True
 exprIsTrivial (Lit lit)        = litIsTrivial lit
 exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
-exprIsTrivial (Tick _ _)       = False  -- See Note [Tick trivial]
+exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
+                                 -- See Note [Tick trivial]
 exprIsTrivial (Cast e _)       = exprIsTrivial e
 exprIsTrivial (Lam b body)     = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial _                = False
@@ -767,8 +860,9 @@ exprIsCheap' good_app (Case e _ _ alts) = exprIsCheap' good_app e &&
 exprIsCheap' good_app (Tick t e)
   | tickishCounts t = False
   | otherwise       = exprIsCheap' good_app e
-     -- never duplicate ticks.  If we get this wrong, then HPC's entry
-     -- counts will be off (check test in libraries/hpc/tests/raytrace)
+     -- never duplicate counting ticks.  If we get this wrong, then
+     -- HPC's entry counts will be off (check test in
+     -- libraries/hpc/tests/raytrace)
 
 exprIsCheap' good_app (Let (NonRec _ b) e)
   = exprIsCheap' good_app b && exprIsCheap' good_app e
@@ -806,6 +900,10 @@ exprIsCheap' good_app other_expr        -- Applications and variables
                         -- Application of a function which
                         -- always gives bottom; we treat this as cheap
                         -- because it certainly doesn't need to be shared!
+
+    go (Tick t e) args
+      | not (tickishCounts t) -- don't duplicate counting ticks, see above
+      = go e args
 
     go _ _ = False
 
@@ -955,8 +1053,9 @@ expr_ok primop_ok (Case e _ _ alts)
 
 expr_ok primop_ok other_expr
   = case collectArgs other_expr of
-        (Var f, args) -> app_ok primop_ok f args
-        _             -> False
+        (expr, args) | Var f <- stripTicksTopE (not . tickishCounts) expr
+                     -> app_ok primop_ok f args
+        _            -> False
 
 -----------------------------
 app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
@@ -1313,29 +1412,40 @@ c.f. add_evals in Simplify.simplAlt
 --
 -- See also 'exprIsBig'
 cheapEqExpr :: Expr b -> Expr b -> Bool
+cheapEqExpr = cheapEqExpr' (const False)
 
-cheapEqExpr (Var v1)   (Var v2)   = v1==v2
-cheapEqExpr (Lit lit1) (Lit lit2) = lit1 == lit2
-cheapEqExpr (Type t1) (Type t2) = t1 `eqType` t2
-cheapEqExpr (Coercion c1) (Coercion c2) = c1 `coreEqCoercion` c2
+-- | Cheap expression equality test, can ignore ticks by type.
+cheapEqExpr' :: (Tickish Id -> Bool) -> Expr b -> Expr b -> Bool
+cheapEqExpr' ignoreTick = go_s
+  where go_s = go `on` stripTicksTopE ignoreTick
+        go (Var v1)   (Var v2)   = v1 == v2
+        go (Lit lit1) (Lit lit2) = lit1 == lit2
+        go (Type t1)  (Type t2)  = t1 `eqType` t2
+        go (Coercion c1) (Coercion c2) = c1 `coreEqCoercion` c2
 
-cheapEqExpr (App f1 a1) (App f2 a2)
-  = f1 `cheapEqExpr` f2 && a1 `cheapEqExpr` a2
+        go (App f1 a1) (App f2 a2)
+          = f1 `go_s` f2 && a1 `go_s` a2
 
-cheapEqExpr (Cast e1 t1) (Cast e2 t2)
-  = e1 `cheapEqExpr` e2 && t1 `coreEqCoercion` t2
+        go (Cast e1 t1) (Cast e2 t2)
+          = e1 `go_s` e2 && t1 `coreEqCoercion` t2
 
-cheapEqExpr _ _ = False
+        go (Tick t1 e1) (Tick t2 e2)
+          = t1 == t2 && e1 `go_s` e2
+
+        go _ _ = False
+        {-# INLINE go #-}
+{-# INLINE cheapEqExpr' #-}
 
 exprIsBig :: Expr b -> Bool
 -- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
 exprIsBig (Lit _)      = False
 exprIsBig (Var _)      = False
-exprIsBig (Type _)    = False
+exprIsBig (Type _)     = False
 exprIsBig (Coercion _) = False
 exprIsBig (Lam _ e)    = exprIsBig e
 exprIsBig (App f a)    = exprIsBig f || exprIsBig a
 exprIsBig (Cast e _)   = exprIsBig e    -- Hopefully coercions are not too big!
+exprIsBig (Tick _ e)   = exprIsBig e
 exprIsBig _            = True
 
 eqExpr :: InScopeSet -> CoreExpr -> CoreExpr -> Bool
@@ -1612,9 +1722,15 @@ tryEtaReduce bndrs body
       = Just (mkCast fun co)   -- Check for any of the binders free in the result
                                -- including the accumulated coercion
 
+    go bs (Tick t e) co
+      | tickishFloatable t
+      = fmap (Tick t) $ go bs e co
+      -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
+
     go (b : bs) (App fun arg) co
-      | Just co' <- ok_arg b arg co
-      = go bs fun co'
+      | Just (co', ticks) <- ok_arg b arg co
+      = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
+            -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
 
     go _ _ _  = Nothing         -- Failure!
 
@@ -1622,6 +1738,7 @@ tryEtaReduce bndrs body
     -- Note [Eta reduction conditions]
     ok_fun (App fun (Type {})) = ok_fun fun
     ok_fun (Cast fun _)        = ok_fun fun
+    ok_fun (Tick _ expr)       = ok_fun expr
     ok_fun (Var fun_id)        = ok_fun_id fun_id || all ok_lam bndrs
     ok_fun _fun                = False
 
@@ -1646,19 +1763,26 @@ tryEtaReduce bndrs body
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
            -> Coercion         -- Of kind (t1~t2)
-           -> Maybe Coercion   -- Of type (arg_t -> t1 ~  bndr_t -> t2)
+           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
+                    , [Tickish Var])
     -- See Note [Eta reduction with casted arguments]
     ok_arg bndr (Type ty) co
        | Just tv <- getTyVar_maybe ty
-       , bndr == tv  = Just (mkForAllCo tv co)
+       , bndr == tv  = Just (mkForAllCo tv co, [])
     ok_arg bndr (Var v) co
-       | bndr == v   = Just (mkFunCo Representational
-                                     (mkReflCo Representational (idType bndr)) co)
-    ok_arg bndr (Cast (Var v) co_arg) co
-       | bndr == v  = Just (mkFunCo Representational (mkSymCo co_arg) co)
+       | bndr == v   = let reflCo = mkReflCo Representational (idType bndr)
+                       in Just (mkFunCo Representational reflCo co, [])
+    ok_arg bndr (Cast e co_arg) co
+       | (ticks, Var v) <- stripTicksTop tickishFloatable e
+       , bndr == v
+       = Just (mkFunCo Representational (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
+    ok_arg bndr (Tick t arg) co
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co
+       = Just (co', t:ticks)
+
     ok_arg _ _ _ = Nothing
 
 {-

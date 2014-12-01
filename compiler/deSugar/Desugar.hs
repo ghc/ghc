@@ -104,6 +104,7 @@ deSugar hsc_env
               target     = hscTarget dflags
               hpcInfo    = emptyHpcInfo other_hpc_info
               want_ticks = gopt Opt_Hpc dflags
+                        || gopt Opt_Debug dflags
                         || target == HscInterpreted
                         || (gopt Opt_SccProfilingOn dflags
                             && case profAuto dflags of

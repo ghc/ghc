@@ -90,11 +90,12 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                       , density      = mkDensity dflags
                       , this_mod     = mod
                       , tickishType  = case hscTarget dflags of
-                          HscInterpreted          -> Breakpoints
-                          _ | gopt Opt_Hpc dflags -> HpcTicks
+                          HscInterpreted            -> Breakpoints
+                          _ | gopt Opt_Hpc dflags   -> HpcTicks
                             | gopt Opt_SccProfilingOn dflags
-                                                  -> ProfNotes
-                            | otherwise           -> error "addTicksToBinds: No way to annotate!"
+                                                    -> ProfNotes
+                            | gopt Opt_Debug dflags -> SourceNotes
+                            | otherwise             -> error "addTicksToBinds: No way to annotate!"
                        })
                    (TT
                       { tickBoxCount = 0
@@ -184,13 +185,14 @@ data TickDensity
 
 mkDensity :: DynFlags -> TickDensity
 mkDensity dflags
-  | gopt Opt_Hpc dflags                  = TickForCoverage
+  | gopt Opt_Hpc dflags
+    || gopt Opt_Debug dflags             = TickForCoverage
   | HscInterpreted  <- hscTarget dflags  = TickForBreakPoints
   | ProfAutoAll     <- profAuto dflags   = TickAllFunctions
   | ProfAutoTop     <- profAuto dflags   = TickTopFunctions
   | ProfAutoExports <- profAuto dflags   = TickExportedFunctions
   | ProfAutoCalls   <- profAuto dflags   = TickCallSites
-  | otherwise = panic "desnity"
+  | otherwise                            = panic "density"
   -- ToDo: -fhpc is taking priority over -fprof-auto here.  It seems
   -- that coverage works perfectly well with profiling, but you don't
   -- get any auto-generated SCCs.  It would make perfect sense to
@@ -939,7 +941,7 @@ data TickTransEnv = TTE { fileName     :: FastString
 
 --      deriving Show
 
-data TickishType = ProfNotes | HpcTicks | Breakpoints
+data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
 
 
 -- | Tickishs that only make sense when their source code location
@@ -1113,6 +1115,9 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
           HpcTicks    -> HpcTick (this_mod env) c
           ProfNotes   -> ProfNote cc count True{-scopes-}
           Breakpoints -> Breakpoint c ids
+          SourceNotes | RealSrcSpan pos' <- pos
+                      -> SourceNote pos' cc_name
+          _otherwise  -> panic "mkTickish: bad source span!"
     in
     ( tickish
     , fvs

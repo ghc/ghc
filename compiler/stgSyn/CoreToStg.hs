@@ -398,6 +398,9 @@ coreToStgExpr (Tick (ProfNote cc tick push) expr)
 coreToStgExpr (Tick Breakpoint{} _expr)
   = panic "coreToStgExpr: breakpoint should not happen"
 
+coreToStgExpr (Tick _ expr)
+  = {- dropped for now ... -} coreToStgExpr expr
+
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
 

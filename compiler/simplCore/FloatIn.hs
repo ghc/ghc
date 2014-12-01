@@ -20,7 +20,8 @@ module FloatIn ( floatInwards ) where
 
 import CoreSyn
 import MkCore
-import CoreUtils        ( exprIsDupable, exprIsExpandable, exprType, exprOkForSideEffects )
+import CoreUtils        ( exprIsDupable, exprIsExpandable, exprType,
+                          exprOkForSideEffects, mkTicks )
 import CoreFVs          ( CoreExprWithFVs, freeVars, freeVarsOf, idRuleAndUnfoldingVars )
 import Id               ( isOneShotBndr, idType )
 import Var
@@ -151,11 +152,12 @@ pull out any silly ones.
 -}
 
 fiExpr dflags to_drop ann_expr@(_,AnnApp {})
-  = wrapFloats drop_here $ wrapFloats extra_drop $
+  = mkTicks ticks $ wrapFloats drop_here $ wrapFloats extra_drop $
     mkApps (fiExpr dflags fun_drop ann_fun)
            (zipWith (fiExpr dflags) arg_drops ann_args)
   where
-    (ann_fun@(fun_fvs, _), ann_args) = collectAnnArgs ann_expr
+    (ann_fun@(fun_fvs, _), ann_args, ticks)
+           = collectAnnArgsTicks tickishFloatable ann_expr
     fun_ty = exprType (deAnnotate ann_fun)
     ((_,extra_fvs), arg_fvs) = mapAccumL mk_arg_fvs (fun_ty, emptyVarSet) ann_args
 
@@ -244,12 +246,11 @@ We don't float lets inwards past an SCC.
 -}
 
 fiExpr dflags to_drop (_, AnnTick tickish expr)
-  | tickishScoped tickish
-  =     -- Wimp out for now - we could push values in
-    wrapFloats to_drop (Tick tickish (fiExpr dflags [] expr))
-
-  | otherwise
+  | tickish `tickishScopesLike` SoftScope
   = Tick tickish (fiExpr dflags to_drop expr)
+
+  | otherwise -- Wimp out for now - we could push values in
+  = wrapFloats to_drop (Tick tickish (fiExpr dflags [] expr))
 
 {-
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}

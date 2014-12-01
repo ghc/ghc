@@ -14,7 +14,8 @@ import CoreSubst
 import Var              ( Var )
 import Id               ( Id, idType, idInlineActivation, zapIdOccInfo )
 import CoreUtils        ( mkAltExpr
-                        , exprIsTrivial)
+                        , exprIsTrivial
+                        , stripTicks, stripTicksTopE, mkTick, mkTicks )
 import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
@@ -171,13 +172,13 @@ cseBind env (Rec pairs)
 
 cseRhs :: CSEnv -> (OutBndr, InExpr) -> (CSEnv, OutExpr)
 cseRhs env (id',rhs)
-  = case lookupCSEnv env rhs' of
+  = case lookupCSEnv env rhs'' of
         Nothing
           | always_active -> (extendCSEnv env rhs' id', rhs')
           | otherwise     -> (env,                      rhs')
         Just id
-          | always_active -> (extendCSSubst env id' id, Var id)
-          | otherwise     -> (env,                      Var id)
+          | always_active -> (extendCSSubst env id' id, mkTicks ticks $ Var id)
+          | otherwise     -> (env,                      mkTicks ticks $ Var id)
           -- In the Just case, we have
           --        x = rhs
           --        ...
@@ -189,16 +190,23 @@ cseRhs env (id',rhs)
   where
     rhs' = cseExpr env rhs
 
+    (ticks, rhs'') = stripTicks tickishFloatable rhs'
+    -- We don't want to lose the source notes when a common sub
+    -- expression gets eliminated. Hence we push all (!) of them on
+    -- top of the replaced sub-expression. This is probably not too
+    -- useful in practice, but upholds our semantics.
+
     always_active = isAlwaysActive (idInlineActivation id')
          -- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
 tryForCSE env expr
-  | exprIsTrivial expr'                   = expr'       -- No point
-  | Just smaller <- lookupCSEnv env expr' = Var smaller
-  | otherwise                             = expr'
+  | exprIsTrivial expr'                    = expr'       -- No point
+  | Just smaller <- lookupCSEnv env expr'' = foldr mkTick (Var smaller) ticks
+  | otherwise                              = expr'
   where
     expr' = cseExpr env expr
+    (ticks, expr'') = stripTicks tickishFloatable expr'
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr env (Type t)               = Type (substTy (csEnvSubst env) t)
@@ -228,8 +236,9 @@ cseAlts :: CSEnv -> OutExpr -> InBndr -> InBndr -> [InAlt] -> [OutAlt]
 cseAlts env scrut' bndr bndr' alts
   = map cse_alt alts
   where
+    scrut'' = stripTicksTopE tickishFloatable scrut'
     (con_target, alt_env)
-        = case scrut' of
+        = case scrut'' of
             Var v' -> (v',     extendCSSubst env bndr v')    -- See Note [Case binders 1]
                                                              -- map: bndr -> v'
 
@@ -286,7 +295,8 @@ lookupCSEnv (CS { cs_map = csmap }) expr
 
 extendCSEnv :: CSEnv -> OutExpr -> Id -> CSEnv
 extendCSEnv cse expr id
-  = cse { cs_map = extendCoreMap (cs_map cse) expr (expr,id) }
+  = cse { cs_map = extendCoreMap (cs_map cse) sexpr (sexpr,id) }
+  where (_, sexpr) = stripTicks tickishFloatable expr
 
 csEnvSubst :: CSEnv -> Subst
 csEnvSubst = cs_subst

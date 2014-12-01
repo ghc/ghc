@@ -592,6 +592,7 @@ notWorthFloating e abs_vars
     go (_, AnnVar {}) n    = n >= 0
     go (_, AnnLit lit) n   = ASSERT( n==0 )
                              litIsTrivial lit   -- Note [Floating literals]
+    go (_, AnnTick t e) n  = not (tickishIsCode t) && go e n
     go (_, AnnCast e _)  n = go e n
     go (_, AnnApp e arg) n
        | (_, AnnType {}) <- arg = go e n
@@ -606,6 +607,7 @@ notWorthFloating e abs_vars
     is_triv (_, AnnCast e _)              = is_triv e
     is_triv (_, AnnApp e (_, AnnType {})) = is_triv e
     is_triv (_, AnnApp e (_, AnnCoercion {})) = is_triv e
+    is_triv (_, AnnTick t e)              = not (tickishIsCode t) && is_triv e
     is_triv _                             = False
 
 {-

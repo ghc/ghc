@@ -419,6 +419,7 @@ data GeneralFlag
    | Opt_ErrorSpans -- Include full span info in error messages,
                     -- instead of just the start position.
    | Opt_PprCaseAsLet
+   | Opt_PprShowTicks
 
    -- Suppress all coercions, them replacing with '...'
    | Opt_SuppressCoercions
@@ -454,6 +455,9 @@ data GeneralFlag
    -- safe haskell flags
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
+
+   -- debugging flags
+   | Opt_Debug
 
    deriving (Eq, Show, Enum)
 
@@ -887,7 +891,7 @@ data ProfAuto
   | ProfAutoTop        -- ^ top-level functions annotated only
   | ProfAutoExports    -- ^ exported functions annotated only
   | ProfAutoCalls      -- ^ annotate call-sites
-  deriving (Enum)
+  deriving (Eq,Enum)
 
 data Settings = Settings {
   sTargetPlatform        :: Platform,    -- Filled in by SysTools
@@ -2649,6 +2653,9 @@ dynamic_flags = [
   , defFlag "fno-safe-infer"   (noArg (\d -> d { safeInfer = False  } ))
   , defGhcFlag "fPIC"          (NoArg (setGeneralFlag Opt_PIC))
   , defGhcFlag "fno-PIC"       (NoArg (unSetGeneralFlag Opt_PIC))
+
+         ------ Debugging flags ----------------------------------------------
+  , defGhcFlag "g"             (NoArg (setGeneralFlag Opt_Debug))
  ]
  ++ map (mkFlag turnOn  ""     setGeneralFlag  ) negatableFlags
  ++ map (mkFlag turnOff "no-"  unSetGeneralFlag) negatableFlags
@@ -2861,6 +2868,7 @@ dFlags = [
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
+  flagSpec "ppr-ticks"                  Opt_PprShowTicks,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,

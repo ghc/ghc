@@ -35,7 +35,8 @@ import CoreSyn          -- All of it
 import CoreSubst
 import OccurAnal        ( occurAnalyseExpr )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
-import CoreUtils        ( exprType, eqExpr )
+import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
+                          stripTicksTopT, stripTicksTopE )
 import PprCore          ( pprRules )
 import Type             ( Type )
 import TcType           ( tcSplitTyConApp_maybe )
@@ -194,6 +195,8 @@ roughTopName (App f _) = roughTopName f
 roughTopName (Var f)   | isGlobalId f   -- Note [Care with roughTopName]
                        , isDataConWorkId f || idArity f > 0
                        = Just (idName f)
+roughTopName (Tick t e) | tickishFloatable t
+                        = roughTopName e
 roughTopName _ = Nothing
 
 ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
@@ -361,20 +364,28 @@ lookupRule dflags in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
         []     -> Nothing
-        (m:ms) -> Just (findBest (fn,args) m ms)
+        (m:ms) -> Just (findBest (fn,args') m ms)
   where
     rough_args = map roughTopName args
 
+    -- Strip ticks from arguments, see note [Tick annotations in RULE
+    -- matching]. We only collect ticks if a rule actually matches -
+    -- this matters for performance tests.
+    args' = map (stripTicksTopE tickishFloatable) args
+    ticks = concatMap (stripTicksTopT tickishFloatable) args
+
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
-    go ms []           = ms
-    go ms (r:rs) = case (matchRule dflags in_scope is_active fn args rough_args r) of
-                        Just e  -> go ((r,e):ms) rs
-                        Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$
-                                   --   ppr [ (arg_id, unfoldingTemplate unf)
-                                   --       | Var arg_id <- args
-                                   --       , let unf = idUnfolding arg_id
-                                   --       , isCheapUnfolding unf] )
-                                   go ms rs
+    go ms [] = ms
+    go ms (r:rs)
+      | Just e <- matchRule dflags in_scope is_active fn args' rough_args r
+      = go ((r,mkTicks ticks e):ms) rs
+      | otherwise
+      = -- pprTrace "match failed" (ppr r $$ ppr args $$
+        --   ppr [ (arg_id, unfoldingTemplate unf)
+        --       | Var arg_id <- args
+        --       , let unf = idUnfolding arg_id
+        --       , isCheapUnfolding unf] )
+        go ms rs
 
 findBest :: (Id, [CoreExpr])
          -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
@@ -609,6 +620,14 @@ match :: RuleMatchEnv
       -> CoreExpr               -- Target
       -> Maybe RuleSubst
 
+-- We look through certain ticks. See note [Tick annotations in RULE matching]
+match renv subst e1 (Tick t e2)
+  | tickishFloatable t
+  = match renv subst' e1 e2
+  where subst' = subst { rs_binds = rs_binds subst . mkTick t }
+match _ _ e@Tick{} _
+  = pprPanic "Tick in rule" (ppr e)
+
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
 
@@ -675,10 +694,11 @@ match renv subst (App f1 a1) (App f2 a2)
         ; match renv subst' a1 a2 }
 
 match renv subst (Lam x1 e1) e2
-  | Just (x2, e2) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
+  | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
   = let renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
                      , rv_fltR = delBndr (rv_fltR renv) x2 }
-    in  match renv' subst e1 e2
+        subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
+    in  match renv' subst' e1 e2
 
 match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do  { subst1 <- match_ty renv subst ty1 ty2
@@ -890,10 +910,17 @@ Hence, (a) the guard (not (isLocallyBoundR v2))
 
 Note [Tick annotations in RULE matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to look through Notes in both template and expression being
-matched.  This would be incorrect for ticks, which we cannot discard,
-so we do not look through Ticks at all.  cf Note [Notes in call
-patterns] in SpecConstr
+
+We used to unconditionally look through Notes in both template and
+expression being matched. This is actually illegal for counting or
+cost-centre-scoped ticks, because we have no place to put them without
+changing entry counts and/or costs. So now we just fail the match in
+these cases.
+
+On the other hand, where we are allowed to insert new cost into the
+tick scope, we can float them upwards to the rule application site.
+
+cf Note [Notes in call patterns] in SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~

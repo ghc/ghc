@@ -372,7 +372,7 @@ subst_expr subst expr
     go (Coercion co)   = Coercion (substCo subst co)
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
-    go (Tick tickish e) = Tick (substTickish subst tickish) (go e)
+    go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Cast e co)     = Cast (go e) (substCo subst co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and
@@ -892,7 +892,7 @@ simple_opt_expr subst expr
     go (Type ty)        = Type     (substTy subst ty)
     go (Coercion co)    = Coercion (optCoercion (getCvSubst subst) co)
     go (Lit lit)        = Lit lit
-    go (Tick tickish e) = Tick (substTickish subst tickish) (go e)
+    go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Cast e co)      | isReflCo co' = go e
                         | otherwise    = Cast (go e) co'
                         where
@@ -956,6 +956,10 @@ simple_app subst (Var v) as
   | isCompulsoryUnfolding (idUnfolding v)
   -- See Note [Unfold compulsory unfoldings in LHSs]
   =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
+simple_app subst (Tick t e) as
+  -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
+  | t `tickishScopesLike` SoftScope
+  = mkTick t $ simple_app subst e as
 simple_app subst e as
   = foldl App (simple_opt_expr subst e) as
 
@@ -1348,36 +1352,44 @@ Currently, it is used in Rules.match, and is required to make
 "map coerce = coerce" match.
 -}
 
-exprIsLambda_maybe :: InScopeEnv -> CoreExpr -> Maybe (Var, CoreExpr)
+exprIsLambda_maybe :: InScopeEnv -> CoreExpr
+                      -> Maybe (Var, CoreExpr,[Tickish Id])
     -- See Note [exprIsLambda_maybe]
 
 -- The simple case: It is a lambda already
 exprIsLambda_maybe _ (Lam x e)
-    = Just (x, e)
+    = Just (x, e, [])
+
+-- Still straightforward: Ticks that we can float out of the way
+exprIsLambda_maybe (in_scope_set, id_unf) (Tick t e)
+    | tickishFloatable t
+    , Just (x, e, ts) <- exprIsLambda_maybe (in_scope_set, id_unf) e
+    = Just (x, e, t:ts)
 
 -- Also possible: A casted lambda. Push the coercion inside
 exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
-    | Just (x, e) <- exprIsLambda_maybe (in_scope_set, id_unf) casted_e
+    | Just (x, e,ts) <- exprIsLambda_maybe (in_scope_set, id_unf) casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
     , ASSERT( not $ x `elemVarSet` tyCoVarsOfCo co) True
-    , let res = pushCoercionIntoLambda in_scope_set x e co
-    = -- pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e, ppr co, ppr res])
+    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
+    , let res = Just (x',e',ts)
+    = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res
 
 -- Another attempt: See if we find a partial unfolding
 exprIsLambda_maybe (in_scope_set, id_unf) e
-    | (Var f, as) <- collectArgs e
+    | (Var f, as, ts) <- collectArgsTicks tickishFloatable e
     , idArity f > length (filter isValArg as)
     -- Make sure there is hope to get a lambda
     , Just rhs <- expandUnfolding_maybe (id_unf f)
     -- Optimize, for beta-reduction
     , let e' =  simpleOptExprWith (mkEmptySubst in_scope_set) (rhs `mkApps` as)
     -- Recurse, because of possible casts
-    , Just (x', e'') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
-    , let res = Just (x', e'')
-    = -- pprTrace "exprIsLambda_maybe:Unfold" (vcat [ppr e, ppr res])
+    , Just (x', e'', ts') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
+    , let res = Just (x', e'', ts++ts')
+    = -- pprTrace "exprIsLambda_maybe:Unfold" (vcat [ppr e, ppr (x',e'')])
       res
 
 exprIsLambda_maybe _ _e

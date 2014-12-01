@@ -21,7 +21,8 @@ module OccurAnal (
 
 import CoreSyn
 import CoreFVs
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp )
+import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
+                          stripTicksTopE, mkTicks )
 import Id
 import Name( localiseName )
 import BasicTypes
@@ -40,6 +41,7 @@ import Util
 import Outputable
 import FastString
 import Data.List
+import Control.Arrow    ( second )
 
 {-
 ************************************************************************
@@ -1179,18 +1181,19 @@ we can sort them into the right place when doing dependency analysis.
 -}
 
 occAnal env (Tick tickish body)
+  | tickish `tickishScopesLike` SoftScope
+  = (usage, Tick tickish body')
+
   | Breakpoint _ ids <- tickish
-  = (mapVarEnv markInsideSCC usage
-         +++ mkVarEnv (zip ids (repeat NoOccInfo)), Tick tickish body')
+  = (usage_lam +++ mkVarEnv (zip ids (repeat NoOccInfo)), Tick tickish body')
     -- never substitute for any of the Ids in a Breakpoint
 
-  | tickishScoped tickish
-  = (mapVarEnv markInsideSCC usage, Tick tickish body')
-
   | otherwise
-  = (usage, Tick tickish body')
+  = (usage_lam, Tick tickish body')
   where
     !(usage,body') = occAnal env body
+    -- for a non-soft tick scope, we can inline lambdas only
+    usage_lam = mapVarEnv markInsideLam usage
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
@@ -1204,7 +1207,7 @@ occAnal env (Cast expr co)
     }
 
 occAnal env app@(App _ _)
-  = occAnalApp env (collectArgs app)
+  = occAnalApp env (collectArgsTicks tickishFloatable app)
 
 -- Ignore type variables altogether
 --   (a) occurrences inside type lambdas only not marked as InsideLam
@@ -1271,6 +1274,13 @@ occAnal env (Case scrut bndr ty alts)
         = (mkOneOcc env v True, Var v)  -- The 'True' says that the variable occurs
                                         -- in an interesting context; the case has
                                         -- at least one non-default alternative
+    occ_anal_scrut (Tick t e) alts
+        | t `tickishScopesLike` SoftScope
+          -- No reason to not look through all ticks here, but only
+          -- for soft-scoped ticks we can do so without having to
+          -- update returned occurance info (see occAnal)
+        = second (Tick t) $ occ_anal_scrut e alts
+
     occ_anal_scrut scrut _alts
         = occAnal (vanillaCtxt env) scrut    -- No need for rhsCtxt
 
@@ -1312,23 +1322,25 @@ Constructors are rather like lambdas in this way.
 -}
 
 occAnalApp :: OccEnv
-           -> (Expr CoreBndr, [Arg CoreBndr])
+           -> (Expr CoreBndr, [Arg CoreBndr], [Tickish Id])
            -> (UsageDetails, Expr CoreBndr)
-occAnalApp env (Var fun, args)
-  = case args_stuff of { (args_uds, args') ->
-    let
-       final_args_uds = markManyIf (isRhsEnv env && is_exp) args_uds
-          -- We mark the free vars of the argument of a constructor or PAP
-          -- as "many", if it is the RHS of a let(rec).
-          -- This means that nothing gets inlined into a constructor argument
-          -- position, which is what we want.  Typically those constructor
-          -- arguments are just variables, or trivial expressions.
-          --
-          -- This is the *whole point* of the isRhsEnv predicate
-          -- See Note [Arguments of let-bound constructors]
-    in
-    (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
+occAnalApp env (Var fun, args, ticks)
+  | null ticks = (uds, mkApps (Var fun) args')
+  | otherwise  = (uds, mkTicks ticks $ mkApps (Var fun) args')
   where
+    uds = fun_uds +++ final_args_uds
+
+    !(args_uds, args') = occAnalArgs env args one_shots
+    !final_args_uds = markManyIf (isRhsEnv env && is_exp) args_uds
+       -- We mark the free vars of the argument of a constructor or PAP
+       -- as "many", if it is the RHS of a let(rec).
+       -- This means that nothing gets inlined into a constructor argument
+       -- position, which is what we want.  Typically those constructor
+       -- arguments are just variables, or trivial expressions.
+       --
+       -- This is the *whole point* of the isRhsEnv predicate
+       -- See Note [Arguments of let-bound constructors]
+
     n_val_args = valArgCount args
     fun_uds    = mkOneOcc env fun (n_val_args > 0)
     is_exp     = isExpandableApp fun n_val_args
@@ -1339,26 +1351,17 @@ occAnalApp env (Var fun, args)
     one_shots  = argsOneShots (idStrictness fun) n_val_args
                  -- See Note [Use one-shot info]
 
-    args_stuff = occAnalArgs env args one_shots
-
-                        -- (foldr k z xs) may call k many times, but it never
-                        -- shares a partial application of k; hence [False,True]
-                        -- This means we can optimise
-                        --      foldr (\x -> let v = ...x... in \y -> ...v...) z xs
-                        -- by floating in the v
-
-occAnalApp env (fun, args)
-  = case occAnal (addAppCtxt env args) fun of   { (fun_uds, fun') ->
+occAnalApp env (fun, args, ticks)
+  = (fun_uds +++ args_uds, mkTicks ticks $ mkApps fun' args')
+  where
+    !(fun_uds, fun') = occAnal (addAppCtxt env args) fun
         -- The addAppCtxt is a bit cunning.  One iteration of the simplifier
         -- often leaves behind beta redexs like
         --      (\x y -> e) a1 a2
         -- Here we would like to mark x,y as one-shot, and treat the whole
         -- thing much like a let.  We do this by pushing some True items
         -- onto the context stack.
-
-    case occAnalArgs env args [] of        { (args_uds, args') ->
-    (fun_uds +++ args_uds, mkApps fun' args') }}
-
+    !(args_uds, args') = occAnalArgs env args []
 
 markManyIf :: Bool              -- If this is true
            -> UsageDetails      -- Then do markMany on this
@@ -1731,7 +1734,7 @@ mkAltEnv :: OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
 --                  c) returns a proxy mapping, binding the scrutinee
 --                     to the case binder, if possible
 mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
-  = case scrut of
+  = case stripTicksTopE (const True) scrut of
       Var v           -> add_scrut v case_bndr'
       Cast (Var v) co -> add_scrut v (Cast case_bndr' (mkSymCo co))
                           -- See Note [Case of cast]
@@ -1843,12 +1846,9 @@ mkOneOcc env id int_cxt
   | otherwise
   = emptyDetails
 
-markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
+markMany, markInsideLam :: OccInfo -> OccInfo
 
 markMany _  = NoOccInfo
-
-markInsideSCC occ = markInsideLam occ
-  -- inside an SCC, we can inline lambdas only.
 
 markInsideLam (OneOcc _ one_br int_cxt) = OneOcc True one_br int_cxt
 markInsideLam occ                       = occ

@@ -43,7 +43,7 @@ module SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
-        showUserSpan,
+        showUserSpan, pprUserRealSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -53,6 +53,7 @@ module SrcLoc (
 
         -- ** Predicates on SrcSpan
         isGoodSrcSpan, isOneLineSpan,
+        containsSpan,
 
         -- * Located
         Located,
@@ -264,8 +265,8 @@ data SrcSpan =
   | UnhelpfulSpan !FastString   -- Just a general indication
                                 -- also used to indicate an empty span
 
-  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, because we
-                                -- derive Show for Token
+  deriving (Eq, Ord, Typeable, Show) -- Show is used by Lexer.x, because we
+                                     -- derive Show for Token
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, wiredInSrcSpan :: SrcSpan
@@ -348,9 +349,19 @@ isOneLineSpan :: SrcSpan -> Bool
 isOneLineSpan (RealSrcSpan s) = srcSpanStartLine s == srcSpanEndLine s
 isOneLineSpan (UnhelpfulSpan _) = False
 
+-- | Tests whether the first span "contains" the other span, meaning
+-- that it covers at least as much source code. True where spans are equal.
+containsSpan :: RealSrcSpan -> RealSrcSpan -> Bool
+containsSpan s1 s2
+  = srcSpanFile s1 == srcSpanFile s2
+    && (srcSpanStartLine s1, srcSpanStartCol s1)
+       <= (srcSpanStartLine s2, srcSpanStartCol s2)
+    && (srcSpanEndLine s1, srcSpanEndCol s1)
+       >= (srcSpanEndLine s2, srcSpanEndCol s2)
+
 {-
-************************************************************************
-*                                                                      *
+%************************************************************************
+%*                                                                      *
 \subsection[SrcSpan-unsafe-access-fns]{Unsafe access functions}
 *                                                                      *
 ************************************************************************
@@ -418,11 +429,12 @@ srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
 ************************************************************************
 -}
 
--- We want to order SrcSpans first by the start point, then by the end point.
-instance Ord SrcSpan where
+-- We want to order RealSrcSpans first by the start point, then by the
+-- end point.
+instance Ord RealSrcSpan where
   a `compare` b =
-     (srcSpanStart a `compare` srcSpanStart b) `thenCmp`
-     (srcSpanEnd   a `compare` srcSpanEnd   b)
+     (realSrcSpanStart a `compare` realSrcSpanStart b) `thenCmp`
+     (realSrcSpanEnd   a `compare` realSrcSpanEnd   b)
 
 instance Show RealSrcLoc where
   show (SrcLoc filename row col)

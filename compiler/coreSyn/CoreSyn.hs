@@ -8,7 +8,8 @@
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
         -- * Main data types
-        Expr(..), Alt, Bind(..), AltCon(..), Arg, Tickish(..),
+        Expr(..), Alt, Bind(..), AltCon(..), Arg,
+        Tickish(..), TickishScoping(..), TickishPlacement(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
@@ -31,13 +32,15 @@ module CoreSyn (
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
-        collectArgs, flattenBinds,
+        collectArgs, collectArgsTicks, flattenBinds,
 
         isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
 
-        tickishCounts, tickishScoped, tickishIsCode, mkNoCount, mkNoScope,
-        tickishCanSplit,
+        tickishCounts, tickishScoped, tickishScopesLike, tickishFloatable,
+        tickishCanSplit, mkNoCount, mkNoScope,
+        tickishIsCode, tickishPlace,
+        tickishContains,
 
         -- * Unfolding data types
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
@@ -62,7 +65,7 @@ module CoreSyn (
         AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt,
 
         -- ** Operations on annotated expressions
-        collectAnnArgs,
+        collectAnnArgs, collectAnnArgsTicks,
 
         -- ** Operations on annotations
         deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
@@ -97,6 +100,7 @@ import DynFlags
 import FastString
 import Outputable
 import Util
+import SrcLoc     ( RealSrcSpan, containsSpan )
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -466,6 +470,28 @@ data Tickish id =
                                 -- Note [substTickish] in CoreSubst.
     }
 
+  -- | A source note.
+  --
+  -- Source notes are pure annotations: Their presence should neither
+  -- influence compilation nor execution. The semantics are given by
+  -- causality: The presence of a source note means that a local
+  -- change in the referenced source code span will possibly provoke
+  -- the generated code to change. On the flip-side, the functionality
+  -- of annotated code *must* be invariant against changes to all
+  -- source code *except* the spans referenced in the source notes
+  -- (see "Causality of optimized Haskell" paper for details).
+  --
+  -- Therefore extending the scope of any given source note is always
+  -- valid. Note that it is still undesirable though, as this reduces
+  -- their usefulness for debugging and profiling. Therefore we will
+  -- generally try only to make use of this property where it is
+  -- neccessary to enable optimizations.
+  | SourceNote
+    { sourceSpan :: RealSrcSpan -- ^ Source covered
+    , sourceName :: String      -- ^ Name for source location
+                                --   (uses same names as CCs)
+    }
+
   deriving (Eq, Ord, Data, Typeable)
 
 
@@ -477,41 +503,200 @@ data Tickish id =
 -- However, we still allow the simplifier to increase or decrease
 -- sharing, so in practice the actual number of ticks may vary, except
 -- that we never change the value from zero to non-zero or vice versa.
---
 tickishCounts :: Tickish id -> Bool
 tickishCounts n@ProfNote{} = profNoteCount n
 tickishCounts HpcTick{}    = True
 tickishCounts Breakpoint{} = True
+tickishCounts _            = False
 
-tickishScoped :: Tickish id -> Bool
-tickishScoped n@ProfNote{} = profNoteScope n
-tickishScoped HpcTick{}    = False
-tickishScoped Breakpoint{} = True
+
+-- | Specifies the scoping behaviour of ticks. This governs the
+-- behaviour of ticks that care about the covered code and the cost
+-- associated with it. Important for ticks relating to profiling.
+data TickishScoping =
+    -- | No scoping: The tick does not care about what code it
+    -- covers. Transformations can freely move code inside as well as
+    -- outside without any additional annotation obligations
+    NoScope
+
+    -- | Soft scoping: We want all code that is covered to stay
+    -- covered.  Note that this scope type does not forbid
+    -- transformations from happening, as as long as all results of
+    -- the transformations are still covered by this tick or a copy of
+    -- it. For example
+    --
+    --   let x = tick<...> (let y = foo in bar) in baz
+    --     ===>
+    --   let x = tick<...> bar; y = tick<...> foo in baz
+    --
+    -- Is a valid transformation as far as "bar" and "foo" is
+    -- concerned, because both still are scoped over by the tick.
+    --
+    -- Note though that one might object to the "let" not being
+    -- covered by the tick any more. However, we are generally lax
+    -- with this - constant costs don't matter too much, and given
+    -- that the "let" was effectively merged we can view it as having
+    -- lost its identity anyway.
+    --
+    -- Also note that this scoping behaviour allows floating a tick
+    -- "upwards" in pretty much any situation. For example:
+    --
+    --   case foo of x -> tick<...> bar
+    --     ==>
+    --   tick<...> case foo of x -> bar
+    --
+    -- While this is always leagl, we want to make a best effort to
+    -- only make us of this where it exposes transformation
+    -- opportunities.
+  | SoftScope
+
+    -- | Cost centre scoping: We don't want any costs to move to other
+    -- cost-centre stacks. This means we not only want no code or cost
+    -- to get moved out of their cost centres, but we also object to
+    -- code getting associated with new cost-centre ticks - or
+    -- changing the order in which they get applied.
+    --
+    -- A rule of thumb is that we don't want any code to gain new
+    -- annotations. However, there are notable exceptions, for
+    -- example:
+    --
+    --   let f = \y -> foo in tick<...> ... (f x) ...
+    --     ==>
+    --   tick<...> ... foo[x/y] ...
+    --
+    -- In-lining lambdas like this is always legal, because inlining a
+    -- function does not change the cost-centre stack when the
+    -- function is called.
+  | CostCentreScope
+
+  deriving (Eq)
+
+-- | Returns the intended scoping rule for a Tickish
+tickishScoped :: Tickish id -> TickishScoping
+tickishScoped n@ProfNote{}
+  | profNoteScope n        = CostCentreScope
+  | otherwise              = NoScope
+tickishScoped HpcTick{}    = NoScope
+tickishScoped Breakpoint{} = CostCentreScope
    -- Breakpoints are scoped: eventually we're going to do call
    -- stacks, but also this helps prevent the simplifier from moving
    -- breakpoints around and changing their result type (see #1531).
+tickishScoped SourceNote{} = SoftScope
+
+-- | Returns whether the tick scoping rule is at least as permissive
+-- as the given scoping rule.
+tickishScopesLike :: Tickish id -> TickishScoping -> Bool
+tickishScopesLike t scope = tickishScoped t `like` scope
+  where NoScope         `like` _               = True
+        _               `like` NoScope         = False
+        SoftScope       `like` _               = True
+        _               `like` SoftScope       = False
+        CostCentreScope `like` _               = True
+
+-- | Returns @True@ for ticks that can be floated upwards easily even
+-- where it might change execution counts, such as:
+--
+--   Just (tick<...> foo)
+--     ==>
+--   tick<...> (Just foo)
+--
+-- This is a combination of @tickishSoftScope@ and
+-- @tickishCounts@. Note that in principle splittable ticks can become
+-- floatable using @mkNoTick@ -- even though there's currently no
+-- tickish for which that is the case.
+tickishFloatable :: Tickish id -> Bool
+tickishFloatable t = t `tickishScopesLike` SoftScope && not (tickishCounts t)
+
+-- | Returns @True@ for a tick that is both counting /and/ scoping and
+-- can be split into its (tick, scope) parts using 'mkNoScope' and
+-- 'mkNoTick' respectively.
+tickishCanSplit :: Tickish id -> Bool
+tickishCanSplit ProfNote{profNoteScope = True, profNoteCount = True}
+                   = True
+tickishCanSplit _  = False
 
 mkNoCount :: Tickish id -> Tickish id
-mkNoCount n@ProfNote{} = n {profNoteCount = False}
-mkNoCount Breakpoint{} = panic "mkNoCount: Breakpoint" -- cannot split a BP
-mkNoCount HpcTick{}    = panic "mkNoCount: HpcTick"
+mkNoCount n | not (tickishCounts n)   = n
+            | not (tickishCanSplit n) = panic "mkNoCount: Cannot split!"
+mkNoCount n@ProfNote{}                = n {profNoteCount = False}
+mkNoCount _                           = panic "mkNoCount: Undefined split!"
 
 mkNoScope :: Tickish id -> Tickish id
-mkNoScope n@ProfNote{} = n {profNoteScope = False}
-mkNoScope Breakpoint{} = panic "mkNoScope: Breakpoint" -- cannot split a BP
-mkNoScope HpcTick{}    = panic "mkNoScope: HpcTick"
+mkNoScope n | tickishScoped n == NoScope  = n
+            | not (tickishCanSplit n)     = panic "mkNoScope: Cannot split!"
+mkNoScope n@ProfNote{}                    = n {profNoteScope = False}
+mkNoScope _                               = panic "mkNoScope: Undefined split!"
 
--- | Return True if this source annotation compiles to some code, or will
--- disappear before the backend.
+-- | Return @True@ if this source annotation compiles to some backend
+-- code. Without this flag, the tickish is seen as a simple annotation
+-- that does not have any associated evaluation code.
+--
+-- What this means that we are allowed to disregard the tick if doing
+-- so means that we can skip generating any code in the first place. A
+-- typical example is top-level bindings:
+--
+--   foo = tick<...> \y -> ...
+--     ==>
+--   foo = \y -> tick<...> ...
+--
+-- Here there is just no operational difference between the first and
+-- the second version. Therefore code generation should simply
+-- translate the code as if it found the latter.
 tickishIsCode :: Tickish id -> Bool
-tickishIsCode _tickish = True  -- all of them for now
+tickishIsCode SourceNote{} = False
+tickishIsCode _tickish     = True  -- all the rest for now
 
--- | Return True if this Tick can be split into (tick,scope) parts with
--- 'mkNoScope' and 'mkNoCount' respectively.
-tickishCanSplit :: Tickish Id -> Bool
-tickishCanSplit Breakpoint{} = False
-tickishCanSplit HpcTick{}    = False
-tickishCanSplit _ = True
+
+-- | Governs the kind of expression that the tick gets placed on when
+-- annotating for example using @mkTick@. If we find that we want to
+-- put a tickish on an expression ruled out here, we try to float it
+-- inwards until we find a suitable expression.
+data TickishPlacement =
+
+    -- | Place ticks exactly on run-time expressions. We can still
+    -- move the tick through pure compile-time constructs such as
+    -- other ticks, casts or type lambdas. This is the most
+    -- restrictive placement rule for ticks, as all tickishs have in
+    -- common that they want to track runtime processes. The only
+    -- legal placement rule for counting ticks.
+    PlaceRuntime
+
+    -- | As @PlaceRuntime@, but we float the tick through all
+    -- lambdas. This makes sense where there is little difference
+    -- between annotating the lambda and annotating the lambda's code.
+  | PlaceNonLam
+
+    -- | In addition to floating through lambdas, cost-centre style
+    -- tickishs can also be moved from constructors, non-function
+    -- variables and literals. For example:
+    --
+    --   let x = scc<...> C (scc<...> y) (scc<...> 3) in ...
+    --
+    -- Neither the constructor application, the variable or the
+    -- literal are likely to have any cost worth mentioning. And even
+    -- if y names a thunk, the call would not care about the
+    -- evaluation context. Therefore removing all annotations in the
+    -- above example is safe.
+  | PlaceCostCentre
+
+  deriving (Eq)
+
+-- | Placement behaviour we want for the ticks
+tickishPlace :: Tickish id -> TickishPlacement
+tickishPlace n@ProfNote{}
+  | profNoteCount n        = PlaceRuntime
+  | otherwise              = PlaceCostCentre
+tickishPlace HpcTick{}     = PlaceRuntime
+tickishPlace Breakpoint{}  = PlaceRuntime
+tickishPlace SourceNote{}  = PlaceNonLam
+
+-- | Returns whether one tick "contains" the other one, therefore
+-- making the second tick redundant.
+tickishContains :: Eq b => Tickish b -> Tickish b -> Bool
+tickishContains (SourceNote sp1 n1) (SourceNote sp2 n2)
+  = n1 == n2 && containsSpan sp1 sp2
+tickishContains t1 t2
+  = t1 == t2
 
 {-
 ************************************************************************
@@ -1324,6 +1509,19 @@ collectArgs expr
     go (App f a) as = go f (a:as)
     go e         as = (e, as)
 
+-- | Like @collectArgs@, but also collects looks through floatable
+-- ticks if it means that we can find more arguments.
+collectArgsTicks :: (Tickish Id -> Bool) -> Expr b
+                 -> (Expr b, [Arg b], [Tickish Id])
+collectArgsTicks skipTick expr
+  = go expr [] []
+  where
+    go (App f a)  as ts = go f (a:as) ts
+    go (Tick t e) as ts
+      | skipTick t      = go e as (t:ts)
+    go e          as ts = (e, as, reverse ts)
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1388,8 +1586,8 @@ seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
 seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
-seqExpr (Tick n e)    = seqTickish n `seq` seqExpr e
-seqExpr (Type t)       = seqType t
+seqExpr (Tick n e)      = seqTickish n `seq` seqExpr e
+seqExpr (Type t)        = seqType t
 seqExpr (Coercion co)   = seqCo co
 
 seqExprs :: [CoreExpr] -> ()
@@ -1400,6 +1598,7 @@ seqTickish :: Tickish Id -> ()
 seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
 seqTickish HpcTick{} = ()
 seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids
+seqTickish SourceNote{} = ()
 
 seqBndr :: CoreBndr -> ()
 seqBndr b = b `seq` ()
@@ -1467,6 +1666,16 @@ collectAnnArgs expr
   where
     go (_, AnnApp f a) as = go f (a:as)
     go e               as = (e, as)
+
+collectAnnArgsTicks :: (Tickish Var -> Bool) -> AnnExpr b a
+                       -> (AnnExpr b a, [AnnExpr b a], [Tickish Var])
+collectAnnArgsTicks tickishOk expr
+  = go expr [] []
+  where
+    go (_, AnnApp f a)  as ts = go f (a:as) ts
+    go (_, AnnTick t e) as ts | tickishOk t
+                              = go e as (t:ts)
+    go e                as ts = (e, as, reverse ts)
 
 deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e

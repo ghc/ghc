@@ -1206,7 +1206,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
         prepd_binds <- {-# SCC "CorePrep" #-}
-                       corePrepPgm dflags hsc_env core_binds data_tycons ;
+                       corePrepPgm hsc_env location core_binds data_tycons ;
         -----------------  Convert to STG ------------------
         (stg_binds, cost_centre_info)
             <- {-# SCC "CoreToStg" #-}
@@ -1269,7 +1269,7 @@ hscInteractive hsc_env cgguts mod_summary = do
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
     prepd_binds <- {-# SCC "CorePrep" #-}
-                   corePrepPgm dflags hsc_env core_binds data_tycons
+                   corePrepPgm hsc_env location core_binds data_tycons
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen dflags this_mod prepd_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff ---
@@ -1493,7 +1493,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     {- Prepare For Code Generation -}
     -- Do saturation and convert to A-normal form
     prepd_binds <- {-# SCC "CorePrep" #-}
-                    liftIO $ corePrepPgm dflags hsc_env core_binds data_tycons
+      liftIO $ corePrepPgm hsc_env iNTERACTIVELoc core_binds data_tycons
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen dflags this_mod
