@@ -2277,8 +2277,7 @@ AC_DEFUN([FP_BFD_SUPPORT], [
                         [],dnl bfd seems to work
                         [AC_MSG_ERROR([can't use 'bfd' library])])
             LIBS="$save_LIBS"
-        ],
-        []
+        ]
     )
 ])
 
