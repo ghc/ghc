@@ -51,9 +51,6 @@ void *lookupSymbol( char *lbl );
 /* delete an object from the pool */
 HsInt unloadObj( pathchar *path );
 
-/* purge an object's symbols from the symbol table, but don't unload it */
-HsInt purgeObj( pathchar *path );
-
 /* add an obj (populate the global symbol table, but don't resolve yet) */
 HsInt loadObj( pathchar *path );
 

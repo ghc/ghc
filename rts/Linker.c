@@ -2280,44 +2280,19 @@ mmap_again:
 }
 #endif // USE_MMAP
 
-/*
- * Remove symbols from the symbol table, and free oc->symbols.
- * This operation is idempotent.
- */
 static void removeOcSymbols (ObjectCode *oc)
 {
     if (oc->symbols == NULL) return;
 
-    // Remove all the mappings for the symbols within this object..
+    /* Remove all the mappings for the symbols within this object..
+     */
     int i;
     for (i = 0; i < oc->n_symbols; i++) {
         if (oc->symbols[i] != NULL) {
             ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
         }
     }
-
-    stgFree(oc->symbols);
-    oc->symbols = NULL;
 }
-
-/*
- * Release StablePtrs and free oc->stable_ptrs.
- * This operation is idempotent.
- */
-static void freeOcStablePtrs (ObjectCode *oc)
-{
-    // Release any StablePtrs that were created when this
-    // object module was initialized.
-    ForeignExportStablePtr *fe_ptr, *next;
-
-    for (fe_ptr = oc->stable_ptrs; fe_ptr != NULL; fe_ptr = next) {
-        next = fe_ptr->next;
-        freeStablePtr(fe_ptr->stable_ptr);
-        stgFree(fe_ptr);
-    }
-    oc->stable_ptrs = NULL;
-}
-
 
 /*
  * freeObjectCode() releases all the pieces of an ObjectCode.  It is called by
@@ -3065,7 +3040,6 @@ static HsInt loadObj_ (pathchar *path)
    if (! loadOc(oc)) {
        // failed; free everything we've allocated
        removeOcSymbols(oc);
-       // no need to freeOcStablePtrs, they aren't created until resolveObjs()
        freeObjectCode(oc);
        return 0;
    }
@@ -3201,7 +3175,7 @@ HsInt resolveObjs (void)
 /* -----------------------------------------------------------------------------
  * delete an object from the pool
  */
-static HsInt unloadObj_ (pathchar *path, rtsBool just_purge)
+static HsInt unloadObj_ (pathchar *path)
 {
     ObjectCode *oc, *prev, *next;
     HsBool unloadedAnyObj = HS_BOOL_FALSE;
@@ -3217,23 +3191,29 @@ static HsInt unloadObj_ (pathchar *path, rtsBool just_purge)
 
         if (!pathcmp(oc->fileName,path)) {
 
-            // these are both idempotent, so in just_purge mode we can
-            // later call unloadObj() to really unload the object.
             removeOcSymbols(oc);
-            freeOcStablePtrs(oc);
 
-            if (!just_purge) {
-                if (prev == NULL) {
-                    objects = oc->next;
-                } else {
-                    prev->next = oc->next;
-                }
-                oc->next = unloaded_objects;
-                unloaded_objects = oc;
-                oc->status = OBJECT_UNLOADED;
+            if (prev == NULL) {
+                objects = oc->next;
             } else {
-                prev = oc;
+                prev->next = oc->next;
             }
+            oc->next = unloaded_objects;
+            unloaded_objects = oc;
+
+            // Release any StablePtrs that were created when this
+            // object module was initialized.
+            {
+                ForeignExportStablePtr *fe_ptr, *next;
+
+                for (fe_ptr = oc->stable_ptrs; fe_ptr != NULL; fe_ptr = next) {
+                    next = fe_ptr->next;
+                    freeStablePtr(fe_ptr->stable_ptr);
+                    stgFree(fe_ptr);
+                }
+            }
+
+            oc->status = OBJECT_UNLOADED;
 
             /* This could be a member of an archive so continue
              * unloading other members. */
@@ -3255,15 +3235,7 @@ static HsInt unloadObj_ (pathchar *path, rtsBool just_purge)
 HsInt unloadObj (pathchar *path)
 {
     ACQUIRE_LOCK(&linker_mutex);
-    HsInt r = unloadObj_(path, rtsFalse);
-    RELEASE_LOCK(&linker_mutex);
-    return r;
-}
-
-HsInt purgeObj (pathchar *path)
-{
-    ACQUIRE_LOCK(&linker_mutex);
-    HsInt r = unloadObj_(path, rtsTrue);
+    HsInt r = unloadObj_(path);
     RELEASE_LOCK(&linker_mutex);
     return r;
 }
