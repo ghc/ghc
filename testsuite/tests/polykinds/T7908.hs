@@ -18,11 +18,11 @@ data Hidden :: (k -> *) -> * where
   Hide :: m a -> Hidden m
 
 instance Monad' Hidden where
-  --return' :: forall (c :: k -> *) (a :: k) . c a -> Hidden c
+  return' :: forall (c :: k -> *) (a :: k) . c a -> Hidden c
   return' = Hide
-  --(>>>=) :: forall (c :: k -> *) (d :: k -> *) . Hidden c -> (forall (a :: k) . c a -> Hidden d) -> Hidden d
+  (>>>=) :: forall (c :: k -> *) (d :: k -> *) . Hidden c -> (forall (a :: k) . c a -> Hidden d) -> Hidden d
   Hide a >>>= f = f a
-  --(>>-) :: forall (c :: k -> *) d . Hidden c -> (forall (a :: k) . c a -> d) -> d
+  (>>-) :: forall (c :: k -> *) d . Hidden c -> (forall (a :: k) . c a -> d) -> d
   Hide a >>- f = f a
 
 
