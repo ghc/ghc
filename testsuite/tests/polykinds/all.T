@@ -113,4 +113,4 @@ test('T9569', normal, compile, [''])
 test('T9838', normal, multimod_compile, ['T9838.hs','-v0'])
 test('T9574', normal, compile_fail, [''])
 test('T9833', normal, compile, [''])
-
+test('T7908', normal, compile, [''])
