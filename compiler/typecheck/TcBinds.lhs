@@ -1371,7 +1371,7 @@ tcTySigs hs_sigs
 
 tcTySig :: LSig Name -> TcM ([TcSigInfo], [TcTyVar])
 tcTySig (L _ (IdSig id))
-  = do { sig <- instTcTySigFromId _ id
+  = do { sig <- instTcTySigFromId id
        ; return ([sig], []) }
 tcTySig (L loc (TypeSig names@(L _ name1 : _) hs_ty wcs))
   = setSrcSpan loc $
