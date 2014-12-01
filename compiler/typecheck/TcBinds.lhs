@@ -899,7 +899,6 @@ tcSpec poly_id prag@(SpecSig fun_name hs_tys inl)
                  (ptext (sLit "SPECIALISE pragma for non-overloaded function")
                   <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]
-        -- ; wraps <- mapM (tcSubType origin sig_ctxt (idType poly_id)) spec_tys
         ; wraps <- mapM (tcSubType sig_ctxt (idType poly_id)) spec_tys
         ; return [ (SpecPrag poly_id wrap inl) | wrap <- wraps ] }
   where
@@ -1371,8 +1370,8 @@ tcTySigs hs_sigs
        ; return (poly_ids, lookupNameEnv env, concat tyvarsl) }
 
 tcTySig :: LSig Name -> TcM ([TcSigInfo], [TcTyVar])
-tcTySig (L loc (IdSig id))
-  = do { sig <- instTcTySigFromId loc id
+tcTySig (L _ (IdSig id))
+  = do { sig <- instTcTySigFromId _ id
        ; return ([sig], []) }
 tcTySig (L loc (TypeSig names@(L _ name1 : _) hs_ty wcs))
   = setSrcSpan loc $
@@ -1411,9 +1410,10 @@ tcTySig (L loc (PatSynSig (L _ name) (_, qtvs) prov req ty))
        ; return ([TcPatSynInfo tpsi], []) }}
 tcTySig _ = return ([], [])
 
-instTcTySigFromId :: SrcSpan -> Id -> TcM TcSigInfo
-instTcTySigFromId loc id
-  = do { (tvs, theta, tau) <- tcInstType (tcInstSigTyVarsLoc loc)
+instTcTySigFromId :: Id -> TcM TcSigInfo
+instTcTySigFromId id
+  = do { let loc = getSrcSpan id
+       ; (tvs, theta, tau) <- tcInstType (tcInstSigTyVarsLoc loc)
                                          (idType id)
        ; return (TcSigInfo { sig_id = id, sig_loc = loc
                            , sig_tvs = [(Nothing, tv) | tv <- tvs]
@@ -1421,10 +1421,6 @@ instTcTySigFromId loc id
                            , sig_theta = theta, sig_tau = tau
                            , sig_extra_cts = Nothing
                            , sig_partial = False }) }
-    -- Hack: in an instance decl we use the selector id as
-    -- the template; but we do *not* want the SrcSpan on the Name of
-    -- those type variables to refer to the class decl, rather to
-    -- the instance decl
 
 instTcTySig :: LHsType Name -> TcType    -- HsType and corresponding TcType
             -> Maybe SrcSpan             -- Just loc <=> an extra-constraints
@@ -1432,7 +1428,7 @@ instTcTySig :: LHsType Name -> TcType    -- HsType and corresponding TcType
             -> [(Name, TcTyVar)] -> Name -> TcM TcSigInfo
 instTcTySig hs_ty@(L loc _) sigma_ty extra_cts nwcs name
   = do { (inst_tvs, theta, tau) <- tcInstType tcInstSigTyVars sigma_ty
-       ; return (TcSigInfo { sig_id = mkLocalId name sigma_ty
+       ; return (TcSigInfo { sig_id  = mkLocalId name sigma_ty
                            , sig_loc = loc
                            , sig_tvs = findScopedTyVars hs_ty sigma_ty inst_tvs
                            , sig_nwcs = nwcs

@@ -20,7 +20,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 import HsSyn
 import TcEnv
 import TcPat( addInlinePrags )
-import TcEvidence( idHsWrapper )
+import TcEvidence( HsWrapper, idHsWrapper )
 import TcBinds
 import TcUnify
 import TcHsType
@@ -225,7 +225,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
                      <+> quotes (ppr sel_name))
 
            ; tc_bind <- tcInstanceMethodBody (ClsSkol clas) tyvars [this_dict]
-                                             dm_id_w_inline local_dm_sig
+                                             dm_id_w_inline local_dm_sig idHsWrapper
                                              IsDefaultMethod dm_bind
 
            ; return (unitBag tc_bind) }
@@ -233,10 +233,11 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
 ---------------
 tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
                      -> Id -> TcSigInfo
+                     -> HsWrapper  -- See Note [Instance method signatures] in TcInstDcls
                      -> TcSpecPrags -> LHsBind Name
                      -> TcM (LHsBind Id)
 tcInstanceMethodBody skol_info tyvars dfun_ev_vars
-                     meth_id local_meth_sig
+                     meth_id local_meth_sig wrapper
                      specs (L loc bind)
   = do  { let local_meth_id = case local_meth_sig of
                   TcSigInfo{ sig_id = meth_id } -> meth_id
@@ -248,12 +249,13 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                <- checkConstraints skol_info tyvars dfun_ev_vars $
                   tcPolyCheck NonRecursive no_prag_fn local_meth_sig lm_bind
 
-        ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
+        ; let export = ABE { abe_wrap = wrapper, abe_poly = meth_id
                            , abe_mono = local_meth_id, abe_prags = specs }
-              full_bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
-                                   , abs_exports = [export]
+              full_bind = AbsBinds { abs_tvs      = tyvars
+                                   , abs_ev_vars  = dfun_ev_vars
+                                   , abs_exports  = [export]
                                    , abs_ev_binds = ev_binds
-                                   , abs_binds = tc_bind }
+                                   , abs_binds    = tc_bind }
 
         ; return (L loc full_bind) }
   where

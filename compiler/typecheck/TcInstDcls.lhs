@@ -917,60 +917,53 @@ tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta
 
 ----------------------
 mkMethIds :: HsSigFun -> Class -> [TcTyVar] -> [EvVar]
-          -> [TcType] -> Id -> TcM (TcId, TcSigInfo)
+          -> [TcType] -> Id -> TcM (TcId, TcSigInfo, HsWrapper)
 mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
-  = do  { let sel_occ = nameOccName sel_name
-        ; meth_name <- newName (mkClassOpAuxOcc sel_occ)
+  = do  { poly_meth_name  <- newName (mkClassOpAuxOcc sel_occ)
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcInstanceMethodBody come from here
+        ; let poly_meth_id  = mkLocalId poly_meth_name  poly_meth_ty
+              local_meth_id = mkLocalId local_meth_name local_meth_ty
 
-        ; local_meth_sig <- case lookupHsSig sig_fn sel_name of
-            Just hs_ty  -- There is a signature in the instance declaration
-               -> do { sig_ty <- check_inst_sig hs_ty
-                     ; instTcTySig hs_ty sig_ty Nothing [] local_meth_name }
+        ; case lookupHsSig sig_fn sel_name of
+            Just lhs_ty  -- There is a signature in the instance declaration
+                         -- See Note [Instance method signatures]
+               -> setSrcSpan (getLoc lhs_ty) $
+                  do { inst_sigs <- xoptM Opt_InstanceSigs
+                     ; checkTc inst_sigs (misplacedInstSig sel_name lhs_ty)
+                     ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name) lhs_ty
+                     ; let poly_sig_ty = mkSigmaTy tyvars theta sig_ty
+                     ; tc_sig  <- instTcTySig lhs_ty sig_ty Nothing [] local_meth_name
+                     ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name poly_sig_ty poly_meth_ty) $
+                                  tcSubType (FunSigCtxt sel_name) poly_sig_ty poly_meth_ty
+                     ; return (poly_meth_id, tc_sig, hs_wrap) }
 
             Nothing     -- No type signature
-               -> do { loc <- getSrcSpanM
-                     ; instTcTySigFromId loc (mkLocalId local_meth_name local_meth_ty) }
+               -> do { tc_sig <- instTcTySigFromId local_meth_id
+                     ; return (poly_meth_id, tc_sig, idHsWrapper) } }
               -- Absent a type sig, there are no new scoped type variables here
               -- Only the ones from the instance decl itself, which are already
               -- in scope.  Example:
               --      class C a where { op :: forall b. Eq b => ... }
               --      instance C [c] where { op = <rhs> }
               -- In <rhs>, 'c' is scope but 'b' is not!
-
-        ; let meth_id = mkLocalId meth_name meth_ty
-        ; return (meth_id, local_meth_sig) }
   where
     sel_name      = idName sel_id
+    sel_occ       = nameOccName sel_name
     local_meth_ty = instantiateMethod clas sel_id inst_tys
-    meth_ty       = mkForAllTys tyvars $ mkPiTypes dfun_ev_vars local_meth_ty
+    poly_meth_ty  = mkSigmaTy tyvars theta local_meth_ty
+    theta         = map idType dfun_ev_vars
 
-    -- Check that any type signatures have exactly the right type
-    check_inst_sig hs_ty@(L loc _)
-       = setSrcSpan loc $
-         do { sig_ty <- tcHsSigType (FunSigCtxt sel_name) hs_ty
-            ; inst_sigs <- xoptM Opt_InstanceSigs
-            ; if inst_sigs then
-                unless (sig_ty `eqType` local_meth_ty)
-                       (badInstSigErr sel_name local_meth_ty)
-              else
-                addErrTc (misplacedInstSig sel_name hs_ty)
-            ; return sig_ty }
-
-badInstSigErr :: Name -> Type -> TcM ()
-badInstSigErr meth ty
-  = do { env0 <- tcInitTidyEnv
-       ; let tidy_ty = tidyType env0 ty
-                 -- Tidy the type using the ambient TidyEnv,
-                 -- to avoid apparent name capture (Trac #7475)
-                 --    class C a where { op :: a -> b }
-                 --    instance C (a->b) where
-                 --       op :: forall x. x
-                 --       op = ...blah...
-       ; addErrTc (hang (ptext (sLit "Method signature does not match class; it should be"))
-                      2 (pprPrefixName meth <+> dcolon <+> ppr tidy_ty)) }
+methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+methSigCtxt sel_name sig_ty meth_ty env0
+  = do { (env1, sig_ty)  <- zonkTidyTcType env0 sig_ty
+       ; (env2, meth_ty) <- zonkTidyTcType env1 meth_ty
+       ; let msg = hang (ptext (sLit "When checking that instance signature for") <+> quotes (ppr sel_name))
+                      2 (vcat [ ptext (sLit "is more general than its signature in the class")
+                              , ptext (sLit "Instance sig:") <+> ppr sig_ty
+                              , ptext (sLit "   Class sig:") <+> ppr meth_ty ])
+       ; return (env2, msg) }
 
 misplacedInstSig :: Name -> LHsType Name -> SDoc
 misplacedInstSig name hs_ty
@@ -988,6 +981,35 @@ tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
              -- The filter removes the pragmas for methods
        ; return (spec_inst_prags, mkPragFun uprags binds) }
 \end{code}
+
+Note [Instance method signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With -XInstanceSigs we allow the user to supply a signature for the
+method in an instance declaration.  Here is an artificial example:
+
+       data Age = MkAge Int
+       instance Ord Age where
+         compare :: a -> a -> Bool
+         compare = error "You can't compare Ages"
+
+The instance signature can be *more* polymorphic than the instantiated
+class method (in this case: Age -> Age -> Bool), but it cannot be less
+polymorphic.  Moreover, if a signature is given, the implementation
+code should match the signature, and type variables bound in the
+singature should scope over the method body.
+
+We achieve this by building a TcSigInfo for the method, whether or not
+there is an instance method signature, and using that to typecheck
+the declaration (in tcInstanceMethodBody).  That means, conveniently,
+that the type variables bound in the signature will scope over the body.
+
+What about the check that the instance method signature is more
+polymorphic than the instantiated class method type?  We just do a
+tcSubType call in mkMethIds, and use the HsWrapper thus generated in
+the method AbsBind.  It's very like the tcSubType impedence-matching
+call in mkExport.  We have to pass the HsWrapper into
+tcInstanceMethodBody.
+
 
 Note [Silent superclass arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1201,15 +1223,16 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_body sig_fn sel_id rn_bind bndr_loc
       = add_meth_ctxt sel_id rn_bind $
         do { traceTc "tc_item" (ppr sel_id <+> ppr (idType sel_id))
-           ; (meth_id, local_meth_sig) <- setSrcSpan bndr_loc $
-                                          mkMethIds sig_fn clas tyvars dfun_ev_vars
-                                                    inst_tys sel_id
+           ; (meth_id, local_meth_sig, hs_wrap) 
+                  <- setSrcSpan bndr_loc $
+                     mkMethIds sig_fn clas tyvars dfun_ev_vars
+                               inst_tys sel_id
            ; let prags = prag_fn (idName sel_id)
            ; meth_id1 <- addInlinePrags meth_id prags
            ; spec_prags <- tcSpecPrags meth_id1 prags
            ; bind <- tcInstanceMethodBody InstSkol
                           tyvars dfun_ev_vars
-                          meth_id1 local_meth_sig
+                          meth_id1 local_meth_sig hs_wrap
                           (mk_meth_spec_prags meth_id1 spec_prags)
                           rn_bind
            ; return (meth_id1, bind) }
@@ -1223,8 +1246,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     tc_default sig_fn sel_id NoDefMeth     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
-           ; (meth_id, _) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
-                                       inst_tys sel_id
+           ; (meth_id, _, _) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
+                                          inst_tys sel_id
            ; dflags <- getDynFlags
            ; return (meth_id,
                      mkVarBind meth_id $
@@ -1239,7 +1262,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
 
     tc_default sig_fn sel_id (DefMeth dm_name) -- A polymorphic default method
-      = do {   -- Build the typechecked version directly,
+      = do {     -- Build the typechecked version directly,
                  -- without calling typecheck_method;
                  -- see Note [Default methods in instances]
                  -- Generate   /\as.\ds. let self = df as ds
@@ -1251,8 +1274,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; let self_ev_bind = EvBind self_dict
                                 (EvDFunApp dfun_id (mkTyVarTys tyvars) (map EvId dfun_ev_vars))
 
-           ; (meth_id, local_meth_sig) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
-                                                    inst_tys sel_id
+           ; (meth_id, local_meth_sig, hs_wrap) 
+                   <- mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
            ; dm_id <- tcLookupId dm_name
            ; let dm_inline_prag = idInlinePragma dm_id
                  rhs = HsWrap (mkWpEvVarApps [self_dict] <.> mkWpTyApps inst_tys) $
@@ -1265,7 +1288,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                         -- method to this version. Note [INLINE and default methods]
 
 
-                 export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id1
+                 export = ABE { abe_wrap = hs_wrap, abe_poly = meth_id1
                               , abe_mono = local_meth_id
                               , abe_prags = mk_meth_spec_prags meth_id1 [] }
                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars

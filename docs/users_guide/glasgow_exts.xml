@@ -5313,7 +5313,7 @@ on the grounds that a later instance declaration might overlap the local one.)
 </sect3>
 
 <sect3 id="instance-sigs">
-<title>Type signatures in instance declarations</title>
+<title>Instance signatures: type signatures in instance declarations</title>
 <para>In Haskell, you can't write a type signature in an instance declaration, but it
 is sometimes convenient to do so, and the language extension <option>-XInstanceSigs</option>
 allows you to do so.  For example:
@@ -5323,10 +5323,30 @@ allows you to do so.  For example:
     (==) :: T a -> T a -> Bool   -- The signature
     (==) (MkT x1 x2) (MkTy y1 y2) = x1==y1 &amp;&amp; x2==y2
 </programlisting>
-The type signature in the instance declaration must be precisely the same as
-the one in the class declaration, instantiated with the instance type.
 </para>
-<para>
+Some details
+<itemizedlist>
+<listitem><para>
+The type signature in the instance declaration must be more polymorphic than (or the same as)
+the one in the class declaration, instantiated with the instance type.
+For example, this is fine:
+<programlisting>
+  instance Eq a => Eq (T a) where
+     (==) :: forall b. b -> b -> Bool
+     (==) x y = True
+</programlisting>
+Here the signature in the instance declaration is more polymorphic than that
+required by the instantiated class method.
+</para>
+</listitem>
+
+<listitem><para>
+The code for the method in the instance declaration is typechecked against the type signature
+supplied in the instance declaration, as you would expect. So if the instance signature
+is more polymorphic than required, the code must be too.
+</para></listitem>
+
+<listitem><para>
 One stylistic reason for wanting to write a type signature is simple documentation.  Another
 is that you may want to bring scoped type variables into scope.  For example:
 <programlisting>
@@ -5344,7 +5364,8 @@ Provided that you also specify <option>-XScopedTypeVariables</option>
 (<xref linkend="scoped-type-variables"/>),
 the <literal>forall b</literal> scopes over the definition of <literal>foo</literal>,
 and in particular over the type signature for <literal>xs</literal>.
-</para>
+</para></listitem>
+</itemizedlist>
 </sect3>
 
 </sect2>
