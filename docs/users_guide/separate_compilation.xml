@@ -966,10 +966,8 @@ ghc -c A.hs
 
       <para>Just like <literal>hs-boot</literal> files, when an
       <literal>hsig</literal> file is compiled it is checked for type
-      consistency against the backing implementation; furthermore, it also
-      produces a pseudo-object file <literal>A.o</literal> which you should
-      not link with.  Signature files are also written in a subset
-      of Haskell similar to essentially identical to that of
+      consistency against the backing implementation.  Signature files are also
+      written in a subset of Haskell essentially identical to that of
       <literal>hs-boot</literal> files.</para>
 
       <para>There is one important gotcha with the current implementation:

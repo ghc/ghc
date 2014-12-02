@@ -240,7 +240,7 @@ compileOne' m_tc_result mHscMessage
 
                _ ->
                    case ms_hsc_src summary of
-                   t | isHsBootOrSig t ->
+                   HsBootFile ->
                        do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                           hscWriteIface dflags iface changed summary
                           touchObjectFile dflags object_filename
@@ -248,7 +248,23 @@ compileOne' m_tc_result mHscMessage
                                                hm_iface    = iface,
                                                hm_linkable = maybe_old_linkable })
 
-                   _ -> do guts0 <- hscDesugar hsc_env summary tc_result
+                   HsigFile ->
+                       do (iface, changed, details) <-
+                                    hscSimpleIface hsc_env tc_result mb_old_hash
+                          hscWriteIface dflags iface changed summary
+                          compileEmptyStub dflags hsc_env basename location
+
+                          -- Same as Hs
+                          o_time <- getModificationUTCTime object_filename
+                          let linkable =
+                                  LM o_time this_mod [DotO object_filename]
+
+                          return (HomeModInfo{ hm_details  = details,
+                                               hm_iface    = iface,
+                                               hm_linkable = Just linkable })
+
+                   HsSrcFile ->
+                        do guts0 <- hscDesugar hsc_env summary tc_result
                            guts <- hscSimplify hsc_env guts0
                            (iface, changed, details, cgguts) <- hscNormalIface hsc_env guts mb_old_hash
                            hscWriteIface dflags iface changed summary
@@ -286,6 +302,21 @@ compileStub hsc_env stub_c = do
                                    Temporary Nothing{-no ModLocation-} Nothing
 
         return stub_o
+
+compileEmptyStub :: DynFlags -> HscEnv -> FilePath -> ModLocation -> IO ()
+compileEmptyStub dflags hsc_env basename location = do
+  -- To maintain the invariant that every Haskell file
+  -- compiles to object code, we make an empty (but
+  -- valid) stub object file for signatures
+  empty_stub <- newTempName dflags "c"
+  writeFile empty_stub ""
+  _ <- runPipeline StopLn hsc_env
+                  (empty_stub, Nothing)
+                  (Just basename)
+                  Persistent
+                  (Just location)
+                  Nothing
+  return ()
 
 -- ---------------------------------------------------------------------------
 -- Link
@@ -341,11 +372,7 @@ link' dflags batch_attempt_linking hpt
                           LinkStaticLib -> True
                           _ -> platformBinariesAreStaticLibs (targetPlatform dflags)
 
-            -- Don't attempt to link hsigs; they don't actually produce objects.
-            -- This is in contrast to hs-boot files, which will /eventually/
-            -- get objects.
-            home_mod_infos =
-                filter ((==Nothing).mi_sig_of.hm_iface) (eltsUFM hpt)
+            home_mod_infos = eltsUFM hpt
 
             -- the packages we depend on
             pkg_deps  = concatMap (map fst . dep_pkgs . mi_deps . hm_iface) home_mod_infos
@@ -980,6 +1007,14 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                 do -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
                    liftIO $ touchObjectFile dflags o_file
+                   return (RealPhase next_phase, o_file)
+            HscUpdateSig ->
+                do -- We need to create a REAL but empty .o file
+                   -- because we are going to attempt to put it in a library
+                   PipeState{hsc_env=hsc_env'} <- getPipeState
+                   let input_fn = expectJust "runPhase" (ml_hs_file location)
+                       basename = dropExtension input_fn
+                   liftIO $ compileEmptyStub dflags hsc_env' basename location
                    return (RealPhase next_phase, o_file)
             HscRecomp cgguts mod_summary
               -> do output_fn <- phaseOutputFilename next_phase

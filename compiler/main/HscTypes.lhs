@@ -195,6 +195,7 @@ data HscStatus
     = HscNotGeneratingCode
     | HscUpToDate
     | HscUpdateBoot
+    | HscUpdateSig
     | HscRecomp CgGuts ModSummary
 
 -- -----------------------------------------------------------------------------

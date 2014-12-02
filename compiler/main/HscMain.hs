@@ -647,7 +647,10 @@ hscCompileOneShot' hsc_env mod_summary src_changed
                     t | isHsBootOrSig t ->
                         do (iface, changed, _) <- hscSimpleIface' tc_result mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
-                           return HscUpdateBoot
+                           return (case t of
+                                    HsBootFile -> HscUpdateBoot
+                                    HsigFile -> HscUpdateSig
+                                    HsSrcFile -> panic "hscCompileOneShot Src")
                     _ ->
                         do guts <- hscSimplify' guts0
                            (iface, changed, _details, cgguts) <- hscNormalIface' guts mb_old_hash
