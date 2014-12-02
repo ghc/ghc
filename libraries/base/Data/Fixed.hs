@@ -143,7 +143,9 @@ showFixed chopTrailingZeros fa@(MkFixed a) = (show i) ++ (withDot (showIntegerZe
     -- enough digits to be unambiguous
     digits = ceiling (logBase 10 (fromInteger res) :: Double)
     maxnum = 10 ^ digits
-    fracNum = div (d * maxnum) res
+    -- read floors, so show must ceil for `read . show = id` to hold. See #9240
+    fracNum = divCeil (d * maxnum) res
+    divCeil x y = (x + y - 1) `div` y
 
 instance (HasResolution a) => Show (Fixed a) where
     show = showFixed False
