@@ -51,7 +51,7 @@ module DynFlags (
         fFlags, fWarningFlags, fLangFlags, xFlags,
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
-        SigOf(..), getSigOf,
+        SigOf, getSigOf,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -643,16 +643,10 @@ data ExtensionFlag
    | Opt_StaticPointers
    deriving (Eq, Enum, Show)
 
-data SigOf = NotSigOf
-           | SigOf Module
-           | SigOfMap (Map ModuleName Module)
+type SigOf = Map ModuleName Module
 
 getSigOf :: DynFlags -> ModuleName -> Maybe Module
-getSigOf dflags n =
-    case sigOf dflags of
-        NotSigOf -> Nothing
-        SigOf m -> Just m
-        SigOfMap m -> Map.lookup n m
+getSigOf dflags n = Map.lookup n (sigOf dflags)
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -1414,7 +1408,7 @@ defaultDynFlags mySettings =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        sigOf                   = NotSigOf,
+        sigOf                   = Map.empty,
         verbosity               = 0,
         optLevel                = 0,
         simplPhases             = 2,
@@ -1918,9 +1912,7 @@ parseSigOf :: String -> SigOf
 parseSigOf str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse -sig-of: " ++ str)
-  where parse = parseOne +++ parseMany
-        parseOne = SigOf `fmap` parseModule
-        parseMany = SigOfMap . Map.fromList <$> sepBy parseEntry (R.char ',')
+  where parse = Map.fromList <$> sepBy parseEntry (R.char ',')
         parseEntry = do
             n <- tok $ parseModuleName
             -- ToDo: deprecate this 'is' syntax?

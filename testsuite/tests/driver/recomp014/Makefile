@@ -18,12 +18,12 @@ recomp014: clean
 	echo 'first run'
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c A.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c A1.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c B.hsig -sig-of main:A
+	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c B.hsig -sig-of "B is main:A"
 	echo 'import B; main = print a' > C.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c C.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c C.hs
 	echo 'second run'
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c B.hsig -sig-of main:A1
+	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c B.hsig -sig-of "B is main:A1"
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c C.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) A1.o C.o -o recomp014
 	./recomp014

@@ -941,14 +941,14 @@ module A where
 
 <programlisting>
 ghc -c Text.hs
-ghc -c TextSig.hsig -sig-of main:Text
+ghc -c TextSig.hsig -sig-of "TextSig is main:Text"
 ghc -c A.hs
 </programlisting>
 
-      <para>Signature files can also be compiled as part of
-      <literal>--make</literal>, in which case the syntax is extended
-      to support specifying implementations of multiple signatures
-      as <literal>FooSig is main:Foo, BarSig is main:Bar</literal>.
+      <para>To specify multiple signatures, use a comma-separated list.
+      The <literal>-sig-of</literal> parameter is required to specify
+      the backing implementations of all home modules, even in one-shot
+      compilation mode.
       At the moment, you must specify the full module name (package key,
       colon, and then module name), although in the future we may support
       more user-friendly syntax.</para>
