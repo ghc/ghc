@@ -71,7 +71,7 @@ libraries/unix               -           -                               ssh://g
 libraries/Win32              -           -                               https://github.com/haskell/win32.git
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
 nofib                        nofib       -                               -
-libraries/parallel           extra       -                               -
+libraries/parallel           extra       -                               ssh://git@github.com/haskell/parallel.git
 libraries/stm                extra       -                               -
 libraries/random             dph         -                               https://github.com/haskell/random.git
 libraries/primitive          dph         -                               https://github.com/haskell/primitive.git
