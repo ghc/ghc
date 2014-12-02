@@ -744,7 +744,7 @@ data IfaceDeclExtras
   | IfaceDataExtras
        Fixity                   -- Fixity of the tycon itself
        [IfaceInstABI]           -- Local class and family instances of this tycon
-                                -- See Note [Orphans] in IfaceSyn
+                                -- See Note [Orphans] in InstEnv
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each constructor: fixity, RULES and annotations
 
@@ -752,7 +752,7 @@ data IfaceDeclExtras
        Fixity                   -- Fixity of the class itself
        [IfaceInstABI]           -- Local instances of this class *or*
                                 --   of its associated data types
-                                -- See Note [Orphans] in IfaceSyn
+                                -- See Note [Orphans] in InstEnv
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each class method: fixity, RULES and annotations
 
@@ -1948,7 +1948,7 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
     do_arg (Coercion co) = IfaceCo   (toIfaceCoercion co)
     do_arg arg           = toIfaceExpr arg
 
-        -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
+        -- Compute orphanhood.  See Note [Orphans] in InstEnv
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
     lhs_names = nameSetElems (ruleLhsOrphNames rule)

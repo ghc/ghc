@@ -273,6 +273,7 @@ data TcGblEnv
           -- ^ The set of orphan modules which transitively reachable from
           -- direct imports.  We use this to figure out if an orphan instance
           -- in the global InstEnv should be considered visible.
+          -- See Note [Instance lookup and orphan instances] in InstEnv
 
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.

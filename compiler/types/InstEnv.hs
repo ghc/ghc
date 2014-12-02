@@ -19,7 +19,7 @@ module InstEnv (
 
         IsOrphan(..), isOrphan, notOrphan,
 
-        InstEnvs(..), InstEnv,
+        InstEnvs(..), VisibleOrphanModules, InstEnv,
         emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead,
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
         memberInstEnv, instIsVisible,
@@ -55,38 +55,10 @@ import Data.Monoid
 {-
 ************************************************************************
 *                                                                      *
-\subsection{The key types}
+           ClsInst: the data type for type-class instances
 *                                                                      *
 ************************************************************************
 -}
-
--- | Is this instance an orphan?  If it is not an orphan, contains an 'OccName'
--- witnessing the instance's non-orphanhood.
-data IsOrphan = IsOrphan | NotOrphan OccName
-    deriving (Data, Typeable)
-
--- | Returns true if 'IsOrphan' is orphan.
-isOrphan :: IsOrphan -> Bool
-isOrphan IsOrphan = True
-isOrphan _ = False
-
--- | Returns true if 'IsOrphan' is not an orphan.
-notOrphan :: IsOrphan -> Bool
-notOrphan NotOrphan{} = True
-notOrphan _ = False
-
-instance Binary IsOrphan where
-    put_ bh IsOrphan = putByte bh 0
-    put_ bh (NotOrphan n) = do
-        putByte bh 1
-        put_ bh n
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> return IsOrphan
-            _ -> do
-                n <- get bh
-                return $ NotOrphan n
 
 data ClsInst
   = ClsInst {   -- Used for "rough matching"; see Note [Rough-match field]
@@ -242,10 +214,9 @@ mkLocalInstance :: DFunId -> OverlapFlag
                 -> [TyVar] -> Class -> [Type]
                 -> ClsInst
 -- Used for local instances, where we can safely pull on the DFunId
--- TODO: what is the difference between source_tvs and tvs?
-mkLocalInstance dfun oflag source_tvs cls tys
+mkLocalInstance dfun oflag tvs cls tys
   = ClsInst { is_flag = oflag, is_dfun = dfun
-            , is_tvs = source_tvs
+            , is_tvs = tvs
             , is_cls = cls, is_cls_nm = cls_name
             , is_tys = tys, is_tcs = roughMatchTcs tys
             , is_orphan = orph
@@ -256,11 +227,11 @@ mkLocalInstance dfun oflag source_tvs cls tys
     this_mod = ASSERT( isExternalName dfun_name ) nameModule dfun_name
     is_local name = nameIsLocalOrFrom this_mod name
 
-        -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
-    (tvs, fds) = classTvsFds cls
+        -- Compute orphanhood.  See Note [Orphans] in InstEnv
+    (cls_tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
 
-    -- See Note [When exactly is an instance decl an orphan?] in IfaceSyn
+    -- See Note [When exactly is an instance decl an orphan?]
     orph | is_local cls_name = NotOrphan (nameOccName cls_name)
          | all notOrphan mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
          | otherwise         = IsOrphan
@@ -272,7 +243,7 @@ mkLocalInstance dfun oflag source_tvs cls tys
                            -- that is not in the "determined" arguments
     mb_ns | null fds   = [choose_one arg_names]
           | otherwise  = map do_one fds
-    do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- tvs `zip` arg_names
+    do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- cls_tvs `zip` arg_names
                                           , not (tv `elem` rtvs)]
 
     choose_one :: [NameSet] -> IsOrphan
@@ -313,8 +284,327 @@ instanceCantMatch (Just t : ts) (Just a : as) = t/=a || instanceCantMatch ts as
 instanceCantMatch _             _             =  False  -- Safe
 
 {-
-Note [Overlapping instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+************************************************************************
+*                                                                      *
+                Orphans
+*                                                                      *
+************************************************************************
+-}
+
+-- | Is this instance an orphan?  If it is not an orphan, contains an 'OccName'
+-- witnessing the instance's non-orphanhood.
+-- See Note [Orphans]
+data IsOrphan
+  = IsOrphan
+  | NotOrphan OccName  -- The OccName 'n' witnesses the instance's non-orphanhood
+                       -- In that case, the instance is fingerprinted as part
+                       -- of the definition of 'n's definition
+    deriving (Data, Typeable)
+
+-- | Returns true if 'IsOrphan' is orphan.
+isOrphan :: IsOrphan -> Bool
+isOrphan IsOrphan = True
+isOrphan _ = False
+
+-- | Returns true if 'IsOrphan' is not an orphan.
+notOrphan :: IsOrphan -> Bool
+notOrphan NotOrphan{} = True
+notOrphan _ = False
+
+instance Binary IsOrphan where
+    put_ bh IsOrphan = putByte bh 0
+    put_ bh (NotOrphan n) = do
+        putByte bh 1
+        put_ bh n
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return IsOrphan
+            _ -> do
+                n <- get bh
+                return $ NotOrphan n
+
+{-
+Note [Orphans]
+~~~~~~~~~~~~~~
+Class instances, rules, and family instances are divided into orphans
+and non-orphans.  Roughly speaking, an instance/rule is an orphan if
+its left hand side mentions nothing defined in this module.  Orphan-hood
+has two major consequences
+
+ * A module that contains orphans is called an "orphan module".  If
+   the module being compiled depends (transitively) on an oprhan
+   module M, then M.hi is read in regardless of whether M is oherwise
+   needed. This is to ensure that we don't miss any instance decls in
+   M.  But it's painful, because it means we need to keep track of all
+   the orphan modules below us.
+
+ * A non-orphan is not finger-printed separately.  Instead, for
+   fingerprinting purposes it is treated as part of the entity it
+   mentions on the LHS.  For example
+      data T = T1 | T2
+      instance Eq T where ....
+   The instance (Eq T) is incorprated as part of T's fingerprint.
+
+   In constrast, orphans are all fingerprinted together in the
+   mi_orph_hash field of the ModIface.
+
+   See MkIface.addFingerprints.
+
+Orphan-hood is computed
+  * For class instances:
+      when we make a ClsInst
+    (because it is needed during instance lookup)
+
+  * For rules and family instances:
+       when we generate an IfaceRule (MkIface.coreRuleToIfaceRule)
+                     or IfaceFamInst (MkIface.instanceToIfaceInst)
+
+Note [When exactly is an instance decl an orphan?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  (see MkIface.instanceToIfaceInst, which implements this)
+Roughly speaking, an instance is an orphan if its head (after the =>)
+mentions nothing defined in this module.
+
+Functional dependencies complicate the situation though. Consider
+
+  module M where { class C a b | a -> b }
+
+and suppose we are compiling module X:
+
+  module X where
+        import M
+        data T = ...
+        instance C Int T where ...
+
+This instance is an orphan, because when compiling a third module Y we
+might get a constraint (C Int v), and we'd want to improve v to T.  So
+we must make sure X's instances are loaded, even if we do not directly
+use anything from X.
+
+More precisely, an instance is an orphan iff
+
+  If there are no fundeps, then at least of the names in
+  the instance head is locally defined.
+
+  If there are fundeps, then for every fundep, at least one of the
+  names free in a *non-determined* part of the instance head is
+  defined in this module.
+
+(Note that these conditions hold trivially if the class is locally
+defined.)
+
+
+************************************************************************
+*                                                                      *
+                InstEnv, ClsInstEnv
+*                                                                      *
+************************************************************************
+
+A @ClsInstEnv@ all the instances of that class.  The @Id@ inside a
+ClsInstEnv mapping is the dfun for that instance.
+
+If class C maps to a list containing the item ([a,b], [t1,t2,t3], dfun), then
+
+        forall a b, C t1 t2 t3  can be constructed by dfun
+
+or, to put it another way, we have
+
+        instance (...) => C t1 t2 t3,  witnessed by dfun
+-}
+
+---------------------------------------------------
+type InstEnv = UniqFM ClsInstEnv        -- Maps Class to instances for that class
+
+-- | 'InstEnvs' represents the combination of the global type class instance
+-- environment, the local type class instance environment, and the set of
+-- transitively reachable orphan modules (according to what modules have been
+-- directly imported) used to test orphan instance visibility.
+data InstEnvs = InstEnvs {
+        ie_global  :: InstEnv,               -- External-package instances
+        ie_local   :: InstEnv,               -- Home-package instances
+        ie_visible :: VisibleOrphanModules   -- Set of all orphan modules transitively
+                                             -- reachable from the module being compiled
+                                             -- See Note [Instance lookup and orphan instances]
+    }
+
+-- | Set of visible orphan modules, according to what modules have been directly
+-- imported.  This is based off of the dep_orphs field, which records
+-- transitively reachable orphan modules (modules that define orphan instances).
+type VisibleOrphanModules = ModuleSet
+
+newtype ClsInstEnv
+  = ClsIE [ClsInst]    -- The instances for a particular class, in any order
+
+instance Outputable ClsInstEnv where
+  ppr (ClsIE is) = pprInstances is
+
+-- INVARIANTS:
+--  * The is_tvs are distinct in each ClsInst
+--      of a ClsInstEnv (so we can safely unify them)
+
+-- Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
+--      [a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
+-- The "a" in the pattern must be one of the forall'd variables in
+-- the dfun type.
+
+emptyInstEnv :: InstEnv
+emptyInstEnv = emptyUFM
+
+instEnvElts :: InstEnv -> [ClsInst]
+instEnvElts ie = [elt | ClsIE elts <- eltsUFM ie, elt <- elts]
+
+-- | Test if an instance is visible, by checking that its origin module
+-- is in 'VisibleOrphanModules'.
+-- See Note [Instance lookup and orphan instances]
+instIsVisible :: VisibleOrphanModules -> ClsInst -> Bool
+instIsVisible vis_mods ispec
+  -- NB: Instances from the interactive package always are visible. We can't
+  -- add interactive modules to the set since we keep creating new ones
+  -- as a GHCi session progresses.
+  | isInteractiveModule mod     = True
+  | IsOrphan <- is_orphan ispec = mod `elemModuleSet` vis_mods
+  | otherwise                   = True
+  where
+    mod = nameModule (idName (is_dfun ispec))
+
+classInstances :: InstEnvs -> Class -> [ClsInst]
+classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
+  = get home_ie ++ get pkg_ie
+  where
+    get env = case lookupUFM env cls of
+                Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
+                Nothing            -> []
+
+-- | Collects the names of concrete types and type constructors that make
+-- up the head of a class instance. For instance, given `class Foo a b`:
+--
+-- `instance Foo (Either (Maybe Int) a) Bool` would yield
+--      [Either, Maybe, Int, Bool]
+--
+-- Used in the implementation of ":info" in GHCi.
+orphNamesOfClsInst :: ClsInst -> NameSet
+orphNamesOfClsInst = orphNamesOfDFunHead . idType . instanceDFunId
+
+-- | Checks for an exact match of ClsInst in the instance environment.
+-- We use this when we do signature checking in TcRnDriver
+memberInstEnv :: InstEnv -> ClsInst -> Bool
+memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
+    maybe False (\(ClsIE items) -> any (identicalInstHead ins_item) items)
+          (lookupUFM inst_env cls_nm)
+
+extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
+extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
+
+extendInstEnv :: InstEnv -> ClsInst -> InstEnv
+extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
+  = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
+  where
+    add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
+
+deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
+deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
+  = adjustUFM adjust inst_env cls_nm
+  where
+    adjust (ClsIE items) = ClsIE (filterOut (identicalInstHead ins_item) items)
+
+identicalInstHead :: ClsInst -> ClsInst -> Bool
+-- ^ True when when the instance heads are the same
+-- e.g.  both are   Eq [(a,b)]
+-- Obviously should be insenstive to alpha-renaming
+identicalInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = tvs1, is_tys = tys1 })
+                  (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tvs = tvs2, is_tys = tys2 })
+  =  cls_nm1 == cls_nm2
+  && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
+  && isJust (tcMatchTys (mkVarSet tvs1) tys1 tys2)
+  && isJust (tcMatchTys (mkVarSet tvs2) tys2 tys1)
+
+{-
+************************************************************************
+*                                                                      *
+        Looking up an instance
+*                                                                      *
+************************************************************************
+
+@lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since
+the env is kept ordered, the first match must be the only one.  The
+thing we are looking up can have an arbitrary "flexi" part.
+
+Note [Instance lookup and orphan instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are compiling a module M, and we have a zillion packages
+loaded, and we are looking up an instance for C (T W).  If we find a
+match in module 'X' from package 'p', should be "in scope"; that is,
+
+  is p:X in the transitive closure of modules imported from M?
+
+The difficulty is that the "zillion packages" might include ones loaded
+through earlier invocations of the GHC API, or earlier module loads in GHCi.
+They might not be in the dependencies of M itself; and if not, the instances
+in them should not be visible.  Trac #2182, #8427.
+
+There are two cases:
+  * If the instance is *not an orphan*, then module X defines C, T, or W.
+    And in order for those types to be involved in typechecking M, it
+    must be that X is in the transitive closure of M's imports.  So we
+    can use the instance.
+
+  * If the instance *is an orphan*, the above reasoning does not apply.
+    So we keep track of the set of orphan modules transitively below M;
+    this is the ie_visible field of InstEnvs, of type VisibleOrphanModules.
+
+    If module p:X is in this set, then we can use the instance, otherwise
+    we can't.
+
+Note [Rules for instance lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These functions implement the carefully-written rules in the user
+manual section on "overlapping instances". At risk of duplication,
+here are the rules.  If the rules change, change this text and the
+user manual simultaneously.  The link may be this:
+http://www.haskell.org/ghc/docs/latest/html/users_guide/type-class-extensions.html#instance-overlap
+
+The willingness to be overlapped or incoherent is a property of the
+instance declaration itself, controlled as follows:
+
+ * An instance is "incoherent"
+   if it has an INCOHERENT pragma, or
+   if it appears in a module compiled with -XIncoherentInstances.
+
+ * An instance is "overlappable"
+   if it has an OVERLAPPABLE or OVERLAPS pragma, or
+   if it appears in a module compiled with -XOverlappingInstances, or
+   if the instance is incoherent.
+
+ * An instance is "overlapping"
+   if it has an OVERLAPPING or OVERLAPS pragma, or
+   if it appears in a module compiled with -XOverlappingInstances, or
+   if the instance is incoherent.
+     compiled with -XOverlappingInstances.
+
+Now suppose that, in some client module, we are searching for an instance
+of the target constraint (C ty1 .. tyn). The search works like this.
+
+ * Find all instances I that match the target constraint; that is, the
+   target constraint is a substitution instance of I. These instance
+   declarations are the candidates.
+
+ * Find all non-candidate instances that unify with the target
+   constraint. Such non-candidates instances might match when the
+   target constraint is further instantiated. If all of them are
+   incoherent, proceed; if not, the search fails.
+
+ * Eliminate any candidate IX for which both of the following hold:
+   * There is another candidate IY that is strictly more specific;
+     that is, IY is a substitution instance of IX but not vice versa.
+
+   * Either IX is overlappable or IY is overlapping.
+
+ * If only one candidate remains, pick it. Otherwise if all remaining
+   candidates are incoherent, pick an arbitrary candidate. Otherwise fail.
+
+Note [Overlapping instances]   (NB: these notes are quite old)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overlap is permitted, but only in such a way that one can make
 a unique choice when looking up.  That is, overlap is only permitted if
 one template matches the other, or vice versa.  So this is ok:
@@ -422,7 +712,7 @@ prematurely chosing a generic instance when a more specific one
 exists.
 
 --Jeff
-
+v
 BUT NOTE [Nov 2001]: we must actually *unify* not reverse-match in
 this test.  Suppose the instance envt had
     ..., forall a b. C a a b, ..., forall a b c. C a b c, ...
@@ -434,180 +724,6 @@ but neither does
 But still x and y might subsequently be unified so they *do* match.
 
 Simple story: unify, don't match.
-
-
-************************************************************************
-*                                                                      *
-                InstEnv, ClsInstEnv
-*                                                                      *
-************************************************************************
-
-A @ClsInstEnv@ all the instances of that class.  The @Id@ inside a
-ClsInstEnv mapping is the dfun for that instance.
-
-If class C maps to a list containing the item ([a,b], [t1,t2,t3], dfun), then
-
-        forall a b, C t1 t2 t3  can be constructed by dfun
-
-or, to put it another way, we have
-
-        instance (...) => C t1 t2 t3,  witnessed by dfun
--}
-
----------------------------------------------------
-type InstEnv = UniqFM ClsInstEnv        -- Maps Class to instances for that class
-
--- | 'InstEnvs' represents the combination of the global type class instance
--- environment, the local type class instance environment, and the set of
--- transitively reachable orphan modules (according to what modules have been
--- directly imported) used to test orphan instance visibility.
-data InstEnvs = InstEnvs {
-        ie_global  :: InstEnv,
-        ie_local   :: InstEnv,
-        ie_visible :: VisibleOrphanModules
-    }
-
-newtype ClsInstEnv
-  = ClsIE [ClsInst]    -- The instances for a particular class, in any order
-
-instance Outputable ClsInstEnv where
-  ppr (ClsIE is) = pprInstances is
-
--- INVARIANTS:
---  * The is_tvs are distinct in each ClsInst
---      of a ClsInstEnv (so we can safely unify them)
-
--- Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
---      [a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
--- The "a" in the pattern must be one of the forall'd variables in
--- the dfun type.
-
-emptyInstEnv :: InstEnv
-emptyInstEnv = emptyUFM
-
-instEnvElts :: InstEnv -> [ClsInst]
-instEnvElts ie = [elt | ClsIE elts <- eltsUFM ie, elt <- elts]
-
--- | Test if an instance is visible, by checking that its origin module
--- is in 'VisibleOrphanModules'.
-instIsVisible :: VisibleOrphanModules -> ClsInst -> Bool
-instIsVisible vis_mods ispec
-  -- NB: Instances from the interactive package always are visible. We can't
-  -- add interactive modules to the set since we keep creating new ones
-  -- as a GHCi session progresses.
-  | isInteractiveModule mod = True
-  | IsOrphan <- is_orphan ispec = mod `elemModuleSet` vis_mods
-  | otherwise = True
-  where mod = nameModule (idName (is_dfun ispec))
-
-classInstances :: InstEnvs -> Class -> [ClsInst]
-classInstances (InstEnvs pkg_ie home_ie vis_mods) cls
-  = filter (instIsVisible vis_mods) (get home_ie ++ get pkg_ie)
-  where
-    get env = case lookupUFM env cls of
-                Just (ClsIE insts) -> insts
-                Nothing            -> []
-
--- | Collects the names of concrete types and type constructors that make
--- up the head of a class instance. For instance, given `class Foo a b`:
---
--- `instance Foo (Either (Maybe Int) a) Bool` would yield
---      [Either, Maybe, Int, Bool]
---
--- Used in the implementation of ":info" in GHCi.
-orphNamesOfClsInst :: ClsInst -> NameSet
-orphNamesOfClsInst = orphNamesOfDFunHead . idType . instanceDFunId
-
--- | Checks for an exact match of ClsInst in the instance environment.
--- We use this when we do signature checking in TcRnDriver
-memberInstEnv :: InstEnv -> ClsInst -> Bool
-memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
-    maybe False (\(ClsIE items) -> any (identicalInstHead ins_item) items)
-          (lookupUFM inst_env cls_nm)
-
-extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
-extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
-
-extendInstEnv :: InstEnv -> ClsInst -> InstEnv
-extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
-  where
-    add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
-
-deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
-deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = adjustUFM adjust inst_env cls_nm
-  where
-    adjust (ClsIE items) = ClsIE (filterOut (identicalInstHead ins_item) items)
-
-identicalInstHead :: ClsInst -> ClsInst -> Bool
--- ^ True when when the instance heads are the same
--- e.g.  both are   Eq [(a,b)]
--- Obviously should be insenstive to alpha-renaming
-identicalInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = tvs1, is_tys = tys1 })
-                  (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tvs = tvs2, is_tys = tys2 })
-  =  cls_nm1 == cls_nm2
-  && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
-  && isJust (tcMatchTys (mkVarSet tvs1) tys1 tys2)
-  && isJust (tcMatchTys (mkVarSet tvs2) tys2 tys1)
-
-{-
-************************************************************************
-*                                                                      *
-        Looking up an instance
-*                                                                      *
-************************************************************************
-
-@lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since
-the env is kept ordered, the first match must be the only one.  The
-thing we are looking up can have an arbitrary "flexi" part.
-
-Note [Rules for instance lookup]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These functions implement the carefully-written rules in the user
-manual section on "overlapping instances". At risk of duplication,
-here are the rules.  If the rules change, change this text and the
-user manual simultaneously.  The link may be this:
-http://www.haskell.org/ghc/docs/latest/html/users_guide/type-class-extensions.html#instance-overlap
-
-The willingness to be overlapped or incoherent is a property of the
-instance declaration itself, controlled as follows:
-
- * An instance is "incoherent"
-   if it has an INCOHERENT pragma, or
-   if it appears in a module compiled with -XIncoherentInstances.
-
- * An instance is "overlappable"
-   if it has an OVERLAPPABLE or OVERLAPS pragma, or
-   if it appears in a module compiled with -XOverlappingInstances, or
-   if the instance is incoherent.
-
- * An instance is "overlapping"
-   if it has an OVERLAPPING or OVERLAPS pragma, or
-   if it appears in a module compiled with -XOverlappingInstances, or
-   if the instance is incoherent.
-     compiled with -XOverlappingInstances.
-
-Now suppose that, in some client module, we are searching for an instance
-of the target constraint (C ty1 .. tyn). The search works like this.
-
- * Find all instances I that match the target constraint; that is, the
-   target constraint is a substitution instance of I. These instance
-   declarations are the candidates.
-
- * Find all non-candidate instances that unify with the target
-   constraint. Such non-candidates instances might match when the
-   target constraint is further instantiated. If all of them are
-   incoherent, proceed; if not, the search fails.
-
- * Eliminate any candidate IX for which both of the following hold:
-   * There is another candidate IY that is strictly more specific;
-     that is, IY is a substitution instance of IX but not vice versa.
-
-   * Either IX is overlappable or IY is overlapping.
-
- * If only one candidate remains, pick it. Otherwise if all remaining
-   candidates are incoherent, pick an arbitrary candidate. Otherwise fail.
 -}
 
 type DFunInstType = Maybe Type
@@ -686,7 +802,8 @@ lookupInstEnv' ie vis_mods cls tys
     find ms us (item@(ClsInst { is_tcs = mb_tcs, is_tvs = tpl_tvs
                               , is_tys = tpl_tys, is_flag = oflag }) : rest)
       | not (instIsVisible vis_mods item)
-      = find ms us rest
+      = find ms us rest  -- See Note [Instance lookup and orphan instances]
+
         -- Fast check for no match, uses the "rough match" fields
       | instanceCantMatch rough_tcs mb_tcs
       = find ms us rest
@@ -726,7 +843,7 @@ lookupInstEnv :: InstEnvs     -- External and home package inst-env
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
-lookupInstEnv (InstEnvs pkg_ie home_ie vis_mods) cls tys
+lookupInstEnv (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls tys
   = (final_matches, final_unifs, safe_fail)
   where
     (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys

@@ -21,7 +21,7 @@ module TcEnv(
         tcLookupField, tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
-        tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
+        tcLookupLocatedClass, tcLookupAxiom,
         
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnv2,
@@ -38,8 +38,11 @@ module TcEnv(
 
         tcExtendRecEnv,         -- For knot-tying
 
+        -- Instances
+        tcLookupInstance, tcGetInstEnvs,
+
         -- Rules
-         tcExtendRules,
+        tcExtendRules,
 
         -- Defaults
         tcGetDefaultTys,
@@ -225,12 +228,14 @@ tcLookupInstance cls tys
         extractTyVar (TyVarTy tv) = tv
         extractTyVar _            = panic "TcEnv.tcLookupInstance: extractTyVar"
 
-    -- NB: duplicated to prevent circular dependence on Inst
-    tcGetInstEnvs = do { eps <- getEps
-                       ; env <- getGblEnv
-                       ; return (InstEnvs (eps_inst_env eps)
-                                          (tcg_inst_env env)
-                                          (tcg_visible_orphan_mods env)) }
+tcGetInstEnvs :: TcM InstEnvs
+-- Gets both the external-package inst-env
+-- and the home-pkg inst env (includes module being compiled)
+tcGetInstEnvs = do { eps <- getEps
+                   ; env <- getGblEnv
+                   ; return (InstEnvs { ie_global  = eps_inst_env eps
+                                      , ie_local   = tcg_inst_env env
+                                      , ie_visible = tcg_visible_orphan_mods env }) }
 \end{code}
 
 \begin{code}

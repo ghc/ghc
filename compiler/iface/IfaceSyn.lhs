@@ -214,7 +214,7 @@ data IfaceClsInst
                    ifInstTys  :: [Maybe IfaceTyCon],       -- the defn of ClsInst
                    ifDFun     :: IfExtName,                -- The dfun
                    ifOFlag    :: OverlapFlag,              -- Overlap flag
-                   ifInstOrph :: IsOrphan }                -- See Note [Orphans]
+                   ifInstOrph :: IsOrphan }                -- See Note [Orphans] in InstEnv
         -- There's always a separate IfaceDecl for the DFun, which gives
         -- its IdInfo with its full type and version number.
         -- The instance declarations taken together have a version number,
@@ -228,7 +228,7 @@ data IfaceFamInst
   = IfaceFamInst { ifFamInstFam      :: IfExtName            -- Family name
                  , ifFamInstTys      :: [Maybe IfaceTyCon]   -- See above
                  , ifFamInstAxiom    :: IfExtName            -- The axiom
-                 , ifFamInstOrph     :: IsOrphan       -- Just like IfaceClsInst
+                 , ifFamInstOrph     :: IsOrphan             -- Just like IfaceClsInst
                  }
 
 data IfaceRule
@@ -302,77 +302,6 @@ data IfaceIdDetails
   | IfDFunId Int          -- Number of silent args
 \end{code}
 
-
-Note [Orphans]: the ifInstOrph and ifRuleOrph fields
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Class instances, rules, and family instances are divided into orphans
-and non-orphans.  Roughly speaking, an instance/rule is an orphan if
-its left hand side mentions nothing defined in this module.  Orphan-hood
-has two major consequences
-
- * A non-orphan is not finger-printed separately.  Instead, for
-   fingerprinting purposes it is treated as part of the entity it
-   mentions on the LHS.  For example
-      data T = T1 | T2
-      instance Eq T where ....
-   The instance (Eq T) is incorprated as part of T's fingerprint.
-
-   In constrast, orphans are all fingerprinted together in the
-   mi_orph_hash field of the ModIface.
-
-   See MkIface.addFingerprints.
-
- * A module that contains orphans is called an "orphan module".  If
-   the module being compiled depends (transitively) on an oprhan
-   module M, then M.hi is read in regardless of whether M is oherwise
-   needed. This is to ensure that we don't miss any instance decls in
-   M.  But it's painful, because it means we need to keep track of all
-   the orphan modules below us.
-
-Orphan-hood is computed when we generate an IfaceInst, IfaceRule, or
-IfaceFamInst respectively:
-
- - If an instance is an orphan its ifInstOprh field is Nothing
-   Otherwise ifInstOrph is (Just n) where n is the Name of a
-   local class or tycon that witnesses its non-orphan-hood.
-   This computation is done by MkIface.instanceToIfaceInst
-
- - Similarly for ifRuleOrph
-   The computation is done by MkIface.coreRuleToIfaceRule
-
-Note [When exactly is an instance decl an orphan?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  (see MkIface.instanceToIfaceInst, which implements this)
-Roughly speaking, an instance is an orphan if its head (after the =>)
-mentions nothing defined in this module.
-
-Functional dependencies complicate the situation though. Consider
-
-  module M where { class C a b | a -> b }
-
-and suppose we are compiling module X:
-
-  module X where
-        import M
-        data T = ...
-        instance C Int T where ...
-
-This instance is an orphan, because when compiling a third module Y we
-might get a constraint (C Int v), and we'd want to improve v to T.  So
-we must make sure X's instances are loaded, even if we do not directly
-use anything from X.
-
-More precisely, an instance is an orphan iff
-
-  If there are no fundeps, then at least of the names in
-  the instance head is locally defined.
-
-  If there are fundeps, then for every fundep, at least one of the
-  names free in a *non-determined* part of the instance head is
-  defined in this module.
-
-(Note that these conditions hold trivially if the class is locally
-defined.)
 
 Note [Versioning of instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

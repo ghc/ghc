@@ -79,7 +79,6 @@ import DataCon
 import Type
 import Class
 import CoAxiom
-import Inst     ( tcGetInstEnvs )
 import Annotations
 import Data.List ( sortBy )
 import Data.Ord
@@ -1974,7 +1973,7 @@ tcRnGetInfo hsc_env name
 
 lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
-  = do  { InstEnvs pkg_ie home_ie vis_mods <- tcGetInstEnvs
+  = do  { InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods } <- tcGetInstEnvs
         ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
                 -- Load all instances for all classes that are
                 -- in the type environment (which are all the ones
