@@ -296,9 +296,9 @@ instance Bits Natural where
     NatJ# n .&. NatJ# m = bigNatToNatural (andBigNat n m)
 
     NatS# n .|. NatS# m = wordToNatural (W# n .|. W# m)
-    NatS# n .|. NatJ# m = NatJ# (andBigNat (wordToBigNat n) m)
-    NatJ# n .|. NatS# m = NatJ# (andBigNat n (wordToBigNat m))
-    NatJ# n .|. NatJ# m = NatJ# (andBigNat n m)
+    NatS# n .|. NatJ# m = NatJ# (orBigNat (wordToBigNat n) m)
+    NatJ# n .|. NatS# m = NatJ# (orBigNat n (wordToBigNat m))
+    NatJ# n .|. NatJ# m = NatJ# (orBigNat n m)
 
     NatS# n `xor` NatS# m = wordToNatural (W# n `xor` W# m)
     NatS# n `xor` NatJ# m = NatJ# (xorBigNat (wordToBigNat n) m)
