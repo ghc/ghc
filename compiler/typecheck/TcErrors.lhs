@@ -793,7 +793,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_env = env, ic_given = given, ic_info = skol_info } <- implic
   = do { let msg = misMatchMsg oriented ty1 ty2
-             untch_extra
+             tclvl_extra
                 = nest 2 $
                   sep [ quotes (ppr tv1) <+> ptext (sLit "is untouchable")
                       , nest 2 $ ptext (sLit "inside the constraints") <+> pprEvVarTheta given
@@ -801,7 +801,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                       , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
              tv_extra = extraTyVarInfo ctxt tv1 ty2
              add_sig  = suggestAddSig ctxt ty1 ty2
-       ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, add_sig, extra]) }
+       ; mkErrorMsg ctxt ct (vcat [msg, tclvl_extra, tv_extra, add_sig, extra]) }
 
   | otherwise
   = reportEqErr ctxt extra ct oriented (mkTyVarTy tv1) ty2

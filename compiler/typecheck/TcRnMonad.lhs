@@ -179,7 +179,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
-                tcl_untch      = noUntouchables
+                tcl_tclvl      = topTcLevel
              } ;
         } ;
 
@@ -1156,33 +1156,33 @@ captureConstraints thing_inside
          lie <- readTcRef lie_var ;
          return (res, lie) }
 
-captureUntouchables :: TcM a -> TcM (a, Untouchables)
-captureUntouchables thing_inside
+captureTcLevel :: TcM a -> TcM (a, TcLevel)
+captureTcLevel thing_inside
   = do { env <- getLclEnv
-       ; let untch' = pushUntouchables (tcl_untch env)
-       ; res <- setLclEnv (env { tcl_untch = untch' })
+       ; let tclvl' = pushTcLevel (tcl_tclvl env)
+       ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
                 thing_inside
-       ; return (res, untch') }
+       ; return (res, tclvl') }
 
-pushUntouchablesM :: TcM a -> TcM a
-pushUntouchablesM thing_inside
+pushTcLevelM :: TcM a -> TcM a
+pushTcLevelM thing_inside
   = do { env <- getLclEnv
-       ; let untch' = pushUntouchables (tcl_untch env)
-       ; setLclEnv (env { tcl_untch = untch' })
+       ; let tclvl' = pushTcLevel (tcl_tclvl env)
+       ; setLclEnv (env { tcl_tclvl = tclvl' })
                    thing_inside }
 
-getUntouchables :: TcM Untouchables
-getUntouchables = do { env <- getLclEnv
-                     ; return (tcl_untch env) }
+getTcLevel :: TcM TcLevel
+getTcLevel = do { env <- getLclEnv
+                     ; return (tcl_tclvl env) }
 
-setUntouchables :: Untouchables -> TcM a -> TcM a
-setUntouchables untch thing_inside 
-  = updLclEnv (\env -> env { tcl_untch = untch }) thing_inside
+setTcLevel :: TcLevel -> TcM a -> TcM a
+setTcLevel tclvl thing_inside 
+  = updLclEnv (\env -> env { tcl_tclvl = tclvl }) thing_inside
 
 isTouchableTcM :: TcTyVar -> TcM Bool
 isTouchableTcM tv
   = do { env <- getLclEnv
-       ; return (isTouchableMetaTyVar (tcl_untch env) tv) }
+       ; return (isTouchableMetaTyVar (tcl_tclvl env) tv) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }

@@ -66,9 +66,9 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
                  InfixPatSyn name1 name2 -> (map unLoc [name1, name2], True)
-       ; (((lpat', (args, pat_ty)), untch), wanted)
-            <- captureConstraints       $
-               captureUntouchables      $
+       ; (((lpat', (args, pat_ty)), tclvl), wanted)
+            <- captureConstraints  $
+               captureTcLevel      $
                do { pat_ty <- newFlexiTyVarTy openTypeKind
                   ; tcPat PatSyn lpat pat_ty $
                do { args <- mapM tcLookupId arg_names
@@ -76,7 +76,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
-       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer untch False named_taus wanted
+       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer tclvl False named_taus wanted
 
        ; (ex_vars, prov_dicts) <- tcCollectEx lpat'
        ; let univ_tvs   = filter (not . (`elemVarSet` ex_vars)) qtvs

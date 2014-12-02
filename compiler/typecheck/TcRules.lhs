@@ -167,7 +167,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
            -- Simplify the RHS constraints
        ; lcl_env <- getLclEnv
        ; rhs_binds_var <- newTcEvBinds
-       ; emitImplication $ Implic { ic_untch  = noUntouchables
+       ; emitImplication $ Implic { ic_tclvl  = topTcLevel
                                   , ic_skols  = qtkvs
                                   , ic_no_eqs = False
                                   , ic_given  = lhs_evs
@@ -181,7 +181,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
            -- (a) so that we report insoluble ones
            -- (b) so that we bind any soluble ones
        ; lhs_binds_var <- newTcEvBinds
-       ; emitImplication $ Implic { ic_untch  = noUntouchables
+       ; emitImplication $ Implic { ic_tclvl  = topTcLevel
                                   , ic_skols  = qtkvs
                                   , ic_no_eqs = False
                                   , ic_given  = lhs_evs

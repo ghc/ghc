@@ -58,7 +58,7 @@ module TcSMonad (
     setWantedTyBind, reportUnifications,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
-    getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
+    getTopEnv, getGblEnv, getTcEvBinds, getTcLevel,
     getTcEvBindsMap, 
 
     lookupFlatCache, newFlattenSkolem,            -- Flatten skolems
@@ -87,7 +87,7 @@ module TcSMonad (
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
     cloneMetaTyVar, demoteUnfilledFmv,
 
-    Untouchables, isTouchableMetaTyVarTcS,
+    TcLevel, isTouchableMetaTyVarTcS,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
     zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkFlats,
 
@@ -610,11 +610,11 @@ getUnsolvedInerts
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
-getNoGivenEqs :: Untouchables     -- Untouchables of this implication
+getNoGivenEqs :: TcLevel     -- TcLevel of this implication
                -> [TcTyVar]       -- Skolems of this implication
                -> TcS Bool        -- True <=> definitely no residual given equalities
 -- See Note [When does an implication have given equalities?]
-getNoGivenEqs untch skol_tvs
+getNoGivenEqs tclvl skol_tvs
   = do { inerts@(IC { inert_eqs = ieqs, inert_irreds = iirreds, inert_funeqs = funeqs })
              <- getInertCans
        ; let local_fsks = foldFunEqs add_fsk funeqs emptyVarSet
@@ -636,7 +636,7 @@ getNoGivenEqs untch skol_tvs
     -- i.e. the current level
     ev_given_here ev
       =  isGiven ev
-      && untch == tcl_untch (ctl_env (ctEvLoc ev))
+      && tclvl == tcl_tclvl (ctl_env (ctEvLoc ev))
 
     add_fsk :: Ct -> VarSet -> VarSet
     add_fsk ct fsks | CFunEqCan { cc_fsk = tv, cc_ev = ev } <- ct
@@ -666,8 +666,8 @@ any equalities among them, the calculation of has_given_eqs.  There
 are some wrinkles:
 
  * We must know which ones are bound in *this* implication and which
-   are bound further out.  We can find that out from the Untouchable
-   level of the Given, which is itself recorded in the tcl_untch field
+   are bound further out.  We can find that out from the TcLevel
+   of the Given, which is itself recorded in the tcl_tclvl field
    of the TcLclEnv stored in the Given (ev_given_here).
 
    What about interactions between inner and outer givens?
@@ -1086,8 +1086,8 @@ traceFireTcS :: CtEvidence -> SDoc -> TcS ()
 traceFireTcS ev doc
   = TcS $ \env -> csTraceTcM 1 $
     do { n <- TcM.readTcRef (tcs_count env)
-       ; untch <- TcM.getUntouchables
-       ; return (hang (int n <> brackets (ptext (sLit "U:") <> ppr untch 
+       ; tclvl <- TcM.getTcLevel
+       ; return (hang (int n <> brackets (ptext (sLit "U:") <> ppr tclvl 
                                           <> ppr (ctLocDepth (ctEvLoc ev))) 
                        <+> doc <> colon)
                      4 (ppr ev)) } 
@@ -1160,8 +1160,8 @@ checkForCyclicBinds ev_binds
     edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs)) | bind@(EvBind bndr rhs) <- bagToList ev_binds]
 #endif
 
-nestImplicTcS :: EvBindsVar -> Untouchables -> TcS a -> TcS a
-nestImplicTcS ref inner_untch (TcS thing_inside)
+nestImplicTcS :: EvBindsVar -> TcLevel -> TcS a -> TcS a
+nestImplicTcS ref inner_tclvl (TcS thing_inside)
   = TcS $ \ TcSEnv { tcs_unified = unified_var
                    , tcs_inerts = old_inert_var
                    , tcs_count = count } ->
@@ -1175,7 +1175,7 @@ nestImplicTcS ref inner_untch (TcS thing_inside)
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
                                , tcs_worklist    = new_wl_var }
-       ; res <- TcM.setUntouchables inner_untch $
+       ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
 
 #ifdef DEBUG
@@ -1307,8 +1307,8 @@ emitInsoluble ct
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds)
 
-getUntouchables :: TcS Untouchables
-getUntouchables = wrapTcS TcM.getUntouchables
+getTcLevel :: TcS TcLevel
+getTcLevel = wrapTcS TcM.getTcLevel
 \end{code}
 
 \begin{code}
@@ -1385,8 +1385,8 @@ pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
 
 isTouchableMetaTyVarTcS :: TcTyVar -> TcS Bool
 isTouchableMetaTyVarTcS tv
-  = do { untch <- getUntouchables
-       ; return $ isTouchableMetaTyVar untch tv }
+  = do { tclvl <- getTcLevel
+       ; return $ isTouchableMetaTyVar tclvl tv }
 
 isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
 isFilledMetaTyVar_maybe tv
@@ -1489,7 +1489,7 @@ newFlattenSkolem ctxt_ev fam_ty
                     ; ref  <- TcM.newMutVar Flexi
                     ; let details = MetaTv { mtv_info  = FlatMetaTv
                                            , mtv_ref   = ref
-                                           , mtv_untch = fskUntouchables }
+                                           , mtv_tclvl = fskTcLevel }
                           name = TcM.mkTcTyVarName uniq (fsLit "s")
                     ; return (mkTcTyVar name (typeKind fam_ty) details) }
        ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fuv))
@@ -1983,11 +1983,11 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; let ev_binds = TcEvBinds ev_binds_var
                                new_ct = mkNonCanonical ctev
                                new_co = ctEvCoercion ctev
-                               new_untch = pushUntouchables (tcl_untch env)
+                               new_tclvl = pushTcLevel (tcl_tclvl env)
                          ; let wc = WC { wc_flat  = singleCt new_ct
                                        , wc_impl  = emptyBag
                                        , wc_insol = emptyCts }
-                               imp = Implic { ic_untch  = new_untch
+                               imp = Implic { ic_tclvl  = new_tclvl
                                             , ic_skols  = skol_tvs
                                             , ic_no_eqs = True
                                             , ic_given  = []

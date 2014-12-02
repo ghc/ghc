@@ -829,8 +829,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
        ; stopWith ev "Solved from inert (r)" }
 
   | otherwise
-  = do { untch <- getUntouchables
-       ; if canSolveByUnification untch ev tv rhs
+  = do { tclvl <- getTcLevel
+       ; if canSolveByUnification tclvl ev tv rhs
          then do { solveByUnification ev tv rhs
                  ; n_kicked <- kickOutRewritable givenFlavour tv
                                -- givenFlavour because the tv := xi is given
@@ -839,10 +839,10 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
          else do { traceTcS "Can't solve tyvar equality"
                        (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
                              , ppWhen (isMetaTyVar tv) $
-                               nest 4 (text "Untouchable level of" <+> ppr tv
-                                       <+> text "is" <+> ppr (metaTyVarUntouchables tv))
+                               nest 4 (text "TcLevel of" <+> ppr tv
+                                       <+> text "is" <+> ppr (metaTyVarTcLevel tv))
                              , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
-                             , text "Untouchables =" <+> ppr untch ])
+                             , text "TcLevel =" <+> ppr tclvl ])
                  ; n_kicked <- kickOutRewritable ev tv
                  ; updInertCans (\ ics -> addInertCan ics workItem)
                  ; return (Stop ev (ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked)) } }
@@ -852,12 +852,12 @@ interactTyVarEq _ wi = pprPanic "interactTyVarEq" (ppr wi)
 -- @trySpontaneousSolve wi@ solves equalities where one side is a
 -- touchable unification variable.
 -- Returns True <=> spontaneous solve happened
-canSolveByUnification :: Untouchables -> CtEvidence -> TcTyVar -> Xi -> Bool
-canSolveByUnification untch gw tv xi
+canSolveByUnification :: TcLevel -> CtEvidence -> TcTyVar -> Xi -> Bool
+canSolveByUnification tclvl gw tv xi
   | isGiven gw   -- See Note [Touchables and givens]
   = False
 
-  | isTouchableMetaTyVar untch tv
+  | isTouchableMetaTyVar tclvl tv
   = case metaTyVarInfo tv of
       SigTv -> is_tyvar xi
       _     -> True
@@ -1993,10 +1993,10 @@ matchClassInst _ clas [ _k, ty1, ty2 ] loc
 
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
-        ; untch <- getUntouchables
+        ; tclvl <- getTcLevel
         ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
                                            , text "inerts=" <+> ppr inerts
-                                           , text "untouchables=" <+> ppr untch ]
+                                           , text "untouchables=" <+> ppr tclvl ]
         ; instEnvs <- getInstEnvs
         ; case lookupInstEnv instEnvs clas tys of
             ([], _, _)               -- Nothing matches
@@ -2006,7 +2006,7 @@ matchClassInst inerts clas tys loc
 
             ([(ispec, inst_tys)], [], _) -- A single match
                 | not (xopt Opt_IncoherentInstances dflags)
-                , given_overlap untch
+                , given_overlap tclvl
                 -> -- See Note [Instance and Given overlap]
                    do { traceTcS "Delaying instance application" $
                           vcat [ text "Workitem=" <+> pprType (mkClassPred clas tys)
@@ -2051,14 +2051,14 @@ matchClassInst inerts clas tys loc
      givens_for_this_clas
          = filterBag isGivenCt (findDictsByClass (inert_dicts $ inert_cans inerts) clas)
 
-     given_overlap :: Untouchables -> Bool
-     given_overlap untch = anyBag (matchable untch) givens_for_this_clas
+     given_overlap :: TcLevel -> Bool
+     given_overlap tclvl = anyBag (matchable tclvl) givens_for_this_clas
 
-     matchable untch (CDictCan { cc_class = clas_g, cc_tyargs = sys
+     matchable tclvl (CDictCan { cc_class = clas_g, cc_tyargs = sys
                                , cc_ev = fl })
        | isGiven fl
        = ASSERT( clas_g == clas )
-         case tcUnifyTys (\tv -> if isTouchableMetaTyVar untch tv &&
+         case tcUnifyTys (\tv -> if isTouchableMetaTyVar tclvl tv &&
                                     tv `elemVarSet` tyVarsOfTypes tys
                                  then BindMe else Skolem) tys sys of
        -- We can't learn anything more about any variable at this point, so the only

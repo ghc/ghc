@@ -562,8 +562,8 @@ newImplication :: SkolemInfo -> [TcTyVar]
 newImplication skol_info skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { ((result, untch), wanted) <- captureConstraints  $
-                                      captureUntouchables $
+    do { ((result, tclvl), wanted) <- captureConstraints  $
+                                      captureTcLevel $
                                       thing_inside
 
        ; if isEmptyWC wanted && null given
@@ -576,7 +576,7 @@ newImplication skol_info skol_tvs given thing_inside
          else do
        { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_untch = untch
+       ; emitImplication $ Implic { ic_tclvl = tclvl
                                   , ic_skols = skol_tvs
                                   , ic_no_eqs = False
                                   , ic_given = given
@@ -678,9 +678,9 @@ uType_defer origin ty1 ty2
 --------------
 -- unify_np (short for "no push" on the origin stack) does the work
 uType origin orig_ty1 orig_ty2
-  = do { untch <- getUntouchables
+  = do { tclvl <- getTcLevel
        ; traceTc "u_tys " $ vcat
-              [ text "untch" <+> ppr untch
+              [ text "tclvl" <+> ppr tclvl
               , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
               , pprCtOrigin origin]
        ; co <- go orig_ty1 orig_ty2

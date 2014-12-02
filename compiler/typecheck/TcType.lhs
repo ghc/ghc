@@ -23,9 +23,9 @@ module TcType (
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
-  -- Untouchables
-  Untouchables(..), noUntouchables, pushUntouchables, 
-  strictlyDeeperThan, sameDepthAs, fskUntouchables,
+  -- TcLevel
+  TcLevel(..), topTcLevel, pushTcLevel,
+  strictlyDeeperThan, sameDepthAs, fskTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -38,7 +38,7 @@ module TcType (
   isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
-  metaTyVarUntouchables, setMetaTyVarUntouchables, metaTyVarUntouchables_maybe,
+  metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
   canUnifyWithPolyType,
@@ -323,7 +323,7 @@ data TcTyVarDetails
 
   | MetaTv { mtv_info  :: MetaInfo
            , mtv_ref   :: IORef MetaDetails
-           , mtv_untch :: Untouchables }  -- See Note [Untouchable type variables]
+           , mtv_tclvl :: TcLevel }  -- See Note [TcLevel and untouchable type variables]
 
 vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
 -- See Note [Binding when looking up instances] in InstEnv
@@ -414,11 +414,16 @@ data UserTypeCtxt
 %*                                                                      *
 %************************************************************************
 
-Note [Untouchable type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+newtype TcLevel = TcLevel Int deriving( Eq )
+  -- See Note [TcLevel and untouchable type variables] for what this Int is
+\end{code}
+
+Note [TcLevel and untouchable type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Each unification variable (MetaTv)
   and each Implication
-  has a level number (of type Untouchables)
+  has a level number (of type TcLevel)
 
 * INVARIANTS.  In a tree of Implications,
 
@@ -435,7 +440,7 @@ Note [Untouchable type variables]
 * INVARIANT
     (GivenInv)  The free variables of the ic_given of an
                 implication are all untouchable; ie their level
-                numbers are LESS THAN the ic_untch of the implication
+                numbers are LESS THAN the ic_tclvl of the implication
 
 
 Note [Skolem escape prevention]
@@ -472,35 +477,32 @@ the whole implication disappears but when we pop out again we are left with
 uf will get unified *once more* to (F Int).
 
 \begin{code}
-newtype Untouchables = Untouchables Int deriving( Eq )
-  -- See Note [Untouchable type variables] for what this Int is
-
-fskUntouchables :: Untouchables
-fskUntouchables = Untouchables 0  -- 0 = Outside the outermost level: 
+fskTcLevel :: TcLevel
+fskTcLevel = TcLevel 0  -- 0 = Outside the outermost level: 
                                   --     flatten skolems
 
-noUntouchables :: Untouchables
-noUntouchables = Untouchables 1   -- 1 = outermost level
+topTcLevel :: TcLevel
+topTcLevel = TcLevel 1   -- 1 = outermost level
 
-pushUntouchables :: Untouchables -> Untouchables
-pushUntouchables (Untouchables us) = Untouchables (us+1)
+pushTcLevel :: TcLevel -> TcLevel
+pushTcLevel (TcLevel us) = TcLevel (us+1)
 
-strictlyDeeperThan :: Untouchables -> Untouchables -> Bool
-strictlyDeeperThan (Untouchables tv_untch) (Untouchables ctxt_untch)
-  = tv_untch > ctxt_untch
+strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
+strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
+  = tv_tclvl > ctxt_tclvl
 
-sameDepthAs :: Untouchables -> Untouchables -> Bool
-sameDepthAs (Untouchables ctxt_untch) (Untouchables tv_untch)
-  = ctxt_untch == tv_untch   -- NB: invariant ctxt_untch >= tv_untch
+sameDepthAs :: TcLevel -> TcLevel -> Bool
+sameDepthAs (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
+  = ctxt_tclvl == tv_tclvl   -- NB: invariant ctxt_tclvl >= tv_tclvl
                              --     So <= would be equivalent
 
-checkTouchableInvariant :: Untouchables -> Untouchables -> Bool
--- Checks (MetaTvInv) from Note [Untouchable type variables]
-checkTouchableInvariant (Untouchables ctxt_untch) (Untouchables tv_untch)
-  = ctxt_untch >= tv_untch
+checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
+-- Checks (MetaTvInv) from Note [TcLevel and untouchable type variables]
+checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
+  = ctxt_tclvl >= tv_tclvl
 
-instance Outputable Untouchables where
-  ppr (Untouchables us) = ppr us
+instance Outputable TcLevel where
+  ppr (TcLevel us) = ppr us
 \end{code}
 
 
@@ -517,8 +519,8 @@ pprTcTyVarDetails (SkolemTv True)  = ptext (sLit "ssk")
 pprTcTyVarDetails (SkolemTv False) = ptext (sLit "sk")
 pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
 pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
-pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
-  = pp_info <> colon <> ppr untch
+pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
+  = pp_info <> colon <> ppr tclvl
   where
     pp_info = case info of
                 ReturnTv    -> ptext (sLit "ret")
@@ -647,33 +649,33 @@ exactTyVarsOfTypes = mapUnionVarSet exactTyVarsOfType
 %************************************************************************
 
 \begin{code}
-isTouchableOrFmv :: Untouchables -> TcTyVar -> Bool
-isTouchableOrFmv ctxt_untch tv
+isTouchableOrFmv :: TcLevel -> TcTyVar -> Bool
+isTouchableOrFmv ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      MetaTv { mtv_untch = tv_untch, mtv_info = info }
-        -> ASSERT2( checkTouchableInvariant ctxt_untch tv_untch,
-                    ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
+      MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info }
+        -> ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
+                    ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
            case info of
              FlatMetaTv -> True
-             _          -> tv_untch `sameDepthAs` ctxt_untch
+             _          -> tv_tclvl `sameDepthAs` ctxt_tclvl
       _          -> False
 
-isTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
-isTouchableMetaTyVar ctxt_untch tv
+isTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
+isTouchableMetaTyVar ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      MetaTv { mtv_untch = tv_untch }
-        -> ASSERT2( checkTouchableInvariant ctxt_untch tv_untch,
-                    ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
-           tv_untch `sameDepthAs` ctxt_untch
+      MetaTv { mtv_tclvl = tv_tclvl }
+        -> ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
+                    ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
+           tv_tclvl `sameDepthAs` ctxt_tclvl
       _ -> False
 
-isFloatedTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
-isFloatedTouchableMetaTyVar ctxt_untch tv
+isFloatedTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
+isFloatedTouchableMetaTyVar ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      MetaTv { mtv_untch = tv_untch } -> tv_untch `strictlyDeeperThan` ctxt_untch
+      MetaTv { mtv_tclvl = tv_tclvl } -> tv_tclvl `strictlyDeeperThan` ctxt_tclvl
       _ -> False
 
 isImmutableTyVar :: TyVar -> Bool
@@ -756,26 +758,26 @@ metaTyVarInfo tv
       MetaTv { mtv_info = info } -> info
       _ -> pprPanic "metaTyVarInfo" (ppr tv)
 
-metaTyVarUntouchables :: TcTyVar -> Untouchables
-metaTyVarUntouchables tv
+metaTyVarTcLevel :: TcTyVar -> TcLevel
+metaTyVarTcLevel tv
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-      MetaTv { mtv_untch = untch } -> untch
-      _ -> pprPanic "metaTyVarUntouchables" (ppr tv)
+      MetaTv { mtv_tclvl = tclvl } -> tclvl
+      _ -> pprPanic "metaTyVarTcLevel" (ppr tv)
 
-metaTyVarUntouchables_maybe :: TcTyVar -> Maybe Untouchables
-metaTyVarUntouchables_maybe tv
+metaTyVarTcLevel_maybe :: TcTyVar -> Maybe TcLevel
+metaTyVarTcLevel_maybe tv
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-      MetaTv { mtv_untch = untch } -> Just untch
+      MetaTv { mtv_tclvl = tclvl } -> Just tclvl
       _                            -> Nothing
 
-setMetaTyVarUntouchables :: TcTyVar -> Untouchables -> TcTyVar
-setMetaTyVarUntouchables tv untch
+setMetaTyVarTcLevel :: TcTyVar -> TcLevel -> TcTyVar
+setMetaTyVarTcLevel tv tclvl
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-      details@(MetaTv {}) -> setTcTyVarDetails tv (details { mtv_untch = untch })
-      _ -> pprPanic "metaTyVarUntouchables" (ppr tv)
+      details@(MetaTv {}) -> setTcTyVarDetails tv (details { mtv_tclvl = tclvl })
+      _ -> pprPanic "metaTyVarTcLevel" (ppr tv)
 
 isSigTyVar :: Var -> Bool
 isSigTyVar tv

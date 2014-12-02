@@ -1055,7 +1055,7 @@ We must solve both!
 unflatten :: Cts -> Cts -> TcS Cts
 unflatten tv_eqs funeqs
  = do { dflags   <- getDynFlags
-      ; untch    <- getUntouchables
+      ; tclvl    <- getTcLevel
 
       ; traceTcS "Unflattening" $ braces $
         vcat [ ptext (sLit "Funeqs =") <+> pprCts funeqs
@@ -1067,7 +1067,7 @@ unflatten tv_eqs funeqs
       ; traceTcS "Unflattening 1" $ braces (pprCts funeqs)
 
           -- Step 2: unify the irreds, if possible
-      ; tv_eqs  <- foldrBagM (unflatten_eq dflags untch) emptyCts tv_eqs
+      ; tv_eqs  <- foldrBagM (unflatten_eq dflags tclvl) emptyCts tv_eqs
       ; traceTcS "Unflattening 2" $ braces (pprCts tv_eqs)
 
           -- Step 3: fill any remaining fmvs with fresh unification variables
@@ -1102,12 +1102,12 @@ unflatten tv_eqs funeqs
     finalise_funeq ct = pprPanic "finalise_funeq" (ppr ct)
 
     ----------------
-    unflatten_eq ::  DynFlags -> Untouchables -> Ct -> Cts -> TcS Cts
-    unflatten_eq dflags untch ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
+    unflatten_eq ::  DynFlags -> TcLevel -> Ct -> Cts -> TcS Cts
+    unflatten_eq dflags tclvl ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
       | isFmvTyVar tv
       = do { lhs_elim <- tryFill dflags tv rhs ev
            ; if lhs_elim then return rest else
-        do { rhs_elim <- try_fill dflags untch ev rhs (mkTyVarTy tv)
+        do { rhs_elim <- try_fill dflags tclvl ev rhs (mkTyVarTy tv)
            ; if rhs_elim then return rest else
              return (ct `consCts` rest) } }
 
@@ -1133,9 +1133,9 @@ unflatten tv_eqs funeqs
     finalise_eq ct _ = pprPanic "finalise_irred" (ppr ct)
 
     ----------------
-    try_fill dflags untch ev ty1 ty2
+    try_fill dflags tclvl ev ty1 ty2
       | Just tv1 <- tcGetTyVar_maybe ty1
-      , isTouchableOrFmv untch tv1
+      , isTouchableOrFmv tclvl tv1
       , typeKind ty1 `isSubKind` tyVarKind tv1
       = tryFill dflags tv1 ty2 ev
       | otherwise

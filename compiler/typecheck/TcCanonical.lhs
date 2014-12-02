@@ -805,8 +805,8 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
       -- If tv1 is touchable, swap only if tv2 is also
       -- touchable and it's strictly better to update the latter
       -- But see Note [Avoid unnecessary swaps]
-      | Just lvl1 <- metaTyVarUntouchables_maybe tv1
-      = case metaTyVarUntouchables_maybe tv2 of
+      | Just lvl1 <- metaTyVarTcLevel_maybe tv1
+      = case metaTyVarTcLevel_maybe tv2 of
           Nothing   -> False
           Just lvl2 | lvl2 `strictlyDeeperThan` lvl1 -> True
                     | lvl1 `strictlyDeeperThan` lvl2 -> False

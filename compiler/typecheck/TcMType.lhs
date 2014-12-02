@@ -343,8 +343,8 @@ newSigTyVar name kind
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
   = do { ref <- newMutVar Flexi
-       ; untch <- getUntouchables
-       ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_untch = untch }) }
+       ; tclvl <- getTcLevel
+       ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_tclvl = tclvl }) }
 
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv

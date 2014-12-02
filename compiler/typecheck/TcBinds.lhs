@@ -606,15 +606,15 @@ tcPolyInfer
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId], TopLevelFlag)
 tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
-  = do { (((binds', mono_infos), untch), wanted)
+  = do { (((binds', mono_infos), tclvl), wanted)
              <- captureConstraints  $
-                captureUntouchables $
+                captureTcLevel      $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
        ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
        ; traceTc "simplifyInfer call" (ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, mr_bites, ev_binds)
-                 <- simplifyInfer untch mono name_taus wanted
+                 <- simplifyInfer tclvl mono name_taus wanted
 
        ; inferred_theta  <- zonkTcThetaType (map evVarPred givens)
        ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs inferred_theta)
@@ -1375,7 +1375,7 @@ tcTySig (L _ (IdSig id))
        ; return ([sig], []) }
 tcTySig (L loc (TypeSig names@(L _ name1 : _) hs_ty wcs))
   = setSrcSpan loc $
-    pushUntouchablesM $
+    pushTcLevelM   $
     do { nwc_tvs <- mapM newWildcardVarMetaKind wcs      -- Generate fresh meta vars for the wildcards
        ; sigma_ty <- tcExtendTyVarEnv nwc_tvs $ tcHsSigType (FunSigCtxt name1) hs_ty
        ; sigs <- mapM (instTcTySig hs_ty sigma_ty (extra_cts hs_ty) (zip wcs nwc_tvs))
