@@ -65,6 +65,7 @@ import Pair
 import Bag
 import Fingerprint
 import TcEnv (InstInfo)
+import StaticFlags( opt_PprStyle_Debug )
 
 import ListSetOps ( assocMaybe )
 import Data.List  ( partition, intersperse )
@@ -2294,6 +2295,11 @@ f_Pat           = nlVarPat f_RDR
 k_Pat           = nlVarPat k_RDR
 z_Pat           = nlVarPat z_RDR
 
+minusInt_RDR, tagToEnum_RDR, error_RDR :: RdrName
+minusInt_RDR  = getRdrName (primOpId IntSubOp   )
+tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
+error_RDR     = getRdrName eRROR_ID
+
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 -- Generates Orig s RdrName, for the binding positions
 con2tag_RDR tycon = mk_tc_deriv_name tycon mkCon2TagOcc
@@ -2304,13 +2310,40 @@ mk_tc_deriv_name :: TyCon -> (OccName -> OccName) -> RdrName
 mk_tc_deriv_name tycon occ_fun = mkAuxBinderName (tyConName tycon) occ_fun
 
 mkAuxBinderName :: Name -> (OccName -> OccName) -> RdrName
-mkAuxBinderName parent occ_fun = mkRdrUnqual (occ_fun (nameOccName parent))
--- Was: mkDerivedRdrName name occ_fun, which made an original name
--- But:  (a) that does not work well for standalone-deriving
---       (b) an unqualified name is just fine, provided it can't clash with user code
+-- ^ Make a top-level binder name for an auxiliary binding for a parent name
+-- See Note [Auxiliary binders]
+mkAuxBinderName parent occ_fun
+  = mkRdrUnqual (occ_fun uniq_parent_occ)
+  where
+    uniq_parent_occ = mkOccName (occNameSpace parent_occ) uniq_string
 
-minusInt_RDR, tagToEnum_RDR, error_RDR :: RdrName
-minusInt_RDR  = getRdrName (primOpId IntSubOp   )
-tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
-error_RDR     = getRdrName eRROR_ID
+    uniq_string
+      | opt_PprStyle_Debug = showSDocSimple (ppr parent_occ <> underscore <> ppr parent_uniq)
+      | otherwise          = show parent_uniq
+      -- The debug thing is just to generate longer, but perhaps more perspicuous, names
+
+    parent_uniq = nameUnique parent
+    parent_occ  = nameOccName parent
 \end{code}
+
+Note [Auxiliary binders]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We often want to make a top-level auxiliary binding.  E.g. for comparison we haev
+
+  instance Ord T where
+    compare a b = $con2tag a `compare` $con2tag b
+
+  $con2tag :: T -> Int
+  $con2tag = ...code....
+
+Of course these top-level bindings should all have distinct name, and we are
+generating RdrNames here.  We can't just use the TyCon or DataCon to distinguish
+becuase with standalone deriving two imported TyCons might both be called T!
+(See Trac #7947.)
+
+So we use the *unique* from the parent name (T in this example) as part of the
+OccName we generate for the new binding.
+
+In the past we used mkDerivedRdrName name occ_fun, which made an original name
+But:  (a) that does not work well for standalone-deriving either
+      (b) an unqualified name is just fine, provided it can't clash with user code
