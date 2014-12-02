@@ -24,7 +24,7 @@ module Vectorise.Utils.Base
   , pdatasReprTyConExact
   , pdataUnwrapScrut
   
-  , preprSynTyCon
+  , preprFamInst
 ) where
 
 import Vectorise.Monad
@@ -258,5 +258,5 @@ pdataUnwrapScrut (ve, le)
 
 -- |Get the representation tycon of the 'PRepr' type family for a given type.
 --
-preprSynTyCon :: Type -> VM FamInstMatch
-preprSynTyCon ty = builtin preprTyCon >>= (`lookupFamInst` [ty])
+preprFamInst :: Type -> VM FamInstMatch
+preprFamInst ty = builtin preprTyCon >>= (`lookupFamInst` [ty])

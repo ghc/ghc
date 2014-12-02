@@ -97,10 +97,10 @@ If we reverse this decision, this comment came from tcTyDecl1, and should
 
 We'd also need to add back in this definition
 
-synTyConsOfType :: Type -> [TyCon]
+synonymTyConsOfType :: Type -> [TyCon]
 -- Does not look through type synonyms at all
 -- Return a list of synonym tycons
-synTyConsOfType ty
+synonymTyConsOfType ty
   = nameEnvElts (go ty)
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
@@ -110,8 +110,9 @@ synTyConsOfType ty
      go (FunTy a b)               = go a `plusNameEnv` go b
      go (ForAllTy _ ty)           = go ty
 
-     go_tc tc tys | isSynTyCon tc = extendNameEnv (go_s tys) (tyConName tc) tc
-                  | otherwise     = go_s tys
+     go_tc tc tys | isTypeSynonymTyCon tc = extendNameEnv (go_s tys)
+                                                          (tyConName tc) tc
+                  | otherwise             = go_s tys
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
 ---------------------------------------- END NOTE ]
 
