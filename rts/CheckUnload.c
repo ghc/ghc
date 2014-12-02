@@ -260,8 +260,6 @@ void checkUnload (StgClosure *static_objects)
 
   if (unloaded_objects == NULL) return;
 
-  ACQUIRE_LOCK(&linker_mutex);
-
   // Mark every unloadable object as unreferenced initially
   for (oc = unloaded_objects; oc; oc = oc->next) {
       IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
@@ -319,6 +317,4 @@ void checkUnload (StgClosure *static_objects)
   }
 
   freeHashTable(addrs, NULL);
-
-  RELEASE_LOCK(&linker_mutex);
 }

@@ -243,11 +243,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    The linker API is now thread-safe.  The main
-                    user-facing impact of this change is that you must
-                    now call <literal>initLinker</literal> before
-                    calling <literal>loadObj</literal> or any of the
-                    other linker APIs.
+                    TODO FIXME
                </para>
            </listitem>
        </itemizedlist>
