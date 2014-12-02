@@ -51,3 +51,5 @@ test('T8963', normal, compile, [''])
 test('T7269', normal, compile, [''])
 test('T9069', normal, compile, [''])
 test('T9359', normal, compile, [''])
+test('T4896', normal, compile, [''])
+

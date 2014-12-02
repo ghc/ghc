@@ -1323,18 +1323,19 @@ we generate
 
 \begin{code}
 gen_Data_binds :: DynFlags
-                -> SrcSpan
-               -> TyCon
+               -> SrcSpan
+               -> TyCon                 -- For data families, this is the
+                                        --  *representation* TyCon
                -> (LHsBinds RdrName,    -- The method bindings
                    BagDerivStuff)       -- Auxiliary bindings
-gen_Data_binds dflags loc tycon
+gen_Data_binds dflags loc rep_tc
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
      `unionBags` gcast_binds,
                 -- Auxiliary definitions: the data type and constructors
      listToBag ( DerivHsBind (genDataTyCon)
                : map (DerivHsBind . genDataDataCon) data_cons))
   where
-    data_cons  = tyConDataCons tycon
+    data_cons  = tyConDataCons rep_tc
     n_cons     = length data_cons
     one_constr = n_cons == 1
 
@@ -1343,11 +1344,11 @@ gen_Data_binds dflags loc tycon
       = (mkHsVarBind loc rdr_name rhs,
          L loc (TypeSig [L loc rdr_name] sig_ty PlaceHolder))
       where
-        rdr_name = mk_data_type_name tycon
+        rdr_name = mk_data_type_name rep_tc
         sig_ty   = nlHsTyVar dataType_RDR
-        constrs  = [nlHsVar (mk_constr_name con) | con <- tyConDataCons tycon]
+        constrs  = [nlHsVar (mk_constr_name con) | con <- tyConDataCons rep_tc]
         rhs = nlHsVar mkDataType_RDR
-              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr tycon)))
+              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr rep_tc)))
               `nlHsApp` nlList constrs
 
     genDataDataCon :: DataCon -> (LHsBind RdrName, LSig RdrName)
@@ -1418,10 +1419,25 @@ gen_Data_binds dflags loc tycon
                         loc
                         dataTypeOf_RDR
                         [nlWildPat]
-                        (nlHsVar (mk_data_type_name tycon))
+                        (nlHsVar (mk_data_type_name rep_tc))
 
         ------------ gcast1/2
-    tycon_kind = tyConKind tycon
+        -- Make the binding    dataCast1 x = gcast1 x  -- if T :: * -> *
+        --               or    dataCast2 x = gcast2 s  -- if T :: * -> * -> *
+        -- (or nothing if T has neither of these two types)
+
+        -- But care is needed for data families:
+        -- If we have   data family D a
+        --              data instance D (a,b,c) = A | B deriving( Data )
+        -- and we want  instance ... => Data (D [(a,b,c)]) where ...
+        -- then we need     dataCast1 x = gcast1 x
+        -- because D :: * -> *
+        -- even though rep_tc has kind * -> * -> * -> *
+        -- Hence looking for the kind of fam_tc not rep_tc
+        -- See Trac #4896
+    tycon_kind = case tyConFamInst_maybe rep_tc of
+                    Just (fam_tc, _) -> tyConKind fam_tc
+                    Nothing          -> tyConKind rep_tc
     gcast_binds | tycon_kind `tcEqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
                 | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
                 | otherwise                 = emptyBag
