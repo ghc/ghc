@@ -1,5 +1,5 @@
-[1 of 2] Compiling GFunctor         ( GFunctor/GFunctor.hs, GFunctor/GFunctor.o )
-[2 of 2] Compiling T5462No1         ( T5462No1.hs, T5462No1.o )
+[1 of 2] Compiling GFunctor         ( GFunctor/GFunctor.hs, T5462No1/GFunctor.o )
+[2 of 2] Compiling T5462No1         ( T5462No1.hs, T5462No1/T5462No1.o )
 
 T5462No1.hs:24:42:
     Can't make a derived instance of ‘GFunctor F’:
