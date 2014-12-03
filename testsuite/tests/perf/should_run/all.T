@@ -61,10 +61,13 @@ test('T876',
           [(wordsize(64), 63216 , 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
-           (wordsize(32), 53024, 5) ]),
+
+           (wordsize(32), 56796, 5) ]),
               # some date:  663712  (Windows, 64-bit machine)
               # 2014-04-04:  56820  (Windows, 64-bit machine)
               # 2014-06-29:  53024  (x86_64/Linux)
+              # 2014-12-01:  56796  (Windows)
+
       only_ways(['normal']),
       extra_run_opts('10000')
       ],
@@ -167,8 +170,10 @@ test('T5205',
 
 test('T5549',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 3362958676, 5),
+                      [(wordsize(32), 4096606332, 5),
                     # expected value: 3362958676 (Windows)
+                    # 2014-12-01:     4096606332 (Windows) integer-gmp2
+
                        (wordsize(64), 8193140752, 5)]),
                     # expected value: 6725846120 (amd64/Linux)
                     #                 8193140752 (amd64/Linux) integer-gmp2

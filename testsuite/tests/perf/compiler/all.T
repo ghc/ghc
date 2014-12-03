@@ -190,10 +190,11 @@ test('T4801',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
                            # expected value: 510938976 (amd64/OS X):
 
-           (wordsize(32), 185242032, 10),
+           (wordsize(32), 203962148, 10),
            # prev:        185669232 (x86/OSX)
            # 2014-01-22:  211198056 (x86/Linux)
            # 2014-09-03:  185242032 (Windows laptop)
+           # 2014-12-01:  203962148 (Windows laptop)
            (wordsize(64), 382056344, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
@@ -251,11 +252,13 @@ test('T3064',
             # (amd64/Linux) 2014-10-13: 38: Stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 162457940, 10),
+          [(wordsize(32), 188697088, 10),
             # 2011-06-28: 56380288  (x86/Linux)
             # 2012-10-30: 111189536 (x86/Windows)
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
             # 2014-01-22: 162457940 (x86/Linux)
+            # 2014-12-01: 162457940 (Windows)
+
            (wordsize(64), 385145080, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
@@ -332,9 +335,10 @@ test('T5030',
 
 test('T5631',
      [compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 346389856, 10),
+          [(wordsize(32), 390199244, 10),
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
+        # 2014-12-01:     390199244 (Windows laptop)
            (wordsize(64), 776121120, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
@@ -454,10 +458,12 @@ test('T5642',
 test('T5837',
      [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 37096484, 10),
+          [(wordsize(32), 135914136, 10),
              # 40000000 (x86/Linux)
-             # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
-             # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
+             # 2013-11-13: 45520936  (x86/Windows, 64bit machine)
+             # 2014-09-03: 37096484  (Windows laptop, w/w for INLINABLE things
+             # 2014-12-01: 135914136 (Windows laptop, regression see below)
+ 
            (wordsize(64), 271028976, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
@@ -475,11 +481,13 @@ test('T5837',
 test('T6048',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 56315812, 10),
+          [(wordsize(32), 49987836, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
             # 2014-09-03: 56315812 (x86 Windows, w/w for INLINEAVBLE)
+            # 2014-12-01: 49987836 (x86 Windows)
+
            (wordsize(64), 88186056, 12)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)

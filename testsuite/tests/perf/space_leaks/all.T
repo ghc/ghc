@@ -15,12 +15,19 @@ test('space_leak_001',
            (wordsize(32), 405650, 10)]),
              # 2013-02-10 372072 (x86/OSX)
              # 2013-02-10 439228 (x86/OSX)
-      stats_num_field('bytes allocated', (11315747416, 1)),
+
+      stats_num_field('bytes allocated', 
+           [ (wordsize(64), 11315747416, 5),
                         # expected value: 9079316016 (amd64/Linux)
                         #                 9331570416 (x86/Linux)
                         #                 9329073952 (x86/OS X)
                         #                 9327959840 (x86/Windows)
                         #                 11315747416 (amd64/Lnx, integer-gmp2)
+
+             (wordsize(32), 13550759068, 5),
+            # 2014-12-01  13550759068 (Windows)
+              
+            ]),
       omit_ways(['profasm','profthreaded','threaded1','threaded2'])
       ],
      compile_and_run,
