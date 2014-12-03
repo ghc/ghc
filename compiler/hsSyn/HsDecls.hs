@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
              DeriveTraversable #-}
@@ -107,15 +106,15 @@ import Data.Foldable ( Foldable )
 import Data.Traversable ( Traversable )
 #endif
 import Data.Maybe
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[HsDecl]{Declarations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LHsDecl id = Located (HsDecl id)
         -- ^ When in a list this may have
         --
@@ -246,9 +245,7 @@ appendGroups
         hs_ruleds = rulds1 ++ rulds2,
         hs_vects  = vects1 ++ vects2,
         hs_docs   = docs1  ++ docs2 }
-\end{code}
 
-\begin{code}
 instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (TyClD dcl)             = ppr dcl
     ppr (ValD binds)            = ppr binds
@@ -315,14 +312,13 @@ deriving instance (DataId id) => Data (SpliceDecl id)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
    ppr (SpliceDecl (L _ e) _) = pprUntypedSplice e
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SynDecl]{@data@, @newtype@ or @type@ (synonym) type declaration}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
                 --------------------------------
                         THE NAMING STORY
@@ -455,9 +451,8 @@ Interface file code:
 
   - RnHsSyn.instDeclFVs treats the dict fun name as free in the decl, so that we
     suck in the dfun binding
+-}
 
-
-\begin{code}
 type LTyClDecl name = Located (TyClDecl name)
 
 -- | A type or class declaration.
@@ -555,12 +550,11 @@ data FamilyInfo name
   deriving( Typeable )
 deriving instance (DataId name) => Data (FamilyInfo name)
 
-\end{code}
-
+{-
 ------------------------------
 Simple classifiers
+-}
 
-\begin{code}
 -- | @True@ <=> argument is a @data@\/@newtype@
 -- declaration.
 isDataDecl :: TyClDecl name -> Bool
@@ -605,11 +599,8 @@ isDataFamilyDecl :: TyClDecl name -> Bool
 isDataFamilyDecl (FamDecl (FamilyDecl { fdInfo = DataFamily })) = True
 isDataFamilyDecl _other      = False
 
-\end{code}
+-- Dealing with names
 
-Dealing with names
-
-\begin{code}
 tyFamInstDeclName :: OutputableBndr name
                   => TyFamInstDecl name -> name
 tyFamInstDeclName = unLoc . tyFamInstDeclLName
@@ -630,9 +621,7 @@ tcdName = unLoc . tyClDeclLName
 tyClDeclTyVars :: OutputableBndr name => TyClDecl name -> LHsTyVarBndrs name
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
-\end{code}
 
-\begin{code}
 countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int)
         -- class, synonym decls, data, newtype, family decls
 countTyClDecls decls
@@ -669,8 +658,8 @@ famDeclHasCusk (FamilyDecl { fdInfo = ClosedTypeFamily _
                            , fdKindSig = m_sig })
   = hsTvbAllKinded tyvars && isJust m_sig
 famDeclHasCusk _ = True  -- all open families have CUSKs!
-\end{code}
 
+{-
 Note [Complete user-supplied kind signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We kind-check declarations differently if they have a complete, user-supplied
@@ -693,8 +682,8 @@ RHS are annotated with kinds.
 variables and its return type are annotated.
 
  - An open type family always has a CUSK -- unannotated type variables (and return type) default to *.
+-}
 
-\begin{code}
 instance OutputableBndr name
               => Outputable (TyClDecl name) where
 
@@ -777,15 +766,14 @@ pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
   = ppr nd
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[ConDecl]{A data-constructor declaration}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 data HsDataDefn name   -- The payload of a data type defn
                        -- Used *both* for vanilla data declarations,
@@ -920,10 +908,7 @@ instance Outputable ty => Outputable (ResType ty) where
          -- Debugging only
    ppr ResTyH98       = ptext (sLit "ResTyH98")
    ppr (ResTyGADT ty) = ptext (sLit "ResTyGADT") <+> ppr ty
-\end{code}
 
-
-\begin{code}
 pp_data_defn :: OutputableBndr name
                   => (HsContext name -> SDoc)   -- Printing the header
                   -> HsDataDefn name
@@ -1005,13 +990,13 @@ instance (Outputable name) => OutputableBndr [Located name] where
 
   pprInfixOcc [x] = ppr x
   pprInfixOcc xs  = cat $ punctuate comma (map ppr xs)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Instance declarations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Type family instance declarations in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1029,8 +1014,8 @@ It is parameterised over its tfe_pats field:
         type T a b
         type T a b = a -> b   -- The default instance
    It is represented by a TyFamDefltEqn, with *type variables8 in the tfe_pats field.
+-}
 
-\begin{code}
 ----------------- Type synonym family instances -------------
 type LTyFamInstEqn  name = Located (TyFamInstEqn  name)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
@@ -1125,8 +1110,8 @@ data InstDecl name  -- Both class and family instances
       { tfid_inst :: TyFamInstDecl name }
   deriving (Typeable)
 deriving instance (DataId id) => Data (InstDecl id)
-\end{code}
 
+{-
 Note [Family instance declaration binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A {Ty|Data}FamInstDecl is a data/type family instance declaration
@@ -1145,8 +1130,8 @@ tvs are fv(pat_tys), *including* ones that are already in scope
           type F (a8,b9) x10 = x10->a8
    so that we can compare the type patter in the 'instance' decl and
    in the associated 'type' decl
+-}
 
-\begin{code}
 instance (OutputableBndr name) => Outputable (TyFamInstDecl name) where
   ppr = pprTyFamInstDecl TopLevel
 
@@ -1231,15 +1216,15 @@ instDeclDataFamInsts inst_decls
       = map unLoc fam_insts
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DerivDecl]{A stand-alone instance deriving declaration}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LDerivDecl name = Located (DerivDecl name)
 
 data DerivDecl name = DerivDecl
@@ -1256,19 +1241,19 @@ deriving instance (DataId name) => Data (DerivDecl name)
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
     ppr (DerivDecl ty o)
         = hsep [ptext (sLit "deriving instance"), ppOverlapPragma o, ppr ty]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DefaultDecl]{A @default@ declaration}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 There can only be one default declaration per module, but it is hard
 for the parser to check that; we pass them all through in the abstract
 syntax, and that restriction must be checked in the front end.
+-}
 
-\begin{code}
 type LDefaultDecl name = Located (DefaultDecl name)
 
 data DefaultDecl name
@@ -1284,15 +1269,14 @@ instance (OutputableBndr name)
 
     ppr (DefaultDecl tys)
       = ptext (sLit "default") <+> parens (interpp'SP tys)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Foreign function interface declaration}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- foreign declarations are distinguished as to whether they define or use a
 -- Haskell name
@@ -1408,16 +1392,15 @@ instance Outputable ForeignImport where
 instance Outputable ForeignExport where
   ppr (CExport  (L _ (CExportStatic lbl cconv)) _) =
     ppr cconv <+> char '"' <> ppr lbl <> char '"'
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Transformation rules}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LRuleDecl name = Located (RuleDecl name)
 
 data RuleDecl name
@@ -1464,14 +1447,13 @@ instance OutputableBndr name => Outputable (RuleDecl name) where
 instance OutputableBndr name => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
    ppr (RuleBndrSig name ty) = ppr name <> dcolon <> ppr ty
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Vectorisation declarations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A vectorisation pragma, one of
 
@@ -1481,8 +1463,8 @@ A vectorisation pragma, one of
 
   {-# VECTORISE type T = ty #-}
   {-# VECTORISE SCALAR type T #-}
+-}
 
-\begin{code}
 type LVectDecl name = Located (VectDecl name)
 
 data VectDecl name
@@ -1565,15 +1547,14 @@ instance OutputableBndr name => Outputable (VectDecl name) where
     = sep [text "{-# VECTORISE SCALAR instance" <+> ppr ty <+> text "#-}" ]
   ppr (HsVectInstOut i)
     = sep [text "{-# VECTORISE SCALAR instance" <+> ppr i <+> text "#-}" ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DocDecl]{Document comments}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 type LDocDecl = Located (DocDecl)
 
@@ -1594,17 +1575,16 @@ docDeclDoc (DocCommentPrev d) = d
 docDeclDoc (DocCommentNamed _ d) = d
 docDeclDoc (DocGroup _ d) = d
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DeprecDecl]{Deprecations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We use exported entities for things to deprecate.
+-}
 
-\begin{code}
 type LWarnDecl name = Located (WarnDecl name)
 
 data WarnDecl name = Warning name WarningTxt
@@ -1613,15 +1593,15 @@ data WarnDecl name = Warning name WarningTxt
 instance OutputableBndr name => Outputable (WarnDecl name) where
     ppr (Warning thing txt)
       = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[AnnDecl]{Annotations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LAnnDecl name = Located (AnnDecl name)
 
 data AnnDecl name = HsAnnotation (AnnProvenance name) (Located (HsExpr name))
@@ -1651,15 +1631,15 @@ pprAnnProvenance :: OutputableBndr name => AnnProvenance name -> SDoc
 pprAnnProvenance ModuleAnnProvenance       = ptext (sLit "ANN module")
 pprAnnProvenance (ValueAnnProvenance name) = ptext (sLit "ANN") <+> ppr name
 pprAnnProvenance (TypeAnnProvenance name)  = ptext (sLit "ANN type") <+> ppr name
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[RoleAnnot]{Role annotations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LRoleAnnotDecl name = Located (RoleAnnotDecl name)
 
 -- See #8185 for more info about why role annotations are
@@ -1681,5 +1661,3 @@ instance OutputableBndr name => Outputable (RoleAnnotDecl name) where
 
 roleAnnotDeclName :: RoleAnnotDecl name -> name
 roleAnnotDeclName (RoleAnnotDecl (L _ name) _) = name
-
-\end{code}

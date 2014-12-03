@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -54,18 +53,17 @@ instance OutputableBndr id => Outputable (HsCmd id)
 type LHsExpr a = Located (HsExpr a)
 type SyntaxExpr a = HsExpr a
 
-pprLExpr :: (OutputableBndr i) => 
+pprLExpr :: (OutputableBndr i) =>
         LHsExpr i -> SDoc
 
-pprExpr :: (OutputableBndr i) => 
+pprExpr :: (OutputableBndr i) =>
         HsExpr i -> SDoc
 
-pprUntypedSplice :: (OutputableBndr i) => 
+pprUntypedSplice :: (OutputableBndr i) =>
                     HsSplice i -> SDoc
 
 pprPatBind :: (OutputableBndr bndr, OutputableBndr id, Outputable body)
            => LPat bndr -> GRHSs id body -> SDoc
 
-pprFunBind :: (OutputableBndr idL, OutputableBndr idR, Outputable body) 
+pprFunBind :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
            => idL -> Bool -> MatchGroup idR body -> SDoc
-\end{code}

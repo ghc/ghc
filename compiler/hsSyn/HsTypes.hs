@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 HsTypes: Abstract syntax: user-defined types
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -18,7 +18,7 @@ HsTypes: Abstract syntax: user-defined types
 module HsTypes (
         HsType(..), LHsType, HsKind, LHsKind,
         HsTyOp,LHsTyOp,
-        HsTyVarBndr(..), LHsTyVarBndr, 
+        HsTyVarBndr(..), LHsTyVarBndr,
         LHsTyVarBndrs(..),
         HsWithBndrs(..),
         HsTupleSort(..), HsExplicitFlag(..),
@@ -28,11 +28,11 @@ module HsTypes (
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
 
-        LBangType, BangType, HsBang(..), 
-        getBangType, getBangStrictness, 
+        LBangType, BangType, HsBang(..),
+        getBangType, getBangStrictness,
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
-        
+
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
         hsExplicitTvs,
@@ -68,17 +68,16 @@ import Maybes( isJust )
 
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Quasi quotes; used in types and elsewhere
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
-data HsQuasiQuote id = HsQuasiQuote 
+data HsQuasiQuote id = HsQuasiQuote
                            id           -- The quasi-quoter
                            SrcSpan      -- The span of the enclosed string
                            FastString   -- The enclosed string
@@ -91,16 +90,15 @@ ppr_qq :: OutputableBndr id => HsQuasiQuote id -> SDoc
 ppr_qq (HsQuasiQuote quoter _ quote) =
     char '[' <> ppr quoter <> ptext (sLit "|") <>
     ppr quote <> ptext (sLit "|]")
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Bang annotations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LBangType name = Located (BangType name)
 type BangType name  = HsType name       -- Bangs are in the HsType data type
 
@@ -111,20 +109,19 @@ getBangType ty                    = ty
 getBangStrictness :: LHsType a -> HsBang
 getBangStrictness (L _ (HsBangTy s _)) = s
 getBangStrictness _                    = HsNoBang
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Data types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is the syntax for types as seen in type signatures.
 
 Note [HsBSig binder lists]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a binder (or pattern) decoarated with a type or kind, 
+Consider a binder (or pattern) decoarated with a type or kind,
    \ (x :: a -> a). blah
    forall (a :: k -> *) (b :: k). blah
 Then we use a LHsBndrSig on the binder, so that the
@@ -132,8 +129,8 @@ renamer can decorate it with the variables bound
 by the pattern ('a' in the first example, 'k' in the second),
 assuming that neither of them is in scope already
 See also Note [Kind and type-variable binders] in RnTypes
+-}
 
-\begin{code}
 type LHsContext name = Located (HsContext name)
 
 type HsContext name = [LHsType name]
@@ -274,16 +271,16 @@ data HsType name
 
   | HsQuasiQuoteTy      (HsQuasiQuote name)
 
-  | HsSpliceTy          (HsSplice name) 
+  | HsSpliceTy          (HsSplice name)
                         (PostTc name Kind)
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
-  | HsBangTy    HsBang (LHsType name)   -- Bang-style type annotations 
+  | HsBangTy    HsBang (LHsType name)   -- Bang-style type annotations
   | HsRecTy     [LConDeclField name]    -- Only in data type declarations
 
-  | HsCoreTy Type       -- An escape hatch for tunnelling a *closed* 
-                        -- Core Type through HsSyn.  
+  | HsCoreTy Type       -- An escape hatch for tunnelling a *closed*
+                        -- Core Type through HsSyn.
 
   | HsExplicitListTy       -- A promoted explicit list
         (PostTc name Kind) -- See Note [Promoted lists and tuples]
@@ -318,8 +315,8 @@ type HsTyOp name = (HsTyWrapper, name)
 
 mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
 mkHsOpTy ty1 op ty2 = HsOpTy ty1 (WpKiApps [], op) ty2
-\end{code}
 
+{-
 Note [HsForAllTy tyvar binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 After parsing:
@@ -347,8 +344,8 @@ Note [Unit tuples]
 ~~~~~~~~~~~~~~~~~~
 Consider the type
     type instance F Int = ()
-We want to parse that "()" 
-    as HsTupleTy HsBoxedOrConstraintTuple [], 
+We want to parse that "()"
+    as HsTupleTy HsBoxedOrConstraintTuple [],
 NOT as HsTyVar unitTyCon
 
 Why? Because F might have kind (* -> Constraint), so we when parsing we
@@ -378,18 +375,18 @@ Notice the difference between
    HsListTy    HsExplicitListTy
    HsTupleTy   HsExplicitListTupleTy
 
-E.g.    f :: [Int]                      HsListTy                
+E.g.    f :: [Int]                      HsListTy
 
-        g3  :: T '[]                   All these use  
-        g2  :: T '[True]                  HsExplicitListTy        
-        g1  :: T '[True,False]          
+        g3  :: T '[]                   All these use
+        g2  :: T '[True]                  HsExplicitListTy
+        g1  :: T '[True,False]
         g1a :: T [True,False]             (can omit ' where unambiguous)
 
   kind of T :: [Bool] -> *        This kind uses HsListTy!
 
-E.g.    h :: (Int,Bool)                 HsTupleTy; f is a pair               
-        k :: S '(True,False)            HsExplicitTypleTy; S is indexed by   
-                                           a type-level pair of booleans 
+E.g.    h :: (Int,Bool)                 HsTupleTy; f is a pair
+        k :: S '(True,False)            HsExplicitTypleTy; S is indexed by
+                                           a type-level pair of booleans
         kind of S :: (Bool,Bool) -> *   This kind uses HsExplicitTupleTy
 
 Note [Distinguishing tuple kinds]
@@ -407,15 +404,15 @@ HsTupleTy, a HsTupleSort). We can tell if a tuple is unboxed while parsing,
 because of the #. However, with -XConstraintKinds we can only distinguish
 between constraint and boxed tuples during type checking, in general. Hence the
 four constructors of HsTupleSort:
-        
+
         HsUnboxedTuple                  -> Produced by the parser
         HsBoxedTuple                    -> Certainly a boxed tuple
         HsConstraintTuple               -> Certainly a constraint tuple
-        HsBoxedOrConstraintTuple        -> Could be a boxed or a constraint 
+        HsBoxedOrConstraintTuple        -> Could be a boxed or a constraint
                                         tuple. Produced by the parser only,
                                         disappears after type checking
+-}
 
-\begin{code}
 data HsTupleSort = HsUnboxedTuple
                  | HsBoxedTuple
                  | HsConstraintTuple
@@ -436,7 +433,7 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
 deriving instance (DataId name) => Data (ConDeclField name)
 
 -----------------------
--- Combine adjacent for-alls. 
+-- Combine adjacent for-alls.
 -- The following awkward situation can happen otherwise:
 --      f :: forall a. ((Num a) => Int)
 -- might generate HsForAll (Just [a]) [] (HsForAll Nothing [Num a] t)
@@ -474,7 +471,7 @@ mk_forall_ty exp  tvs  (L _ (HsParTy ty)) = mk_forall_ty exp tvs ty
 mk_forall_ty exp  tvs  ty                 = HsForAllTy exp Nothing (mkHsQTvs tvs) (noLoc []) ty
         -- Even if tvs is empty, we still make a HsForAll!
         -- In the Implicit case, this signals the place to do implicit quantification
-        -- In the Explicit case, it prevents implicit quantification    
+        -- In the Explicit case, it prevents implicit quantification
         --      (see the sigtype production in Parser.y)
         --      so that (forall. ty) isn't implicitly quantified
 
@@ -520,10 +517,7 @@ isWildcardTy _ = False
 isNamedWildcardTy :: HsType a -> Bool
 isNamedWildcardTy (HsNamedWildcardTy _) = True
 isNamedWildcardTy _ = False
-\end{code}
 
-
-\begin{code}
 splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)
 splitHsAppTys (L _ (HsParTy f))   as = splitHsAppTys f as
@@ -548,12 +542,12 @@ mkHsAppTys fun_ty [] = pprPanic "mkHsAppTys" (ppr fun_ty)
 mkHsAppTys fun_ty (arg_ty:arg_tys)
   = foldl mk_app (HsAppTy fun_ty arg_ty) arg_tys
   where
-    mk_app fun arg = HsAppTy (noLoc fun) arg    
-       -- Add noLocs for inner nodes of the application; 
-       -- they are never used 
+    mk_app fun arg = HsAppTy (noLoc fun) arg
+       -- Add noLocs for inner nodes of the application;
+       -- they are never used
 
 splitLHsInstDeclTy_maybe
-    :: LHsType name 
+    :: LHsType name
     -> Maybe (LHsTyVarBndrs name, HsContext name, Located name, [LHsType name])
         -- Split up an instance decl type, returning the pieces
 splitLHsInstDeclTy_maybe inst_ty = do
@@ -562,7 +556,7 @@ splitLHsInstDeclTy_maybe inst_ty = do
     return (tvs, cxt, cls, tys)
 
 splitLHsForAllTy
-    :: LHsType name 
+    :: LHsType name
     -> (LHsTyVarBndrs name, HsContext name, LHsType name)
 splitLHsForAllTy poly_ty
   = case unLoc poly_ty of
@@ -575,7 +569,7 @@ splitHsClassTy_maybe :: HsType name -> Maybe (name, [LHsType name])
 splitHsClassTy_maybe ty = fmap (\(L _ n, tys) -> (n, tys)) $ splitLHsClassTy_maybe (noLoc ty)
 
 splitLHsClassTy_maybe :: LHsType name -> Maybe (Located name, [LHsType name])
---- Watch out.. in ...deriving( Show )... we use this on 
+--- Watch out.. in ...deriving( Show )... we use this on
 --- the list of partially applied predicates in the deriving,
 --- so there can be zero args.
 
@@ -593,19 +587,19 @@ splitLHsClassTy_maybe ty
         _                  -> Nothing
 
 -- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
--- Breaks up any parens in the result type: 
+-- Breaks up any parens in the result type:
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
 splitHsFunType :: LHsType Name -> ([LHsType Name], LHsType Name)
-splitHsFunType (L _ (HsParTy ty)) 
+splitHsFunType (L _ (HsParTy ty))
   = splitHsFunType ty
 
 splitHsFunType (L _ (HsFunTy x y))
   | (args, res) <- splitHsFunType y
   = (x:args, res)
 
-splitHsFunType orig_ty@(L _ (HsAppTy t1 t2)) 
+splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
     go (L _ (HsTyVar fn))    tys | fn == funTyConName
@@ -617,16 +611,15 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
     go _                     _   = ([], orig_ty)  -- Failure to match
 
 splitHsFunType other = ([], other)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Pretty printing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance (OutputableBndr name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
 
@@ -634,7 +627,7 @@ instance Outputable HsTyLit where
     ppr = ppr_tylit
 
 instance (OutputableBndr name) => Outputable (LHsTyVarBndrs name) where
-    ppr (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs }) 
+    ppr (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs })
       = sep [ ifPprDebug $ braces (interppSP kvs), interppSP tvs ]
 
 instance (OutputableBndr name) => Outputable (HsTyVarBndr name) where
@@ -693,8 +686,8 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
         = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
     ppr_names [n] = ppr n
     ppr_names ns = sep (punctuate comma (map ppr ns))
-\end{code}
 
+{-
 Note [Printing KindedTyVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Trac #3830 reminded me that we should really only print the kind
@@ -705,8 +698,8 @@ rather than converting to KindedTyVars as before.
 (As it happens, the message in #3830 comes out a different way now,
 and the problem doesn't show up; but having the flag on a KindedTyVar
 seems like the Right Thing anyway.)
+-}
 
-\begin{code}
 -- Printing works more-or-less as for Types
 
 pprHsType, pprParendHsType :: (OutputableBndr name) => HsType name -> SDoc
@@ -786,7 +779,7 @@ ppr_mono_ty _         (HsParTy ty)
   -- But we still use the precedence stuff to add parens because
   --    toHsType doesn't put in any HsParTys, so we may still need them
 
-ppr_mono_ty ctxt_prec (HsDocTy ty doc) 
+ppr_mono_ty ctxt_prec (HsDocTy ty doc)
   = maybeParen ctxt_prec TyOpPrec $
     ppr_mono_lty TyOpPrec ty <+> ppr (unLoc doc)
   -- we pretty print Haddock comments on types as if they were
@@ -805,6 +798,3 @@ ppr_fun_ty ctxt_prec ty1 ty2
 ppr_tylit :: HsTyLit -> SDoc
 ppr_tylit (HsNumTy i) = integer i
 ppr_tylit (HsStrTy s) = text (show s)
-\end{code}
-
-

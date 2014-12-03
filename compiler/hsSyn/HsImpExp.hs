@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 HsImpExp: Abstract syntax: imports, exports, interfaces
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module HsImpExp where
@@ -19,16 +19,17 @@ import FastString
 import SrcLoc
 
 import Data.Data
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Import and export declaration lists}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 One per \tr{import} declaration in a module.
-\begin{code}
+-}
+
 type LImportDecl name = Located (ImportDecl name)
         -- ^ When in a list this may have
         --
@@ -76,9 +77,7 @@ simpleImportDecl mn = ImportDecl {
       ideclAs        = Nothing,
       ideclHiding    = Nothing
     }
-\end{code}
 
-\begin{code}
 instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) where
     ppr (ImportDecl { ideclName = mod', ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
@@ -112,15 +111,15 @@ instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) 
 
         ppr_ies []  = ptext (sLit "()")
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Imported and exported entities}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LIE name = Located (IE name)
         -- ^ When in a list this may have
         --
@@ -154,9 +153,7 @@ data IE name
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
   deriving (Eq, Data, Typeable)
-\end{code}
 
-\begin{code}
 ieName :: IE name -> name
 ieName (IEVar (L _ n))         = n
 ieName (IEThingAbs  n)         = n
@@ -173,9 +170,6 @@ ieNames (IEModuleContents _    ) = []
 ieNames (IEGroup          _ _  ) = []
 ieNames (IEDoc            _    ) = []
 ieNames (IEDocNamed       _    ) = []
-\end{code}
-
-\begin{code}
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
@@ -196,4 +190,3 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
-\end{code}

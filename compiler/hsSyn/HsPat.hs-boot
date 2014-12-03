@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -29,4 +28,3 @@ instance Typeable1 Pat
 
 instance (DataId id) => Data (Pat id)
 instance (OutputableBndr name) => Outputable (Pat name)
-\end{code}

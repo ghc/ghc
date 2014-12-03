@@ -1,12 +1,12 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[HsBinds]{Abstract syntax: top-level bindings and signatures}
 
 Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -50,17 +50,17 @@ import Control.Applicative hiding (empty)
 #else
 import Control.Applicative ((<$>))
 #endif
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Bindings: @BindGroup@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Global bindings (where clauses)
+-}
 
-\begin{code}
 -- During renaming, we need bindings where the left-hand sides
 -- have been renamed but the the right-hand sides have not.
 -- the ...LR datatypes are parametrized by two id types,
@@ -234,8 +234,7 @@ data PatSynBind idL idR
 deriving instance (DataId idL, DataId idR )
   => Data (PatSynBind idL idR)
 
-\end{code}
-
+{-
 Note [AbsBinds]
 ~~~~~~~~~~~~~~~
 The AbsBinds constructor is used in the output of the type checker, to record
@@ -333,8 +332,8 @@ Specifically,
 
   * Before renaming, and after typechecking, the field is unused;
     it's just an error thunk
+-}
 
-\begin{code}
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsLocalBindsLR idL idR) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
@@ -427,8 +426,8 @@ getTypeSigNames (ValBindsOut _ sigs)
   = mkNameSet [unLoc n | L _ (TypeSig names _ _) <- sigs, n <- names]
 getTypeSigNames _
   = panic "HsBinds.getTypeSigNames"
-\end{code}
 
+{-
 What AbsBinds means
 ~~~~~~~~~~~~~~~~~~~
          AbsBinds tvs
@@ -452,8 +451,8 @@ So the desugarer tries to do a better job:
 
         tp = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND
                                       in (fm,gm)
+-}
 
-\begin{code}
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsBindLR idL idR) where
     ppr mbind = ppr_monobind mbind
 
@@ -507,10 +506,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL 
           ImplicitBidirectional    -> ppr_simple equals
           ExplicitBidirectional mg -> ppr_simple (ptext (sLit "<-")) <+> ptext (sLit "where") $$
                                       (nest 2 $ pprFunBind psyn is_infix mg)
-\end{code}
 
-
-\begin{code}
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
 -- them appearing in error messages (from the desugarer); see Trac # 3263
@@ -520,15 +516,15 @@ pprTicks pp_no_debug pp_when_debug
   = getPprStyle (\ sty -> if debugStyle sty || dumpStyle sty
                              then pp_when_debug
                              else pp_no_debug)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Implicit parameter bindings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data HsIPBinds id
   = IPBinds
         [LIPBind id]
@@ -565,21 +561,20 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
     where name = case lr of
                    Left ip  -> pprBndr LetBind ip
                    Right id -> pprBndr LetBind id
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@Sig@: type signatures and value-modifying user pragmas}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 It is convenient to lump ``value-modifying'' user-pragmas (e.g.,
 ``specialise this function to these four types...'') in with type
 signatures.  Then all the machinery to move them into place, etc.,
 serves for both.
+-}
 
-\begin{code}
 type LSig name = Located (Sig name)
 
 -- | Signatures and pragmas
@@ -769,13 +764,13 @@ hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> ptext (sLit "p
 hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
 hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
 hsSigDoc (MinimalSig {})        = ptext (sLit "MINIMAL pragma")
-\end{code}
 
+{-
 Check if signatures overlap; this is used when checking for duplicate
 signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
+-}
 
-\begin{code}
 instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
@@ -835,15 +830,15 @@ instance Outputable TcSpecPrag where
 
 pprMinimalSig :: OutputableBndr name => BooleanFormula (Located name) -> SDoc
 pprMinimalSig bf = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[PatSynBind]{A pattern synonym definition}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data HsPatSynDetails a
   = InfixPatSyn a a
   | PrefixPatSyn [a]
@@ -885,4 +880,3 @@ data HsPatSynDir id
   | ExplicitBidirectional (MatchGroup id (LHsExpr id))
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsPatSynDir id)
-\end{code}

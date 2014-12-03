@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[HsLit]{Abstract syntax: source-language literals}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[HsLit]{Abstract syntax: source-language literals}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -28,20 +28,15 @@ import Lexer       ( SourceText )
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
-\end{code}
 
-
-
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[HsLit]{Literals}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 -- Note [literal source text] for SourceText fields in the following
 data HsLit
   = HsChar          SourceText Char        -- Character
@@ -98,8 +93,8 @@ data OverLitVal
 
 overLitType :: HsOverLit a -> PostTc a Type
 overLitType = ol_type
-\end{code}
 
+{-
 Note [literal source text]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -157,8 +152,8 @@ calls, which wouldn't be possible if the desguarar made the application.
 
 The PostTcType in each branch records the type the overload literal is
 found to have.
+-}
 
-\begin{code}
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
 instance Eq (HsOverLit id) where
@@ -183,9 +178,7 @@ instance Ord OverLitVal where
   compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `compare` s2
   compare (HsIsString _ _)    (HsIntegral _ _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
-\end{code}
 
-\begin{code}
 instance Outputable HsLit where
         -- Use "show" because it puts in appropriate escapes
     ppr (HsChar _ c)       = pprHsChar c
@@ -211,4 +204,3 @@ instance Outputable OverLitVal where
   ppr (HsIntegral _ i)   = integer i
   ppr (HsFractional f)   = ppr f
   ppr (HsIsString _ s)   = pprHsString s
-\end{code}

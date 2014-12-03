@@ -1,7 +1,6 @@
+{-
+(c) The University of Glasgow, 1992-2006
 
-%
-% (c) The University of Glasgow, 1992-2006
-%
 
 Here we collect a variety of helper functions that construct or
 analyse HsSyn.  All these functions deal with generic HsSyn; functions
@@ -12,8 +11,8 @@ which deal with the instantiated versions are located elsewhere:
    RdrName              parser/RdrHsSyn
    Name                 rename/RnHsSyn
    Id                   typecheck/TcHsSyn
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -103,20 +102,19 @@ import Outputable
 import Data.Either
 import Data.Function
 import Data.List
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Some useful helpers for constructing syntax
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These functions attempt to construct a not-completely-useless SrcSpan
 from their components, compared with the nl* functions below which
 just attach noSrcSpan to everything.
+-}
 
-\begin{code}
 mkHsPar :: LHsExpr id -> LHsExpr id
 mkHsPar e = L (getLoc e) (HsPar e)
 
@@ -312,16 +310,15 @@ mkHsString s = HsString s (mkFastString s)
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
 -- Caller sets location
 userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Constructing syntax with no location info
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 nlHsVar :: id -> LHsExpr id
 nlHsVar n = noLoc (HsVar n)
 
@@ -407,12 +404,12 @@ nlHsFunTy a b           = noLoc (HsFunTy a b)
 
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
-\end{code}
 
+{-
 Tuples.  All these functions are *pre-typechecker* because they lack
 types on the tuple.
+-}
 
-\begin{code}
 mkLHsTupleExpr :: [LHsExpr a] -> LHsExpr a
 -- Makes a pre-typechecker boxed tuple, deals with 1 case
 mkLHsTupleExpr [e] = e
@@ -426,18 +423,17 @@ nlTuplePat pats box = noLoc (TuplePat pats box [])
 
 missingTupArg :: HsTupArg RdrName
 missingTupArg = Missing placeHolderType
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Converting a Type to an HsType RdrName
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is needed to implement GeneralizedNewtypeDeriving.
+-}
 
-\begin{code}
 toHsType :: Type -> LHsType RdrName
 toHsType ty
   | [] <- tvs_only
@@ -471,9 +467,6 @@ toHsType ty
 toHsKind :: Kind -> LHsKind RdrName
 toHsKind = toHsType
 
-\end{code}
-
-\begin{code}
 --------- HsWrappers: type args, dict args, casts ---------
 mkLHsWrap :: HsWrapper -> LHsExpr id -> LHsExpr id
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
@@ -515,15 +508,16 @@ mkHsWrapPatCo co pat ty | isTcReflCo co = pat
 
 mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
-\end{code}
-l
-%************************************************************************
-%*                                                                      *
-                Bindings; with a location at the top
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+{-
+l
+************************************************************************
+*                                                                      *
+                Bindings; with a location at the top
+*                                                                      *
+************************************************************************
+-}
+
 mkFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)]
           -> HsBind RdrName
 -- Not infix, with place holders for coercion and free vars
@@ -574,14 +568,13 @@ mkMatch pats expr binds
   where
     paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp)
                      | otherwise          = lp
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Collecting binders
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Get all the binders in some HsBindGroups, IN THE ORDER OF APPEARANCE. eg.
 
@@ -599,8 +592,8 @@ These functions should only be used on HsSyn *after* the renamer,
 to return a [Name] or [Id].  Before renaming the record punning
 and wild-card mechanism makes it hard to know what is bound.
 So these functions should not be applied to (HsSyn RdrName)
+-}
 
-\begin{code}
 ----------------- Bindings --------------------------
 collectLocalBinders :: HsLocalBindsLR idL idR -> [idL]
 collectLocalBinders (HsValBinds val_binds) = collectHsValBinders val_binds
@@ -703,8 +696,8 @@ collect_lpat (L _ pat) bndrs
     go (SplicePat _)              = bndrs
     go (QuasiQuotePat _)          = bndrs
     go (CoPat _ pat _)            = go pat
-\end{code}
 
+{-
 Note [Dictionary binders in ConPatOut] See also same Note in DsArrows
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Do *not* gather (a) dictionary and (b) dictionary bindings as binders
@@ -730,8 +723,8 @@ Here, the pattern (C (n+1)) binds a hidden dictionary (d::Num a),
 and *also* uses that dictionary to match the (n+1) pattern.  Yet, the
 variables bound by the lazy pattern are n,m, *not* the dictionary d.
 So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
+-}
 
-\begin{code}
 hsGroupBinders :: HsGroup Name -> [Name]
 hsGroupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
                           hs_instds = inst_decls, hs_fords = foreign_decls })
@@ -817,8 +810,7 @@ hsConDeclsBinders cons = go id cons
              L loc (ConDecl { con_names = names }) ->
                 (map (L loc . unLoc) names) ++ go remSeen rs
 
-\end{code}
-
+{-
 Note [Binders in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a type or data family instance declaration, the type
@@ -827,19 +819,19 @@ constructor is an *occurrence* not a binding site
     data instance S Bool = S1 | S2     -- Binders are S1,S2
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         Collecting binders the user did not write
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The job of this family of functions is to run through binding sites and find the set of all Names
 that were defined "implicitly", without being explicitly written by the user.
 
 The main purpose is to find names introduced by record wildcards so that we can avoid
 warning the user when they don't use those names (#4404)
+-}
 
-\begin{code}
 lStmtsImplicits :: [LStmtLR Name idR (Located (body idR))] -> NameSet
 lStmtsImplicits = hs_lstmts
   where
@@ -903,4 +895,3 @@ lPatImplicits = hs_lpat
                                                                      (unLoc fld)
                                                           pat_explicit = maybe True (i<) (rec_dotdot fs)]
     details (InfixCon p1 p2) = hs_lpat p1 `unionNameSet` hs_lpat p2
-\end{code}

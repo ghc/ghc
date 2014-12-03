@@ -1,8 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\begin{code}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -40,15 +40,15 @@ import Type
 
 -- libraries:
 import Data.Data hiding (Fixity)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Expressions proper}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- * Expressions proper
 
 type LHsExpr id = Located (HsExpr id)
@@ -87,8 +87,7 @@ noSyntaxExpr = HsLit (HsString "" (fsLit "noSyntaxExpr"))
 type CmdSyntaxTable id = [(Name, SyntaxExpr id)]
 -- See Note [CmdSyntaxTable]
 
-\end{code}
-
+{-
 Note [CmdSyntaxtable]
 ~~~~~~~~~~~~~~~~~~~~~
 Used only for arrow-syntax stuff (HsCmdTop), the CmdSyntaxTable keeps
@@ -122,9 +121,8 @@ is Less Cool because
     than the rest of rebindable syntax, where the type is less
     pre-ordained.  (And this flexibility is useful; for example we can
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
+-}
 
-
-\begin{code}
 -- | A Haskell expression.
 data HsExpr id
   = HsVar     id                        -- ^ Variable
@@ -296,7 +294,7 @@ data HsExpr id
                 (ArithSeqInfo id)
 
   -- | Arithmetic sequence for parallel array
-  | PArrSeq                             
+  | PArrSeq
                 PostTcExpr              -- [:e1..e2:] or [:e1, e2..e3:]
                 (ArithSeqInfo id)
 
@@ -442,8 +440,8 @@ deriving instance (DataId id) => Data (HsTupArg id)
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True
 tupArgPresent (L _ (Missing {})) = False
-\end{code}
 
+{-
 Note [Parens in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~
 HsPar (and ParPat in patterns, HsParTy in types) is used as follows
@@ -478,13 +476,11 @@ whereas that would not be possible using a all to a polymorphic function
 (because you can't call a polymorphic function at an unboxed type).
 
 So we use Nothing to mean "use the old built-in typing rule".
+-}
 
-\begin{code}
 instance OutputableBndr id => Outputable (HsExpr id) where
     ppr expr = pprExpr expr
-\end{code}
 
-\begin{code}
 -----------------------
 -- pprExpr, pprLExpr, pprBinds call pprDeeper;
 -- the underscore versions do not
@@ -696,8 +692,7 @@ ppr_expr (HsArrForm op _ args)
 ppr_expr (HsUnboundVar nm)
   = ppr nm
 
-\end{code}
-
+{-
 HsSyn records exactly where the user put parens, with HsPar.
 So generally speaking we print without adding any parens.
 However, some code is internally generated, and in some places
@@ -707,8 +702,8 @@ pprParendExpr (but don't print double parens of course).
 For operator applications we don't add parens, because the oprerator
 fixities should do the job, except in debug mode (-dppr-debug) so we
 can see the structure of the parse tree.
+-}
 
-\begin{code}
 pprDebugParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
 pprDebugParendExpr expr
   = getPprStyle (\sty ->
@@ -754,17 +749,17 @@ isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)   = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)      = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr _              = False
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Commands (in arrow abstractions)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We re-use HsExpr to represent these.
+-}
 
-\begin{code}
 type LHsCmd id = Located (HsCmd id)
 
 data HsCmd id
@@ -816,13 +811,12 @@ deriving instance (DataId id) => Data (HsCmd id)
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
   deriving (Data, Typeable)
 
-\end{code}
-
+{-
 Top-level command, introducing a new arrow.
 This may occur inside a proc (where the stack is empty) or as an
 argument of a command-forming operator.
+-}
 
-\begin{code}
 type LHsCmdTop id = Located (HsCmdTop id)
 
 data HsCmdTop id
@@ -832,10 +826,7 @@ data HsCmdTop id
              (CmdSyntaxTable id) -- See Note [CmdSyntaxTable]
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsCmdTop id)
-\end{code}
 
-
-\begin{code}
 instance OutputableBndr id => Outputable (HsCmd id) where
     ppr cmd = pprCmd cmd
 
@@ -923,24 +914,22 @@ pprCmdArg (HsCmdTop cmd _ _ _)
 instance OutputableBndr id => Outputable (HsCmdTop id) where
     ppr = pprCmdArg
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Record binds}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type HsRecordBinds id = HsRecFields id (LHsExpr id)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@Match@, @GRHSs@, and @GRHS@ datatypes}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @Match@es are sets of pattern bindings and right hand sides for
 functions, patterns or case branches. For example, if a function @g@
@@ -955,8 +944,8 @@ It is always the case that each element of an @[Match]@ list has the
 same number of @pats@s inside it.  This corresponds to saying that
 a function defined by pattern matching must have the same number of
 patterns in each equation.
+-}
 
-\begin{code}
 data MatchGroup id body
   = MG { mg_alts    :: [LMatch id body]  -- The alternatives
        , mg_arg_tys :: [PostTc id Type]  -- Types of the arguments, t1..tn
@@ -1013,11 +1002,9 @@ data GRHS id body = GRHS [GuardLStmt id] -- Guards
                          body            -- Right hand side
   deriving (Typeable)
 deriving instance (Data body,DataId id) => Data (GRHS id body)
-\end{code}
 
-We know the list must have at least one @Match@ in it.
+-- We know the list must have at least one @Match@ in it.
 
-\begin{code}
 pprMatches :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
            => HsMatchContext idL -> MatchGroup idR body -> SDoc
 pprMatches ctxt (MG { mg_alts = matches })
@@ -1087,15 +1074,15 @@ pprGRHS ctxt (GRHS guards body)
 
 pp_rhs :: Outputable body => HsMatchContext idL -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Do stmts and list comprehensions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LStmt id body = Located (StmtLR id id body)
 type LStmtLR idL idR body = Located (StmtLR idL idR body)
 
@@ -1223,8 +1210,8 @@ data ParStmtBlock idL idR
         (SyntaxExpr idR)   -- The return operator
   deriving( Typeable )
 deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
-\end{code}
 
+{-
 Note [The type of bind in Stmts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some Stmts, notably BindStmt, keep the (>>=) bind operator.
@@ -1359,9 +1346,8 @@ Parallel statements require the 'Control.Monad.Zip.mzip' function:
 
 In any other context than 'MonadComp', the fields for most of these
 'SyntaxExpr's stay bottom.
+-}
 
-
-\begin{code}
 instance (OutputableBndr idL, OutputableBndr idR)
     => Outputable (ParStmtBlock idL idR) where
   ppr (ParStmtBlock stmts _ _) = interpp'SP stmts
@@ -1436,15 +1422,15 @@ pprQuals :: (OutputableBndr id, Outputable body)
         => [LStmt id body] -> SDoc
 -- Show list comprehension qualifiers separated by commas
 pprQuals quals = interpp'SP quals
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Template Haskell quotation brackets
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data HsSplice id
    = HsSplice            --  $z  or $(f 4)
         id               -- A unique name to identify this splice point
@@ -1471,8 +1457,8 @@ type PendingTcSplice = PendingSplice Id
 
 deriving instance (DataId id) => Data (HsSplice id)
 deriving instance (DataId id) => Data (PendingSplice id)
-\end{code}
 
+{-
 Note [Pending Splices]
 ~~~~~~~~~~~~~~~~~~~~~~
 When we rename an untyped bracket, we name and lift out all the nested
@@ -1529,8 +1515,8 @@ e.g., in a type error message, we *do not* want to print out the pending
 splices. In contrast, when pretty printing the output of the type checker, we
 *do* want to print the pending splices. So splitting them up seems to make
 sense, although I hate to add another constructor to HsExpr.
+-}
 
-\begin{code}
 instance OutputableBndr id => Outputable (HsSplice id) where
   ppr (HsSplice n e) = angleBrackets (ppr n <> comma <+> ppr e)
 
@@ -1599,15 +1585,15 @@ instance Outputable PendingRnSplice where
   ppr (PendingRnTypeSplice s)  = ppr s
   ppr (PendingRnDeclSplice s)  = ppr s
   ppr (PendingRnCrossStageSplice name) = ppr name
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Enumerations and list comprehensions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data ArithSeqInfo id
   = From            (LHsExpr id)
   | FromThen        (LHsExpr id)
@@ -1619,9 +1605,7 @@ data ArithSeqInfo id
                     (LHsExpr id)
   deriving (Typeable)
 deriving instance (DataId id) => Data (ArithSeqInfo id)
-\end{code}
 
-\begin{code}
 instance OutputableBndr id => Outputable (ArithSeqInfo id) where
     ppr (From e1)             = hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
@@ -1631,16 +1615,15 @@ instance OutputableBndr id => Outputable (ArithSeqInfo id) where
 
 pp_dotdot :: SDoc
 pp_dotdot = ptext (sLit " .. ")
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{HsMatchCtxt}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data HsMatchContext id  -- Context of a Match
   = FunRhs id Bool              -- Function binding for f; True <=> written infix
   | LambdaExpr                  -- Patterns of a lambda
@@ -1675,9 +1658,7 @@ data HsStmtContext id
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext id)     -- A branch of a transform stmt
   deriving (Data, Typeable)
-\end{code}
 
-\begin{code}
 isListCompExpr :: HsStmtContext id -> Bool
 -- Uses syntax [ e | quals ]
 isListCompExpr ListComp          = True
@@ -1692,9 +1673,7 @@ isMonadCompExpr MonadComp            = True
 isMonadCompExpr (ParStmtCtxt ctxt)   = isMonadCompExpr ctxt
 isMonadCompExpr (TransStmtCtxt ctxt) = isMonadCompExpr ctxt
 isMonadCompExpr _                    = False
-\end{code}
 
-\begin{code}
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})  = ptext (sLit "=")
 matchSeparator CaseAlt      = ptext (sLit "->")
@@ -1707,9 +1686,7 @@ matchSeparator RecUpd       = panic "unused"
 matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
-\end{code}
 
-\begin{code}
 pprMatchContext :: Outputable id => HsMatchContext id -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = ptext (sLit "an") <+> pprMatchContextNoun ctxt
@@ -1792,9 +1769,7 @@ matchContextErrString (StmtCtxt MDoExpr)           = ptext (sLit "'mdo' block")
 matchContextErrString (StmtCtxt ListComp)          = ptext (sLit "list comprehension")
 matchContextErrString (StmtCtxt MonadComp)         = ptext (sLit "monad comprehension")
 matchContextErrString (StmtCtxt PArrComp)          = ptext (sLit "array comprehension")
-\end{code}
 
-\begin{code}
 pprMatchInCtxt :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
                => HsMatchContext idL -> Match idR body -> SDoc
 pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon)
@@ -1814,4 +1789,3 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
-\end{code}

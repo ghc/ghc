@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 This module converts Template Haskell syntax into HsSyn
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
@@ -1140,7 +1140,7 @@ okOcc ns str
   | OccName.isVarNameSpace ns     = okVarOcc str
   | OccName.isDataConNameSpace ns = okConOcc str
   | otherwise                     = okTcOcc  str
-            
+
 -- Determine the name space of a name in a type
 --
 isVarName :: TH.Name -> Bool
@@ -1216,8 +1216,8 @@ mk_pkg pkg = stringToPackageKey (TH.pkgString pkg)
 
 mk_uniq :: Int -> Unique
 mk_uniq u = mkUniqueGrimily u
-\end{code}
 
+{-
 Note [Binders in Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this TH term construction:
@@ -1270,3 +1270,4 @@ the way System Names are printed.
 
 There's a small complication of course; see Note [Looking up Exact
 RdrNames] in RnEnv.
+-}

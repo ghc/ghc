@@ -1,14 +1,14 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section{Haskell abstract syntax definition}
 
 This module glues together the pieces of the Haskell abstract syntax,
 which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -54,9 +54,7 @@ import FastString
 
 -- libraries:
 import Data.Data hiding ( Fixity )
-\end{code}
 
-\begin{code}
 -- | All we actually declare here is the top-level structure for a module.
 data HsModule name
   = HsModule {
@@ -105,10 +103,7 @@ data HsModule name
      --
       deriving (Typeable)
 deriving instance (DataId name) => Data (HsModule name)
-\end{code}
 
-
-\begin{code}
 instance (OutputableBndr name, HasOccName name)
         => Outputable (HsModule name) where
 
@@ -143,4 +138,3 @@ pp_mb Nothing  = empty
 pp_nonnull :: Outputable t => [t] -> SDoc
 pp_nonnull [] = empty
 pp_nonnull xs = vcat (map ppr xs)
-\end{code}

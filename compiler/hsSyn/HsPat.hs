@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[PatSyntax]{Abstract Haskell syntax---patterns}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[PatSyntax]{Abstract Haskell syntax---patterns}
+-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -52,10 +52,7 @@ import FastString
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 import Data.Maybe
-\end{code}
 
-
-\begin{code}
 type InPat id  = LPat id        -- No 'Out' constructors
 type OutPat id = LPat id        -- No 'In' constructors
 
@@ -114,7 +111,7 @@ data Pat id
         pat_con     :: Located ConLike,
         pat_arg_tys :: [Type],          -- The univeral arg types, 1-1 with the universal
                                         -- tyvars of the constructor/pattern synonym
-                                        --   Use (conLikeResTy pat_con pat_arg_tys) to get 
+                                        --   Use (conLikeResTy pat_con pat_arg_tys) to get
                                         --   the type of the pattern
 
         pat_tvs   :: [TyVar],           -- Existentially bound type variables (tyvars only)
@@ -173,11 +170,9 @@ data Pat id
         -- the scrutinee, followed by a match on 'pat'
   deriving (Typeable)
 deriving instance (DataId id) => Data (Pat id)
-\end{code}
 
-HsConDetails is use for patterns/expressions *and* for data type declarations
+-- HsConDetails is use for patterns/expressions *and* for data type declarations
 
-\begin{code}
 data HsConDetails arg rec
   = PrefixCon [arg]             -- C p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
@@ -190,12 +185,12 @@ hsConPatArgs :: HsConPatDetails id -> [LPat id]
 hsConPatArgs (PrefixCon ps)   = ps
 hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
-\end{code}
 
+{-
 However HsRecFields is used only for patterns and expressions
 (not data type declarations)
+-}
 
-\begin{code}
 data HsRecFields id arg         -- A bunch of record fields
                                 --      { x = 3, y = True }
         -- Used for both expressions and patterns
@@ -239,15 +234,15 @@ data HsRecField id arg = HsRecField {
 
 hsRecFields :: HsRecFields id arg -> [id]
 hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*              Printing patterns
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*              Printing patterns
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance (OutputableBndr name) => Outputable (Pat name) where
     ppr = pprPat
 
@@ -324,16 +319,15 @@ instance (OutputableBndr id, Outputable arg)
   ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
-\end{code}
 
+{-
+************************************************************************
+*                                                                      *
+*              Building patterns
+*                                                                      *
+************************************************************************
+-}
 
-%************************************************************************
-%*                                                                      *
-%*              Building patterns
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 mkPrefixConPat :: DataCon -> [OutPat id] -> [Type] -> OutPat id
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
@@ -347,14 +341,13 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 mkCharLitPat :: String -> Char -> OutPat id
 mkCharLitPat src c = mkPrefixConPat charDataCon
                                     [noLoc $ LitPat (HsCharPrim src c)] []
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-%* Predicates for checking things about pattern-lists in EquationInfo   *
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+* Predicates for checking things about pattern-lists in EquationInfo   *
+*                                                                      *
+************************************************************************
 
 \subsection[Pat-list-predicates]{Look for interesting things in patterns}
 
@@ -379,7 +372,8 @@ A pattern is in {\em exactly one} of the above three categories; `as'
 patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
-\begin{code}
+-}
+
 isStrictLPat :: LPat id -> Bool
 isStrictLPat (L _ (ParPat p))             = isStrictLPat p
 isStrictLPat (L _ (BangPat {}))           = True
@@ -394,7 +388,7 @@ isStrictHsBind _                         = False
 
 looksLazyPatBind :: HsBind id -> Bool
 -- Returns True of anything *except*
---     a StrictHsBind (as above) or 
+--     a StrictHsBind (as above) or
 --     a VarPat
 -- In particular, returns True of a pattern binding with a compound pattern, like (I# x)
 looksLazyPatBind (PatBind { pat_lhs = p }) = looksLazyLPat p
@@ -452,7 +446,7 @@ isIrrefutableHsPat pat
 
     -- Both should be gotten rid of by renamer before
     -- isIrrefutablePat is called
-    go1 (SplicePat {})     = urk pat    
+    go1 (SplicePat {})     = urk pat
     go1 (QuasiQuotePat {}) = urk pat
 
     urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
@@ -483,4 +477,3 @@ conPatNeedsParens :: HsConDetails a b -> Bool
 conPatNeedsParens (PrefixCon args) = not (null args)
 conPatNeedsParens (InfixCon {})    = True
 conPatNeedsParens (RecCon {})      = True
-\end{code}
