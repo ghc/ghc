@@ -98,11 +98,11 @@ constraints, but we cannot define them as such in Haskell. But we also cannot
 just define them only in GHC.Prim (like (->)), because we need a real module
 for them, e.g. to compile the constructor's info table.
 
-Furthermore the type of MkCoercible cannot be written in Haskell (no syntax for
-~#R).
+Furthermore the type of MkCoercible cannot be written in Haskell
+(no syntax for ~#R).
 
-So we define them as regular data types in GHC.Types, and do magic in GHC to
-change the kind and type, in tysWiredIn.
+So we define them as regular data types in GHC.Types, and do magic in TysWiredIn,
+inside GHC, to change the kind and type.
 -}
 
 
@@ -161,6 +161,10 @@ data (~) a b = Eq# ((~#) a b)
 --
 --      /Since: 4.7.0.0/
 data Coercible a b = MkCoercible ((~#) a b)
+-- It's really ~R# (represntational equality), not ~#,
+-- but  * we don't yet have syntax for ~R#,
+--      * the compiled code is the same either way
+--      * TysWiredIn has the truthful types
 -- Also see Note [Kind-changing of (~) and Coercible]
 
 -- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False

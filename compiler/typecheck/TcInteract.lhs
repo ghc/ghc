@@ -1038,8 +1038,8 @@ outer type constructors match.
 
 Note [Delicate equality kick-out]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When adding an work-item CTyEqCan (a ~ xi), we kick out an inert
-CTyEqCan (b ~ phi) when
+When adding an fully-rewritten work-item CTyEqCan (a ~ xi), we kick
+out an inert CTyEqCan (b ~ phi) when
 
   a) the work item can rewrite the inert item
 
