@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
+-}
+
 {-# LANGUAGE CPP #-}
 module Specialise ( specProgram, specUnfolding ) where
 
@@ -44,13 +44,13 @@ import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[notes-Specialise]{Implementation notes [SLPJ, Aug 18 1993]}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These notes describe how we implement specialisation to eliminate
 overloading.
@@ -511,11 +511,11 @@ like
         f :: Eq [(a,b)] => ...
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{The new specialiser}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Our basic game plan is this.  For let(rec) bound function
         f :: (C a, D c) => (a,b,c,d) -> Bool
@@ -557,20 +557,20 @@ method from it!  Even if it didn't, not a great deal is saved.
 We do, however, generate polymorphic, but not overloaded, specialisations:
 
   f :: Eq a => [a] -> b -> b -> b
-  {#- SPECIALISE f :: [Int] -> b -> b -> b #-}
+  ... SPECIALISE f :: [Int] -> b -> b -> b ...
 
 Hence, the invariant is this:
 
         *** no specialised version is overloaded ***
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{The exported function}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
@@ -693,8 +693,8 @@ wantSpecImport dflags unf
                -- so perhaps it never will.  Moreover it may have calls
                -- inside it that we want to specialise
        | otherwise -> False    -- Stable, not INLINE, hence INLINEABLE
-\end{code}
 
+{-
 Note [Specialise imported INLINABLE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What imported functions do we specialise?  The basic set is
@@ -740,14 +740,14 @@ And if the call is to the same type, one specialisation is enough.
 Avoiding this recursive specialisation loop is the reason for the
 'done' VarSet passed to specImports and specImport.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{@specExpr@: the main function}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
-data SpecEnv 
+data SpecEnv
   = SE { se_subst :: CoreSubst.Subst
              -- We carry a substitution down:
              -- a) we must clone any binding that might float outwards,
@@ -756,14 +756,14 @@ data SpecEnv
              --    the RHS of specialised bindings (no type-let!)
 
 
-       , se_interesting :: VarSet 
+       , se_interesting :: VarSet
              -- Dict Ids that we know something about
              -- and hence may be worth specialising against
              -- See Note [Interesting dictionary arguments]
      }
 
 emptySpecEnv :: SpecEnv
-emptySpecEnv = SE { se_subst = CoreSubst.emptySubst, se_interesting = emptyVarSet} 
+emptySpecEnv = SE { se_subst = CoreSubst.emptySubst, se_interesting = emptyVarSet}
 
 specVar :: SpecEnv -> Id -> CoreExpr
 specVar env v = CoreSubst.lookupIdSubst (text "specVar") (se_subst env) v
@@ -852,7 +852,7 @@ specCase env scrut' case_bndr [(con, args, rhs)]
                        | sc_arg' <- sc_args' ]
 
              -- Extend the substitution for RHS to map the *original* binders
-             -- to their floated verions.  
+             -- to their floated verions.
              mb_sc_flts :: [Maybe DictId]
              mb_sc_flts = map (lookupVarEnv clone_env) args'
              clone_env  = zipVarEnv sc_args' sc_args_flt
@@ -905,8 +905,8 @@ specCase env scrut case_bndr alts
           return ((con, args', wrapDictBindsE dumped_dbs rhs'), free_uds)
         where
           (env_rhs, args') = substBndrs env_alt args
-\end{code}
 
+{-
 Note [Floating dictionaries out of cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -938,13 +938,13 @@ we transform to
 The "_flt" things are the floated binds; we use the current substitution
 to substitute sc -> sc_flt in the RHS
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                      Dealing with a binding
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 specBind :: SpecEnv                     -- Use this for RHSs
          -> CoreBind
          -> UsageDetails                -- Info on how the scope of the binding
@@ -1120,9 +1120,9 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
     already_covered :: DynFlags -> [CoreExpr] -> Bool
     already_covered dflags args      -- Note [Specialisations already covered]
-       = isJust (lookupRule dflags 
+       = isJust (lookupRule dflags
                             (CoreSubst.substInScope (se_subst env), realIdUnfolding)
-                            (const True) 
+                            (const True)
                             fn args rules_for_me)
 
     mk_ty_args :: [Maybe Type] -> [TyVar] -> [CoreExpr]
@@ -1271,8 +1271,8 @@ bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
              -- For the former, note that we bind the *original* dict in the substitution,
              -- overriding any d->dx_id binding put there by substBndrs
     go _ _ = pprPanic "bindAuxiliaryDicts" (ppr orig_dict_ids $$ ppr call_ds $$ ppr inst_dict_ids)
-\end{code}
 
+{-
 Note [Make the new dictionaries interesting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Important!  We're going to substitute dx_id1 for d
@@ -1485,7 +1485,7 @@ It's a silly exapmle, but we get
 where choose doesn't have any dict arguments.  Thus far I have not
 tried to fix this (wait till there's a real example).
 
-Mind you, then 'choose' will be inlined (since RHS is trivial) so 
+Mind you, then 'choose' will be inlined (since RHS is trivial) so
 it doesn't matter.  This comes up with single-method classes
 
    class C a where { op :: a -> a }
@@ -1541,7 +1541,7 @@ all they should be inlined, right?  Two reasons:
       $wreplicateM_ = ...
    Now an importing module has a specialised call to replicateM_, say
    (replicateM_ dMonadIO).  We certainly want to specialise $wreplicateM_!
-   This particular example had a huge effect on the call to replicateM_ 
+   This particular example had a huge effect on the call to replicateM_
    in nofib/shootout/n-body.
 
 Why (b): discard INLINEABLE pragmas? See Trac #4874 for persuasive examples.
@@ -1565,13 +1565,13 @@ for examples involving specialisation, which is the dominant use of
 INLINABLE.  See Trac #4874.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{UsageDetails and suchlike}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data UsageDetails
   = MkUD {
         ud_binds :: !(Bag DictBind),
@@ -1730,8 +1730,8 @@ mkCallUDs' env f args
             EqPred {}       -> True
             IrredPred {}    -> True   -- Things like (D []) where D is a
                                       -- Constraint-ranged family; Trac #7785
-\end{code}
 
+{-
 Note [Type determines value]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Only specialise if all overloading is on non-IP *class* params,
@@ -1762,7 +1762,7 @@ because the code for the specialised f is not improved at all, because
 d is lambda-bound.  We simply get junk specialisations.
 
 What is "interesting"?  Just that it has *some* structure.  But what about
-variables?  
+variables?
 
  * A variable might be imported, in which case its unfolding
    will tell us whether it has useful structure
@@ -1772,17 +1772,16 @@ variables?
    (cloneIdBndr).  Moreover, we make up some new bindings, and it's a
    nuisance to give them unfoldings.  So we keep track of the
    "interesting" dictionaries as a VarSet in SpecEnv.
-   We have to take care to put any new interesting dictionary 
+   We have to take care to put any new interesting dictionary
    bindings in the set.
 
 We accidentally lost accurate tracking of local variables for a long
-time, because cloned variables don't have unfoldings. But makes a 
-massive difference in a few cases, eg Trac #5113. For nofib as a 
+time, because cloned variables don't have unfoldings. But makes a
+massive difference in a few cases, eg Trac #5113. For nofib as a
 whole it's only a small win: 2.2% improvement in allocation for ansi,
 1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
+-}
 
-
-\begin{code}
 interestingDict :: SpecEnv -> CoreExpr -> Bool
 -- A dictionary argument is interesting if it has *some* structure
 interestingDict env (Var v) =  hasSomeUnfolding (idUnfolding v)
@@ -1795,9 +1794,7 @@ interestingDict env (App fn (Coercion _)) = interestingDict env fn
 interestingDict env (Tick _ a)            = interestingDict env a
 interestingDict env (Cast e _)            = interestingDict env e
 interestingDict _ _                       = True
-\end{code}
 
-\begin{code}
 plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
 plusUDs (MkUD {ud_binds = db1, ud_calls = calls1})
         (MkUD {ud_binds = db2, ud_calls = calls2})
@@ -1946,16 +1943,15 @@ deleteCallsMentioning bs calls
 deleteCallsFor :: [Id] -> CallDetails -> CallDetails
 -- Remove calls *for* bs
 deleteCallsFor bs calls = delVarEnvList calls bs
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Boring helper functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype SpecM a = SpecM (State SpecState a)
 
 data SpecState = SpecState {
@@ -2010,7 +2006,7 @@ mapAndCombineSM f (x:xs) = do (y, uds1) <- f x
                               return (y:ys, uds1 `plusUDs` uds2)
 
 extendTvSubstList :: SpecEnv -> [(TyVar,Type)] -> SpecEnv
-extendTvSubstList env tv_binds 
+extendTvSubstList env tv_binds
   = env { se_subst = CoreSubst.extendTvSubstList (se_subst env) tv_binds }
 
 substTy :: SpecEnv -> Type -> Type
@@ -2033,7 +2029,7 @@ cloneBindSM :: SpecEnv -> CoreBind -> SpecM (SpecEnv, SpecEnv, CoreBind)
 cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (NonRec bndr rhs)
   = do { us <- getUniqueSupplyM
        ; let (subst', bndr') = CoreSubst.cloneIdBndr subst us bndr
-             interesting' | interestingDict env rhs 
+             interesting' | interestingDict env rhs
                           = interesting `extendVarSet` bndr'
                           | otherwise = interesting
        ; return (env, env { se_subst = subst', se_interesting = interesting' }
@@ -2043,7 +2039,7 @@ cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (Rec pai
   = do { us <- getUniqueSupplyM
        ; let (subst', bndrs') = CoreSubst.cloneRecIdBndrs subst us (map fst pairs)
              env' = env { se_subst = subst'
-                        , se_interesting = interesting `extendVarSetList` 
+                        , se_interesting = interesting `extendVarSetList`
                                            [ v | (v,r) <- pairs, interestingDict env r ] }
        ; return (env', env', Rec (bndrs' `zip` map snd pairs)) }
 
@@ -2063,9 +2059,8 @@ newSpecIdSM old_id new_ty
               new_occ = mkSpecOcc (nameOccName name)
               new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
         ; return new_id }
-\end{code}
 
-
+{-
                 Old (but interesting) stuff about unboxed bindings
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2133,4 +2128,4 @@ Answer: When they at the top-level (where it is necessary) or when
 inlining would duplicate work (or possibly code depending on
 options). However, the _Lifting will still be eliminated if the
 strictness analyser deems the lifted binding strict.
-
+-}

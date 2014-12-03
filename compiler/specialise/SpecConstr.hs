@@ -1,14 +1,15 @@
+{-
 ToDo [Oct 2013]
 ~~~~~~~~~~~~~~~
 1. Nuke ForceSpecConstr for good (it is subsumed by GHC.Types.SPEC in ghc-prim)
 2. Nuke NoSpecConstr
 
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[SpecConstr]{Specialise over constructors}
 
-\begin{code}
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
+\section[SpecConstr]{Specialise over constructors}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module SpecConstr(
@@ -65,8 +66,8 @@ type SpecConstrAnnotation = ()
 import TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 #endif
-\end{code}
 
+{-
 -----------------------------------------------------
                         Game plan
 -----------------------------------------------------
@@ -653,13 +654,13 @@ But perhaps the first one isn't good.  After all, we know that tpl_B2 is
 a T (I# x) really, because T is strict and Int has one constructor.  (We can't
 unbox the strict fields, because T is polymorphic!)
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Top level wrapper stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 specConstrProgram :: ModGuts -> CoreM ModGuts
 specConstrProgram guts
   = do
@@ -682,18 +683,17 @@ specConstrProgram guts
     go env usg (bind:binds) = do (usg', bind') <- scTopBind env usg bind
                                  binds' <- go env usg' binds
                                  return (bind' : binds')
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Environment: goes downwards}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Work-free values only in environment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The sc_vals field keeps track of in-scope value bindings, so 
+The sc_vals field keeps track of in-scope value bindings, so
 that if we come across (case x of Just y ->...) we can reduce the
 case from knowing that x is bound to a pair.
 
@@ -703,7 +703,7 @@ then we do NOT want to expand to
      let y = expensive v in ...
 because the x-binding still exists and we've now duplicated (expensive v).
 
-This seldom happens because let-bound constructor applications are 
+This seldom happens because let-bound constructor applications are
 ANF-ised, but it can happen as a result of on-the-fly transformations in
 SpecConstr itself.  Here is Trac #7865:
 
@@ -721,7 +721,7 @@ SpecConstr itself.  Here is Trac #7865:
               (GHC.Types.: @ GHC.Types.Int x_af7 wild_X6) (q'_afe, p'_afd)
             } } in
 
-When processed knowing that xs_af8 was bound to a cons, we simplify to 
+When processed knowing that xs_af8 was bound to a cons, we simplify to
    a'_shr = (expensive x_af7, x_af7)
 and we do NOT want to inline that at the occurrence of a'_shr in ds_sht.
 (There are other occurrences of a'_shr.)  No no no.
@@ -730,10 +730,10 @@ It would be possible to do some on-the-fly ANF-ising, so that a'_shr turned
 into a work-free value again, thus
    a1 = expensive x_af7
    a'_shr = (a1, x_af7)
-but that's more work, so until its shown to be important I'm going to 
+but that's more work, so until its shown to be important I'm going to
 leave it for now.
+-}
 
-\begin{code}
 data ScEnv = SCE { sc_dflags    :: DynFlags,
                    sc_size      :: Maybe Int,   -- Size threshold
                    sc_count     :: Maybe Int,   -- Max # of specialisations for any one fn
@@ -869,7 +869,7 @@ extendBndr  env bndr  = (env { sc_subst = subst' }, bndr')
 
 extendValEnv :: ScEnv -> Id -> Maybe Value -> ScEnv
 extendValEnv env _  Nothing   = env
-extendValEnv env id (Just cv) 
+extendValEnv env id (Just cv)
  | valueIsWorkFree cv      -- Don't duplicate work!!  Trac #7865
  = env { sc_vals = extendVarEnv (sc_vals env) id cv }
 extendValEnv env _ _ = env
@@ -959,8 +959,8 @@ forceSpecArgTy env ty
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False
-\end{code}
 
+{-
 Note [Add scrutinee to ValueEnv too]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
@@ -1003,13 +1003,13 @@ So when recursively specialising we divide the sc_count by the number of
 copies we are making at this level, including the original.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Usage information: flows upwards}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data ScUsage
    = SCU {
         scu_calls :: CallEnv,           -- Calls
@@ -1114,18 +1114,18 @@ setScrutOcc env usg (Var v)    occ
   | otherwise                           = usg
 setScrutOcc _env usg _other _occ        -- Catch-all
   = usg
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The main recursive function}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The main recursive function gathers up usage information, and
 creates specialised versions of functions.
+-}
 
-\begin{code}
 scExpr, scExpr' :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr)
         -- The unique supply is needed when we invent
         -- a new name for the specialised function and its args
@@ -1236,8 +1236,8 @@ scExpr' env (Let (Rec prs) body)
 
         ; return (all_usg { scu_calls = scu_calls all_usg `delVarEnvList` bndrs' },
                   Let bind' body') }
-\end{code}
 
+{-
 Note [Local let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 It is not uncommon to find this
@@ -1253,9 +1253,8 @@ in the *RHS* of the function.  Here we look for call patterns in the
 At one point I predicated this on the RHS mentioning the outer
 recursive function, but that's not essential and might even be
 harmful.  I'm not sure.
+-}
 
-
-\begin{code}
 scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
 
 scApp env (Var fn, args)        -- Function is a variable
@@ -1380,16 +1379,14 @@ specInfoBinds (RI { ri_fn = fn, ri_new_rhs = new_rhs }) specs
   where
     rules = [r | OS _ r _ _ <- specs]
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 The specialiser itself
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data RhsInfo
   = RI { ri_fn :: OutId                 -- The binder
        , ri_new_rhs :: OutExpr          -- The specialised RHS (in current envt)
@@ -1597,24 +1594,24 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
               -- changes (#4012).
               rule_name  = mkFastString ("SC:" ++ occNameString fn_occ ++ show rule_number)
               spec_name  = mkInternalName spec_uniq spec_occ fn_loc
---      ; pprTrace "{spec_one" (ppr (sc_count env) <+> ppr fn <+> ppr pats <+> text "-->" <+> ppr spec_name) $ 
+--      ; pprTrace "{spec_one" (ppr (sc_count env) <+> ppr fn <+> ppr pats <+> text "-->" <+> ppr spec_name) $
 --        return ()
 
         -- Specialise the body
         ; (spec_usg, spec_body) <- scExpr spec_env body
 
---      ; pprTrace "done spec_one}" (ppr fn) $ 
+--      ; pprTrace "done spec_one}" (ppr fn) $
 --        return ()
 
                 -- And build the results
-        ; let spec_id    = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty) 
+        ; let spec_id    = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args
               spec_str   = calcSpecStrictness fn spec_lam_args pats
                 -- Conditionally use result of new worker-wrapper transform
               (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars NoOneShotInfo body_ty
-                -- Usual w/w hack to avoid generating 
+                -- Usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
 
               spec_rhs   = mkLams spec_lam_args spec_body
@@ -1646,12 +1643,12 @@ calcSpecStrictness fn qvars pats
 
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
     go_one env d   (Var v) = extendVarEnv_C bothDmd env v d
-    go_one env d e 
+    go_one env d e
            | Just ds <- splitProdDmd_maybe d  -- NB: d does not have to be strict
            , (Var _, args) <- collectArgs e = go env ds args
     go_one env _         _ = env
-\end{code}
 
+{-
 Note [spec_usg includes rhs_usg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In calls to 'specialise', the returned ScUsage must include the rhs_usg in
@@ -1706,11 +1703,11 @@ See Trac #3437 for a good example.
 The function calcSpecStrictness performs the calculation.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Argument analysis}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This code deals with analysing call-site arguments to see whether
 they are constructor applications.
@@ -1729,8 +1726,8 @@ BUT phantom type synonyms can mess this reasoning up,
   eg   x::T b   with  type T b = Int
 So we apply expandTypeSynonyms to the bound Ids.
 See Trac # 5458.  Yuk.
+-}
 
-\begin{code}
 type CallPat = ([Var], [CoreExpr])      -- Quantified variables and arguments
 
 callsToPats :: ScEnv -> [OneSpec] -> [ArgOcc] -> [Call] -> UniqSM (Bool, [CallPat])
@@ -1952,10 +1949,7 @@ argsToPats env in_scope val_env args occs
   = do { stuff <- zipWithM (argToPat env in_scope val_env) args occs
        ; let (interesting_s, args') = unzip stuff
        ; return (or interesting_s, args') }
-\end{code}
 
-
-\begin{code}
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)
   | litIsLifted lit = Nothing
@@ -2026,8 +2020,8 @@ samePat (vs1, as1) (vs2, as2)
     bad (Let {})  = True
     bad (Lam {})  = True
     bad _other    = False
-\end{code}
 
+{-
 Note [Ignore type differences]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do not want to generate specialisations where the call patterns
@@ -2035,4 +2029,4 @@ differ only in their type arguments!  Not only is it utterly useless,
 but it also means that (with polymorphic recursion) we can generate
 an infinite number of specialisations. Example is Data.Sequence.adjustTree,
 I think.
-
+-}

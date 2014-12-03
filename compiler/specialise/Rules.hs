@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[CoreRules]{Transformation rules}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[CoreRules]{Transformation rules}
+-}
+
 {-# LANGUAGE CPP #-}
 
 -- | Functions for collecting together and applying rewrite rules to a module.
@@ -58,8 +58,8 @@ import Bag
 import Util
 import Data.List
 import Data.Ord
-\end{code}
 
+{-
 Note [Overall plumbing for rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * After the desugarer:
@@ -125,11 +125,11 @@ Note [Overall plumbing for rules]
   matter.]
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[specialisation-IdInfo]{Specialisation info about an @Id@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A @CoreRule@ holds details of one rule for an @Id@, which
 includes its specialisations.
@@ -158,8 +158,8 @@ might have a specialisation
         [Int#] ===>  (case pi' of Lift pi# -> pi#)
 
 where pi' :: Lift Int# is the specialised version of pi.
+-}
 
-\begin{code}
 mkRule :: Bool -> Bool -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
@@ -212,8 +212,8 @@ ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 ruleCantMatch (Just n1 : ts) (Just n2 : as) = n1 /= n2 || ruleCantMatch ts as
 ruleCantMatch (_       : ts) (_       : as) = ruleCantMatch ts as
 ruleCantMatch _              _              = False
-\end{code}
 
+{-
 Note [Care with roughTopName]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
@@ -231,9 +231,8 @@ However, suppose we have
 where k is a *function* exported by M.  We never really match
 functions (lambdas) except by name, so in this case it seems like
 a good idea to treat 'M.k' as a roughTopName of the call.
+-}
 
-
-\begin{code}
 pprRulesForUser :: [CoreRule] -> SDoc
 -- (a) tidy the rules
 -- (b) sort them into order based on the rule name
@@ -245,16 +244,15 @@ pprRulesForUser rules
     pprRules $
     sortBy (comparing ru_name) $
     tidyRules emptyTidyEnv rules
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 SpecInfo: the rules in an IdInfo
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Make a 'SpecInfo' containing a number of 'CoreRule's, suitable
 -- for putting into an 'IdInfo'
 mkSpecInfo :: [CoreRule] -> SpecInfo
@@ -285,8 +283,8 @@ getRules rule_base fn
   = idCoreRules fn ++ imp_rules
   where
     imp_rules = lookupNameEnv rule_base (idName fn) `orElse` []
-\end{code}
 
+{-
 Note [Where rules are found]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The rules for an Id come from two places:
@@ -307,13 +305,13 @@ but that isn't quite right:
        the rules are kept in the global RuleBase
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 RuleBase
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
 type RuleBase = NameEnv [CoreRule]
         -- The rules are are unordered;
@@ -339,16 +337,15 @@ extendRuleBase rule_base rule
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs)
                          | rs <- nameEnvElts rules ]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Matching
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | The main rule matching function. Attempts to apply all (active)
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
@@ -427,8 +424,8 @@ isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 
 noBlackList :: Activation -> Bool
 noBlackList _ = False           -- Nothing is black listed
-\end{code}
 
+{-
 Note [Extra args in rule matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we find a matching rule, we return (Just (rule, rhs)),
@@ -444,8 +441,8 @@ You might think it'd be cleaner for lookupRule to deal with the
 leftover arguments, by applying 'rhs' to them, but the main call
 in the Simplifier works better as it is.  Reason: the 'args' passed
 to lookupRule are the result of a lazy substitution
+-}
 
-\begin{code}
 ------------------------------------
 matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
@@ -534,8 +531,8 @@ matchN (in_scope, id_unf) tmpl_vars tmpl_es target_es
 
     unbound var = pprPanic "Template variable unbound in rewrite rule"
                         (ppr var $$ ppr tmpl_vars $$ ppr tmpl_vars' $$ ppr tmpl_es $$ ppr target_es)
-\end{code}
 
+{-
 Note [Template binders]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following match:
@@ -553,24 +550,24 @@ To achive this, we use rnBndrL to rename the template variables if
 necessary; the renamed ones are the tmpl_vars'
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                    The main matcher
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
         ---------------------------------------------
                 The inner workings of matching
         ---------------------------------------------
+-}
 
-\begin{code}
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.
 --
 -- * The BindWrapper in a RuleSubst are the bindings floated out
 --   from nested matches; see the Let case of match, below
 --
-data RuleMatchEnv 
+data RuleMatchEnv
   = RV { rv_tmpls :: VarSet          -- Template variables
        , rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
                                      --   (lambda/case)
@@ -863,8 +860,8 @@ match_ty renv subst ty1 ty2
   where
     tv_subst = rs_tv_subst subst
     menv = ME { me_tmpls = rv_tmpls renv, me_env = rv_lcl renv }
-\end{code}
 
+{-
 Note [Expanding variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is another Very Important rule: if the term being matched is a
@@ -1005,16 +1002,16 @@ That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                    Rule-check the program
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
    We want to know what sites have rules that could have fired but didn't.
    This pass runs over the tree (without changing it) and reports such.
+-}
 
-\begin{code}
 -- | Report partial matches for rules beginning with the specified
 -- string for the purposes of error reporting
 ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
@@ -1068,9 +1065,7 @@ ruleCheckApp :: RuleCheckEnv -> Expr CoreBndr -> [Arg CoreBndr] -> Bag SDoc
 ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
 ruleCheckApp env (Var f) as   = ruleCheckFun env f as
 ruleCheckApp env other _      = ruleCheck env other
-\end{code}
 
-\begin{code}
 ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
 -- Produce a report for all rules matching the predicate
 -- saying why it doesn't match the specified application
@@ -1101,7 +1096,7 @@ ruleAppCheck_help env fn args rules
         = ptext (sLit "Rule") <+> doubleQuotes (ftext name)
 
     rule_info dflags rule
-        | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env) 
+        | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)
                               noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 
@@ -1128,5 +1123,3 @@ ruleAppCheck_help env fn args rules
                             , rv_tmpls = mkVarSet rule_bndrs
                             , rv_fltR  = mkEmptySubst in_scope
                             , rv_unf   = rc_id_unf env }
-\end{code}
-
