@@ -1,4 +1,3 @@
-\begin{code}
 module Name where
 
 import {-# SOURCE #-} Module
@@ -6,4 +5,3 @@ import {-# SOURCE #-} Module
 data Name
 
 nameModule :: Name -> Module
-\end{code}

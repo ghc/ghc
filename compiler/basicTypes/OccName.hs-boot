@@ -1,5 +1,3 @@
-\begin{code}
 module OccName where
 
 data OccName
-\end{code}

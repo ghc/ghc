@@ -1,4 +1,3 @@
-\begin{code}
 module Module where
 
 data Module
@@ -7,4 +6,3 @@ data PackageKey
 moduleName :: Module -> ModuleName
 modulePackageKey :: Module -> PackageKey
 packageKeyString :: PackageKey -> String
-\end{code}

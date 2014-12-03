@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
-\section[Literal]{@Literal@: Machine literals (unboxed, of course)}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1998
 
-\begin{code}
+\section[Literal]{@Literal@: Machine literals (unboxed, of course)}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module Literal
@@ -63,16 +63,15 @@ import Data.Word
 import Data.Char
 import Data.Data ( Data, Typeable )
 import Numeric ( fromRat )
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Literals}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | So-called 'Literal's are one of:
 --
 -- * An unboxed (/machine/) literal ('MachInt', 'MachFloat', etc.),
@@ -118,8 +117,8 @@ data Literal
   | LitInteger Integer Type --  ^ Integer literals
                             -- See Note [Integer literals]
   deriving (Data, Typeable)
-\end{code}
 
+{-
 Note [Integer literals]
 ~~~~~~~~~~~~~~~~~~~~~~~
 An Integer literal is represented using, well, an Integer, to make it
@@ -139,8 +138,8 @@ in TcIface.
 
 
 Binary instance
+-}
 
-\begin{code}
 instance Binary Literal where
     put_ bh (MachChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (MachStr ab)      = do putByte bh 1; put_ bh ab
@@ -195,9 +194,7 @@ instance Binary Literal where
                     i <- get bh
                     -- See Note [Integer literals]
                     return $ mkLitInteger i (panic "Evaluated the place holder for mkInteger")
-\end{code}
 
-\begin{code}
 instance Outputable Literal where
     ppr lit = pprLiteral (\d -> d) lit
 
@@ -211,12 +208,12 @@ instance Ord Literal where
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
     compare a b = cmpLit a b
-\end{code}
 
-
+{-
         Construction
         ~~~~~~~~~~~~
-\begin{code}
+-}
+
 -- | Creates a 'Literal' of type @Int#@
 mkMachInt :: DynFlags -> Integer -> Literal
 mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
@@ -272,11 +269,12 @@ isZeroLit (MachWord64 0) = True
 isZeroLit (MachFloat  0) = True
 isZeroLit (MachDouble 0) = True
 isZeroLit _              = False
-\end{code}
 
+{-
         Coercions
         ~~~~~~~~~
-\begin{code}
+-}
+
 narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
   char2IntLit, int2CharLit,
@@ -330,11 +328,12 @@ double2FloatLit l              = pprPanic "double2FloatLit" (ppr l)
 
 nullAddrLit :: Literal
 nullAddrLit = MachNullAddr
-\end{code}
 
+{-
         Predicates
         ~~~~~~~~~~
-\begin{code}
+-}
+
 -- | True if there is absolutely no penalty to duplicating the literal.
 -- False principally of strings
 litIsTrivial :: Literal -> Bool
@@ -359,11 +358,12 @@ litFitsInChar _           = False
 litIsLifted :: Literal -> Bool
 litIsLifted (LitInteger {}) = True
 litIsLifted _               = False
-\end{code}
 
+{-
         Types
         ~~~~~
-\begin{code}
+-}
+
 -- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
 literalType MachNullAddr    = addrPrimTy
@@ -392,12 +392,12 @@ absent_lits = listToUFM [ (addrPrimTyConKey,    MachNullAddr)
                         , (doublePrimTyConKey,  MachDouble 0)
                         , (wordPrimTyConKey,    MachWord 0)
                         , (word64PrimTyConKey,  MachWord64 0) ]
-\end{code}
 
-
+{-
         Comparison
         ~~~~~~~~~~
-\begin{code}
+-}
+
 cmpLit :: Literal -> Literal -> Ordering
 cmpLit (MachChar      a)   (MachChar       b)   = a `compare` b
 cmpLit (MachStr       a)   (MachStr        b)   = a `compare` b
@@ -425,14 +425,14 @@ litTag (MachFloat     _)   = _ILIT(8)
 litTag (MachDouble    _)   = _ILIT(9)
 litTag (MachLabel _ _ _)   = _ILIT(10)
 litTag (LitInteger  {})    = _ILIT(11)
-\end{code}
 
+{-
         Printing
         ~~~~~~~~
 * MachX (i.e. unboxed) things are printed unadornded (e.g. 3, 'a', "foo")
   exceptions: MachFloat gets an initial keyword prefix.
+-}
 
-\begin{code}
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
 -- The function is used on non-atomic literals
 -- to wrap parens around literals that occur in
@@ -456,19 +456,18 @@ pprIntVal :: Integer -> SDoc
 -- ^ Print negative integers with parens to be sure it's unambiguous
 pprIntVal i | i < 0     = parens (integer i)
             | otherwise = integer i
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Hashing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Hash values should be zero or a positive integer.  No negatives please.
 (They mess up the UniqFM for some reason.)
+-}
 
-\begin{code}
 hashLiteral :: Literal -> Int
 hashLiteral (MachChar c)        = ord c + 1000  -- Keep it out of range of common ints
 hashLiteral (MachStr s)         = hashByteString s
@@ -492,4 +491,3 @@ hashInteger i = 1 + abs (fromInteger (i `rem` 10000))
 
 hashFS :: FastString -> Int
 hashFS s = iBox (uniqueOfFS s)
-\end{code}

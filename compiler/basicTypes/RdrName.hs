@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 -- |
@@ -45,7 +44,7 @@ module RdrName (
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
-        lookupGlobalRdrEnv, extendGlobalRdrEnv, 
+        lookupGlobalRdrEnv, extendGlobalRdrEnv,
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
         transformGREs, findLocalDupsRdrEnv, pickGREs,
@@ -76,15 +75,15 @@ import Util
 import StaticFlags( opt_PprStyle_Debug )
 
 import Data.Data
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The main data type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Do not use the data constructors of RdrName directly: prefer the family
 -- of functions that creates them, such as 'mkRdrUnqual'
 data RdrName
@@ -117,16 +116,14 @@ data RdrName
         --
         -- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
   deriving (Data, Typeable)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Simple functions}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 instance HasOccName RdrName where
   occName = rdrNameOcc
@@ -173,9 +170,7 @@ demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = panic "demoteRdrName"
 demoteRdrName (Exact _) = panic "demoteRdrName"
-\end{code}
 
-\begin{code}
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
 mkRdrUnqual occ = Unqual occ
@@ -213,9 +208,7 @@ nukeExact :: Name -> RdrName
 nukeExact n
   | isExternalName n = Orig (nameModule n) (nameOccName n)
   | otherwise        = Unqual (nameOccName n)
-\end{code}
 
-\begin{code}
 isRdrDataCon :: RdrName -> Bool
 isRdrTyVar   :: RdrName -> Bool
 isRdrTc      :: RdrName -> Bool
@@ -256,16 +249,15 @@ isExact _         = False
 isExact_maybe :: RdrName -> Maybe Name
 isExact_maybe (Exact n) = Just n
 isExact_maybe _         = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Instances}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Outputable RdrName where
     ppr (Exact name)   = ppr name
     ppr (Unqual occ)   = ppr occ
@@ -323,15 +315,15 @@ instance Ord RdrName where
 
     compare (Orig m1 o1) (Orig m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2)
     compare (Orig _ _)   _            = GT
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         LocalRdrEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | This environment is used to store local bindings (@let@, @where@, lambda, @case@).
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
@@ -388,11 +380,11 @@ inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 inLocalRdrEnvScope name (LRE { lre_in_scope = ns }) = name `elemNameSet` ns
 
 delLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
-delLocalRdrEnvList (LRE { lre_env = env, lre_in_scope = ns }) occs 
+delLocalRdrEnvList (LRE { lre_env = env, lre_in_scope = ns }) occs
   = LRE { lre_env = delListFromOccEnv env occs
         , lre_in_scope = ns }
-\end{code}
 
+{-
 Note [Local bindings with Exact Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With Template Haskell we can make local bindings that have Exact Names.
@@ -401,13 +393,13 @@ does so in RnTpes.bindHsTyVars), so for an Exact Name we must consult
 the in-scope-name-set.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                         GlobalRdrEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 -- ^ Keyed by 'OccName'; when looking up a qualified name
 -- we look up the 'OccName' part, and then check the 'Provenance'
@@ -455,8 +447,8 @@ hasParent n (ParentIs n')
   | n /= n' = pprPanic "hasParent" (ppr n <+> ppr n')  -- Parents should agree
 #endif
 hasParent n _  = ParentIs n
-\end{code}
 
+{-
 Note [Parents]
 ~~~~~~~~~~~~~~~~~
   Parent           Children
@@ -496,9 +488,8 @@ those.  For T that will mean we have
   one GRE with Parent C
   one GRE with NoParent
 That's why plusParent picks the "best" case.
+-}
 
-
-\begin{code}
 -- | make a 'GlobalRdrEnv' where all the elements point to the same
 -- Provenance (useful for "hiding" imports, or imports with
 -- no details).
@@ -531,9 +522,9 @@ instance Outputable GlobalRdrElt where
 
 pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
 pprGlobalRdrEnv locals_only env
-  = vcat [ ptext (sLit "GlobalRdrEnv") <+> ppWhen locals_only (ptext (sLit "(locals only)")) 
+  = vcat [ ptext (sLit "GlobalRdrEnv") <+> ppWhen locals_only (ptext (sLit "(locals only)"))
              <+> lbrace
-         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- occEnvElts env ] 
+         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- occEnvElts env ]
              <+> rbrace) ]
   where
     remove_locals gres | locals_only = filter isLocalGRE gres
@@ -642,11 +633,9 @@ pickGREs rdr_name gres
                       = filter ((== mod) . is_as . is_decl) is
                       | otherwise
                       = []
-\end{code}
 
-Building GlobalRdrEnvs
+-- Building GlobalRdrEnvs
 
-\begin{code}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
 
@@ -755,16 +744,16 @@ shadow_name env name
        = Nothing   -- Shadow both qualified and unqualified
        | otherwise -- Shadow unqualified only
        = Just (is { is_decl = id_spec { is_qual = True } })
-\end{code}
 
+{-
 Note [Template Haskell binders in the GlobalRdrEnv]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For reasons described in Note [Top-level Names in Template Haskell decl quotes]
 in RnNames, a GRE with an Internal gre_name (i.e. one generated by a TH decl
 quote) should *shadow* a GRE with an External gre_name.  Hence some faffing
 around in pickGREs and findLocalDupsRdrEnv
+-}
 
-\begin{code}
 findLocalDupsRdrEnv :: GlobalRdrEnv -> [Name] -> [[GlobalRdrElt]]
 -- ^ For each 'OccName', see if there are multiple local definitions
 -- for it; return a list of all such
@@ -791,15 +780,15 @@ findLocalDupsRdrEnv rdr_env occs
       | isInternalName name = isInternalName n
       | otherwise           = True
     pick _ _ = False
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Provenance
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | The 'Provenance' of something says how it came to be in scope.
 -- It's quite elaborate so that we can give accurate unused-name warnings.
 data Provenance
@@ -890,9 +879,7 @@ instance Ord ImpDeclSpec where
 
 instance Ord ImpItemSpec where
    compare is1 is2 = is_iloc is1 `compare` is_iloc is2
-\end{code}
 
-\begin{code}
 plusProv :: Provenance -> Provenance -> Provenance
 -- Choose LocalDef over Imported
 -- There is an obscure bug lurking here; in the presence
@@ -946,4 +933,3 @@ instance Outputable ImportSpec where
 pprLoc :: SrcSpan -> SDoc
 pprLoc (RealSrcSpan s)    = ptext (sLit "at") <+> ppr s
 pprLoc (UnhelpfulSpan {}) = empty
-\end{code}

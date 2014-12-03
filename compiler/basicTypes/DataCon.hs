@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
-\section[DataCon]{@DataCon@: Data Constructors}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1998
 
-\begin{code}
+\section[DataCon]{@DataCon@: Data Constructors}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module DataCon (
@@ -71,9 +71,8 @@ import qualified Data.Typeable
 import Data.Maybe
 import Data.Char
 import Data.Word
-\end{code}
 
-
+{-
 Data constructor representation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following Haskell data type declaration
@@ -238,13 +237,13 @@ Does the C constructor in Core contain the Ord dictionary?  Yes, it must:
 
 Note that (Foo a) might not be an instance of Ord.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Data constructors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A data constructor
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -460,8 +459,8 @@ data HsBang
 -- StrictnessMark is internal only, used to indicate strictness
 -- of the DataCon *worker* fields
 data StrictnessMark = MarkedStrict | NotMarkedStrict
-\end{code}
 
+{-
 Note [Data con representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The dcRepType field contains the type of the representation of a contructor
@@ -502,13 +501,13 @@ For imported data types, the dcArgBangs field is just the same as the
 dcr_bangs field; we don't know what the user originally said.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Instances}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Eq DataCon where
     a == b = getUnique a == getUnique b
     a /= b = getUnique a /= getUnique b
@@ -572,16 +571,15 @@ isBanged _                         = True
 isMarkedStrict :: StrictnessMark -> Bool
 isMarkedStrict NotMarkedStrict = False
 isMarkedStrict _               = True   -- All others are strict
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Construction}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Build a new data constructor
 mkDataCon :: Name
           -> Bool               -- ^ Is the constructor declared infix?
@@ -659,8 +657,8 @@ mkDataCon name declared_infix
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
-\end{code}
 
+{-
 Note [Unpack equality predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have a GADT with a contructor C :: (a~[b]) => b -> T a
@@ -669,8 +667,8 @@ takes no space at all.  This is easily done: just give it
 an UNPACK pragma. The rest of the unpack/repack code does the
 heavy lifting.  This one line makes every GADT take a word less
 space for each equality predicate, so it's pretty important!
+-}
 
-\begin{code}
 -- | The 'Name' of the 'DataCon', giving it a unique, rooted identification
 dataConName :: DataCon -> Name
 dataConName = dcName
@@ -911,9 +909,7 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
     map (substTyWith tyvars inst_tys) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
-\end{code}
 
-\begin{code}
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
 dataConOrigArgTys :: DataCon -> [Type]
@@ -929,9 +925,7 @@ dataConRepArgTys (MkData { dcRep = rep
   = case rep of
       NoDataConRep -> ASSERT( null eq_spec ) theta ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
-\end{code}
 
-\begin{code}
 -- | The string @package:module.name@ identifying a constructor, which is attached
 -- to its info table and used by the GHCi debugger and the heap profiler
 dataConIdentity :: DataCon -> [Word8]
@@ -941,9 +935,7 @@ dataConIdentity dc = bytesFS (packageKeyFS (modulePackageKey mod)) ++
                   fromIntegral (ord '.') : bytesFS (occNameFS (nameOccName name))
   where name = dataConName dc
         mod  = ASSERT( isExternalName name ) nameModule name
-\end{code}
 
-\begin{code}
 isTupleDataCon :: DataCon -> Bool
 isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 
@@ -953,16 +945,12 @@ isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool
 isVanillaDataCon dc = dcVanilla dc
-\end{code}
 
-\begin{code}
 classDataCon :: Class -> DataCon
 classDataCon clas = case tyConDataCons (classTyCon clas) of
                       (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr
                       [] -> panic "classDataCon"
-\end{code}
 
-\begin{code}
 dataConCannotMatch :: [Type] -> DataCon -> Bool
 -- Returns True iff the data con *definitely cannot* match a
 --                  scrutinee of type (T tys)
@@ -986,18 +974,18 @@ dataConCannotMatch tys con
                      EqPred ty1 ty2 -> [(ty1, ty2)]
                      TuplePred ts   -> concatMap predEqs ts
                      _              -> []
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               Building an algebraic data type
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 buildAlgTyCon is here because it is called from TysWiredIn, which in turn
 depends on DataCon, but not on BuildTyCl.
+-}
 
-\begin{code}
 buildAlgTyCon :: Name
               -> [TyVar]               -- ^ Kind variables and type variables
               -> [Role]
@@ -1024,28 +1012,27 @@ buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
     mb_promoted_tc
       | is_promotable = Just (mkPromotedTyCon tc (promoteKind kind))
       | otherwise     = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Promoting of data types to the kind level
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These two 'promoted..' functions are here because
  * They belong together
  * 'promoteDataCon' depends on DataCon stuff
+-}
 
-\begin{code}
 promoteDataCon :: DataCon -> TyCon
 promoteDataCon (MkData { dcPromoted = Just tc }) = tc
 promoteDataCon dc = pprPanic "promoteDataCon" (ppr dc)
 
 promoteDataCon_maybe :: DataCon -> Maybe TyCon
 promoteDataCon_maybe (MkData { dcPromoted = mb_tc }) = mb_tc
-\end{code}
 
+{-
 Note [Promoting a Type to a Kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppsoe we have a data constructor D
@@ -1062,8 +1049,8 @@ The transformation from type to kind is done by promoteType
   * Ensure that all type constructors mentioned (Maybe and T
     in the example) are promotable; that is, they have kind
           * -> ... -> * -> *
+-}
 
-\begin{code}
 -- | Promotes a type to a kind.
 -- Assumes the argument satisfies 'isPromotableType'
 promoteType :: Type -> Kind
@@ -1088,15 +1075,15 @@ promoteKind (TyConApp tc [])
   | tc `hasKey` liftedTypeKindTyConKey = superKind
 promoteKind (FunTy arg res) = FunTy (promoteKind arg) (promoteKind res)
 promoteKind k = pprPanic "promoteKind" (ppr k)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Splitting products}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Extract the type constructor, type argument, data constructor and it's
 -- /representation/ argument types from a type if it is a product type.
 --
@@ -1126,4 +1113,3 @@ splitDataProductType_maybe ty
   = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
   | otherwise
   = Nothing
-\end{code}

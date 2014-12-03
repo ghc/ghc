@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section{@Vars@: Variables}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section{@Vars@: Variables}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 -- |
 -- #name_types#
@@ -80,18 +80,17 @@ import FastString
 import Outputable
 
 import Data.Data
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                      Synonyms
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 -- These synonyms are here and not in Id because otherwise we need a very
 -- large number of SOURCE imports of Id.hs :-(
+-}
 
-\begin{code}
 type Id    = Var       -- A term-level identifier
 
 type TyVar   = Var     -- Type *or* kind variable (historical)
@@ -110,8 +109,8 @@ type IpId   = EvId      -- A term-level implicit parameter
 type EqVar  = EvId      -- Boxed equality evidence
 
 type CoVar = Id         -- See Note [Evidence: EvIds and CoVars]
-\end{code}
 
+{-
 Note [Evidence: EvIds and CoVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * An EvId (evidence Id) is a *boxed*, term-level evidence variable
@@ -136,19 +135,19 @@ go over the whole compiler code to use:
    - KindVar to mean kind         variables
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{The main data type declarations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 Every @Var@ has a @Unique@, to uniquify it and for fast comparison, a
 @Type@, and an @IdInfo@ (non-essential info about it, e.g.,
 strictness).  The essential info about different kinds of @Vars@ is
 in its @VarDetails@.
+-}
 
-\begin{code}
 -- | Essentially a typed 'Name', that may also contain some additional information
 -- about the 'Var' and it's use sites.
 data Var
@@ -185,8 +184,8 @@ data IdScope    -- See Note [GlobalId/LocalId]
 data ExportFlag
   = NotExported -- ^ Not exported: may be discarded as dead code.
   | Exported    -- ^ Exported: kept alive
-\end{code}
 
+{-
 Note [GlobalId/LocalId]
 ~~~~~~~~~~~~~~~~~~~~~~~
 A GlobalId is
@@ -203,13 +202,13 @@ A LocalId is
   * always treated as a candidate by the free-variable finder
 
 After CoreTidy, top-level LocalIds are turned into GlobalIds
+-}
 
-\begin{code}
 instance Outputable Var where
   ppr var = ppr (varName var) <> getPprStyle (ppr_debug var)
 
 ppr_debug :: Var -> PprStyle -> SDoc
-ppr_debug (TyVar {}) sty 
+ppr_debug (TyVar {}) sty
   | debugStyle sty = brackets (ptext (sLit "tv"))
 ppr_debug (TcTyVar {tc_tv_details = d}) sty
   | dumpStyle sty || debugStyle sty = brackets (pprTcTyVarDetails d)
@@ -243,10 +242,7 @@ instance Data Var where
   toConstr _   = abstractConstr "Var"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Var"
-\end{code}
 
-
-\begin{code}
 varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (iBox (realUnique var))
 
@@ -262,16 +258,15 @@ setVarName var new_name
 
 setVarType :: Id -> Type -> Id
 setVarType id ty = id { varType = ty }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Type and kind variables}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tyVarName :: TyVar -> Name
 tyVarName = varName
 
@@ -294,9 +289,7 @@ updateTyVarKindM :: (Monad m) => (Kind -> m Kind) -> TyVar -> m TyVar
 updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
-\end{code}
 
-\begin{code}
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
                           , realUnique = getKeyFastInt (nameUnique name)
@@ -327,15 +320,14 @@ mkKindVar name kind = TyVar
   , realUnique = getKeyFastInt (nameUnique name)
   , varType    = kind }
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Ids}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 idInfo :: Id -> IdInfo
 idInfo (Id { id_info = info }) = info
 idInfo other                   = pprPanic "idInfo" (ppr other)
@@ -394,15 +386,15 @@ setIdNotExported :: Id -> Id
 -- ^ We can only do this to LocalIds
 setIdNotExported id = ASSERT( isLocalId id )
                       id { idScope = LocalId NotExported }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Predicates over variables}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 isTyVar :: Var -> Bool
 isTyVar = isTKVar     -- Historical
 
@@ -446,4 +438,3 @@ isExportedId :: Var -> Bool
 isExportedId (Id { idScope = GlobalId })        = True
 isExportedId (Id { idScope = LocalId Exported}) = True
 isExportedId _ = False
-\end{code}

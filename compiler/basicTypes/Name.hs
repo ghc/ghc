@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[Name]{@Name@: to transmit name info from renamer to typechecker}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[Name]{@Name@: to transmit name info from renamer to typechecker}
+-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 -- |
@@ -89,15 +89,15 @@ import FastString
 import Outputable
 
 import Data.Data
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Name-datatype]{The @Name@ datatype, and name construction}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A unique, unambigious name for something, containing information about where
 -- that thing originated.
 data Name = Name {
@@ -129,15 +129,15 @@ data NameSort
 -- which have special syntactic forms.  They aren't in scope
 -- as such.
 data BuiltInSyntax = BuiltInSyntax | UserSyntax
-\end{code}
 
+{-
 Notes about the NameSorts:
 
 1.  Initially, top-level Ids (including locally-defined ones) get External names,
     and all other local Ids get Internal names
 
 2.  In any invocation of GHC, an External Name for "M.x" has one and only one
-    unique.  This unique association is ensured via the Name Cache; 
+    unique.  This unique association is ensured via the Name Cache;
     see Note [The Name Cache] in IfaceEnv.
 
 3.  Things with a External name are given C static labels, so they finally
@@ -165,8 +165,8 @@ Wired-in thing  => The thing (Id, TyCon) is fully known to the compiler,
                    E.g. Bool, True, Int, Float, and many others
 
 All built-in syntax is for wired-in things.
+-}
 
-\begin{code}
 instance HasOccName Name where
   occName = nameOccName
 
@@ -180,15 +180,15 @@ nameUnique  name = mkUniqueGrimily (iBox (n_uniq name))
 nameOccName name = n_occ  name
 nameSrcLoc  name = srcSpanStart (n_loc name)
 nameSrcSpan name = n_loc  name
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Predicates on names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 nameIsLocalOrFrom :: Module -> Name -> Bool
 isInternalName    :: Name -> Bool
 isExternalName    :: Name -> Bool
@@ -239,16 +239,15 @@ isVarName = isVarOcc . nameOccName
 
 isSystemName (Name {n_sort = System}) = True
 isSystemName _                        = False
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Making names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Create a name which is (for now at least) local to the current module and hence
 -- does not need a 'Module' to disambiguate it from other 'Name's
 mkInternalName :: Unique -> OccName -> SrcSpan -> Name
@@ -309,9 +308,7 @@ mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs)
 mkFCallName :: Unique -> String -> Name
 mkFCallName uniq str = mkInternalName uniq (mkVarOcc str) noSrcSpan
    -- The encoded string completely describes the ccall
-\end{code}
 
-\begin{code}
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
@@ -333,9 +330,7 @@ tidyNameOcc name                            occ = name { n_occ = occ }
 -- | Make the 'Name' into an internal name, regardless of what it was to begin with
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }
-\end{code}
 
-\begin{code}
 -- |Create a localised variant of a name.
 --
 -- If the name is external, encode the original's module name to disambiguate.
@@ -346,15 +341,14 @@ mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
     origin
       | nameIsLocalOrFrom this_mod name = Nothing
       | otherwise                       = Just (moduleNameColons . moduleName . nameModule $ name)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Hashing and comparison}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 cmpName :: Name -> Name -> Ordering
 cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
@@ -378,15 +372,15 @@ stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
     sort_cmp Internal         System           = LT
     sort_cmp System           System           = EQ
     sort_cmp System           _                = GT
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Name-instances]{Instance declarations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Eq Name where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
     a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
@@ -409,15 +403,15 @@ instance Data Name where
   toConstr _   = abstractConstr "Name"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Name"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Binary}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Binary Name where
    put_ bh name =
       case getUserData bh of
@@ -426,15 +420,15 @@ instance Binary Name where
    get bh =
       case getUserData bh of
         UserData { ud_get_name = get_name } -> get_name bh
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Pretty printing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Outputable Name where
     ppr name = pprName name
 
@@ -546,24 +540,22 @@ pprNameDefnLoc name
          -> ptext (sLit "at") <+> ftext s
          | otherwise
          -> ptext (sLit "in") <+> quotes (ppr (nameModule name))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Overloaded functions related to Names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A class allowing convenient access to the 'Name' of various datatypes
 class NamedThing a where
     getOccName :: a -> OccName
     getName    :: a -> Name
 
     getOccName n = nameOccName (getName n)      -- Default method
-\end{code}
 
-\begin{code}
 getSrcLoc           :: NamedThing a => a -> SrcLoc
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String
@@ -577,15 +569,15 @@ pprInfixName, pprPrefixName :: (Outputable a, NamedThing a) => a -> SDoc
 -- add parens or back-quotes as appropriate
 pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
 
-pprPrefixName thing 
- |  name `hasKey` liftedTypeKindTyConKey 
+pprPrefixName thing
+ |  name `hasKey` liftedTypeKindTyConKey
  = ppr name   -- See Note [Special treatment for kind *]
  | otherwise
  = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
  where
    name = getName thing
-\end{code}
 
+{-
 Note [Special treatment for kind *]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Do not put parens around the kind '*'.  Even though it looks like
@@ -597,4 +589,4 @@ the overloaded function pprPrefixOcc.  It's easier where we know the
 type being pretty printed; eg the pretty-printing code in TypeRep.
 
 See Trac #7645, which led to this.
-
+-}

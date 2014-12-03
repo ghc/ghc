@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
-\section[PatSyn]{@PatSyn@: Pattern synonyms}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1998
 
-\begin{code}
+\section[PatSyn]{@PatSyn@: Pattern synonyms}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module PatSyn (
@@ -36,16 +36,15 @@ import HsBinds( HsPatSynDetails(..) )
 import qualified Data.Data as Data
 import qualified Data.Typeable
 import Data.Function
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Pattern synonyms}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A pattern synonym
 -- See Note [Pattern synonym representation]
 data PatSyn
@@ -90,8 +89,8 @@ data PatSyn
              -- See Note [Builder for pattern synonyms with unboxed type]
   }
   deriving Data.Typeable.Typeable
-\end{code}
 
+{-
 Note [Pattern synonym representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following pattern synonym declaration
@@ -143,7 +142,7 @@ For the above example, the matcher function has type:
 
 with the following implementation:
 
-        $mP @r @t $dEq $dNum scrut cont fail 
+        $mP @r @t $dEq $dNum scrut cont fail
           = case scrut of
               MkT @b $dShow $dOrd [x] (Just 42) -> cont @b $dShow $dOrd x
               _                                 -> fail Void#
@@ -153,7 +152,7 @@ be instantiated by an unboxed type; for example where we see
      f (P x) = 3#
 
 The extra Void# argument for the failure continuation is needed so that
-it is lazy even when the result type is unboxed. 
+it is lazy even when the result type is unboxed.
 
 For the same reason, if the pattern has no arguments, an extra Void#
 argument is added to the success continuation as well.
@@ -190,13 +189,13 @@ we must remember that the builder has this void argument. This is
 done by TcPatSyn.patSynBuilderOcc.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Instances}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Eq PatSyn where
     (==) = (==) `on` getUnique
     (/=) = (/=) `on` getUnique
@@ -226,16 +225,15 @@ instance Data.Data PatSyn where
     toConstr _   = abstractConstr "PatSyn"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "PatSyn"
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Construction}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
@@ -263,9 +261,7 @@ mkPatSyn name declared_infix
                 psOrigResTy = orig_res_ty,
                 psMatcher = matcher,
                 psBuilder = builder }
-\end{code}
 
-\begin{code}
 -- | The 'Name' of the 'PatSyn', giving it a unique, rooted identification
 patSynName :: PatSyn -> Name
 patSynName = psName
@@ -347,4 +343,3 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
   = ASSERT2( length univ_tvs == length inst_tys
            , ptext (sLit "patSynInstResTy") <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
     substTyWith univ_tvs inst_tys res_ty
-\end{code}

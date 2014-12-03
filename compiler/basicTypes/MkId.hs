@@ -1,7 +1,7 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1998
+
 
 This module contains definitions for the IdInfo for things that
 have a standard form, namely:
@@ -10,8 +10,8 @@ have a standard form, namely:
 - record selectors
 - method and superclass selectors
 - primitive operations
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module MkId (
@@ -76,13 +76,13 @@ import FastString
 import ListSetOps
 
 import Data.Maybe       ( maybeToList )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Wired in Ids}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Wired-in Ids]
 ~~~~~~~~~~~~~~~~~~~
@@ -115,8 +115,8 @@ In cases (2-4), the function has a definition in a library module, and
 can be called; but the wired-in version means that the details are
 never read from that module's interface file; instead, the full definition
 is right here.
+-}
 
-\begin{code}
 wiredInIds :: [Id]
 wiredInIds
   =  [lazyId, dollarId, oneShotId]
@@ -137,13 +137,13 @@ ghcPrimIds
     coerceId,
     proxyHashId
     ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Data constructors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The wrapper for a constructor is an ordinary top-level binding that evaluates
 any strict args, unboxes any args that are going to be flattened, and calls
@@ -241,11 +241,11 @@ predicate (C a).  But now we treat that as an ordinary argument, not
 part of the theta-type, so all is well.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Dictionary selectors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Selecting a field for a dictionary.  If there is just one field, then
 there's nothing to do.
@@ -264,8 +264,8 @@ Then the top-level type for op is
 This is unlike ordinary record selectors, which have all the for-alls
 at the outside.  When dealing with classes it's very convenient to
 recover the original type signature from the class op selector.
+-}
 
-\begin{code}
 mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
@@ -355,17 +355,15 @@ dictSelRule val_index n_ty_args _ id_unf _ args
   = Just (getNth con_args val_index)
   | otherwise
   = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Data constructors
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon
@@ -445,8 +443,8 @@ dataConCPR con
     --         on the stack, and are often then allocated in the heap
     --         by the caller.  So doing CPR for them may in fact make
     --         things worse.
-\end{code}
 
+{-
 -------------------------------------------------
 --         Data constructor representation
 --
@@ -454,9 +452,8 @@ dataConCPR con
 -- constructor fields
 --
 --------------------------------------------------
+-}
 
-
-\begin{code}
 type Unboxer = Var -> UniqSM ([Var], CoreExpr -> CoreExpr)
   -- Unbox: bind rep vars by decomposing src var
 
@@ -728,8 +725,8 @@ isUnpackableType fam_envs ty
     attempt_unpack (HsUserBang Nothing bang)     = bang  -- Be conservative
     attempt_unpack HsStrict                      = False
     attempt_unpack HsNoBang                      = False
-\end{code}
 
+{-
 Note [Unpack one-wide fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The flag UnboxSmallStrictFields ensures that any field that can
@@ -790,22 +787,21 @@ takes no space at all.  This is easily done: just give it
 an UNPACK pragma. The rest of the unpack/repack code does the
 heavy lifting.  This one line makes every GADT take a word less
 space for each equality predicate, so it's pretty important!
+-}
 
-
-\begin{code}
 mk_pred_strict_mark :: PredType -> HsBang
 mk_pred_strict_mark pred
   | isEqPred pred = HsUnpack Nothing    -- Note [Unpack equality predicates]
   | otherwise     = HsNoBang
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Wrapping and unwrapping newtypes and type families
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- The wrapper for the data constructor for a newtype looks like this:
 --      newtype T a = MkT (a,Int)
@@ -878,16 +874,15 @@ unwrapTypeFamInstScrut axiom ind args scrut
 unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
 unwrapTypeUnbranchedFamInstScrut axiom
   = unwrapTypeFamInstScrut axiom 0
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Primitive operations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkPrimOpId :: PrimOp -> Id
 mkPrimOpId prim_op
   = id
@@ -939,14 +934,13 @@ mkFCallId dflags uniq fcall ty
     (arg_tys, _)    = tcSplitFunTys tau
     arity           = length arg_tys
     strict_sig      = mkClosedStrictSig (replicate arity evalDmd) topRes
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{DictFuns and default methods}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Dict funs and default methods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -955,8 +949,8 @@ involves user-written code, so we can't figure out their strictness etc
 based on fixed info, as we can for constructors and record selectors (say).
 
 NB: See also Note [Exported LocalIds] in Id
+-}
 
-\begin{code}
 mkDictFunId :: Name      -- Name to use for the dict fun;
             -> [TyVar]
             -> ThetaType
@@ -989,14 +983,13 @@ mkDictFunTy tvs theta clas tys
                    -- See Note [Silent Superclass Arguments]
     discard pred = any (`eqPred` pred) theta
                  -- See the DFun Superclass Invariant in TcInstDcls
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Un-definable}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These Ids can't be defined in Haskell.  They could be defined in
 unfoldings in the wired-in GHC.Prim interface file, but we'd have to
@@ -1012,8 +1005,8 @@ add it as a built-in Id with an unfolding here.
 The type variables we use here are "open" type variables: this means
 they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
+-}
 
-\begin{code}
 lazyIdName, unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
    magicDictName, coerceName, proxyName, dollarName, oneShotName :: Name
@@ -1029,9 +1022,7 @@ coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-\end{code}
 
-\begin{code}
 dollarId :: Id  -- Note [dollarId magic]
 dollarId = pcMiscPrelId dollarName ty
              (noCafIdInfo `setUnfoldingInfo` unf)
@@ -1155,8 +1146,8 @@ coerceId = pcMiscPrelId coerceName ty info
     rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $
           mkWildCase (Var eqR) eqRTy betaTy $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (CoVarCo eq))]
-\end{code}
 
+{-
 Note [dollarId magic]
 ~~~~~~~~~~~~~~~~~~~~~
 The only reason that ($) is wired in is so that its type can be
@@ -1351,9 +1342,8 @@ The evaldUnfolding makes it look that some primitive value is
 evaluated, which in turn makes Simplify.interestingArg return True,
 which in turn makes INLINE things applied to said value likely to be
 inlined.
+-}
 
-
-\begin{code}
 realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
                      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
@@ -1371,10 +1361,7 @@ coercionTokenId -- Used to replace Coercion terms when we go to STG
   = pcMiscPrelId coercionTokenName
                  (mkTyConApp eqPrimTyCon [liftedTypeKind, unitTy, unitTy])
                  noCafIdInfo
-\end{code}
 
-
-\begin{code}
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
   = mkVanillaGlobalWithInfo name ty info
@@ -1383,4 +1370,3 @@ pcMiscPrelId name ty info
     -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
     -- being compiled, then it's just a matter of luck if the definition
     -- will be in "the right place" to be in scope.
-\end{code}

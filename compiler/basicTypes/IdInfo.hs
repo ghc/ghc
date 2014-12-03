@@ -1,13 +1,13 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+
 \section[IdInfo]{@IdInfos@: Non-essential information about @Ids@}
 
 (And a pretty good illustration of quite a few things wrong with
 Haskell. [WDP 94/11])
+-}
 
-\begin{code}
 module IdInfo (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails,
@@ -93,15 +93,15 @@ infixl  1 `setSpecInfo`,
           `setCafInfo`,
           `setStrictnessInfo`,
           `setDemandInfo`
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                      IdDetails
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | The 'IdDetails' of an 'Id' give stable, and necessary,
 -- information about the Id.
 data IdDetails
@@ -165,16 +165,15 @@ pprIdDetails other     = brackets (pp other)
    pp (RecSelId { sel_naughty = is_naughty })
                          = brackets $ ptext (sLit "RecSel")
                             <> ppWhen is_naughty (ptext (sLit "(naughty)"))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The main IdInfo type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | An 'IdInfo' gives /optional/ information about an 'Id'.  If
 -- present it never lies, but it may not be present, in which case there
 -- is always a conservative assumption which can be made.
@@ -232,11 +231,9 @@ seqStrictnessInfo ty = seqStrictSig ty
 
 seqDemandInfo :: Demand -> ()
 seqDemandInfo dmd = seqDemand dmd
-\end{code}
 
-Setters
+-- Setters
 
-\begin{code}
 setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
 setSpecInfo       info sp = sp `seq` info { specInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
@@ -273,10 +270,7 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
-\end{code}
 
-
-\begin{code}
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
@@ -297,20 +291,19 @@ vanillaIdInfo
 noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
         -- Used for built-in type Ids in MkId.
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[arity-IdInfo]{Arity info about an @Id@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 For locally-defined Ids, the code generator maintains its own notion
 of their arities; so it should not be asking...  (but other things
 besides the code-generator need arity info!)
+-}
 
-\begin{code}
 -- | An 'ArityInfo' of @n@ tells us that partial application of this
 -- 'Id' to up to @n-1@ value arguments does essentially no work.
 --
@@ -328,15 +321,15 @@ unknownArity = 0 :: Arity
 ppArityInfo :: Int -> SDoc
 ppArityInfo 0 = empty
 ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Inline-pragma information}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Tells when the inlining is active.
 -- When it is active the thing may be inlined, depending on how
 -- big it is.
@@ -347,26 +340,24 @@ ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
 -- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
 -- entirely as a way to inhibit inlining until we want it
 type InlinePragInfo = InlinePragma
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                Strictness
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 pprStrictness :: StrictSig -> SDoc
 pprStrictness sig = ppr sig
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         SpecInfo
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Specialisations and RULES in IdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -386,8 +377,8 @@ differently because:
 
 In TidyPgm, when the LocalId becomes a GlobalId, its RULES are stripped off
 and put in the global list.
+-}
 
-\begin{code}
 -- | Records the specializations of this 'Id' that we know about
 -- in the form of rewrite 'CoreRule's that target them
 data SpecInfo
@@ -420,15 +411,15 @@ setSpecInfoHead fn (SpecInfo rules fvs)
 
 seqSpecInfo :: SpecInfo -> ()
 seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[CG-IdInfo]{Code generator-related information}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- CafInfo is used to build Static Reference Tables (see simplStg/SRT.lhs).
 
 -- | Records whether an 'Id' makes Constant Applicative Form references
@@ -461,15 +452,15 @@ instance Outputable CafInfo where
 ppCafInfo :: CafInfo -> SDoc
 ppCafInfo NoCafRefs = ptext (sLit "NoCafRefs")
 ppCafInfo MayHaveCafRefs = empty
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Bulk operations on IdInfo}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | This is used to remove information on lambda binders that we have
 -- setup as part of a lambda group, assuming they will be applied all at once,
 -- but turn out to be part of an unsaturated lambda as in e.g:
@@ -492,15 +483,11 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
                  _other                -> occ
 
     is_safe_dmd dmd = not (isStrictDmd dmd)
-\end{code}
 
-\begin{code}
 -- | Remove demand info on the 'IdInfo' if it is present, otherwise return @Nothing@
 zapDemandInfo :: IdInfo -> Maybe IdInfo
 zapDemandInfo info = Just (info {demandInfo = topDmd})
-\end{code}
 
-\begin{code}
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables
 zapFragileInfo info
@@ -509,15 +496,15 @@ zapFragileInfo info
                `setOccInfo` zapFragileOcc occ)
   where
     occ = occInfo info
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{TickBoxOp}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type TickBoxId = Int
 
 -- | Tick box for Hpc-style coverage
@@ -526,4 +513,3 @@ data TickBoxOp
 
 instance Outputable TickBoxOp where
     ppr (TickBox mod n)         = ptext (sLit "tick") <+> ppr (mod,n)
-\end{code}

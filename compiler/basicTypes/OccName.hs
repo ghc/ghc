@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 -- |
@@ -109,17 +108,17 @@ import Lexeme
 import Binary
 import Data.Char
 import Data.Data
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               FastStringEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 FastStringEnv can't be in FastString because the env depends on UniqFM
+-}
 
-\begin{code}
 type FastStringEnv a = UniqFM a         -- Keyed by FastString
 
 
@@ -132,15 +131,15 @@ emptyFsEnv  = emptyUFM
 lookupFsEnv = lookupUFM
 extendFsEnv = addToUFM
 mkFsEnv     = listToUFM
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Name space}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data NameSpace = VarName        -- Variables, including "real" data constructors
                | DataName       -- "Source" data constructors
                | TvName         -- Type variables
@@ -231,25 +230,21 @@ demoteNameSpace VarName = Nothing
 demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Name-pieces-datatypes]{The @OccName@ datatypes}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data OccName = OccName
     { occNameSpace  :: !NameSpace
     , occNameFS     :: !FastString
     }
     deriving Typeable
-\end{code}
 
-
-\begin{code}
 instance Eq OccName where
     (OccName sp1 s1) == (OccName sp2 s2) = s1 == s2 && sp1 == sp2
 
@@ -266,16 +261,15 @@ instance Data OccName where
 
 instance HasOccName OccName where
   occName = id
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Printing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Outputable OccName where
     ppr = pprOccName
 
@@ -303,21 +297,21 @@ pprOccName (OccName sp occ)
     strip_th_unique ('[' : c : _) | isAlphaNum c = []
     strip_th_unique (c : cs) = c : strip_th_unique cs
     strip_th_unique []       = []
-\end{code}
 
+{-
 Note [Suppressing uniques in OccNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This is a hack to de-wobblify the OccNames that contain uniques from
 Template Haskell that have been turned into a string in the OccName.
 See Note [Unique OccNames from Template Haskell] in Convert.hs
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Construction}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkOccName :: NameSpace -> String -> OccName
 mkOccName occ_sp str = OccName occ_sp (mkFastString str)
 
@@ -378,14 +372,13 @@ otherNameSpace TcClsName = TvName
 This class provides a consistent way to access the underlying OccName. -}
 class HasOccName name where
   occName :: name -> OccName
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Environments
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 OccEnvs are used mainly for the envts in ModIfaces.
 
@@ -399,8 +392,8 @@ So we can make a Unique using
         mkUnique ns key  :: Unique
 where 'ns' is a Char representing the name space.  This in turn makes it
 easy to build an OccEnv.
+-}
 
-\begin{code}
 instance Uniquable OccName where
       -- See Note [The Unique of an OccName]
   getUnique (OccName VarName   fs) = mkVarOccUnique  fs
@@ -487,16 +480,15 @@ foldOccSet        = foldUniqSet
 isEmptyOccSet     = isEmptyUniqSet
 intersectOccSet   = intersectUniqSets
 intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Predicates and taking them apart}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 occNameString :: OccName -> String
 occNameString (OccName _ s) = unpackFS s
 
@@ -544,24 +536,20 @@ parenSymOcc :: OccName -> SDoc -> SDoc
 -- ^ Wrap parens around an operator
 parenSymOcc occ doc | isSymOcc occ = parens doc
                     | otherwise    = doc
-\end{code}
 
-
-\begin{code}
 startsWithUnderscore :: OccName -> Bool
 -- ^ Haskell 98 encourages compilers to suppress warnings about unsed
 -- names in a pattern if they start with @_@: this implements that test
 startsWithUnderscore occ = case occNameString occ of
                              ('_' : _) -> True
                              _other    -> False
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Making system names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Here's our convention for splitting up the interface file name space:
 
@@ -591,8 +579,8 @@ This knowledge is encoded in the following functions.
 
 @mk_deriv@ generates an @OccName@ from the prefix and a string.
 NB: The string must already be encoded!
+-}
 
-\begin{code}
 mk_deriv :: NameSpace
          -> String              -- Distinguishes one sort of derived name from another
          -> String
@@ -606,9 +594,7 @@ isDerivedOccName occ =
      '$':c:_ | isAlphaNum c -> True
      ':':c:_ | isAlphaNum c -> True
      _other                 -> False
-\end{code}
 
-\begin{code}
 mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
         mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
         mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
@@ -694,9 +680,7 @@ mk_simple_deriv_with sp px (Just with) occ = mk_deriv sp (px ++ with ++ "_") (oc
 -- of the data constructor OccName (which should be a DataName)
 -- to VarName
 mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
-\end{code}
 
-\begin{code}
 mkSuperDictSelOcc :: Int        -- ^ Index of superclass, e.g. 3
                   -> OccName    -- ^ Class, e.g. @Ord@
                   -> OccName    -- ^ Derived 'Occname', e.g. @$p3Ord@
@@ -710,9 +694,7 @@ mkLocalOcc uniq occ
    = mk_deriv varName ("$L" ++ show uniq) (occNameString occ)
         -- The Unique might print with characters
         -- that need encoding (e.g. 'z'!)
-\end{code}
 
-\begin{code}
 -- | Derive a name for the representation type constructor of a
 -- @data@\/@newtype@ instance.
 mkInstTyTcOcc :: String                 -- ^ Family name, e.g. @Map@
@@ -720,9 +702,7 @@ mkInstTyTcOcc :: String                 -- ^ Family name, e.g. @Map@
               -> OccName                -- ^ @R:Map@
 mkInstTyTcOcc str set =
   chooseUniqueOcc tcName ('R' : ':' : str) set
-\end{code}
 
-\begin{code}
 mkDFunOcc :: String             -- ^ Typically the class and type glommed together e.g. @OrdMaybe@.
                                 -- Only used in debug mode, for extra clarity
           -> Bool               -- ^ Is this a hs-boot instance DFun?
@@ -738,20 +718,20 @@ mkDFunOcc info_str is_boot set
   where
     prefix | is_boot   = "$fx"
            | otherwise = "$f"
-\end{code}
 
+{-
 Sometimes we need to pick an OccName that has not already been used,
 given a set of in-use OccNames.
+-}
 
-\begin{code}
 chooseUniqueOcc :: NameSpace -> String -> OccSet -> OccName
 chooseUniqueOcc ns str set = loop (mkOccName ns str) (0::Int)
   where
   loop occ n
    | occ `elemOccSet` set = loop (mkOccName ns (str ++ show n)) (n+1)
    | otherwise            = occ
-\end{code}
 
+{-
 We used to add a '$m' to indicate a method, but that gives rise to bad
 error messages from the type checker when we print the function name or pattern
 of an instance-decl binding.  Why? Because the binding is zapped
@@ -770,19 +750,18 @@ e.g. a call to constructor MkFoo where
 
 If this is necessary, we do it by prefixing '$m'.  These
 guys never show up in error messages.  What a hack.
+-}
 
-\begin{code}
 mkMethodOcc :: OccName -> OccName
 mkMethodOcc occ@(OccName VarName _) = occ
 mkMethodOcc occ                     = mk_simple_deriv varName "$m" occ
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Tidying them up}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Before we print chunks of code we like to rename it so that
 we don't have to print lots of silly uniques in it.  But we mustn't
@@ -809,8 +788,8 @@ type TidyOccEnv = UniqFM Int
 
 * When looking for a renaming for "foo2" we strip off the "2" and start
   with "foo".  Otherwise if we tidy twice we get silly names like foo23.
+-}
 
-\begin{code}
 type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
   -- See Note [TidyOccEnv]
 
@@ -843,16 +822,16 @@ tidyOccName env occ@(OccName occ_sp fs)
        where
          n1 = n+1
          new_fs = mkFastString (base ++ show n)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Binary instance
     Here rather than BinIface because OccName is abstract
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Binary NameSpace where
     put_ bh VarName = do
             putByte bh 0
@@ -878,4 +857,3 @@ instance Binary OccName where
           aa <- get bh
           ab <- get bh
           return (OccName aa ab)
-\end{code}

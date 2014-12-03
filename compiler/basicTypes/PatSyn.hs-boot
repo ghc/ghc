@@ -1,4 +1,3 @@
-\begin{code}
 module PatSyn where
 import Name( NamedThing )
 import Data.Typeable ( Typeable )
@@ -16,4 +15,3 @@ instance OutputableBndr PatSyn
 instance Uniquable PatSyn
 instance Typeable PatSyn
 instance Data PatSyn
-\end{code}

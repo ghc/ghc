@@ -1,14 +1,14 @@
-%
-% (c) The University of Glasgow, 2004-2006
-%
+{-
+(c) The University of Glasgow, 2004-2006
+
 
 Module
 ~~~~~~~~~~
 Simply the name of a module, represented as a FastString.
 These are Uniquable, hence we can build Maps with Modules as
 the keys.
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Module
@@ -72,7 +72,7 @@ module Module
         ModuleNameEnv,
 
         -- * Sets of Modules
-        ModuleSet, 
+        ModuleSet,
         emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
 
@@ -91,15 +91,15 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
 import System.FilePath
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Module locations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Where a module lives on the file system: the actual locations
 -- of the .hs, .hi and .o files, if we have them
 data ModLocation
@@ -122,8 +122,8 @@ data ModLocation
 
 instance Outputable ModLocation where
    ppr = text . show
-\end{code}
 
+{-
 For a module in another package, the hs_file and obj_file
 components of ModLocation are undefined.
 
@@ -131,8 +131,8 @@ The locations specified by a ModLocation may or may not
 correspond to actual files yet: for example, even if the object
 file doesn't exist, the ModLocation still contains the path to
 where the object file will reside if/when it is created.
+-}
 
-\begin{code}
 addBootSuffix :: FilePath -> FilePath
 -- ^ Add the @-boot@ suffix to .hs, .hi and .o files
 addBootSuffix path = path ++ "-boot"
@@ -149,16 +149,15 @@ addBootSuffixLocn locn
   = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
          , ml_hi_file  = addBootSuffix (ml_hi_file locn)
          , ml_obj_file = addBootSuffix (ml_obj_file locn) }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The name of a module}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString
     deriving Typeable
@@ -226,15 +225,15 @@ moduleNameSlashes = dots_to_slashes . moduleNameString
 moduleNameColons :: ModuleName -> String
 moduleNameColons = dots_to_colons . moduleNameString
   where dots_to_colons = map (\c -> if c == '.' then ':' else c)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{A fully qualified module}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A Module is a pair of a 'PackageKey' and a 'ModuleName'.
 data Module = Module {
    modulePackageKey :: !PackageKey,  -- pkg-1.0
@@ -291,15 +290,15 @@ class ContainsModule t where
 
 class HasModule m where
     getModule :: m Module
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{PackageKey}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A string which uniquely identifies a package.  For wired-in packages,
 -- it is just the package name, but for user compiled packages, it is a hash.
 -- ToDo: when the key is a hash, we can do more clever things than store
@@ -411,15 +410,15 @@ wiredInPackageKeys = [ primPackageKey,
                        thisGhcPackageKey,
                        dphSeqPackageKey,
                        dphParPackageKey ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@ModuleEnv@s}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map Module elt)
 
@@ -486,9 +485,7 @@ isEmptyModuleEnv (ModuleEnv e) = Map.null e
 
 foldModuleEnv :: (a -> b -> b) -> b -> ModuleEnv a -> b
 foldModuleEnv f x (ModuleEnv e) = Map.foldRightWithKey (\_ v -> f v) x e
-\end{code}
 
-\begin{code}
 -- | A set of 'Module's
 type ModuleSet = Map Module ()
 
@@ -503,13 +500,11 @@ mkModuleSet ms    = Map.fromList [(m,()) | m <- ms ]
 extendModuleSet s m = Map.insert m () s
 moduleSetElts     = Map.keys
 elemModuleSet     = Map.member
-\end{code}
 
+{-
 A ModuleName has a Unique, so we can build mappings of these using
 UniqFM.
+-}
 
-\begin{code}
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 type ModuleNameEnv elt = UniqFM elt
-\end{code}
-

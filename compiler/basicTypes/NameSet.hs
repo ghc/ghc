@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module NameSet (
         -- * Names set type
@@ -34,15 +33,15 @@ module NameSet (
 
 import Name
 import UniqSet
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Sets of names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type NameSet = UniqSet Name
 
 emptyNameSet       :: NameSet
@@ -84,18 +83,17 @@ intersectNameSet  = intersectUniqSets
 delListFromNameSet set ns = foldl delFromNameSet set ns
 
 intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Free variables}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These synonyms are useful when we are thinking of free variables
+-}
 
-\begin{code}
 type FreeVars   = NameSet
 
 plusFV   :: FreeVars -> FreeVars -> FreeVars
@@ -117,16 +115,15 @@ addOneFV    = extendNameSet
 unitFV      = unitNameSet
 delFV n s   = delFromNameSet s n
 delFVs ns s = delListFromNameSet s ns
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Defs and uses
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A set of names that are defined somewhere
 type Defs = NameSet
 
@@ -196,4 +193,3 @@ findUses dus uses
         = rhs_uses `unionNameSet` uses
         | otherwise     -- No def is used
         = uses
-\end{code}

@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow, 1992-2006
-%
+-- (c) The University of Glasgow, 1992-2006
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
    -- Workaround for Trac #5252 crashes the bootstrap compiler without -O
@@ -83,17 +80,18 @@ import Data.Bits
 import Data.Data
 import Data.List
 import Data.Ord
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcLoc-SrcLocations]{Source-location information}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
-\begin{code}
+-}
+
 -- | Represents a single point within a file
 data RealSrcLoc
   = SrcLoc      FastString              -- A precise location (file name)
@@ -104,15 +102,15 @@ data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
   | UnhelpfulLoc FastString     -- Just a general indication
   deriving Show
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcLoc-access-fns]{Access functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
 mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col)
 
@@ -149,15 +147,15 @@ advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
 advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (((((c - 1) `shiftR` 3) + 1)
                                                   `shiftL` 3) + 1)
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcLoc-instances]{Instance declarations for various names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- SrcLoc is an instance of Ord so that we can sort error messages easily
 instance Eq SrcLoc where
   loc1 == loc2 = case loc1 `cmpSrcLoc` loc2 of
@@ -219,15 +217,15 @@ instance Data SrcSpan where
   toConstr _   = abstractConstr "SrcSpan"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "SrcSpan"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcSpan]{Source Spans}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 {- |
 A SrcSpan delimits a portion of a text file.  It could be represented
 by a pair of (line,column) coordinates, but in fact we optimise
@@ -330,15 +328,15 @@ combineRealSrcSpans span1 span2
     (line_end, col_end)     = max (srcSpanEndLine span1, srcSpanEndCol span1)
                                   (srcSpanEndLine span2, srcSpanEndCol span2)
     file = srcSpanFile span1
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcSpan-predicates]{Predicates}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Test if a 'SrcSpan' is "good", i.e. has precise location information
 isGoodSrcSpan :: SrcSpan -> Bool
 isGoodSrcSpan (RealSrcSpan _) = True
@@ -350,15 +348,13 @@ isOneLineSpan :: SrcSpan -> Bool
 isOneLineSpan (RealSrcSpan s) = srcSpanStartLine s == srcSpanEndLine s
 isOneLineSpan (UnhelpfulSpan _) = False
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcSpan-unsafe-access-fns]{Unsafe access functions}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 srcSpanStartLine :: RealSrcSpan -> Int
 srcSpanEndLine :: RealSrcSpan -> Int
@@ -381,15 +377,13 @@ srcSpanEndCol SrcSpanOneLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanMultiLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcSpan-access-fns]{Access functions}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanStart :: SrcSpan -> SrcLoc
@@ -416,15 +410,13 @@ srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
 srcSpanFileName_maybe (RealSrcSpan s)   = Just (srcSpanFile s)
 srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[SrcSpan-instances]{Instances}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- We want to order SrcSpans first by the start point, then by the end point.
 instance Ord SrcSpan where
@@ -499,15 +491,15 @@ pprUserRealSpan show_path (SrcSpanPoint src_path line col)
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , int line <> colon
          , int col ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Located]{Attaching SrcSpans to things}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data GenLocated l e = L l e
   deriving (Eq, Ord, Typeable, Data)
@@ -556,15 +548,15 @@ instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
                 -- ifPprDebug (braces (pprUserSpan False l))
                 ifPprDebug (braces (ppr l))
              $$ ppr e
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Ordering SrcSpans for InteractiveUI}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Alternative strategies for ordering 'SrcSpan's
 leftmost_smallest, leftmost_largest, rightmost :: SrcSpan -> SrcSpan -> Ordering
 rightmost            = flip compare
@@ -587,5 +579,3 @@ isSubspanOf src parent
     | srcSpanFileName_maybe parent /= srcSpanFileName_maybe src = False
     | otherwise = srcSpanStart parent <= srcSpanStart src &&
                   srcSpanEnd parent   >= srcSpanEnd src
-
-\end{code}

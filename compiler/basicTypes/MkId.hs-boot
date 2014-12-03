@@ -1,4 +1,3 @@
-\begin{code}
 module MkId where
 import Name( Name )
 import Var( Id )
@@ -11,6 +10,3 @@ mkDataConWorkId :: Name -> DataCon -> Id
 mkPrimOpId      :: PrimOp -> Id
 
 magicDictId :: Id
-\end{code}
-
-

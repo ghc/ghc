@@ -1,7 +1,7 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 @Uniques@ are used to distinguish entities in the compiler (@Ids@,
 @Classes@, etc.) from each other.  Thus, @Uniques@ are the basic
@@ -14,8 +14,8 @@ directed to that end.
 Some of the other hair in this code is to be able to use a
 ``splittable @UniqueSupply@'' if requested/possible (not standard
 Haskell).
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, BangPatterns, MagicHash #-}
 
 module Unique (
@@ -70,30 +70,30 @@ import Util
 import GHC.Exts (indexCharOffAddr#, Char(..))
 
 import Data.Char        ( chr, ord )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Unique-type]{@Unique@ type and operations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The @Chars@ are ``tag letters'' that identify the @UniqueSupply@.
 Fast comparison is everything on @Uniques@:
+-}
 
-\begin{code}
 --why not newtype Int?
 
 -- | The type of unique identifiers that are used in many places in GHC
 -- for fast ordering and equality tests. You should generate these with
 -- the functions from the 'UniqSupply' module
 data Unique = MkUnique FastInt
-\end{code}
 
+{-
 Now come the functions which construct uniques from their pieces, and vice versa.
 The stuff about unique *supplies* is handled further down this module.
+-}
 
-\begin{code}
 unpkUnique      :: Unique -> (Char, Int)        -- The reverse
 
 mkUniqueGrimily :: Int -> Unique                -- A trap-door for UniqSupply
@@ -103,10 +103,7 @@ getKeyFastInt   :: Unique -> FastInt            -- for Var
 incrUnique      :: Unique -> Unique
 deriveUnique    :: Unique -> Int -> Unique
 newTagUnique    :: Unique -> Char -> Unique
-\end{code}
 
-
-\begin{code}
 mkUniqueGrimily x = MkUnique (iUnbox x)
 
 {-# INLINE getKey #-}
@@ -146,17 +143,15 @@ unpkUnique (MkUnique u)
         i   = iBox (u `bitAndFastInt` _ILIT(16777215){-``0x00ffffff''-})
     in
     (tag, i)
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Uniquable-class]{The @Uniquable@ class}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Class of things that we can obtain a 'Unique' from
 class Uniquable a where
     getUnique :: a -> Unique
@@ -169,20 +164,19 @@ instance Uniquable FastString where
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Unique-instances]{Instance declarations for @Unique@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 And the whole point (besides uniqueness) is fast equality.  We don't
 use `deriving' because we want {\em precise} control of ordering
 (equality on @Uniques@ is v common).
+-}
 
-\begin{code}
 eqUnique, ltUnique, leUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 ==# u2
 ltUnique (MkUnique u1) (MkUnique u2) = u1 <#  u2
@@ -206,10 +200,9 @@ instance Ord Unique where
 -----------------
 instance Uniquable Unique where
     getUnique u = u
-\end{code}
 
-We do sometimes make strings with @Uniques@ in them:
-\begin{code}
+-- We do sometimes make strings with @Uniques@ in them:
+
 showUnique :: Unique -> String
 showUnique uniq
   = case unpkUnique uniq of
@@ -230,19 +223,19 @@ instance Outputable Unique where
 
 instance Show Unique where
     show uniq = showUnique uniq
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-base62]{Base-62 numbers}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A character-stingy way to read/write numbers (notably Uniques).
 The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
+-}
 
-\begin{code}
 iToBase62 :: Int -> String
 iToBase62 n_
   = ASSERT(n_ >= 0) go (iUnbox n_) ""
@@ -259,13 +252,13 @@ iToBase62 n_
     {-# INLINE chooseChar62 #-}
     chooseChar62 n = C# (indexCharOffAddr# chars62 n)
     !chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Uniques-prelude]{@Uniques@ for wired-in Prelude things}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Allocation of unique supply characters:
         v,t,u : for renumbering value-, type- and usage- vars.
@@ -285,8 +278,8 @@ Allocation of unique supply characters:
         n       Native codegen
         r       Hsc name cache
         s       simplifier
+-}
 
-\begin{code}
 mkAlphaTyVarUnique     :: Int -> Unique
 mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
@@ -356,5 +349,3 @@ mkVarOccUnique  fs = mkUnique 'i' (iBox (uniqueOfFS fs))
 mkDataOccUnique fs = mkUnique 'd' (iBox (uniqueOfFS fs))
 mkTvOccUnique   fs = mkUnique 'v' (iBox (uniqueOfFS fs))
 mkTcOccUnique   fs = mkUnique 'c' (iBox (uniqueOfFS fs))
-\end{code}
-

@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 module VarEnv (
         -- * Var, Id and TyVar environments (maps)
         VarEnv, IdEnv, TyVarEnv, CoVarEnv,
@@ -60,16 +59,15 @@ import Outputable
 import FastTypes
 import StaticFlags
 import FastString
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 In-scope sets
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A set of variables that are in scope at some point
 data InScopeSet = InScope (VarEnv Var) FastInt
         -- The (VarEnv Var) is just a VarSet.  But we write it like
@@ -129,9 +127,7 @@ lookupInScope_Directly (InScope in_scope _) uniq
 unionInScope :: InScopeSet -> InScopeSet -> InScopeSet
 unionInScope (InScope s1 _) (InScope s2 n2)
   = InScope (s1 `plusVarEnv` s2) n2
-\end{code}
 
-\begin{code}
 -- | @uniqAway in_scope v@ finds a unique that is not used in the
 -- in-scope set, and gives that to v.
 uniqAway :: InScopeSet -> Var -> Var
@@ -158,15 +154,15 @@ uniqAway' (InScope set n) var
           | otherwise = setVarUnique var uniq
           where
             uniq = deriveUnique orig_unique (iBox (n *# k))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Dual renaming
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | When we are comparing (or matching) types or terms, we are faced with
 -- \"going under\" corresponding binders.  E.g. when comparing:
 --
@@ -320,8 +316,8 @@ nukeRnEnvL, nukeRnEnvR :: RnEnv2 -> RnEnv2
 -- ^ Wipe the left or right side renaming
 nukeRnEnvL env = env { envL = emptyVarEnv }
 nukeRnEnvR env = env { envR = emptyVarEnv }
-\end{code}
 
+{-
 Note [Eta expansion]
 ~~~~~~~~~~~~~~~~~~~~
 When matching
@@ -337,29 +333,28 @@ For example, if we don't do this, we can get silly matches like
 succeeding with [a -> v y], which is bogus of course.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Tidying
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | When tidying up print names, we keep a mapping of in-scope occ-names
 -- (the 'TidyOccEnv') and a Var-to-Var of the current renamings
 type TidyEnv = (TidyOccEnv, VarEnv Var)
 
 emptyTidyEnv :: TidyEnv
 emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@VarEnv@s}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type VarEnv elt   = UniqFM elt
 type IdEnv elt    = VarEnv elt
 type TyVarEnv elt = VarEnv elt
@@ -399,9 +394,7 @@ lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv        :: Var -> VarEnv a -> Bool
 elemVarEnvByKey   :: Unique -> VarEnv a -> Bool
 foldVarEnv        :: (a -> b -> b) -> b -> VarEnv a -> b
-\end{code}
 
-\begin{code}
 elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
 alterVarEnv      = alterUFM
@@ -439,12 +432,12 @@ zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
 lookupVarEnv_NF env id = case lookupVarEnv env id of
                          Just xx -> xx
                          Nothing -> panic "lookupVarEnv_NF: Nothing"
-\end{code}
 
+{-
 @modifyVarEnv@: Look up a thing in the VarEnv,
 then mash it with the modify function, and put it back.
+-}
 
-\begin{code}
 modifyVarEnv mangle_fn env key
   = case (lookupVarEnv env key) of
       Nothing -> env
@@ -455,4 +448,3 @@ modifyVarEnv_Directly mangle_fn env key
   = case (lookupUFM_Directly env key) of
       Nothing -> env
       Just xx -> addToUFM_Directly env key (mangle_fn xx)
-\end{code}

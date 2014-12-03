@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[NameEnv]{@NameEnv@: name environments}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[NameEnv]{@NameEnv@: name environments}
+-}
+
 {-# LANGUAGE CPP #-}
 module NameEnv (
         -- * Var, Id and TyVar environments (maps)
@@ -31,15 +31,15 @@ import Name
 import Unique
 import UniqFM
 import Maybes
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Name environment}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 depAnal :: (node -> [Name])      -- Defs
         -> (node -> [Name])      -- Uses
         -> [node]
@@ -56,16 +56,15 @@ depAnal get_defs get_uses nodes
 
     key_map :: NameEnv Int   -- Maps a Name to the key of the decl that defines it
     key_map = mkNameEnv [(name,key) | (node, key) <- keyed_nodes, name <- get_defs node]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Name environment}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type NameEnv a = UniqFM a       -- Domain is Name
 
 emptyNameEnv       :: NameEnv a
@@ -116,4 +115,3 @@ anyNameEnv f x          = foldUFM ((||) . f) False x
 disjointNameEnv x y     = isNullUFM (intersectUFM x y)
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
-\end{code}

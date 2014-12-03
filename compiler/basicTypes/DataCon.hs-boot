@@ -1,4 +1,3 @@
-\begin{code}
 module DataCon where
 import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )
@@ -17,4 +16,3 @@ instance Uniquable DataCon
 instance NamedThing DataCon
 instance Outputable DataCon
 instance OutputableBndr DataCon
-\end{code}

@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1998
-%
-\section[ConLike]{@ConLike@: Constructor-like things}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1998
 
-\begin{code}
+\section[ConLike]{@ConLike@: Constructor-like things}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module ConLike (
@@ -23,29 +23,28 @@ import Name
 import Data.Function (on)
 import qualified Data.Data as Data
 import qualified Data.Typeable
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Constructor-like things}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A constructor-like thing
 data ConLike = RealDataCon DataCon
              | PatSynCon PatSyn
   deriving Data.Typeable.Typeable
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Instances}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Eq ConLike where
     (==) = (==) `on` getUnique
     (/=) = (/=) `on` getUnique
@@ -80,4 +79,3 @@ instance Data.Data ConLike where
     toConstr _   = abstractConstr "ConLike"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "ConLike"
-\end{code}

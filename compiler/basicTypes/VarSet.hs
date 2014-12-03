@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module VarSet (
@@ -27,15 +26,15 @@ module VarSet (
 import Var      ( Var, TyVar, CoVar, Id )
 import Unique
 import UniqSet
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@VarSet@s}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type VarSet       = UniqSet Var
 type IdSet        = UniqSet Id
 type TyVarSet     = UniqSet TyVar
@@ -103,9 +102,7 @@ extendVarSet_C = addOneToUniqSet_C
 delVarSetByKey  = delOneFromUniqSet_Directly
 elemVarSetByKey = elemUniqSet_Directly
 partitionVarSet = partitionUniqSet
-\end{code}
 
-\begin{code}
 mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
 
 -- See comments with type signatures
@@ -118,10 +115,6 @@ fixVarSet f s | new_s `subVarSet` s = s
               | otherwise           = fixVarSet f new_s
               where
                 new_s = f s
-\end{code}
 
-\begin{code}
 seqVarSet :: VarSet -> ()
 seqVarSet s = sizeVarSet s `seq` ()
-\end{code}
-

@@ -1,7 +1,7 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1997-1998
+
 \section[BasicTypes]{Miscellanous types}
 
 This module defines a miscellaneously collection of very simple
@@ -12,8 +12,8 @@ types that
 \item don't depend on any other complicated types
 \item are used in more than one "part" of the compiler
 \end{itemize}
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module BasicTypes(
@@ -94,15 +94,15 @@ import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity)
 import Data.Function (on)
 import GHC.Exts (Any)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Arity]{Arity}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | The number of value arguments that can be applied to a value before it does
 -- "real work". So:
 --  fib 100     has arity 0
@@ -115,40 +115,40 @@ type Arity = Int
 --  \x -> fib x                has representation arity 1
 --  \(# x, y #) -> fib (x + y) has representation arity 2
 type RepArity = Int
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               Constructor tags
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Type of the tags associated with each constructor possibility
 type ConTag = Int
 
 fIRST_TAG :: ConTag
 -- ^ Tags are allocated from here for real constructors
 fIRST_TAG =  1
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Alignment]{Alignment}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
          One-shot information
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | If the 'Id' is a lambda-bound variable then it may have lambda-bound
 -- variable info. Sometimes we know whether the lambda binding this variable
 -- is a \"one-shot\" lambda; that is, whether it is applied at most once.
@@ -191,16 +191,15 @@ pprOneShotInfo OneShotLam    = ptext (sLit "OneShot")
 
 instance Outputable OneShotInfo where
     ppr = pprOneShotInfo
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
            Swap flag
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data SwapFlag
   = NotSwapped  -- Args are: actual,   expected
   | IsSwapped   -- Args are: expected, actual
@@ -220,32 +219,30 @@ isSwapped NotSwapped = False
 unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
 unSwap NotSwapped f a b = f a b
 unSwap IsSwapped  f a b = f b a
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[FunctionOrData]{FunctionOrData}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data FunctionOrData = IsFunction | IsData
     deriving (Eq, Ord, Data, Typeable)
 
 instance Outputable FunctionOrData where
     ppr IsFunction = text "(function)"
     ppr IsData     = text "(data)"
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Version]{Module and identifier version numbers}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type Version = Int
 
 bumpVersion :: Version -> Version
@@ -253,16 +250,15 @@ bumpVersion v = v+1
 
 initialVersion :: Version
 initialVersion = 1
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Deprecations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 -- reason/explanation from a WARNING or DEPRECATED pragma
 data WarningTxt = WarningTxt [Located FastString]
                 | DeprecatedTxt [Located FastString]
@@ -272,25 +268,25 @@ instance Outputable WarningTxt where
     ppr (WarningTxt    ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
     ppr (DeprecatedTxt ds) = text "Deprecated:" <+>
                              doubleQuotes (vcat (map (ftext . unLoc) ds))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Rules
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type RuleName = FastString
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Fixity]{Fixity info}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 ------------------------
 data Fixity = Fixity Int FixityDirection
   deriving (Data, Typeable)
@@ -322,8 +318,8 @@ negateFixity, funTyFixity :: Fixity
 -- Wired-in fixities
 negateFixity = Fixity 6 InfixL  -- Fixity of unary negate
 funTyFixity  = Fixity 0 InfixR  -- Fixity of '->'
-\end{code}
 
+{-
 Consider
 
 \begin{verbatim}
@@ -331,8 +327,8 @@ Consider
 \end{verbatim}
 @(compareFixity op1 op2)@ tells which way to arrange appication, or
 whether there's an error.
+-}
 
-\begin{code}
 compareFixity :: Fixity -> Fixity
               -> (Bool,         -- Error please
                   Bool)         -- Associate to the right: a op1 (b op2 c)
@@ -348,16 +344,15 @@ compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
     right        = (False, True)
     left         = (False, False)
     error_please = (True,  False)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Top-level/local]{Top-level/not-top level flag}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data TopLevelFlag
   = TopLevel
   | NotTopLevel
@@ -373,16 +368,15 @@ isTopLevel NotTopLevel  = False
 instance Outputable TopLevelFlag where
   ppr TopLevel    = ptext (sLit "<TopLevel>")
   ppr NotTopLevel = ptext (sLit "<NotTopLevel>")
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Boxity flag
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data Boxity
   = Boxed
   | Unboxed
@@ -391,16 +385,15 @@ data Boxity
 isBoxed :: Boxity -> Bool
 isBoxed Boxed   = True
 isBoxed Unboxed = False
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Recursive/Non-Recursive flag
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data RecFlag = Recursive
              | NonRecursive
              deriving( Eq, Data, Typeable )
@@ -420,14 +413,15 @@ boolToRecFlag False = NonRecursive
 instance Outputable RecFlag where
   ppr Recursive    = ptext (sLit "Recursive")
   ppr NonRecursive = ptext (sLit "NonRecursive")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Code origin
-%*                                                                      *
-%************************************************************************
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
+
 data Origin = FromSource
             | Generated
             deriving( Eq, Data, Typeable )
@@ -439,15 +433,15 @@ isGenerated FromSource = False
 instance Outputable Origin where
   ppr FromSource  = ptext (sLit "FromSource")
   ppr Generated   = ptext (sLit "Generated")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Instance overlap flag
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | The semantics allowed for overlapping instances for a particular
 -- instance. See Note [Safe Haskell isSafeOverlap] (in `InstEnv.lhs`) for a
 -- explanation of the `isSafeOverlap` field.
@@ -541,15 +535,15 @@ instance Outputable OverlapMode where
 pprSafeOverlap :: Bool -> SDoc
 pprSafeOverlap True  = ptext $ sLit "[safe]"
 pprSafeOverlap False = empty
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Tuples
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data TupleSort
   = BoxedTuple
   | UnboxedTuple
@@ -570,13 +564,13 @@ tupleParens BoxedTuple      p = parens p
 tupleParens ConstraintTuple p = parens p -- The user can't write fact tuples
                                          -- directly, we overload the (,,) syntax
 tupleParens UnboxedTuple p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Generic]{Generic flag}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is the "Embedding-Projection pair" datatype, it contains
 two pieces of code (normally either RenamedExpr's or Id's)
@@ -593,12 +587,12 @@ And we should have
 T and Tring are arbitrary, but typically T is the 'main' type while
 Tring is the 'representation' type.  (This just helps us remember
 whether to use 'from' or 'to'.
+-}
 
-\begin{code}
 data EP a = EP { fromEP :: a,   -- :: T -> Tring
                  toEP   :: a }  -- :: Tring -> T
-\end{code}
 
+{-
 Embedding-projection pairs are used in several places:
 
 First of all, each type constructor has an EP associated with it, the
@@ -609,18 +603,18 @@ tcMethodBinds), we are constructing bimaps by induction on the structure
 of the type of the method signature.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Occurrence information}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This data type is used exclusively by the simplifier, but it appears in a
 SubstResult, which is currently defined in VarEnv, which is pretty near
 the base of the module hierarchy.  So it seemed simpler to put the
 defn of OccInfo here, safely at the bottom
+-}
 
-\begin{code}
 -- | Identifier occurrence information
 data OccInfo
   = NoOccInfo           -- ^ There are many occurrences, or unknown occurrences
@@ -639,8 +633,8 @@ data OccInfo
         !RulesOnly
 
 type RulesOnly = Bool
-\end{code}
 
+{-
 Note [LoopBreaker OccInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
    IAmALoopBreaker True  <=> A "weak" or rules-only loop breaker
@@ -650,9 +644,8 @@ Note [LoopBreaker OccInfo]
                              Do not inline at all
 
 See OccurAnal Note [Weak loop breakers]
+-}
 
-
-\begin{code}
 isNoOcc :: OccInfo -> Bool
 isNoOcc NoOccInfo = True
 isNoOcc _         = False
@@ -703,9 +696,7 @@ isOneOcc _           = False
 zapFragileOcc :: OccInfo -> OccInfo
 zapFragileOcc (OneOcc {}) = NoOccInfo
 zapFragileOcc occ         = occ
-\end{code}
 
-\begin{code}
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoOccInfo            = empty
@@ -720,20 +711,20 @@ instance Outputable OccInfo where
                  | otherwise  = char '*'
           pp_args | int_cxt   = char '!'
                   | otherwise = empty
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Default method specfication
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The DefMethSpec enumeration just indicates what sort of default method
 is used for a class. It is generated from source code, and present in
 interface files; it is converted to Class.DefMeth before begin put in a
 Class object.
+-}
 
-\begin{code}
 data DefMethSpec = NoDM        -- No default method
                  | VanillaDM   -- Default method given with polymorphic code
                  | GenericDM   -- Default method given with generic code
@@ -743,15 +734,15 @@ instance Outputable DefMethSpec where
   ppr NoDM      = empty
   ppr VanillaDM = ptext (sLit "{- Has default method -}")
   ppr GenericDM = ptext (sLit "{- Has generic default method -}")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Success flag}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data SuccessFlag = Succeeded | Failed
 
 instance Outputable SuccessFlag where
@@ -768,18 +759,17 @@ succeeded Failed    = False
 
 failed Succeeded = False
 failed Failed    = True
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Activation}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 When a rule or inlining is active
+-}
 
-\begin{code}
 type PhaseNum = Int  -- Compilation phase
                      -- Phases decrease towards zero
                      -- Zero is the last phase
@@ -827,8 +817,8 @@ data InlineSpec   -- What the user's INLINE pragma looked like
                      -- where there isn't any real inline pragma at all
   deriving( Eq, Data, Typeable, Show )
         -- Show needed for Lexer.x
-\end{code}
 
+{-
 Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~
 This data type mirrors what you can write in an INLINE or NOINLINE pragma in
@@ -879,8 +869,8 @@ The main effects of CONLIKE are:
 
     - The rule matcher consults this field.  See
       Note [Expanding variables] in Rules.lhs.
+-}
 
-\begin{code}
 isConLike :: RuleMatchInfo -> Bool
 isConLike ConLike = True
 isConLike _            = False
@@ -1003,11 +993,7 @@ isAlwaysActive _            = False
 isEarlyActive AlwaysActive      = True
 isEarlyActive (ActiveBefore {}) = True
 isEarlyActive _                 = False
-\end{code}
 
-
-
-\begin{code}
 -- Used (instead of Rational) to represent exactly the floating point literal that we
 -- encountered in the user's source program. This allows us to pretty-print exactly what
 -- the user wrote, which is important e.g. for floating point numbers that can't represented
@@ -1037,10 +1023,5 @@ instance Ord FractionalLit where
 
 instance Outputable FractionalLit where
   ppr = text . fl_text
-\end{code}
-
-\begin{code}
 
 newtype HValue = HValue Any
-
-\end{code}
