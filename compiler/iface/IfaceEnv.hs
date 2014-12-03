@@ -1,6 +1,5 @@
-(c) The University of Glasgow 2002-2006
+-- (c) The University of Glasgow 2002-2006
 
-\begin{code}
 {-# LANGUAGE CPP, RankNTypes #-}
 
 module IfaceEnv (
@@ -38,14 +37,13 @@ import Outputable
 import Exception     ( evaluate )
 
 import Data.IORef    ( atomicModifyIORef, readIORef )
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
         Allocating new Names in the Name Cache
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 Note [The Name Cache]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -61,9 +59,8 @@ External Name "M.x" has one, and only one globally-agreed Unique.
 The functions newGlobalBinder, allocateGlobalBinder do the main work.
 When you make an External name, you should probably be calling one
 of them.
+-}
 
-
-\begin{code}
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
@@ -165,13 +162,13 @@ lookupOrig mod occ
                     new_cache = extendNameCache (nsNames name_cache) mod occ name
                   in (name_cache{ nsUniqs = us, nsNames = new_cache }, name)
     }}}
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Name cache access
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 See Note [The Name Cache] above.
 
@@ -192,8 +189,8 @@ However, there are two reasons why we might look up an Orig RdrName:
     (DsMeta.globalVar), and parses a NameG into an Orig RdrName
     (Convert.thRdrName).  So, eg $(do { reify '(,); ... }) will
     go this route (Trac #8954).
+-}
 
-\begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
   | Just name <- isBuiltInOcc_maybe occ
@@ -240,10 +237,7 @@ mkNameCacheUpdater = do
                        _ <- evaluate =<< readIORef nc_var
                        return r
   return (NCU update_nc)
-\end{code}
 
-
-\begin{code}
 initNameCache :: UniqSupply -> [Name] -> NameCache
 initNameCache us names
   = NameCache { nsUniqs = us,
@@ -251,17 +245,15 @@ initNameCache us names
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Type variables and local Ids
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceLclId :: FastString -> IfL Id
 tcIfaceLclId occ
   = do  { lcl <- getLclEnv
@@ -297,16 +289,15 @@ extendIfaceTyVarEnv tyvars thing_inside
         ; let { tv_env' = addListToUFM (if_tv_env env) pairs
               ; pairs   = [(occNameFS (getOccName tv), tv) | tv <- tyvars] }
         ; setLclEnv (env { if_tv_env = tv_env' }) thing_inside }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Getting from RdrNames to Names
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 lookupIfaceTop :: OccName -> IfL Name
 -- Look up a top-level name from the current Iface module
 lookupIfaceTop occ
@@ -322,4 +313,3 @@ newIfaceNames occs
   = do  { uniqs <- newUniqueSupply
         ; return [ mkInternalName uniq occ noSrcSpan
                  | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
-\end{code}

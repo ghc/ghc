@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module IfaceSyn (
@@ -63,16 +62,15 @@ import System.IO.Unsafe
 import Data.Maybe (isJust)
 
 infixl 3 &&&
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                     Declarations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type IfaceTopBndr = OccName
   -- It's convenient to have an OccName in the IfaceSyn, altough in each
   -- case the namespace is implied by the context. However, having an
@@ -300,29 +298,26 @@ data IfaceIdDetails
   = IfVanillaId
   | IfRecSelId IfaceTyCon Bool
   | IfDFunId Int          -- Number of silent args
-\end{code}
 
-
+{-
 Note [Versioning of instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See [http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance#Instances]
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Functions over declarations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
 visibleIfConDecls IfDataFamTyCon       = []
 visibleIfConDecls (IfDataTyCon cs)     = cs
 visibleIfConDecls (IfNewTyCon c)       = [c]
-\end{code}
 
-\begin{code}
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
 -- Deeply revolting, because it has to predict what gets bound,
@@ -403,15 +398,15 @@ ifaceDeclFingerprints hash decl
      computeFingerprint' =
        unsafeDupablePerformIO
         . computeFingerprint (panic "ifaceDeclFingerprints")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Expressions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data IfaceExpr
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
@@ -450,8 +445,8 @@ data IfaceBinding
 -- It's used for *non-top-level* let/rec binders
 -- See Note [IdInfo on nested let-bindings]
 data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo
-\end{code}
 
+{-
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In IfaceSyn an IfaceCase does not record the types of the alternatives,
@@ -476,13 +471,13 @@ In general we retain all info that is left by CoreTidy.tidyLetBndr, since
 that is what is seen by importing module with --make
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
               Printing IfaceDecl
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 pprAxBranch :: SDoc -> IfaceAxBranch -> SDoc
 -- The TyCon might be local (just an OccName), or this might
 -- be a branch for an imported TyCon, so it would be an ExtName
@@ -544,8 +539,8 @@ showSub :: HasOccName n => ShowSub -> n -> Bool
 showSub (ShowSub { ss_how_much = ShowHeader })     _     = False
 showSub (ShowSub { ss_how_much = ShowSome (n:_) }) thing = n == occName thing
 showSub (ShowSub { ss_how_much = _ })              _     = True
-\end{code}
 
+{-
 Note [Printing IfaceDecl binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The binders in an IfaceDecl are just OccNames, so we don't know what module they
@@ -556,8 +551,8 @@ binders.
 
 When printing an interface file (--show-iface), we want to print
 everything unqualified, so we can just print the OccName directly.
+-}
 
-\begin{code}
 ppr_trim :: [Maybe SDoc] -> [SDoc]
 -- Collapse a group of Nothings to a single "..."
 ppr_trim xs
@@ -860,8 +855,8 @@ instance Outputable IfaceFamInst where
 ppr_rough :: Maybe IfaceTyCon -> SDoc
 ppr_rough Nothing   = dot
 ppr_rough (Just tc) = ppr tc
-\end{code}
 
+{-
 Note [Result type of a data family GADT]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -884,8 +879,8 @@ Remember that in IfaceSyn, the TyCon and DataCon share the same
 universal type variables.
 
 ----------------------------- Printing IfaceExpr ------------------------------------
+-}
 
-\begin{code}
 instance Outputable IfaceExpr where
     ppr e = pprIfaceExpr noParens e
 
@@ -1021,13 +1016,13 @@ instance Outputable IfaceUnfolding where
                                         pprParendIfaceExpr e]
   ppr (IfDFunUnfold bs es) = hang (ptext (sLit "DFun:") <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               Finding the Names in IfaceSyn
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is used for dependency analysis in MkIface, so that we
 fingerprint a declaration before the things that depend on it.  It
@@ -1035,8 +1030,8 @@ is specific to interface-file fingerprinting in the sense that we
 don't collect *all* Names: for example, the DFun of an instance is
 recorded textually rather than by its fingerprint when
 fingerprinting the instance, so DFuns are not dependencies.
+-}
 
-\begin{code}
 freeNamesIfDecl :: IfaceDecl -> NameSet
 freeNamesIfDecl (IfaceId _s t d i) =
   freeNamesIfType t &&&
@@ -1269,8 +1264,8 @@ freeNamesIfaceTyConParent (IfDataInstance ax tc tys)
 
 fnList :: (a -> NameSet) -> [a] -> NameSet
 fnList f = foldr (&&&) emptyNameSet . map f
-\end{code}
 
+{-
 Note [Tracking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a case expression
@@ -1297,13 +1292,13 @@ on the *locally-defined* type PackageState is not visible. We need
 to take account of the use of the data constructor PS in the pattern match.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Binary instances
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Binary IfaceDecl where
     put_ bh (IfaceId name ty details idinfo) = do
         putByte bh 0
@@ -1839,4 +1834,3 @@ instance Binary IfaceTyConParent where
                 pr <- get bh
                 ty <- get bh
                 return $ IfDataInstance ax pr ty
-\end{code}

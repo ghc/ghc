@@ -1,4 +1,3 @@
-\begin{code}
 module TcIface where
 
 import IfaceSyn    ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule, IfaceAnnotation )
@@ -17,5 +16,3 @@ tcIfaceVectInfo    :: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
 tcIfaceInst        :: IfaceClsInst -> IfL ClsInst
 tcIfaceFamInst     :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations :: [IfaceAnnotation] -> IfL [Annotation]
-\end{code}
-

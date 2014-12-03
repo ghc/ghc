@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module BuildTyCl (
@@ -41,10 +40,7 @@ import TcRnMonad
 import UniqSupply
 import Util
 import Outputable
-\end{code}
 
-
-\begin{code}
 ------------------------------------------------------
 buildSynonymTyCon :: Name -> [TyVar] -> [Role]
                   -> Type
@@ -213,11 +209,9 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     ([pat_ty', cont_sigma, _], _) = tcSplitFunTys tau
     (ex_tvs', prov_theta', cont_tau) = tcSplitSigmaTy cont_sigma
     (arg_tys', _) = tcSplitFunTys cont_tau
-\end{code}
 
+-- ------------------------------------------------------
 
-------------------------------------------------------
-\begin{code}
 type TcMethInfo = (Name, DefMethSpec, Type)
         -- A temporary intermediate, to communicate between
         -- tcClassSigs and buildClass.
@@ -319,8 +313,8 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
                                           ; return (DefMeth dm_name) }
            ; return (mkDictSelId op_name rec_clas, dm_info) }
-\end{code}
 
+{-
 Note [Class newtypes and equality predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -336,3 +330,4 @@ Moreover,
 Here we can't use a newtype either, even though there is only
 one field, because equality predicates are unboxed, and classes
 are boxed.
+-}

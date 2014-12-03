@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+
 
 This module defines interface types and binders
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module IfaceType (
         IfExtName, IfLclName,
@@ -65,15 +65,15 @@ import Outputable
 import FastString
 import UniqSet
 import Data.Maybe( fromMaybe )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Local (nested) binders
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type IfLclName = FastString     -- A local name in iface syntax
 
 type IfExtName = Name   -- An External or WiredIn Name can appear in IfaceSyn
@@ -150,17 +150,14 @@ data IfaceCoercion
   | IfaceSubCo       IfaceCoercion
   | IfaceAxiomRuleCo IfLclName [IfaceType] [IfaceCoercion]
 
-
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Functions over IFaceTypes
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 splitIfaceSigmaTy :: IfaceType -> ([IfaceTvBndr], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
 splitIfaceSigmaTy ty
@@ -219,13 +216,13 @@ ifTyVarsOfArgs args = argv emptyUniqSet args
      argv vs (ITC_Type t ts) = argv (vs `unionUniqSets` (ifTyVarsOfType t)) ts
      argv vs (ITC_Kind k ks) = argv (vs `unionUniqSets` (ifTyVarsOfType k)) ks
      argv vs ITC_Nil         = vs
-\end{code}
 
+{-
 Substitutions on IfaceType. This is only used during pretty-printing to construct
 the result type of a GADT, and does not deal with binders (eg IfaceForAll), so
 it doesn't need fancy capture stuff.
+-}
 
-\begin{code}
 type IfaceTySubst = FastStringEnv IfaceType
 
 mkIfaceTySubst :: [IfaceTvBndr] -> [IfaceType] -> IfaceTySubst
@@ -255,16 +252,15 @@ substIfaceTyVar :: IfaceTySubst -> IfLclName -> IfaceType
 substIfaceTyVar env tv
   | Just ty <- lookupFsEnv env tv = ty
   | otherwise                     = IfaceTyVar tv
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Functions over IFaceTcArgs
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 stripKindArgs :: DynFlags -> IfaceTcArgs -> IfaceTcArgs
 stripKindArgs dflags tys
   | gopt Opt_PrintExplicitKinds dflags = tys
@@ -290,8 +286,8 @@ tcArgsIfaceTypes :: IfaceTcArgs -> [IfaceType]
 tcArgsIfaceTypes ITC_Nil = []
 tcArgsIfaceTypes (ITC_Kind t ts) = t : tcArgsIfaceTypes ts
 tcArgsIfaceTypes (ITC_Type t ts) = t : tcArgsIfaceTypes ts
-\end{code}
 
+{-
 Note [Suppressing kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We use the IfaceTcArgs to specify which of the arguments to a type
@@ -306,24 +302,25 @@ we want
   'Just *         prints as    Just *
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Functions over IFaceTyCon
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 --isPromotedIfaceTyCon :: IfaceTyCon -> Bool
 --isPromotedIfaceTyCon (IfacePromotedTyCon _) = True
 --isPromotedIfaceTyCon _ = False
-\end{code}
-%************************************************************************
-%*                                                                      *
-                Pretty-printing
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+{-
+************************************************************************
+*                                                                      *
+                Pretty-printing
+*                                                                      *
+************************************************************************
+-}
+
 pprIfaceInfixApp :: (TyPrec -> a -> SDoc) -> TyPrec -> SDoc -> a -> a -> SDoc
 pprIfaceInfixApp pp p pp_tc ty1 ty2
   = maybeParen p FunPrec $
@@ -334,12 +331,9 @@ pprIfacePrefixApp p pp_fun pp_tys
   | null pp_tys = pp_fun
   | otherwise   = maybeParen p TyConPrec $
                   hang pp_fun 2 (sep pp_tys)
-\end{code}
 
+-- ----------------------------- Printing binders ------------------------------------
 
------------------------------ Printing binders ------------------------------------
-
-\begin{code}
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
     ppr (IfaceTvBndr bndr) = char '@' <+> pprIfaceTvBndr bndr
@@ -387,11 +381,9 @@ instance Binary IfaceOneShot where
             case h of
               0 -> do return IfaceNoOneShot
               _ -> do return IfaceOneShot
-\end{code}
 
------------------------------ Printing IfaceType ------------------------------------
+-- ----------------------------- Printing IfaceType ------------------------------------
 
-\begin{code}
 ---------------------------------
 instance Outputable IfaceType where
   ppr ty = pprIfaceType ty
@@ -881,15 +873,14 @@ instance Binary IfaceCoercion where
                    return $ IfaceAxiomRuleCo a b c
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Conversion from Type to IfaceType
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 ----------------
 toIfaceTvBndr :: TyVar -> (IfLclName, IfaceType)
 toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), toIfaceKind (tyVarKind tyvar))
@@ -978,4 +969,3 @@ toIfaceCoercion (AxiomRuleCo co ts cs) = IfaceAxiomRuleCo
                                           (coaxrName co)
                                           (map toIfaceType ts)
                                           (map toIfaceCoercion cs)
-\end{code}

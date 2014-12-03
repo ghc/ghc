@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006-2008
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
+{-
+(c) The University of Glasgow 2006-2008
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 
 -- | Module for constructing @ModIface@ values (interface files),
@@ -25,8 +24,8 @@ module MkIface (
 
         tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
-\end{code}
 
+{-
   -----------------------------------------------
           Recompilation checking
   -----------------------------------------------
@@ -56,8 +55,8 @@ Basic idea:
 
   * In checkOldIface we compare the mi_usages for the module with
     the actual fingerprint for all each thing recorded in mi_usages
+-}
 
-\begin{code}
 #include "HsVersions.h"
 
 import IfaceSyn
@@ -123,17 +122,15 @@ import Data.Ord
 import Data.IORef
 import System.Directory
 import System.FilePath
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Completing an interface}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
@@ -669,10 +666,7 @@ sortDependencies d
           dep_pkgs   = sortBy (stablePackageKeyCmp `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
-\end{code}
 
-
-\begin{code}
 -- | Creates cached lookup for the 'mi_anns' field of ModIface
 -- Hackily, we use "module" as the OccName for any module-level annotations
 mkIfaceAnnCache :: [IfaceAnnotation] -> OccName -> [AnnPayload]
@@ -686,8 +680,8 @@ mkIfaceAnnCache anns
       , [value])
     -- flipping (++), so the first argument is always short
     env = mkOccEnv_C (flip (++)) (map pair anns)
-\end{code}
 
+{-
 Note [Orphans and auto-generated rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we specialise an INLINEABLE function, or when we have
@@ -707,11 +701,11 @@ module M will be used in other modules only if M.hi has been read for
 some other reason, which is actually pretty likely.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
           The ABI of an IfaceDecl
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [The ABI of an IfaceDecl]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -734,8 +728,8 @@ Items (c)-(f) are not stored in the IfaceDecl, but instead appear
 elsewhere in the interface file.  But they are *fingerprinted* with
 the declaration itself. This is done by grouping (c)-(f) in IfaceDeclExtras,
 and fingerprinting that as part of the declaration.
+-}
 
-\begin{code}
 type IfaceDeclABI = (Module, IfaceDecl, IfaceDeclExtras)
 
 data IfaceDeclExtras
@@ -946,16 +940,15 @@ mkOrphMap get_key decls
         | NotOrphan occ <- get_key d
         = (extendOccEnv_Acc (:) singleton non_orphs occ d, orphs)
         | otherwise = (non_orphs, d:orphs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
        Keeping track of what we've slurped, and fingerprints
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath] -> IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
   = do
@@ -1093,18 +1086,14 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
               from generating many of these usages (at least in
               one-shot mode), but that's even more bogus!
         -}
-\end{code}
 
-\begin{code}
 mkIfaceAnnotation :: Annotation -> IfaceAnnotation
 mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload })
   = IfaceAnnotation {
         ifAnnotatedTarget = fmap nameOccName target,
         ifAnnotatedValue = payload
     }
-\end{code}
 
-\begin{code}
 mkIfaceExports :: [AvailInfo] -> [IfaceExport]  -- Sort to make canonical
 mkIfaceExports exports
   = sortBy stableAvailCmp (map sort_subs exports)
@@ -1116,8 +1105,8 @@ mkIfaceExports exports
        | n==m      = AvailTC n (m:sortBy stableNameCmp ms)
        | otherwise = AvailTC n (sortBy stableNameCmp (m:ms))
        -- Maintain the AvailTC Invariant
-\end{code}
 
+{-
 Note [Orignal module]
 ~~~~~~~~~~~~~~~~~~~~~
 Consider this:
@@ -1143,14 +1132,14 @@ Trac #5362 for an example.  Such Names are always
   - They are always System Names, hence the assert, just as a double check.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         Load the old interface file for this module (unless
         we have it already), and check whether it is up to date
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data RecompileRequired
   = UpToDate
        -- ^ everything is up to date, recompilation is not required
@@ -1500,15 +1489,15 @@ checkList (check:checks) = do recompile <- check
                               if recompileRequired recompile
                                 then return recompile
                                 else checkList checks
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Converting things to their Iface equivalents
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tyThingToIfaceDecl :: TyThing -> IfaceDecl
 tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
 tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
@@ -2041,4 +2030,3 @@ toIfaceVar v
     | isExternalName name                        = IfaceExt name
     | otherwise                                  = IfaceLcl (getFS name)
   where name = idName v
-\end{code}

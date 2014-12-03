@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Type checking of type signatures in interface files
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module TcIface (
@@ -75,8 +75,8 @@ import qualified Data.Map as Map
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
 #endif
-\end{code}
 
+{-
 This module takes
 
         IfaceDecl -> TyThing
@@ -96,12 +96,12 @@ Names before typechecking, because there should be no scope errors etc.
         -- bound in this module (and hence not yet processed).
         -- The discarding happens when forkM finds a type error.
 
-%************************************************************************
-%*                                                                      *
-%*      tcImportDecl is the key function for "faulting in"              *
-%*      imported things
-%*                                                                      *
-%************************************************************************
+************************************************************************
+*                                                                      *
+*      tcImportDecl is the key function for "faulting in"              *
+*      imported things
+*                                                                      *
+************************************************************************
 
 The main idea is this.  We are chugging along type-checking source code, and
 find a reference to GHC.Base.map.  We call tcLookupGlobal, which doesn't find
@@ -119,8 +119,8 @@ mutable variable.  This is important in situations like
         ...$(e1)...$(e2)...
 where the code that e1 expands to might import some defns that
 also turn out to be needed by the code that e2 expands to.
+-}
 
-\begin{code}
 tcLookupImported_maybe :: Name -> TcM (MaybeErr MsgDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 tcLookupImported_maybe name
@@ -167,13 +167,13 @@ importDecl name
                                 pprNameSpace (occNameSpace (nameOccName name)) <+> ppr name)
                        2 (vcat [ptext (sLit "Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
                                 ptext (sLit "Use -ddump-if-trace to get an idea of which file caused the error")])
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
            Checks for wired-in things
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Loading instances for wired-in things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,9 +200,8 @@ for any module with an instance decl or RULE that we might want.
 
 All of this is done by the type checker. The renamer plays no role.
 (It used to, but no longer.)
+-}
 
-
-\begin{code}
 checkWiredInTyCon :: TyCon -> TcM ()
 -- Ensure that the home module of the TyCon (and hence its instances)
 -- are loaded. See Note [Loading instances for wired-in things]
@@ -244,13 +243,13 @@ needWiredInHomeIface :: TyThing -> Bool
 -- Only for TyCons; see Note [Loading instances for wired-in things]
 needWiredInHomeIface (ATyCon {}) = True
 needWiredInHomeIface _           = False
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Type-checking a complete interface
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Suppose we discover we don't need to recompile.  Then we must type
 check the old interface file.  This is a bit different to the
@@ -259,8 +258,8 @@ we do things similarly as when we are typechecking source decls: we
 bring into scope the type envt for the interface all at once, using a
 knot.  Remember, the decls aren't necessarily in dependency order --
 and even if they were, the type decls might be mutually recursive.
+-}
 
-\begin{code}
 typecheckIface :: ModIface      -- Get the decls from here
                -> TcRnIf gbl lcl ModDetails
 typecheckIface iface
@@ -306,16 +305,15 @@ typecheckIface iface
                               , md_exports   = exports
                               }
     }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Type and class declarations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcHiBootIface :: HscSource -> Module -> TcRn ModDetails
 -- Load the hi-boot iface for the module being compiled,
 -- if it indeed exists in the transitive closure of imports
@@ -384,14 +382,13 @@ tcHiBootIface hsc_src mod
 
     elaborate err = hang (ptext (sLit "Could not find hi-boot interface for") <+>
                           quotes (ppr mod) <> colon) 4 err
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Type and class declarations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 When typechecking a data type decl, we *lazily* (via forkM) typecheck
 the constructor argument types.  This is in the hope that we may never
@@ -435,9 +432,8 @@ type envt by accident, because they look at it later.
 
 What this means is that the implicitTyThings MUST NOT DEPEND on any of
 the forkM stuff.
+-}
 
-
-\begin{code}
 tcIfaceDecl :: Bool     -- True <=> discard IdInfo on IfaceId bindings
             -> IfaceDecl
             -> IfL TyThing
@@ -706,8 +702,8 @@ tcIfaceEqSpec spec
     do_item (occ, if_ty) = do { tv <- tcIfaceTyVar occ
                               ; ty <- tcIfaceType if_ty
                               ; return (tv,ty) }
-\end{code}
 
+{-
 Note [Synonym kind loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Notice that we eagerly grab the *kind* from the interface file, but
@@ -726,13 +722,13 @@ be defined, and we must not do that until we've finished with M.T.
 Solution: record S's kind in the interface file; now we can safely
 look at it.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Instances
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
@@ -751,20 +747,19 @@ tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
          ; let axiom'' = toUnbranchedAxiom axiom'
                mb_tcs' = map (fmap ifaceTyConName) mb_tcs
          ; return (mkImportedFamInst fam mb_tcs' axiom'') }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Rules
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We move a IfaceRule from eps_rules to eps_rule_base when all its LHS free vars
 are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
+-}
 
-\begin{code}
 tcIfaceRules :: Bool            -- True <=> ignore rules
              -> [IfaceRule]
              -> IfL [CoreRule]
@@ -805,16 +800,15 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Annotations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceAnnotations :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceAnnotations = mapM tcIfaceAnnotation
 
@@ -833,16 +827,14 @@ tcIfaceAnnTarget (NamedTarget occ) = do
 tcIfaceAnnTarget (ModuleTarget mod) = do
     return $ ModuleTarget mod
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Vectorisation information
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- We need access to the type environment as we need to look up information about type constructors
 -- (i.e., their data constructors and whether they are class type constructors).  If a vectorised
 -- type constructor or class is defined in the same module as where it is vectorised, we cannot
@@ -962,15 +954,15 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                }
 
         notATyConErr = pprPanic "TcIface.tcIfaceVectInfo: not a tycon" (ppr name)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Types
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)         = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
 tcIfaceType (IfaceAppTy t1 t2)     = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
@@ -1015,16 +1007,15 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
 tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo (IfaceReflCo r t)         = mkReflCo r <$> tcIfaceType t
 tcIfaceCo (IfaceFunCo r c1 c2)      = mkFunCo r <$> tcIfaceCo c1 <*> tcIfaceCo c2
@@ -1061,16 +1052,15 @@ tcIfaceCoAxiomRule n =
   case Map.lookup n typeNatCoAxiomRules of
     Just ax -> return ax
     _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         Core
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceExpr :: IfaceExpr -> IfL CoreExpr
 tcIfaceExpr (IfaceType ty)
   = Type <$> tcIfaceType ty
@@ -1247,16 +1237,15 @@ tcIfaceDataAlt con inst_tys arg_strs rhs
                   extendIfaceIdEnv arg_ids      $
                   tcIfaceExpr rhs
         ; return (DataAlt con, ex_tvs ++ arg_ids, rhs') }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 IdInfo
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
 tcIdDetails ty (IfDFunId ns)
@@ -1291,9 +1280,7 @@ tcIdInfo ignore_prags name ty info
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
            ; return (info1 `setUnfoldingInfoLazily` unf) }
-\end{code}
 
-\begin{code}
 tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding name _ info (IfCoreUnfold stable if_expr)
   = do  { dflags <- getDynFlags
@@ -1333,12 +1320,12 @@ tcUnfolding name dfun_ty _ (IfDFunUnfold bs ops)
   where
     doc = text "Class ops for dfun" <+> ppr name
     (_, _, cls, _) = tcSplitDFunTy dfun_ty
-\end{code}
 
+{-
 For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
+-}
 
-\begin{code}
 tcPragExpr :: Name -> IfaceExpr -> IfL (Maybe CoreExpr)
 tcPragExpr name expr
   = forkM_maybe doc $ do
@@ -1370,17 +1357,15 @@ tcPragExpr name expr
              ; return (varEnvElts (if_tv_env lcl_env) ++
                        varEnvElts (if_id_env lcl_env) ++
                        rec_ids) }
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Getting from Names to TyThings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
   | Just thing <- wiredInNameTyThing_maybe name
@@ -1461,15 +1446,15 @@ tcIfaceExtId name = do { thing <- tcIfaceGlobal name
                        ; case thing of
                           AnId id -> return id
                           _       -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Bindings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 bindIfaceBndr :: IfaceBndr -> (CoreBndr -> IfL a) -> IfL a
 bindIfaceBndr (IfaceIdBndr (fs, ty)) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
@@ -1532,4 +1517,3 @@ bindIfaceTyVars_AT (b@(tv_occ,_) : bs) thing_inside
        ; bind_b $ \b' ->
          bindIfaceTyVars_AT bs $ \bs' ->
          thing_inside (b':bs') }
-\end{code}
