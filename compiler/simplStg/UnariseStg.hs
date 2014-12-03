@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-2012
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-2012
+
 
 Note [Unarisation]
 ~~~~~~~~~~~~~~~~~~
@@ -25,8 +25,8 @@ Because of unarisation, the arity that will be recorded in the generated info ta
 for an Id may be larger than the idArity. Instead we record what we call the RepArity,
 which is the Arity taking into account any expanded arguments, and corresponds to
 the number of (possibly-void) *registers* arguments will arrive in.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module UnariseStg (unarise) where
@@ -69,13 +69,13 @@ unarise us binds = zipWith (\us -> unariseBinding us init_env) (listSplitUniqSup
 unariseBinding :: UniqSupply -> UnariseEnv -> StgBinding -> StgBinding
 unariseBinding us rho bind = case bind of
   StgNonRec x rhs -> StgNonRec x (unariseRhs us rho rhs)
-  StgRec xrhss    -> StgRec $ zipWith (\us (x, rhs) -> (x, unariseRhs us rho rhs)) 
+  StgRec xrhss    -> StgRec $ zipWith (\us (x, rhs) -> (x, unariseRhs us rho rhs))
                                       (listSplitUniqSupply us) xrhss
 
 unariseRhs :: UniqSupply -> UnariseEnv -> StgRhs -> StgRhs
 unariseRhs us rho rhs = case rhs of
   StgRhsClosure ccs b_info fvs update_flag srt args expr
-    -> StgRhsClosure ccs b_info (unariseIds rho fvs) update_flag 
+    -> StgRhsClosure ccs b_info (unariseIds rho fvs) update_flag
                      (unariseSRT rho srt) args' (unariseExpr us' rho' expr)
     where (us', rho', args') = unariseIdBinders us rho args
   StgRhsCon ccs con args
@@ -86,21 +86,21 @@ unariseExpr :: UniqSupply -> UnariseEnv -> StgExpr -> StgExpr
 unariseExpr _ rho (StgApp f args)
   | null args
   , UbxTupleRep tys <- repType (idType f)
-  =  -- Particularly important where (##) is concerned 
+  =  -- Particularly important where (##) is concerned
      -- See Note [Nullary unboxed tuple]
-    StgConApp (tupleCon UnboxedTuple (length tys)) 
+    StgConApp (tupleCon UnboxedTuple (length tys))
               (map StgVarArg (unariseId rho f))
 
   | otherwise
   = StgApp f (unariseArgs rho args)
 
-unariseExpr _ _ (StgLit l) 
+unariseExpr _ _ (StgLit l)
   = StgLit l
 
 unariseExpr _ rho (StgConApp dc args)
   | isUnboxedTupleCon dc = StgConApp (tupleCon UnboxedTuple (length args')) args'
   | otherwise            = StgConApp dc args'
-  where 
+  where
     args' = unariseArgs rho args
 
 unariseExpr _ rho (StgOpApp op args ty)
@@ -108,26 +108,26 @@ unariseExpr _ rho (StgOpApp op args ty)
 
 unariseExpr us rho (StgLam xs e)
   = StgLam xs' (unariseExpr us' rho' e)
-  where 
+  where
     (us', rho', xs') = unariseIdBinders us rho xs
 
 unariseExpr us rho (StgCase e case_lives alts_lives bndr srt alt_ty alts)
-  = StgCase (unariseExpr us1 rho e) (unariseLives rho case_lives) 
-            (unariseLives rho alts_lives) bndr (unariseSRT rho srt) 
+  = StgCase (unariseExpr us1 rho e) (unariseLives rho case_lives)
+            (unariseLives rho alts_lives) bndr (unariseSRT rho srt)
             alt_ty' alts'
- where 
+ where
     (us1, us2) = splitUniqSupply us
     (alt_ty', alts') = unariseAlts us2 rho alt_ty bndr (repType (idType bndr)) alts
 
 unariseExpr us rho (StgLet bind e)
   = StgLet (unariseBinding us1 rho bind) (unariseExpr us2 rho e)
-  where 
+  where
     (us1, us2) = splitUniqSupply us
 
 unariseExpr us rho (StgLetNoEscape live_in_let live_in_bind bind e)
-  = StgLetNoEscape (unariseLives rho live_in_let) (unariseLives rho live_in_bind) 
+  = StgLetNoEscape (unariseLives rho live_in_let) (unariseLives rho live_in_bind)
                    (unariseBinding us1 rho bind) (unariseExpr us2 rho e)
-  where 
+  where
     (us1, us2) = splitUniqSupply us
 
 unariseExpr us rho (StgSCC cc bump_entry push_cc e)
@@ -137,19 +137,19 @@ unariseExpr us rho (StgTick mod tick_n e)
 
 ------------------------
 unariseAlts :: UniqSupply -> UnariseEnv -> AltType -> Id -> RepType -> [StgAlt] -> (AltType, [StgAlt])
-unariseAlts us rho alt_ty _ (UnaryRep _) alts 
+unariseAlts us rho alt_ty _ (UnaryRep _) alts
   = (alt_ty, zipWith (\us alt -> unariseAlt us rho alt) (listSplitUniqSupply us) alts)
 
 unariseAlts us rho _ bndr (UbxTupleRep tys) ((DEFAULT, [], [], e) : _)
   = (UbxTupAlt n, [(DataAlt (tupleCon UnboxedTuple n), ys, uses, unariseExpr us2' rho' e)])
-  where 
+  where
     (us2', rho', ys) = unariseIdBinder us rho bndr
     uses = replicate (length ys) (not (isDeadBinder bndr))
     n = length tys
 
-unariseAlts us rho _ bndr (UbxTupleRep _) [(DataAlt _, ys, uses, e)] 
+unariseAlts us rho _ bndr (UbxTupleRep _) [(DataAlt _, ys, uses, e)]
   = (UbxTupAlt n, [(DataAlt (tupleCon UnboxedTuple n), ys', uses', unariseExpr us2' rho'' e)])
-  where 
+  where
     (us2', rho', ys', uses') = unariseUsedIdBinders us rho ys uses
     rho'' = extendVarEnv rho' bndr ys'
     n = length ys'
@@ -159,9 +159,9 @@ unariseAlts _ _ _ _ (UbxTupleRep _) alts
 
 --------------------------
 unariseAlt :: UniqSupply -> UnariseEnv -> StgAlt -> StgAlt
-unariseAlt us rho (con, xs, uses, e) 
+unariseAlt us rho (con, xs, uses, e)
   = (con, xs', uses', unariseExpr us' rho' e)
-  where 
+  where
     (us', rho', xs', uses') = unariseUsedIdBinders us rho xs uses
 
 ------------------------
@@ -184,9 +184,9 @@ unariseIds :: UnariseEnv -> [Id] -> [Id]
 unariseIds rho = concatMap (unariseId rho)
 
 unariseId :: UnariseEnv -> Id -> [Id]
-unariseId rho x 
+unariseId rho x
   | Just ys <- lookupVarEnv rho x
-  = ASSERT2( case repType (idType x) of UbxTupleRep _ -> True; _ -> x == ubxTupleId0 
+  = ASSERT2( case repType (idType x) of UbxTupleRep _ -> True; _ -> x == ubxTupleId0
            , text "unariseId: not unboxed tuple" <+> ppr x )
     ys
 
@@ -195,9 +195,9 @@ unariseId rho x
            , text "unariseId: was unboxed tuple" <+> ppr x )
     [x]
 
-unariseUsedIdBinders :: UniqSupply -> UnariseEnv -> [Id] -> [Bool] 
+unariseUsedIdBinders :: UniqSupply -> UnariseEnv -> [Id] -> [Bool]
                      -> (UniqSupply, UnariseEnv, [Id], [Bool])
-unariseUsedIdBinders us rho xs uses 
+unariseUsedIdBinders us rho xs uses
   = case mapAccumL2 do_one us rho (zipEqual "unariseUsedIdBinders" xs uses) of
       (us', rho', xs_usess) -> uncurry ((,,,) us' rho') (unzip (concat xs_usess))
   where
@@ -220,4 +220,3 @@ unboxedTupleBindersFrom us x tys = zipWith (mkSysLocal fs) (uniqsFromSupply us) 
 
 concatMapVarSet :: (Var -> [Var]) -> VarSet -> VarSet
 concatMapVarSet f xs = mkVarSet [x' | x <- varSetElems xs, x' <- f x]
-\end{code}

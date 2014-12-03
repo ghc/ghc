@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[StgStats]{Gathers statistical information about programs}
 
 
@@ -19,8 +19,8 @@ The program gather statistics about
 %\item number of top-level CAFs
 \item number of constructors
 \end{enumerate}
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module StgStats ( showStgStats ) where
@@ -34,9 +34,7 @@ import Panic
 
 import Data.Map (Map)
 import qualified Data.Map as Map
-\end{code}
 
-\begin{code}
 data CounterType
   = Literals
   | Applications
@@ -53,9 +51,7 @@ data CounterType
 
 type Count      = Int
 type StatEnv    = Map CounterType Count
-\end{code}
 
-\begin{code}
 emptySE :: StatEnv
 emptySE = Map.empty
 
@@ -70,15 +66,15 @@ countOne c = Map.singleton c 1
 
 countN :: CounterType -> Int -> StatEnv
 countN = Map.singleton
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Top-level list of bindings (a ``program'')}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 showStgStats :: [StgBinding] -> String
 
 showStgStats prog
@@ -107,15 +103,15 @@ gatherStgStats :: [StgBinding] -> StatEnv
 
 gatherStgStats binds
   = combineSEs (map (statBinding True{-top-level-}) binds)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Bindings}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 statBinding :: Bool -- True <=> top-level; False <=> nested
             -> StgBinding
             -> StatEnv
@@ -140,15 +136,15 @@ statRhs top (_, StgRhsClosure _ _ fv u _ _ body)
         Updatable   -> UpdatableBinds   top
         SingleEntry -> SingleEntryBinds top
     )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 statExpr :: StgExpr -> StatEnv
 
 statExpr (StgApp _ _)     = countOne Applications
@@ -176,5 +172,3 @@ statExpr (StgCase expr _ _ _ _ _ alts)
         = combineSEs (map statExpr [ e | (_,_,_,e) <- alts ])
 
 statExpr (StgLam {}) = panic "statExpr StgLam"
-\end{code}
-

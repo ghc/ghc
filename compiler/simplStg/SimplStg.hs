@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section[SimplStg]{Driver for simplifying @STG@ programs}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[SimplStg]{Driver for simplifying @STG@ programs}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module SimplStg ( stg2stg ) where
@@ -25,9 +25,7 @@ import SrcLoc
 import UniqSupply       ( mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
-\end{code}
 
-\begin{code}
 stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> Module                    -- module name (profiling only)
         -> [StgBinding]              -- input...
@@ -89,4 +87,3 @@ stg2stg dflags module_name binds
             --         UniqueSupply for the next guy to use
             --         cost-centres to be declared/registered (specialised)
             --         add to description of what's happened (reverse order)
-\end{code}
