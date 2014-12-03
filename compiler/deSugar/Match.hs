@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 The @match@ function
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat ) where
@@ -48,16 +48,16 @@ import FastString
 
 import Control.Monad( when )
 import qualified Data.Map as Map
-\end{code}
 
+{-
 This function is a wrapper of @match@, it must be called from all the parts where
 it was called match, but only substitutes the first call, ....
 if the associated flags are declared, warnings will be issued.
 It can not be called matchWrapper because this name already exists :-(
 
 JJCQ 30-Nov-1997
+-}
 
-\begin{code}
 matchCheck ::  DsMatchContext
             -> [Id]             -- Vars rep'ing the exprs we're matching with
             -> Type             -- Type of the case expression
@@ -102,21 +102,19 @@ matchCheck_really dflags ctx@(DsMatchContext hs_ctx _) vars ty qs
                                            -- in list comprehensions, pattern guards
                                            -- etc.  They are often *supposed* to be
                                            -- incomplete
-\end{code}
 
+{-
 This variable shows the maximum number of lines of output generated for warnings.
 It will limit the number of patterns/equations displayed to@ maximum_output@.
 
 (ToDo: add command-line option?)
+-}
 
-\begin{code}
 maximum_output :: Int
 maximum_output = 4
-\end{code}
 
-The next two functions create the warning message.
+-- The next two functions create the warning message.
 
-\begin{code}
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
 dsShadowWarn ctx@(DsMatchContext kind loc) qs
   = putSrcSpanDs loc (warnDs warn)
@@ -171,14 +169,13 @@ ppr_constraint (var,pats) = sep [ppr var, ptext (sLit "`notElem`"), ppr pats]
 
 ppr_eqn :: (SDoc -> SDoc) -> HsMatchContext Name -> EquationInfo -> SDoc
 ppr_eqn prefixF kind eqn = prefixF (ppr_shadow_pats kind (eqn_pats eqn))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 The main matching function
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The function @match@ is basically the same as in the Wadler chapter,
 except it is monadised, to carry around the name supply, info about
@@ -276,8 +273,8 @@ constructors, or all variables (or similar beasts), etc.
 @match_unmixed_eqn_blks@ simply takes the place of the @foldr@ in the
 Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
 corresponds roughly to @matchVarCon@.
+-}
 
-\begin{code}
 match :: [Id]             -- Variables rep\'ing the exprs we\'re matching with
       -> Type             -- Type of the case expression
       -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
@@ -420,8 +417,8 @@ getViewPat (ViewPat _ pat _) = unLoc pat
 getViewPat _                 = panic "getViewPat"
 getOLPat (ListPat pats ty (Just _)) = ListPat pats ty Nothing
 getOLPat _                   = panic "getOLPat"
-\end{code}
 
+{-
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The list of EquationInfo can be empty, arising from
@@ -440,11 +437,11 @@ case we want to see that "hello" exception, not (error "empty case").
 See also Note [Case elimination: lifted case] in Simplify.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Tidying patterns
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
 which will be scrutinised.  This means:
@@ -480,8 +477,8 @@ Float,  Double, at least) are converted to unboxed form; e.g.,
 (ConPat I# _ _ [LitPat (HsIntPrim i)])
 \end{verbatim}
 \end{description}
+-}
 
-\begin{code}
 tidyEqnInfo :: Id -> EquationInfo
             -> DsM (DsWrapper, EquationInfo)
         -- DsM'd because of internal call to dsLHsBinds
@@ -633,7 +630,7 @@ push_bang_into_newtype_arg :: SrcSpan -> HsConPatDetails Id -> HsConPatDetails I
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l (PrefixCon (arg:args))
-  = ASSERT( null args) 
+  = ASSERT( null args)
     PrefixCon [L l (BangPat arg)]
 push_bang_into_newtype_arg l (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
@@ -642,8 +639,8 @@ push_bang_into_newtype_arg l (RecCon rf)
     RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg = L l (BangPat arg) })] })
 push_bang_into_newtype_arg _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
-\end{code}
 
+{-
 Note [Bang patterns and newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the pattern  !(Just pat)  we can discard the bang, because
@@ -681,11 +678,11 @@ evaluation of \tr{e}.  An alternative translation (No.~2):
 ]
 \end{verbatim}
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection[improved-unmixing]{UNIMPLEMENTED idea for improved unmixing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We might be able to optimise unmixing when confronted by
 only-one-constructor-possible, of which tuples are the most notable
@@ -721,11 +718,11 @@ Need to make sure the right names get bound for the variable patterns.
 Presumably just a variant on the constructor case (as it is now).
 \end{description}
 
-%************************************************************************
-%*                                                                      *
-%*  matchWrapper: a convenient way to call @match@                      *
-%*                                                                      *
-%************************************************************************
+************************************************************************
+*                                                                      *
+*  matchWrapper: a convenient way to call @match@                      *
+*                                                                      *
+************************************************************************
 \subsection[matchWrapper]{@matchWrapper@: a convenient interface to @match@}
 
 Calls to @match@ often involve similar (non-trivial) work; that work
@@ -764,13 +761,13 @@ by examining one of the RHS expressions in one of the @EquationInfo@s.
 \item
 Call @match@ with all of this information!
 \end{enumerate}
+-}
 
-\begin{code}
 matchWrapper :: HsMatchContext Name         -- For shadowing warning messages
              -> MatchGroup Id (LHsExpr Id)  -- Matches being desugared
              -> DsM ([Id], CoreExpr)        -- Results
-\end{code}
 
+{-
  There is one small problem with the Lambda Patterns, when somebody
  writes something similar to:
 \begin{verbatim}
@@ -792,8 +789,8 @@ due to the fact that lambda patterns can have more than
 one pattern, and match simply only accepts one pattern.
 
 JJQC 30-Nov-1997
+-}
 
-\begin{code}
 matchWrapper ctxt (MG { mg_alts = matches
                       , mg_arg_tys = arg_tys
                       , mg_res_ty = rhs_ty
@@ -828,19 +825,19 @@ matchEquations ctxt vars eqns_info rhs_ty
 
         ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
         ; extractMatchResult match_result fail_expr }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[matchSimply]{@matchSimply@: match a single expression against a single pattern}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @mkSimpleMatch@ is a wrapper for @match@ which deals with the
 situation where we want to match a single expression against a single
 pattern. It returns an expression.
+-}
 
-\begin{code}
 matchSimply :: CoreExpr                 -- Scrutinee
             -> HsMatchContext Name      -- Match kind
             -> LPat Id                  -- Pattern it should match
@@ -871,16 +868,15 @@ matchSinglePat scrut hs_ctx pat ty match_result
   = do { var <- selectSimpleMatchVarL pat
        ; match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Pattern classification
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data PatGroup
   = PgAny               -- Immediate match: variables, wildcards,
                         --                  lazy patterns
@@ -923,17 +919,16 @@ subGroup group
 
     -- pg_map :: Map a [EquationInfo]
     -- Equations seen so far in reverse order of appearance
-\end{code}
 
+{-
 Note [Take care with pattern order]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the subGroup function we must be very careful about pattern re-ordering,
 Consider the patterns [ (True, Nothing), (False, x), (True, y) ]
 Then in bringing together the patterns for True, we must not
 swap the Nothing and y!
+-}
 
-
-\begin{code}
 sameGroup :: PatGroup -> PatGroup -> Bool
 -- Same group means that a single case expression
 -- or test will suffice to match both, *and* the order
@@ -1073,8 +1068,8 @@ patGroup _      (CoPat _ p _)                 = PgCo  (hsPatType p) -- Type of i
 patGroup _      (ViewPat expr p _)            = PgView expr (hsPatType (unLoc p))
 patGroup _      (ListPat _ _ (Just _))        = PgOverloadedList
 patGroup _      pat                           = pprPanic "patGroup" (ppr pat)
-\end{code}
 
+{-
 Note [Grouping overloaded literal patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 WATCH OUT!  Consider
@@ -1092,4 +1087,4 @@ If the first arg matches '1' but the second does not match 'True', we
 cannot jump to the third equation!  Because the same argument might
 match '2'!
 Hence we don't regard 1 and 2, or (n+1) and (n+2), as part of the same group.
-
+-}

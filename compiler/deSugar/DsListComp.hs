@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Desugaring list comprehensions, monad comprehensions and array comprehensions
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, NamedFieldPuns #-}
 
 module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
@@ -35,15 +35,15 @@ import FastString
 import TcType
 import ListSetOps( getNth )
 import Util
-\end{code}
 
+{-
 List comprehensions may be desugared in one of two ways: ``ordinary''
 (as you would expect if you read SLPJ's book) and ``with foldr/build
 turned on'' (if you read Gill {\em et al.}'s paper on the subject).
 
 There will be at least one ``qualifier'' in the input.
+-}
 
-\begin{code}
 dsListComp :: [ExprLStmt Id]
            -> Type              -- Type of entire list
            -> DsM CoreExpr
@@ -137,13 +137,13 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
     return (bound_unzipped_inner_list_expr, pat)
 
 dsTransStmt _ = panic "dsTransStmt: Not given a TransStmt"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DsListComp-ordinary]{Ordinary desugaring of list comprehensions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Just as in Phil's chapter~7 in SLPJ, using the rules for
 optimally-compiled list comprehensions.  This is what Kevin followed
@@ -202,8 +202,7 @@ don't have to deal with arbitrary limits on the number of zip functions in the
 prelude, nor which library the zip function came from.
 The introduced tuples are Boxed, but only because I couldn't get it to work
 with the Unboxed variety.
-
-\begin{code}
+-}
 
 deListComp :: [ExprStmt Id] -> CoreExpr -> DsM CoreExpr
 
@@ -251,10 +250,7 @@ deListComp (ParStmt stmtss_w_bndrs _ _ : quals) list
         pats = map mkBigLHsVarPatTup bndrs_s
 
 deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
-\end{code}
 
-
-\begin{code}
 deBindComp :: OutPat Id
            -> CoreExpr
            -> [ExprStmt Id]
@@ -288,13 +284,13 @@ deBindComp pat core_list1 quals core_list2 = do
                         -- Increasing order of tag
 
     return (Let (Rec [(h, rhs)]) letrec_body)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DsListComp-foldr-build]{Foldr/Build desugaring of list comprehensions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @dfListComp@ are the rules used with foldr/build turned on:
 
@@ -308,8 +304,8 @@ TE[ e | p <- l , q ] c n = let
                            in
                            foldr f n l
 \end{verbatim}
+-}
 
-\begin{code}
 dfListComp :: Id -> Id      -- 'c' and 'n'
         -> [ExprStmt Id]    -- the rest of the qual's
         -> DsM CoreExpr
@@ -368,15 +364,14 @@ dfBindComp c_id n_id (pat, core_list1) quals = do
 
     -- now build the outermost foldr, and return
     mkFoldrExpr x_ty b_ty (mkLams [x, b] core_expr) (Var n_id) core_list1
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DsFunGeneration]{Generation of zip/unzip functions for use in desugaring}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 -- mkZipBind [t1, t2]
@@ -456,15 +451,14 @@ mkUnzipBind _ elt_tys
     unzip_fn_ty        = elt_tuple_list_ty `mkFunTy` elt_list_tuple_ty
 
     mkConcatExpression (list_element_ty, head, tail) = mkConsExpr list_element_ty head tail
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[DsPArrComp]{Desugaring of array comprehensions}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- entry point for desugaring a parallel array comprehension
 --
@@ -658,11 +652,9 @@ parrElemType e  =
     Just (tycon, [ty]) | tycon == parrTyCon -> ty
     _                                                     -> panic
       "DsListComp.parrElemType: not a parallel array type"
-\end{code}
 
-Translation for monad comprehensions
+-- Translation for monad comprehensions
 
-\begin{code}
 -- Entry point for monad comprehension desugaring
 dsMonadComp :: [ExprLStmt Id] -> DsM CoreExpr
 dsMonadComp stmts = dsMcStmts stmts
@@ -780,7 +772,7 @@ dsMcStmt (ParStmt blocks mzip_op bind_op) stmts_rest
 
        ; dsMcBindStmt pat rhs bind_op noSyntaxExpr stmts_rest }
   where
-    ds_inner (ParStmtBlock stmts bndrs return_op) 
+    ds_inner (ParStmtBlock stmts bndrs return_op)
        = do { exp <- dsInnerMonadComp stmts bndrs return_op
             ; return (exp, mkBigCoreVarTupTy bndrs) }
 
@@ -877,4 +869,3 @@ mkMcUnzipM _ fmap_op ys elt_tys
                         mkTupleSelector xs (getNth xs n) tup_xs (Var tup_xs)
 
        ; return (mkBigCoreTup (map mk_elt [0..length elt_tys - 1])) }
-\end{code}

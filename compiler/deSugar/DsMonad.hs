@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 @DsMonad@: monadery used in desugaring
+-}
 
-\begin{code}
 {-# LANGUAGE FlexibleInstances #-}
 
 module DsMonad (
@@ -19,12 +19,12 @@ module DsMonad (
         newFailLocalDs, newPredVarDs,
         getSrcSpanDs, putSrcSpanDs,
         mkPrintUnqualifiedDs,
-        newUnique, 
+        newUnique,
         UniqSupply, newUniqueSupply,
         getGhcModeDs, dsGetFamInstEnvs,
         dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
-        
-        PArrBuiltin(..), 
+
+        PArrBuiltin(..),
         dsLookupDPHRdrEnv, dsLookupDPHRdrEnv_maybe,
         dsInitPArrBuiltin,
 
@@ -67,15 +67,15 @@ import Maybes
 
 import Data.IORef
 import Control.Monad
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Data types for the desugarer
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data DsMatchContext
   = DsMatchContext (HsMatchContext Name) SrcSpan
   deriving ()
@@ -110,20 +110,19 @@ data CanItFail = CanFail | CantFail
 orFail :: CanItFail -> CanItFail -> CanItFail
 orFail CantFail CantFail = CantFail
 orFail _        _        = CanFail
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Monad stuff
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
 a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
+-}
 
-\begin{code}
 type DsM result = TcRnIf DsGblEnv DsLclEnv result
 
 -- Compatibility functions
@@ -131,7 +130,7 @@ fixDs :: (a -> DsM a) -> DsM a
 fixDs    = fixM
 
 type DsWarning = (SrcSpan, SDoc)
-        -- Not quite the same as a WarnMsg, we have an SDoc here 
+        -- Not quite the same as a WarnMsg, we have an SDoc here
         -- and we'll do the print_unqual stuff later on to turn it
         -- into a Doc.
 
@@ -154,13 +153,13 @@ data PArrBuiltin
         , enumFromThenToPVar :: Var     -- ^ enumFromThenToP
         }
 
-data DsGblEnv 
+data DsGblEnv
         = DsGblEnv
         { ds_mod          :: Module             -- For SCC profiling
         , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
         , ds_unqual  :: PrintUnqualified
         , ds_msgs    :: IORef Messages          -- Warning messages
-        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global, 
+        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                                 -- possibly-imported things
         , ds_dph_env :: GlobalRdrEnv            -- exported entities of 'Data.Array.Parallel.Prim'
                                                 -- iff '-fvectorise' flag was given as well as
@@ -177,12 +176,12 @@ data DsLclEnv = DsLclEnv {
         ds_loc     :: SrcSpan           -- to put in pattern-matching error msgs
      }
 
--- Inside [| |] brackets, the desugarer looks 
+-- Inside [| |] brackets, the desugarer looks
 -- up variables in the DsMetaEnv
 type DsMetaEnv = NameEnv DsMetaVal
 
 data DsMetaVal
-   = Bound Id           -- Bound by a pattern inside the [| |]. 
+   = Bound Id           -- Bound by a pattern inside the [| |].
                         -- Will be dynamically alpha renamed.
                         -- The Id has type THSyntax.Var
 
@@ -205,7 +204,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
                             initDPHBuiltins $
                               tryM thing_inside     -- Catch exceptions (= errors during desugaring)
 
-        -- Display any errors and warnings 
+        -- Display any errors and warnings
         -- Note: if -Werror is used, we don't signal an error here.
         ; msgs <- readIORef msg_var
 
@@ -217,7 +216,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
                 -- a UserError exception.  Then it should have put an error
                 -- message in msg_var, so we just discard the exception
 
-        ; return (msgs, final_res) 
+        ; return (msgs, final_res)
         }
   where
     -- Extend the global environment with a 'GlobalRdrEnv' containing the exported entities of
@@ -235,7 +234,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
                       -> DsM GlobalRdrEnv     -- empty if condition 'False'
         loadOneModule modname check err
           = do { doLoad <- check
-               ; if not doLoad 
+               ; if not doLoad
                  then return emptyGlobalRdrEnv
                  else do {
                ; result <- liftIO $ findImportedModule hsc_env modname Nothing
@@ -260,7 +259,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
 
     checkLoadDAP = do { paEnabled <- xoptM Opt_ParallelArrays
                       ; return $ paEnabled &&
-                                 mod /= gHC_PARR' && 
+                                 mod /= gHC_PARR' &&
                                  moduleName mod /= dATA_ARRAY_PARALLEL_NAME
                       }
                       -- do not load 'Data.Array.Parallel' iff compiling 'base:GHC.PArr' or a
@@ -313,46 +312,45 @@ loadModule doc mod
     imp_spec = ImpDeclSpec { is_mod = name, is_qual = True,
                              is_dloc = wiredInSrcSpan, is_as = name }
     name = moduleName mod
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Operations in the monad
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 And all this mysterious stuff is so we can occasionally reach out and
 grab one or more names.  @newLocalDs@ isn't exported---exported
 functions are defined with it.  The difference in name-strings makes
 it easier to read debugging output.
+-}
 
-\begin{code}
 -- Make a new Id with the same print name, but different type, and new unique
 newUniqueId :: Id -> Type -> DsM Id
 newUniqueId id = mkSysLocalM (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
-duplicateLocalDs old_local 
+duplicateLocalDs old_local
   = do  { uniq <- newUnique
         ; return (setIdUnique old_local uniq) }
 
 newPredVarDs :: PredType -> DsM Var
 newPredVarDs pred
  = newSysLocalDs pred
- 
+
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDs  = mkSysLocalM (fsLit "ds")
 newFailLocalDs = mkSysLocalM (fsLit "fail")
 
 newSysLocalsDs :: [Type] -> DsM [Id]
 newSysLocalsDs tys = mapM newSysLocalDs tys
-\end{code}
 
+{-
 We can also reach out and either set/grab location information from
 the @SrcSpan@ being carried around.
+-}
 
-\begin{code}
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
@@ -363,15 +361,15 @@ putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
 
 warnDs :: SDoc -> DsM ()
-warnDs warn = do { env <- getGblEnv 
+warnDs warn = do { env <- getGblEnv
                  ; loc <- getSrcSpanDs
                  ; dflags <- getDynFlags
                  ; let msg = mkWarnMsg dflags loc (ds_unqual env)  warn
                  ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 failWithDs :: SDoc -> DsM a
-failWithDs err 
-  = do  { env <- getGblEnv 
+failWithDs err
+  = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
         ; dflags <- getDynFlags
         ; let msg = mkErrMsg dflags loc (ds_unqual env) err
@@ -380,21 +378,19 @@ failWithDs err
 
 mkPrintUnqualifiedDs :: DsM PrintUnqualified
 mkPrintUnqualifiedDs = ds_unqual <$> getGblEnv
-\end{code}
 
-\begin{code}
 instance MonadThings (IOEnv (Env DsGblEnv DsLclEnv)) where
     lookupThing = dsLookupGlobal
 
 dsLookupGlobal :: Name -> DsM TyThing
 -- Very like TcEnv.tcLookupGlobal
-dsLookupGlobal name 
+dsLookupGlobal name
   = do  { env <- getGblEnv
         ; setEnvs (ds_if_env env)
                   (tcIfaceGlobal name) }
 
 dsLookupGlobalId :: Name -> DsM Id
-dsLookupGlobalId name 
+dsLookupGlobalId name
   = tyThingId <$> dsLookupGlobal name
 
 -- |Get a name from "Data.Array.Parallel" for the desugarer, from the 'ds_parr_bi' component of the
@@ -410,10 +406,6 @@ dsLookupTyCon name
 dsLookupDataCon :: Name -> DsM DataCon
 dsLookupDataCon name
   = tyThingDataCon <$> dsLookupGlobal name
-\end{code}
-
-\begin{code}
-
 
 -- |Lookup a name exported by 'Data.Array.Parallel.Prim' or 'Data.Array.Parallel.Prim'.
 --  Panic if there isn't one, or if it is defined multiple times.
@@ -477,9 +469,7 @@ dsInitPArrBuiltin thing_inside
     externalVar fs = dsLookupDPHRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
 
     arithErr = panic "Arithmetic sequences have to wait until we support type classes"
-\end{code}
 
-\begin{code}
 dsGetFamInstEnvs :: DsM FamInstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
@@ -496,9 +486,7 @@ dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (ds_meta env
 dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
 dsExtendMetaEnv menv thing_inside
   = updLclEnv (\env -> env { ds_meta = ds_meta env `plusNameEnv` menv }) thing_inside
-\end{code}
 
-\begin{code}
 discardWarningsDs :: DsM a -> DsM a
 -- Ignore warnings inside the thing inside;
 -- used to ignore inaccessable cases etc. inside generated code
@@ -512,4 +500,3 @@ discardWarningsDs thing_inside
         ; writeTcRef (ds_msgs env) old_msgs
 
         ; return result }
-\end{code}

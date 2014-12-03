@@ -1,4 +1,3 @@
-\begin{code}
 module Match where
 import Var      ( Id )
 import TcType   ( Type )
@@ -32,4 +31,3 @@ matchSinglePat
         -> Type
         -> MatchResult
         -> DsM MatchResult
-\end{code}

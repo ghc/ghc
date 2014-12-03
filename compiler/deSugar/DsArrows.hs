@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Desugaring arrow commands
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module DsArrows ( dsProcExpr ) where
@@ -48,9 +48,7 @@ import SrcLoc
 import ListSetOps( assocDefault )
 import FastString
 import Data.List
-\end{code}
 
-\begin{code}
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
     }
@@ -137,12 +135,12 @@ mkSndExpr a_ty b_ty = do
     pair_var <- newSysLocalDs (mkCorePairTy a_ty b_ty)
     return (Lam pair_var
                (coreCasePair pair_var a_var b_var (Var b_var)))
-\end{code}
 
+{-
 Build case analysis of a tuple.  This cannot be done in the DsM monad,
 because the list of variables is typically not yet defined.
+-}
 
-\begin{code}
 -- coreCaseTuple [u1..] v [x1..xn] body
 --      = case v of v { (x1, .., xn) -> body }
 -- But the matching may be nested if the tuple is very big
@@ -155,9 +153,7 @@ coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
 coreCasePair scrut_var var1 var2 body
   = Case (Var scrut_var) scrut_var (exprType body)
          [(DataAlt (tupleCon BoxedTuple 2), [var1, var2], body)]
-\end{code}
 
-\begin{code}
 mkCorePairTy :: Type -> Type -> Type
 mkCorePairTy t1 t2 = mkBoxedTupleTy [t1, t2]
 
@@ -166,8 +162,8 @@ mkCorePairExpr e1 e2 = mkCoreTup [e1, e2]
 
 mkCoreUnitExpr :: CoreExpr
 mkCoreUnitExpr = mkCoreTup []
-\end{code}
 
+{-
 The input is divided into a local environment, which is a flat tuple
 (unless it's too big), and a stack, which is a right-nested pair.
 In general, the input has the form
@@ -176,8 +172,8 @@ In general, the input has the form
 
 where xi are the environment values, and si the ones on the stack,
 with s1 being the "top", the first one to be matched with a lambda.
+-}
 
-\begin{code}
 envStackType :: [Id] -> Type -> Type
 envStackType ids stack_ty = mkCorePairTy (mkBigCoreVarTupTy ids) stack_ty
 
@@ -250,17 +246,12 @@ matchVarStack (param_id:param_ids) stack_id body = do
     (tail_id, tail_code) <- matchVarStack param_ids stack_id body
     pair_id <- newSysLocalDs (mkCorePairTy (idType param_id) (idType tail_id))
     return (pair_id, coreCasePair pair_id param_id tail_id tail_code)
-\end{code}
 
-\begin{code}
 mkHsEnvStackExpr :: [Id] -> Id -> LHsExpr Id
 mkHsEnvStackExpr env_ids stack_id
   = mkLHsTupleExpr [mkLHsVarTuple env_ids, nlHsVar stack_id]
-\end{code}
 
-Translation of arrow abstraction
-
-\begin{code}
+-- Translation of arrow abstraction
 
 -- D; xs |-a c : () --> t'      ---> c'
 -- --------------------------
@@ -287,8 +278,8 @@ dsProcExpr pat (L _ (HsCmdTop cmd _unitTy cmd_ty ids)) = do
                     (Lam var match_code)
                     core_cmd
     return (mkLets meth_binds proc_code)
-\end{code}
 
+{-
 Translation of a command judgement of the form
 
         D; xs |-a c : stk --> t
@@ -296,8 +287,8 @@ Translation of a command judgement of the form
 to an expression e such that
 
         D |- e :: a (xs, stk) t
+-}
 
-\begin{code}
 dsLCmd :: DsCmdEnv -> IdSet -> Type -> Type -> LHsCmd Id -> [Id]
        -> DsM (CoreExpr, IdSet)
 dsLCmd ids local_vars stk_ty res_ty cmd env_ids
@@ -483,8 +474,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
                 core_if
                 (do_choice ids then_ty else_ty res_ty core_then core_else),
         fvs_cond `unionVarSet` fvs_then `unionVarSet` fvs_else)
-\end{code}
 
+{-
 Case commands are treated in much the same way as if commands
 (see above) except that there are more alternatives.  For example
 
@@ -509,8 +500,8 @@ case bodies, containing the following fields:
    input type of the arrow
  * a CoreExpr for an arrow built by combining the translated command
    bodies with |||.
+-}
 
-\begin{code}
 dsCmd ids local_vars stack_ty res_ty
       (HsCmdCase exp (MG { mg_alts = matches, mg_arg_tys = arg_tys, mg_origin = origin }))
       env_ids = do
@@ -678,13 +669,11 @@ trimInput build_arrow
         (core_cmd, free_vars) <- build_arrow env_ids
         return (core_cmd, free_vars, varSetElems free_vars))
 
-\end{code}
-
+{-
 Translation of command judgements of the form
 
         D |-a do { ss } : t
-
-\begin{code}
+-}
 
 dsCmdDo :: DsCmdEnv             -- arrow combinators
         -> IdSet                -- set of local vars available to this statement
@@ -731,11 +720,12 @@ dsCmdDo ids local_vars res_ty (stmt:stmts) env_ids = do
                 core_stmts,
               fv_stmt)
 
-\end{code}
+{-
 A statement maps one local environment to another, and is represented
 as an arrow from one tuple type to another.  A statement sequence is
 translated to a composition of such arrows.
-\begin{code}
+-}
+
 dsCmdLStmt :: DsCmdEnv -> IdSet -> [Id] -> CmdLStmt Id -> [Id]
            -> DsM (CoreExpr, IdSet)
 dsCmdLStmt ids local_vars out_ids cmd env_ids
@@ -994,10 +984,10 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
 
     return (core_loop, env1_id_set, env1_ids)
 
-\end{code}
+{-
 A sequence of statements (as in a rec) is desugared to an arrow between
 two environments (no stack)
-\begin{code}
+-}
 
 dsfixCmdStmts
         :: DsCmdEnv             -- arrow combinators
@@ -1038,11 +1028,9 @@ dsCmdStmts ids local_vars out_ids (stmt:stmts) env_ids = do
               fv_stmt)
 
 dsCmdStmts _ _ _ [] _ = panic "dsCmdStmts []"
-\end{code}
 
-Match a list of expressions against a list of patterns, left-to-right.
+-- Match a list of expressions against a list of patterns, left-to-right.
 
-\begin{code}
 matchSimplys :: [CoreExpr]              -- Scrutinees
              -> HsMatchContext Name     -- Match kind
              -> [LPat Id]               -- Patterns they should match
@@ -1054,11 +1042,9 @@ matchSimplys (exp:exps) ctxt (pat:pats) result_expr fail_expr = do
     match_code <- matchSimplys exps ctxt pats result_expr fail_expr
     matchSimply exp ctxt pat match_code fail_expr
 matchSimplys _ _ _ _ _ = panic "matchSimplys"
-\end{code}
 
-List of leaf expressions, with set of variables bound in each
+-- List of leaf expressions, with set of variables bound in each
 
-\begin{code}
 leavesMatch :: LMatch Id (Located (body Id)) -> [(Located (body Id), IdSet)]
 leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
   = let
@@ -1070,11 +1056,9 @@ leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
       mkVarSet (collectLStmtsBinders stmts)
         `unionVarSet` defined_vars)
     | L _ (GRHS stmts body) <- grhss]
-\end{code}
 
-Replace the leaf commands in a match
+-- Replace the leaf commands in a match
 
-\begin{code}
 replaceLeavesMatch
         :: Type                                 -- new result type
         -> [Located (body' Id)]                 -- replacement leaf expressions of that type
@@ -1095,11 +1079,9 @@ replaceLeavesGRHS
 replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts _))
   = (leaves, L loc (GRHS stmts leaf))
 replaceLeavesGRHS [] _ = panic "replaceLeavesGRHS []"
-\end{code}
 
-Balanced fold of a non-empty list.
+-- Balanced fold of a non-empty list.
 
-\begin{code}
 foldb :: (a -> a -> a) -> [a] -> a
 foldb _ [] = error "foldb of empty list"
 foldb _ [x] = x
@@ -1108,8 +1090,8 @@ foldb f xs = foldb f (fold_pairs xs)
     fold_pairs [] = []
     fold_pairs [x] = [x]
     fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
-\end{code}
 
+{-
 Note [Dictionary binders in ConPatOut] See also same Note in HsUtils
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following functions to collect value variables from patterns are
@@ -1129,8 +1111,8 @@ Here p77 is a local binding for the (+) operation.
 
 See comments in HsUtils for why the other version does not include
 these bindings.
+-}
 
-\begin{code}
 collectPatBinders :: LPat Id -> [Id]
 collectPatBinders pat = collectl pat []
 
@@ -1193,5 +1175,3 @@ collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
                                         $ [ s | ParStmtBlock ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_later_ids = later_ids }) = later_ids
-
-\end{code}

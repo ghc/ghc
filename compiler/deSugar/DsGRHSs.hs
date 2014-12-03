@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Matching guarded right-hand-sides (GRHSs)
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS ) where
@@ -30,8 +30,8 @@ import Name
 import Util
 import SrcLoc
 import Outputable
-\end{code}
 
+{-
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
 It desugars:
 \begin{verbatim}
@@ -42,24 +42,22 @@ It desugars:
 \end{verbatim}
 producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
+-}
 
-\begin{code}
 dsGuarded :: GRHSs Id (LHsExpr Id) -> Type -> DsM CoreExpr
 
 dsGuarded grhss rhs_ty = do
     match_result <- dsGRHSs PatBindRhs [] grhss rhs_ty
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
     extractMatchResult match_result error_expr
-\end{code}
 
-In contrast, @dsGRHSs@ produces a @MatchResult@.
+-- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
-\begin{code}
 dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchContext from
         -> GRHSs Id (LHsExpr Id)                -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty 
+dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
   = ASSERT( notNull grhss )
     do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
@@ -70,16 +68,15 @@ dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS Id (LHsExpr Id) -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
-\end{code}
 
+{-
+************************************************************************
+*                                                                      *
+*  matchGuard : make a MatchResult from a guarded RHS                  *
+*                                                                      *
+************************************************************************
+-}
 
-%************************************************************************
-%*                                                                      *
-%*  matchGuard : make a MatchResult from a guarded RHS                  *
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 matchGuards :: [GuardStmt Id]       -- Guard
             -> HsStmtContext Name   -- Context
             -> LHsExpr Id           -- RHS
@@ -152,10 +149,11 @@ isTrueLHsExpr (L _ (HsBinTick ixT _ e))
 
 isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
 isTrueLHsExpr _                       = Nothing
-\end{code}
 
+{-
 Should {\em fail} if @e@ returns @D@
 \begin{verbatim}
 f x | p <- e', let C y# = e, f y# = r1
     | otherwise          = r2
 \end{verbatim}
+-}

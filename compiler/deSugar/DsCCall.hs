@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1994-1998
+
 
 Desugaring foreign calls
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module DsCCall
         ( dsCCall
@@ -45,8 +45,8 @@ import Outputable
 import Util
 
 import Data.Maybe
-\end{code}
 
+{-
 Desugaring of @ccall@s consists of adding some state manipulation,
 unboxing any boxed primitive arguments and boxing the result if
 desired.
@@ -81,8 +81,8 @@ follows:
    \ s# -> case (ccall# foo [ r, t1#, ... tm# ] s# e1# ... em#) of
           (StateAnd<r># result# state#) -> (R# result#, realWorld#)
 \end{verbatim}
+-}
 
-\begin{code}
 dsCCall :: CLabelString -- C routine to invoke
         -> [CoreExpr]   -- Arguments (desugared)
         -> Safety       -- Safety of the call
@@ -121,9 +121,7 @@ mkFCall dflags uniq the_fcall val_args res_ty
     tyvars  = varSetElems (tyVarsOfType body_ty)
     ty      = mkForAllTys tyvars body_ty
     the_fcall_id = mkFCallId dflags uniq the_fcall ty
-\end{code}
 
-\begin{code}
 unboxArg :: CoreExpr                    -- The supplied argument
          -> DsM (CoreExpr,              -- To pass as the actual argument
                  CoreExpr -> CoreExpr   -- Wrapper to unbox the arg
@@ -195,10 +193,7 @@ unboxArg arg
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
     maybe_arg3_tycon               = tyConAppTyCon_maybe data_con_arg_ty3
     Just arg3_tycon                = maybe_arg3_tycon
-\end{code}
 
-
-\begin{code}
 boxResult :: Type
           -> DsM (Type, CoreExpr -> CoreExpr)
 
@@ -385,4 +380,3 @@ maybeNarrow dflags tycon
   | tycon `hasKey` word32TyConKey
          && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
   | otherwise                     = id
-\end{code}

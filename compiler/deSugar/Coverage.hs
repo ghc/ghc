@@ -1,8 +1,8 @@
-%
-% (c) Galois, 2006
-% (c) University of Glasgow, 2007
-%
-\begin{code}
+{-
+(c) Galois, 2006
+(c) University of Glasgow, 2007
+-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 
 module Coverage (addTicksToBinds, hpcInitCode) where
@@ -43,16 +43,15 @@ import Trace.Hpc.Util
 import BreakArray
 import Data.Map (Map)
 import qualified Data.Map as Map
-\end{code}
 
+{-
+************************************************************************
+*                                                                      *
+*              The main function: addTicksToBinds
+*                                                                      *
+************************************************************************
+-}
 
-%************************************************************************
-%*                                                                      *
-%*              The main function: addTicksToBinds
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 addTicksToBinds
         :: DynFlags
         -> Module
@@ -526,7 +525,7 @@ addTickHsExpr (ExplicitList ty wit es) =
         liftM3 ExplicitList
                 (return ty)
                 (addTickWit wit)
-                (mapM (addTickLHsExpr) es) 
+                (mapM (addTickLHsExpr) es)
              where addTickWit Nothing = return Nothing
                    addTickWit (Just fln) = do fln' <- addTickHsExpr fln
                                               return (Just fln')
@@ -808,7 +807,7 @@ addTickHsCmd (HsCmdArrForm e fix cmdtop) =
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdCast co cmd) 
+addTickHsCmd (HsCmdCast co cmd)
   = liftM2 HsCmdCast (return co) (addTickHsCmd cmd)
 
 -- Others should never happen in a command context.
@@ -918,9 +917,7 @@ liftL :: (Monad m) => (a -> m a) -> Located a -> m (Located a)
 liftL f (L loc a) = do
   a' <- f a
   return $ L loc a'
-\end{code}
 
-\begin{code}
 data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry_]
                          }
@@ -1164,18 +1161,12 @@ mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
-\end{code}
 
-
-\begin{code}
 matchesOneOfMany :: [LMatch Id body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
         matchCount (L _ (Match _pats _ty (GRHSs grhss _binds))) = length grhss
-\end{code}
 
-
-\begin{code}
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 
 -- For the hash value, we hash everything: the file name,
@@ -1187,13 +1178,13 @@ type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 mixHash :: FilePath -> UTCTime -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
         (show $ Mix file tm 0 tabstop entries)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*              initialisation
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*              initialisation
+*                                                                      *
+************************************************************************
 
 Each module compiled with -fhpc declares an initialisation function of
 the form `hpc_init_<module>()`, which is emitted into the _stub.c file
@@ -1207,8 +1198,8 @@ static void hpc_init_Main(void) __attribute__((constructor));
 static void hpc_init_Main(void)
 {extern StgWord64 _hpc_tickboxes_Main_hpc[];
  hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
+-}
 
-\begin{code}
 hpcInitCode :: Module -> HpcInfo -> SDoc
 hpcInitCode _ (NoHpcInfo {}) = Outputable.empty
 hpcInitCode this_mod (HpcInfo tickCount hashNo)
@@ -1240,4 +1231,3 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
        = module_name
        | otherwise
        = package_name <> char '/' <> module_name
-\end{code}

@@ -1,13 +1,13 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Utilities for desugaring
 
 This module exports some utility functions of no great interest.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 -- | Utility functions for constructing Core syntax, principally for desugaring
@@ -75,21 +75,20 @@ import FastString
 import TcEvidence
 
 import Control.Monad    ( zipWithM )
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{ Selecting match variables}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We're about to match against some patterns.  We want to make some
 @Ids@ to use as match variables.  If a pattern has an @Id@ readily at
 hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
+-}
 
-\begin{code}
 selectSimpleMatchVarL :: LPat Id -> DsM Id
 selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 
@@ -120,8 +119,8 @@ selectMatchVar (VarPat var)  = return (localiseId var)  -- Note [Localise patter
 selectMatchVar (AsPat var _) = return (unLoc var)
 selectMatchVar other_pat     = newSysLocalDs (hsPatType other_pat)
                                   -- OK, better make up one...
-\end{code}
 
+{-
 Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider     module M where
@@ -160,28 +159,26 @@ runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
 
-%************************************************************************
-%*                                                                      *
-%* type synonym EquationInfo and access functions for its pieces        *
-%*                                                                      *
-%************************************************************************
+************************************************************************
+*                                                                      *
+* type synonym EquationInfo and access functions for its pieces        *
+*                                                                      *
+************************************************************************
 \subsection[EquationInfo-synonym]{@EquationInfo@: a useful synonym}
 
 The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
+-}
 
-\begin{code}
 firstPat :: EquationInfo -> Pat Id
 firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
 
 shiftEqns :: [EquationInfo] -> [EquationInfo]
 -- Drop the first pattern in each equation
 shiftEqns eqns = [ eqn { eqn_pats = tail (eqn_pats eqn) } | eqn <- eqns ]
-\end{code}
 
-Functions on MatchResults
+-- Functions on MatchResults
 
-\begin{code}
 matchCanFail :: MatchResult -> Bool
 matchCanFail (MatchResult CanFail _)  = True
 matchCanFail (MatchResult CantFail _) = False
@@ -337,9 +334,6 @@ mkCoAlgCaseMatchResult dflags var ty match_alts
 mkCoSynCaseMatchResult :: Id -> Type -> CaseAlt PatSyn -> MatchResult
 mkCoSynCaseMatchResult var ty alt = MatchResult CanFail $ mkPatSynCase var ty alt
 
-\end{code}
-
-\begin{code}
 sort_alts :: [CaseAlt DataCon] -> [CaseAlt DataCon]
 sort_alts = sortWith (dataConTag . alt_pat)
 
@@ -450,15 +444,15 @@ mkPArrCase dflags var ty sorted_alts fail = do
         binds = [NonRec arg (indexExpr i) | (i, arg) <- zip [1..] (alt_bndrs alt)]
         --
         indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, mkIntExpr dflags i]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Desugarer's versions of some Core functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkErrorAppDs :: Id              -- The error function
              -> Type            -- Type to which it should be applied
              -> SDoc            -- The error message string to pass
@@ -472,8 +466,8 @@ mkErrorAppDs err_id ty msg = do
         core_msg = Lit (mkMachString full_msg)
         -- mkMachString returns a result of type String#
     return (mkApps (Var err_id) [Type ty, core_msg])
-\end{code}
 
+{-
 'mkCoreAppDs' and 'mkCoreAppsDs' hand the special-case desugaring of 'seq'.
 
 Note [Desugaring seq (1)]  cf Trac #1031
@@ -539,8 +533,8 @@ The isLocalId ensures that we don't turn
 into
         case True of True { ... }
 which stupidly tries to bind the datacon 'True'.
+-}
 
-\begin{code}
 mkCoreAppDs  :: CoreExpr -> CoreExpr -> CoreExpr
 mkCoreAppDs (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
@@ -554,14 +548,13 @@ mkCoreAppDs fun arg = mkCoreApp fun arg  -- The rest is done in MkCore
 
 mkCoreAppsDs :: CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreAppsDs fun args = foldl mkCoreAppDs fun args
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[mkSelectorBind]{Make a selector bind}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is used in various places to do with lazy patterns.
 For each binder $b$ in the pattern, we create a binding:
@@ -604,8 +597,8 @@ Otherwise we do (B).  Really (A) is just an optimisation for very common
 cases like
      Just x = e
      (p,q) = e
+-}
 
-\begin{code}
 mkSelectorBinds :: [Maybe (Tickish Id)]  -- ticks to add, possibly
                 -> LPat Id      -- The pattern
                 -> CoreExpr     -- Expression to which the pattern is bound
@@ -690,13 +683,13 @@ mkSelectorBinds ticks pat val_expr
     is_triv_pat (WildPat _) = True
     is_triv_pat (ParPat p)  = is_triv_lpat p
     is_triv_pat _           = False
-\end{code}
 
+{-
 Creating big tuples and their types for full Haskell expressions.
 They work over *Ids*, and create tuples replete with their types,
 which is whey they are not in HsUtils.
+-}
 
-\begin{code}
 mkLHsPatTup :: [LPat Id] -> LPat Id
 mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
@@ -723,13 +716,13 @@ mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
 
 mkBigLHsPatTup :: [LPat Id] -> LPat Id
 mkBigLHsPatTup = mkChunkified mkLHsPatTup
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[mkFailurePair]{Code for pattern-matching and other failures}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Generally, we handle pattern matching failure like this: let-bind a
 fail-variable, and use that variable if the thing fails:
@@ -778,8 +771,8 @@ for the primitive case:
 \end{verbatim}
 
 Now @fail.33@ is a function, so it can be let-bound.
+-}
 
-\begin{code}
 mkFailurePair :: CoreExpr       -- Result type of the whole case expression
               -> DsM (CoreBind, -- Binds the newly-created fail variable
                                 -- to \ _ -> expression
@@ -793,8 +786,8 @@ mkFailurePair expr
                  App (Var fail_fun_var) (Var voidPrimId)) }
   where
     ty = exprType expr
-\end{code}
 
+{-
 Note [Failure thunks and CPR]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we make a failure point we ensure that it
@@ -812,8 +805,8 @@ entered at most once.  Adding a dummy 'realWorld' token argument makes
 it clear that sharing is not an issue.  And that in turn makes it more
 CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see Trac #3403.
+-}
 
-\begin{code}
 mkOptTickBox :: Maybe (Tickish Id) -> CoreExpr -> CoreExpr
 mkOptTickBox Nothing e        = e
 mkOptTickBox (Just tickish) e = Tick tickish e
@@ -831,4 +824,3 @@ mkBinaryTickBox ixT ixF e = do
                        [ (DataAlt falseDataCon, [], falseBox)
                        , (DataAlt trueDataCon,  [], trueBox)
                        ]
-\end{code}

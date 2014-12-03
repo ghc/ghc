@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 The Desugarer: turning HsSyn into Core.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module Desugar ( deSugar, deSugarExpr ) where
@@ -52,15 +52,15 @@ import OrdList
 import Data.List
 import Data.IORef
 import Control.Monad( when )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*              The main function: deSugar
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*              The main function: deSugar
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Main entry point to the desugarer.
 deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
@@ -212,8 +212,8 @@ combineEvBinds (NonRec b r : bs) val_prs
   | otherwise = NonRec b r : combineEvBinds bs val_prs
 combineEvBinds (Rec prs : bs) val_prs
   = combineEvBinds bs (prs ++ val_prs)
-\end{code}
 
+{-
 Note [Top-level evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Top-level evidence bindings may be mutually recursive with the top-level value
@@ -223,9 +223,8 @@ when computing dependencies.
 
 So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
+-}
 
-
-\begin{code}
 deSugarExpr :: HscEnv -> LHsExpr Id -> IO (Messages, Maybe CoreExpr)
 
 deSugarExpr hsc_env tc_expr
@@ -249,15 +248,15 @@ deSugarExpr hsc_env tc_expr
             Just expr -> dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
 
        ; return (msgs, mb_core_expr) }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*              Add rules and export flags to binders
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*              Add rules and export flags to binders
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 addExportFlagsAndRules
     :: HscTarget -> NameSet -> NameSet -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
@@ -299,9 +298,8 @@ addExportFlagsAndRules target exports keep_alive rules prs
     is_exported :: Name -> Bool
     is_exported | targetRetainsAllBindings target = isExternalName
                 | otherwise                       = (`elemNameSet` exports)
-\end{code}
 
-
+{-
 Note [Adding export flags]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Set the no-discard flag if either
@@ -338,13 +336,12 @@ Reason
     thereby get dropped
 
 
-%************************************************************************
-%*                                                                      *
-%*              Desugaring transformation rules
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+************************************************************************
+*                                                                      *
+*              Desugaring transformation rules
+*                                                                      *
+************************************************************************
+-}
 
 dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
@@ -378,7 +375,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 
               inline_shadows_rule   -- Function can be inlined before rule fires
                 | wopt Opt_WarnInlineRuleShadowing dflags
-                , isLocalId fn_id || hasSomeUnfolding (idUnfolding fn_id)   
+                , isLocalId fn_id || hasSomeUnfolding (idUnfolding fn_id)
                        -- If imported with no unfolding, no worries
                 = case (idInlineActivation fn_id, act) of
                     (NeverActive, _)    -> False
@@ -422,8 +419,7 @@ unfold_coerce bndrs lhs rhs = do
             (bndrs,wrap) <- go vs
             return (v:bndrs, wrap)
 
-\end{code}
-
+{-
 Note [Desugaring RULE left hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the LHS of a RULE we do *not* want to desugar
@@ -455,13 +451,13 @@ corresponding `co :: a ~#R b` and wrap the LHS and the RHS in
 `let c = MkCoercible co in ...`. This is later simplified to the desired form
 by simpleOptExpr (for the LHS) resp. the simplifiers (for the RHS).
 
-%************************************************************************
-%*                                                                      *
-%*              Desugaring vectorisation declarations
-%*                                                                      *
-%************************************************************************
+************************************************************************
+*                                                                      *
+*              Desugaring vectorisation declarations
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dsVect :: LVectDecl Id -> DsM CoreVect
 dsVect (L loc (HsVect (L _ v) rhs))
   = putSrcSpanDs loc $
@@ -486,4 +482,3 @@ dsVect (L _loc (HsVectInstOut inst))
   = return $ VectInst (instanceDFunId inst)
 dsVect vi@(L _ (HsVectInstIn _))
   = pprPanic "Desugar.dsVect: unexpected 'HsVectInstIn'" (ppr vi)
-\end{code}

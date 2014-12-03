@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Pattern-matching constructors
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module MatchCon ( matchConFamily, matchPatSyn ) where
@@ -31,8 +31,8 @@ import SrcLoc
 import DynFlags
 import Outputable
 import Control.Monad(liftM)
-\end{code}
 
+{-
 We are confronted with the first column of patterns in a set of
 equations, all beginning with constructors from one ``family'' (e.g.,
 @[]@ and @:@ make up the @List@ ``family'').  We want to generate the
@@ -83,7 +83,8 @@ returned is the number of constructors in the family.
 The function @matchConFamily@ is concerned with this
 have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
-\begin{code}
+-}
+
 matchConFamily :: [Id]
                -> Type
                -> [[EquationInfo]]
@@ -226,8 +227,8 @@ conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
   | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats
-\end{code}
 
+{-
 Note [Record patterns]
 ~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -286,4 +287,4 @@ Originally I tried to use
         (\b -> let e = d in expr2) a
 to do this substitution.  While this is "correct" in a way, it fails
 Lint, because e::Ord b but d::Ord a.
-
+-}

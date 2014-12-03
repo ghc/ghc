@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1998
+
 
 Desugaring foreign declarations (see also DsCCall).
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module DsForeign ( dsForeigns
@@ -60,8 +60,8 @@ import Hooks
 
 import Data.Maybe
 import Data.List
-\end{code}
 
+{-
 Desugaring of @foreign@ declarations is naturally split up into
 parts, an @import@ and an @export@  part. A @foreign import@
 declaration
@@ -74,8 +74,8 @@ is the same as
   f a1 ... an = _ccall_ nm cc a1 ... an
 \end{verbatim}
 so we reuse the desugaring code in @DsCCall@ to deal with these.
+-}
 
-\begin{code}
 type Binding = (Id, CoreExpr)   -- No rec/nonrec structure;
                                 -- the occurrence analyser will sort it all out
 
@@ -111,14 +111,13 @@ dsForeigns' fos = do
                           (CExport (L _ (CExportStatic ext_nm cconv)) _)) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Foreign import}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Desugaring foreign imports is just the matter of creating a binding
 that on its RHS unboxes its arguments, performs the external call
@@ -137,8 +136,8 @@ However, we create a worker/wrapper pair, thus:
 The strictness/CPR analyser won't do this automatically because it doesn't look
 inside returned tuples; but inlining this wrapper is a Really Good Idea
 because it exposes the boxing to the call site.
+-}
 
-\begin{code}
 dsFImport :: Id
           -> Coercion
           -> ForeignImport
@@ -191,16 +190,15 @@ fun_type_arg_stdcall_info dflags StdCallConv ty
     in Just $ sum (map (widthInBytes . typeWidth . typeCmmType dflags . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _ _other_conv _
   = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Foreign calls}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id co fcall mDeclHeader = do
@@ -280,14 +278,13 @@ dsFCall fn_id co fcall mDeclHeader = do
         fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfolding (Just (length args)) wrap_rhs'
 
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, cDoc)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Primitive calls}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is for `@foreign import prim@' declarations.
 
@@ -295,8 +292,8 @@ Currently, at the core level we pretend that these primitive calls are
 foreign calls. It may make more sense in future to have them as a distinct
 kind of Id, or perhaps to bundle them with PrimOps since semantically and
 for calling convention they are really prim ops.
+-}
 
-\begin{code}
 dsPrimCall :: Id -> Coercion -> ForeignCall
            -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsPrimCall fn_id co fcall = do
@@ -317,13 +314,12 @@ dsPrimCall fn_id co fcall = do
         rhs'     = Cast rhs co
     return ([(fn_id, rhs')], empty, empty)
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Foreign export}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The function that does most of the work for `@foreign export@' declarations.
 (see below for the boilerplate code a `@foreign export@' declaration expands
@@ -335,8 +331,8 @@ For each `@foreign export foo@' in a module M we generate:
 \item a Haskell stub `@M.\$ffoo@', which calls
 \end{itemize}
 the user-written Haskell function `@M.foo@'.
+-}
 
-\begin{code}
 dsFExport :: Id                 -- Either the exported Id,
                                 -- or the foreign-export-dynamic constructor
           -> Coercion           -- Coercion between the Haskell type callable
@@ -376,8 +372,8 @@ dsFExport fn_id co ext_name cconv isDyn = do
       mkFExportCBits dflags ext_name
                      (if isDyn then Nothing else Just fn_id)
                      fe_arg_tys res_ty is_IO_res_ty cconv
-\end{code}
 
+{-
 @foreign import "wrapper"@ (previously "foreign export dynamic") lets
 you dress up Haskell IO actions of some fixed type behind an
 externally callable interface (i.e., as a C function pointer). Useful
@@ -411,8 +407,8 @@ f_helper(StablePtr s, HsBool b, HsInt i)
         rts_unlock(cap);
 }
 \end{verbatim}
+-}
 
-\begin{code}
 dsFExportDynamic :: Id
                  -> Coercion
                  -> CCallConv
@@ -488,19 +484,19 @@ dsFExportDynamic id co0 cconv = do
 
 toCName :: DynFlags -> Id -> String
 toCName dflags i = showSDoc dflags (pprCode CStyle (ppr (idName i)))
-\end{code}
 
-%*
-%
+{-
+*
+
 \subsection{Generating @foreign export@ stubs}
-%
-%*
+
+*
 
 For each @foreign export@ function, a C stub function is generated.
 The C stub constructs the application of the exported Haskell function
 using the hugs/ghc rts invocation API.
+-}
 
-\begin{code}
 mkFExportCBits :: DynFlags
                -> FastString
                -> Maybe Id      -- Just==static, Nothing==dynamic
@@ -814,4 +810,3 @@ primTyDescChar dflags ty
        | wORD_SIZE dflags == 4  = ('W','w')
        | wORD_SIZE dflags == 8  = ('L','l')
        | otherwise              = panic "primTyDescChar"
-\end{code}

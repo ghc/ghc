@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
-%
-% Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 
-\begin{code}
+Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
+-}
+
 {-# LANGUAGE CPP #-}
 
 module Check ( check , ExhaustivePat ) where
@@ -29,8 +29,8 @@ import Util
 import BasicTypes
 import Outputable
 import FastString
-\end{code}
 
+{-
 This module performs checks about if one list of equations are:
 \begin{itemize}
 \item Overlapped
@@ -95,8 +95,8 @@ Then we need to use InPats.
      Juan Quintela 5 JUL 1998\\
           User-friendliness and compiler writers are no friends.
 \end{quotation}
+-}
 
-\begin{code}
 type WarningPat = InPat Name
 type ExhaustivePat = ([WarningPat], [(Name, [HsLit])])
 type EqnNo  = Int
@@ -122,11 +122,8 @@ untidy_exhaustive (pats, messages) =
 
 untidy_message :: (Name, [HsLit]) -> (Name, [HsLit])
 untidy_message (string, lits) = (string, map untidy_lit lits)
-\end{code}
 
-The function @untidy@ does the reverse work of the @tidy_pat@ function.
-
-\begin{code}
+-- The function @untidy@ does the reverse work of the @tidy_pat@ function.
 
 type NeedPars = Bool
 
@@ -144,9 +141,9 @@ untidy b (L loc p) = L loc (untidy' b p)
     untidy' _ (LitPat lit)           = LitPat (untidy_lit lit)
     untidy' _ p@(ConPatIn _ (PrefixCon [])) = p
     untidy' b (ConPatIn name ps)     = pars b (L loc (ConPatIn name (untidy_con ps)))
-    untidy' _ (ListPat pats ty Nothing)     = ListPat (map untidy_no_pars pats) ty Nothing   
+    untidy' _ (ListPat pats ty Nothing)     = ListPat (map untidy_no_pars pats) ty Nothing
     untidy' _ (TuplePat pats box tys) = TuplePat (map untidy_no_pars pats) box tys
-    untidy' _ (ListPat _ _ (Just _)) = panic "Check.untidy: Overloaded ListPat"    
+    untidy' _ (ListPat _ _ (Just _)) = panic "Check.untidy: Overloaded ListPat"
     untidy' _ (PArrPat _ _)          = panic "Check.untidy: Shouldn't get a parallel array here!"
     untidy' _ (SigPatIn _ _)         = panic "Check.untidy: SigPat"
     untidy' _ (LazyPat {})           = panic "Check.untidy: LazyPat"
@@ -177,8 +174,8 @@ pars _    p = unLoc p
 untidy_lit :: HsLit -> HsLit
 untidy_lit (HsCharPrim src c) = HsChar src c
 untidy_lit lit                = lit
-\end{code}
 
+{-
 This equation is the same that check, the only difference is that the
 boring work is done, that work needs to be done only once, this is
 the reason top have two functions, check is the external interface,
@@ -203,9 +200,7 @@ There are several cases:
       vars in the first column, we actuate in consequence.
 
 \end{itemize}
-
-
-\begin{code}
+-}
 
 check' :: [(EqnNo, EquationInfo)]
         -> ([ExhaustivePat],    -- Pattern scheme that might not be matched at all
@@ -213,7 +208,7 @@ check' :: [(EqnNo, EquationInfo)]
 
 check' [] = ([],emptyUniqSet)
   -- Was    ([([],[])], emptyUniqSet)
-  -- But that (a) seems weird, and (b) triggered Trac #7669 
+  -- But that (a) seems weird, and (b) triggered Trac #7669
   -- So now I'm just doing the simple obvious thing
 
 check' ((n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult can_fail _ }) : rs)
@@ -242,36 +237,34 @@ check' qs
     some_constructors = any is_con first_pats
     some_literals     = any is_lit first_pats
     only_vars         = all is_var first_pats
-\end{code}
 
+{-
 Here begins the code to deal with literals, we need to split the matrix
 in different matrix beginning by each literal and a last matrix with the
 rest of values.
+-}
 
-\begin{code}
 split_by_literals :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat], EqnSet)
 split_by_literals qs = process_literals used_lits qs
            where
              used_lits = get_used_lits qs
-\end{code}
 
+{-
 @process_explicit_literals@ is a function that process each literal that appears
 in the column of the matrix.
+-}
 
-\begin{code}
 process_explicit_literals :: [HsLit] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 process_explicit_literals lits qs = (concat pats, unionManyUniqSets indexs)
     where
       pats_indexs   = map (\x -> construct_literal_matrix x qs) lits
       (pats,indexs) = unzip pats_indexs
-\end{code}
 
-
+{-
 @process_literals@ calls @process_explicit_literals@ to deal with the literals
 that appears in the matrix and deal also with the rest of the cases. It
 must be one Variable to be complete.
-
-\begin{code}
+-}
 
 process_literals :: [HsLit] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 process_literals used_lits qs
@@ -285,12 +278,12 @@ process_literals used_lits qs
        pats_default    = [(nlWildPatName:ps,constraints) |
                                         (ps,constraints) <- (pats')] ++ pats
        indexs_default  = unionUniqSets indexs' indexs
-\end{code}
 
+{-
 Here we have selected the literal and we will select all the equations that
 begins for that literal and create a new matrix.
+-}
 
-\begin{code}
 construct_literal_matrix :: HsLit -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 construct_literal_matrix lit qs =
     (map (\ (xs,ys) -> (new_lit:xs,ys)) pats,indexs)
@@ -307,12 +300,12 @@ remove_first_column_lit lit qs
   where
      shift_pat eqn@(EqnInfo { eqn_pats = _:ps}) = eqn { eqn_pats = ps }
      shift_pat _                                = panic "Check.shift_var: no patterns"
-\end{code}
 
+{-
 This function splits the equations @qs@ in groups that deal with the
 same constructor.
+-}
 
-\begin{code}
 split_by_constructor :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat], EqnSet)
 split_by_constructor qs
   | null used_cons      = ([], mkUniqSet $ map fst qs)
@@ -321,19 +314,19 @@ split_by_constructor qs
                        where
                           used_cons   = get_used_cons qs
                           unused_cons = get_unused_cons used_cons
-\end{code}
 
+{-
 The first column of the patterns matrix only have vars, then there is
 nothing to do.
+-}
 
-\begin{code}
 first_column_only_vars :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 first_column_only_vars qs
   = (map (\ (xs,ys) -> (nlWildPatName:xs,ys)) pats,indexs)
   where
     (pats, indexs) = check' (map remove_var qs)
-\end{code}
 
+{-
 This equation takes a matrix of patterns and split the equations by
 constructor, using all the constructors that appears in the first column
 of the pattern matching.
@@ -341,8 +334,8 @@ of the pattern matching.
 We can need a default clause or not ...., it depends if we used all the
 constructors or not explicitly. The reasoning is similar to @process_literals@,
 the difference is that here the default case is not always needed.
+-}
 
-\begin{code}
 no_need_default_case :: [Pat Id] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 no_need_default_case cons qs = (concat pats, unionManyUniqSets indexs)
     where
@@ -369,8 +362,8 @@ construct_matrix con qs =
     (map (make_con con) pats,indexs)
   where
     (pats,indexs) = (check' (remove_first_column con qs))
-\end{code}
 
+{-
 Here remove first column is more difficult that with literals due to the fact
 that constructors can have arguments.
 
@@ -384,8 +377,8 @@ is transformed in:
  x xs y
  _ _  y
 \end{verbatim}
+-}
 
-\begin{code}
 remove_first_column :: Pat Id                -- Constructor
                     -> [(EqnNo, EquationInfo)]
                     -> [(EqnNo, EquationInfo)]
@@ -536,8 +529,8 @@ is_var_lit _   (WildPat _)   = True
 is_var_lit lit pat
   | Just lit' <- get_lit pat = lit == lit'
   | otherwise                = False
-\end{code}
 
+{-
 The difference beteewn @make_con@ and @make_whole_con@ is that
 @make_wole_con@ creates a new constructor with all their arguments, and
 @make_con@ takes a list of argumntes, creates the contructor getting their
@@ -570,12 +563,12 @@ In particular:
 \\      @((:) x xs)@  & returns to be & @(x:xs)@
 \\      @(x:(...:[])@ & returns to be & @[x,...]@
 \end{tabular}
-%
+
 The difficult case is the third one becouse we need to follow all the
 contructors until the @[]@ to know that we need to use the second case,
 not the second. \fbox{\ ???\ }
-%
-\begin{code}
+-}
+
 isInfixCon :: DataCon -> Bool
 isInfixCon con = isDataSymOcc (getOccName con)
 
@@ -629,8 +622,8 @@ make_whole_con con | isInfixCon con = nlInfixConPat name
                 where
                   name   = getName con
                   pats   = [nlWildPatName | _ <- dataConOrigArgTys con]
-\end{code}
 
+{-
 ------------------------------------------------------------------------
                    Tidying equations
 ------------------------------------------------------------------------
@@ -640,8 +633,8 @@ that is, it removes syntactic sugar, reducing the number of cases that
 must be handled by the main checking algorithm.  One difference is
 that here we can do *all* the tidying at once (recursively), rather
 than doing it incrementally.
+-}
 
-\begin{code}
 tidy_eqn :: EquationInfo -> EquationInfo
 tidy_eqn eqn = eqn { eqn_pats = map tidy_pat (eqn_pats eqn),
                      eqn_rhs  = tidy_rhs (eqn_rhs eqn) }
@@ -778,4 +771,3 @@ tidy_con con (RecCon (HsRecFields fs _))
     insertNm nm p (x@(n,_):xs)
       | nm == n    = (nm,p):xs
       | otherwise  = x : insertNm nm p xs
-\end{code}

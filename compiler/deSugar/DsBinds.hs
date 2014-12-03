@@ -1,15 +1,15 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Pattern-matching bindings (HsBinds and MonoBinds)
 
 Handles @HsBinds@; those at the top level require different handling,
 in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
@@ -70,15 +70,15 @@ import Util
 import Control.Monad( when )
 import MonadUtils
 import Control.Monad(liftM)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[dsMonoBinds]{Desugaring a @MonoBinds@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dsTopLHsBinds :: LHsBinds Id -> DsM (OrdList (Id,CoreExpr))
 dsTopLHsBinds binds = ds_lhs_binds binds
 
@@ -244,7 +244,7 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
                 -- See Note [ClassOp/DFun selection] in TcInstDcls
                 -- See Note [Single-method classes]  in TcInstDcls
     mk_dfun_w_stuff is_newtype
-       | is_newtype 
+       | is_newtype
        = gbl_id `setIdUnfolding`  mkInlineUnfolding (Just 0) rhs
                 `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
        | otherwise
@@ -261,8 +261,8 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity
 dictArity dicts = count isId dicts
-\end{code}
 
+{-
 [Desugaring AbsBinds]
 ~~~~~~~~~~~~~~~~~~~~~
 In the general AbsBinds case we desugar the binding to this:
@@ -425,8 +425,8 @@ Note that
 
   * The RHS of f_spec, <poly_rhs> has a *copy* of 'binds', so that it
     can fully specialise it.
+-}
 
-\begin{code}
 ------------------------
 dsSpecs :: CoreExpr     -- Its rhs
         -> TcSpecPrags
@@ -538,9 +538,8 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 specOnInline :: Name -> MsgDoc
 specOnInline f = ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:")
                  <+> quotes (ppr f)
-\end{code}
 
-
+{-
 Note [Activation pragmas for SPECIALISE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 From a user SPECIALISE pragma for f, we generate
@@ -582,13 +581,13 @@ NOINLINE [k] f
 SPEC f :: ty                [n]   INLINE [k]
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Adding inline pragmas}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
 -- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
@@ -673,8 +672,8 @@ decomposeRuleLhs orig_bndrs orig_lhs
      where
        rhs_fvs = exprFreeVars r
        needed' = (needed `minusVarSet` rhs_fvs) `extendVarSet` d
-\end{code}
 
+{-
 Note [Decomposing the left-hand side of a RULE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are several things going on here.
@@ -731,7 +730,7 @@ The drop_dicts algorithm is based on these observations:
 
   * The "needed variables" are simply the orig_bndrs.  Consider
        f :: (Eq a, Show b) => a -> b -> String
-       {-# SPECIALISE f :: (Show b) => Int -> b -> String
+       ... SPECIALISE f :: (Show b) => Int -> b -> String ...
     Then orig_bndrs includes the *quantified* dictionaries of the type
     namely (dsb::Show b), but not the one for Eq Int
 
@@ -770,7 +769,7 @@ Note [Unused spec binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
         f :: a -> a
-        {-# SPECIALISE f :: Eq a => a -> a #-}
+        ... SPECIALISE f :: Eq a => a -> a ...
 It's true that this *is* a more specialised type, but the rule
 we get is something like this:
         f_spec d = f
@@ -790,7 +789,7 @@ over it too.  *Any* dict with that type will do.
 So for example when you have
         f :: Eq a => a -> a
         f = <rhs>
-        {-# SPECIALISE f :: Int -> Int #-}
+        ... SPECIALISE f :: Int -> Int ...
 
 Then we get the SpecPrag
         SpecPrag (f Int dInt)
@@ -807,14 +806,14 @@ utterly bogus. So we really make a fresh Id, with the same unique and type
 as the old one, but with an Internal name and no IdInfo.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Desugaring evidence
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
+-}
 
-\begin{code}
 dsHsWrapper :: HsWrapper -> CoreExpr -> DsM CoreExpr
 dsHsWrapper WpHole            e = return e
 dsHsWrapper (WpTyApp ty)      e = return $ App e (Type ty)
@@ -990,8 +989,8 @@ ds_tc_coercion subst tc_co
     ds_ev_id subst v
      | Just co <- Coercion.lookupCoVar subst v = co
      | otherwise  = pprPanic "ds_tc_coercion" (ppr v $$ ppr tc_co)
-\end{code}
 
+{-
 Note [Simple coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~
 We have a special case for coercions that are simple variables.
@@ -1016,5 +1015,4 @@ which simpleOpt (currently) doesn't remove. So the rule never matches.
 
 Maybe simpleOpt should be smarter.  But it seems like a good plan
 to simply never generate the redundant box/unbox in the first place.
-
-
+-}

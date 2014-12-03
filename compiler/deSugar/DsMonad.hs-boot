@@ -1,4 +1,3 @@
-\begin{code}
 module DsMonad (DsM) where
 
 import TcRnTypes
@@ -7,8 +6,7 @@ data DsGblEnv
 data DsLclEnv
 type DsM result = TcRnIf DsGblEnv DsLclEnv result
 
-\end{code}
-
+{-
 Some notes about this boot file (from Edsko):
 
 
@@ -31,3 +29,4 @@ for the dsForeignsHook.)
 I'm sure this cycle can be broken somehow, but I'm not familiar enough
 with this part of the compiler to see if there is a natural point to
 do it.
+-}
