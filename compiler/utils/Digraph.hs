@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow 2006
-%
+-- (c) The University of Glasgow 2006
 
-\begin{code}
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 module Digraph(
         Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
@@ -58,13 +55,13 @@ import Data.Ord
 import Data.Array.ST
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*      Graphs and Graph Construction
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*      Graphs and Graph Construction
+*                                                                      *
+************************************************************************
 
 Note [Nodes, keys, vertices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,8 +72,8 @@ Note [Nodes, keys, vertices]
 
  * Digraph then maps each 'key' to a Vertex (Int) which is
         arranged densely in 0.n
+-}
 
-\begin{code}
 data Graph node = Graph {
     gr_int_graph      :: IntGraph,
     gr_vertex_to_node :: Vertex -> node,
@@ -151,15 +148,15 @@ reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_verte
                                     LT -> find a (mid - 1)
                                     EQ -> Just mid
                                     GT -> find (mid + 1) b
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*      SCC
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*      SCC
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type WorkItem key payload
   = (Node key payload,  -- Tip of the path
      [payload])         -- Rest of the path;
@@ -208,15 +205,15 @@ findCycle graph
 
     new_work :: [key] -> [payload] -> [WorkItem key payload]
     new_work deps path = [ (n, path) | Just n <- map (`Map.lookup` env) deps ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*      SCC
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*      SCC
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data SCC vertex = AcyclicSCC vertex
                 | CyclicSCC  [vertex]
 
@@ -234,19 +231,19 @@ flattenSCC (CyclicSCC vs) = vs
 instance Outputable a => Outputable (SCC a) where
    ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*      Strongly Connected Component wrappers for Graph
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*      Strongly Connected Component wrappers for Graph
+*                                                                      *
+************************************************************************
 
 Note: the components are returned topologically sorted: later components
 depend on earlier ones, but not vice versa i.e. later components only have
 edges going from them to earlier ones.
+-}
 
-\begin{code}
 stronglyConnCompG :: Graph node -> [SCC node]
 stronglyConnCompG graph = decodeSccs graph forest
   where forest = {-# SCC "Digraph.scc" #-} scc (gr_int_graph graph)
@@ -278,15 +275,15 @@ stronglyConnCompFromEdgedVerticesR
         => [Node key payload]
         -> [SCC (Node key payload)]
 stronglyConnCompFromEdgedVerticesR = stronglyConnCompG . graphFromEdgedVertices
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*      Misc wrappers for Graph
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*      Misc wrappers for Graph
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 topologicalSortG :: Graph node -> [node]
 topologicalSortG graph = map (gr_vertex_to_node graph) result
   where result = {-# SCC "Digraph.topSort" #-} topSort (gr_int_graph graph)
@@ -340,15 +337,14 @@ emptyG g = graphEmpty (gr_int_graph g)
 
 componentsG :: Graph node -> [[node]]
 componentsG graph = map (map (gr_vertex_to_node graph) . flattenTree) $ components (gr_int_graph graph)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-%*      Showing Graphs
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+{-
+************************************************************************
+*                                                                      *
+*      Showing Graphs
+*                                                                      *
+************************************************************************
+-}
 
 instance Outputable node => Outputable (Graph node) where
     ppr graph = vcat [
@@ -359,23 +355,20 @@ instance Outputable node => Outputable (Graph node) where
 instance Outputable node => Outputable (Edge node) where
     ppr (Edge from to) = ppr from <+> text "->" <+> ppr to
 
-\end{code}
+{-
+************************************************************************
+*                                                                      *
+*      IntGraphs
+*                                                                      *
+************************************************************************
+-}
 
-%************************************************************************
-%*                                                                      *
-%*      IntGraphs
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 type Vertex  = Int
 type Table a = Array Vertex a
 type IntGraph   = Table [Vertex]
 type Bounds  = (Vertex, Vertex)
 type IntEdge    = (Vertex, Vertex)
-\end{code}
 
-\begin{code}
 vertices :: IntGraph -> [Vertex]
 vertices  = indices
 
@@ -405,15 +398,14 @@ graphEmpty :: IntGraph -> Bool
 graphEmpty g = lo > hi
   where (lo, hi) = bounds g
 
-\end{code}
+{-
+************************************************************************
+*                                                                      *
+*      Trees and forests
+*                                                                      *
+************************************************************************
+-}
 
-%************************************************************************
-%*                                                                      *
-%*      Trees and forests
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 data Tree a   = Node a (Forest a)
 type Forest a = [Tree a]
 
@@ -422,9 +414,7 @@ mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
 
 flattenTree :: Tree a -> [a]
 flattenTree (Node x ts) = x : concatMap flattenTree ts
-\end{code}
 
-\begin{code}
 instance Show a => Show (Tree a) where
   showsPrec _ t s = showTree t ++ s
 
@@ -451,16 +441,15 @@ draw (Node x ts) = grp this (space (length this)) (stLoop ts)
        grp fst rst   = zipWith (++) (fst:repeat rst)
 
        [s1,s2,s3,s4,s5,s6] = ["- ", "--", "-+", " |", " `", " +"]
-\end{code}
 
+{-
+************************************************************************
+*                                                                      *
+*      Depth first search
+*                                                                      *
+************************************************************************
+-}
 
-%************************************************************************
-%*                                                                      *
-%*      Depth first search
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 type Set s    = STArray s Vertex Bool
 
 mkEmpty      :: Bounds -> ST s (Set s)
@@ -471,9 +460,7 @@ contains m v  = readArray m v
 
 include      :: Set s -> Vertex -> ST s ()
 include m v   = writeArray m v True
-\end{code}
 
-\begin{code}
 dff          :: IntGraph -> Forest Vertex
 dff g         = dfs g (vertices g)
 
@@ -498,20 +485,19 @@ chop m (Node v ts : us)
                   chop m ts   >>= \as ->
                   chop m us   >>= \bs ->
                   return (Node v as : bs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-%*      Algorithms
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+*      Algorithms
+*                                                                      *
+************************************************************************
 
 ------------------------------------------------------------
 -- Algorithm 1: depth first search numbering
 ------------------------------------------------------------
+-}
 
-\begin{code}
 preorder            :: Tree a -> [a]
 preorder (Node a ts) = a : preorderF ts
 
@@ -523,13 +509,13 @@ tabulate bnds vs = array bnds (zip vs [1..])
 
 preArr          :: Bounds -> Forest Vertex -> Table Int
 preArr bnds      = tabulate bnds . preorderF
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 2: topological sorting
 ------------------------------------------------------------
+-}
 
-\begin{code}
 postorder :: Tree a -> [a] -> [a]
 postorder (Node a ts) = postorderF ts . (a :)
 
@@ -541,34 +527,34 @@ postOrd g = postorderF (dff g) []
 
 topSort :: IntGraph -> [Vertex]
 topSort = reverse . postOrd
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 3: connected components
 ------------------------------------------------------------
+-}
 
-\begin{code}
 components   :: IntGraph -> Forest Vertex
 components    = dff . undirected
 
 undirected   :: IntGraph -> IntGraph
 undirected g  = buildG (bounds g) (edges g ++ reverseE g)
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 4: strongly connected components
 ------------------------------------------------------------
+-}
 
-\begin{code}
 scc  :: IntGraph -> Forest Vertex
 scc g = dfs g (reverse (postOrd (transpose g)))
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 5: Classifying edges
 ------------------------------------------------------------
+-}
 
-\begin{code}
 back              :: IntGraph -> Table Int -> IntGraph
 back g post        = mapT select g
  where select v ws = [ w | w <- ws, post!v < post!w ]
@@ -580,25 +566,25 @@ cross g pre post   = mapT select g
 forward           :: IntGraph -> IntGraph -> Table Int -> IntGraph
 forward g tree pre = mapT select g
  where select v ws = [ w | w <- ws, pre!v < pre!w ] \\ tree!v
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 6: Finding reachable vertices
 ------------------------------------------------------------
+-}
 
-\begin{code}
 reachable    :: IntGraph -> [Vertex] -> [Vertex]
 reachable g vs = preorderF (dfs g vs)
 
 path         :: IntGraph -> Vertex -> Vertex -> Bool
 path g v w    = w `elem` (reachable g [v])
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 7: Biconnected components
 ------------------------------------------------------------
+-}
 
-\begin{code}
 bcc :: IntGraph -> Forest [Vertex]
 bcc g = (concat . map bicomps . map (do_label g dnum)) forest
  where forest = dff g
@@ -620,8 +606,8 @@ collect (Node (v,dv,lv) ts) = (lv, Node (v:vs) cs)
        vs = concat [ ws | (lw, Node ws _)  <- collected, lw<dv]
        cs = concat [ if lw<dv then us else [Node (v:ws) us]
                         | (lw, Node ws us) <- collected ]
-\end{code}
 
+{-
 ------------------------------------------------------------
 -- Algorithm 8: Total ordering on groups of vertices
 ------------------------------------------------------------
@@ -637,8 +623,7 @@ We proceed by iteratively removing elements with no outgoing edges
 and their associated edges from the graph.
 
 This probably isn't very efficient and certainly isn't very clever.
-
-\begin{code}
+-}
 
 vertexGroups :: IntGraph -> [[Vertex]]
 vertexGroups g = runST (mkEmpty (bounds g) >>= \provided -> vertexGroupsS provided g next_vertices)
@@ -665,4 +650,3 @@ vertexGroupsS provided g to_provide
 
 vertexReady :: Set s -> IntGraph -> Vertex -> ST s Bool
 vertexReady provided g v = liftM2 (&&) (liftM not $ provided `contains` v) (allM (provided `contains`) (g!v))
-\end{code}

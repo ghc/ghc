@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[ListSetOps]{Set-like operations on lists}
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[ListSetOps]{Set-like operations on lists}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module ListSetOps (
@@ -29,8 +29,8 @@ import UniqFM
 import Util
 
 import Data.List
-\end{code}
 
+{-
 ---------
 #ifndef DEBUG
 getNth :: [a] -> Int -> a
@@ -41,20 +41,21 @@ getNth xs n = ASSERT2( xs `lengthAtLeast` n, ppr n $$ ppr xs )
               xs !! n
 #endif
 ----------
-\begin{code}
+-}
+
 getNth :: Outputable a => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
               xs !! n
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Treating lists as sets
         Assumes the lists contain no duplicates, but are unordered
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 insertList :: Eq a => a -> [a] -> [a]
 -- Assumes the arg list contains no dups; guarantees the result has no dups
 insertList x xs | isIn "insert" x xs = xs
@@ -62,25 +63,24 @@ insertList x xs | isIn "insert" x xs = xs
 
 unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
 -- Assumes that the arguments contain no duplicates
-unionLists xs ys 
+unionLists xs ys
   = WARN(length xs > 100 || length ys > 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
 minusList :: (Eq a) => [a] -> [a] -> [a]
 -- Everything in the first list that is not in the second list:
 minusList xs ys = [ x | x <- xs, isn'tIn "minusList" x ys]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-assoc]{Association lists}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Inefficient finite maps based on association lists and equality.
+-}
 
-\begin{code}
 -- A finite mapping based on equality and association lists
 type Assoc a b = [(a,b)]
 
@@ -104,15 +104,15 @@ assocMaybe alist key
   where
     lookup []             = Nothing
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-dups]{Duplicate-handling}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 hasNoDups :: (Eq a) => [a] -> Bool
 
 hasNoDups xs = f [] xs
@@ -123,9 +123,7 @@ hasNoDups xs = f [] xs
                            else f (x:seen_so_far) xs
 
     is_elem = isIn "hasNoDups"
-\end{code}
 
-\begin{code}
 equivClasses :: (a -> a -> Ordering) -- Comparison
              -> [a]
              -> [[a]]
@@ -135,16 +133,16 @@ equivClasses _   stuff@[_] = [stuff]
 equivClasses cmp items     = runs eq (sortBy cmp items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
-\end{code}
 
+{-
 The first cases in @equivClasses@ above are just to cut to the point
 more quickly...
 
 @runs@ groups a list into a list of lists, each sublist being a run of
 identical elements of the input list. It is passed a predicate @p@ which
 tells when two elements are equal.
+-}
 
-\begin{code}
 runs :: (a -> a -> Bool) -- Equality
      -> [a]
      -> [[a]]
@@ -152,9 +150,7 @@ runs :: (a -> a -> Bool) -- Equality
 runs _ []     = []
 runs p (x:xs) = case (span (p x) xs) of
                 (first, rest) -> (x:first) : (runs p rest)
-\end{code}
 
-\begin{code}
 removeDups :: (a -> a -> Ordering) -- Comparison function
            -> [a]
            -> ([a],     -- List with no duplicates
@@ -176,10 +172,7 @@ findDupsEq _  [] = []
 findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
                      | otherwise   = (x:eq_xs) : findDupsEq eq neq_xs
     where (eq_xs, neq_xs) = partition (eq x) xs
-\end{code}
 
-
-\begin{code}
 equivClassesByUniq :: (a -> Unique) -> [a] -> [[a]]
         -- NB: it's *very* important that if we have the input list [a,b,c],
         -- where a,b,c all have the same unique, then we get back the list
@@ -192,5 +185,3 @@ equivClassesByUniq get_uniq xs
   where
     add a ufm = addToUFM_C tack_on ufm (get_uniq a) [a]
     tack_on old new = new++old
-\end{code}
-

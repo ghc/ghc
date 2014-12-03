@@ -1,6 +1,5 @@
-Some extra functions to extend Data.Map
+-- Some extra functions to extend Data.Map
 
-\begin{code}
 module FiniteMap (
         insertList,
         insertListWith,
@@ -28,5 +27,3 @@ foldRight        :: (elt -> a -> a) -> a -> Map key elt -> a
 foldRight        = Map.fold
 foldRightWithKey :: (key -> elt -> a -> a) -> a -> Map key elt -> a
 foldRightWithKey = Map.foldrWithKey
-\end{code}
-

@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Bag: an unordered collection with duplicates
+-}
 
-\begin{code}
 {-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
 
 module Bag (
@@ -32,10 +32,7 @@ import Data.List ( partition )
 
 infixr 3 `consBag`
 infixl 3 `snocBag`
-\end{code}
 
-
-\begin{code}
 data Bag a
   = EmptyBag
   | UnitBag a
@@ -257,9 +254,7 @@ listToBag vs = ListBag vs
 
 bagToList :: Bag a -> [a]
 bagToList b = foldrBag (:) [] b
-\end{code}
 
-\begin{code}
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))
 
@@ -269,5 +264,3 @@ instance Data a => Data (Bag a) where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Bag"
   dataCast1 x  = gcast1 x
-\end{code}
-

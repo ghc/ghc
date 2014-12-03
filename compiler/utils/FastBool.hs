@@ -1,9 +1,9 @@
-%
-% (c) The University of Glasgow, 2000-2006
-%
-\section{Fast booleans}
+{-
+(c) The University of Glasgow, 2000-2006
 
-\begin{code}
+\section{Fast booleans}
+-}
+
 {-# LANGUAGE CPP, MagicHash #-}
 
 module FastBool (
@@ -68,5 +68,3 @@ fastBool :: Bool -> FastBool
 isFastTrue :: FastBool -> Bool
 fastOr :: FastBool -> FastBool -> FastBool
 fastAnd :: FastBool -> FastBool -> FastBool
-
-\end{code}

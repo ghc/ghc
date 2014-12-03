@@ -1,9 +1,9 @@
-%
-% (c) The University of Glasgow, 2000-2006
-%
-\section{Fast integers, etc... booleans moved to FastBool for using panic}
+{-
+(c) The University of Glasgow, 2000-2006
 
-\begin{code}
+\section{Fast integers, etc... booleans moved to FastBool for using panic}
+-}
+
 {-# LANGUAGE CPP, MagicHash #-}
 
 --Even if the optimizer could handle boxed arithmetic equally well,
@@ -136,5 +136,3 @@ eqFastChar :: FastChar -> FastChar -> Bool
 pBox :: FastPtr a -> Ptr a
 pUnbox :: Ptr a -> FastPtr a
 castFastPtr :: FastPtr a -> FastPtr b
-
-\end{code}

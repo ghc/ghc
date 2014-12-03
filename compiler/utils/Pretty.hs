@@ -1,15 +1,16 @@
-%*********************************************************************************
-%*                                                                               *
-%*       John Hughes's and Simon Peyton Jones's Pretty Printer Combinators       *
-%*                                                                               *
-%*               based on "The Design of a Pretty-printing Library"              *
-%*               in Advanced Functional Programming,                             *
-%*               Johan Jeuring and Erik Meijer (eds), LNCS 925                   *
-%*               http://www.cs.chalmers.se/~rjmh/Papers/pretty.ps                *
-%*                                                                               *
-%*               Heavily modified by Simon Peyton Jones, Dec 96                  *
-%*                                                                               *
-%*********************************************************************************
+{-
+*********************************************************************************
+*                                                                               *
+*       John Hughes's and Simon Peyton Jones's Pretty Printer Combinators       *
+*                                                                               *
+*               based on "The Design of a Pretty-printing Library"              *
+*               in Advanced Functional Programming,                             *
+*               Johan Jeuring and Erik Meijer (eds), LNCS 925                   *
+*               http://www.cs.chalmers.se/~rjmh/Papers/pretty.ps                *
+*                                                                               *
+*               Heavily modified by Simon Peyton Jones, Dec 96                  *
+*                                                                               *
+*********************************************************************************
 
 Version 3.0     28 May 1997
   * Cured massive performance bug.  If you write
@@ -148,10 +149,8 @@ Relative to John's original paper, there are the following new features:
 
 6.      Numerous implementation tidy-ups
         Use of unboxed data types to speed up the implementation
+-}
 
-
-
-\begin{code}
 {-# LANGUAGE BangPatterns, CPP, MagicHash #-}
 
 module Pretty (
@@ -194,26 +193,20 @@ import GHC.Ptr  ( Ptr(..) )
 infixl 6 <>
 infixl 6 <+>
 infixl 5 $$, $+$
-\end{code}
-
-
-\begin{code}
 
 -- Disable ASSERT checks; they are expensive!
 #define LOCAL_ASSERT(x)
 
-\end{code}
-
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{The interface}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
 
 The primitive @Doc@ values
+-}
 
-\begin{code}
 empty                     :: Doc
 isEmpty                   :: Doc    -> Bool
 -- | Some text, but without any width. Use for non-printing text
@@ -234,11 +227,9 @@ integer  :: Integer -> Doc
 float    :: Float -> Doc
 double   :: Double -> Doc
 rational :: Rational -> Doc
-\end{code}
 
-Combining @Doc@ values
+-- Combining @Doc@ values
 
-\begin{code}
 (<>)   :: Doc -> Doc -> Doc     -- Beside
 hcat   :: [Doc] -> Doc          -- List version of <>
 (<+>)  :: Doc -> Doc -> Doc     -- Beside, separated by space
@@ -254,18 +245,14 @@ fcat   :: [Doc] -> Doc          -- ``Paragraph fill'' version of cat
 fsep   :: [Doc] -> Doc          -- ``Paragraph fill'' version of sep
 
 nest   :: Int -> Doc -> Doc     -- Nested
-\end{code}
 
-GHC-specific ones.
+-- GHC-specific ones.
 
-\begin{code}
 hang :: Doc -> Int -> Doc -> Doc
 punctuate :: Doc -> [Doc] -> [Doc]      -- punctuate p [d1, ... dn] = [d1 <> p, d2 <> p, ... dn-1 <> p, dn]
-\end{code}
 
-Displaying @Doc@ values.
+-- Displaying @Doc@ values.
 
-\begin{code}
 instance Show Doc where
   showsPrec _ doc cont = showDocPlus PageMode 100 doc cont
 
@@ -281,14 +268,13 @@ data Mode = PageMode            -- Normal
           | ZigZagMode          -- With zig-zag cuts
           | LeftMode            -- No indentation, infinitely long lines
           | OneLineMode         -- All on one line
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{The @Doc@ calculus}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
 
 The @Doc@ combinators satisfy the following laws:
 \begin{verbatim}
@@ -363,13 +349,13 @@ But it doesn't work, for if x=empty, we would have
 
 
 
-%*********************************************************
-%*                                                       *
+*********************************************************
+*                                                       *
 \subsection{Simple derived definitions}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 semi  = char ';'
 colon = char ':'
 comma = char ','
@@ -411,18 +397,18 @@ punctuate p (d:ds) = go d ds
                    where
                      go d [] = [d]
                      go d (e:es) = (d <> p) : go e es
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{The @Doc@ data type}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
 
 A @Doc@ represents a {\em set} of layouts.  A @Doc@ with
 no occurrences of @Union@ or @NoDoc@ represents just one layout.
-\begin{code}
+-}
+
 data Doc
  = Empty                                -- empty
  | NilAbove Doc                         -- text "" $$ x
@@ -453,8 +439,8 @@ space_text :: TextDetails
 space_text = Chr ' '
 nl_text :: TextDetails
 nl_text    = Chr '\n'
-\end{code}
 
+{-
 Here are the invariants:
 \begin{itemize}
 \item
@@ -486,8 +472,8 @@ is longer than the first line of any layout in the right argument.
 this invariant means that the right argument must have at least two
 lines.
 \end{itemize}
+-}
 
-\begin{code}
 -- Arg of a NilAbove is always an RDoc
 nilAbove_ :: Doc -> Doc
 nilAbove_ p = LOCAL_ASSERT( _ok p ) NilAbove p
@@ -517,8 +503,8 @@ union_ p q = Union (LOCAL_ASSERT( _ok p ) p) (LOCAL_ASSERT( _ok q ) q)
              _ok (NilAbove _)       = True
              _ok (Union _ _)        = True
              _ok _                  = False
-\end{code}
 
+{-
 Notice the difference between
         * NoDoc (no documents)
         * Empty (one empty document; no height and no width)
@@ -527,13 +513,13 @@ Notice the difference between
 
 
 
-%*********************************************************
-%*                                                       *
+*********************************************************
+*                                                       *
 \subsection{@empty@, @text@, @nest@, @union@}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 empty = Empty
 
 isEmpty Empty = True
@@ -574,16 +560,15 @@ mkNest k       p           = nest_ k p
 mkUnion :: Doc -> Doc -> Doc
 mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
-\end{code}
 
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Vertical composition @$$@}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-
-\begin{code}
 p $$  q = Above p False q
 ($+$) :: Doc -> Doc -> Doc
 p $+$ q = Above p True q
@@ -612,9 +597,7 @@ aboveNest (TextBeside s sl p) g k q = textBeside_ s sl rest
                                                 Empty -> nilAboveNest g k1 q
                                                 _     -> aboveNest  p g k1 q
 aboveNest _                   _ _ _ = panic "aboveNest: Unhandled case"
-\end{code}
 
-\begin{code}
 nilAboveNest :: Bool -> FastInt -> RDoc -> RDoc
 -- Specification: text s <> nilaboveNest g k q
 --              = text s <> (text "" $g$ nest k q)
@@ -626,16 +609,15 @@ nilAboveNest g k q           | (not g) && (k ># _ILIT(0))        -- No newline i
                              = textBeside_ (Str (spaces k)) k q
                              | otherwise                        -- Put them really above
                              = nilAbove_ (mkNest k q)
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Horizontal composition @<>@}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 p <>  q = Beside p False q
 p <+> q = Beside p True  q
 
@@ -658,9 +640,7 @@ beside (TextBeside s sl p) g q   = textBeside_ s sl $! rest
                                   rest = case p of
                                            Empty -> nilBeside g q
                                            _     -> beside p g q
-\end{code}
 
-\begin{code}
 nilBeside :: Bool -> RDoc -> RDoc
 -- Specification: text "" <> nilBeside g p
 --              = text "" <g> p
@@ -669,15 +649,15 @@ nilBeside _ Empty      = Empty  -- Hence the text "" in the spec
 nilBeside g (Nest _ p) = nilBeside g p
 nilBeside g p          | g         = textBeside_ space_text (_ILIT(1)) p
                        | otherwise = p
-\end{code}
 
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Separate, @sep@, Hughes version}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 -- Specification: sep ps  = oneLiner (hsep ps)
 --                         `union`
 --                          vcat ps
@@ -722,15 +702,15 @@ sepNB g Empty k ys        = oneLiner (nilBeside g (reduceDoc rest))
                                  | otherwise = hcat ys
 
 sepNB g p k ys            = sep1 g p k ys
-\end{code}
 
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{@fill@}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 fsep = fill True
 fcat = fill False
 
@@ -771,16 +751,15 @@ fillNB g Empty k (y:ys)    = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k1 ys
                                  | otherwise = k
 
 fillNB g p k ys            = fill1 g p k ys
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Selecting the best layout}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 best :: Int             -- Line length
      -> Int             -- Ribbon length
      -> RDoc
@@ -830,12 +809,12 @@ fits _ Empty               = True
 fits _ (NilAbove _)        = True
 fits n (TextBeside _ sl p) = fits (n -# sl) p
 fits _ _                   = panic "fits: Unhandled case"
-\end{code}
 
+{-
 @first@ and @nonEmptySet@ are similar to @nicest@ and @fits@, only simpler.
 @first@ returns its first argument if it is non-empty, otherwise its second.
+-}
 
-\begin{code}
 first :: Doc -> Doc -> Doc
 first p q | nonEmptySet p = p
           | otherwise     = q
@@ -848,11 +827,9 @@ nonEmptySet (NilAbove _)       = True           -- NoDoc always in first line
 nonEmptySet (TextBeside _ _ p) = nonEmptySet p
 nonEmptySet (Nest _ p)         = nonEmptySet p
 nonEmptySet _                  = panic "nonEmptySet: Unhandled case"
-\end{code}
 
-@oneLiner@ returns the one-line members of the given set of @Doc@s.
+-- @oneLiner@ returns the one-line members of the given set of @Doc@s.
 
-\begin{code}
 oneLiner :: Doc -> Doc
 oneLiner NoDoc               = NoDoc
 oneLiner Empty               = Empty
@@ -861,18 +838,15 @@ oneLiner (TextBeside s sl p) = textBeside_ s sl (oneLiner p)
 oneLiner (Nest k p)          = nest_ k (oneLiner p)
 oneLiner (p `Union` _)       = oneLiner p
 oneLiner _                   = panic "oneLiner: Unhandled case"
-\end{code}
 
-
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Displaying the best layout}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-
-\begin{code}
 showDocPlus :: Mode -> Int -> Doc -> String -> String
 showDocPlus mode cols doc rest = fullRender mode cols 1.5 string_txt rest doc
 
@@ -885,9 +859,6 @@ string_txt (Str s1)  s2 = s1 ++ s2
 string_txt (PStr s1) s2 = unpackFS s1 ++ s2
 string_txt (ZStr s1) s2 = zString s1 ++ s2
 string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
-\end{code}
-
-\begin{code}
 
 fullRender OneLineMode _ _ txt end doc
   = lay (reduceDoc doc)
@@ -977,9 +948,6 @@ spaces :: Int# -> String
 spaces n | n <=# _ILIT(0) = ""
          | otherwise      = ' ' : spaces (n -# _ILIT(1))
 
-\end{code}
-
-\begin{code}
 printDoc :: Mode -> Int -> Handle -> Doc -> IO ()
 -- printDoc adds a newline to the end
 printDoc mode cols hdl doc = printDoc_ mode cols hdl (doc $$ text "")
@@ -1054,4 +1022,3 @@ layLeft b (TextBeside s _ p) = put b s >> layLeft b p
     put b (ZStr s)   = bPutFZS  b s
     put b (LStr s l) = bPutLitString b s l
 layLeft _ _                  = panic "layLeft: Unhandled case"
-\end{code}

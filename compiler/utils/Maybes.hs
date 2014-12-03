@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module Maybes (
         module Data.Maybe,
@@ -25,15 +24,15 @@ import Control.Monad
 import Data.Maybe
 
 infixr 4 `orElse`
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Maybe type]{The @Maybe@ type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 firstJust :: Maybe a -> Maybe a -> Maybe a
 firstJust a b = firstJusts [a, b]
 
@@ -54,15 +53,14 @@ whenIsJust Nothing  _ = return ()
 -- | Flipped version of @fromMaybe@, useful for chaining.
 orElse :: Maybe a -> a -> a
 orElse = flip fromMaybe
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[MaybeT type]{The @MaybeT@ monad transformer}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 newtype MaybeT m a = MaybeT {runMaybeT :: m (Maybe a)}
 
@@ -78,16 +76,14 @@ instance Monad m => Monad (MaybeT m) where
   x >>= f = MaybeT $ runMaybeT x >>= maybe (return Nothing) (runMaybeT . f)
   fail _ = MaybeT $ return Nothing
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[MaybeErr type]{The @MaybeErr@ type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data MaybeErr err val = Succeeded val | Failed err
 
 instance Functor (MaybeErr err) where
@@ -108,4 +104,3 @@ isSuccess (Failed {})    = False
 
 failME :: err -> MaybeErr err val
 failME e = Failed e
-\end{code}

@@ -1,9 +1,10 @@
+{-
 Z%
-% (c) The University of Glasgow, 2000-2006
-%
-\section{Fast functions}
+(c) The University of Glasgow, 2000-2006
 
-\begin{code}
+\section{Fast functions}
+-}
+
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 
 module FastFunctions (
@@ -43,5 +44,3 @@ global a = unsafePerformIO (newIORef a)
 indexWord8OffFastPtr :: FastPtr Word8 -> FastInt -> Word8
 indexWord8OffFastPtrAsFastChar :: FastPtr Word8 -> FastInt -> FastChar
 indexWord8OffFastPtrAsFastInt :: FastPtr Word8 -> FastInt -> FastInt
-
-\end{code}

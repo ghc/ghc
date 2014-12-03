@@ -1,14 +1,14 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1994-1998
+
 \section[UniqSet]{Specialised sets, for things with @Uniques@}
 
 Based on @UniqFMs@ (as you would expect).
 
 Basically, the things need to be in class @Uniquable@.
+-}
 
-\begin{code}
 module UniqSet (
         -- * Unique set type
         UniqSet,    -- type synonym for UniqFM a
@@ -37,15 +37,14 @@ module UniqSet (
 import UniqFM
 import Unique
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The signature of the module}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 emptyUniqSet :: UniqSet a
 unitUniqSet :: Uniquable a => a -> UniqSet a
 mkUniqSet :: Uniquable a => [a]  -> UniqSet a
@@ -74,15 +73,14 @@ sizeUniqSet :: UniqSet a -> Int
 isEmptyUniqSet :: UniqSet a -> Bool
 lookupUniqSet :: Uniquable a => UniqSet a -> a -> Maybe a
 uniqSetToList :: UniqSet a -> [a]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Implementation using ``UniqFM''}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 type UniqSet a = UniqFM a
 
@@ -115,5 +113,3 @@ sizeUniqSet = sizeUFM
 isEmptyUniqSet = isNullUFM
 lookupUniqSet = lookupUFM
 uniqSetToList = eltsUFM
-
-\end{code}

@@ -1,8 +1,8 @@
-
+{-
 A simple homogeneous pair type with useful Functor, Applicative, and
 Traversable instances.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module Pair ( Pair(..), unPair, toPair, swap ) where
@@ -48,4 +48,3 @@ toPair (x,y) = Pair x y
 
 swap :: Pair a -> Pair a
 swap (Pair x y) = Pair y x
-\end{code}

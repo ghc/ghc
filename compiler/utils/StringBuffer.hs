@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The University of Glasgow, 1997-2006
-%
+{-
+(c) The University of Glasgow 2006
+(c) The University of Glasgow, 1997-2006
+
 
 Buffers for scanning string input stored in external arrays.
+-}
 
-\begin{code}
 {-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -255,5 +255,3 @@ parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
            | otherwise = case byteOff i of
                char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0
-
-\end{code}

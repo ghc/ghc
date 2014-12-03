@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006-2012
-% (c) The GRASP Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006-2012
+(c) The GRASP Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 -- | This module defines classes and functions for pretty-printing. It also
 -- exports a number of helpful debugging and other utilities such as 'trace' and 'panic'.
 --
@@ -105,17 +104,14 @@ import Text.Printf
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The @PprStyle@ data type}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 data PprStyle
   = PprUser PrintUnqualified Depth
@@ -246,8 +242,8 @@ mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
-\end{code}
 
+{-
 Orthogonal to the above printing styles are (possibly) some
 command-line flags that affect printing (often carried with the
 style).  The most likely ones are variations on how much type info is
@@ -256,13 +252,13 @@ shown.
 The following test decides whether or not we are actually generating
 code (either C or assembly), or generating interface files.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{The @SDoc@ data type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
 data SDocContext = SDC
@@ -294,7 +290,7 @@ pprDeeper d = SDoc $ \ctx -> case ctx of
 
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 -- Truncate a list that list that is longer than the current depth
-pprDeeperList f ds 
+pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
@@ -324,9 +320,7 @@ sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
 
 sdocWithPlatform :: (Platform -> SDoc) -> SDoc
 sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
-\end{code}
 
-\begin{code}
 qualName :: PprStyle -> QueryQualifyName
 qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
 qualName (PprDump q)    mod occ = queryQualifyName q mod occ
@@ -372,9 +366,6 @@ ifPprDebug d = SDoc $ \ctx ->
     case ctx of
         SDC{sdocStyle=PprDebug} -> runSDoc d ctx
         _                       -> Pretty.empty
-\end{code}
-
-\begin{code}
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
@@ -452,9 +443,7 @@ showSDocDumpOneLine dflags d
 irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
 irrelevantNCols = 1
-\end{code}
 
-\begin{code}
 docToSDoc :: Doc -> SDoc
 docToSDoc d = SDoc (\_ -> d)
 
@@ -485,7 +474,7 @@ float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
 
-parens, braces, brackets, quotes, quote, 
+parens, braces, brackets, quotes, quote,
         paBrackets, doubleQuotes, angleBrackets :: SDoc -> SDoc
 
 parens d        = SDoc $ Pretty.parens . runSDoc d
@@ -655,16 +644,14 @@ bold = coloured colBold
 keyword :: SDoc -> SDoc
 keyword = bold
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Outputable-class]{The @Outputable@ class}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Class designating that some type has an 'SDoc' representation
 class Outputable a where
         ppr :: a -> SDoc
@@ -675,9 +662,7 @@ class Outputable a where
 
         ppr = pprPrec 0
         pprPrec _ = ppr
-\end{code}
 
-\begin{code}
 instance Outputable Char where
     ppr c = text [c]
 
@@ -779,15 +764,15 @@ instance (Outputable elt) => Outputable (IM.IntMap elt) where
 
 instance Outputable Fingerprint where
     ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The @OutputableBndr@ class}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | 'BindingSite' is used to tell the thing that prints binder what
 -- language construct is binding the identifier.  This can be used
 -- to decide how much info to print.
@@ -800,18 +785,18 @@ class Outputable a => OutputableBndr a where
    pprBndr _b x = ppr x
 
    pprPrefixOcc, pprInfixOcc :: a -> SDoc
-      -- Print an occurrence of the name, suitable either in the 
+      -- Print an occurrence of the name, suitable either in the
       -- prefix position of an application, thus   (f a b) or  ((+) x)
       -- or infix position,                 thus   (a `f` b) or  (x + y)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Random printing helpers}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- We have 31-bit Chars and will simply use Show instances of Char and String.
 
 -- | Special combinator for showing character literals.
@@ -849,15 +834,15 @@ pprInfixVar is_operator pp_v
 ---------------------
 pprFastFilePath :: FastString -> SDoc
 pprFastFilePath path = text $ normalise $ unpackFS path
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Other helper functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 pprWithCommas :: (a -> SDoc) -- ^ The pretty printing function to use
               -> [a]         -- ^ The things to be pretty printed
               -> SDoc        -- ^ 'SDoc' where the things have been pretty printed,
@@ -885,16 +870,15 @@ quotedListWithOr :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' or `z'
 quotedListWithOr xs@(_:_:_) = quotedList (init xs) <+> ptext (sLit "or") <+> quotes (last xs)
 quotedListWithOr xs = quotedList xs
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Printing numbers verbally}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 intWithCommas :: Integral a => a -> SDoc
 -- Prints a big integer with commas, eg 345,821
 intWithCommas n
@@ -982,16 +966,14 @@ plural _   = char 's'
 isOrAre :: [a] -> SDoc
 isOrAre [_] = ptext (sLit "is")
 isOrAre _   = ptext (sLit "are")
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Error handling}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 pprPanic :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
@@ -1043,5 +1025,3 @@ pprDebugAndThen dflags cont heading pretty_msg
  = cont (showSDocDump dflags doc)
  where
      doc = sep [heading, nest 2 pretty_msg]
-\end{code}
-

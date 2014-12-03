@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE CPP, BangPatterns, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -32,9 +31,7 @@ writeFastMutInt :: FastMutInt -> Int -> IO ()
 newFastMutPtr :: IO FastMutPtr
 readFastMutPtr :: FastMutPtr -> IO (Ptr a)
 writeFastMutPtr :: FastMutPtr -> Ptr a -> IO ()
-\end{code}
 
-\begin{code}
 data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
 
 newFastMutInt = IO $ \s ->
@@ -64,5 +61,3 @@ readFastMutPtr (FastMutPtr arr) = IO $ \s ->
 writeFastMutPtr (FastMutPtr arr) (Ptr i) = IO $ \s ->
   case writeAddrArray# arr 0# i s of { s ->
   (# s, () #) }
-\end{code}
-

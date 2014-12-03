@@ -1,7 +1,5 @@
-%
-% (c) The University of Glasgow, 1997-2006
-%
-\begin{code}
+-- (c) The University of Glasgow, 1997-2006
+
 {-# LANGUAGE BangPatterns, CPP, DeriveDataTypeable, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -640,4 +638,3 @@ fsLit x = mkFastString x
     forall x . sLit  (unpackCString# x) = mkLitString#  x #-}
 {-# RULES "fslit"
     forall x . fsLit (unpackCString# x) = mkFastString# x #-}
-\end{code}

@@ -1,8 +1,5 @@
-%
-% (c) The University of Glasgow 2006
-%
+-- (c) The University of Glasgow 2006
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 -- | Highly random utility functions
@@ -133,13 +130,13 @@ import qualified Data.Set as Set
 import Data.Time
 
 infixr 9 `thenCmp`
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Is DEBUG on, are we on Windows, etc?}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These booleans are global constants, set by CPP flags.  They allow us to
 recompile a single module (this one) to change whether or not debug output
@@ -149,8 +146,8 @@ It's important that the flags are literal constants (True/False). Then,
 with -0, tests of the flags in other modules will simplify to the correct
 branch of the conditional, thereby dropping debug code altogether when
 the flags are off.
+-}
 
-\begin{code}
 ghciSupported :: Bool
 #ifdef GHCI
 ghciSupported = True
@@ -192,23 +189,21 @@ isDarwinHost = True
 #else
 isDarwinHost = False
 #endif
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{A for loop}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Compose a function with itself n times.  (nth rather than twice)
 nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
 nTimes n f = f . nTimes (n-1) f
-\end{code}
 
-\begin{code}
 fstOf3   :: (a,b,c) -> a
 sndOf3   :: (a,b,c) -> b
 thirdOf3 :: (a,b,c) -> c
@@ -221,23 +216,21 @@ third3 f (a, b, c) = (a, b, f c)
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
-\end{code}
 
-\begin{code}
 firstM :: Monad m => (a -> m c) -> (a, b) -> m (c, b)
 firstM f (x, y) = liftM (\x' -> (x', y)) (f x)
 
 first3M :: Monad m => (a -> m d) -> (a, b, c) -> m (d, b, c)
 first3M f (x, y, z) = liftM (\x' -> (x', y, z)) (f x)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-lists]{General list processing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 filterOut :: (a->Bool) -> [a] -> [a]
 -- ^ Like filter, only it reverses the sense of the test
 filterOut _ [] = []
@@ -266,13 +259,13 @@ chkAppend :: [a] -> [a] -> [a]
 chkAppend xs ys
   | null ys   = xs
   | otherwise = xs ++ ys
-\end{code}
 
+{-
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
 are of equal length.  Alastair Reid thinks this should only happen if
 DEBUGging on; hey, why not?
+-}
 
-\begin{code}
 zipEqual        :: String -> [a] -> [b] -> [(a,b)]
 zipWithEqual    :: String -> (a->b->c) -> [a]->[b]->[c]
 zipWith3Equal   :: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
@@ -302,17 +295,12 @@ zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
 zipWith4Equal _   _ [] [] [] [] =  []
 zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 #endif
-\end{code}
 
-\begin{code}
 -- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy []     _       = []
 zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
-\end{code}
 
-
-\begin{code}
 stretchZipWith :: (a -> Bool) -> b -> (a->b->c) -> [a] -> [b] -> [c]
 -- ^ @stretchZipWith p z f xs ys@ stretches @ys@ by inserting @z@ in
 -- the places where @p@ returns @True@
@@ -323,10 +311,7 @@ stretchZipWith p z f (x:xs) ys
   | otherwise = case ys of
                 []     -> []
                 (y:ys) -> f x y : stretchZipWith p z f xs ys
-\end{code}
 
-
-\begin{code}
 mapFst :: (a->c) -> [(a,b)] -> [(c,b)]
 mapSnd :: (b->c) -> [(a,b)] -> [(a,c)]
 
@@ -364,9 +349,7 @@ mapAccumL2 f s1 s2 xs = (s1', s2', ys)
   where ((s1', s2'), ys) = mapAccumL (\(s1, s2) x -> case f s1 s2 x of
                                                        (s1', s2', y) -> ((s1', s2'), y))
                                      (s1, s2) xs
-\end{code}
 
-\begin{code}
 nOfThem :: Int -> a -> [a]
 nOfThem n thing = replicate n thing
 
@@ -451,11 +434,9 @@ only [a] = a
 only (a:_) = a
 #endif
 only _ = panic "Util: only"
-\end{code}
 
-Debugging/specialising versions of \tr{elem} and \tr{notElem}
+-- Debugging/specialising versions of \tr{elem} and \tr{notElem}
 
-\begin{code}
 isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
 
 # ifndef DEBUG
@@ -481,15 +462,15 @@ isn'tIn msg x ys
                                 (x `notElem` (y:ys))
       | otherwise      =  x /= y && notElem100 (i +# _ILIT(1)) x ys
 # endif /* DEBUG */
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Sort utils}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 sortWith :: Ord b => (a->b) -> [a] -> [a]
 sortWith get_key xs = sortBy (comparing get_key) xs
 
@@ -499,17 +480,17 @@ minWith get_key xs = ASSERT( not (null xs) )
 
 nubSort :: Ord a => [a] -> [a]
 nubSort = Set.toAscList . Set.fromList
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-transitive-closure]{Transitive closure}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This algorithm for transitive closure is straightforward, albeit quadratic.
+-}
 
-\begin{code}
 transitiveClosure :: (a -> [a])         -- Successor function
                   -> (a -> a -> Bool)   -- Equality predicate
                   -> [a]
@@ -525,17 +506,17 @@ transitiveClosure succ eq xs
    _ `is_in` []                 = False
    x `is_in` (y:ys) | eq x y    = True
                     | otherwise = x `is_in` ys
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-accum]{Accumulating}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A combination of foldl with zip.  It works with equal length lists.
+-}
 
-\begin{code}
 foldl2 :: (acc -> a -> b -> acc) -> acc -> [a] -> [b] -> acc
 foldl2 _ z [] [] = z
 foldl2 k z (a:as) (b:bs) = foldl2 k (k z a b) as bs
@@ -547,21 +528,19 @@ all2 :: (a -> b -> Bool) -> [a] -> [b] -> Bool
 all2 _ []     []     = True
 all2 p (x:xs) (y:ys) = p x y && all2 p xs ys
 all2 _ _      _      = False
-\end{code}
 
-Count the number of times a predicate is true
+-- Count the number of times a predicate is true
 
-\begin{code}
 count :: (a -> Bool) -> [a] -> Int
 count _ [] = 0
 count p (x:xs) | p x       = 1 + count p xs
                | otherwise = count p xs
-\end{code}
 
+{-
 @splitAt@, @take@, and @drop@ but with length of another
 list giving the break-off point:
+-}
 
-\begin{code}
 takeList :: [b] -> [a] -> [a]
 takeList [] _ = []
 takeList (_:xs) ls =
@@ -621,16 +600,15 @@ split c s = case rest of
                 []     -> [chunk]
                 _:rest -> chunk : split c rest
   where (chunk, rest) = break (==c) s
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-comparison]{Comparisons}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 isEqual :: Ordering -> Bool
 -- Often used in (isEqual (a `compare` b))
 isEqual GT = False
@@ -660,20 +638,18 @@ cmpList _   []     _  = LT
 cmpList _   _      [] = GT
 cmpList cmp (a:as) (b:bs)
   = case cmp a b of { EQ -> cmpList cmp as bs; xxx -> xxx }
-\end{code}
 
-\begin{code}
 removeSpaces :: String -> String
 removeSpaces = dropWhileEndLE isSpace . dropWhile isSpace
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Edit distance}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Find the "restricted" Damerau-Levenshtein edit distance between two strings.
 -- See: <http://en.wikipedia.org/wiki/Damerau-Levenshtein_distance>.
 -- Based on the algorithm presented in "A Bit-Vector Algorithm for Computing
@@ -796,59 +772,49 @@ fuzzyLookup user_entered possibilites
     --
     fuzzy_threshold = truncate $ fromIntegral (length user_entered + 2) / (4 :: Rational)
     mAX_RESULTS = 3
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-pairs]{Pairs}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
 unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
-\end{code}
 
-\begin{code}
 seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
-\end{code}
 
-Global variables:
+-- Global variables:
 
-\begin{code}
 global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
-\end{code}
 
-\begin{code}
 consIORef :: IORef [a] -> a -> IO ()
 consIORef var x = do
   atomicModifyIORef var (\xs -> (x:xs,()))
-\end{code}
 
-\begin{code}
 globalM :: IO a -> IORef a
 globalM ma = unsafePerformIO (ma >>= newIORef)
-\end{code}
 
-Module names:
+-- Module names:
 
-\begin{code}
 looksLikeModuleName :: String -> Bool
 looksLikeModuleName [] = False
 looksLikeModuleName (c:cs) = isUpper c && go cs
   where go [] = True
         go ('.':cs) = looksLikeModuleName cs
         go (c:cs)   = (isAlphaNum c || c == '_' || c == '\'') && go cs
-\end{code}
 
+{-
 Akin to @Prelude.words@, but acts like the Bourne shell, treating
 quoted strings as Haskell Strings, and also parses Haskell [String]
 syntax.
+-}
 
-\begin{code}
 getCmd :: String -> Either String             -- Error
                            (String, String) -- (Cmd, Rest)
 getCmd s = case break isSpace $ dropWhile isSpace s of
@@ -890,12 +856,12 @@ toArgs str
                     (arg, s'') -> case toArgs' s'' of
                                   Left err -> Left err
                                   Right args -> Right (arg : args)
-\end{code}
 
+{-
 -- -----------------------------------------------------------------------------
 -- Floats
+-}
 
-\begin{code}
 readRational__ :: ReadS Rational -- NB: doesn't handle leading "-"
 readRational__ r = do
      (n,d,s) <- readFix r
@@ -1026,33 +992,31 @@ this `makeRelativeTo` that = directory </> thisFilename
           f (x : xs) (y : ys)
            | x == y = f xs ys
           f xs ys = replicate (length ys) ".." ++ xs
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-Data]{Utils for defining Data instances}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These functions helps us to define Data instances for abstract types.
+-}
 
-\begin{code}
 abstractConstr :: String -> Constr
 abstractConstr n = mkConstr (abstractDataType n) ("{abstract:"++n++"}") [] Prefix
-\end{code}
 
-\begin{code}
 abstractDataType :: String -> DataType
 abstractDataType n = mkDataType n [abstractConstr n]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-C]{Utils for printing C code}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 charToC :: Word8 -> String
 charToC w =
   case chr (fromIntegral w) of
@@ -1064,15 +1028,15 @@ charToC w =
                          chr (ord '0' + ord c `div` 64),
                          chr (ord '0' + ord c `div` 8 `mod` 8),
                          chr (ord '0' + ord c         `mod` 8)]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Utils-Hashing]{Utils for hashing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A sample hash function for Strings.  We keep multiplying by the
 -- golden ratio and adding.  The implementation is:
 --
@@ -1131,5 +1095,3 @@ mulHi :: Int32 -> Int32 -> Int32
 mulHi a b = fromIntegral (r `shiftR` 32)
    where r :: Int64
          r = fromIntegral a * fromIntegral b
-\end{code}
-

@@ -1,14 +1,14 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1993-1998
+
 
 This is useful, general stuff for the Native Code Generator.
 
 Provide trees (of instructions), so that lists of instructions
 can be appended in linear time.
+-}
 
-\begin{code}
 module OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
@@ -96,4 +96,3 @@ foldlOL k z (Many xs)   = foldl k z xs
 toOL :: [a] -> OrdList a
 toOL [] = None
 toOL xs = Many xs
-\end{code}

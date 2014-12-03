@@ -1,7 +1,7 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1994-1998
+
 
 UniqFM: Specialised finite maps, for things with @Uniques@.
 
@@ -18,8 +18,8 @@ The @UniqFM@ interface maps directly to Data.IntMap, only
 ``Data.IntMap.union'' is left-biased and ``plusUFM'' right-biased
 and ``addToUFM\_C'' and ``Data.IntMap.insertWith'' differ in the order
 of arguments of combining function.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -81,15 +81,15 @@ import Data.Data
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid
 #endif
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The signature of the module}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 emptyUFM        :: UniqFM elt
 isNullUFM       :: UniqFM elt -> Bool
 unitUFM         :: Uniquable key => key -> elt -> UniqFM elt
@@ -190,27 +190,26 @@ eltsUFM         :: UniqFM elt -> [elt]
 ufmToSet_Directly :: UniqFM elt -> S.IntSet
 ufmToList       :: UniqFM elt -> [(Unique, elt)]
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Monoid interface}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Monoid (UniqFM a) where
     mempty = emptyUFM
     mappend = plusUFM
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Implementation using ``Data.IntMap''}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype UniqFM ele = UFM (M.IntMap ele)
   deriving (Data, Eq, Foldable.Foldable, Functor, Traversable.Traversable,
             Typeable)
@@ -294,15 +293,14 @@ joinUFM eltJoin l (OldFact old) (NewFact new) = foldUFM_Directly add (NoChange, 
                                 (SomeChange, v') -> (SomeChange, addToUFM_Directly joinmap k v')
                                 (NoChange, _) -> (ch, joinmap)
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Output-ery}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance Outputable a => Outputable (UniqFM a) where
     ppr ufm = pprUniqFM ppr ufm
 
@@ -311,4 +309,3 @@ pprUniqFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
     [ ppr uq <+> ptext (sLit ":->") <+> ppr_elt elt
     | (uq, elt) <- ufmToList ufm ]
-\end{code}

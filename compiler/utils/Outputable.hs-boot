@@ -1,7 +1,3 @@
-
-\begin{code}
 module Outputable where
 
 data SDoc
-\end{code}
-
