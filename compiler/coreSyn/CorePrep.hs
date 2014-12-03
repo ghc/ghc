@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow, 1994-2006
-%
+{-
+(c) The University of Glasgow, 1994-2006
+
 
 Core pass to saturate constructors and PrimOps
+-}
 
-\begin{code}
 {-# LANGUAGE BangPatterns, CPP #-}
 
 module CorePrep (
@@ -56,8 +56,8 @@ import Config
 import Data.Bits
 import Data.List        ( mapAccumL )
 import Control.Monad
-\end{code}
 
+{-
 -- ---------------------------------------------------------------------------
 -- Overview
 -- ---------------------------------------------------------------------------
@@ -142,21 +142,21 @@ Here is the syntax of the Core produced by CorePrep:
 
 We define a synonym for each of these non-terminals.  Functions
 with the corresponding name produce a result in that syntax.
+-}
 
-\begin{code}
 type CpeTriv = CoreExpr    -- Non-terminal 'triv'
 type CpeApp  = CoreExpr    -- Non-terminal 'app'
 type CpeBody = CoreExpr    -- Non-terminal 'body'
 type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Top level stuff
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 corePrepPgm :: DynFlags -> HscEnv -> CoreProgram -> [TyCon] -> IO CoreProgram
 corePrepPgm dflags hsc_env binds data_tycons = do
     showPass dflags "CorePrep"
@@ -202,8 +202,8 @@ mkDataConWorkers data_tycons
     | tycon <- data_tycons,     -- CorePrep will eta-expand it
       data_con <- tyConDataCons tycon,
       let id = dataConWorkId data_con ]
-\end{code}
 
+{-
 Note [Floating out of top level bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 NB: we do need to float out of top-level bindings
@@ -335,13 +335,13 @@ Into this one:
 (Since f is not considered to be free in its own RHS.)
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 The main code
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
         -> UniqSM (CorePrepEnv, Floats)
 cpeBind top_lvl env (NonRec bndr rhs)
@@ -349,7 +349,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
        ; let dmd         = idDemandInfo bndr
              is_unlifted = isUnLiftedType (idType bndr)
        ; (floats, bndr2, rhs2) <- cpePair top_lvl NonRecursive
-                                          dmd 
+                                          dmd
                                           is_unlifted
                                           env bndr1 rhs
        ; let new_float = mkFloat dmd is_unlifted bndr2 rhs2
@@ -697,7 +697,7 @@ cpeApp env expr
 -- ---------------------------------------------------------------------------
 
 -- This is where we arrange that a non-trivial argument is let-bound
-cpeArg :: CorePrepEnv -> Demand 
+cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> Type -> UniqSM (Floats, CpeTriv)
 cpeArg env dmd arg arg_ty
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
@@ -719,8 +719,8 @@ cpeArg env dmd arg arg_ty
     is_unlifted = isUnLiftedType arg_ty
     is_strict   = isStrictDmd dmd
     want_float  = wantFloatNested NonRecursive (is_strict || is_unlifted)
-\end{code}
 
+{-
 Note [Floating unlifted arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider    C (let v* = expensive in v)
@@ -741,8 +741,8 @@ because that has different strictness.  Hence the use of 'allLazy'.
 
 maybeSaturate deals with saturating primops and constructors
 The type is the type of the entire application
+-}
 
-\begin{code}
 maybeSaturate :: Id -> CpeApp -> Int -> UniqSM CpeRhs
 maybeSaturate fn expr n_args
   | Just DataToTagOp <- isPrimOpId_maybe fn     -- DataToTag must have an evaluated arg
@@ -783,8 +783,8 @@ saturateDataToTag sat_expr
 
     eval_data2tag_arg other     -- Should not happen
         = pprPanic "eval_data2tag" (ppr other)
-\end{code}
 
+{-
 Note [dataToTag magic]
 ~~~~~~~~~~~~~~~~~~~~~~
 Horrid: we must ensure that the arg of data2TagOp is evaluated
@@ -795,13 +795,13 @@ How might it not be evaluated?  Well, we might have floated it out
 of the scope of a `seq`, or dropped the `seq` altogether.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Simple CoreSyn operations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- we don't ignore any Tickishes at the moment.
 ignoreTickish :: Tickish Id -> Bool
 ignoreTickish _ = False
@@ -817,8 +817,8 @@ cpe_ExprIsTrivial (Tick t e)     = not (tickishIsCode t) && cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Cast e _)     = cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Lam b body) | isTyVar b = cpe_ExprIsTrivial body
 cpe_ExprIsTrivial _              = False
-\end{code}
 
+{-
 -- -----------------------------------------------------------------------------
 --      Eta reduction
 -- -----------------------------------------------------------------------------
@@ -858,14 +858,14 @@ and now we do NOT want eta expansion to give
 
 Instead CoreArity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
+-}
 
-\begin{code}
 cpeEtaExpand :: Arity -> CpeRhs -> CpeRhs
 cpeEtaExpand arity expr
   | arity == 0 = expr
   | otherwise  = etaExpand arity expr
-\end{code}
 
+{-
 -- -----------------------------------------------------------------------------
 --      Eta reduction
 -- -----------------------------------------------------------------------------
@@ -876,8 +876,8 @@ trivial (like f, or f Int).  But for deLam it would be enough to
 get to a partial application:
         case x of { p -> \xs. map f xs }
     ==> case x of { p -> map f }
+-}
 
-\begin{code}
 tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
 tryEtaReducePrep bndrs expr@(App _ _)
   | ok_to_eta_reduce f
@@ -910,20 +910,19 @@ tryEtaReducePrep bndrs (Let bind@(NonRec _ r) body)
     fvs = exprFreeVars r
 
 tryEtaReducePrep _ _ = Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Floats
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Pin demand info on floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We pin demand info on floated lets so that we can see the one-shot thunks.
+-}
 
-\begin{code}
 data FloatingBind
   = FloatLet CoreBind    -- Rhs of bindings are CpeRhss
                          -- They are always of lifted type;
@@ -1093,16 +1092,15 @@ allLazyNested :: RecFlag -> Floats -> Bool
 allLazyNested _      (Floats OkToSpec    _) = True
 allLazyNested _      (Floats NotOkToSpec _) = False
 allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Cloning
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- ---------------------------------------------------------------------------
 --                      The environment
 -- ---------------------------------------------------------------------------
@@ -1208,4 +1206,3 @@ newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
      return (mkSysLocal (fsLit "sat") uniq ty)
-\end{code}

@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 -- | Handy functions for creating much Core syntax
@@ -91,15 +90,15 @@ import Data.Word        ( Word )
 #endif
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Basic CoreSyn construction}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 sortQuantVars :: [Var] -> [Var]
 -- Sort the variables (KindVars, TypeVars, and Ids)
 -- into order: Kind, then Type, then Id
@@ -219,26 +218,26 @@ castBottomExpr e res_ty
   | otherwise            = Case e (mkWildValBinder e_ty) res_ty []
   where
     e_ty = exprType e
-\end{code}
 
+{-
 The functions from this point don't really do anything cleverer than
 their counterparts in CoreSyn, but they are here for consistency
+-}
 
-\begin{code}
 -- | Create a lambda where the given expression has a number of variables
 -- bound over it. The leftmost binder is that bound by the outermost
 -- lambda in the result
 mkCoreLams :: [CoreBndr] -> CoreExpr -> CoreExpr
 mkCoreLams = mkLams
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Making literals}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExpr :: DynFlags -> Integer -> CoreExpr        -- Result = I# i :: Int
 mkIntExpr dflags i = mkConApp intDataCon  [mkIntLit dflags i]
@@ -295,9 +294,6 @@ mkStringExprFS str
   where
     chars = unpackFS str
     safeChar c = ord c >= 1 && ord c <= 0x7F
-\end{code}
-
-\begin{code}
 
 -- This take a ~# b (or a ~# R b) and returns a ~ b (or Coercible a b)
 mkEqBox :: Coercion -> CoreExpr
@@ -310,15 +306,14 @@ mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ p
             Representational -> coercibleDataCon
             Phantom ->          pprPanic "mkEqBox does not support boxing phantom coercions"
                                          (ppr co)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Tuple constructors}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- $big_tuples
 -- #big_tuples#
@@ -361,8 +356,7 @@ chunkify xs
     split [] = []
     split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
 
-\end{code}
-
+{-
 Creating tuples and their types for Core expressions
 
 @mkBigCoreVarTup@ builds a tuple; the inverse to @mkTupleSelector@.
@@ -371,8 +365,7 @@ Creating tuples and their types for Core expressions
 
 * If there are more elements than a big tuple can have, it nests
   the tuples.
-
-\begin{code}
+-}
 
 -- | Build a small tuple holding the specified variables
 mkCoreVarTup :: [Id] -> CoreExpr
@@ -404,16 +397,15 @@ mkBigCoreTup = mkChunkified mkCoreTup
 -- | Build the type of a big tuple that holds the specified type of thing
 mkBigCoreTupTy :: [Type] -> Type
 mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Floats
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data FloatBind
   = FloatLet  CoreBind
   | FloatCase CoreExpr Id AltCon [Var]
@@ -428,15 +420,15 @@ instance Outputable FloatBind where
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
 wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body)]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Tuple destructors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Builds a selector which scrutises the given
 -- expression and extracts the one name from the list given.
 -- If you want the no-shadowing rule to apply, the caller
@@ -475,9 +467,7 @@ mkTupleSelector vars the_var scrut_var scrut
           tpl_vs  = mkTemplateLocals tpl_tys
           [(tpl_v, group)] = [(tpl,gp) | (tpl,gp) <- zipEqual "mkTupleSelector" tpl_vs vars_s,
                                          the_var `elem` gp ]
-\end{code}
 
-\begin{code}
 -- | Like 'mkTupleSelector' but for tuples that are guaranteed
 -- never to be \"big\".
 --
@@ -495,9 +485,7 @@ mkSmallTupleSelector vars the_var scrut_var scrut
   = ASSERT( notNull vars )
     Case scrut scrut_var (idType the_var)
          [(DataAlt (tupleCon BoxedTuple (length vars)), vars, Var the_var)]
-\end{code}
 
-\begin{code}
 -- | A generalization of 'mkTupleSelector', allowing the body
 -- of the case to be an arbitrary expression.
 --
@@ -535,9 +523,7 @@ mkTupleCase uniqs vars body scrut_var scrut
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us', scrut_var:vs, body')
-\end{code}
 
-\begin{code}
 -- | As 'mkTupleCase', but for a tuple that is small enough to be guaranteed
 -- not to need nesting.
 mkSmallTupleCase
@@ -552,18 +538,18 @@ mkSmallTupleCase [var] body _scrut_var scrut
 mkSmallTupleCase vars body scrut_var scrut
 -- One branch no refinement?
   = Case scrut scrut_var (exprType body) [(DataAlt (tupleCon BoxedTuple (length vars)), vars, body)]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Common list manipulation expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Call the constructor Ids when building explicit lists, so that they
 interact well with rules.
+-}
 
-\begin{code}
 -- | Makes a list @[]@ for lists of the specified type
 mkNilExpr :: Type -> CoreExpr
 mkNilExpr ty = mkConApp nilDataCon [Type ty]
@@ -613,16 +599,15 @@ mkBuildExpr elt_ty mk_build_inside = do
     newTyVars tyvar_tmpls = do
       uniqs <- getUniquesM
       return (zipWith setTyVarUnique tyvar_tmpls uniqs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                       Error expressions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkRuntimeErrorApp
         :: Id           -- Should be of type (forall a. Addr# -> a)
                         --      where Addr# points to a UTF8 encoded string
@@ -638,13 +623,13 @@ mkRuntimeErrorApp err_id res_ty err_msg
 mkImpossibleExpr :: Type -> CoreExpr
 mkImpossibleExpr res_ty
   = mkRuntimeErrorApp rUNTIME_ERROR_ID res_ty "Impossible case alternative"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                      Error Ids
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 GHC randomly injects these into the code.
 
@@ -660,8 +645,8 @@ crash).
 @parError@ is a special version of @error@ which the compiler does
 not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
 templates, but we don't ever expect to generate code for it.
+-}
 
-\begin{code}
 errorIds :: [Id]
 errorIds
   = [ eRROR_ID,   -- This one isn't used anywhere else in the compiler
@@ -719,9 +704,7 @@ mkRuntimeErrorId name = pc_bottoming_Id1 name runtimeErrorTy
 runtimeErrorTy :: Type
 -- The runtime error Ids take a UTF8-encoded string as argument
 runtimeErrorTy = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
-\end{code}
 
-\begin{code}
 errorName :: Name
 errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
 
@@ -739,8 +722,8 @@ uNDEFINED_ID = pc_bottoming_Id0 undefinedName undefinedTy
 
 undefinedTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
 undefinedTy  = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
-\end{code}
 
+{-
 Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'error' and 'undefined' have types
@@ -754,13 +737,13 @@ This is OK because it never returns, so the return type is irrelevant.
 See Note [OpenTypeKind accepts foralls] in TcUnify.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Utilities}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 pc_bottoming_Id1 :: Name -> Type -> Id
 -- Function of arity 1, which diverges after being given one argument
 pc_bottoming_Id1 name ty
@@ -789,4 +772,3 @@ pc_bottoming_Id0 name ty
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
     strict_sig = mkClosedStrictSig [] botRes
-\end{code}

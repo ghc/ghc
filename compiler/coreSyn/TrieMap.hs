@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE RankNTypes, TypeFamilies #-}
 module TrieMap(
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
@@ -34,8 +33,8 @@ import VarEnv
 import NameEnv
 import Outputable
 import Control.Monad( (>=>) )
-\end{code}
 
+{-
 This module implements TrieMaps, which are finite mappings
 whose key is a structured value like a CoreExpr or Type.
 
@@ -43,13 +42,13 @@ The code is very regular and boilerplate-like, but there is
 some neat handling of *binders*.  In effect they are deBruijn
 numbered on the fly.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                    The TrieMap class
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type XT a = Maybe a -> Maybe a  -- How to alter a non-existent elt (Nothing)
                                 --               or an existing elt (Just)
 
@@ -94,15 +93,15 @@ x |> f = f x
 deMaybe :: TrieMap m => Maybe (m a) -> m a
 deMaybe Nothing  = emptyTM
 deMaybe (Just m) = m
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    IntMaps
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance TrieMap IntMap.IntMap where
   type Key IntMap.IntMap = Int
   emptyTM = IntMap.empty
@@ -129,19 +128,18 @@ instance TrieMap UniqFM where
   alterTM k f m = alterUFM f m k
   foldTM k m z = foldUFM k z m
   mapTM f m = mapUFM f m
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Lists
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 If              m is a map from k -> val
 then (MaybeMap m) is a map from (Maybe k) -> val
+-}
 
-\begin{code}
 data MaybeMap m a = MM { mm_nothing  :: Maybe a, mm_just :: m a }
 
 instance TrieMap m => TrieMap (MaybeMap m) where
@@ -205,16 +203,15 @@ fdList k m = foldMaybe k          (lm_nil m)
 foldMaybe :: (a -> b -> b) -> Maybe a -> b -> b
 foldMaybe _ Nothing  b = b
 foldMaybe k (Just a) b = k a b
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Basic maps
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 lkNamed :: NamedThing n => n -> NameEnv a -> Maybe a
 lkNamed n env = lookupNameEnv env (getName n)
 
@@ -232,13 +229,13 @@ lkLit = lookupTM
 
 xtLit :: Literal -> XT a -> LiteralMap a -> LiteralMap a
 xtLit = alterTM
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    CoreMap
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Binders]
 ~~~~~~~~~~~~~~
@@ -268,8 +265,8 @@ is that it's unnecesary, so we have two fields (cm_case and cm_ecase)
 for the two possibilities.  Only cm_ecase looks at the type.
 
 See also Note [Empty case alternatives] in CoreSyn.
+-}
 
-\begin{code}
 data CoreMap a
   = EmptyCM
   | CM { cm_var   :: VarMap a
@@ -449,15 +446,15 @@ fdA :: (a -> b -> b) -> AltMap a -> b -> b
 fdA k m = foldTM k (am_deflt m)
         . foldTM (foldTM k) (am_data m)
         . foldTM (foldTM k) (am_lit m)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data CoercionMap a
   = EmptyKM
   | KM { km_refl   :: RoleMap (TypeMap a)
@@ -586,10 +583,6 @@ fdC k m = foldTM (foldTM k) (km_refl m)
         . foldTM k          (km_sub m)
         . foldTM (foldTM (foldTM k)) (km_axiom_rule m)
 
-\end{code}
-
-\begin{code}
-
 newtype RoleMap a = RM { unRM :: (IntMap.IntMap a) }
 
 instance TrieMap RoleMap where
@@ -616,16 +609,14 @@ fdR f (RM m) = foldTM f m
 mapR :: (a -> b) -> RoleMap a -> RoleMap b
 mapR f = RM . mapTM f . unRM
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Types
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data TypeMap a
   = EmptyTM
   | TM { tm_var   :: VarMap a
@@ -764,16 +755,15 @@ xtTyLit l f m =
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
 foldTyLit l m = flip (Map.fold l) (tlm_string m)
               . flip (Map.fold l) (tlm_number m)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                    Variables
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type BoundVar = Int  -- Bound variables are deBruijn numbered
 type BoundVarMap a = IntMap.IntMap a
 
@@ -837,4 +827,3 @@ lkFreeVar var env = lookupVarEnv env var
 
 xtFreeVar :: Var -> XT a -> VarEnv a -> VarEnv a
 xtFreeVar v f m = alterVarEnv f m v
-\end{code}

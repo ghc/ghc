@@ -1,12 +1,11 @@
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
 
 A ``lint'' pass to check for Core correctness
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fprof-auto #-}
 
@@ -48,8 +47,8 @@ import Control.Monad
 import MonadUtils
 import Data.Maybe
 import Pair
-\end{code}
 
+{-
 Note [GHC Formalism]
 ~~~~~~~~~~~~~~~~~~~~
 This file implements the type-checking algorithm for System FC, the "official"
@@ -62,11 +61,11 @@ just about anything in this file or you change other types/functions throughout
 the Core language (all signposted to this note), you should update that
 formalism. See docs/core-spec/README for more info about how to do so.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[lintCoreBindings]{@lintCoreBindings@: Top-level interface}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Checks that a set of core bindings is well-formed.  The PprStyle and String
 just control what we print in the event of an error.  The Bool value
@@ -111,9 +110,8 @@ to the type of the binding variable.  lintBinders does this.
 For Ids, the type-substituted Id is added to the in_scope set (which
 itself is part of the TvSubst we are carrying down), and when we
 find an occurrence of an Id, we fetch it from the in-scope set.
+-}
 
-
-\begin{code}
 lintCoreBindings :: [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
@@ -149,18 +147,18 @@ lintCoreBindings local_in_scope binds
     -- See Note [GHC Formalism]
     lint_bind (Rec prs)         = mapM_ (lintSingleBinding TopLevel Recursive) prs
     lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lintUnfolding]{lintUnfolding}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
+-}
 
-\begin{code}
 lintUnfolding :: SrcLoc
               -> [Var]          -- Treat these as in scope
               -> CoreExpr
@@ -185,17 +183,17 @@ lintExpr vars expr
     (_warns, errs) = initL (addLoc TopLevelBindings $
                             addInScopeVars vars     $
                             lintCoreExpr expr)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lintCoreBinding]{lintCoreBinding}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Check a core binding, returning the list of variables bound.
+-}
 
-\begin{code}
 lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -263,15 +261,15 @@ lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
        ; checkTys bndr_ty ty (mkRhsMsg bndr (ptext (sLit "unfolding")) ty) }
 lintIdUnfolding  _ _ _
   = return ()       -- We could check more
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lintCoreExpr]{lintCoreExpr}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 --type InKind      = Kind       -- Substitution not yet applied
 type InType      = Type
 type InCoercion  = Coercion
@@ -415,8 +413,7 @@ lintCoreExpr (Coercion co)
   = do { (_kind, ty1, ty2, role) <- lintInCo co
        ; return (mkCoercionType role ty1 ty2) }
 
-\end{code}
-
+{-
 Note [Kind instantiation in coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following coercion axiom:
@@ -436,16 +433,16 @@ kind coercions and produce the following substitution which is to be
 applied in the type variables:
   k_ag   ~~>   * -> *
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[lintCoreArgs]{lintCoreArgs}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The basic version of these functions checks that the argument is a
 subtype of the required type, as one would expect.
+-}
 
-\begin{code}
 lintCoreArg  :: OutType -> CoreArg -> LintM OutType
 lintCoreArg fun_ty (Type arg_ty)
   = do { arg_ty' <- applySubstTy arg_ty
@@ -496,9 +493,7 @@ lintValApp arg fun_ty arg_ty
   where
     err1 = mkAppMsg       fun_ty arg_ty arg
     err2 = mkNonFunAppMsg fun_ty arg_ty arg
-\end{code}
 
-\begin{code}
 checkTyKind :: OutTyVar -> OutType -> LintM ()
 -- Both args have had substitution applied
 
@@ -528,16 +523,15 @@ checkDeadIdOcc id
                 (ptext (sLit "Occurrence of a dead Id") <+> ppr id) }
   | otherwise
   = return ()
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lintCoreAlts]{lintCoreAlts}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
 -- b1) Check that the DEFAULT comes first, if it exists
@@ -574,9 +568,7 @@ checkCaseAlts e ty alts =
     is_infinite_ty = case tyConAppTyCon_maybe ty of
                         Nothing    -> False
                         Just tycon -> isPrimTyCon tycon
-\end{code}
 
-\begin{code}
 checkAltExpr :: CoreExpr -> OutType -> LintM ()
 checkAltExpr expr ann_ty
   = do { actual_ty <- lintCoreExpr expr
@@ -620,15 +612,15 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 
   | otherwise   -- Scrut-ty is wrong shape
   = addErrL (mkBadAltMsg scrut_ty alt)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lint-types]{Types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- When we lint binders, we (one at a time and in order):
 --  1. Lint var types or kinds (possibly substituting)
 --  2. Add the binder to the in scope set, and if its a coercion var,
@@ -675,20 +667,19 @@ lintAndScopeId id linterF
   = do { ty <- lintInTy (idType id)
        ; let id' = setIdType id ty
        ; addInScopeVar id' $ (linterF id') }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Types and kinds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We have a single linter for types and kinds.  That is convenient
 because sometimes it's not clear whether the thing we are looking
 at is a type or a kind.
+-}
 
-\begin{code}
 lintInTy :: InType -> LintM LintedType
 -- Types only, not kinds
 -- Check the type, and apply the substitution to it
@@ -746,10 +737,6 @@ lintType (ForAllTy tv ty)
 
 lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 
-\end{code}
-
-
-\begin{code}
 lintKind :: OutKind -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -757,10 +744,7 @@ lintKind k = do { sk <- lintType k
                 ; unless (isSuperKind sk)
                          (addErrL (hang (ptext (sLit "Ill-kinded kind:") <+> ppr k)
                                       2 (ptext (sLit "has kind:") <+> ppr sk))) }
-\end{code}
 
-
-\begin{code}
 lintArrow :: SDoc -> LintedKind -> LintedKind -> LintM LintedKind
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -823,15 +807,15 @@ lint_app doc kfn kas
            ; return (substKiWith [kv] [ta] kfn) }
 
     go_app _ _ = failWithL fail_msg
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
          Linting coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 lintInCo :: InCoercion -> LintM (LintedKind, LintedType, LintedType, Role)
 -- Check the coercion, and apply the substitution to it
 -- See Note [Linting type lets]
@@ -1053,15 +1037,13 @@ lintCoercion this@(AxiomRuleCo co ts cs)
                           [ txt "Expected:" <+> int (n + length es)
                           , txt "Provided:" <+> int n ]
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lint-monad]{The Lint monad}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -1118,17 +1100,12 @@ data LintLocInfo
   | TopLevelBindings
   | InType Type         -- Inside a type
   | InCo   Coercion     -- Inside a coercion
-\end{code}
 
-
-\begin{code}
 initL :: LintM a -> WarnsAndErrs    -- Errors and warnings
 initL m
   = case unLintM m [] emptyTvSubst (emptyBag, emptyBag) of
       (_, errs) -> errs
-\end{code}
 
-\begin{code}
 checkL :: Bool -> MsgDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
@@ -1195,9 +1172,7 @@ applySubstCo co = do { subst <- getTvSubst; return (substCo (tvCvSubst subst) co
 extendSubstL :: TyVar -> Type -> LintM a -> LintM a
 extendSubstL tv ty m
   = LintM (\ loc subst errs -> unLintM m loc (Type.extendTvSubst subst tv ty) errs)
-\end{code}
 
-\begin{code}
 lookupIdInScope :: Id -> LintM Id
 lookupIdInScope id
   | not (mustHaveLocalBinding id)
@@ -1247,15 +1222,14 @@ checkRole co r1 r2
             ptext (sLit "got") <+> ppr r2 $$
             ptext (sLit "in") <+> ppr co)
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Error messages}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dumpLoc :: LintLocInfo -> (SrcLoc, SDoc)
 
 dumpLoc (RhsOf v)
@@ -1294,9 +1268,7 @@ pp_binders bs = sep (punctuate comma (map pp_binder bs))
 pp_binder :: Var -> SDoc
 pp_binder b | isId b    = hsep [ppr b, dcolon, ppr (idType b)]
             | otherwise = hsep [ppr b, dcolon, ppr (tyVarKind b)]
-\end{code}
 
-\begin{code}
 ------------------------------------------------------
 --      Messages for case expressions
 
@@ -1468,4 +1440,3 @@ dupExtVars :: [[Name]] -> MsgDoc
 dupExtVars vars
   = hang (ptext (sLit "Duplicate top-level variables with the same qualified name"))
        2 (ppr vars)
-\end{code}

@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
 Utility functions on @Core@ syntax
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module CoreSubst (
         -- * Main data types
@@ -82,16 +82,15 @@ import FastString
 import Data.List
 
 import TysWiredIn
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Substitutions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A substitution environment, containing both 'Id' and 'TyVar' substitutions.
 --
 -- Some invariants apply to how you use the substitution:
@@ -124,8 +123,8 @@ data Subst
         --              Types.TvSubstEnv
         --
         -- INVARIANT 3: See Note [Extending the Subst]
-\end{code}
 
+{-
 Note [Extending the Subst]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a core Subst, which binds Ids as well, we make a different choice for Ids
@@ -179,8 +178,8 @@ TvSubstEnv and CvSubstEnv?
 
 * For TyVars, only coercion variables can possibly change, and they are
   easy to spot
+-}
 
-\begin{code}
 -- | An environment for substituting for 'Id's
 type IdSubstEnv = IdEnv CoreExpr
 
@@ -331,11 +330,9 @@ extendInScopeIds (Subst in_scope ids tvs cvs) vs
 
 setInScope :: Subst -> InScopeSet -> Subst
 setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
-\end{code}
 
-Pretty printing, for debugging only
+-- Pretty printing, for debugging only
 
-\begin{code}
 instance Outputable Subst where
   ppr (Subst in_scope ids tvs cvs)
         =  ptext (sLit "<InScope =") <+> braces (fsep (map ppr (varEnvElts (getInScopeVars in_scope))))
@@ -343,16 +340,15 @@ instance Outputable Subst where
         $$ ptext (sLit " TvSubst   =") <+> ppr tvs
         $$ ptext (sLit " CvSubst   =") <+> ppr cvs
          <> char '>'
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Substituting expressions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only
 -- apply the substitution /once/: see "CoreSubst#apply_once"
 --
@@ -428,9 +424,7 @@ substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
                                 (bndrs, rhss)    = unzip pairs
                                 (subst', bndrs') = substRecBndrs subst bndrs
                                 rhss' = map (subst_expr subst') rhss
-\end{code}
 
-\begin{code}
 -- | De-shadowing the program is sometimes a useful pre-pass. It can be done simply
 -- by running over the bindings with an empty substitution, because substitution
 -- returns a result that has no-shadowing guaranteed.
@@ -442,21 +436,20 @@ substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
 --          short and simple that I'm going to leave it here
 deShadowBinds :: CoreProgram -> CoreProgram
 deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Substituting binders
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Remember that substBndr and friends are used when doing expression
 substitution only.  Their only business is substitution, so they
 preserve all IdInfo (suitably substituted).  For example, we *want* to
 preserve occ info in rules.
+-}
 
-\begin{code}
 -- | Substitutes a 'Var' for another one according to the 'Subst' given, returning
 -- the result and an updated 'Subst' that should be used by subsequent substitutions.
 -- 'IdInfo' is preserved by this process, although it is substituted into appropriately.
@@ -476,10 +469,7 @@ substRecBndrs subst bndrs
   = (new_subst, new_bndrs)
   where         -- Here's the reason we need to pass rec_subst to subst_id
     (new_subst, new_bndrs) = mapAccumL (substIdBndr (text "rec-bndr") new_subst) subst bndrs
-\end{code}
 
-
-\begin{code}
 substIdBndr :: SDoc
             -> Subst            -- ^ Substitution to use for the IdInfo
             -> Subst -> Id      -- ^ Substitution and Id to transform
@@ -513,12 +503,12 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
     no_change = id1 == old_id
         -- See Note [Extending the Subst]
         -- it's /not/ necessary to check mb_new_info and no_type_change
-\end{code}
 
+{-
 Now a variant that unconditionally allocates a new unique.
 It also unconditionally zaps the OccInfo.
+-}
 
-\begin{code}
 -- | Very similar to 'substBndr', but it always allocates a new 'Unique' for
 -- each variable in its output.  It substitutes the IdInfo though.
 cloneIdBndr :: Subst -> UniqSupply -> Id -> (Subst, Id)
@@ -564,20 +554,19 @@ clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
     new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
     (new_idvs, new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
                         | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Types and Coercions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 For types and coercions we just call the corresponding functions in
 Type and Coercion, but we have to repackage the substitution, from a
 Subst to a TvSubst.
+-}
 
-\begin{code}
 substTyVarBndr :: Subst -> TyVar -> (Subst, TyVar)
 substTyVarBndr (Subst in_scope id_env tv_env cv_env) tv
   = case Type.substTyVarBndr (TvSubst in_scope tv_env) tv of
@@ -609,16 +598,15 @@ getCvSubst (Subst in_scope _ tenv cenv) = CvSubst in_scope tenv cenv
 -- | See 'Coercion.substCo'
 substCo :: Subst -> Coercion -> Coercion
 substCo subst co = Coercion.substCo (getCvSubst subst) co
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section{IdInfo substitution}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst _ _ tv_env cv_env) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env) || isEmptyVarSet (Type.tyVarsOfType old_ty) = id
@@ -760,8 +748,8 @@ for an Id in a breakpoint.  We ensure this by never storing an Id with
 an unlifted type in a Breakpoint - see Coverage.mkTickish.
 Breakpoints can't handle free variables with unlifted types anyway.
 -}
-\end{code}
 
+{-
 Note [Worker inlining]
 ~~~~~~~~~~~~~~~~~~~~~~
 A worker can get sustituted away entirely.
@@ -774,11 +762,11 @@ In all all these cases we simply drop the special case, returning to
 InlVanilla.  The WARN is just so I can see if it happens a lot.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         The Very Simple Optimiser
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Optimise coercion boxes agressively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -830,8 +818,8 @@ we wouldn't simplify this expression at all:
 
 The rule LHS desugarer can't deal with Let at all, so we need to push that box into
 the use sites.
+-}
 
-\begin{code}
 simpleOptExpr :: CoreExpr -> CoreExpr
 -- Do simple optimisation on an expression
 -- The optimisation is very straightforward: just
@@ -1093,8 +1081,8 @@ simpleUnfoldingFun :: IdUnfoldingFun
 simpleUnfoldingFun id
   | isAlwaysActive (idInlineActivation id) = idUnfolding id
   | otherwise                              = noUnfolding
-\end{code}
 
+{-
 Note [Inline prag in simplOpt]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If there's an INLINE/NOINLINE pragma that restricts the phase in
@@ -1121,11 +1109,11 @@ match if we replace coerce by its unfolding on the LHS, because that is the
 core that the rule matching engine will find. So do that for everything that
 has a compulsory unfolding. Also see Note [Desugaring coerce as cast] in Desugar
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
          exprIsConApp_maybe
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [exprIsConApp_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1157,8 +1145,8 @@ Just (':', [Char], ['a', unpackCString# "bc"]).
 We need to be careful about UTF8 strings here. ""# contains a ByteString, so
 we must parse it back into a FastString to split off the first character.
 That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
+-}
 
-\begin{code}
 data ConCont = CC [CoreExpr] Coercion
                   -- Substitution already applied
 
@@ -1314,8 +1302,8 @@ stripTypeArgs :: [CoreExpr] -> [Type]
 stripTypeArgs args = ASSERT2( all isTypeArg args, ppr args )
                      [ty | Type ty <- args]
   -- We really do want isTypeArg here, not isTyCoArg!
-\end{code}
 
+{-
 Note [Unfolding DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~
 DFuns look like
@@ -1333,8 +1321,8 @@ Note [DFun arity check]
 Here we check that the total number of supplied arguments (inclding
 type args) matches what the dfun is expecting.  This may be *less*
 than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
+-}
 
-\begin{code}
 exprIsLiteral_maybe :: InScopeEnv -> CoreExpr -> Maybe Literal
 -- Same deal as exprIsConApp_maybe, but much simpler
 -- Nevertheless we do need to look through unfoldings for
@@ -1347,8 +1335,8 @@ exprIsLiteral_maybe env@(_, id_unf) e
       Var v     | Just rhs <- expandUnfolding_maybe (id_unf v)
                 -> exprIsLiteral_maybe env rhs
       _         -> Nothing
-\end{code}
 
+{-
 Note [exprIsLambda_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprIsLambda_maybe will, given an expression `e`, try to turn it into the form
@@ -1358,8 +1346,8 @@ has a greater arity than arguments are present.
 
 Currently, it is used in Rules.match, and is required to make
 "map coerce = coerce" match.
+-}
 
-\begin{code}
 exprIsLambda_maybe :: InScopeEnv -> CoreExpr -> Maybe (Var, CoreExpr)
     -- See Note [exprIsLambda_maybe]
 
@@ -1418,5 +1406,3 @@ pushCoercionIntoLambda in_scope x e co
     | otherwise
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing
-
-\end{code}

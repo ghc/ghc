@@ -1,12 +1,12 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1996-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1996-1998
+
 
 This module contains "tidying" code for *nested* expressions, bindings, rules.
 The code for *top-level* bindings is in TidyPgm.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module CoreTidy (
         tidyExpr, tidyVarOcc, tidyRule, tidyRules, tidyUnfolding
@@ -27,16 +27,15 @@ import Name hiding (tidyNameOcc)
 import SrcLoc
 import Maybes
 import Data.List
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Tidying expressions, rules}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tidyBind :: TidyEnv
          -> CoreBind
          ->  (TidyEnv, CoreBind)
@@ -105,16 +104,15 @@ tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
            ru_rhs   = tidyExpr env' rhs,
            ru_fn    = tidyNameOcc env fn,
            ru_rough = map (fmap (tidyNameOcc env')) mb_ns }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Tidying non-top-level binders}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tidyNameOcc :: TidyEnv -> Name -> Name
 -- In rules and instances, we have Names, and we must tidy them too
 -- Fortunately, we can lookup in the VarEnv with a name
@@ -223,8 +221,8 @@ tidyUnfolding tidy_env
   | otherwise
   = unf_from_rhs
 tidyUnfolding _ unf _ = unf     -- NoUnfolding or OtherCon
-\end{code}
 
+{-
 Note [Tidy IdInfo]
 ~~~~~~~~~~~~~~~~~~
 All nested Ids now have the same IdInfo, namely vanillaIdInfo, which
@@ -268,9 +266,7 @@ optimisation pipeline, leaving only the OneShotInfo on the lambda. Hence we
 must preserve this info in inlinings.
 
 This applies to lambda binders only, hence it is stored in IfaceLamBndr.
+-}
 
-
-\begin{code}
 (=:) :: a -> (a -> b) -> b
 m =: k = m `seq` k m
-\end{code}

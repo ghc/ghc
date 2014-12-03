@@ -1,7 +1,7 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1994-1998
+
 
 Core-syntax unfoldings
 
@@ -13,8 +13,8 @@ unfoldings, capturing ``higher-level'' things we know about a binding,
 usually things that the simplifier found out (e.g., ``it's a
 literal'').  In the corner of a @CoreUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module CoreUnfold (
@@ -66,16 +66,15 @@ import ForeignCall
 
 import qualified Data.ByteString as BS
 import Data.Maybe
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Making unfoldings}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkTopUnfolding :: DynFlags -> Bool -> CoreExpr -> Unfolding
 mkTopUnfolding dflags = mkUnfolding dflags InlineRhs True {- Top level -}
 
@@ -184,8 +183,8 @@ specUnfolding _ _ _ _ _ = noUnfolding
 
 spec_doc :: SDoc
 spec_doc = ptext (sLit "specUnfolding")
-\end{code}
 
+{-
 Note [Specialising unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we specialise a function for some given type-class arguments, we use
@@ -214,9 +213,8 @@ specUnfolding to specialise its unfolding.  Some important points:
         we keep it (so the specialised thing too will always inline)
      if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
         (which arises from INLINEABLE), we discard it
+-}
 
-
-\begin{code}
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
@@ -253,8 +251,8 @@ mkUnfolding dflags src top_lvl is_bottoming expr
     guidance = calcUnfoldingGuidance dflags expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
-\end{code}
 
+{-
 Note [Occurrence analysis of unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do occurrence-analysis of unfoldings once and for all, when the
@@ -297,13 +295,13 @@ it gets fixed up next round.  And it should be rare, because large
 let-bound things that are dead are usually caught by preInlineUnconditionally
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{The UnfoldingGuidance type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 inlineBoringOk :: CoreExpr -> Bool
 -- See Note [INLINE for small functions]
 -- True => the result of inlining the expression is
@@ -361,8 +359,8 @@ calcUnfoldingGuidance dflags expr
              plus_disc | isFunTy (idType bndr) = max
                        | otherwise             = (+)
              -- See Note [Function and non-function discounts]
-\end{code}
 
+{-
 Note [Computing the size of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea of sizeExpr is obvious enough: count nodes.  But getting the
@@ -457,8 +455,8 @@ Things to note:
     NB: you might think that PostInlineUnconditionally would do this
     but it doesn't fire for top-level things; see SimplUtils
     Note [Top level and postInlineUnconditionally]
+-}
 
-\begin{code}
 uncondInline :: CoreExpr -> Arity -> Int -> Bool
 -- Inline unconditionally if there no size increase
 -- Size of call is arity (+1 for the function)
@@ -466,10 +464,7 @@ uncondInline :: CoreExpr -> Arity -> Int -> Bool
 uncondInline rhs arity size
   | arity > 0 = size <= 10 * (arity + 1) -- See Note [INLINE for small functions] (1)
   | otherwise = exprIsTrivial rhs        -- See Note [INLINE for small functions] (4)
-\end{code}
 
-
-\begin{code}
 sizeExpr :: DynFlags
          -> FastInt         -- Bomb out if it gets bigger than this
          -> [Id]            -- Arguments; we're interested in which of these
@@ -630,10 +625,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     -- an expression of type State# RealWorld must be a variable
     isRealWorldExpr (Var id) = isRealWorldId id
     isRealWorldExpr _        = False
-\end{code}
 
-
-\begin{code}
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
@@ -699,8 +691,8 @@ conSize dc n_val_args
 
 -- See Note [Constructor size and result discount]
   | otherwise = SizeIs (_ILIT(10)) emptyBag (iUnbox (10 * (1 + n_val_args)))
-\end{code}
 
+{-
 Note [Constructor size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Treat a constructors application as size 10, regardless of how many
@@ -771,8 +763,8 @@ There's no point in doing so -- any optimisations will see the S#
 through n's unfolding.  Nor will a big size inhibit unfoldings functions
 that mention a literal Integer, because the float-out pass will float
 all those constants to top level.
+-}
 
-\begin{code}
 primOpSize :: PrimOp -> Int -> ExprSize
 primOpSize op n_val_args
  = if primOpOutOfLine op
@@ -800,8 +792,8 @@ augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
 lamScrutDiscount :: DynFlags -> ExprSize -> ExprSize
 lamScrutDiscount dflags (SizeIs n vs _) = SizeIs n vs (iUnbox (ufFunAppDiscount dflags))
 lamScrutDiscount _      TooBig          = TooBig
-\end{code}
 
+{-
 Note [addAltSize result discounts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When adding the size of alternatives, we *add* the result discounts
@@ -854,8 +846,8 @@ In a function application (f a b)
     get a saturated application)
 
 Code for manipulating sizes
+-}
 
-\begin{code}
 data ExprSize = TooBig
               | SizeIs FastInt          -- Size found
                        !(Bag (Id,Int))  -- Arguments cased herein, and discount for each such
@@ -886,21 +878,20 @@ sizeN :: Int -> ExprSize
 
 sizeZero = SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
 sizeN n  = SizeIs (iUnbox n) emptyBag (_ILIT(0))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[considerUnfolding]{Given all the info, do (not) do the unfolding}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We use 'couldBeSmallEnoughToInline' to avoid exporting inlinings that
 we ``couldn't possibly use'' on the other side.  Can be overridden w/
 flaggery.  Just the same as smallEnoughToInline, except that it has no
 actual arguments.
+-}
 
-\begin{code}
 couldBeSmallEnoughToInline :: DynFlags -> Int -> CoreExpr -> Bool
 couldBeSmallEnoughToInline dflags threshold rhs
   = case sizeExpr dflags (iUnbox threshold) [] body of
@@ -947,8 +938,8 @@ certainlyWillInline _ unf@(DFunUnfolding {})
 
 certainlyWillInline _ _
   = Nothing
-\end{code}
 
+{-
 Note [certainlyWillInline: be careful of thunks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't claim that thunks will certainly inline, because that risks work
@@ -959,11 +950,11 @@ found that the WorkWrap phase thought that
 was certainlyWillInline, so the addition got duplicated.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{callSiteInline}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is the key function.  It decides whether to inline a variable at a call site
 
@@ -980,8 +971,8 @@ NOTE: we don't want to inline top-level functions that always diverge.
 It just makes the code bigger.  Tt turns out that the convenient way to prevent
 them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
+-}
 
-\begin{code}
 callSiteInline :: DynFlags
                -> Id                    -- The Id
                -> Bool                  -- True <=> unfolding is active
@@ -1117,8 +1108,8 @@ tryUnfolding dflags id lone_variable
               RhsCtxt     -> uf_arity > 0  --
               _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
                                                       -- Note [Inlining in ArgCtxt]
-\end{code}
 
+{-
 Note [Unfold into lazy contexts], Note [RHS of lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the call is the argument of a function with a RULE, or the RHS of a let,
@@ -1310,8 +1301,8 @@ This kind of thing can occur if you have
         foo = let x = e in (x,x)
 
 which Roman did.
+-}
 
-\begin{code}
 computeDiscount :: DynFlags -> [Int] -> Int -> [ArgSummary] -> CallCtxt
                 -> Int
 computeDiscount dflags arg_discounts res_discount arg_infos cont_info
@@ -1361,13 +1352,13 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
                 -- Otherwise we, rather arbitrarily, threshold it.  Yuk.
                 -- But we want to aovid inlining large functions that return
                 -- constructors into contexts that are simply "interesting"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Interesting arguments
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Interesting arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1398,8 +1389,8 @@ where df is con-like. Then we'd really like to inline 'f' so that the
 rule for (*) (df d) can fire.  To do this
   a) we give a discount for being an argument of a class-op (eg (*) d)
   b) we say that a con-like argument (eg (df d)) is interesting
+-}
 
-\begin{code}
 data ArgSummary = TrivArg       -- Nothing interesting
                 | NonTrivArg    -- Arg has structure
                 | ValueArg      -- Arg is a con-app or PAP
@@ -1439,4 +1430,3 @@ interestingArg e = go e 0
 nonTriv ::  ArgSummary -> Bool
 nonTriv TrivArg = False
 nonTriv _       = True
-\end{code}

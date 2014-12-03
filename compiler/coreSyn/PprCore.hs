@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The AQUA Project, Glasgow University, 1996-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The AQUA Project, Glasgow University, 1996-1998
+
 
 Printing of Core syntax
+-}
 
-\begin{code}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module PprCore (
         pprCoreExpr, pprParendExpr,
@@ -29,17 +29,17 @@ import BasicTypes
 import Util
 import Outputable
 import FastString
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Public interfaces for Core printing (excluding instances)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
+-}
 
-\begin{code}
 pprCoreBindings :: OutputableBndr b => [Bind b] -> SDoc
 pprCoreBinding  :: OutputableBndr b => Bind b  -> SDoc
 pprCoreExpr     :: OutputableBndr b => Expr b  -> SDoc
@@ -53,16 +53,15 @@ instance OutputableBndr b => Outputable (Bind b) where
 
 instance OutputableBndr b => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The guts}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 pprTopBinds :: OutputableBndr a => [Bind a] -> SDoc
 pprTopBinds binds = vcat (map pprTopBind binds)
 
@@ -78,9 +77,7 @@ pprTopBind (Rec (b:bs))
           vcat [blankLine $$ ppr_binding b | b <- bs],
           ptext (sLit "end Rec }"),
           blankLine]
-\end{code}
 
-\begin{code}
 ppr_bind :: OutputableBndr b => Bind b -> SDoc
 
 ppr_bind (NonRec val_bdr expr) = ppr_binding (val_bdr, expr)
@@ -92,17 +89,13 @@ ppr_binding :: OutputableBndr b => (b, Expr b) -> SDoc
 ppr_binding (val_bdr, expr)
   = pprBndr LetBind val_bdr $$
     hang (ppr val_bdr <+> equals) 2 (pprCoreExpr expr)
-\end{code}
 
-\begin{code}
 pprParendExpr expr = ppr_expr parens expr
 pprCoreExpr   expr = ppr_expr noParens expr
 
 noParens :: SDoc -> SDoc
 noParens pp = pp
-\end{code}
 
-\begin{code}
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
@@ -158,7 +151,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PprCaseAsLet dflags
     then add_par $  -- See Note [Print case as let]
-         sep [ sep [ ptext (sLit "let! {") 
+         sep [ sep [ ptext (sLit "let! {")
                      <+> ppr_case_pat con args
                      <+> ptext (sLit "~")
                      <+> ppr_bndr var
@@ -252,23 +245,23 @@ pprArg (Type ty)
    else ptext (sLit "@") <+> pprParendType ty
 pprArg (Coercion co) = ptext (sLit "@~") <+> pprParendCo co
 pprArg expr          = pprParendExpr expr
-\end{code}
 
+{-
 Note [Print case as let]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Single-branch case expressions are very common:
-   case x of y { I# x' -> 
+   case x of y { I# x' ->
    case p of q { I# p' -> ... } }
 These are, in effect, just strict let's, with pattern matching.
 With -dppr-case-as-let we print them as such:
    let! { I# x' ~ y <- x } in
    let! { I# p' ~ q <- p } in ...
 
- 
+
 Other printing bits-and-bobs used with the general @pprCoreBinding@
 and @pprCoreExpr@ functions.
+-}
 
-\begin{code}
 instance OutputableBndr Var where
   pprBndr = pprCoreBinder
   pprInfixOcc  = pprInfixName  . varName
@@ -351,7 +344,7 @@ pprIdBndrInfo info
 
     has_prag  = not (isDefaultInlinePragma prag_info)
     has_occ   = not (isNoOcc occ_info)
-    has_dmd   = not $ isTopDmd dmd_info 
+    has_dmd   = not $ isTopDmd dmd_info
     has_lbv   = not (hasNoOneShotInfo lbv_info)
 
     doc = showAttributes
@@ -360,14 +353,13 @@ pprIdBndrInfo info
           , (has_dmd,  ptext (sLit "Dmd=") <> ppr dmd_info)
           , (has_lbv , ptext (sLit "OS=") <> ppr lbv_info)
           ]
-\end{code}
 
-
+{-
 -----------------------------------------------------
 --      IdDetails and IdInfo
 -----------------------------------------------------
+-}
 
-\begin{code}
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo id info
   = sdocWithDynFlags $ \dflags ->
@@ -412,13 +404,13 @@ showAttributes stuff
   | otherwise = brackets (sep (punctuate comma docs))
   where
     docs = [d | (True,d) <- stuff]
-\end{code}
 
+{-
 -----------------------------------------------------
 --      Unfolding and UnfoldingGuidance
 -----------------------------------------------------
+-}
 
-\begin{code}
 instance Outputable UnfoldingGuidance where
     ppr UnfNever  = ptext (sLit "NEVER")
     ppr (UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok })
@@ -441,7 +433,7 @@ instance Outputable Unfolding where
   ppr NoUnfolding                = ptext (sLit "No unfolding")
   ppr (OtherCon cs)              = ptext (sLit "OtherCon") <+> ppr cs
   ppr (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
-       = hang (ptext (sLit "DFun:") <+> ptext (sLit "\\") 
+       = hang (ptext (sLit "DFun:") <+> ptext (sLit "\\")
                 <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
             2 (ppr con <+> sep (map ppr args))
   ppr (CoreUnfolding { uf_src = src
@@ -463,13 +455,13 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
             -- blowup in the size of the printout!
-\end{code}
 
+{-
 -----------------------------------------------------
 --      Rules
 -----------------------------------------------------
+-}
 
-\begin{code}
 instance Outputable CoreRule where
    ppr = pprRule
 
@@ -489,13 +481,13 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
                nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
             ])
-\end{code}
 
+{-
 -----------------------------------------------------
 --      Tickish
 -----------------------------------------------------
+-}
 
-\begin{code}
 instance Outputable id => Outputable (Tickish id) where
   ppr (HpcTick modl ix) =
       hcat [ptext (sLit "tick<"),
@@ -514,13 +506,13 @@ instance Outputable id => Outputable (Tickish id) where
          (True,True)  -> hcat [ptext (sLit "scctick<"), ppr cc, char '>']
          (True,False) -> hcat [ptext (sLit "tick<"),    ppr cc, char '>']
          _            -> hcat [ptext (sLit "scc<"),     ppr cc, char '>']
-\end{code}
 
+{-
 -----------------------------------------------------
 --      Vectorisation declarations
 -----------------------------------------------------
+-}
 
-\begin{code}
 instance Outputable CoreVect where
   ppr (Vect     var e)               = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
                                          4 (pprCoreExpr e)
@@ -533,4 +525,3 @@ instance Outputable CoreVect where
                                        char '=' <+> ppr tc
   ppr (VectClass tc)                 = ptext (sLit "VECTORISE class") <+> ppr tc
   ppr (VectInst var)                 = ptext (sLit "VECTORISE SCALAR instance") <+> ppr var
-\end{code}

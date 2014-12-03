@@ -1,11 +1,11 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 
         Arity and eta expansion
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 -- | Arity and eta expansion
@@ -34,13 +34,13 @@ import Outputable
 import FastString
 import Pair
 import Util     ( debugIsOn )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               manifestArity and exprArity
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 exprArity is a cheap-and-cheerful version of exprEtaExpandArity.
 It tells how many things the expression can be applied to before doing
@@ -65,8 +65,8 @@ won't be eta-expanded.
 And in any case it seems more robust to have exprArity be a bit more intelligent.
 But note that   (\x y z -> f x y z)
 should have arity 3, regardless of f's arity.
+-}
 
-\begin{code}
 manifestArity :: CoreExpr -> Arity
 -- ^ manifestArity sees how many leading value lambdas there are,
 --   after looking through casts
@@ -142,8 +142,8 @@ exprBotStrictness_maybe e
     env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
     sig ar = mkClosedStrictSig (replicate ar topDmd) botRes
                   -- For this purpose we can be very simple
-\end{code}
 
+{-
 Note [exprArity invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprArity has the following invariant:
@@ -238,11 +238,11 @@ When we come to an application we check that the arg is trivial.
    unknown, hence arity 0
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
            Computing the "arity" of an expression
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Definition of arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -465,7 +465,8 @@ Then  f             :: AT [False,False] ATop
       f <expensive> :: AT []            ATop
 
 -------------------- Main arity code ----------------------------
-\begin{code}
+-}
+
 -- See Note [ArityType]
 data ArityType = ATop [OneShotInfo] | ABot Arity
      -- There is always an explicit lambda
@@ -559,8 +560,8 @@ rhsEtaExpandArity dflags cheap_app e
     has_lam (Tick _ e) = has_lam e
     has_lam (Lam b e)  = isId b || has_lam e
     has_lam _          = False
-\end{code}
 
+{-
 Note [Arity analysis]
 ~~~~~~~~~~~~~~~~~~~~~
 The motivating example for arity analysis is this:
@@ -628,8 +629,8 @@ PAPSs
 because that might in turn make g inline (if it has an inline pragma),
 which we might not want.  After all, INLINE pragmas say "inline only
 when saturated" so we don't want to be too gung-ho about saturating!
+-}
 
-\begin{code}
 arityLam :: Id -> ArityType -> ArityType
 arityLam id (ATop as) = ATop (idOneShotInfo id : as)
 arityLam _  (ABot n)  = ABot (n+1)
@@ -660,8 +661,8 @@ andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
     combine (a:as) (b:bs) = (a `bestOneShot` b) : combine as bs
     combine []     bs     = takeWhile isOneShotInfo bs
     combine as     []     = takeWhile isOneShotInfo as
-\end{code}
 
+{-
 Note [Combining case branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -679,8 +680,8 @@ lambda wasn't one-shot we don't want to do this.
 
 So we combine the best of the two branches, on the (slightly dodgy)
 basis that if we know one branch is one-shot, then they all must be.
+-}
 
-\begin{code}
 ---------------------------
 type CheapFun = CoreExpr -> Maybe Type -> Bool
         -- How to decide if an expression is cheap
@@ -767,14 +768,13 @@ arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
 
 arityType _ _ = vanillaArityType
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               The main eta-expander
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We go for:
    f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
@@ -822,8 +822,8 @@ Note that SCCs are not treated specially by etaExpand.  If we have
         etaExpand 2 (\x -> scc "foo" e)
         = (\xy -> (scc "foo" e) y)
 So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
+-}
 
-\begin{code}
 -- | @etaExpand n us e ty@ returns an expression with
 -- the same meaning as @e@, but with arity @n@.
 --
@@ -1001,4 +1001,3 @@ freshEtaId n subst ty
         eta_id' = uniqAway (getTvInScope subst) $
                   mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
         subst'  = extendTvInScope subst eta_id'
-\end{code}

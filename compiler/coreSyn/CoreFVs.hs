@@ -1,10 +1,10 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-Taken quite directly from the Peyton Jones/Lester paper.
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+Taken quite directly from the Peyton Jones/Lester paper.
+-}
+
 {-# LANGUAGE CPP #-}
 
 -- | A module concerned with finding the free variables of an expression.
@@ -20,7 +20,7 @@ module CoreFVs (
         exprSomeFreeVars, exprsSomeFreeVars,
 
         -- * Free variables of Rules, Vars and Ids
-        varTypeTyVars, 
+        varTypeTyVars,
         idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
@@ -50,14 +50,13 @@ import Maybes( orElse )
 import Util
 import BasicTypes( Activation )
 import Outputable
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section{Finding the free variables of an expression}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This function simply finds the free variables of an expression.
 So far as type variables are concerned, it only finds tyvars that are
@@ -66,8 +65,8 @@ So far as type variables are concerned, it only finds tyvars that are
         * free in the type of a binder,
 
 but not those that are free in the type of variable occurrence.
+-}
 
-\begin{code}
 -- | Find all locally-defined free Ids or type variables in an expression
 exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = exprSomeFreeVars isLocalVar
@@ -101,14 +100,11 @@ exprsSomeFreeVars fv_cand = mapUnionVarSet (exprSomeFreeVars fv_cand)
 
 -- | Predicate on possible free variables: returns @True@ iff the variable is interesting
 type InterestingVarFun = Var -> Bool
-\end{code}
 
-
-\begin{code}
 type FV = InterestingVarFun
         -> VarSet               -- Locally bound
         -> VarSet               -- Free vars
- -- Return the vars that are both (a) interesting 
+ -- Return the vars that are both (a) interesting
  --                           and (b) not locally bound
  -- See function keep_it
 
@@ -172,10 +168,7 @@ addBndr bndr fv fv_cand in_scope
 
 addBndrs :: [CoreBndr] -> FV -> FV
 addBndrs bndrs fv = foldr addBndr fv bndrs
-\end{code}
 
-
-\begin{code}
 expr_fvs :: CoreExpr -> FV
 
 expr_fvs (Type ty)       = someVars (tyVarsOfType ty)
@@ -213,16 +206,15 @@ exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
 tickish_fvs :: Tickish Id -> FV
 tickish_fvs (Breakpoint _ ids) = someVars (mkVarSet ids)
 tickish_fvs _ = noVars
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section{Free names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | ruleLhsOrphNames is used when deciding whether
 -- a rule is an orphan.  In particular, suppose that T is defined in this
 -- module; we want to avoid declaring that a rule like:
@@ -268,15 +260,15 @@ exprOrphNames e
 -- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
 exprsOrphNames :: [CoreExpr] -> NameSet
 exprsOrphNames es = foldr (unionNameSet . exprOrphNames) emptyNameSet es
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section[freevars-everywhere]{Attaching free variables to every sub-expression}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Those variables free in the right hand side of a rule
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
@@ -314,8 +306,8 @@ ruleLhsFreeIds :: CoreRule -> VarSet
 ruleLhsFreeIds (BuiltinRule {}) = noFVs
 ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
-\end{code}
 
+{-
 Note [Rule free var hack]  (Not a hack any more)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 We used not to include the Id in its own rhs free-var set.
@@ -326,8 +318,8 @@ However, the occurrence analyser distinguishes "non-rule loop breakers"
 from "rule-only loop breakers" (see BasicTypes.OccInfo).  So it will
 put this 'f' in a Rec block, but will mark the binding as a non-rule loop
 breaker, which is perfectly inlinable.
+-}
 
-\begin{code}
 -- |Free variables of a vectorisation declaration
 vectsFreeVars :: [CoreVect] -> VarSet
 vectsFreeVars = mapUnionVarSet vectFreeVars
@@ -338,19 +330,18 @@ vectsFreeVars = mapUnionVarSet vectFreeVars
     vectFreeVars (VectClass _)    = noFVs
     vectFreeVars (VectInst _)     = noFVs
       -- this function is only concerned with values, not types
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section[freevars-everywhere]{Attaching free variables to every sub-expression}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The free variable pass annotates every node in the expression with its
 NON-GLOBAL free variables and type variables.
+-}
 
-\begin{code}
 -- | Every node in a binding group annotated with its
 -- (non-global) free variables, both Ids and TyVars
 type CoreBindWithFVs = AnnBind Id VarSet
@@ -444,22 +435,21 @@ stableUnfoldingVars :: Unfolding -> Maybe VarSet
 stableUnfoldingVars unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-         | isStableSource src          
+         | isStableSource src
          -> Just (exprFreeVars rhs)
-      DFunUnfolding { df_bndrs = bndrs, df_args = args } 
+      DFunUnfolding { df_bndrs = bndrs, df_args = args }
          -> Just (exprs_fvs args isLocalVar (mkVarSet bndrs))
             -- DFuns are top level, so no fvs from types of bndrs
       _other -> Nothing
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Free variables (and types)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 freeVars :: CoreExpr -> CoreExprWithFVs
 -- ^ Annotate a 'CoreExpr' with its (non-global) free type and value variables at every tree node
 freeVars (Var v)
@@ -541,5 +531,3 @@ freeVars (Tick tickish expr)
 freeVars (Type ty) = (tyVarsOfType ty, AnnType ty)
 
 freeVars (Coercion co) = (tyCoVarsOfCo co, AnnCoercion co)
-\end{code}
-

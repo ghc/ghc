@@ -1,9 +1,8 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
@@ -105,17 +104,17 @@ import Data.Word
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The main data types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These data types are the heart of the compiler
+-}
 
-\begin{code}
 -- | This is the data type that represents GHCs core intermediate language. Currently
 -- GHC uses System FC <http://research.microsoft.com/~simonpj/papers/ext-f/> for this purpose,
 -- which is closely related to the simpler and better known System F <http://en.wikipedia.org/wiki/System_F>.
@@ -287,8 +286,8 @@ data AltCon
 data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
   deriving (Data, Typeable)
-\end{code}
 
+{-
 Note [Shadowing]
 ~~~~~~~~~~~~~~~~
 While various passes attempt to rename on-the-fly in a manner that
@@ -422,13 +421,13 @@ if for no other reason that we don't need to instantiate the (~) at an
 unboxed type.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
               Ticks
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Allows attaching extra information to points in expressions
 
 -- If you edit this type, you may need to update the GHC formalism
@@ -513,19 +512,18 @@ tickishCanSplit :: Tickish Id -> Bool
 tickishCanSplit Breakpoint{} = False
 tickishCanSplit HpcTick{}    = False
 tickishCanSplit _ = True
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Transformation rules}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The CoreRule type and its friends are dealt with mainly in CoreRules,
 but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
+-}
 
-\begin{code}
 -- | A 'CoreRule' is:
 --
 -- * \"Local\" if the function it is a rule for is defined in the
@@ -620,36 +618,34 @@ isLocalRule = ru_local
 -- | Set the 'Name' of the 'Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Vectorisation declarations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Representation of desugared vectorisation declarations that are fed to the vectoriser (via
 'ModGuts').
+-}
 
-\begin{code}
 data CoreVect = Vect      Id   CoreExpr
               | NoVect    Id
               | VectType  Bool TyCon (Maybe TyCon)
               | VectClass TyCon                     -- class tycon
               | VectInst  Id                        -- instance dfun (always SCALAR)  !!!FIXME: should be superfluous now
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Unfoldings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The @Unfolding@ type is declared here to avoid numerous loops
+-}
 
-\begin{code}
 -- | Records the /unfolding/ of an identifier, which is approximately the form the
 -- identifier would have if we substituted its definition in for the identifier.
 -- This type should be treated as abstract everywhere except in "CoreUnfold"
@@ -770,8 +766,8 @@ data UnfoldingGuidance
                           -- (where there are the right number of arguments.)
 
   | UnfNever        -- The RHS is big, so don't inline it
-\end{code}
 
+{-
 Note [Historical note: unfoldings for wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to have a nice clever scheme in interface files for
@@ -818,8 +814,8 @@ why we record the number of expected arguments in the DFunUnfolding.
 Note that although it's an Arity, it's most convenient for it to give
 the *total* number of arguments, both type and value.  See the use
 site in exprIsConApp_maybe.
+-}
 
-\begin{code}
 -- Constants for the UnfWhen constructor
 needSaturated, unSaturatedOk :: Bool
 needSaturated = False
@@ -853,9 +849,7 @@ seqUnfolding _ = ()
 seqGuidance :: UnfoldingGuidance -> ()
 seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
 seqGuidance _                      = ()
-\end{code}
 
-\begin{code}
 isStableSource :: UnfoldingSource -> Bool
 -- Keep the unfolding template
 isStableSource InlineCompulsory   = True
@@ -963,8 +957,8 @@ neverUnfoldGuidance _        = False
 canUnfold :: Unfolding -> Bool
 canUnfold (CoreUnfolding { uf_guidance = g }) = not (neverUnfoldGuidance g)
 canUnfold _                                   = False
-\end{code}
 
+{-
 Note [InlineRules]
 ~~~~~~~~~~~~~~~~~
 When you say
@@ -1008,13 +1002,13 @@ the occurrence info is wrong
     without a loop breaker marked
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                   AltCon
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- The Ord is needed for the FiniteMap used in the lookForConstructor
 -- in SimplEnv.  If you declared that lookForConstructor *ignores*
 -- constructor-applications with LitArg args, then you could get
@@ -1044,13 +1038,13 @@ cmpAltCon (LitAlt _)   DEFAULT      = GT
 cmpAltCon con1 con2 = WARN( True, text "Comparing incomparable AltCons" <+>
                                   ppr con1 <+> ppr con2 )
                       LT
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Useful synonyms}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [CoreProgram]
 ~~~~~~~~~~~~~~~~~~
@@ -1071,8 +1065,7 @@ a list of CoreBind
    bindings where possible.  So the program typically starts life as a
    single giant Rec, which is then dependency-analysed into smaller
    chunks.
-
-\begin{code}
+-}
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
@@ -1089,15 +1082,15 @@ type CoreArg  = Arg  CoreBndr
 type CoreBind = Bind CoreBndr
 -- | Case alternatives where binders are 'CoreBndr's
 type CoreAlt  = Alt  CoreBndr
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Tagging}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Binders are /tagged/ with a t
 data TaggedBndr t = TB CoreBndr t       -- TB for "tagged binder"
 
@@ -1132,16 +1125,15 @@ deTagBind (Rec prs)             = Rec [(b, deTagExpr rhs) | (TB b _, rhs) <- prs
 
 deTagAlt :: TaggedAlt t -> CoreAlt
 deTagAlt (con, bndrs, rhs) = (con, [b | TB b _ <- bndrs], deTagExpr rhs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Core-constructing functions with checking}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Apply a list of argument expressions to a function expression in a nested fashion. Prefer to
 -- use 'MkCore.mkCoreApps' if possible
 mkApps    :: Expr b -> [Arg b]  -> Expr b
@@ -1253,16 +1245,15 @@ varToCoreExpr v | isTyVar v = Type (mkTyVarTy v)
 
 varsToCoreExprs :: [CoreBndr] -> [Expr b]
 varsToCoreExprs vs = map varToCoreExpr vs
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Simple access functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Extract every variable by this group
 bindersOf  :: Bind b -> [b]
 -- If you edit this function, you may need to update the GHC formalism
@@ -1287,9 +1278,7 @@ flattenBinds :: [Bind b] -> [(b, Expr b)]
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []                   = []
-\end{code}
 
-\begin{code}
 -- | We often want to strip off leading lambdas before getting down to
 -- business. This function is your friend.
 collectBinders               :: Expr b -> ([b],         Expr b)
@@ -1325,9 +1314,7 @@ collectValBinders expr
   where
     go ids (Lam b e) | isId b = go (b:ids) e
     go ids body               = (reverse ids, body)
-\end{code}
 
-\begin{code}
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied
 collectArgs :: Expr b -> (Expr b, [Arg b])
@@ -1336,20 +1323,20 @@ collectArgs expr
   where
     go (App f a) as = go f (a:as)
     go e         as = (e, as)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Predicates}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 At one time we optionally carried type arguments through to runtime.
 @isRuntimeVar v@ returns if (Lam v _) really becomes a lambda at runtime,
 i.e. if type applications are actual lambdas because types are kept around
 at runtime.  Similarly isRuntimeArg.
+-}
 
-\begin{code}
 -- | Will this variable exist at runtime?
 isRuntimeVar :: Var -> Bool
 isRuntimeVar = isId
@@ -1384,16 +1371,15 @@ valBndrCount = count isId
 -- | The number of argument expressions that are values rather than types at their top level
 valArgCount :: [Arg b] -> Int
 valArgCount = count isValArg
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Seq stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 seqExpr :: CoreExpr -> ()
 seqExpr (Var v)         = v `seq` ()
 seqExpr (Lit lit)       = lit `seq` ()
@@ -1439,15 +1425,15 @@ seqRules [] = ()
 seqRules (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs } : rules)
   = seqBndrs bndrs `seq` seqExprs (rhs:args) `seq` seqRules rules
 seqRules (BuiltinRule {} : rules) = seqRules rules
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Annotated core}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Annotated core: allows annotation at every node in the tree
 type AnnExpr bndr annot = (annot, AnnExpr' bndr annot)
 
@@ -1472,9 +1458,7 @@ type AnnAlt bndr annot = (AltCon, [bndr], AnnExpr bndr annot)
 data AnnBind bndr annot
   = AnnNonRec bndr (AnnExpr bndr annot)
   | AnnRec    [(bndr, AnnExpr bndr annot)]
-\end{code}
 
-\begin{code}
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied
 collectAnnArgs :: AnnExpr b a -> (AnnExpr b a, [AnnExpr b a])
@@ -1483,9 +1467,7 @@ collectAnnArgs expr
   where
     go (_, AnnApp f a) as = go f (a:as)
     go e               as = (e, as)
-\end{code}
 
-\begin{code}
 deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
@@ -1510,9 +1492,7 @@ deAnnotate' (AnnCase scrut v t alts)
 
 deAnnAlt :: AnnAlt bndr annot -> Alt bndr
 deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
-\end{code}
 
-\begin{code}
 -- | As 'collectBinders' but for 'AnnExpr' rather than 'Expr'
 collectAnnBndrs :: AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
 collectAnnBndrs e
@@ -1520,4 +1500,3 @@ collectAnnBndrs e
   where
     collect bs (_, AnnLam b body) = collect (b:bs) body
     collect bs body               = (reverse bs, body)
-\end{code}
