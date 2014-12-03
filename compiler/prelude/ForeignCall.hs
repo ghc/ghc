@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[Foreign]{Foreign calls}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[Foreign]{Foreign calls}
+-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module ForeignCall (
@@ -25,16 +25,15 @@ import Module
 
 import Data.Char
 import Data.Data
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Data types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype ForeignCall = CCall CCallSpec
   deriving Eq
   {-! derive: Binary !-}
@@ -46,10 +45,7 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
   ppr (CCall cc)  = ppr cc
-\end{code}
 
-
-\begin{code}
 data Safety
   = PlaySafe            -- Might invoke Haskell GC, or do a call back, or
                         -- switch threads, etc.  So make sure things are
@@ -82,16 +78,15 @@ playSafe PlayRisky = False
 playInterruptible :: Safety -> Bool
 playInterruptible PlayInterruptible = True
 playInterruptible _ = False
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Calling C}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data CExportSpec
   = CExportStatic               -- foreign export ccall foo :: ty
         CLabelString            -- C Name of exported function
@@ -105,11 +100,8 @@ data CCallSpec
                 Safety
   deriving( Eq )
   {-! derive: Binary !-}
-\end{code}
 
-The call target:
-
-\begin{code}
+-- The call target:
 
 -- | How to call a particular function in C-land.
 data CCallTarget
@@ -138,9 +130,8 @@ data CCallTarget
 isDynamicTarget :: CCallTarget -> Bool
 isDynamicTarget DynamicTarget = True
 isDynamicTarget _             = False
-\end{code}
 
-
+{-
 Stuff to do with calling convention:
 
 ccall:          Caller allocates parameters, *and* deallocates them.
@@ -154,8 +145,8 @@ so perhaps we should emit a warning if it's being used on other
 platforms.
 
 See: http://www.programmersheaven.com/2/Calling-conventions
+-}
 
-\begin{code}
 -- any changes here should be replicated in  the CallConv type in template haskell
 data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptCallConv
   deriving (Eq, Data, Typeable)
@@ -177,21 +168,19 @@ ccallConvToInt CCallConv   = 1
 ccallConvToInt CApiConv    = panic "ccallConvToInt CApiConv"
 ccallConvToInt (PrimCallConv {}) = panic "ccallConvToInt PrimCallConv"
 ccallConvToInt JavaScriptCallConv = panic "ccallConvToInt JavaScriptCallConv"
-\end{code}
 
+{-
 Generate the gcc attribute corresponding to the given
 calling convention (used by PprAbsC):
+-}
 
-\begin{code}
 ccallConvAttribute :: CCallConv -> SDoc
 ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv         = empty
 ccallConvAttribute CApiConv          = empty
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 ccallConvAttribute JavaScriptCallConv = panic "ccallConvAttribute JavaScriptCallConv"
-\end{code}
 
-\begin{code}
 type CLabelString = FastString          -- A C label, completely unencoded
 
 pprCLabelString :: CLabelString -> SDoc
@@ -204,12 +193,9 @@ isCLabelString lbl
     ok c = isAlphaNum c || c == '_' || c == '.'
         -- The '.' appears in e.g. "foo.so" in the
         -- module part of a ExtName.  Maybe it should be separate
-\end{code}
 
+-- Printing into C files:
 
-Printing into C files:
-
-\begin{code}
 instance Outputable CExportSpec where
   ppr (CExportStatic str _) = pprCLabelString str
 
@@ -233,9 +219,7 @@ instance Outputable CCallSpec where
 
       ppr_fun DynamicTarget
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
-\end{code}
 
-\begin{code}
 -- The filename for a C header file
 newtype Header = Header FastString
     deriving (Eq, Data, Typeable)
@@ -253,16 +237,15 @@ instance Outputable CType where
         where hDoc = case mh of
                      Nothing -> empty
                      Just h -> ppr h
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Misc}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 {-* Generated by DrIFT-v1.0 : Look, but Don't Touch. *-}
 instance Binary ForeignCall where
     put_ bh (CCall aa) = put_ bh aa
@@ -350,4 +333,3 @@ instance Binary Header where
     put_ bh (Header h) = put_ bh h
     get bh = do h <- get bh
                 return (Header h)
-\end{code}

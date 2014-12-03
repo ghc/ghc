@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[PrelNames]{Definitions of prelude modules and names}
 
 
@@ -100,8 +100,8 @@ This is accomplished through a combination of mechanisms:
           than trying to find it in the original-name cache.
 
           See also Note [Built-in syntax and the OrigNameCache]
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module PrelNames (
@@ -127,36 +127,32 @@ import SrcLoc
 import FastString
 import Config ( cIntegerLibraryType, IntegerLibrary(..) )
 import Panic ( panic )
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
      allNameStrings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 allNameStrings :: [String]
 -- Infinite list of a,b,c...z, aa, ab, ac, ... etc
 allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Local Names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This *local* name is used by the interactive stuff
+-}
 
-\begin{code}
 itName :: Unique -> SrcSpan -> Name
 itName uniq loc = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) loc
-\end{code}
 
-\begin{code}
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
 mkUnboundName :: RdrName -> Name
@@ -164,14 +160,13 @@ mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) noSrcSp
 
 isUnboundName :: Name -> Bool
 isUnboundName name = name `hasKey` unboundKey
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Known key Names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This section tells what the compiler knows about the association of
 names with uniques.  These ones are the *non* wired-in ones.  The
@@ -182,8 +177,8 @@ The names for DPH can come from one of multiple backend packages. At the point w
 the names for multiple backends.  That works out fine, although they use the same uniques,
 as we are guaranteed to only load one backend; hence, only one of the different names
 sharing a unique will be used.
+-}
 
-\begin{code}
 basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
@@ -368,18 +363,18 @@ genericTyConNames = [
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
     repTyConName, rep1TyConName
   ]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Module names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 --MetaHaskell Extension Add a new module here
-\begin{code}
+-}
+
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
@@ -491,29 +486,28 @@ mkMainModule m = mkModule mainPackageKey (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
 mkMainModule_ m = mkModule mainPackageKey m
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Constructing the names of tuples
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkTupleModule :: TupleSort -> Module
 mkTupleModule BoxedTuple      = gHC_TUPLE
 mkTupleModule ConstraintTuple = gHC_TUPLE
 mkTupleModule UnboxedTuple    = gHC_PRIM
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                         RdrNames
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 main_RDR_Unqual    :: RdrName
 main_RDR_Unqual = mkUnqual varName (fsLit "main")
         -- We definitely don't want an Orig RdrName, because
@@ -738,13 +732,13 @@ varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
 tcQual_RDR   mod str = mkOrig mod (mkOccNameFS tcName str)
 clsQual_RDR  mod str = mkOrig mod (mkOccNameFS clsName str)
 dataQual_RDR mod str = mkOrig mod (mkOccNameFS dataName str)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Known-key names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Many of these Names are not really "built in", but some parts of the
 compiler (notably the deriving mechanism) need to mention their names,
@@ -752,9 +746,8 @@ and it's convenient to write them all down in one place.
 
 --MetaHaskell Extension  add the constrs and the lower case case
 -- guys as well (perhaps) e.g. see  trueDataConName     below
+-}
 
-
-\begin{code}
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
@@ -1165,17 +1158,17 @@ pLUGINS :: Module
 pLUGINS = mkThisGhcModule (fsLit "Plugins")
 pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Local helpers}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 All these are original names; hence mkOrig
+-}
 
-\begin{code}
 varQual, tcQual, clsQual :: Module -> FastString -> Unique -> Name
 varQual  = mk_known_key_name varName
 tcQual   = mk_known_key_name tcName
@@ -1188,16 +1181,16 @@ mk_known_key_name space modu str unique
 conName :: Module -> FastString -> Unique -> Name
 conName modu occ unique
   = mkExternalName unique modu (mkOccNameFS dataName occ) noSrcSpan
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[Uniques-prelude-Classes]{@Uniques@ for wired-in @Classes@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 --MetaHaskell extension hand allocate keys here
+-}
 
-\begin{code}
 boundedClassKey, enumClassKey, eqClassKey, floatingClassKey,
     fractionalClassKey, integralClassKey, monadClassKey, dataClassKey,
     functorClassKey, numClassKey, ordClassKey, readClassKey, realClassKey,
@@ -1270,15 +1263,15 @@ ghciIoClassKey = mkPreludeClassUnique 44
 
 ipClassNameKey :: Unique
 ipClassNameKey = mkPreludeClassUnique 45
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[Uniques-prelude-TyCons]{@Uniques@ for wired-in @TyCons@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
     charPrimTyConKey, charTyConKey, doublePrimTyConKey, doubleTyConKey,
     floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
@@ -1495,15 +1488,15 @@ smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  179
 
 unitTyConKey :: Unique
 unitTyConKey = mkTupleTyConUnique BoxedTuple 0
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[Uniques-prelude-DataCons]{@Uniques@ for wired-in @DataCons@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
@@ -1545,15 +1538,15 @@ eqDataConKey                            = mkPreludeDataConUnique 28
 gtDataConKey                            = mkPreludeDataConUnique 29
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[Uniques-prelude-Ids]{@Uniques@ for wired-in @Ids@ (except @DataCons@)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     buildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
@@ -1716,13 +1709,13 @@ magicDictKey                  = mkPreludeMiscIdUnique 156
 
 coerceKey :: Unique
 coerceKey                     = mkPreludeMiscIdUnique 157
-\end{code}
 
+{-
 Certain class operations from Prelude classes.  They get their own
 uniques so we can look them up easily when we want to conjure them up
 during type checking.
+-}
 
-\begin{code}
         -- Just a place holder for  unbound variables  produced by the renamer:
 unboundKey :: Unique
 unboundKey                    = mkPreludeMiscIdUnique 160
@@ -1800,19 +1793,19 @@ proxyHashKey = mkPreludeMiscIdUnique 502
 ---------------- Template Haskell -------------------
 --      USES IdUniques 200-499
 -----------------------------------------------------
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Class-std-groups]{Standard groups of Prelude classes}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
 even though every numeric class has these two as a superclass,
 because the list of ambiguous dictionaries hasn't been simplified.
+-}
 
-\begin{code}
 numericClassKeys :: [Unique]
 numericClassKeys =
         [ numClassKey
@@ -1840,14 +1833,13 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
                       applicativeClassKey, foldableClassKey,
                       traversableClassKey, alternativeClassKey
                      ]
-\end{code}
 
+{-
 @derivableClassKeys@ is also used in checking \tr{deriving} constructs
 (@TcDeriv@).
+-}
 
-\begin{code}
 derivableClassKeys :: [Unique]
 derivableClassKeys
   = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
       boundedClassKey, showClassKey, readClassKey ]
-\end{code}

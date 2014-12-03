@@ -1,10 +1,10 @@
-%
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
+{-
+(c) The AQUA Project, Glasgow University, 1994-1998
+
 
 \section[TysPrim]{Wired-in knowledge about primitive types}
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
@@ -92,15 +92,15 @@ import PrelNames
 import FastString
 
 import Data.Char
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Primitive type constructors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 primTyCons :: [TyCon]
 primTyCons
   = [ addrPrimTyCon
@@ -195,18 +195,18 @@ stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyC
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO#") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Support code}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 alphaTyVars is a list of type variables for use in templates:
         ["a", "b", ..., "z", "t1", "t2", ... ]
+-}
 
-\begin{code}
 tyVarList :: Kind -> [TyVar]
 tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u)
                                 (mkTyVarOccFS (mkFastString name))
@@ -245,16 +245,14 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 kKiVar :: KindVar
 kKiVar = (tyVarList superKind) !! 10
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 FunTyCon
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 funTyConName :: Name
 funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
@@ -283,14 +281,13 @@ funTyCon = mkFunTyCon funTyConName $
 --      --------------------------
 --      Gamma |- tau -> sigma :: *
 -- In the end we don't want subkinding at all.
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Kinds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [SuperKind (BOX)]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -308,9 +305,8 @@ So the full defn of keq is
    keq :: (~) BOX * * = Eq# BOX * * <refl *>
 
 So you can see it's convenient to have BOX:BOX
+-}
 
-
-\begin{code}
 -- | See "Type#kind_subtyping" for details of the distinction between the 'Kind' 'TyCon's
 superKindTyCon, anyKindTyCon, liftedTypeKindTyCon,
       openTypeKindTyCon, unliftedTypeKindTyCon,
@@ -349,10 +345,7 @@ mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkTcOccFS occ)
                                               BuiltInSyntax
         -- All of the super kinds and kinds are defined in Prim and use BuiltInSyntax,
         -- because they are never in scope in the source
-\end{code}
 
-
-\begin{code}
 kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []   -- mkTyConApp isn't defined yet
 
@@ -373,15 +366,15 @@ mkArrowKind k1 k2 = FunTy k1 k2
 -- | Iterated application of 'mkArrowKind'
 mkArrowKinds :: [Kind] -> Kind -> Kind
 mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-basic]{Basic primitive types (@Char#@, @Int#@, etc.)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- only used herein
 pcPrimTyCon :: Name -> [Role] -> PrimRep -> TyCon
 pcPrimTyCon name roles rep
@@ -445,14 +438,13 @@ doublePrimTy :: Type
 doublePrimTy    = mkTyConTy doublePrimTyCon
 doublePrimTyCon :: TyCon
 doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName DoubleRep
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-state]{The @State#@ type (and @_RealWorld@ types)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [The ~# TyCon)
 ~~~~~~~~~~~~~~~~~~~~
@@ -480,8 +472,8 @@ keep different state threads separate.  It is represented by nothing at all.
 The type parameter to State# is intended to keep separate threads separate.
 Even though this parameter is not used in the definition of State#, it is
 given role Nominal to enforce its intended use.
+-}
 
-\begin{code}
 mkStatePrimTy :: Type -> Type
 mkStatePrimTy ty = TyConApp statePrimTyCon [ty]
 
@@ -520,31 +512,31 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName kind
   where kind = ForAllTy kv $ mkArrowKinds [k, k] unliftedTypeKind
         kv = kKiVar
         k  = mkTyVarTy kv
-\end{code}
 
+{-
 RealWorld is deeply magical.  It is *primitive*, but it is not
 *unlifted* (hence ptrArg).  We never manipulate values of type
 RealWorld; it's only used in the type system, to parameterise State#.
+-}
 
-\begin{code}
 realWorldTyCon :: TyCon
 realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind [] PtrRep
 realWorldTy :: Type
 realWorldTy          = mkTyConTy realWorldTyCon
 realWorldStatePrimTy :: Type
 realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
-\end{code}
 
+{-
 Note: the ``state-pairing'' types are not truly primitive, so they are
 defined in \tr{TysWiredIn.lhs}, not here.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-arrays]{The primitive array types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
     byteArrayPrimTyCon, arrayArrayPrimTyCon, mutableArrayArrayPrimTyCon,
     smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: TyCon
@@ -573,110 +565,110 @@ mkMutableArrayArrayPrimTy :: Type -> Type
 mkMutableArrayArrayPrimTy s = TyConApp mutableArrayArrayPrimTyCon [s]
 mkSmallMutableArrayPrimTy :: Type -> Type -> Type
 mkSmallMutableArrayPrimTy s elt = TyConApp smallMutableArrayPrimTyCon [s, elt]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-mut-var]{The mutable variable type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mutVarPrimTyCon :: TyCon
 mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName [Nominal, Representational] PtrRep
 
 mkMutVarPrimTy :: Type -> Type -> Type
 mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [s, elt]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-synch-var]{The synchronizing variable type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mVarPrimTyCon :: TyCon
 mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName [Nominal, Representational] PtrRep
 
 mkMVarPrimTy :: Type -> Type -> Type
 mkMVarPrimTy s elt          = TyConApp mVarPrimTyCon [s, elt]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-stm-var]{The transactional variable type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tVarPrimTyCon :: TyCon
 tVarPrimTyCon = pcPrimTyCon tVarPrimTyConName [Nominal, Representational] PtrRep
 
 mkTVarPrimTy :: Type -> Type -> Type
 mkTVarPrimTy s elt = TyConApp tVarPrimTyCon [s, elt]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-stable-ptrs]{The stable-pointer type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 stablePtrPrimTyCon :: TyCon
 stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName [Representational] AddrRep
 
 mkStablePtrPrimTy :: Type -> Type
 mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [ty]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-stable-names]{The stable-name type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 stableNamePrimTyCon :: TyCon
 stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName [Representational] PtrRep
 
 mkStableNamePrimTy :: Type -> Type
 mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [ty]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-BCOs]{The ``bytecode object'' type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 bcoPrimTy    :: Type
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
 bcoPrimTyCon :: TyCon
 bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName PtrRep
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-Weak]{The ``weak pointer'' type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 weakPrimTyCon :: TyCon
 weakPrimTyCon = pcPrimTyCon weakPrimTyConName [Representational] PtrRep
 
 mkWeakPrimTy :: Type -> Type
 mkWeakPrimTy v = TyConApp weakPrimTyCon [v]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysPrim-thread-ids]{The ``thread id'' type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A thread id is represented by a pointer to the TSO itself, to ensure
 that they are always unique and we can always find the TSO for a given
@@ -686,19 +678,19 @@ collector and can keep TSOs around for too long.
 
 Hence the programmer API for thread manipulation uses a weak pointer
 to the thread id internally.
+-}
 
-\begin{code}
 threadIdPrimTy :: Type
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
 threadIdPrimTyCon :: TyCon
 threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName PtrRep
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Any
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Any types]
 ~~~~~~~~~~~~~~~~
@@ -763,8 +755,8 @@ This commit uses
         Any for kind *
         Any(*->*) for kind *->*
         etc
+-}
 
-\begin{code}
 anyTyConName :: Name
 anyTyConName = mkPrimTc (fsLit "Any") anyTyConKey anyTyCon
 
@@ -780,14 +772,13 @@ anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar]
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = TyConApp anyTyCon [kind]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{SIMD vector types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 #include "primop-vector-tys.hs-incl"
-\end{code}

@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[ConFold]{Constant Folder}
 
 Conceptually, constant folding should be parameterized with the kind
@@ -10,8 +10,8 @@ and runtime. We cheat a little bit here...
 ToDo:
    check boundaries before folding, e.g. we can fold the Float addition
    (i1 + i2) only if it results in a valid Float.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, RankNTypes #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
@@ -60,9 +60,8 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
-\end{code}
 
-
+{-
 Note [Constant folding]
 ~~~~~~~~~~~~~~~~~~~~~~~
 primOpRules generates a rewrite rule for each primop
@@ -77,9 +76,8 @@ more like
 where the (+#) on the rhs is done at compile time
 
 That is why these rules are built in here.
+-}
 
-
-\begin{code}
 primOpRules :: Name -> PrimOp -> Maybe CoreRule
     -- ToDo: something for integer-shift ops?
     --       NotOp
@@ -271,15 +269,13 @@ primOpRules nm SparkOp    = mkPrimOpRule nm 4 [ sparkRule ]
 
 primOpRules _  _          = Nothing
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Doing the business}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- useful shorthands
 mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
@@ -401,10 +397,10 @@ wordShiftRule shift_op
   = do { dflags <- getDynFlags
        ; [e1, Lit (MachInt shift_len)] <- getArgs
        ; case e1 of
-           _ | shift_len == 0 
+           _ | shift_len == 0
              -> return e1
              | shift_len < 0 || wordSizeInBits dflags < shift_len
-             -> return (mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy 
+             -> return (mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy
                                         ("Bad shift length" ++ show shift_len))
            Lit (MachWord x)
              -> let op = shift_op dflags
@@ -553,8 +549,8 @@ idempotent :: RuleM CoreExpr
 idempotent = do [e1, e2] <- getArgs
                 guard $ cheapEqExpr e1 e2
                 return e1
-\end{code}
 
+{-
 Note [Guarding against silly shifts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this code:
@@ -593,7 +589,7 @@ Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
                   9223372036854775807 -> __word 0
                 } } } }
 
-Note the massive shift on line "!!!!".  It can't happen, because we've checked 
+Note the massive shift on line "!!!!".  It can't happen, because we've checked
 that w < 64, but the optimiser didn't spot that. We DO NO want to constant-fold this!
 Moreover, if the programmer writes (n `uncheckedShiftL` 9223372036854775807), we
 can't constant fold it, but if it gets to the assember we get
@@ -602,13 +598,13 @@ can't constant fold it, but if it gets to the assember we get
 So the best thing to do is to rewrite the shift with a call to error,
 when the second arg is stupid.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Vaguely generic functions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkBasicRule :: Name -> Int -> RuleM CoreExpr -> CoreRule
 -- Gives the Rule the same name as the primop itself
 mkBasicRule op_name n_args rm
@@ -829,13 +825,12 @@ matchPrimOpId op id = do
   op' <- liftMaybe $ isPrimOpId_maybe id
   guard $ op == op'
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Special rules for seq, tagToEnum, dataToTag}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [tagToEnum#]
 ~~~~~~~~~~~~~~~~~
@@ -857,8 +852,8 @@ because we don't expect the user to call tagToEnum# at all; we merely
 generate calls in derived instances of Enum.  So we compromise: a
 rewrite rule rewrites a bad instance of tagToEnum# to an error call,
 and emits a warning.
+-}
 
-\begin{code}
 tagToEnumRule :: RuleM CoreExpr
 -- If     data T a = A | B | C
 -- then   tag2Enum# (T ty) 2# -->  B ty
@@ -875,15 +870,14 @@ tagToEnumRule = do
     -- See Note [tagToEnum#]
     _ -> WARN( True, ptext (sLit "tagToEnum# on non-enumeration type") <+> ppr ty )
          return $ mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type"
-\end{code}
 
-
+{-
 For dataToTag#, we can reduce if either
 
         (a) the argument is a constructor
         (b) the argument is a variable whose unfolding is a known constructor
+-}
 
-\begin{code}
 dataToTagRule :: RuleM CoreExpr
 dataToTagRule = a `mplus` b
   where
@@ -899,15 +893,15 @@ dataToTagRule = a `mplus` b
       (dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
       return $ mkIntVal dflags (toInteger (dataConTag dc - fIRST_TAG))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Rules for seq# and spark#}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- seq# :: forall a s . a -> State# s -> (# State# s, a #)
 seqRule :: RuleM CoreExpr
 seqRule = do
@@ -921,13 +915,13 @@ sparkRule :: RuleM CoreExpr
 sparkRule = seqRule -- reduce on HNF, just the same
   -- XXX perhaps we shouldn't do this, because a spark eliminated by
   -- this rule won't be counted as a dud at runtime?
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Built in rules}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Scoping for Builtin rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -954,9 +948,8 @@ rewriting so again we are fine.
 
 (This whole thing doesn't show up for non-built-in rules because their dependencies
 are explicit.)
+-}
 
-
-\begin{code}
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
@@ -1327,4 +1320,3 @@ match_smallIntegerTo primOp _ _ _ [App (Var x) y]
   | idName x == smallIntegerName
   = Just $ App (Var (mkPrimOpId primOp)) y
 match_smallIntegerTo _ _ _ _ _ = Nothing
-\end{code}

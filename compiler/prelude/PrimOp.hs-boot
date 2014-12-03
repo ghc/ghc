@@ -1,7 +1,3 @@
-
-\begin{code}
 module PrimOp where
 
 data PrimOp
-\end{code}
-

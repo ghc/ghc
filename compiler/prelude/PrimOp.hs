@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[PrimOp]{Primitive operations (machine-level)}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[PrimOp]{Primitive operations (machine-level)}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module PrimOp (
@@ -41,26 +41,23 @@ import Outputable
 import FastTypes
 import FastString
 import Module           ( PackageKey )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[PrimOp-datatype]{Datatype for @PrimOp@ (an enumeration)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These are in \tr{state-interface.verb} order.
-
-\begin{code}
+-}
 
 -- supplies:
 -- data PrimOp = ...
 #include "primop-data-decl.hs-incl"
-\end{code}
 
-Used for the Ord instance
+-- Used for the Ord instance
 
-\begin{code}
 primOpTag :: PrimOp -> Int
 primOpTag op = iBox (tagOf_PrimOp op)
 
@@ -84,34 +81,26 @@ instance Ord PrimOp where
 
 instance Outputable PrimOp where
     ppr op = pprPrimOp op
-\end{code}
 
-\begin{code}
 data PrimOpVecCat = IntVec
                   | WordVec
                   | FloatVec
-\end{code}
 
-An @Enum@-derived list would be better; meanwhile... (ToDo)
+-- An @Enum@-derived list would be better; meanwhile... (ToDo)
 
-\begin{code}
 allThePrimOps :: [PrimOp]
 allThePrimOps =
 #include "primop-list.hs-incl"
-\end{code}
 
-\begin{code}
 tagToEnumKey :: Unique
 tagToEnumKey = mkPrimOpIdUnique (primOpTag TagToEnumOp)
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[PrimOp-info]{The essential info about each @PrimOp@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The @String@ in the @PrimOpInfos@ is the ``base name'' by which the user may
 refer to the primitive operation.  The conventional \tr{#}-for-
@@ -122,7 +111,8 @@ interfere with the programmer's Haskell name spaces.
 
 We use @PrimKinds@ for the ``type'' information, because they're
 (slightly) more convenient to use than @TyCons@.
-\begin{code}
+-}
+
 data PrimOpInfo
   = Dyadic      OccName         -- string :: T -> T -> T
                 Type
@@ -142,50 +132,50 @@ mkCompare str ty = Compare (mkVarOccFS str) ty
 
 mkGenPrimOp :: FastString -> [TyVar] -> [Type] -> Type -> PrimOpInfo
 mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Strictness}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Not all primops are strict!
+-}
 
-\begin{code}
 primOpStrictness :: PrimOp -> Arity -> StrictSig
         -- See Demand.StrictnessInfo for discussion of what the results
         -- The arity should be the arity of the primop; that's why
         -- this function isn't exported.
 #include "primop-strictness.hs-incl"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Fixity}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 primOpFixity :: PrimOp -> Maybe Fixity
 #include "primop-fixity.hs-incl"
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[PrimOp-comparison]{PrimOpInfo basic comparison ops}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @primOpInfo@ gives all essential information (from which everything
 else, notably a type, can be constructed) for each @PrimOp@.
+-}
 
-\begin{code}
 primOpInfo :: PrimOp -> PrimOpInfo
 #include "primop-primop-info.hs-incl"
 primOpInfo _ = error "primOpInfo: unknown primop"
-\end{code}
 
+{-
 Here are a load of comments from the old primOp info:
 
 A @Word#@ is an unsigned @Int#@.
@@ -302,27 +292,25 @@ These primops are pretty weird.
 The constraints aren't currently checked by the front end, but the
 code generator will fall over if they aren't satisfied.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
             Which PrimOps are out-of-line
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Some PrimOps need to be called out-of-line because they either need to
 perform a heap check or they block.
+-}
 
-
-\begin{code}
 primOpOutOfLine :: PrimOp -> Bool
 #include "primop-out-of-line.hs-incl"
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
             Failure and side effects
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [PrimOp can_fail and has_side_effects]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -470,9 +458,8 @@ Two main predicates on primpops test these flags:
 
   * The no-duplicate thing is done via primOpIsCheap, by making
     has_side_effects things (very very very) not-cheap!
+-}
 
-
-\begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
 #include "primop-has-side-effects.hs-incl"
 
@@ -492,9 +479,8 @@ primOpOkForSpeculation op
 primOpOkForSideEffects :: PrimOp -> Bool
 primOpOkForSideEffects op
   = not (primOpHasSideEffects op)
-\end{code}
 
-
+{-
 Note [primOpIsCheap]
 ~~~~~~~~~~~~~~~~~~~~
 @primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
@@ -502,8 +488,8 @@ WARNING), we just borrow some other predicates for a
 what-should-be-good-enough test.  "Cheap" means willing to call it more
 than once, and/or push it inside a lambda.  The latter could change the
 behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
+-}
 
-\begin{code}
 primOpIsCheap :: PrimOp -> Bool
 -- See Note [PrimOp can_fail and has_side_effects]
 primOpIsCheap op = primOpOkForSpeculation op
@@ -523,21 +509,20 @@ primOpIsCheap op = primOpOkForSpeculation op
 -- were we don't want to inline x. But primopIsCheap doesn't control
 -- that (it's exprIsDupable that does) so the problem doesn't occur
 -- even if primOpIsCheap sometimes says 'True'.
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                PrimOp code size
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 primOpCodeSize
 ~~~~~~~~~~~~~~
 Gives an indication of the code size of a primop, for the purposes of
 calculating unfolding sizes; see CoreUnfold.sizeExpr.
+-}
 
-\begin{code}
 primOpCodeSize :: PrimOp -> Int
 #include "primop-code-size.hs-incl"
 
@@ -548,16 +533,15 @@ primOpCodeSizeDefault = 1
 
 primOpCodeSizeForeignCall :: Int
 primOpCodeSizeForeignCall = 4
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                PrimOp types
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case primOpInfo op of
@@ -590,9 +574,7 @@ primOpSig op
         Dyadic    _occ ty                    -> ([],     [ty,ty], ty       )
         Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
         GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
-\end{code}
 
-\begin{code}
 data PrimOpResultInfo
   = ReturnsPrim     PrimRep
   | ReturnsAlg      TyCon
@@ -614,46 +596,41 @@ getPrimOpResultInfo op
                         -- All primops return a tycon-app result
                         -- The tycon can be an unboxed tuple, though, which
                         -- gives rise to a ReturnAlg
-\end{code}
 
+{-
 We do not currently make use of whether primops are commutable.
 
 We used to try to move constants to the right hand side for strength
 reduction.
+-}
 
-\begin{code}
 {-
 commutableOp :: PrimOp -> Bool
 #include "primop-commutable.hs-incl"
 -}
-\end{code}
 
-Utils:
-\begin{code}
+-- Utils:
+
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
 monadic_fun_ty ty = mkFunTy  ty ty
 compare_fun_ty ty = mkFunTys [ty, ty] intPrimTy
-\end{code}
 
-Output stuff:
-\begin{code}
+-- Output stuff:
+
 pprPrimOp  :: PrimOp -> SDoc
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[PrimCall]{User-imported primitive calls}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data PrimCall = PrimCall CLabelString PackageKey
 
 instance Outputable PrimCall where
   ppr (PrimCall lbl pkgId)
         = text "__primcall" <+> ppr pkgId <+> ppr lbl
-
-\end{code}

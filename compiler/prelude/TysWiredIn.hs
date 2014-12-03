@@ -1,9 +1,9 @@
-%
-% (c) The GRASP Project, Glasgow University, 1994-1998
-%
-\section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
+{-
+(c) The GRASP Project, Glasgow University, 1994-1998
 
-\begin{code}
+\section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
+-}
+
 {-# LANGUAGE CPP #-}
 
 -- | This module is about types that can be defined in Haskell, but which
@@ -111,19 +111,18 @@ alpha_tyvar = [alphaTyVar]
 
 alpha_ty :: [Type]
 alpha_ty = [alphaTy]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Wired in type constructors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 If you change which things are wired in, make sure you change their
 names in PrelNames, so they use wTcQual, wDataQual, etc
+-}
 
-\begin{code}
 -- This list is used only to define PrelInfo.wiredInThings. That in turn
 -- is used to initialise the name environment carried around by the renamer.
 -- This means that if we look up the name of a TyCon (or its implicit binders)
@@ -156,9 +155,7 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , typeNatKindCon
               , typeSymbolKindCon
               ]
-\end{code}
 
-\begin{code}
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
 mkWiredInTyConName built_in modu fs unique tycon
   = mkWiredInName modu (mkTcOccFS fs) unique
@@ -228,15 +225,15 @@ listTyCon_RDR   = nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
 parrTyCon_RDR   = nameRdrName parrTyConName
 eqTyCon_RDR     = nameRdrName eqTyConName
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{mkWiredInTyCon}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 pcNonRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 -- Not an enumeration, not promotable
 pcNonRecDataTyCon = pcTyCon False NonRecursive False
@@ -293,16 +290,15 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_name = mkWiredInName modu wrk_occ wrk_key
                              (AnId (dataConWorkId data_con)) UserSyntax
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
       Kinds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 typeNatKindCon, typeSymbolKindCon :: TyCon
 -- data Nat
 -- data Symbol
@@ -312,14 +308,13 @@ typeSymbolKindCon = pcTyCon False NonRecursive True typeSymbolKindConName Nothin
 typeNatKind, typeSymbolKind :: Kind
 typeNatKind    = TyConApp (promoteTyCon typeNatKindCon)    []
 typeSymbolKind = TyConApp (promoteTyCon typeSymbolKindCon) []
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Stuff for dealing with tuples
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [How tuples work]  See also Note [Known-key names] in PrelNames
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -338,10 +333,10 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
   we get the right wired-in name.  This guy can't tell the difference
   betweeen BoxedTuple and ConstraintTuple (same OccName!), so tuples
   are not serialised into interface files using OccNames at all.
+-}
 
-\begin{code}
 isBuiltInOcc_maybe :: OccName -> Maybe Name
--- Built in syntax isn't "in scope" so these OccNames 
+-- Built in syntax isn't "in scope" so these OccNames
 -- map to wired-in Names with BuiltInSyntax
 isBuiltInOcc_maybe occ
   = case occNameString occ of
@@ -365,7 +360,7 @@ isBuiltInOcc_maybe occ
     tail_matches BoxedTuple   ")"  = True
     tail_matches UnboxedTuple "#)" = True
     tail_matches _            _    = False
-  
+
     choose_ns tc dc
       | isTcClsNameSpace ns   = Just (getName tc)
       | isDataConNameSpace ns = Just (getName dc)
@@ -479,16 +474,15 @@ unboxedPairTyCon :: TyCon
 unboxedPairTyCon   = tupleTyCon UnboxedTuple 2
 unboxedPairDataCon :: DataCon
 unboxedPairDataCon = tupleCon   UnboxedTuple 2
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysWiredIn-boxed-prim]{The ``boxed primitive'' types (@Char@, @Int@, etc)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 eqTyCon :: TyCon
 eqTyCon = mkAlgTyCon eqTyConName
             (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
@@ -537,9 +531,6 @@ coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon
 coercibleClass :: Class
 coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
 
-\end{code}
-
-\begin{code}
 charTy :: Type
 charTy = mkTyConTy charTyCon
 
@@ -552,9 +543,7 @@ charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
 stringTy :: Type
 stringTy = mkListTy charTy -- convenience only
-\end{code}
 
-\begin{code}
 intTy :: Type
 intTy = mkTyConTy intTyCon
 
@@ -562,9 +551,7 @@ intTyCon :: TyCon
 intTyCon = pcNonRecDataTyCon intTyConName (Just (CType Nothing (fsLit "HsInt"))) [] [intDataCon]
 intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
-\end{code}
 
-\begin{code}
 wordTy :: Type
 wordTy = mkTyConTy wordTyCon
 
@@ -572,9 +559,7 @@ wordTyCon :: TyCon
 wordTyCon = pcNonRecDataTyCon wordTyConName (Just (CType Nothing (fsLit "HsWord"))) [] [wordDataCon]
 wordDataCon :: DataCon
 wordDataCon = pcDataCon wordDataConName [] [wordPrimTy] wordTyCon
-\end{code}
 
-\begin{code}
 floatTy :: Type
 floatTy = mkTyConTy floatTyCon
 
@@ -582,9 +567,7 @@ floatTyCon :: TyCon
 floatTyCon   = pcNonRecDataTyCon floatTyConName   (Just (CType Nothing (fsLit "HsFloat"))) [] [floatDataCon]
 floatDataCon :: DataCon
 floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
-\end{code}
 
-\begin{code}
 doubleTy :: Type
 doubleTy = mkTyConTy doubleTyCon
 
@@ -593,14 +576,13 @@ doubleTyCon = pcNonRecDataTyCon doubleTyConName (Just (CType Nothing (fsLit "HsD
 
 doubleDataCon :: DataCon
 doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysWiredIn-Bool]{The @Bool@ type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 An ordinary enumeration type, but deeply wired in.  There are no
 magical operations on @Bool@ (just the regular Prelude code).
@@ -643,8 +625,8 @@ necessarily need to be a straightforwardly boxed version of its
 primitive counterpart.
 
 {\em END IDLE SPECULATION BY SIMON}
+-}
 
-\begin{code}
 boolTy :: Type
 boolTy = mkTyConTy boolTyCon
 
@@ -674,13 +656,13 @@ ltDataConId, eqDataConId, gtDataConId :: Id
 ltDataConId = dataConWorkId ltDataCon
 eqDataConId = dataConWorkId eqDataCon
 gtDataConId = dataConWorkId gtDataCon
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysWiredIn-List]{The @List@ type (incl ``build'' magic)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Special syntax, deeply wired in, but otherwise an ordinary algebraic
 data types:
@@ -690,8 +672,8 @@ data () = ()
 data (,) a b = (,,) a b
 ...
 \end{verbatim}
+-}
 
-\begin{code}
 mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
@@ -715,13 +697,13 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysWiredIn-Tuples]{The @Tuple@ types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The tuple types are definitely magic, because they form an infinite
 family.
@@ -762,8 +744,8 @@ There should also be a way to generate the appropriate code for each
 of these instances, but (like the info tables and entry code) it is
 done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
+-}
 
-\begin{code}
 mkTupleTy :: TupleSort -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy sort [ty] | Boxed <- tupleSortBoxity sort = ty
@@ -775,17 +757,17 @@ mkBoxedTupleTy tys = mkTupleTy BoxedTuple tys
 
 unitTy :: Type
 unitTy = mkTupleTy BoxedTuple []
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[TysWiredIn-PArr]{The @[::]@ type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Special syntax for parallel arrays needs some wired in definitions.
+-}
 
-\begin{code}
 -- | Construct a type representing the application of the parallel array constructor
 mkPArrTy    :: Type -> Type
 mkPArrTy ty  = mkTyConApp parrTyCon [ty]
@@ -848,20 +830,16 @@ mkPArrFakeCon arity  = data_con
 -- | Checks whether a data constructor is a fake constructor for parallel arrays
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
-\end{code}
 
-Promoted Booleans
+-- Promoted Booleans
 
-\begin{code}
 promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon :: TyCon
 promotedBoolTyCon     = promoteTyCon boolTyCon
 promotedTrueDataCon   = promoteDataCon trueDataCon
 promotedFalseDataCon  = promoteDataCon falseDataCon
-\end{code}
 
-Promoted Ordering
+-- Promoted Ordering
 
-\begin{code}
 promotedOrderingTyCon
   , promotedLTDataCon
   , promotedEQDataCon
@@ -871,7 +849,3 @@ promotedOrderingTyCon = promoteTyCon orderingTyCon
 promotedLTDataCon     = promoteDataCon ltDataCon
 promotedEQDataCon     = promoteDataCon eqDataCon
 promotedGTDataCon     = promoteDataCon gtDataCon
-\end{code}
-
-
-

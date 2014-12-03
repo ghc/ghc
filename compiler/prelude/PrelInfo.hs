@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[PrelInfo]{The @PrelInfo@ interface to the compiler's prelude knowledge}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[PrelInfo]{The @PrelInfo@ interface to the compiler's prelude knowledge}
+-}
+
 {-# LANGUAGE CPP #-}
 module PrelInfo (
         wiredInIds, ghcPrimIds,
@@ -39,13 +39,13 @@ import Util
 import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
 
 import Data.Array
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[builtinNameInfo]{Lookup built-in names}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Notes about wired in things
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,9 +64,8 @@ Notes about wired in things
 
 * MkIface prunes out wired-in things before putting them in an interface file.
   So interface files never contain wired-in things.
+-}
 
-
-\begin{code}
 wiredInThings :: [TyThing]
 -- This list is used only to initialise HscMain.knownKeyNames
 -- to ensure that when you say "Prelude.map" in your source code, you
@@ -86,19 +85,19 @@ wiredInThings
   where
     tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons
                                     ++ typeNatTyCons)
-\end{code}
 
+{-
 We let a lot of "non-standard" values be visible, so that we can make
 sense of them in interface pragmas. It's cool, though they all have
 "non-standard" names, so they won't get past the parser in user code.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 PrimOpIds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 primOpIds :: Array Int Id
 -- A cache of the PrimOp Ids, indexed by PrimOp tag
 primOpIds = array (1,maxPrimOpTag) [ (primOpTag op, mkPrimOpId op)
@@ -106,51 +105,47 @@ primOpIds = array (1,maxPrimOpTag) [ (primOpTag op, mkPrimOpId op)
 
 primOpId :: PrimOp -> Id
 primOpId op = primOpIds ! primOpTag op
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Export lists for pseudo-modules (GHC.Prim)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
+-}
 
-\begin{code}
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
  = map (Avail . idName) ghcPrimIds ++
    map (Avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n]
    | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Built-in keys}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 ToDo: make it do the ``like'' part properly (as in 0.26 and before).
+-}
 
-\begin{code}
 maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
 maybeCharLikeCon con = con `hasKey` charDataConKey
 maybeIntLikeCon  con = con `hasKey` intDataConKey
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Class predicates}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 isNumericClass, isStandardClass :: Class -> Bool
 
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
@@ -158,4 +153,3 @@ isStandardClass    clas = classKey clas `is_elem` standardClassKeys
 
 is_elem :: Eq a => a -> [a] -> Bool
 is_elem = isIn "is_X_Class"
-\end{code}
