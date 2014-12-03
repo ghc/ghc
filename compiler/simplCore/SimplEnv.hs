@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
-\section[SimplMonad]{The simplifier Monad}
+{-
+(c) The AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[SimplMonad]{The simplifier Monad}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module SimplEnv (
@@ -61,15 +61,15 @@ import FastString
 import Util
 
 import Data.List
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Simplify-types]{Type declarations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type InBndr     = CoreBndr
 type InVar      = Var                   -- Not yet cloned
 type InId       = Id                    -- Not yet cloned
@@ -90,16 +90,15 @@ type OutBind     = CoreBind
 type OutExpr     = CoreExpr
 type OutAlt      = CoreAlt
 type OutArg      = CoreArg
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{The @SimplEnv@ type}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 data SimplEnv
   = SimplEnv {
      ----------- Static part of the environment -----------
@@ -159,8 +158,8 @@ instance Outputable SimplSR where
         -- fvs = exprFreeVars e
         -- filter_env env = filterVarEnv_Directly keep env
         -- keep uniq _ = uniq `elemUFM_Directly` fvs
-\end{code}
 
+{-
 Note [SimplEnv invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 seInScope:
@@ -224,9 +223,8 @@ seIdSubst:
   map to the same target:  x->x, y->x.  Notably:
         case y of x { ... }
   That's why the "set" is actually a VarEnv Var
+-}
 
-
-\begin{code}
 mkSimplEnv :: SimplifierMode -> SimplEnv
 mkSimplEnv mode
   = SimplEnv { seMode = mode
@@ -240,8 +238,8 @@ mkSimplEnv mode
 init_in_scope :: InScopeSet
 init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder unitTy))
               -- See Note [WildCard binders]
-\end{code}
 
+{-
 Note [WildCard binders]
 ~~~~~~~~~~~~~~~~~~~~~~~
 The program to be simplified may have wild binders
@@ -259,8 +257,8 @@ thing. Generally, you want to run the simplifier to get rid of the
 wild-ids before doing much else.
 
 It's a very dark corner of GHC.  Maybe it should be cleaned up.
+-}
 
-\begin{code}
 getMode :: SimplEnv -> SimplifierMode
 getMode env = seMode env
 
@@ -330,15 +328,13 @@ setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst 
 
 mkContEx :: SimplEnv -> InExpr -> SimplSR
 mkContEx (SimplEnv { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }) e = ContEx tvs cvs ids e
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Floats}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Simplifier floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -359,8 +355,8 @@ Examples
 Can't happen:
   NonRec x# (a /# b)    -- Might fail; does not satisfy let/app
   NonRec x# (f y)       -- Might diverge; does not satisfy let/app
+-}
 
-\begin{code}
 data Floats = Floats (OrdList OutBind) FloatFlag
         -- See Note [Simplifier floats]
 
@@ -399,25 +395,25 @@ doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
 doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff})
   =  not (isNilOL fs) && want_to_float && can_float
   where
-     want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs 
+     want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
                      -- See Note [Float when cheap or expandable]
      can_float = case ff of
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
                    FltCareful -> isNotTopLevel lvl && isNonRec rec && str
-\end{code}
 
+{-
 Note [Float when cheap or expandable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to float a let from a let if the residual RHS is
    a) cheap, such as (\x. blah)
    b) expandable, such as (f b) if f is CONLIKE
-But there are 
+But there are
   - cheap things that are not expandable (eg \x. expensive)
   - expandable things that are not cheap (eg (f b) where b is CONLIKE)
 so we must take the 'or' of the two.
+-}
 
-\begin{code}
 emptyFloats :: Floats
 emptyFloats = Floats nilOL FltLifted
 
@@ -489,8 +485,8 @@ getFloatBinds (SimplEnv {seFloats = Floats bs _})
 isEmptyFloats :: SimplEnv -> Bool
 isEmptyFloats (SimplEnv {seFloats = Floats bs _})
   = isNilOL bs
-\end{code}
 
+{-
 -- mapFloats commented out: used only in a commented-out bit of Simplify,
 -- concerning ticks
 --
@@ -502,11 +498,11 @@ isEmptyFloats (SimplEnv {seFloats = Floats bs _})
 --     app (Rec bs)     = Rec (map fun bs)
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Substitution of Vars
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Global Ids in the substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -518,8 +514,8 @@ for a LocalId version of g (with the same unique though):
                                 ... case X.g_34 of { (p,q) -> ...} ... }
 So we want to look up the inner X.g_34 in the substitution, where we'll
 find that it has been substituted by b.  (Or conceivably cloned.)
+-}
 
-\begin{code}
 substId :: SimplEnv -> InId -> SimplSR
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
@@ -547,19 +543,18 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         Just (DoneId v) -> v
         Just _ -> pprPanic "lookupRecBndr" (ppr v)
         Nothing -> refine in_scope v
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section{Substituting an Id binder}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 These functions are in the monad only so that they can be made strict via seq.
+-}
 
-\begin{code}
 simplBinders, simplLamBndrs
         :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
@@ -656,9 +651,7 @@ substNonCoVarIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }
               = extendVarEnv id_subst old_id (DoneId new_id)
               | otherwise
               = delVarEnv id_subst old_id
-\end{code}
 
-\begin{code}
 ------------------------------------
 seqTyVar :: TyVar -> ()
 seqTyVar b = b `seq` ()
@@ -671,9 +664,8 @@ seqId id = seqType (idType id)  `seq`
 seqIds :: [Id] -> ()
 seqIds []       = ()
 seqIds (id:ids) = seqId id `seq` seqIds ids
-\end{code}
 
-
+{-
 Note [Arity robustness]
 ~~~~~~~~~~~~~~~~~~~~~~~
 We *do* transfer the arity from from the in_id of a let binding to the
@@ -719,9 +711,8 @@ cases where he really, really wanted a RULE for a recursive function
 to apply in that function's own right-hand side.
 
 See Note [Loop breaking and RULES] in OccAnal.
+-}
 
-
-\begin{code}
 addBndrRules :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
 -- Rules are added back into the bin
 addBndrRules env in_id out_id
@@ -732,16 +723,15 @@ addBndrRules env in_id out_id
     old_rules = idSpecialisation in_id
     new_rules = CoreSubst.substSpec subst out_id old_rules
     final_id  = out_id `setIdSpecialisation` new_rules
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Impedence matching to type substitution
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 getTvSubst :: SimplEnv -> TvSubst
 getTvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env })
   = mkTvSubst in_scope tv_env
@@ -813,5 +803,3 @@ substUnfolding :: SimplEnv -> Unfolding -> Unfolding
 substUnfolding env unf = CoreSubst.substUnfolding (mkCoreSubst (text "subst-unfolding") env) unf
   -- Do *not* short-cut in the case of an empty substitution
   -- See Note [SimplEnv invariants]
-\end{code}
-

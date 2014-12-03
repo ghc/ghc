@@ -1,12 +1,12 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-%************************************************************************
+
+************************************************************************
 
                Static Argument Transformation pass
 
-%************************************************************************
+************************************************************************
 
 May be seen as removing invariants from loops:
 Arguments of recursive functions that do not change in recursive
@@ -46,9 +46,8 @@ Geometric Mean  +0.0%     -0.2%     -6.9%
 
 The previous patch, to fix polymorphic floatout demand signatures, is
 essential to make this work well!
+-}
 
-
-\begin{code}
 {-# LANGUAGE CPP #-}
 module SAT ( doStaticArgs ) where
 
@@ -72,17 +71,14 @@ import Data.List
 import FastString
 
 #include "HsVersions.h"
-\end{code}
 
-\begin{code}
 doStaticArgs :: UniqSupply -> CoreProgram -> CoreProgram
 doStaticArgs us binds = snd $ mapAccumL sat_bind_threaded_us us binds
   where
     sat_bind_threaded_us us bind =
         let (us1, us2) = splitUniqSupply us
         in (us1, fst $ runSAT us2 (satBind bind emptyUniqSet))
-\end{code}
-\begin{code}
+
 -- We don't bother to SAT recursive groups since it can lead
 -- to massive code expansion: see Andre Santos' thesis for details.
 -- This means we only apply the actual SAT to Rec groups of one element,
@@ -111,8 +107,7 @@ satBind (Rec pairs) interesting_ids = do
     rhss_SATed <- mapM (\e -> satTopLevelExpr e interesting_ids) rhss
     let (rhss', sat_info_rhss') = unzip rhss_SATed
     return (Rec (zipEqual "satBind" binders rhss'), mergeIdSATInfos sat_info_rhss')
-\end{code}
-\begin{code}
+
 data App = VarApp Id | TypeApp Type | CoApp Coercion
 data Staticness a = Static a | NotStatic
 
@@ -177,8 +172,7 @@ finalizeApp (Just (v, sat_info')) id_sat_info =
                         Nothing -> sat_info'
                         Just sat_info -> mergeSATInfo sat_info sat_info'
     in extendVarEnv id_sat_info v sat_info''
-\end{code}
-\begin{code}
+
 satTopLevelExpr :: CoreExpr -> IdSet -> SatM (CoreExpr, IdSATInfo)
 satTopLevelExpr expr interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
@@ -249,15 +243,15 @@ satExpr co@(Coercion _) _ = do
 satExpr (Cast expr coercion) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
     return (Cast expr' coercion, sat_info_expr, expr_app)
-\end{code}
 
-%************************************************************************
+{-
+************************************************************************
 
                 Static Argument Transformation Monad
 
-%************************************************************************
+************************************************************************
+-}
 
-\begin{code}
 type SatM result = UniqSM result
 
 runSAT :: UniqSupply -> SatM a -> a
@@ -265,14 +259,13 @@ runSAT = initUs_
 
 newUnique :: SatM Unique
 newUnique = getUniqueM
-\end{code}
 
-
-%************************************************************************
+{-
+************************************************************************
 
                 Static Argument Transformation Monad
 
-%************************************************************************
+************************************************************************
 
 To do the transformation, the game plan is to:
 
@@ -368,8 +361,8 @@ GHC.Base.until =
 Where sat_shadow has captured the type variables of x_a6X etc as it has a a_aiK
 type argument. This is bad because it means the application sat_worker_s1aU x_a6X
 is not well typed.
+-}
 
-\begin{code}
 saTransformMaybe :: Id -> Maybe SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
 saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
   | Just arg_staticness <- maybe_arg_staticness
@@ -436,5 +429,3 @@ saTransform binder arg_staticness rhs_binders rhs_body
 isStaticValue :: Staticness App -> Bool
 isStaticValue (Static (VarApp _)) = True
 isStaticValue _                   = False
-
-\end{code}

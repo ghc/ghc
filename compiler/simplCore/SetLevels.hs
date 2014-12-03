@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section{SetLevels}
 
                 ***************************
@@ -40,8 +40,8 @@
   The simplifier tries to get rid of occurrences of x, in favour of wild,
   in the hope that there will only be one remaining occurrence of x, namely
   the scrutinee of the case, and we can inline it.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 module SetLevels (
         setLevels,
@@ -80,15 +80,15 @@ import UniqSupply
 import Util
 import Outputable
 import FastString
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Level numbers}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LevelledExpr = TaggedExpr FloatSpec
 type LevelledBind = TaggedBind FloatSpec
 type LevelledBndr = TaggedBndr FloatSpec
@@ -107,8 +107,8 @@ data FloatSpec
 floatSpecLevel :: FloatSpec -> Level
 floatSpecLevel (FloatMe l) = l
 floatSpecLevel (StayPut l) = l
-\end{code}
 
+{-
 The {\em level number} on a (type-)lambda-bound variable is the
 nesting depth of the (type-)lambda which binds it.  The outermost lambda
 has level 1, so (Level 0 0) means that the variable is bound outside any lambda.
@@ -162,8 +162,8 @@ One particular case is that of workers: we don't want to float the
 call to the worker outside the wrapper, otherwise the worker might get
 inlined into the floated expression, and an importing module won't see
 the worker at all.
+-}
 
-\begin{code}
 instance Outputable FloatSpec where
   ppr (FloatMe l) = char 'F' <> ppr l
   ppr (StayPut l) = ppr l
@@ -199,16 +199,15 @@ instance Outputable Level where
 
 instance Eq Level where
   (Level maj1 min1) == (Level maj2 min2) = maj1 == maj2 && min1 == min2
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Main level-setting code}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 setLevels :: FloatOutSwitches
           -> CoreProgram
           -> UniqSupply
@@ -237,13 +236,13 @@ lvlTopBind env (Rec pairs)
            (env', bndrs') = substAndLvlBndrs Recursive env tOP_LEVEL bndrs
        rhss' <- mapM (lvlExpr env' . freeVars) rhss
        return (Rec (bndrs' `zip` rhss'), env')
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Setting expression levels}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Floating over-saturated applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -258,13 +257,13 @@ is minimal, and the extra local thunks allocated cost money.
 Arguably we could float even class-op applications if they were going to
 top level -- but then they must be applied to a constant dictionary and
 will almost certainly be optimised away anyway.
+-}
 
-\begin{code}
 lvlExpr :: LevelEnv             -- Context
         -> CoreExprWithFVs      -- Input expression
         -> LvlM LevelledExpr    -- Result expression
-\end{code}
 
+{-
 The @ctxt_lvl@ is, roughly, the level of the innermost enclosing
 binder.  Here's an example
 
@@ -279,8 +278,8 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 --- because it isn't a *maximal* free expression.
 
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
+-}
 
-\begin{code}
 lvlExpr env (_, AnnType ty)     = return (Type (substTy (le_subst env) ty))
 lvlExpr env (_, AnnCoercion co) = return (Coercion (substCo (le_subst env) co))
 lvlExpr env (_, AnnVar v)       = return (lookupVar env v)
@@ -398,8 +397,8 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
              ; return (con, bs', rhs') }
         where
           (new_env, bs') = substAndLvlBndrs NonRecursive alts_env incd_lvl bs
-\end{code}
 
+{-
 Note [Floating cases]
 ~~~~~~~~~~~~~~~~~~~~~
 Consider this:
@@ -443,8 +442,8 @@ the inner case out, at least not unless x is also evaluated at its
 binding site.
 
 That's why we apply exprOkForSpeculation to scrut' and not to scrut.
+-}
 
-\begin{code}
 lvlMFE ::  Bool                 -- True <=> strict context [body of case or let]
         -> LevelEnv             -- Level of in-scope names/tyvars
         -> CoreExprWithFVs      -- input expression
@@ -516,8 +515,8 @@ lvlMFE strict_ctxt env ann_expr@(fvs, _)
           --
           -- Also a strict contxt includes uboxed values, and they
           -- can't be bound at top level
-\end{code}
 
+{-
 Note [Unlifted MFEs]
 ~~~~~~~~~~~~~~~~~~~~
 We don't float unlifted MFEs, which potentially loses big opportunites.
@@ -566,8 +565,8 @@ Because in doing so we share a tiny bit of computation (the switch) but
 in exchange we build a thunk, which is bad.  This case reduces allocation
 by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
 Doesn't change any other allocation at all.
+-}
 
-\begin{code}
 annotateBotStr :: Id -> Maybe (Arity, StrictSig) -> Id
 -- See Note [Bottoming floats] for why we want to add
 -- bottoming information right now
@@ -608,8 +607,8 @@ notWorthFloating e abs_vars
     is_triv (_, AnnApp e (_, AnnType {})) = is_triv e
     is_triv (_, AnnApp e (_, AnnCoercion {})) = is_triv e
     is_triv _                             = False
-\end{code}
 
+{-
 Note [Floating literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 It's important to float Integer literals, so that they get shared,
@@ -663,15 +662,15 @@ OLD comment was:
         to the condition above. We should really try this out.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Bindings}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The binding stuff works for top level too.
+-}
 
-\begin{code}
 lvlBind :: LevelEnv
         -> CoreBindWithFVs
         -> LvlM (LevelledBind, LevelEnv)
@@ -789,16 +788,15 @@ lvlFloatRhs abs_vars dest_lvl env rhs
        ; return (mkLams abs_vars_w_lvls rhs') }
   where
     (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Deciding floatability}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 substAndLvlBndrs :: RecFlag -> LevelEnv -> Level -> [InVar] -> (LevelEnv, [LevelledBndr])
 substAndLvlBndrs is_rec env lvl bndrs
   = lvlBndrs subst_env lvl subst_bndrs
@@ -847,9 +845,7 @@ lvlBndrs env@(LE { le_lvl_env = lvl_env }) new_lvl bndrs
   where
     lvld_bndrs    = [TB bndr (StayPut new_lvl) | bndr <- bndrs]
     add_lvl env v = extendVarEnv env v new_lvl
-\end{code}
 
-\begin{code}
   -- Destination level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
 destLevel :: LevelEnv -> VarSet
@@ -895,16 +891,15 @@ countFreeIds = foldVarSet add 0
     add :: Var -> Int -> Int
     add v n | isId v    = n+1
             | otherwise = n
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Free-To-Level Monad}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type InVar  = Var   -- Pre  cloning
 type InId   = Id    -- Pre  cloning
 type OutVar = Var   -- Post cloning
@@ -1028,17 +1023,12 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
     close v = foldVarSet (unionVarSet . close)
                          (unitVarSet v)
                          (varTypeTyVars v)
-\end{code}
 
-\begin{code}
 type LvlM result = UniqSM result
 
 initLvl :: UniqSupply -> UniqSM a -> a
 initLvl = initUs_
-\end{code}
 
-
-\begin{code}
 newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> [InId] -> UniqSM (LevelEnv, [OutId])
 -- The envt is extended to bind the new bndrs to dest_lvl, but
 -- the ctxt_lvl is unaffected
@@ -1109,8 +1099,8 @@ zap_demand_info :: Var -> Var
 zap_demand_info v
   | isId v    = zapDemandIdInfo v
   | otherwise = v
-\end{code}
 
+{-
 Note [Zapping the demand info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 VERY IMPORTANT: we must zap the demand info if the thing is going to
@@ -1119,3 +1109,4 @@ binding site.  Eg
    f :: Int -> Int
    f x = let v = 3*4 in v+x
 Here v is strict; but if we float v to top level, it isn't any more.
+-}

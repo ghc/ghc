@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
-\section{Common subexpression}
+{-
+(c) The AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section{Common subexpression}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module CSE (cseProgram) where
@@ -22,9 +22,8 @@ import BasicTypes       ( isAlwaysActive )
 import TrieMap
 
 import Data.List
-\end{code}
 
-
+{-
                         Simple common sub-expression
                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we see
@@ -146,13 +145,13 @@ Consider
 Then we can CSE the inner (f x) to y.  In fact 'case' is like a strict
 let-binding, and we can use cseRhs for dealing with the scrutinee.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \section{Common subexpression}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 cseProgram :: CoreProgram -> CoreProgram
 cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
 
@@ -256,16 +255,15 @@ cseAlts env scrut' bndr bndr' alts
         = (con, args', tryForCSE env' rhs)
         where
           (env', args') = addBinders alt_env args
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \section{The CSE envt}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type InExpr  = CoreExpr         -- Pre-cloning
 type InBndr  = CoreBndr
 type InAlt   = CoreAlt
@@ -313,4 +311,3 @@ addRecBinders :: CSEnv -> [Id] -> (CSEnv, [Id])
 addRecBinders cse vs = (cse { cs_subst = sub' }, vs')
                 where
                   (sub', vs') = substRecBndrs (cs_subst cse) vs
-\end{code}

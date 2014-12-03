@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
-\section[SimplMonad]{The simplifier Monad}
+{-
+(c) The AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[SimplMonad]{The simplifier Monad}
+-}
+
 module SimplMonad (
         -- The monad
         SimplM,
@@ -31,18 +31,18 @@ import FastString
 import MonadUtils
 import ErrUtils
 import Control.Monad       ( when, liftM, ap )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Monad plumbing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 (Command-line switches move around through the explicitly-passed SimplEnv.)
+-}
 
-\begin{code}
 newtype SimplM result
   =  SM  { unSM :: SimplTopEnv  -- Envt that does not change much
                 -> UniqSupply   -- We thread the unique supply because
@@ -57,9 +57,7 @@ data SimplTopEnv
                                -- Zero means infinity!
         , st_rules :: RuleBase
         , st_fams  :: (FamInstEnv, FamInstEnv) }
-\end{code}
 
-\begin{code}
 initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
          -> Int                 -- Size of the bindings, used to limit
@@ -136,19 +134,18 @@ thenSmpl_ m k
 traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
   = do { dflags <- getDynFlags
-       ; when (dopt Opt_D_dump_simpl_trace dflags) $ liftIO $ 
+       ; when (dopt Opt_D_dump_simpl_trace dflags) $ liftIO $
          printInfoForUser dflags alwaysQualify $
          hang (text herald) 2 doc }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The unique supply}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance MonadUnique SimplM where
     getUniqueSupplyM
        = SM (\_st_env us sc -> case splitUniqSupply us of
@@ -179,16 +176,15 @@ getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 newId :: FastString -> Type -> SimplM Id
 newId fs ty = do uniq <- getUniqueM
                  return (mkSysLocal fs uniq ty)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Counting up what we've done}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 getSimplCount :: SimplM SimplCount
 getSimplCount = SM (\_st_env us sc -> return (sc, us, sc))
 
@@ -220,4 +216,3 @@ freeTick :: Tick -> SimplM ()
 freeTick t
    = SM (\_st_env us sc -> let sc' = doFreeSimplTick t sc
                            in sc' `seq` return ((), us, sc'))
-\end{code}

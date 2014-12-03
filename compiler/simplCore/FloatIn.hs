@@ -1,17 +1,17 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-%************************************************************************
-%*                                                                      *
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
+************************************************************************
+*                                                                      *
 \section[FloatIn]{Floating Inwards pass}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The main purpose of @floatInwards@ is floating into branches of a
 case, so that we don't allocate things, save them on the stack, and
 then discover that they aren't needed in the chosen branch.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module FloatIn ( floatInwards ) where
@@ -31,12 +31,12 @@ import UniqFM
 import DynFlags
 import Outputable
 import Data.List( mapAccumL )
-\end{code}
 
+{-
 Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
+-}
 
-\begin{code}
 floatInwards :: DynFlags -> CoreProgram -> CoreProgram
 floatInwards dflags = map fi_top_bind
   where
@@ -44,13 +44,13 @@ floatInwards dflags = map fi_top_bind
       = NonRec binder (fiExpr dflags [] (freeVars rhs))
     fi_top_bind (Rec pairs)
       = Rec [ (b, fiExpr dflags [] (freeVars rhs)) | (b, rhs) <- pairs ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Mail from Andr\'e [edited]}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 {\em Will wrote: What??? I thought the idea was to float as far
 inwards as possible, no matter what.  This is dropping all bindings
@@ -110,13 +110,13 @@ Also, even if a is not found to be strict in the new context and is
 still left as a let, if the branch is not taken (or b is not entered)
 the closure for a is not built.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Main floating-inwards code}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type FreeVarSet  = IdSet
 type BoundVarSet = IdSet
 
@@ -143,13 +143,13 @@ fiExpr dflags to_drop (_, AnnCast expr (fvs_co, co))
     Cast (fiExpr dflags e_drop expr) co
   where
     [drop_here, e_drop, co_drop] = sepBindsByDropPoint dflags False [freeVarsOf expr, fvs_co] to_drop
-\end{code}
 
+{-
 Applications: we do float inside applications, mainly because we
 need to get at all the arguments.  The next simplifier run will
 pull out any silly ones.
+-}
 
-\begin{code}
 fiExpr dflags to_drop ann_expr@(_,AnnApp {})
   = wrapFloats drop_here $ wrapFloats extra_drop $
     mkApps (fiExpr dflags fun_drop ann_fun)
@@ -175,8 +175,8 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
 
     drop_here : extra_drop : fun_drop : arg_drops
       = sepBindsByDropPoint dflags False (extra_fvs : fun_fvs : arg_fvs) to_drop
-\end{code}
 
+{-
 Note [Do not destroy the let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Watch out for
@@ -223,8 +223,8 @@ This is what the 'go' function in the AnnLam case is doing.
 
 Urk! if all are tyvars, and we don't float in, we may miss an
       opportunity to float inside a nested case branch
+-}
 
-\begin{code}
 fiExpr dflags to_drop lam@(_, AnnLam _ _)
   | okToFloatInside bndrs       -- Float in
      -- NB: Must line up with noFloatIntoRhs (AnnLam...); see Trac #7088
@@ -235,14 +235,14 @@ fiExpr dflags to_drop lam@(_, AnnLam _ _)
 
   where
     (bndrs, body) = collectAnnBndrs lam
-\end{code}
 
+{-
 We don't float lets inwards past an SCC.
         ToDo: keep info on current cc, and when passing
         one, if it is not the same, annotate all lets in binds with current
         cc, change current cc to the new one and float binds into expr.
+-}
 
-\begin{code}
 fiExpr dflags to_drop (_, AnnTick tickish expr)
   | tickishScoped tickish
   =     -- Wimp out for now - we could push values in
@@ -250,8 +250,8 @@ fiExpr dflags to_drop (_, AnnTick tickish expr)
 
   | otherwise
   = Tick tickish (fiExpr dflags to_drop expr)
-\end{code}
 
+{-
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}
 bindings are: (a)~in the body, (b1)~in the RHS of a NonRec binding,
 or~(b2), in each of the RHSs of the pairs of a @Rec@.
@@ -300,9 +300,8 @@ Here y is not free in rhs or body; but we still want to dump bindings
 that bind y outside the let.  So we augment extra_fvs with the
 idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
 idFreeVars.
+-}
 
-
-\begin{code}
 fiExpr dflags to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
   = fiExpr dflags new_to_drop body
   where
@@ -365,8 +364,8 @@ fiExpr dflags to_drop (_,AnnLet (AnnRec bindings) body)
     fi_bind to_drops pairs
       = [ (binder, fiExpr dflags to_drop rhs)
         | ((binder, rhs), to_drop) <- zipEqual "fi_bind" pairs to_drops ]
-\end{code}
 
+{-
 For @Case@, the possible ``drop points'' for the \tr{to_drop}
 bindings are: (a)~inside the scrutinee, (b)~inside one of the
 alternatives/default [default FVs always {\em first}!].
@@ -378,8 +377,8 @@ inward. SIMD primops for unpacking SIMD vectors into an unboxed tuple of unboxed
 scalars also need to be floated inward, but unpacks have a single non-DEFAULT
 alternative that binds the elements of the tuple. We now therefore also support
 floating in cases with a single alternative that may bind values.
+-}
 
-\begin{code}
 fiExpr dflags to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
   | isUnLiftedType (idType case_bndr)
   , exprOkForSideEffects (deAnnotate scrut)
@@ -448,14 +447,13 @@ noFloatIntoExpr (AnnLam bndr e)
 noFloatIntoExpr rhs = exprIsExpandable (deAnnotate' rhs)
        -- We'd just float right back out again...
        -- Should match the test in SimplEnv.doFloatFromRhs
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@sepBindsByDropPoint@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is the crucial function.  The idea is: We have a wad of bindings
 that we'd like to distribute inside a collection of {\em drop points};
@@ -471,8 +469,8 @@ then it has to go in a you-must-drop-it-above-all-these-drop-points
 point.
 
 We have to maintain the order on these drop-point-related lists.
+-}
 
-\begin{code}
 sepBindsByDropPoint
     :: DynFlags
     -> Bool             -- True <=> is case expression
@@ -560,4 +558,3 @@ floatIsDupable :: DynFlags -> FloatBind -> Bool
 floatIsDupable dflags (FloatCase scrut _ _ _) = exprIsDupable dflags scrut
 floatIsDupable dflags (FloatLet (Rec prs))    = all (exprIsDupable dflags . snd) prs
 floatIsDupable dflags (FloatLet (NonRec _ r)) = exprIsDupable dflags r
-\end{code}

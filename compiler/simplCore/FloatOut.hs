@@ -1,11 +1,11 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[FloatOut]{Float bindings outwards (towards the top level)}
 
 ``Long-distance'' floating of bindings towards the top level.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -31,8 +31,8 @@ import FastString
 import qualified Data.IntMap as M
 
 #include "HsVersions.h"
-\end{code}
 
+{-
         -----------------
         Overall game plan
         -----------------
@@ -106,13 +106,13 @@ vwhich might usefully be separated to
 Well, maybe.  We don't do this at the moment.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[floatOutwards]{@floatOutwards@: let-floating interface function}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 floatOutwards :: FloatOutSwitches
               -> DynFlags
               -> UniqSupply
@@ -144,15 +144,15 @@ floatTopBind bind
     in case bind' of
       Rec prs   -> (fs, unitBag (Rec (addTopFloatPairs float_bag prs)))
       NonRec {} -> (fs, float_bag `snocBag` bind') }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[FloatOut-Bind]{Floating in a binding (the business end)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 floatBind :: LevelledBind -> (FloatStats, FloatBinds, CoreBind)
 floatBind (NonRec (TB var _) rhs)
   = case (floatExpr rhs) of { (fs, rhs_floats, rhs') ->
@@ -205,8 +205,8 @@ floatList _ [] = (zeroStats, emptyFloats, [])
 floatList f (a:as) = case f a            of { (fs_a,  binds_a,  b)  ->
                      case floatList f as of { (fs_as, binds_as, bs) ->
                      (fs_a `add_stats` fs_as, binds_a `plusFloats`  binds_as, b:bs) }}
-\end{code}
 
+{-
 Note [Floating out of Rec rhss]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider   Rec { f<1,0> = \xy. body }
@@ -239,13 +239,13 @@ We could perhaps get rid of the 'tops' component of the floating binds,
 but this case works just as well.
 
 
-%************************************************************************
+************************************************************************
 
 \subsection[FloatOut-Expr]{Floating in expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 floatBody :: Level
           -> LevelledExpr
           -> (FloatStats, FloatBinds, CoreExpr)
@@ -342,8 +342,8 @@ floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
     float_alt bind_lvl (con, bs, rhs)
         = case (floatBody bind_lvl rhs) of { (fs, rhs_floats, rhs') ->
           (fs, rhs_floats, (con, [b | TB b _ <- bs], rhs')) }
-\end{code}
 
+{-
 Note [Avoiding unnecessary floating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we want to avoid floating a let unnecessarily, because
@@ -383,16 +383,16 @@ altogether when profiling got in the way.
 
 So now we do the partition right at the (Let..) itself.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Utility bits for floating stats}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 I didn't implement this with unboxed numbers.  I don't want to be too
 strict in this stuff, as it is rarely turned on.  (WDP 95/09)
+-}
 
-\begin{code}
 data FloatStats
   = FlS Int  -- Number of top-floats * lambda groups they've been past
         Int  -- Number of non-top-floats * lambda groups they've been past
@@ -414,14 +414,13 @@ add_stats (FlS a1 b1 c1) (FlS a2 b2 c2)
 add_to_stats :: FloatStats -> FloatBinds -> FloatStats
 add_to_stats (FlS a b c) (FB tops others)
   = FlS (a + lengthBag tops) (b + lengthBag (flattenMajor others)) (c + 1)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Utility bits for floating}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Representation of FloatBinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -441,9 +440,8 @@ That is why MajorEnv is represented as a finite map.
 We keep the bindings destined for the *top* level separate, because
 we float them out even if they don't escape a *value* lambda; see
 partitionByMajorLevel.
+-}
 
-
-\begin{code}
 type FloatLet = CoreBind        -- INVARIANT: a FloatLet is always lifted
 type MajorEnv = M.IntMap MinorEnv         -- Keyed by major level
 type MinorEnv = M.IntMap (Bag FloatBind)  -- Keyed by minor level
@@ -563,4 +561,3 @@ wrapTick t (FB tops defns)
       -- Conversely, inlining of HNFs inside an SCC is allowed, and
       -- indeed the HNF we're floating here might well be inlined back
       -- again, and we don't want to end up with duplicate ticks.
-\end{code}

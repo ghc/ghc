@@ -1,17 +1,16 @@
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \section[OccurAnal]{Occurrence analysis pass}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The occurrence analyser re-typechecks a core expression, returning a new
 core expression with (hopefully) improved usage information.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, BangPatterns #-}
 
 module OccurAnal (
@@ -41,18 +40,17 @@ import Util
 import Outputable
 import FastString
 import Data.List
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[OccurAnal-main]{Counting occurrences: main function}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Here's the externally-callable interface:
+-}
 
-\begin{code}
 occurAnalysePgm :: Module       -- Used only in debug output
                 -> (Activation -> Bool)
                 -> [CoreRule] -> [CoreVect] -> VarSet
@@ -114,19 +112,18 @@ occurAnalyseExpr' enable_binder_swap expr
     env = (initOccEnv all_active_rules) {occ_binder_swap = enable_binder_swap}
     -- To be conservative, we say that all inlines and rules are active
     all_active_rules = \_ -> True
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[OccurAnal-main]{Counting occurrences: main function}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Bindings
 ~~~~~~~~
+-}
 
-\begin{code}
 occAnalBind :: OccEnv           -- The incoming OccEnv
             -> IdEnv IdSet      -- Mapping from FVs of imported RULE LHSs to RHS FVs
             -> CoreBind
@@ -177,8 +174,8 @@ occAnalRecBind env imp_rules_edges pairs body_usage
 
     nodes :: [Node Details]
     nodes = {-# SCC "occAnalBind.assoc" #-} map (makeNode env imp_rules_edges bndr_set) pairs
-\end{code}
 
+{-
 Note [Dead code]
 ~~~~~~~~~~~~~~~~
 Dropping dead code for a cyclic Strongly Connected Component is done
@@ -634,9 +631,8 @@ But watch out!  If 'fs' is not chosen as a loop breaker, we may get an infinite 
   - now there's another opportunity to apply the RULE
 
 This showed up when compiling Control.Concurrent.Chan.getChanContents.
+-}
 
-
-\begin{code}
 type Node details = (details, Unique, [Unique]) -- The Ints are gotten from the Unique,
                                                 -- which is gotten from the Id.
 data Details
@@ -793,8 +789,8 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
         | (ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs },_,_) <- nodes
         , let trimmed_rule_fvs = rule_fvs `intersectVarSet` bndr_set
         , not (isEmptyVarSet trimmed_rule_fvs)]
-\end{code}
 
+{-
 @loopBreakSCC@ is applied to the list of (binder,rhs) pairs for a cyclic
 strongly connected component (there's guaranteed to be a cycle).  It returns the
 same pairs, but
@@ -809,8 +805,8 @@ Furthermore, the order of the binds is such that if we neglect dependencies
 on the no-inline Ids then the binds are topologically sorted.  This means
 that the simplifier will generally do a good job if it works from top bottom,
 recording inlinings for any Ids which aren't marked as "no-inline" as it goes.
+-}
 
-\begin{code}
 type Binding = (Id,CoreExpr)
 
 mk_loop_breaker :: Node Details -> Binding
@@ -944,8 +940,8 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
     is_con_app (Lam _ e)  = is_con_app e
     is_con_app (Tick _ e) = is_con_app e
     is_con_app _          = False
-\end{code}
 
+{-
 Note [Complexity of loop breaking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The loop-breaking algorithm knocks out one binder at a time, and
@@ -1067,9 +1063,8 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 [March 97] We do the same for atomic RHSs.  Reason: see notes with loopBreakSCC.
 [June 98, SLPJ]  I've undone this change; I don't understand it.  See notes with loopBreakSCC.
+-}
 
-
-\begin{code}
 occAnalRecRhs :: OccEnv -> CoreExpr    -- Rhs
            -> (UsageDetails, CoreExpr)
               -- Returned usage details covers only the RHS,
@@ -1111,8 +1106,8 @@ addIdOccs usage id_set = foldVarSet add usage id_set
         --   b) We don't want to substitute a BIG expression inside a RULE
         --      even if that's the only occurrence of the thing
         --      (Same goes for INLINE.)
-\end{code}
 
+{-
 Note [Cascading inlines]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 By default we use an rhsCtxt for the RHS of a binding.  This tells the
@@ -1155,7 +1150,8 @@ for the various clauses.
 
 Expressions
 ~~~~~~~~~~~
-\begin{code}
+-}
+
 occAnal :: OccEnv
         -> CoreExpr
         -> (UsageDetails,       -- Gives info only about the "interesting" Ids
@@ -1174,14 +1170,14 @@ occAnal env expr@(Var v)  = (mkOneOcc env v False, expr)
 occAnal _ (Coercion co)
   = (addIdOccs emptyDetails (coVarsOfCo co), Coercion co)
         -- See Note [Gather occurrences of coercion variables]
-\end{code}
 
+{-
 Note [Gather occurrences of coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to gather info about what coercion variables appear, so that
 we can sort them into the right place when doing dependency analysis.
+-}
 
-\begin{code}
 occAnal env (Tick tickish body)
   | Breakpoint _ ids <- tickish
   = (mapVarEnv markInsideSCC usage
@@ -1206,9 +1202,7 @@ occAnal env (Cast expr co)
         -- then mark y as 'Many' so that we don't
         -- immediately inline y again.
     }
-\end{code}
 
-\begin{code}
 occAnal env app@(App _ _)
   = occAnalApp env (collectArgs app)
 
@@ -1286,7 +1280,7 @@ occAnal env (Let bind body)
        (final_usage, mkLets new_binds body') }}
 
 occAnalArgs :: OccEnv -> [CoreExpr] -> [OneShots] -> (UsageDetails, [CoreExpr])
-occAnalArgs _ [] _ 
+occAnalArgs _ [] _
   = (emptyDetails, [])
 
 occAnalArgs env (arg:args) one_shots
@@ -1299,8 +1293,8 @@ occAnalArgs env (arg:args) one_shots
     case occAnal arg_env arg             of { (uds1, arg') ->
     case occAnalArgs env args one_shots' of { (uds2, args') ->
     (uds1 +++ uds2, arg':args') }}}
-\end{code}
 
+{-
 Applications are dealt with specially because we want
 the "build hack" to work.
 
@@ -1315,8 +1309,8 @@ that y may be duplicated thereby.
 
 If we aren't careful we duplicate the (expensive x) call!
 Constructors are rather like lambdas in this way.
+-}
 
-\begin{code}
 occAnalApp :: OccEnv
            -> (Expr CoreBndr, [Arg CoreBndr])
            -> (UsageDetails, Expr CoreBndr)
@@ -1371,8 +1365,8 @@ markManyIf :: Bool              -- If this is true
            -> UsageDetails
 markManyIf True  uds = mapVarEnv markMany uds
 markManyIf False uds = uds
-\end{code}
 
+{-
 Note [Use one-shot information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The occurrrence analyser propagates one-shot-lambda information in two situation
@@ -1402,8 +1396,8 @@ Simplify.mkDupableAlt
 In this example, though, the Simplifier will bring 'a' and 'b' back to
 life, beause it binds 'y' to (a,b) (imagine got inlined and
 scrutinised y).
+-}
 
-\begin{code}
 occAnalAlt :: (OccEnv, Maybe (Id, CoreExpr))
            -> CoreAlt
            -> (UsageDetails, Alt IdWithOccInfo)
@@ -1440,16 +1434,15 @@ wrapAltRHS env (Just (scrut_var, let_rhs)) alt_usg bndrs alt_rhs
 
 wrapAltRHS _ _ alt_usg _ alt_rhs
   = (alt_usg, alt_rhs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                     OccEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- Tells about linearity
@@ -1502,16 +1495,16 @@ rhsCtxt :: OccEnv -> OccEnv
 rhsCtxt env = env { occ_encl = OccRhs, occ_one_shots = [] }
 
 argCtxt :: OccEnv -> [OneShots] -> (OccEnv, [OneShots])
-argCtxt env [] 
+argCtxt env []
   = (env { occ_encl = OccVanilla, occ_one_shots = [] }, [])
-argCtxt env (one_shots:one_shots_s) 
+argCtxt env (one_shots:one_shots_s)
   = (env { occ_encl = OccVanilla, occ_one_shots = one_shots }, one_shots_s)
 
 isRhsEnv :: OccEnv -> Bool
 isRhsEnv (OccEnv { occ_encl = OccRhs })     = True
 isRhsEnv (OccEnv { occ_encl = OccVanilla }) = False
 
-oneShotGroup :: OccEnv -> [CoreBndr] 
+oneShotGroup :: OccEnv -> [CoreBndr]
              -> ( OccEnv
                 , [CoreBndr] )
         -- The result binders have one-shot-ness set that they might not have had originally.
@@ -1532,7 +1525,7 @@ oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
 
     go ctxt (bndr:bndrs) rev_bndrs
       | isId bndr
-      
+
       = case ctxt of
           []                -> go []   bndrs (bndr : rev_bndrs)
           (one_shot : ctxt) -> go ctxt bndrs (bndr': rev_bndrs)
@@ -1544,10 +1537,7 @@ oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
-\end{code}
 
-
-\begin{code}
 transClosureFV :: UniqFM VarSet -> UniqFM VarSet
 -- If (f,g), (g,h) are in the input, then (f,h) is in the output
 --                                   as well as (f,g), (g,h)
@@ -1578,14 +1568,13 @@ extendFvs env s
     extras :: VarSet    -- env(s)
     extras = foldUFM unionVarSet emptyVarSet $
              intersectUFM_C (\x _ -> x) env s
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                     Binder swap
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
@@ -1656,7 +1645,7 @@ When the scrutinee is a GlobalId we must take care in two ways
 
  i) In order to *know* whether 'x' occurs free in the RHS, we need its
     occurrence info. BUT, we don't gather occurrence info for
-    GlobalIds.  That's the reason for the (small) occ_gbl_scrut env in 
+    GlobalIds.  That's the reason for the (small) occ_gbl_scrut env in
     OccEnv is for: it says "gather occurrence info for these".
 
  ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
@@ -1734,8 +1723,8 @@ binder-swap in OccAnal:
 It's fixed by doing the binder-swap in OccAnal because we can do the
 binder-swap unconditionally and still get occurrence analysis
 information right.
+-}
 
-\begin{code}
 mkAltEnv :: OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
 -- Does two things: a) makes the occ_one_shots = OccVanilla
 --                  b) extends the GlobalScruts if possible
@@ -1758,16 +1747,15 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
         -- new binding for it, and it might have an External Name, or
         -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
         -- Also we don't want any INLINE or NOINLINE pragmas!
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[OccurAnal-types]{OccEnv}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type UsageDetails = IdEnv OccInfo       -- A finite map from ids to their usage
                 -- INVARIANT: never IAmDead
                 -- (Deadness is signalled by not being in the map at all)
@@ -1835,16 +1823,15 @@ setBinderOcc usage bndr
   | otherwise = setIdOccInfo bndr occ_info
   where
     occ_info = lookupVarEnv usage bndr `orElse` IAmDead
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Operations over OccInfo}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> UsageDetails
 mkOneOcc env id int_cxt
   | isLocalId id
@@ -1882,4 +1869,3 @@ orOccInfo (OneOcc in_lam1 _ int_cxt1)
            (int_cxt1 && int_cxt2)
 orOccInfo a1 a2 = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
                   NoOccInfo
-\end{code}

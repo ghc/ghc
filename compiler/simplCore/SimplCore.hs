@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[SimplCore]{Driver for simplifying @Core@ programs}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[SimplCore]{Driver for simplifying @Core@ programs}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module SimplCore ( core2core, simplifyExpr ) where
@@ -55,15 +55,15 @@ import Control.Monad
 import DynamicLoading   ( loadPlugins )
 import Plugins          ( installCoreToDos )
 #endif
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The driver for the simplifier}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 core2core :: HscEnv -> ModGuts -> IO ModGuts
 core2core hsc_env guts
   = do { us <- mkSplitUniqSupply 's'
@@ -91,16 +91,15 @@ core2core hsc_env guts
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
     print_unqual = mkPrintUnqualified dflags (mg_rdr_env guts)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
            Generating the main optimisation pipeline
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 getCoreToDo :: DynFlags -> [CoreToDo]
 getCoreToDo dflags
   = core_todo
@@ -311,11 +310,9 @@ getCoreToDo dflags
 
         maybe_rule_check (Phase 0)
      ]
-\end{code}
 
-Loading plugins
+-- Loading plugins
 
-\begin{code}
 addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
 #ifndef GHCI
 addPluginPasses builtin_passes = return builtin_passes
@@ -327,15 +324,15 @@ addPluginPasses builtin_passes
   where
     query_plug todos (_, plug, options) = installCoreToDos plug options todos
 #endif
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                   The CoreToDo interpreter
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 runCorePasses :: [CoreToDo] -> ModGuts -> CoreM ModGuts
 runCorePasses passes guts
   = foldM do_pass guts passes
@@ -395,15 +392,15 @@ doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
 #endif
 
 doCorePass pass = pprPanic "doCorePass" (ppr pass)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Core pass combinators}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 printCore :: DynFlags -> CoreProgram -> IO ()
 printCore dflags binds
     = Err.dumpIfSet dflags True "Print Core" (pprCoreBindings binds)
@@ -467,16 +464,15 @@ observe do_pass = doPassM $ \binds -> do
     dflags <- getDynFlags
     _ <- liftIO $ do_pass dflags binds
     return binds
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Gentle simplification
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
              -> CoreExpr
              -> IO CoreExpr
@@ -525,16 +521,15 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 simplExprGently env expr = do
     expr1 <- simplExpr env (occurAnalyseExpr expr)
     simplExpr env (occurAnalyseExpr expr1)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The driver for the simplifier}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 simplifyPgm :: CoreToDo -> ModGuts -> CoreM ModGuts
 simplifyPgm pass guts
   = do { hsc_env <- getHscEnv
@@ -700,14 +695,13 @@ dump_end_iteration dflags print_unqual iteration_no counts binds rules
     pp_counts = vcat [ ptext (sLit "---- Simplifier counts for") <+> hdr
                      , pprSimplCount counts
                      , ptext (sLit "---- End of simplifier counts for") <+> hdr ]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Shorting out indirections
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 If we have this:
 
@@ -826,8 +820,8 @@ could be eliminated.  But I don't think it's very common
 and it's dangerous to do this fiddling in STG land
 because we might elminate a binding that's mentioned in the
 unfolding for something.
+-}
 
-\begin{code}
 type IndEnv = IdEnv Id          -- Maps local_id -> exported_id
 
 shortOutIndirections :: CoreProgram -> CoreProgram
@@ -920,4 +914,3 @@ transferIdInfo exported_id local_id
                                (specInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another
-\end{code}

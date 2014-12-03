@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
-\section[SimplUtils]{The simplifier utilities}
+{-
+(c) The AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[SimplUtils]{The simplifier utilities}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module SimplUtils (
@@ -17,16 +17,16 @@ module SimplUtils (
         simplEnvForGHCi, updModeForStableUnfoldings,
 
         -- The continuation type
-        SimplCont(..), DupFlag(..), 
+        SimplCont(..), DupFlag(..),
         isSimplified,
         contIsDupable, contResultType, contInputType,
         contIsTrivial, contArgs, dropArgs,
-        pushSimplifiedArgs, countValArgs, countArgs, 
+        pushSimplifiedArgs, countValArgs, countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
-        interestingCallContext, interestingArg, 
+        interestingCallContext, interestingArg,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), mkArgInfo, addArgTo, addCastTo, 
+        ArgInfo(..), ArgSpec(..), mkArgInfo, addArgTo, addCastTo,
         argInfoExpr, argInfoValArgs,
 
         abstractFloats
@@ -62,14 +62,13 @@ import FastString
 import Pair
 
 import Control.Monad    ( when )
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 The SimplCont type
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 A SimplCont allows the simplifier to traverse the expression in a
 zipper-like fashion.  The SimplCont represents the rest of the expression,
@@ -90,8 +89,8 @@ Key points:
 
   * A SimplCont describes a context that *does not* bind
     any variables.  E.g. \x. [] is not a SimplCont
+-}
 
-\begin{code}
 data SimplCont
   = Stop                -- An empty context, or <hole>
         OutType         -- Type of the <hole>
@@ -210,8 +209,8 @@ instance Outputable DupFlag where
   ppr OkToDup    = ptext (sLit "ok")
   ppr NoDup      = ptext (sLit "nodup")
   ppr Simplified = ptext (sLit "simpl")
-\end{code}
 
+{-
 Note [DupFlag invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 In both (ApplyTo dup _ env k)
@@ -221,8 +220,8 @@ the following invariants hold
   (a) if dup = OkToDup, then continuation k is also ok-to-dup
   (b) if dup = OkToDup or Simplified, the subst-env is empty
       (and and hence no need to re-simplify)
+-}
 
-\begin{code}
 -------------------
 mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty BoringCtxt
@@ -297,7 +296,7 @@ countArgs _                    = 0
 
 contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
--- The returned continuation of the call is only used to 
+-- The returned continuation of the call is only used to
 -- answer questions like "are you interesting?"
 contArgs cont
   | lone cont = (True, [], cont)
@@ -326,9 +325,8 @@ dropArgs :: Int -> SimplCont -> SimplCont
 dropArgs 0 cont = cont
 dropArgs n (ApplyTo _ _ _ cont) = dropArgs (n-1) cont
 dropArgs n other                = pprPanic "dropArgs" (ppr n <+> ppr other)
-\end{code}
 
-
+{-
 Note [Interesting call context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to avoid inlining an expression where there can't possibly be
@@ -361,9 +359,8 @@ since we can just eliminate this case instead (x is in WHNF).  Similar
 applies when x is bound to a lambda expression.  Hence
 contIsInteresting looks for case expressions with just a single
 default case.
+-}
 
-
-\begin{code}
 interestingCallContext :: SimplCont -> CallCtxt
 -- See Note [Interesting call context]
 interestingCallContext cont
@@ -511,14 +508,13 @@ interestingArgContext rules call_cont
 
     interesting RuleArgCtxt = True
     interesting _           = False
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                   SimplifierMode
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The SimplifierMode controls several switches; see its definition in
 CoreMonad
@@ -526,8 +522,8 @@ CoreMonad
         sm_inline     :: Bool     -- Whether inlining is enabled
         sm_case_case  :: Bool     -- Whether case-of-case is enabled
         sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
+-}
 
-\begin{code}
 simplEnvForGHCi :: DynFlags -> SimplEnv
 simplEnvForGHCi dflags
   = mkSimplEnv $ SimplMode { sm_names = ["GHCi"]
@@ -553,8 +549,8 @@ updModeForStableUnfoldings inline_rule_act current_mode
   where
     phaseFromActivation (ActiveAfter n) = Phase n
     phaseFromActivation _               = InitialPhase
-\end{code}
 
+{-
 Note [Inlining in gentle mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Something is inlined if
@@ -670,8 +666,8 @@ the wrapper (initially, the worker's only call site!).  But,
 if the wrapper is sure to be called, the strictness analyser will
 mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
 continuation.
+-}
 
-\begin{code}
 activeUnfolding :: SimplEnv -> Id -> Bool
 activeUnfolding env
   | not (sm_inline mode) = active_unfolding_minimal
@@ -733,15 +729,13 @@ activeRule env
   | otherwise           = isActive (sm_phase mode)
   where
     mode = getMode env
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                   preInlineUnconditionally
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 preInlineUnconditionally
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -851,8 +845,8 @@ Note [Do not inline CoVars unconditionally]
 Coercion variables appear inside coercions, and the RHS of a let-binding
 is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
+-}
 
-\begin{code}
 preInlineUnconditionally :: DynFlags -> SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
 -- Precondition: rhs satisfies the let/app invariant
 -- See Note [CoreSyn let/app invariant] in CoreSyn
@@ -922,13 +916,12 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
 -- top level things, but then we become more leery about inlining
 -- them.
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                   postInlineUnconditionally
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 postInlineUnconditionally
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -957,8 +950,8 @@ it's best to inline it anyway.  We often get a=E; b=a from desugaring,
 with both a and b marked NOINLINE.  But that seems incompatible with
 our new view that inlining is like a RULE, so I'm sticking to the 'active'
 story for now.
+-}
 
-\begin{code}
 postInlineUnconditionally
     :: DynFlags -> SimplEnv -> TopLevelFlag
     -> OutId            -- The binder (an InId would be fine too)
@@ -1041,8 +1034,8 @@ postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
   where
     active = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
-\end{code}
 
+{-
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't do postInlineUnconditionally for top-level things (even for
@@ -1089,13 +1082,13 @@ won't inline because 'e' is too big.
     c.f. Note [Stable unfoldings and preInlineUnconditionally]
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         Rebuilding a lambda
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 mkLam :: [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
 -- mkLam tries three things
 --      a) eta reduction, if that gives a trivial expression
@@ -1138,9 +1131,8 @@ mkLam bndrs body cont
 
       | otherwise
       = return (mkLams bndrs body)
-\end{code}
 
-
+{-
 Note [Eta expanding lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we *do* want to eta-expand lambdas. Consider
@@ -1191,13 +1183,13 @@ It does not make sense to transform
         /\g. e `cast` g  ==>  (/\g.e) `cast` (/\g.g)
 because the latter is not well-kinded.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
               Eta expansion
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tryEtaExpandRhs :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 tryEtaExpandRhs env bndr rhs
@@ -1226,8 +1218,8 @@ tryEtaExpandRhs env bndr rhs
 
     old_arity    = exprArity rhs -- See Note [Do not expand eta-expand PAPs]
     old_id_arity = idArity bndr
-\end{code}
 
+{-
 Note [Eta-expanding at let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We now eta expand at let-bindings, which is where the payoff comes.
@@ -1256,7 +1248,7 @@ Note [Do not eta-expand PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to have old_arity = manifestArity rhs, which meant that we
 would eta-expand even PAPs.  But this gives no particular advantage,
-and can lead to a massive blow-up in code size, exhibited by Trac #9020.  
+and can lead to a massive blow-up in code size, exhibited by Trac #9020.
 Suppose we have a PAP
     foo :: IO ()
     foo = returnIO ()
@@ -1276,11 +1268,11 @@ Does it matter not eta-expanding such functions?  I'm not sure.  Perhaps
 strictness analysis will have less to bite on?
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Floating lets out of big lambdas}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Floating and type abstraction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1356,9 +1348,8 @@ as we would normally do.
 That's why the whole transformation is part of the same process that
 floats let-bindings and constructor arguments out of RHSs.  In particular,
 it is guarded by the doFloatFromRhs call in simplLazyBind.
+-}
 
-
-\begin{code}
 abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats main_tvs body_env body
   = ASSERT( notNull body_floats )
@@ -1437,8 +1428,8 @@ abstractFloats main_tvs body_env body
                 -- where x* has an INLINE prag on it.  Now, once x* is inlined,
                 -- the occurrences of x' will be just the occurrences originally
                 -- pinned on x.
-\end{code}
 
+{-
 Note [Abstract over coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If a coercion variable (g :: a ~ Int) is free in the RHS, then so is the
@@ -1468,11 +1459,11 @@ Historical note: if you use let-bindings instead of a substitution, beware of th
                 --           to appear many times.  (NB: mkInlineMe eliminates
                 --           such notes on trivial RHSs, so do it manually.)
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 prepareAlts
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 prepareAlts tries these things:
 
@@ -1515,8 +1506,8 @@ h y = case y of
 If we inline h into f, the default case of the inlined h can't happen.
 If we don't notice this, we may end up filtering out *all* the cases
 of the inner case y, which give us nowhere to go!
+-}
 
-\begin{code}
 prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 prepareAlts scrut case_bndr' alts
@@ -1524,18 +1515,18 @@ prepareAlts scrut case_bndr' alts
            --   OutId, it has maximum information; this is important.
            --   Test simpl013 is an example
   = do { us <- getUniquesM
-       ; let (imposs_deflt_cons, refined_deflt, alts') 
+       ; let (imposs_deflt_cons, refined_deflt, alts')
                 = filterAlts us (varType case_bndr') imposs_cons alts
        ; when refined_deflt $ tick (FillInCaseDefault case_bndr')
- 
+
        ; alts'' <- combineIdenticalAlts case_bndr' alts'
        ; return (imposs_deflt_cons, alts'') }
   where
     imposs_cons = case scrut of
                     Var v -> otherCons (idUnfolding v)
                     _     -> []
-\end{code}
 
+{-
 Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  If several alternatives are identical, merge them into
@@ -1578,8 +1569,8 @@ NB: it's important that all this is done in [InAlt], *before* we work
 on the alternatives themselves, because Simpify.simplAlt may zap the
 occurrence info on the binders in the alternatives, which in turn
 defeats combineIdenticalAlts (see Trac #7360).
+-}
 
-\begin{code}
 combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
 -- See Note [Combine identical alternatives]
 combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
@@ -1592,14 +1583,13 @@ combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
     identical_to_alt1 (_con,bndrs,rhs) = all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1
 
 combineIdenticalAlts _ alts = return alts
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 mkCase
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 mkCase tries these things
 
@@ -1628,9 +1618,8 @@ mkCase tries these things
                 False -> False
 
     and similar friends.
+-}
 
-
-\begin{code}
 mkCase, mkCase1, mkCase2
    :: DynFlags
    -> OutExpr -> OutId
@@ -1720,8 +1709,8 @@ mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 --------------------------------------------------
 mkCase2 _dflags scrut bndr alts_ty alts
   = return (Case scrut bndr alts_ty alts)
-\end{code}
 
+{-
 Note [Dead binders]
 ~~~~~~~~~~~~~~~~~~~~
 Note that dead-ness is maintained by the simplifier, so that it is
@@ -1787,5 +1776,4 @@ without getting changed to c1=I# c2.
 
 I don't think this is worth fixing, even if I knew how. It'll
 all come out in the next pass anyway.
-
-
+-}

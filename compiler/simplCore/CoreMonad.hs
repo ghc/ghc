@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
-\section[CoreMonad]{The core pipeline monad}
+{-
+(c) The AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[CoreMonad]{The core pipeline monad}
+-}
+
 {-# LANGUAGE CPP, UndecidableInstances #-}
 
 module CoreMonad (
@@ -118,19 +118,19 @@ saveLinkerGlobals = return ()
 restoreLinkerGlobals :: () -> IO ()
 restoreLinkerGlobals () = return ()
 #endif
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                        Debug output
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These functions are not CoreM monad stuff, but they probably ought to
 be, and it makes a conveneint place.  place for them.  They print out
 stuff before and after core passes, and do Core Lint when necessary.
+-}
 
-\begin{code}
 showPass :: CoreToDo -> CoreM ()
 showPass pass = do { dflags <- getDynFlags
                    ; liftIO $ showPassIO dflags pass }
@@ -286,17 +286,15 @@ interactiveInScope hsc_env
               -- I think it's because of the GHCi debugger, which can bind variables
               --   f :: [t] -> [t]
               -- where t is a RuntimeUnk (see TcType)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
               The CoreToDo type and related types
           Abstraction of core-to-core passes to run.
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 data CoreToDo           -- These are diff core-to-core passes,
                         -- which may be invoked in any order,
@@ -330,9 +328,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreTidy
   | CorePrep
 
-\end{code}
-
-\begin{code}
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
@@ -384,9 +379,7 @@ pprPassDetails :: CoreToDo -> SDoc
 pprPassDetails (CoreDoSimplify n md) = vcat [ ptext (sLit "Max iterations =") <+> int n
                                             , ppr md ]
 pprPassDetails _ = Outputable.empty
-\end{code}
 
-\begin{code}
 data SimplifierMode             -- See comments in SimplMonad
   = SimplMode
         { sm_names      :: [String] -- Name(s) of the phase
@@ -410,10 +403,7 @@ instance Outputable SimplifierMode where
              , pp_flag cc  (sLit "case-of-case") ])
          where
            pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
-\end{code}
 
-
-\begin{code}
 data FloatOutSwitches = FloatOutSwitches {
   floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
                                    -- doing so will abstract over n or fewer
@@ -450,9 +440,7 @@ runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
 runMaybe (Just x) f = f x
 runMaybe Nothing  _ = CoreDoNothing
 
-\end{code}
-
-
+{-
 Note [RULEs enabled in SimplGently]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 RULES are enabled when doing "gentle" simplification.  Two reasons:
@@ -470,13 +458,13 @@ But watch out: list fusion can prevent floating.  So use phase control
 to switch off those rules until after floating.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
              Types for Plugins
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A description of the plugin pass itself
 type PluginPass = ModGuts -> CoreM ModGuts
 
@@ -484,16 +472,15 @@ bindsOnlyPass :: (CoreProgram -> CoreM CoreProgram) -> ModGuts -> CoreM ModGuts
 bindsOnlyPass pass guts
   = do { binds' <- pass (mg_binds guts)
        ; return (guts { mg_binds = binds' }) }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Counting and logging
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 verboseSimplStats :: Bool
 verboseSimplStats = opt_PprStyle_Debug          -- For now, anyway
 
@@ -504,9 +491,7 @@ pprSimplCount      :: SimplCount -> SDoc
 doSimplTick        :: DynFlags -> Tick -> SimplCount -> SimplCount
 doFreeSimplTick    ::             Tick -> SimplCount -> SimplCount
 plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
-\end{code}
 
-\begin{code}
 data SimplCount
    = VerySimplCount !Int        -- Used when don't want detailed stats
 
@@ -608,10 +593,7 @@ pprTickGroup group@((tick1,_):_)
                                     -- flip as we want largest first
                | (tick,n) <- sortBy (flip (comparing snd)) group])
 pprTickGroup [] = panic "pprTickGroup"
-\end{code}
 
-
-\begin{code}
 data Tick
   = PreInlineUnconditionally    Id
   | PostInlineUnconditionally   Id
@@ -725,16 +707,15 @@ cmpEqTick (CaseElim a)                  (CaseElim b)                    = a `com
 cmpEqTick (CaseIdentity a)              (CaseIdentity b)                = a `compare` b
 cmpEqTick (FillInCaseDefault a)         (FillInCaseDefault b)           = a `compare` b
 cmpEqTick _                             _                               = EQ
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Monad and carried data structure definitions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype CoreState = CoreState {
         cs_uniq_supply :: UniqSupply
 }
@@ -841,16 +822,13 @@ runCoreM hsc_env rule_base us mod print_unqual m = do
     extract :: (a, CoreState, CoreWriter) -> (a, SimplCount)
     extract (value, _, writer) = (value, cw_simpl_count writer)
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Core combinators, not exported
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 nop :: CoreState -> a -> CoreIOEnv (a, CoreState, CoreWriter)
 nop s x = do
@@ -869,11 +847,7 @@ modifyS f = CoreM (\s -> nop (f s) ())
 write :: CoreWriter -> CoreM ()
 write w = CoreM (\s -> return ((), s, w))
 
-\end{code}
-
-\subsection{Lifting IO into the monad}
-
-\begin{code}
+-- \subsection{Lifting IO into the monad}
 
 -- | Lift an 'IOEnv' operation into 'CoreM'
 liftIOEnv :: CoreIOEnv a -> CoreM a
@@ -886,16 +860,14 @@ instance MonadIO CoreM where
 liftIOWithCount :: IO (SimplCount, a) -> CoreM a
 liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> return x)
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Reader, writer and state accessors
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 getHscEnv :: CoreM HscEnv
 getHscEnv = read cr_hsc_env
 
@@ -928,13 +900,13 @@ getPackageFamInstEnv = do
     hsc_env <- getHscEnv
     eps <- liftIO $ hscEPS hsc_env
     return $ eps_fam_inst_env eps
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Initializing globals
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is a rather annoying function. When a plugin is loaded, it currently
 gets linked against a *newly loaded* copy of the GHC package. This would
@@ -973,8 +945,8 @@ will have to say `reinitializeGlobals` before it does anything, but never mind.
 I've threaded the cr_globals through CoreM rather than giving them as an
 argument to the plugin function so that we can turn this function into
 (return ()) without breaking any plugins when we eventually get 1. working.
+-}
 
-\begin{code}
 reinitializeGlobals :: CoreM ()
 reinitializeGlobals = do
     linker_globals <- read cr_globals
@@ -982,15 +954,15 @@ reinitializeGlobals = do
     let dflags = hsc_dflags hsc_env
     liftIO $ restoreLinkerGlobals linker_globals
     liftIO $ setUnsafeGlobalDynFlags dflags
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
              Dealing with annotations
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Get all annotations of a given type. This happens lazily, that is
 -- no deserialization will take place until the [a] is actually demanded and
 -- the [a] can also be empty (the UniqFM is not filtered).
@@ -1011,8 +983,7 @@ getFirstAnnotations deserialize guts
   = liftM (mapUFM head . filterUFM (not . null))
   $ getAnnotations deserialize guts
 
-\end{code}
-
+{-
 Note [Annotations]
 ~~~~~~~~~~~~~~~~~~
 A Core-to-Core pass that wants to make use of annotations calls
@@ -1031,13 +1002,12 @@ only want to deserialise every annotation once, we would have to build a cache
 for every module in the HTP. In the end, it's probably not worth it as long as
 we aren't using annotations heavily.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Direct screen output
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 msg :: (DynFlags -> SDoc -> IO ()) -> SDoc -> CoreM ()
 msg how doc = do
@@ -1079,29 +1049,28 @@ debugTraceMsg = msg (flip Err.debugTraceMsg 3)
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
 dumpIfSet_dyn :: DumpFlag -> String -> SDoc -> CoreM ()
 dumpIfSet_dyn flag str = msg (\dflags -> Err.dumpIfSet_dyn dflags flag str)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                Finding TyThings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 instance MonadThings CoreM where
     lookupThing name = do
         hsc_env <- getHscEnv
         liftIO $ initTcForLookup hsc_env (tcLookupGlobal name)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                Template Haskell interoperability
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 #ifdef GHCI
 -- | Attempt to convert a Template Haskell name to one that GHC can
 -- understand. Original TH names such as those you get when you use
@@ -1114,4 +1083,3 @@ thNameToGhcName th_name = do
     hsc_env <- getHscEnv
     liftIO $ initTcForLookup hsc_env (lookupThName_maybe th_name)
 #endif
-\end{code}

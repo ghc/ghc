@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
-\section[LiberateCase]{Unroll recursion to allow evals to be lifted from a loop}
+{-
+(c) The AQUA Project, Glasgow University, 1994-1998
 
-\begin{code}
+\section[LiberateCase]{Unroll recursion to allow evals to be lifted from a loop}
+-}
+
 {-# LANGUAGE CPP #-}
 module LiberateCase ( liberateCase ) where
 
@@ -15,8 +15,8 @@ import CoreUnfold       ( couldBeSmallEnoughToInline )
 import Id
 import VarEnv
 import Util             ( notNull )
-\end{code}
 
+{-
 The liberate-case transformation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This module walks over @Core@, and looks for @case@ on free variables.
@@ -111,13 +111,13 @@ Here, the level of @f@ is zero, the level of @g@ is one,
 and the level of @h@ is zero (NB not one).
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
          Top-level code
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 liberateCase :: DynFlags -> CoreProgram -> CoreProgram
 liberateCase dflags binds = do_prog (initEnv dflags) binds
   where
@@ -125,18 +125,18 @@ liberateCase dflags binds = do_prog (initEnv dflags) binds
     do_prog env (bind:binds) = bind' : do_prog env' binds
                              where
                                (env', bind') = libCaseBind env bind
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
          Main payload
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Bindings
 ~~~~~~~~
-\begin{code}
+-}
+
 libCaseBind :: LibCaseEnv -> CoreBind -> (LibCaseEnv, CoreBind)
 
 libCaseBind env (NonRec binder rhs)
@@ -164,8 +164,8 @@ libCaseBind env (Rec pairs)
         =  idArity id > 0       -- Note [Only functions!]
         && maybe True (\size -> couldBeSmallEnoughToInline (lc_dflags env) size rhs)
                       (bombOutSize env)
-\end{code}
 
+{-
 Note [Need to localiseId in libCaseBind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The call to localiseId is needed for two subtle reasons
@@ -191,8 +191,8 @@ rhs_small_enough call in the comprehension for env_rhs does.
 
 Expressions
 ~~~~~~~~~~~
+-}
 
-\begin{code}
 libCase :: LibCaseEnv
         -> CoreExpr
         -> CoreExpr
@@ -224,12 +224,12 @@ libCase env (Case scrut bndr ty alts)
 libCaseAlt :: LibCaseEnv -> (AltCon, [CoreBndr], CoreExpr)
                          -> (AltCon, [CoreBndr], CoreExpr)
 libCaseAlt env (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
-\end{code}
 
-
+{-
 Ids
 ~~~
-\begin{code}
+-}
+
 libCaseId :: LibCaseEnv -> Id -> CoreExpr
 libCaseId env v
   | Just the_bind <- lookupRecId env v  -- It's a use of a recursive thing
@@ -253,8 +253,8 @@ freeScruts env rec_bind_lvl
        , scrut_at_lvl > rec_bind_lvl]
         -- Note [When to specialise]
         -- Note [Avoiding fruitless liberate-case]
-\end{code}
 
+{-
 Note [When to specialise]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -294,13 +294,13 @@ an occurrence of 'g', we want to check that there's a scruted-var v st
    b) v's scrutinisation site is *inside* g
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         Utility functions
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 addBinders :: LibCaseEnv -> [CoreBndr] -> LibCaseEnv
 addBinders env@(LibCaseEnv { lc_lvl = lvl, lc_lvl_env = lvl_env }) binders
   = env { lc_lvl_env = lvl_env' }
@@ -342,22 +342,20 @@ lookupLevel env id
   = case lookupVarEnv (lc_lvl_env env) id of
       Just lvl -> lvl
       Nothing  -> topLevel
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
          The environment
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type LibCaseLevel = Int
 
 topLevel :: LibCaseLevel
 topLevel = 0
-\end{code}
 
-\begin{code}
 data LibCaseEnv
   = LibCaseEnv {
         lc_dflags :: DynFlags,
@@ -408,4 +406,3 @@ initEnv dflags
 -- (passed in from cmd-line args)
 bombOutSize :: LibCaseEnv -> Maybe Int
 bombOutSize = liberateCaseThreshold . lc_dflags
-\end{code}

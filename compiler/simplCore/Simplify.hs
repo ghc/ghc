@@ -1,9 +1,9 @@
-%
-% (c) The AQUA Project, Glasgow University, 1993-1998
-%
-\section[Simplify]{The main module of the simplifier}
+{-
+(c) The AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[Simplify]{The main module of the simplifier}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module Simplify ( simplTopBinds, simplExpr ) where
@@ -49,9 +49,8 @@ import FastString
 import Pair
 import Util
 import ErrUtils
-\end{code}
 
-
+{-
 The guts of the simplifier is in this module, but the driver loop for
 the simplifier is in SimplCore.lhs.
 
@@ -205,13 +204,13 @@ we should eta expand wherever we find a (value) lambda?  Then the eta
 expansion at a let RHS can concentrate solely on the PAP case.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Bindings}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 simplTopBinds :: SimplEnv -> [InBind] -> SimplM SimplEnv
 
 simplTopBinds env0 binds0
@@ -238,19 +237,18 @@ simplTopBinds env0 binds0
     simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel NonRecursive b b' r
         where
           (env', b') = addBndrRules env b (lookupRecBndr env b)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Lazy bindings}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 simplRecBind is used for
         * recursive bindings only
+-}
 
-\begin{code}
 simplRecBind :: SimplEnv -> TopLevelFlag
              -> [(InId, InExpr)]
              -> SimplM SimplEnv
@@ -272,15 +270,15 @@ simplRecBind env0 top_lvl pairs0
     go env ((old_bndr, new_bndr, rhs) : pairs)
         = do { env' <- simplRecOrTopPair env top_lvl Recursive old_bndr new_bndr rhs
              ; go env' pairs }
-\end{code}
 
+{-
 simplOrTopPair is used for
         * recursive bindings (whether top level or not)
         * top-level non-recursive bindings
 
 It assumes the binder has already been simplified, but not its IdInfo.
+-}
 
-\begin{code}
 simplRecOrTopPair :: SimplEnv
                   -> TopLevelFlag -> RecFlag
                   -> InId -> OutBndr -> InExpr  -- Binder and rhs
@@ -302,9 +300,8 @@ simplRecOrTopPair env top_lvl is_rec old_bndr new_bndr rhs
       = pprTrace "SimplBind" (ppr old_bndr) thing_inside
         -- trace_bind emits a trace for each top-level binding, which
         -- helps to locate the tracing for inlining and rule firing
-\end{code}
 
-
+{-
 simplLazyBind is used for
   * [simplRecOrTopPair] recursive bindings (whether top level or not)
   * [simplRecOrTopPair] top-level non-recursive bindings
@@ -318,8 +315,8 @@ Nota bene:
 
     3. It does not check for pre-inline-unconditionally;
        that should have been done already.
+-}
 
-\begin{code}
 simplLazyBind :: SimplEnv
               -> TopLevelFlag -> RecFlag
               -> InId -> OutId          -- Binder, both pre-and post simpl
@@ -368,12 +365,12 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; return (env', rhs') }
 
         ; completeBind env' top_lvl bndr bndr1 rhs' }
-\end{code}
 
+{-
 A specialised variant of simplNonRec used when the RHS is already simplified,
 notably in knownCon.  It uses case-binding where necessary.
+-}
 
-\begin{code}
 simplNonRecX :: SimplEnv
              -> InId            -- Old binder
              -> OutExpr         -- Simplified RHS
@@ -409,8 +406,8 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
                         ; return (addFloats env env1, rhs1) }   -- Add the floats to the main env
                 else return (env, wrapFloats env1 rhs1)         -- Wrap the floats around the RHS
         ; completeBind env2 NotTopLevel old_bndr new_bndr rhs2 }
-\end{code}
 
+{-
 {- No, no, no!  Do not try preInlineUnconditionally in completeNonRecX
    Doing so risks exponential behaviour, because new_rhs has been simplified once already
    In the cases described by the folowing commment, postInlineUnconditionally will
@@ -451,8 +448,8 @@ We also want to deal well cases like this
 Here we want to make e1,e2 trivial and get
         x1 = e1; x2 = e2; v = (f x1 `cast` co) v2
 That's what the 'go' loop in prepareRhs does
+-}
 
-\begin{code}
 prepareRhs :: TopLevelFlag -> SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
 prepareRhs top_lvl env id (Cast rhs co)    -- Note [Float coercions]
@@ -491,9 +488,8 @@ prepareRhs top_lvl env0 _ rhs0
 
     go _ env other
         = return (False, env, other)
-\end{code}
 
-
+{-
 Note [Float coercions]
 ~~~~~~~~~~~~~~~~~~~~~~
 When we find the binding
@@ -542,9 +538,8 @@ But 'v' isn't in scope!
 These strange casts can happen as a result of case-of-case
         bar = case (case x of { T -> (# 2,3 #); F -> error "urk" }) of
                 (# p,q #) -> p+q
+-}
 
-
-\begin{code}
 makeTrivialArg :: SimplEnv -> ArgSpec -> SimplM (SimplEnv, ArgSpec)
 makeTrivialArg env (ValArg e)  = do { (env', e') <- makeTrivial NotTopLevel env e
                                     ; return (env', ValArg e') }
@@ -589,8 +584,8 @@ bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 bindingOk top_lvl _ expr_ty
   | isTopLevel top_lvl = not (isUnLiftedType expr_ty)
   | otherwise          = True
-\end{code}
 
+{-
 Note [Cannot trivialise]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Consider tih
@@ -613,11 +608,11 @@ trivial):
 
 We don't want to ANF-ise this.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Completing a lazy binding}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 completeBind
   * deals only with Ids, not TyVars
@@ -637,8 +632,8 @@ It does *not* attempt to do let-to-case.  Why?  Because it is used for
                 (so let-to-case is inappropriate).
 
 Nor does it do the atomic-argument thing
+-}
 
-\begin{code}
 completeBind :: SimplEnv
              -> TopLevelFlag            -- Flag stuck into unfolding
              -> InId                    -- Old binder
@@ -782,8 +777,8 @@ simplUnfolding env top_lvl id new_rhs unf
     act      = idInlineActivation id
     rule_env = updMode (updModeForStableUnfoldings act) env
                -- See Note [Simplifying inside stable unfoldings] in SimplUtils
-\end{code}
 
+{-
 Note [Force bottoming field]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to force bottoming, or the new unfolding holds
@@ -845,11 +840,11 @@ After inlining f at some of its call sites the original binding may
 The solution here is a bit ad hoc...
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection[Simplify-simplExpr]{The main function: simplExpr}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The reason for this OutExprStuff stuff is that we want to float *after*
 simplifying a RHS, not before.  If we do so naively we get quadratic
@@ -887,9 +882,8 @@ whole round if we float first.  This can cascade.  Consider
 
 Only in this second round can the \y be applied, and it
 might do the same again.
+-}
 
-
-\begin{code}
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 simplExpr env expr = simplExprC env expr (mkBoringStop expr_out_ty)
   where
@@ -1149,16 +1143,15 @@ simplTick env tickish expr cont
 -- So we've moved a constant amount of work out of the scc to expose
 -- the case.  We only do this when the continuation is interesting: in
 -- for now, it has to be another Case (maybe generalise this later).
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The main rebuilder}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplEnv, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant
 -- only the in-scope set and floats should matter
@@ -1178,16 +1171,15 @@ rebuild env expr cont
         | otherwise                 -> do { arg' <- simplExpr (se `setInScope` env) arg
                                           ; rebuild env (App expr arg') cont }
       TickIt t cont                 -> rebuild env (mkTick t expr) cont
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Lambdas}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplEnv, OutExpr)
 simplCast env body co0 cont0
@@ -1253,14 +1245,13 @@ simplCast env body co0 cont0
            arg_se'    = arg_se `setInScope` env
 
        add_coerce co _ cont = CoerceIt co cont
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Lambdas}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Zap unfolding when beta-reducing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1274,8 +1265,8 @@ stupid situation of
           let b{Unf=Just x} = y
           in ...b...
 Here it'd be far better to drop the unfolding and use the actual RHS.
+-}
 
-\begin{code}
 simplLam :: SimplEnv -> [InId] -> InExpr -> SimplCont
          -> SimplM (SimplEnv, OutExpr)
 
@@ -1355,15 +1346,15 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
                  ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
                  ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
                  ; simplLam env3 bndrs body cont }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                      Variables
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
 simplVar env var
@@ -1501,8 +1492,8 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
                  -- Rules don't match
            ; Nothing -> rebuild env (argInfoExpr fun rev_args) cont      -- No rules
     } }
-\end{code}
 
+{-
 Note [RULES apply to simplified arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very desirable to try RULES once the arguments have been simplified, because
@@ -1550,13 +1541,13 @@ discard the entire application and replace it with (error "foo").  Getting
 all this at once is TOO HARD!
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Rewrite rules
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 tryRules :: SimplEnv -> [CoreRule]
          -> Id -> [OutExpr] -> SimplCont
          -> SimplM (Maybe (CoreExpr, SimplCont))
@@ -1618,8 +1609,8 @@ tryRules env rules fn args call_cont
     log_rule dflags flag hdr details
       = liftIO . dumpSDoc dflags alwaysQualify flag "" $
                    sep [text hdr, nest 4 details]
-\end{code}
 
+{-
 Note [Optimising tagToEnum#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have an enumeration data type:
@@ -1654,11 +1645,11 @@ is recursive, and hence a loop breaker:
 So it's up to the programmer: rules can cause divergence
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Rebuilding a case expression
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Case elimination]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1754,7 +1745,7 @@ let-bound to (error "good").
 Nevertheless, the paper "A semantics for imprecise exceptions" allows
 this transformation. If you want to fix the evaluation order, use
 'pseq'.  See Trac #8900 for an example where the loss of this
-transformation bit us in practice. 
+transformation bit us in practice.
 
 See also Note [Empty case alternatives] in CoreSyn.
 
@@ -1828,8 +1819,8 @@ Why don't we drop the case?  Because it's strict in v.  It's technically
 wrong to drop even unnecessary evaluations, and in practice they
 may be a result of 'seq' so we *definitely* don't want to drop those.
 I don't really know how to improve this situation.
+-}
 
-\begin{code}
 ---------------------------------------------------------
 --      Eliminate the case if possible
 
@@ -1957,8 +1948,8 @@ reallyRebuildCase env scrut case_bndr alts cont
         -- (which in any case is only build in simplAlts)
         -- The case binder *not* scope over the whole returned case-expression
         ; rebuild env' case_expr nodup_cont }
-\end{code}
 
+{-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
 try to eliminate uses of v in the RHSs in favour of case_bndr; that
 way, there's a chance that v will now only be used once, and hence
@@ -2039,8 +2030,8 @@ taking advantage of the `seq`.
 At one point I did transformation in LiberateCase, but it's more
 robust here.  (Otherwise, there's a danger that we'll simply drop the
 'seq' altogether, before LiberateCase gets to see it.)
+-}
 
-\begin{code}
 simplAlts :: SimplEnv
           -> OutExpr
           -> InId                       -- Case binder
@@ -2183,8 +2174,8 @@ zapBndrOccInfo :: Bool -> Id -> Id
 zapBndrOccInfo keep_occ_info pat_id
   | keep_occ_info = pat_id
   | otherwise     = zapIdOccInfo pat_id
-\end{code}
 
+{-
 Note [Add unfolding for scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general it's unlikely that a variable scrutinee will appear
@@ -2220,11 +2211,11 @@ So instead we add the unfolding x -> Just a, and x -> Nothing in the
 respective RHSs.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Known constructor}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We are a bit careful with occurrence info.  Here's an example
 
@@ -2238,8 +2229,8 @@ and then
         f (h v)
 
 All this should happen in one sweep.
+-}
 
-\begin{code}
 knownCon :: SimplEnv
          -> OutExpr                             -- The scrutinee
          -> DataCon -> [OutType] -> [OutExpr]   -- The scrutinee (in pieces)
@@ -2304,16 +2295,15 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExp
 missingAlt env case_bndr _ cont
   = WARN( True, ptext (sLit "missingAlt") <+> ppr case_bndr )
     return (env, mkImpossibleExpr (contResultType cont))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Duplicating continuations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 prepareCaseCont :: SimplEnv
                 -> [InAlt] -> SimplCont
                 -> SimplM (SimplEnv,
@@ -2346,8 +2336,8 @@ prepareCaseCont env alts cont
       | otherwise      = not (all is_bot_alt alts)
 
     is_bot_alt (_,_,rhs) = exprIsBottom rhs
-\end{code}
 
+{-
 Note [Bottom alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we have
@@ -2358,8 +2348,8 @@ will disappear immediately.  This is more direct than creating
 join points and inlining them away; and in some cases we would
 not even create the join points (see Note [Single-alternative case])
 and we would keep the case-of-case which is silly.  See Trac #4930.
+-}
 
-\begin{code}
 mkDupableCont :: SimplEnv -> SimplCont
               -> SimplM (SimplEnv, SimplCont, SimplCont)
 
@@ -2512,8 +2502,8 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
         ; env' <- addPolyBind NotTopLevel env (NonRec (join_bndr `setIdArity` join_arity) join_rhs)
         ; return (env', (con, bndrs', join_call)) }
                 -- See Note [Duplicated env]
-\end{code}
 
+{-
 Note [Fusing case continuations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's important to fuse two successive case continuations when the
@@ -2846,3 +2836,4 @@ whether to use a real join point or just duplicate the continuation:
 
 Hence: check whether the case binder's type is unlifted, because then
 the outer case is *not* a seq.
+-}
