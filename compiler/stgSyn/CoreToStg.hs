@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 --
@@ -1192,4 +1191,3 @@ stgArity :: Id -> HowBound -> Arity
 stgArity _ (LetBound _ arity) = arity
 stgArity f ImportBound        = idArity f
 stgArity _ LambdaBound        = 0
-\end{code}

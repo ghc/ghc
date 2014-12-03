@@ -1,14 +1,14 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[StgSyn]{Shared term graph (STG) syntax for spineless-tagless code generation}
 
 This data type represents programs just before code generation (conversion to
 @Cmm@): basically, what we have is a stylised form of @CoreSyntax@, the style
 being one that happens to be ideally suited to spineless tagless code
 generation.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module StgSyn (
@@ -69,13 +69,13 @@ import UniqSet
 import Unique      ( Unique )
 import Util
 import VarSet      ( IdSet, isEmptyVarSet )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@GenStgBinding@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 As usual, expressions are interesting; other things are boring. Here
 are the boring things [except note the @GenStgRhs@], parameterised
@@ -83,20 +83,20 @@ with respect to binder and occurrence information (just as in
 @CoreSyn@):
 
 There is one SRT for each group of bindings.
+-}
 
-\begin{code}
 data GenStgBinding bndr occ
   = StgNonRec bndr (GenStgRhs bndr occ)
   | StgRec    [(bndr, GenStgRhs bndr occ)]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{@GenStgArg@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data GenStgArg occ
   = StgVarArg  occ
   | StgLitArg  Literal
@@ -142,22 +142,22 @@ isAddrRep _       = False
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{STG expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The @GenStgExpr@ data type is parameterised on binder and occurrence
 info, as before.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{@GenStgExpr@ application}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 An application is of a function to a list of atoms [not expressions].
 Operationally, we want to push the arguments on the stack and call the
@@ -166,24 +166,26 @@ their closures first.)
 
 There is no constructor for a lone variable; it would appear as
 @StgApp var [] _@.
-\begin{code}
+-}
+
 type GenStgLiveVars occ = UniqSet occ
 
 data GenStgExpr bndr occ
   = StgApp
         occ             -- function
         [GenStgArg occ] -- arguments; may be empty
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@StgConApp@ and @StgPrimApp@---saturated applications}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 There are a specialised forms of application, for constructors,
 primitives, and literals.
-\begin{code}
+-}
+
   | StgLit      Literal
 
         -- StgConApp is vital for returning unboxed tuples
@@ -196,32 +198,32 @@ primitives, and literals.
                 Type            -- Result type
                                 -- We need to know this so that we can
                                 -- assign result registers
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@StgLam@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 StgLam is used *only* during CoreToStg's work. Before CoreToStg has
 finished it encodes (\x -> e) as (let f = \x -> e in f)
+-}
 
-\begin{code}
   | StgLam
         [bndr]
         StgExpr    -- Body of lambda
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@GenStgExpr@: case-expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This has the same boxed/unboxed business as Core case expressions.
-\begin{code}
+-}
+
   | StgCase
         (GenStgExpr bndr occ)
                     -- the thing to examine
@@ -248,13 +250,13 @@ This has the same boxed/unboxed business as Core case expressions.
         [GenStgAlt bndr occ]
                     -- The DEFAULT case is always *first*
                     -- if it is there at all
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@GenStgExpr@: @let(rec)@-expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The various forms of let(rec)-expression encode most of the
 interesting things we want to do.
@@ -341,7 +343,8 @@ in e
 \end{enumerate}
 
 And so the code for let(rec)-things:
-\begin{code}
+-}
+
   | StgLet
         (GenStgBinding bndr occ)    -- right hand sides (see below)
         (GenStgExpr bndr occ)       -- body
@@ -358,50 +361,51 @@ And so the code for let(rec)-things:
 
         (GenStgBinding bndr occ)    -- right hand sides (see below)
         (GenStgExpr bndr occ)       -- body
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@GenStgExpr@: @scc@ expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 For @scc@ expressions we introduce a new STG construct.
+-}
 
-\begin{code}
   | StgSCC
         CostCentre             -- label of SCC expression
         !Bool                  -- bump the entry count?
         !Bool                  -- push the cost centre?
         (GenStgExpr bndr occ)  -- scc expression
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@GenStgExpr@: @hpc@ expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Finally for @hpc@ expressions we introduce a new STG construct.
+-}
 
-\begin{code}
   | StgTick
         Module                 -- the module of the source of this tick
         Int                    -- tick number
         (GenStgExpr bndr occ)  -- sub expression
 
 -- END of GenStgExpr
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{STG right-hand sides}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Here's the rest of the interesting stuff for @StgLet@s; the first
 flavour is for closures:
-\begin{code}
+-}
+
 data GenStgRhs bndr occ
   = StgRhsClosure
         CostCentreStack         -- CCS to be attached (default is CurrentCCS)
@@ -413,7 +417,8 @@ data GenStgRhs bndr occ
         [bndr]                  -- arguments; if empty, then not a function;
                                 -- as above, order is important.
         (GenStgExpr bndr occ)   -- body
-\end{code}
+
+{-
 An example may be in order.  Consider:
 \begin{verbatim}
 let t = \x -> \y -> ... x ... y ... p ... q in e
@@ -427,7 +432,8 @@ offsets from @Node@ into the closure, and the code ptr for the closure
 will be exactly that in parentheses above.
 
 The second flavour of right-hand-side is for constructors (simple but important):
-\begin{code}
+-}
+
   | StgRhsCon
         CostCentreStack  -- CCS to be attached (default is CurrentCCS).
                          -- Top-level (static) ones will end up with
@@ -456,10 +462,9 @@ rhsHasCafRefs (StgRhsCon _ _ args)
 stgArgHasCafRefs :: GenStgArg Id -> Bool
 stgArgHasCafRefs (StgVarArg id) = mayHaveCafRefs (idCafInfo id)
 stgArgHasCafRefs _ = False
-\end{code}
 
-Here's the @StgBinderInfo@ type, and its combining op:
-\begin{code}
+-- Here's the @StgBinderInfo@ type, and its combining op:
+
 data StgBinderInfo
   = NoStgBinderInfo
   | SatCallsOnly        -- All occurrences are *saturated* *function* calls
@@ -484,13 +489,13 @@ combineStgBinderInfo _            _            = NoStgBinderInfo
 pp_binder_info :: StgBinderInfo -> SDoc
 pp_binder_info NoStgBinderInfo = empty
 pp_binder_info SatCallsOnly    = ptext (sLit "sat-only")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Stg-case-alternatives]{STG case alternatives}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Very like in @CoreSyntax@ (except no type-world stuff).
 
@@ -502,8 +507,8 @@ constructor might not have all the constructors visible. So
 mkStgAlgAlts (in CoreToStg) ensures that it gets the TyCon from the
 constructors or literals (which are guaranteed to have the Real McCoy)
 rather than from the scrutinee type.
+-}
 
-\begin{code}
 type GenStgAlt bndr occ
   = (AltCon,            -- alts: data constructor,
      [bndr],            -- constructor's parameters,
@@ -518,30 +523,30 @@ data AltType
   | UbxTupAlt Int       -- Unboxed tuple of this arity
   | AlgAlt    TyCon     -- Algebraic data type; the AltCons will be DataAlts
   | PrimAlt   TyCon     -- Primitive data type; the AltCons will be LitAlts
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Stg]{The Plain STG parameterisation}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This happens to be the only one we use at the moment.
+-}
 
-\begin{code}
 type StgBinding  = GenStgBinding  Id Id
 type StgArg      = GenStgArg      Id
 type StgLiveVars = GenStgLiveVars Id
 type StgExpr     = GenStgExpr     Id Id
 type StgRhs      = GenStgRhs      Id Id
 type StgAlt      = GenStgAlt      Id Id
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[UpdateFlag-datatype]{@UpdateFlag@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is also used in @LambdaFormInfo@ in the @ClosureInfo@ module.
 
@@ -550,8 +555,8 @@ updated or blackholed. An @Updatable@ closure should be updated after
 evaluation (and may be blackholed during evaluation). A @SingleEntry@
 closure will only be entered once, and so need not be updated but may
 safely be blackholed.
+-}
 
-\begin{code}
 data UpdateFlag = ReEntrant | Updatable | SingleEntry
 
 instance Outputable UpdateFlag where
@@ -564,19 +569,19 @@ isUpdatable :: UpdateFlag -> Bool
 isUpdatable ReEntrant   = False
 isUpdatable SingleEntry = False
 isUpdatable Updatable   = True
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{StgOp}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 An StgOp allows us to group together PrimOps and ForeignCalls.
 It's quite useful to move these around together, notably
 in StgOpApp and COpStmt.
+-}
 
-\begin{code}
 data StgOp
   = StgPrimOp  PrimOp
 
@@ -586,14 +591,13 @@ data StgOp
         -- The Unique is occasionally needed by the C pretty-printer
         -- (which lacks a unique supply), notably when generating a
         -- typedef for foreign-export-dynamic
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[Static Reference Tables]{@SRT@}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 There is one SRT per top-level function group. Each local binding and
 case expression within this binding group has a subrange of the whole
@@ -601,8 +605,8 @@ SRT, expressed as an offset and length.
 
 In CoreToStg we collect the list of CafRefs at each SRT site, which is later
 converted into the length and offset form by the SRT pass.
+-}
 
-\begin{code}
 data SRT
   = NoSRT
   | SRTEntries IdSet
@@ -619,18 +623,18 @@ pprSRT :: SRT -> SDoc
 pprSRT (NoSRT)          = ptext (sLit "_no_srt_")
 pprSRT (SRTEntries ids) = text "SRT:" <> ppr ids
 pprSRT (SRT off _ _)    = parens (ppr off <> comma <> text "*bitmap*")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[Stg-pretty-printing]{Pretty-printing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Robin Popplestone asked for semi-colon separators on STG binds; here's
 hoping he likes terminators instead...  Ditto for case alternatives.
+-}
 
-\begin{code}
 pprGenStgBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
                  => GenStgBinding bndr bdee -> SDoc
 
@@ -814,5 +818,3 @@ pprStgRhs (StgRhsCon cc con args)
 pprMaybeSRT :: SRT -> SDoc
 pprMaybeSRT (NoSRT) = empty
 pprMaybeSRT srt     = ptext (sLit "srt:") <> pprSRT srt
-\end{code}
-

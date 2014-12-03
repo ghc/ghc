@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section[StgLint]{A ``lint'' pass to check for Stg correctness}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section[StgLint]{A ``lint'' pass to check for Stg correctness}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module StgLint ( lintStgBindings ) where
@@ -23,7 +23,7 @@ import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
 import TypeRep
 import Type
 import TyCon
-import Util 
+import Util
 import SrcLoc
 import Outputable
 import FastString
@@ -34,8 +34,8 @@ import Control.Monad
 import Data.Function
 
 #include "HsVersions.h"
-\end{code}
 
+{-
 Checks for
         (a) *some* type errors
         (b) locally-defined variables used but not defined
@@ -52,15 +52,15 @@ for Stg code that is currently perfectly acceptable for code
 generation.  Solution: don't use it!  (KSW 2000-05).
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{``lint'' for various constructs}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @lintStgBindings@ is the top-level interface function.
+-}
 
-\begin{code}
 lintStgBindings :: String -> [StgBinding] -> [StgBinding]
 
 lintStgBindings whodunnit binds
@@ -82,10 +82,7 @@ lintStgBindings whodunnit binds
         binders <- lintStgBinds bind
         addInScopeVars binders $
             lint_binds binds
-\end{code}
 
-
-\begin{code}
 lintStgArg :: StgArg -> LintM (Maybe Type)
 lintStgArg (StgLitArg lit) = return (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
@@ -93,9 +90,7 @@ lintStgArg (StgVarArg v)   = lintStgVar v
 lintStgVar :: Id -> LintM (Maybe Kind)
 lintStgVar v = do checkInScope v
                   return (Just (idType v))
-\end{code}
 
-\begin{code}
 lintStgBinds :: StgBinding -> LintM [Id] -- Returns the binders
 lintStgBinds (StgNonRec binder rhs) = do
     lint_binds_help (binder,rhs)
@@ -131,9 +126,7 @@ lint_binds_help (binder, rhs)
         return ()
   where
     binder_ty = idType binder
-\end{code}
 
-\begin{code}
 lintStgRhs :: StgRhs -> LintM (Maybe Type)   -- Just ty => type is exact
 
 lintStgRhs (StgRhsClosure _ _ _ _ _ [] expr)
@@ -150,9 +143,7 @@ lintStgRhs (StgRhsCon _ con args) = runMaybeT $ do
     MaybeT $ checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
   where
     con_ty = dataConRepType con
-\end{code}
 
-\begin{code}
 lintStgExpr :: StgExpr -> LintM (Maybe Type) -- Just ty => type is exact
 
 lintStgExpr (StgLit l) = return (Just (literalType l))
@@ -274,16 +265,15 @@ lintAlt scrut_ty (DataAlt con, args, _, rhs) = do
     -- We give it its own copy, so it isn't overloaded.
     elem _ []       = False
     elem x (y:ys)   = x==y || elem x ys
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection[lint-monad]{The Lint monad}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 newtype LintM a = LintM
     { unLintM :: [LintLocInfo]      -- Locations
               -> IdSet              -- Local vars in scope
@@ -312,9 +302,7 @@ pp_binders bs
   where
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
-\end{code}
 
-\begin{code}
 initL :: LintM a -> Maybe MsgDoc
 initL (LintM m)
   = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
@@ -345,9 +333,7 @@ thenL_ :: LintM a -> LintM b -> LintM b
 thenL_ m k = LintM $ \loc scope errs
   -> case unLintM m loc scope errs of
       (_, errs') -> unLintM k loc scope errs'
-\end{code}
 
-\begin{code}
 checkL :: Bool -> MsgDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = addErrL msg
@@ -382,15 +368,15 @@ addInScopeVars ids m = LintM $ \loc scope errs
 --  then id
 --  else pprTrace "Shadowed vars:" (ppr (varSetElems shadowed))) $
     unLintM m loc (scope `unionVarSet` new_set) errs
-\end{code}
 
+{-
 Checking function applications: we only check that the type has the
 right *number* of arrows, we don't actually compare the types.  This
 is because we can't expect the types to be equal - the type
 applications and type lambdas that we use to calculate accurate types
 have long since disappeared.
+-}
 
-\begin{code}
 checkFunApp :: Type                 -- The function type
             -> [Type]               -- The arg type(s)
             -> MsgDoc              -- Error message
@@ -410,9 +396,9 @@ checkFunApp fun_ty arg_tys msg
   cfa accurate fun_ty []      -- Args have run out; that's fine
       = (if accurate then Just fun_ty else Nothing, Nothing)
 
-  cfa accurate fun_ty arg_tys@(arg_ty':arg_tys')   
+  cfa accurate fun_ty arg_tys@(arg_ty':arg_tys')
       | Just (arg_ty, res_ty) <- splitFunTy_maybe fun_ty
-      = if accurate && not (arg_ty `stgEqType` arg_ty') 
+      = if accurate && not (arg_ty `stgEqType` arg_ty')
         then (Nothing, Just msg)       -- Arg type mismatch
         else cfa accurate res_ty arg_tys'
 
@@ -421,7 +407,7 @@ checkFunApp fun_ty arg_tys msg
 
       | Just (tc,tc_args) <- splitTyConApp_maybe fun_ty
       , isNewTyCon tc
-      = if length tc_args < tyConArity tc 
+      = if length tc_args < tyConArity tc
         then WARN( True, text "cfa: unsaturated newtype" <+> ppr fun_ty $$ msg )
              (Nothing, Nothing)   -- This is odd, but I've seen it
         else cfa False (newTyConInstRhs tc tc_args) arg_tys
@@ -432,9 +418,7 @@ checkFunApp fun_ty arg_tys msg
 
       | otherwise
       = (Nothing, Nothing)
-\end{code}
 
-\begin{code}
 stgEqType :: Type -> Type -> Bool
 -- Compare types, but crudely because we have discarded
 -- both casts and type applications, so types might look
@@ -443,7 +427,7 @@ stgEqType :: Type -> Type -> Bool
 --
 -- Fundamentally this is a losing battle because of unsafeCoerce
 
-stgEqType orig_ty1 orig_ty2 
+stgEqType orig_ty1 orig_ty2
   = gos (repType orig_ty1) (repType orig_ty2)
   where
     gos :: RepType -> RepType -> Bool
@@ -456,18 +440,18 @@ stgEqType orig_ty1 orig_ty2
     go ty1 ty2
       | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
       , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
-      , let res = if tc1 == tc2 
+      , let res = if tc1 == tc2
                   then equalLength tc_args1 tc_args2 && and (zipWith (gos `on` repType) tc_args1 tc_args2)
-                  else  -- TyCons don't match; but don't bleat if either is a 
-                        -- family TyCon because a coercion might have made it 
+                  else  -- TyCons don't match; but don't bleat if either is a
+                        -- family TyCon because a coercion might have made it
                         -- equal to something else
                     (isFamilyTyCon tc1 || isFamilyTyCon tc2)
       = if res then True
-        else 
-        pprTrace "stgEqType: unequal" (vcat [ppr ty1, ppr ty2]) 
+        else
+        pprTrace "stgEqType: unequal" (vcat [ppr ty1, ppr ty2])
         False
 
-      | otherwise = True  -- Conservatively say "fine".  
+      | otherwise = True  -- Conservatively say "fine".
                           -- Type variables in particular
 
 checkInScope :: Id -> LintM ()
@@ -482,9 +466,7 @@ checkTys ty1 ty2 msg = LintM $ \loc _scope errs
   -> if (ty1 `stgEqType` ty2)
      then ((), errs)
      else ((), addErr errs msg loc)
-\end{code}
 
-\begin{code}
 _mkCaseAltMsg :: [StgAlt] -> MsgDoc
 _mkCaseAltMsg _alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
@@ -551,4 +533,3 @@ mkUnLiftedTyMsg binder rhs
      ptext (sLit "has unlifted type") <+> quotes (ppr (idType binder)))
     $$
     (ptext (sLit "RHS:") <+> ppr rhs)
-\end{code}
