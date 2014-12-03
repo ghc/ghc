@@ -1,4 +1,3 @@
-\begin{code}
 module RnSplice where
 
 import HsSyn
@@ -14,4 +13,3 @@ rnSpliceType :: HsSplice RdrName   -> PostTc Name Kind
 rnSplicePat  :: HsSplice RdrName   -> RnM ( Either (Pat RdrName) (Pat Name)
                                           , FreeVars )
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
-\end{code}

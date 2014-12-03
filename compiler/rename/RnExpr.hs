@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[RnExpr]{Renaming of expressions}
 
 Basically dependency analysis.
@@ -8,8 +8,8 @@ Basically dependency analysis.
 Handles @Match@, @GRHSs@, @HsExpr@, and @Qualifier@ datatypes.  In
 general, all of these functions return a renamed thing, and a set of
 free variables.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module RnExpr (
@@ -46,15 +46,15 @@ import SrcLoc
 import FastString
 import Control.Monad
 import TysWiredIn       ( nilDataConName )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnExprs :: [LHsExpr RdrName] -> RnM ([LHsExpr Name], FreeVars)
 rnExprs ls = rnExprs' ls emptyUniqSet
  where
@@ -66,11 +66,9 @@ rnExprs ls = rnExprs' ls emptyUniqSet
       ; let  acc' = acc `plusFV` fvExpr
       ; (exprs', fvExprs) <- acc' `seq` rnExprs' exprs acc'
       ; return (expr':exprs', fvExprs) }
-\end{code}
 
-Variables. We look up the variable and return the resulting name.
+-- Variables. We look up the variable and return the resulting name.
 
-\begin{code}
 rnLExpr :: LHsExpr RdrName -> RnM (LHsExpr Name, FreeVars)
 rnLExpr = wrapLocFstM rnExpr
 
@@ -294,26 +292,26 @@ rnExpr (ArithSeq _ _ seq)
 rnExpr (PArrSeq _ seq)
   = do { (new_seq, fvs) <- rnArithSeq seq
        ; return (PArrSeq noPostTcExpr new_seq, fvs) }
-\end{code}
 
+{-
 These three are pattern syntax appearing in expressions.
 Since all the symbols are reservedops we can simply reject them.
 We return a (bogus) EWildPat in each case.
+-}
 
-\begin{code}
 rnExpr EWildPat        = return (hsHoleExpr, emptyFVs)
 rnExpr e@(EAsPat {})   = patSynErr e
 rnExpr e@(EViewPat {}) = patSynErr e
 rnExpr e@(ELazyPat {}) = patSynErr e
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Arrow notation
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
     rnPat ProcExpr pat $ \ pat' -> do
@@ -354,15 +352,15 @@ rnSection section@(SectionL expr op)
         ; return (SectionL expr' op', fvs_op `plusFV` fvs_expr) }
 
 rnSection other = pprPanic "rnSection" (ppr other)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Records
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnHsRecBinds :: HsRecFieldContext -> HsRecordBinds RdrName
              -> RnM (HsRecordBinds Name, FreeVars)
 rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
@@ -373,16 +371,15 @@ rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
   where
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Arrow commands
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnCmdArgs :: [LHsCmdTop RdrName] -> RnM ([LHsCmdTop Name], FreeVars)
 rnCmdArgs [] = return ([], emptyFVs)
 rnCmdArgs (arg:args)
@@ -546,16 +543,15 @@ methodNamesStmt (ParStmt {})                     = emptyFVs
 methodNamesStmt (TransStmt {})                   = emptyFVs
    -- ParStmt and TransStmt can't occur in commands, but it's not convenient to error
    -- here so we just do what's convenient
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Arithmetic sequences
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnArithSeq :: ArithSeqInfo RdrName -> RnM (ArithSeqInfo Name, FreeVars)
 rnArithSeq (From expr)
  = do { (expr', fvExpr) <- rnLExpr expr
@@ -577,15 +573,15 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
       ; (expr3', fvExpr3) <- rnLExpr expr3
       ; return (FromThenTo expr1' expr2' expr3',
                 plusFVs [fvExpr1, fvExpr2, fvExpr3]) }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{@Stmt@s: in @do@ expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnStmts :: Outputable (body RdrName) => HsStmtContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
         -> [LStmt RdrName (Located (body RdrName))]
@@ -791,8 +787,8 @@ lookupStmtName ctxt n
   where
     rebindable     = lookupSyntaxName n
     not_rebindable = return (HsVar n, emptyFVs)
-\end{code}
 
+{-
 Note [Renaming parallel Stmts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Renaming parallel statements is painful.  Given, say
@@ -811,13 +807,13 @@ To satisfy (a) we nest the segements.
 To satisfy (b) we check for duplicates just before thing_inside.
 To satisfy (c) we reset the LocalRdrEnv each time.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{mdo expressions}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type FwdRefs = NameSet
 type Segment stmts = (Defs,
                       Uses,     -- May include defs
@@ -986,7 +982,7 @@ rn_rec_stmts rnBody bndrs stmts
        ; return (concat segs_s) }
 
 ---------------------------------------------
-segmentRecStmts :: HsStmtContext Name 
+segmentRecStmts :: HsStmtContext Name
                 -> Stmt Name body
                 -> [Segment (LStmt Name body)] -> FreeVars
                 -> ([LStmt Name body], FreeVars)
@@ -1039,8 +1035,8 @@ addFwdRefs segs
           all_defs = later_defs `unionNameSet` defs
           new_fwds = fwds `unionNameSet` (uses `intersectNameSet` later_defs)
                 -- Add the downstream fwd refs here
-\end{code}
 
+{-
 Note [Segmenting mdo]
 ~~~~~~~~~~~~~~~~~~~~~
 NB. June 7 2012: We only glom segments that appear in an explicit mdo;
@@ -1082,8 +1078,8 @@ glom it together with the first two groups
      { rec { x <- ...y...; p <- z ; y <- ...x... ;
              q <- x ; z <- y } ;
        r <- x }
+-}
 
-\begin{code}
 glomSegments :: HsStmtContext Name -> [Segment (LStmt Name body)] -> [Segment [LStmt Name body]]
 -- See Note [Glomming segments]
 
@@ -1132,15 +1128,15 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
     non_rec    = isSingleton ss && isEmptyNameSet fwds
     used_later = defs `intersectNameSet` later_uses
                                 -- The ones needed after the RecStmt
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Errors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 checkEmptyStmts :: HsStmtContext Name -> RnM ()
 -- We've seen an empty sequence of Stmts... is that ok?
 checkEmptyStmts ctxt
@@ -1309,4 +1305,3 @@ badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds
   = hang (ptext (sLit "Implicit-parameter bindings illegal in") <+> what)
          2 (ppr binds)
-\end{code}

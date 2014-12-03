@@ -1,6 +1,6 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[RnPat]{Renaming of patterns}
 
 Basically dependency analysis.
@@ -8,8 +8,8 @@ Basically dependency analysis.
 Handles @Match@, @GRHSs@, @HsExpr@, and @Qualifier@ datatypes.  In
 general, all of these functions return a renamed thing, and a set of
 free variables.
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
 
 module RnPat (-- main entry points
@@ -40,7 +40,7 @@ import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
 
 #include "HsVersions.h"
 
-import HsSyn            
+import HsSyn
 import TcRnMonad
 import TcHsSyn             ( hsOverLitName )
 import RnEnv
@@ -65,14 +65,13 @@ import TysWiredIn          ( nilDataCon )
 import DataCon             ( dataConName )
 import Control.Monad       ( when, liftM, ap )
 import Data.Ratio
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
         The CpsRn Monad
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 Note [CpsRn monad]
 ~~~~~~~~~~~~~~~~~~
@@ -85,17 +84,17 @@ style of programming:
 
    where rs::[RdrName], ns::[Name]
 
-The idea is that '...blah...' 
+The idea is that '...blah...'
   a) sees the bindings of ns
   b) returns the free variables it mentions
      so that bindNames can report unused ones
 
-In particular, 
+In particular,
     mapM rnPatAndThen [p1, p2, p3]
-has a *left-to-right* scoping: it makes the binders in 
+has a *left-to-right* scoping: it makes the binders in
 p1 scope over p2,p3.
+-}
 
-\begin{code}
 newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
                                             -> RnM (r, FreeVars) }
         -- See Note [CpsRn monad]
@@ -125,19 +124,19 @@ liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
 wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
 -- Set the location, and also wrap it around the value returned
 wrapSrcSpanCps fn (L loc a)
-  = CpsRn (\k -> setSrcSpan loc $ 
-                 unCpsRn (fn a) $ \v -> 
+  = CpsRn (\k -> setSrcSpan loc $
+                 unCpsRn (fn a) $ \v ->
                  k (L loc v))
 
 lookupConCps :: Located RdrName -> CpsRn (Located Name)
-lookupConCps con_rdr 
+lookupConCps con_rdr
   = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
                     ; (r, fvs) <- k con_name
                     ; return (r, addOneFV fvs (unLoc con_name)) })
     -- We add the constructor name to the free vars
     -- See Note [Patterns are uses]
-\end{code}
 
+{-
 Note [Patterns are uses]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -165,20 +164,20 @@ where we don't know yet whether P2 is a constructor or a pattern
 synonym. So for now, we do report conid occurrences in patterns as
 uses.
 
-%*********************************************************
-%*                                                      *
+*********************************************************
+*                                                      *
         Name makers
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 Externally abstract type of name makers,
 which is how you go from a RdrName to a Name
+-}
 
-\begin{code}
-data NameMaker 
-  = LamMk       -- Lambdas 
+data NameMaker
+  = LamMk       -- Lambdas
       Bool      -- True <=> report unused bindings
-                --   (even if True, the warning only comes out 
+                --   (even if True, the warning only comes out
                 --    if -fwarn-unused-matches is on)
 
   | LetMk       -- Let bindings, incl top level
@@ -194,7 +193,7 @@ isTopRecNameMaker (LetMk TopLevel _) = True
 isTopRecNameMaker _ = False
 
 localRecNameMaker :: MiniFixityEnv -> NameMaker
-localRecNameMaker fix_env = LetMk NotTopLevel fix_env 
+localRecNameMaker fix_env = LetMk NotTopLevel fix_env
 
 matchNameMaker :: HsMatchContext a -> NameMaker
 matchNameMaker ctxt = LamMk report_unused
@@ -210,19 +209,19 @@ matchNameMaker ctxt = LamMk report_unused
 
 rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
            -> CpsRn (HsWithBndrs Name (LHsType Name))
-rnHsSigCps sig 
+rnHsSigCps sig
   = CpsRn (rnHsBndrSig PatCtx sig)
 
 newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
-  = CpsRn (\ thing_inside -> 
+  = CpsRn (\ thing_inside ->
         do { name <- newLocalBndrRn rdr_name
            ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
            ; return (res, name `delFV` fvs) })
 
 newPatName (LetMk is_top fix_env) rdr_name
-  = CpsRn (\ thing_inside -> 
+  = CpsRn (\ thing_inside ->
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
@@ -230,15 +229,15 @@ newPatName (LetMk is_top fix_env) rdr_name
                                         -- See Note [View pattern usage]
              addLocalFixities fix_env [name] $
              thing_inside name })
-                          
+
     -- Note: the bindLocalNames is somewhat suspicious
     --       because it binds a top-level name as a local name.
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
     --       then the top-level name is added to the global env
     --       before going on to the RHSes (see RnSource.lhs).
-\end{code}
 
+{-
 Note [View pattern usage]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -248,28 +247,28 @@ We want to "see" this use, and in let-bindings we collect all uses and
 report unused variables at the binding level. So we must use bindLocalNames
 here, *not* bindLocalNameFV.  Trac #3943.
 
-%*********************************************************
-%*                                                      *
+*********************************************************
+*                                                      *
         External entry points
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 There are various entry points to renaming patterns, depending on
  (1) whether the names created should be top-level names or local names
  (2) whether the scope of the names is entirely given in a continuation
      (e.g., in a case or lambda, but not in a let or at the top-level,
       because of the way mutually recursive bindings are handled)
- (3) whether the a type signature in the pattern can bind 
-        lexically-scoped type variables (for unpacking existential 
+ (3) whether the a type signature in the pattern can bind
+        lexically-scoped type variables (for unpacking existential
         type vars in data constructors)
  (4) whether we do duplicate and unused variable checking
  (5) whether there are fixity declarations associated with the names
      bound by the patterns that need to be brought into scope with them.
-     
+
  Rather than burdening the clients of this module with all of these choices,
  we export the three points in this design space that we actually need:
+-}
 
-\begin{code}
 -- ----------- Entry point 1: rnPats -------------------
 -- Binds local names; the scope of the bindings is entirely in the thing_inside
 --   * allows type sigs to bind type vars
@@ -277,7 +276,7 @@ There are various entry points to renaming patterns, depending on
 --   * unused and duplicate checking
 --   * no fixities
 rnPats :: HsMatchContext Name -- for error messages
-       -> [LPat RdrName] 
+       -> [LPat RdrName]
        -> ([LPat Name] -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
 rnPats ctxt pats thing_inside
@@ -286,14 +285,14 @@ rnPats ctxt pats thing_inside
           -- (1) rename the patterns, bringing into scope all of the term variables
           -- (2) then do the thing inside.
         ; unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
-        { -- Check for duplicated and shadowed names 
+        { -- Check for duplicated and shadowed names
           -- Must do this *after* renaming the patterns
           -- See Note [Collect binders only after renaming] in HsUtils
           -- Because we don't bind the vars all at once, we can't
-          --    check incrementally for duplicates; 
+          --    check incrementally for duplicates;
           -- Nor can we check incrementally for shadowing, else we'll
           --    complain *twice* about duplicates e.g. f (x,x) = ...
-        ; addErrCtxt doc_pat $ 
+        ; addErrCtxt doc_pat $
           checkDupAndShadowedNames envs_before $
           collectPatsBinders pats'
         ; thing_inside pats' } }
@@ -301,11 +300,11 @@ rnPats ctxt pats thing_inside
     doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt
 
 rnPat :: HsMatchContext Name -- for error messages
-      -> LPat RdrName 
+      -> LPat RdrName
       -> (LPat Name -> RnM (a, FreeVars))
-      -> RnM (a, FreeVars)     -- Variables bound by pattern do not 
-                               -- appear in the result FreeVars 
-rnPat ctxt pat thing_inside 
+      -> RnM (a, FreeVars)     -- Variables bound by pattern do not
+                               -- appear in the result FreeVars
+rnPat ctxt pat thing_inside
   = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
 
 applyNameMaker :: NameMaker -> Located RdrName -> RnM Name
@@ -322,19 +321,18 @@ rnBindPat :: NameMaker
           -> LPat RdrName
           -> RnM (LPat Name, FreeVars)
    -- Returned FreeVars are the free variables of the pattern,
-   -- of course excluding variables bound by this pattern 
+   -- of course excluding variables bound by this pattern
 
 rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
         The main event
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parametrized by how you make new names
 
@@ -358,7 +356,7 @@ rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
                                    ; return (VarPat name) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
-                                     
+
 rnPatAndThen mk (SigPatIn pat sig)
   -- When renaming a pattern type signature (e.g. f (a :: T) = ...), it is
   -- important to rename its type signature _before_ renaming the rest of the
@@ -372,11 +370,11 @@ rnPatAndThen mk (SigPatIn pat sig)
   = do { sig' <- rnHsSigCps sig
        ; pat' <- rnLPatAndThen mk pat
        ; return (SigPatIn pat' sig') }
-       
+
 rnPatAndThen mk (LitPat lit)
   | HsString src s <- lit
   = do { ovlStr <- liftCps (xoptM Opt_OverloadedStrings)
-       ; if ovlStr 
+       ; if ovlStr
          then rnPatAndThen mk (mkNPat (mkHsIsString src s placeHolderType)
                                       Nothing)
          else normal_lit }
@@ -410,8 +408,8 @@ rnPatAndThen mk p@(ViewPat expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM Opt_ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
-         -- this will be in the right context 
-       ; expr' <- liftCpsFV $ rnLExpr expr 
+         -- this will be in the right context
+       ; expr' <- liftCpsFV $ rnLExpr expr
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
@@ -423,7 +421,7 @@ rnPatAndThen mk (ConPatIn con stuff)
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM Opt_OverloadedLists
                     ; if ol_flag then rnPatAndThen mk (ListPat [] placeHolderType Nothing)
-                                 else rnConPatAndThen mk con stuff} 
+                                 else rnConPatAndThen mk con stuff}
       False   -> rnConPatAndThen mk con stuff
 
 rnPatAndThen mk (ListPat pats _ _)
@@ -448,12 +446,12 @@ rnPatAndThen mk (SplicePat splice)
   = do { eith <- liftCpsFV $ rnSplicePat splice
        ; case eith of   -- See Note [rnSplicePat] in RnSplice
            Left not_yet_renamed -> rnPatAndThen mk not_yet_renamed
-           Right already_renamed -> return already_renamed } 
-    
+           Right already_renamed -> return already_renamed }
+
 rnPatAndThen mk (QuasiQuotePat qq)
   = do { pat <- liftCps $ runQuasiQuotePat qq
          -- Wrap the result of the quasi-quoter in parens so that we don't
-         -- lose the outermost location set by runQuasiQuote (#7918) 
+         -- lose the outermost location set by runQuasiQuote (#7918)
        ; rnPatAndThen mk (ParPat pat) }
 
 rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
@@ -462,7 +460,7 @@ rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 --------------------
 rnConPatAndThen :: NameMaker
                 -> Located RdrName          -- the constructor
-                -> HsConPatDetails RdrName 
+                -> HsConPatDetails RdrName
                 -> CpsRn (Pat Name)
 
 rnConPatAndThen mk con (PrefixCon pats)
@@ -491,7 +489,7 @@ rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
   = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) VarPat hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
-  where 
+  where
     rn_field (L l fld, n') = do { arg' <- rnLPatAndThen (nested_mk dd mk n')
                                                         (hsRecFieldArg fld)
                                 ; return (L l (fld { hsRecFieldArg = arg' })) }
@@ -500,23 +498,22 @@ rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
     nested_mk Nothing  mk                    _  = mk
     nested_mk (Just _) mk@(LetMk {})         _  = mk
     nested_mk (Just n) (LamMk report_unused) n' = LamMk (report_unused && (n' <= n))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Record fields
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
-data HsRecFieldContext 
+data HsRecFieldContext
   = HsRecFieldCon Name
   | HsRecFieldPat Name
   | HsRecFieldUpd
 
 rnHsRecFields
-    :: forall arg. 
+    :: forall arg.
        HsRecFieldContext
     -> (RdrName -> arg) -- When punning, use this to build a new field
     -> HsRecFields RdrName (Located arg)
@@ -552,9 +549,9 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                 HsRecFieldCon con | not (isUnboundName con) -> Just con
                 HsRecFieldPat con | not (isUnboundName con) -> Just con
                 _ {- update or isUnboundName con -}         -> Nothing
-           -- The unbound name test is because if the constructor 
+           -- The unbound name test is because if the constructor
            -- isn't in scope the constructor lookup will add an error
-           -- add an error, but still return an unbound name. 
+           -- add an error, but still return an unbound name.
            -- We don't want that to screw up the dot-dot fill-in stuff.
 
     doc = case mb_con of
@@ -565,7 +562,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                           , hsRecFieldArg = arg
                                           , hsRecPun = pun }))
       = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndrOcc True parent doc) fld
-           ; arg' <- if pun 
+           ; arg' <- if pun
                      then do { checkErr pun_ok (badPun fld)
                              ; return (L loc (mk_arg (mkRdrUnqual (nameOccName fld_nm)))) }
                      else return arg
@@ -601,7 +598,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    -- ignoring the record field itself
                    -- Eg.  data R = R { x,y :: Int }
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
-                 arg_in_scope fld 
+                 arg_in_scope fld
                    = rdr `elemLocalRdrEnv` lcl_env
                    || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
                                     , case gre_par gre of
@@ -617,7 +614,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 , not (null gres)  -- Check field is in scope
                                 , case ctxt of
                                     HsRecFieldCon {} -> arg_in_scope fld
-                                    _other           -> True ] 
+                                    _other           -> True ]
 
            ; addUsedRdrNames (map greRdrName dot_dot_gres)
            ; return [ L loc (HsRecField
@@ -629,17 +626,17 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                           arg_rdr = mkRdrUnqual (nameOccName fld) ] }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM Parent
-    -- When disambiguation is on, 
+    -- When disambiguation is on,
     check_disambiguation disambig_ok mb_con
       | disambig_ok, Just con <- mb_con
       = do { env <- getGlobalRdrEnv; return (ParentIs (find_tycon env con)) }
       | otherwise = return NoParent
- 
+
     find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Name {- TyCon -}
     -- Return the parent *type constructor* of the data constructor
-    -- That is, the parent of the data constructor.  
+    -- That is, the parent of the data constructor.
     -- That's the parent to use for looking up record fields.
-    find_tycon env con 
+    find_tycon env con
       | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con
       = tyConName (dataConTyCon dc)   -- Special case for [], which is built-in syntax
                                       -- and not in the GlobalRdrEnv (Trac #8448)
@@ -679,7 +676,7 @@ badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (p
 
 dupFieldErr :: HsRecFieldContext -> [RdrName] -> SDoc
 dupFieldErr ctxt dups
-  = hsep [ptext (sLit "duplicate field name"), 
+  = hsep [ptext (sLit "duplicate field name"),
           quotes (ppr (head dups)),
           ptext (sLit "in record"), pprRFC ctxt]
 
@@ -687,20 +684,19 @@ pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = ptext (sLit "construction")
 pprRFC (HsRecFieldPat {}) = ptext (sLit "pattern")
 pprRFC (HsRecFieldUpd {}) = ptext (sLit "update")
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Literals}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 When literals occur we have to make sure
 that the types and classes they involve
 are made available.
+-}
 
-\begin{code}
 rnLit :: HsLit -> RnM ()
 rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
@@ -727,15 +723,15 @@ rnOverLit origLit
         ; return (lit { ol_witness = from_thing_name
                       , ol_rebindable = rebindable
                       , ol_type = placeHolderType }, fvs) }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Errors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
@@ -748,4 +744,3 @@ bogusCharError c
 badViewPat :: Pat RdrName -> SDoc
 badViewPat pat = vcat [ptext (sLit "Illegal view pattern: ") <+> ppr pat,
                        ptext (sLit "Use ViewPatterns to enable view patterns")]
-\end{code}

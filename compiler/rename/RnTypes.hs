@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[RnSource]{Main pass of renamer}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[RnSource]{Main pass of renamer}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module RnTypes (
@@ -50,18 +50,18 @@ import Data.List        ( nub, nubBy )
 import Control.Monad    ( unless, when )
 
 #include "HsVersions.h"
-\end{code}
 
+{-
 These type renamers are in a separate module, rather than in (say) RnSource,
 to break several loop.
 
-%*********************************************************
-%*                                                      *
+*********************************************************
+*                                                      *
 \subsection{Renaming types}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnHsSigType :: SDoc -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
         -- rnHsSigType is used for source-language type signatures,
         -- which use *implicit* universal quantification.
@@ -81,8 +81,8 @@ rnLHsInstType doc_str ty
 
 badInstTy :: LHsType RdrName -> SDoc
 badInstTy ty = ptext (sLit "Malformed instance:") <+> ppr ty
-\end{code}
 
+{-
 rnHsType is here because we call it from loadInstDecl, and I didn't
 want a gratuitous knot.
 
@@ -104,8 +104,8 @@ f :: forall a. a -> (() => b) binds "a" and "b"
 
 The -fwarn-context-quantification flag warns about
 this situation. See rnHsTyKi for case HsForAllTy Qualified.
+-}
 
-\begin{code}
 rnLHsTyKi  :: Bool --  True <=> renaming a type, False <=> a kind
            -> HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnLHsTyKi isType doc (L loc ty)
@@ -299,7 +299,7 @@ rnHsTyKi isType doc (HsQuasiQuoteTy qq)
   = ASSERT( isType )
     do { ty <- runQuasiQuoteType qq
          -- Wrap the result of the quasi-quoter in parens so that we don't
-         -- lose the outermost location set by runQuasiQuote (#7918) 
+         -- lose the outermost location set by runQuasiQuote (#7918)
        ; rnHsType doc (HsParTy ty) }
 
 rnHsTyKi isType _ (HsCoreTy ty)
@@ -344,10 +344,7 @@ rnTyVar is_type rdr_name
 rnLHsTypes :: HsDocContext -> [LHsType RdrName]
            -> RnM ([LHsType Name], FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
-\end{code}
 
-
-\begin{code}
 rnForAll :: HsDocContext -> HsExplicitFlag
          -> Maybe SrcSpan           -- Location of an extra-constraints wildcard
          -> [RdrName]               -- Kind variables
@@ -515,15 +512,15 @@ dataKindsErr is_type thing
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Contexts and predicates}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnConDeclFields :: HsDocContext -> [LConDeclField RdrName]
                 -> RnM ([LConDeclField Name], FreeVars)
 rnConDeclFields doc fields = mapFvRn (rnField doc) fields
@@ -540,14 +537,13 @@ rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVar
 rnContext doc (L loc cxt)
   = do { (cxt', fvs) <- rnLHsTypes doc cxt
        ; return (L loc cxt', fvs) }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Fixities and precedence parsing
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @mkOpAppRn@ deals with operator fixities.  The argument expressions
 are assumed to be already correctly arranged.  It needs the fixities
@@ -566,8 +562,8 @@ is always read in as
 mkHsOpTyRn rearranges where necessary.  The two arguments
 have already been renamed and rearranged.  It's made rather tiresome
 by the presence of ->, which is a separate syntactic construct.
+-}
 
-\begin{code}
 ---------------
 -- Building (ty1 `op1` (ty21 `op2` ty22))
 mkHsOpTyRn :: (LHsType Name -> LHsType Name -> HsType Name)
@@ -795,11 +791,9 @@ checkSectionPrec direction section op arg
                   || (op_prec == arg_prec && direction == assoc))
                  (sectionPrecErr (op_name, op_fix)
                                  (arg_op, arg_fix) section)
-\end{code}
 
-Precedence-related error messages
+-- Precedence-related error messages
 
-\begin{code}
 precParseErr :: (Name, Fixity) -> (Name, Fixity) -> RnM ()
 precParseErr op1@(n1,_) op2@(n2,_)
   | isUnboundName n1 || isUnboundName n2
@@ -825,15 +819,15 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
    where
      pp_op | op == negateName = ptext (sLit "prefix `-'")
            | otherwise        = quotes (ppr op)
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Errors}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 warnUnusedForAlls :: SDoc -> LHsTyVarBndrs RdrName -> [RdrName] -> TcM ()
 warnUnusedForAlls in_doc bound mentioned_rdrs
   = whenWOptM Opt_WarnUnusedMatches $
@@ -874,13 +868,13 @@ opTyErr op ty@(HsOpTy ty1 _ _)
     forall_head (L _ (HsAppTy ty _)) = forall_head ty
     forall_head _other               = False
 opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
       Finding the free type variables of a (HsType RdrName)
-%*                                                                    *
-%************************************************************************
+*                                                                    *
+************************************************************************
 
 
 Note [Kind and type-variable binders]
@@ -910,8 +904,8 @@ In general we want to walk over a type, and find
 
 Hence we returns a pair (kind-vars, type vars)
 See also Note [HsBSig binder lists] in HsTypes
+-}
 
-\begin{code}
 type FreeKiTyVars = ([RdrName], [RdrName])
 
 filterInScope :: LocalRdrEnv -> FreeKiTyVars -> FreeKiTyVars
@@ -1082,5 +1076,3 @@ extractWildcards ty
                        return (nwcs, awcs, tys')
         goList f tys = do (nwcs, awcs, tys') <- extList tys
                           return (nwcs, awcs, L l $ f tys')
-
-\end{code}

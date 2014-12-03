@@ -1,14 +1,14 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
 \section[RnBinds]{Renaming and dependency analysis of bindings}
 
 This module does renaming and dependency analysis on value bindings in
 the abstract syntax.  It does {\em not} do cycle-checks on class or
 type-synonym declarations; those cannot be done at this stage because
 they may be affected by renaming (which isn't fully worked out yet).
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module RnBinds (
@@ -53,8 +53,8 @@ import Control.Monad
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
 #endif
-\end{code}
 
+{-
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
 -- place and can be used when complaining.
 
@@ -82,11 +82,11 @@ within one @MonoBinds@, so that unique-Int plumbing is done explicitly
 (heavy monad machinery not needed).
 
 
-%************************************************************************
-%*                                                                      *
-%* naming conventions                                                   *
-%*                                                                      *
-%************************************************************************
+************************************************************************
+*                                                                      *
+* naming conventions                                                   *
+*                                                                      *
+************************************************************************
 
 \subsection[name-conventions]{Name conventions}
 
@@ -109,11 +109,11 @@ a set of variables defined in @Exp@ is written @dvExp@
 a set of variables free in @Exp@ is written @fvExp@
 \end{itemize}
 
-%************************************************************************
-%*                                                                      *
-%* analysing polymorphic bindings (HsBindGroup, HsBind)
-%*                                                                      *
-%************************************************************************
+************************************************************************
+*                                                                      *
+* analysing polymorphic bindings (HsBindGroup, HsBind)
+*                                                                      *
+************************************************************************
 
 \subsubsection[dep-HsBinds]{Polymorphic bindings}
 
@@ -155,13 +155,13 @@ instance declarations.  It expects only to see @FunMonoBind@s, and
 it expects the global environment to contain bindings for the binders
 (which are all class operations).
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsubsection{ Top-level bindings}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- for top-level bindings, we need to make top-level names,
 -- so we have a different entry point than for local bindings
 rnTopBindsLHS :: MiniFixityEnv
@@ -186,16 +186,15 @@ rnTopBindsBoot (ValBindsIn mbinds sigs)
         ; (sigs', fvs) <- renameSigs HsBootCtxt sigs
         ; return (ValBindsOut [] sigs', usesOnly fvs) }
 rnTopBindsBoot b = pprPanic "rnTopBindsBoot" (ppr b)
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
                 HsLocalBinds
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnLocalBindsAndThen :: HsLocalBinds RdrName
                     -> (HsLocalBinds Name -> RnM (result, FreeVars))
                     -> RnM (result, FreeVars)
@@ -223,16 +222,15 @@ rnIPBind :: IPBind RdrName -> RnM (IPBind Name, FreeVars)
 rnIPBind (IPBind ~(Left n) expr) = do
     (expr',fvExpr) <- rnLExpr expr
     return (IPBind (Left n) expr', fvExpr)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 ValBinds
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- Renaming local binding groups
 -- Does duplicate/shadow check
 rnLocalValBindsLHS :: MiniFixityEnv
@@ -678,9 +676,8 @@ mkSigTvFn sigs
                     , L _ name <- names]
         -- Note the pattern-match on "Explicit"; we only bind
         -- type variables from signatures with an explicit top-level for-all
-\end{code}
 
-
+{-
 @rnMethodBinds@ is used for the method bindings of a class and an instance
 declaration.   Like @rnBinds@ but without dependency analysis.
 
@@ -695,8 +692,8 @@ and unless @op@ occurs we won't treat the type signature of @op@ in the class
 decl for @Foo@ as a source of instance-decl gates.  But we should!  Indeed,
 in many ways the @op@ in an instance decl is just like an occurrence, not
 a binder.
+-}
 
-\begin{code}
 rnMethodBinds :: Name                   -- Class name
               -> (Name -> [Name])       -- Signature tyvar function
               -> LHsBinds RdrName
@@ -757,26 +754,24 @@ rnMethodBind _ _ (L loc bind@(PatSynBind {})) = do
     return (emptyBag, emptyFVs)
 
 rnMethodBind _ _ b = pprPanic "rnMethodBind" (ppr b)
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection[dep-Sigs]{Signatures (and user-pragmas for values)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @renameSigs@ checks for:
 \begin{enumerate}
 \item more than one sig for one thing;
 \item signatures given for things not bound here;
 \end{enumerate}
-%
+
 At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
+-}
 
-\begin{code}
 renameSigs :: HsSigCtxt
            -> [LSig RdrName]
            -> RnM ([LSig Name], FreeVars)
@@ -946,16 +941,15 @@ checkDupMinimalSigs sigs
   = case filter isMinimalLSig sigs of
       minSigs@(_:_:_) -> dupMinimalSigErr minSigs
       _ -> return ()
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Match}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
              -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
              -> MatchGroup RdrName (Located (body RdrName))
@@ -1006,16 +1000,15 @@ resSigErr ctxt match ty
           , nest 2 $ ptext (sLit
                  "Result signatures are no longer supported in pattern matches")
           , pprMatchInCtxt ctxt match ]
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsubsection{Guarded right-hand sides (GRHSs)}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnGRHSs :: HsMatchContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
         -> GRHSs RdrName (Located (body RdrName))
@@ -1051,15 +1044,15 @@ rnGRHS' ctxt rnBody (GRHS guards rhs)
     is_standard_guard []                       = True
     is_standard_guard [L _ (BodyStmt _ _ _ _)] = True
     is_standard_guard _                        = False
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Error messages}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 dupSigDeclErr :: [(Located RdrName, Sig RdrName)] -> RnM ()
 dupSigDeclErr pairs@((L loc name, sig) : _)
   = addErrAt loc $
@@ -1113,4 +1106,3 @@ dupMinimalSigErr sigs@(L loc _ : _)
          , ptext (sLit "at") <+> vcat (map ppr $ sort $ map getLoc sigs)
          , ptext (sLit "Combine alternative minimal complete definitions with `|'") ]
 dupMinimalSigErr [] = panic "dupMinimalSigErr"
-\end{code}

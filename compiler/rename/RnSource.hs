@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[RnSource]{Main pass of renamer}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[RnSource]{Main pass of renamer}
+-}
+
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module RnSource (
@@ -52,8 +52,8 @@ import Data.List( partition, sortBy )
 import Data.Traversable (traverse)
 #endif
 import Maybes( orElse, mapMaybe )
-\end{code}
 
+{-
 @rnSourceDecl@ `renames' declarations.
 It simultaneously performs dependency analysis and precedence parsing.
 It also does the following error checks:
@@ -68,9 +68,8 @@ Checks that all variable occurrences are defined.
 \item
 Checks the @(..)@ etc constraints in the export list.
 \end{enumerate}
+-}
 
-
-\begin{code}
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
 rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
@@ -221,16 +220,15 @@ addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 
 rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
 rnList f xs = mapFvRn (wrapLocFstM f) xs
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
         HsDoc stuff
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 rnDocDecl :: DocDecl -> RnM DocDecl
 rnDocDecl (DocCommentNext doc) = do
   rn_doc <- rnHsDoc doc
@@ -244,16 +242,15 @@ rnDocDecl (DocCommentNamed str doc) = do
 rnDocDecl (DocGroup lev doc) = do
   rn_doc <- rnHsDoc doc
   return (DocGroup lev rn_doc)
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
         Source-code fixity declarations
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 rnSrcFixityDecls :: NameSet -> [LFixitySig RdrName] -> RnM [LFixitySig Name]
 -- Rename the fixity decls, so we can put
 -- the renamed decls in the renamed syntax tree
@@ -285,22 +282,21 @@ rnSrcFixityDecls bndr_set fix_decls
         do names <- lookupLocalTcNames sig_ctxt what rdr_name
            return [ L name_loc name | name <- names ]
     what = ptext (sLit "fixity signature")
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
         Source-code deprecations declarations
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
 
 Check that the deprecated names are defined, are defined locally, and
 that there are no duplicate deprecations.
 
 It's only imported deprecations, dealt with in RnIfaces, that we
 gather them together.
+-}
 
-\begin{code}
 -- checks that the deprecations are defined locally, and that there are no duplicates
 rnSrcWarnDecls :: NameSet -> [LWarnDecl RdrName] -> RnM Warnings
 rnSrcWarnDecls _ []
@@ -339,15 +335,14 @@ dupWarnDecl (L loc _) rdr_name
   = vcat [ptext (sLit "Multiple warning declarations for") <+> quotes (ppr rdr_name),
           ptext (sLit "also at ") <+> ppr loc]
 
-\end{code}
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Annotation declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnAnnDecl :: AnnDecl RdrName -> RnM (AnnDecl Name, FreeVars)
 rnAnnDecl ann@(HsAnnotation provenance expr)
   = addErrCtxt (annCtxt ann) $
@@ -360,30 +355,30 @@ rnAnnProvenance :: AnnProvenance RdrName -> RnM (AnnProvenance Name, FreeVars)
 rnAnnProvenance provenance = do
     provenance' <- traverse lookupTopBndrRn provenance
     return (provenance', maybe emptyFVs unitFV (annProvenanceName_maybe provenance'))
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Default declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnDefaultDecl :: DefaultDecl RdrName -> RnM (DefaultDecl Name, FreeVars)
 rnDefaultDecl (DefaultDecl tys)
   = do { (tys', fvs) <- rnLHsTypes doc_str tys
        ; return (DefaultDecl tys', fvs) }
   where
     doc_str = DefaultDeclCtx
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Foreign declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnHsForeignDecl :: ForeignDecl RdrName -> RnM (ForeignDecl Name, FreeVars)
 rnHsForeignDecl (ForeignImport name ty _ spec)
   = do { topEnv :: HscEnv <- getTopEnv
@@ -425,17 +420,14 @@ patchCCallTarget packageKey callTarget =
   StaticTarget label Nothing isFun -> StaticTarget label (Just packageKey) isFun
   _                                -> callTarget
 
-
-\end{code}
-
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Instance declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
 rnSrcInstDecl (TyFamInstD { tfid_inst = tfi })
   = do { (tfi', fvs) <- rnTyFamInstDecl Nothing tfi
@@ -612,11 +604,9 @@ rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
                                  , dfid_pats  = pats'
                                  , dfid_defn  = defn'
                                  , dfid_fvs   = fvs }, fvs) }
-\end{code}
 
-Renaming of the associated types in instances.
+-- Renaming of the associated types in instances.
 
-\begin{code}
 -- Rename associated type family decl in class
 rnATDecls :: Name      -- Class
           -> [LFamilyDecl RdrName]
@@ -641,8 +631,8 @@ rnATInstDecls rnFun cls hs_tvs at_insts
   where
     tv_ns = hsLKiTyVarNames hs_tvs
     -- See Note [Renaming associated types]
-\end{code}
 
+{-
 Note [Renaming associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check that the RHS of the decl mentions only type variables
@@ -669,9 +659,8 @@ can all be in scope (Trac #5862):
       id :: Ob x a => x a a
       (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c
 Here 'k' is in scope in the kind signature, just like 'x'.
+-}
 
-
-\begin{code}
 extendTyVarEnvForMethodBinds :: [Name]
                              -> RnM (LHsBinds Name, FreeVars)
                              -> RnM (LHsBinds Name, FreeVars)
@@ -684,15 +673,15 @@ extendTyVarEnvForMethodBinds ktv_names thing_inside
                 extendTyVarEnvFVRn ktv_names thing_inside
           else
                 thing_inside }
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Stand-alone deriving declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
 rnSrcDerivDecl (DerivDecl ty overlap)
   = do { standalone_deriv_ok <- xoptM Opt_StandaloneDeriving
@@ -704,15 +693,15 @@ standaloneDerivErr :: SDoc
 standaloneDerivErr
   = hang (ptext (sLit "Illegal standalone deriving declaration"))
        2 (ptext (sLit "Use StandaloneDeriving to enable this extension"))
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Rules}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnHsRuleDecl :: RuleDecl RdrName -> RnM (RuleDecl Name, FreeVars)
 rnHsRuleDecl (HsRule rule_name act vars lhs _fv_lhs rhs _fv_rhs)
   = do { let rdr_names_w_loc = map get_var vars
@@ -749,8 +738,8 @@ bindHsRuleVars rule_name vars names thing_inside
 
     go [] [] thing_inside = thing_inside []
     go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
-\end{code}
 
+{-
 Note [Rule LHS validity checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check the shape of a transformation rule LHS.  Currently we only allow
@@ -764,8 +753,8 @@ with LHSs with a complicated desugaring (and hence unlikely to match);
 But there are legitimate non-trivial args ei, like sections and
 lambdas.  So it seems simmpler not to check at all, and that is why
 check_e is commented out.
+-}
 
-\begin{code}
 checkValidRule :: FastString -> [Name] -> LHsExpr Name -> NameSet -> RnM ()
 checkValidRule rule_name ids lhs' fv_lhs'
   = do  {       -- Check for the form of the LHS
@@ -821,16 +810,15 @@ badRuleLhsErr name lhs bad_e
                        ptext (sLit "in left-hand side:") <+> ppr lhs])]
     $$
     ptext (sLit "LHS must be of form (f e1 .. en) where f is not forall'd")
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Vectorisation declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
@@ -872,13 +860,13 @@ rnHsVectDecl (HsVectInstIn instTy)
        }
 rnHsVectDecl (HsVectInstOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectInstOut'"
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Type, class and iface sig declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 @rnTyDecl@ uses the `global name function' to create a new type
 declaration in which local names have been replaced by their original
@@ -920,8 +908,8 @@ that live on other packages. Since we don't have mutual dependencies across
 packages, it is safe not to add the dependencies on the .hs-boot stuff to B2.
 
 See also Note [Grouping of type and class declarations] in TcTyClsDecls.
+-}
 
-\begin{code}
 isInPackage :: PackageKey -> Name -> Bool
 isInPackage pkgId nm = case nameModule_maybe nm of
                          Nothing -> False
@@ -1196,8 +1184,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
      rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
      rn_info DataFamily     = return (DataFamily, emptyFVs)
 
-\end{code}
-
+{-
 Note [Stupid theta]
 ~~~~~~~~~~~~~~~~~~~
 Trac #3850 complains about a regression wrt 6.10 for
@@ -1206,9 +1193,8 @@ There is no reason not to allow the stupid theta if there are no data
 constructors.  It's still stupid, but does no harm, and I don't want
 to cause programs to break unnecessarily (notably HList).  So if there
 are no data constructors we allow h98_style = True
+-}
 
-
-\begin{code}
 depAnalTyClDecls :: [(LTyClDecl Name, FreeVars)] -> [SCC (LTyClDecl Name)]
 -- See Note [Dependency analysis of type and class decls]
 depAnalTyClDecls ds_w_fvs
@@ -1236,8 +1222,8 @@ depAnalTyClDecls ds_w_fvs
           -> do L _ dc <- cons
                 return $ zip (map unLoc $ con_names dc) (repeat data_name)
         _ -> []
-\end{code}
 
+{-
 Note [Dependency analysis of type and class decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to do dependency analysis on type and class declarations
@@ -1281,13 +1267,13 @@ the case of staged module compilation (Template Haskell, GHCi).
 See #8485. With the new lookup process (which includes types declared in other
 modules), we get better error messages, too.
 
-%*********************************************************
-%*                                                      *
+*********************************************************
+*                                                      *
 \subsection{Support code for type/data declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 ---------------
 badAssocRhs :: [Name] -> RnM ()
 badAssocRhs ns
@@ -1396,17 +1382,18 @@ deprecRecSyntax decl
 
 badRecResTy :: SDoc -> SDoc
 badRecResTy doc = ptext (sLit "Malformed constructor signature") $$ doc
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Support code for type/data declarations}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 Get the mapping from constructors to fields for this module.
 It's convenient to do this after the data type decls have been renamed
-\begin{code}
+-}
+
 extendRecordFieldEnv :: [TyClGroup RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
 extendRecordFieldEnv tycl_decls inst_decls
   = do  { tcg_env <- getGblEnv
@@ -1439,15 +1426,15 @@ extendRecordFieldEnv tycl_decls inst_decls
                    fld_set' = extendNameSetList fld_set flds'
              ; return $ (RecFields env' fld_set') }
     get_con _ env = return env
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
 \subsection{Support code to rename types}
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
+-}
 
-\begin{code}
 rnFds :: [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
 rnFds fds
   = mapM (wrapLocM rn_fds) fds
@@ -1462,21 +1449,20 @@ rnHsTyVars tvs  = mapM rnHsTyVar tvs
 
 rnHsTyVar :: RdrName -> RnM Name
 rnHsTyVar tyvar = lookupOccRn tyvar
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
         findSplice
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 This code marches down the declarations, looking for the first
 Template Haskell splice.  As it does so it
         a) groups the declarations into a HsGroup
         b) runs any top-level quasi-quotes
+-}
 
-\begin{code}
 findSplice :: [LHsDecl RdrName] -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
 findSplice ds = addl emptyRdrGroup ds
 
@@ -1567,4 +1553,3 @@ add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
 add_sig :: LSig a -> HsValBinds a -> HsValBinds a
 add_sig s (ValBindsIn bs sigs) = ValBindsIn bs (s:sigs)
 add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
-\end{code}

@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[RnNames]{Extracting imported and top-level names in scope}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[RnNames]{Extracting imported and top-level names in scope}
+-}
+
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 
 module RnNames (
@@ -48,14 +48,13 @@ import Data.List        ( partition, (\\), find )
 import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{rnImports}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Tracking Trust Transitively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,9 +134,8 @@ compilation errors in code that doesn't do anything with Safe Haskell simply
 because they are using the network package. They will have to call 'ghc-pkg
 trust network' to get everything working. Due to this invasive nature of going
 with yes we have gone with no for now.
+-}
 
-
-\begin{code}
 -- | Process Import Decls
 -- Do the non SOURCE ones first, so that we get a helpful warning for SOURCE
 -- ones that are unnecessary
@@ -357,14 +355,13 @@ warnRedundantSourceImport :: ModuleName -> SDoc
 warnRedundantSourceImport mod_name
   = ptext (sLit "Unnecessary {-# SOURCE #-} in the import of module")
           <+> quotes (ppr mod_name)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{importsFromLocalDecls}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 From the top-level declarations of this module produce
         * the lexical environment
@@ -411,8 +408,8 @@ top level binders specially in two ways
    stage. This is a slight hack, because the stage field was really
    meant for the type checker, and here we are not interested in the
    fields of Brack, hence the error thunks in thRnBrack.
+-}
 
-\begin{code}
 extendGlobalRdrEnvRn :: [AvailInfo]
                      -> MiniFixityEnv
                      -> RnM (TcGblEnv, TcLclEnv)
@@ -473,14 +470,14 @@ extendGlobalRdrEnvRn avails new_fixities
       = fix_env
       where
         occ  = nameOccName name
-\end{code}
 
+{-
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
 used for source code.
 
         *** See "THE NAMING STORY" in HsDecls ****
+-}
 
-\begin{code}
 getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
                       -> RnM ((TcGblEnv, TcLclEnv), NameSet)
 -- Get all the top-level binders bound the group *except*
@@ -568,8 +565,8 @@ getLocalNonValBinders fixity_env
              ; sub_names <- mapM newTopSrcBinder (hsDataFamInstBinders ti_decl)
              ; return (AvailTC (unLoc main_name) sub_names) }
                         -- main_name is not bound here!
-\end{code}
 
+{-
 Note [Looking up family names in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -588,21 +585,21 @@ Solution is simple: process the type family declarations first, extend
 the environment, and then process the type instances.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Filtering imports}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 @filterImports@ takes the @ExportEnv@ telling what the imported module makes
 available, and filters it through the import spec (if any).
 
 Note [Dealing with imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For import M( ies ), we take the mi_exports of M, and make 
-   imp_occ_env :: OccEnv (Name, AvailInfo, Maybe Name) 
+For import M( ies ), we take the mi_exports of M, and make
+   imp_occ_env :: OccEnv (Name, AvailInfo, Maybe Name)
 One entry for each Name that M exports; the AvailInfo describes just
-that Name.   
+that Name.
 
 The situation is made more complicated by associated types. E.g.
    module M where
@@ -619,8 +616,8 @@ From this we construct the imp_occ_env
 
 Note that the imp_occ_env will have entries for data constructors too,
 although we never look up data constructors.
+-}
 
-\begin{code}
 filterImports
     :: [ModIface]
     -> ImpDeclSpec                     -- The span for the entire import decl
@@ -756,7 +753,7 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
            (name, AvailTC _ ns, mb_parent) <- lookup_name rdr_tc
 
            -- Look up the children in the sub-names of the parent
-           let subnames = case ns of   -- The tc is first in ns, 
+           let subnames = case ns of   -- The tc is first in ns,
                             [] -> []   -- if it is there at all
                                        -- See the AvailTC Invariant in Avail.hs
                             (n1:ns1) | n1 == name -> ns1
@@ -814,15 +811,15 @@ catchIELookup m h = case m of
 
 catIELookupM :: [IELookupM a] -> [a]
 catIELookupM ms = [ a | Succeeded a <- ms ]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Import/Export Utils}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 greExportAvail :: GlobalRdrElt -> AvailInfo
 greExportAvail gre
   = case gre_par gre of
@@ -914,14 +911,13 @@ nubAvails :: [AvailInfo] -> [AvailInfo]
 nubAvails avails = nameEnvElts (foldl add emptyNameEnv avails)
   where
     add env avail = extendNameEnv_C plusAvail env (availName avail) avail
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Export list processing}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Processing the export list.
 
@@ -961,8 +957,8 @@ At one point I implemented a compromise:
 But the compromise seemed too much of a hack, so we backed it out.
 You just have to use an explicit export list:
     module M( F(..) ) where ...
+-}
 
-\begin{code}
 type ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ([LIE Name],             -- Export items with Names
@@ -1262,16 +1258,15 @@ dupExport_ok n ie1 ie2
     single (IEVar {})      = True
     single (IEThingAbs {}) = True
     single _               = False
-\end{code}
 
-
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Unused names}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
+-}
 
-\begin{code}
 reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
@@ -1313,26 +1308,24 @@ reportUnusedNames _export_decls gbl_env
     unused_locals = filter is_unused_local defined_but_not_used
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
-\end{code}
 
-%*********************************************************
-%*                                                       *
+{-
+*********************************************************
+*                                                       *
 \subsection{Unused imports}
-%*                                                       *
-%*********************************************************
+*                                                       *
+*********************************************************
 
 This code finds which import declarations are unused.  The
 specification and implementation notes are here:
   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/UnusedImports
+-}
 
-\begin{code}
 type ImportDeclUsage
    = ( LImportDecl Name   -- The import declaration
      , [AvailInfo]        -- What *is* used (normalised)
      , [Name] )           -- What is imported but *not* used
-\end{code}
 
-\begin{code}
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
   = do { uses <- readMutVar (tcg_used_rdrnames gbl_env)
@@ -1352,9 +1345,8 @@ warnUnusedImportDecls gbl_env
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
-\end{code}
 
-
+{-
 Note [The ImportMap]
 ~~~~~~~~~~~~~~~~~~~~
 The ImportMap is a short-lived intermediate data struture records, for
@@ -1374,8 +1366,8 @@ It's just a cheap hack; we could equally well use the Span too.
 
 The AvailInfos are the things imported from that decl (just a list,
 not normalised).
+-}
 
-\begin{code}
 type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 
 findImportUsage :: [LImportDecl Name]
@@ -1462,9 +1454,7 @@ extendImportMap rdr_env rdr imp_map
     isImpAll :: ImportSpec -> Bool
     isImpAll (ImpSpec { is_item = ImpAll }) = True
     isImpAll _other                         = False
-\end{code}
 
-\begin{code}
 warnUnusedImport :: ImportDeclUsage -> RnM ()
 warnUnusedImport (L loc decl, used, unused)
   | Just (False,L _ []) <- ideclHiding decl
@@ -1491,8 +1481,8 @@ warnUnusedImport (L loc decl, used, unused)
       | otherwise           = Outputable.empty
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
-\end{code}
 
+{-
 Note [Do not warn about Prelude hiding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do not warn about
@@ -1513,8 +1503,8 @@ decls, and simply trim their import lists.  NB that
 
   * We do not disard a decl altogether; we might need instances
     from it.  Instead we just trim to an empty import list
+-}
 
-\begin{code}
 printMinimalImports :: [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
 printMinimalImports imports_w_usage
@@ -1571,8 +1561,8 @@ printMinimalImports imports_w_usage
            _other             -> map (IEVar . noLoc)  ns
         where
           all_used avail_occs = all (`elem` ns) avail_occs
-\end{code}
 
+{-
 Note [Partial export]
 ~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -1593,13 +1583,13 @@ which we would usually generate if C was exported from B.  Hence
 the (x `elem` xs) test when deciding what to generate.
 
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Errors}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 qualImportItemErr :: RdrName -> SDoc
 qualImportItemErr rdr
   = hang (ptext (sLit "Illegal qualified name in import item:"))
@@ -1789,4 +1779,3 @@ checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
 badDataCon :: RdrName -> SDoc
 badDataCon name
    = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
-\end{code}

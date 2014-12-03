@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module RnSplice (
@@ -37,9 +36,7 @@ import {-# SOURCE #-} RnExpr   ( rnLExpr )
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
 import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 #endif
-\end{code}
 
-\begin{code}
 #ifndef GHCI
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e _ = failTH e "Template Haskell bracket"
@@ -60,13 +57,13 @@ rnSplicePat e = failTH e "Template Haskell pattern splice"
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
 rnSpliceDecl e = failTH e "Template Haskell declaration splice"
 #else
-\end{code}
 
-%*********************************************************
-%*                                                      *
+{-
+*********************************************************
+*                                                      *
                 Splices
-%*                                                      *
-%*********************************************************
+*                                                      *
+*********************************************************
 
 Note [Free variables of typed splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -95,8 +92,8 @@ It's important to wrap renamer calls in checkNoErrs, because the
 renamer does not fail for out of scope variables etc. Instead it
 returns a bogus term/type, so that it can report more than one error.
 We don't want the type checker to see these bogus unbound variables.
+-}
 
-\begin{code}
 rnSpliceGen :: Bool                                     -- Typed splice?
             -> (HsSplice Name -> RnM (a, FreeVars))     -- Outside brackets, run splice
             -> (HsSplice Name -> (PendingRnSplice, a))  -- Inside brackets, make it pending
@@ -206,8 +203,7 @@ rnSpliceType splice k
                                   }
             ; return (unLoc hs_ty3, fvs) }
 
-\end{code}
-
+{-
 Note [rnSplicePat]
 ~~~~~~~~~~~~~~~~~~
 Renaming a pattern splice is a bit tricky, because we need the variables
@@ -229,8 +225,7 @@ In any case, when we're done in rnSplicePat, we'll either have a
 Pat RdrName (the result of running a top-level splice) or a Pat Name
 (the renamed nested splice). Thus, the awkward return type of
 rnSplicePat.
-
-\begin{code}
+-}
 
 -- | Rename a splice pattern. See Note [rnSplicePat]
 rnSplicePat :: HsSplice RdrName -> RnM ( Either (Pat RdrName) (Pat Name)
@@ -265,9 +260,7 @@ rnSpliceDecl (SpliceDecl (L loc splice) flg)
        = (PendingRnDeclSplice (PendSplice n e), SpliceDecl(L loc rn_splice) flg)
 
     run_decl_splice rn_splice = pprPanic "rnSpliceDecl" (ppr rn_splice)
-\end{code}
 
-\begin{code}
 rnTopSpliceDecls :: HsSplice RdrName -> RnM ([LHsDecl RdrName], FreeVars)
 -- Declaration splice at the very top level of the module
 rnTopSpliceDecls (HsSplice _ expr'')
@@ -285,15 +278,15 @@ rnTopSpliceDecls (HsSplice _ expr'')
                  (ppr (getLoc expr) $$ (vcat (map ppr decls)))
 
          ; return (decls,fvs) }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Template Haskell brackets
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e br_body
   = addErrCtxt (quotationCtxtDoc br_body) $
@@ -401,9 +394,7 @@ rn_bracket _ (DecBrG _) = panic "rn_bracket: unexpected DecBrG"
 
 rn_bracket _ (TExpBr e) = do { (e', fvs) <- rnLExpr e
                              ; return (TExpBr e', fvs) }
-\end{code}
 
-\begin{code}
 spliceCtxt :: HsExpr RdrName -> SDoc
 spliceCtxt expr= hang (ptext (sLit "In the splice:")) 2 (ppr expr)
 
@@ -451,9 +442,7 @@ quotationCtxtDoc br_body
 --              2 (char '$' <> pprParendExpr expr)
 --        , ptext (sLit "To see what the splice expanded to, use -ddump-splices") ]
 #endif
-\end{code}
 
-\begin{code}
 checkThLocalName :: Name -> RnM ()
 #ifndef GHCI  /* GHCI and TH is off */
 --------------------------------------
@@ -462,7 +451,7 @@ checkThLocalName _name
   = return ()
 
 #else         /* GHCI and TH is on */
-checkThLocalName name 
+checkThLocalName name
   = do  { traceRn (text "checkThLocalName" <+> ppr name)
         ; mb_local_use <- getStageAndBindLevel name
         ; case mb_local_use of {
@@ -510,8 +499,8 @@ checkCrossStageLifting top_lvl name (Brack _ (RnPendingUntyped ps_var))
 
 checkCrossStageLifting _ _ _ = return ()
 #endif /* GHCI */
-\end{code}
 
+{-
 Note [Keeping things alive for Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -571,4 +560,4 @@ Examples:
   \y. [| \x. $(f 'y) |] -- Not ok (bind =1, use = 1)
 
   [| \x. $(f 'x) |]     -- OK (bind = 2, use = 1)
-
+-}
