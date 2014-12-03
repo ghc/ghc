@@ -1,9 +1,9 @@
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
 \section{Tidying up Core}
+-}
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 
 module TidyPgm (
@@ -63,9 +63,8 @@ import Control.Monad
 import Data.Function
 import Data.List        ( sortBy )
 import Data.IORef       ( atomicModifyIORef )
-\end{code}
 
-
+{-
 Constructing the TypeEnv, Instances, Rules, VectInfo from which the
 ModIface is constructed, and which goes on to subsequent modules in
 --make mode.
@@ -84,11 +83,11 @@ plus one for each DataCon; the interface file will contain just one
 data type declaration, but it is de-serialised back into a collection
 of TyThings.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
                 Plan A: simpleTidyPgm
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 
 Plan A: mkBootModDetails: omit pragmas, make interfaces small
@@ -123,8 +122,8 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 
 * If this an hsig file, drop the instances altogether too (they'll
   get pulled in by the implicit module import.
+-}
 
-\begin{code}
 -- This is Plan A: make a small type env when typechecking only,
 -- or when compiling a hs-boot file, or simply when not using -O
 --
@@ -200,14 +199,13 @@ globaliseAndTidyId id
   = Id.setIdType (globaliseId id) tidy_type
   where
     tidy_type = tidyTopType (idType id)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Plan B: tidy bindings, make TypeEnv full of IdInfo
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Plan B: include pragmas, make interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -297,8 +295,8 @@ binder
 Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
+-}
 
-\begin{code}
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_exports   = exports
@@ -334,7 +332,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; (unfold_env, tidy_occ_env)
               <- chooseExternalIds hsc_env mod omit_prags expose_all
                                    binds implicit_binds imp_rules (vectInfoVar vect_info)
-        ; let { (trimmed_binds, trimmed_rules) 
+        ; let { (trimmed_binds, trimmed_rules)
                     = findExternalRules omit_prags binds imp_rules unfold_env }
 
         ; (tidy_env, tidy_binds)
@@ -422,10 +420,7 @@ lookup_aux_id type_env id
   = case lookupTypeEnv type_env (idName id) of
         Just (AnId id') -> id'
         _other          -> pprPanic "lookup_aux_id" (ppr id)
-\end{code}
 
-
-\begin{code}
 tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
             -> TypeEnv -> TypeEnv
 
@@ -464,9 +459,7 @@ trimThing other_thing
 extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
 extendTypeEnvWithPatSyns tidy_patsyns type_env
   = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
-\end{code}
 
-\begin{code}
 tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
 tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                                          , vectInfoParallelVars = parallelVars
@@ -493,17 +486,17 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                                  ]
 
     lookup_var var = lookupWithDefaultVarEnv var_env var var
-    
+
     -- We need to make sure that all names getting into the iface version of 'VectInfo' are
     -- external; otherwise, 'MkIface' will bomb out.
     isExternalId = isExternalName . idName
-\end{code}
 
+{-
 Note [Don't attempt to trim data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For some time GHC tried to avoid exporting the data constructors
 of a data type if it wasn't strictly necessary to do so; see Trac #835.
-But "strictly necessary" accumulated a longer and longer list 
+But "strictly necessary" accumulated a longer and longer list
 of exceptions, and finally I gave up the battle:
 
     commit 9a20e540754fc2af74c2e7392f2786a81d8d5f11
@@ -511,27 +504,27 @@ of exceptions, and finally I gave up the battle:
     Date:   Thu Dec 6 16:03:16 2012 +0000
 
     Stop attempting to "trim" data types in interface files
-    
+
     Without -O, we previously tried to make interface files smaller
     by not including the data constructors of data types.  But
     there are a lot of exceptions, notably when Template Haskell is
     involved or, more recently, DataKinds.
-    
+
     However Trac #7445 shows that even without TemplateHaskell, using
     the Data class and invoking Language.Haskell.TH.Quote.dataToExpQ
     is enough to require us to expose the data constructors.
-    
+
     So I've given up on this "optimisation" -- it's probably not
     important anyway.  Now I'm simply not attempting to trim off
     the data constructors.  The gain in simplicity is worth the
     modest cost in interface file growth, which is limited to the
     bits reqd to describe those data constructors.
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
         Implicit bindings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Injecting implicit bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -578,8 +571,8 @@ There is one sort of implicit binding that is injected still later,
 namely those for data constructor workers. Reason (I think): it's
 really just a code generation trick.... binding itself makes no sense.
 See Note [Data constructor workers] in CorePrep.
+-}
 
-\begin{code}
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
@@ -590,18 +583,17 @@ getClassImplicitBinds cls
 
 get_defn :: Id -> CoreBind
 get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Step 1: finding externals}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 See Note [Choosing external names].
+-}
 
-\begin{code}
 type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
   -- Maps each top-level Id to its new Name (the Id is tidied in step 2)
   -- The Unique is unchanged.  If the new Name is external, it will be
@@ -696,7 +688,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
 
                 -- add vectorised version if any exists
           new_ids' = new_ids ++ maybeToList (fmap snd $ lookupVarEnv vect_vars idocc)
-          
+
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
@@ -744,13 +736,13 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
            || neverUnfoldGuidance guidance)
     show_unfolding (DFunUnfolding {}) = True
     show_unfolding _                  = False
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                Deterministic free variables
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 We want a deterministic free-variable list.  exprFreeVars gives us
 a VarSet, which is in a non-deterministic order when converted to a
@@ -758,8 +750,8 @@ list.  Hence, here we define a free-variable finder that returns
 the free variables in the order that they are encountered.
 
 See Note [Choosing external names]
+-}
 
-\begin{code}
 bndrFvsInOrder :: Bool -> Id -> [Id]
 bndrFvsInOrder show_unfold id
   = run (dffvLetBndr show_unfold id)
@@ -849,21 +841,20 @@ dffvLetBndr vanilla_unfold id
                      | otherwise      -> return ()
            _                          -> dffvExpr rhs
 
-    go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args }) 
+    go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args })
              = extendScopeList bndrs $ mapM_ dffvExpr args
     go_unf _ = return ()
 
     go_rule (BuiltinRule {}) = return ()
     go_rule (Rule { ru_bndrs = bndrs, ru_rhs = rhs })
       = extendScopeList bndrs (dffvExpr rhs)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                findExternalRules
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Finding external rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -918,9 +909,8 @@ called in the final code), we keep the rule too.
 I found that binary sizes jumped by 6-10% when I started to specialise
 INLINE functions (again, Note [Inline specialisations] in Specialise).
 Adding trimAutoRules removed all this bloat.
+-}
 
-
-\begin{code}
 findExternalRules :: Bool       -- Omit pragmas
                   -> [CoreBind]
                   -> [CoreRule] -- Local rules for imported fns
@@ -1000,20 +990,20 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
                         , is_external_id id   -- Only collect rules for external Ids
                         , rule <- idCoreRules id
                         , expose_rule rule ]  -- and ones that can fire in a client
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                tidyTopName
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This is where we set names to local/global based on whether they really are
 externally visible (see comment at the top of this module).  If the name
 was previously local, we have to give it a unique occurrence name if
 we intend to externalise it.
+-}
 
-\begin{code}
 tidyTopName :: Module -> IORef NameCache -> Maybe Id -> TidyOccEnv
             -> Id -> IO (TidyOccEnv, Name)
 tidyTopName mod nc_var maybe_ref occ_env id
@@ -1081,17 +1071,15 @@ tidyTopName mod nc_var maybe_ref occ_env id
         -- All this is done by allcoateGlobalBinder.
         -- This is needed when *re*-compiling a module in GHCi; we must
         -- use the same name for externally-visible things as we did before.
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Step 2: top-level tidying}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 -- TopTidyEnv: when tidying we need to know
 --   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.
 --        These may have arisen because the
@@ -1248,7 +1236,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
 
     sig = strictnessInfo idinfo
     final_sig | not $ isNopSig sig
-                 = WARN( _bottom_hidden sig , ppr name ) sig 
+                 = WARN( _bottom_hidden sig , ppr name ) sig
                  -- try a cheap-and-cheerful bottom analyser
                  | Just (_, nsig) <- mb_bot_str = nsig
                  | otherwise                    = sig
@@ -1285,13 +1273,13 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     -- it to the top level. So it seems more robust just to
     -- fix it here.
     arity = exprArity orig_rhs
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Figuring out CafInfo for an expression}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 hasCafRefs decides whether a top-level closure can point into the dynamic heap.
 We mark such things as `MayHaveCafRefs' because this information is
@@ -1307,8 +1295,8 @@ hence the size of the SRTs) down, we could also look at the expression and
 decide whether it requires a small bounded amount of heap, so we can ignore
 it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.
+-}
 
-\begin{code}
 hasCafRefs :: DynFlags -> PackageKey -> Module
            -> (Id, Maybe DataCon, VarEnv Var) -> Arity -> CoreExpr
            -> CafInfo
@@ -1359,9 +1347,8 @@ cafRefsV (_, _, p) id
 fastOr :: FastBool -> (a -> FastBool) -> a -> FastBool
 -- hack for lazy-or over FastBool.
 fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
-\end{code}
 
-
+{-
 ------------------------------------------------------------------------------
 --               Old, dead, type-trimming code
 -------------------------------------------------------------------------------
@@ -1460,3 +1447,4 @@ mustExposeTyCon no_trim_types exports tc
     data_cons = tyConDataCons tc
     exported_con con = any (`elemNameSet` exports)
                            (dataConName con : dataConFieldLabels con)
+-}

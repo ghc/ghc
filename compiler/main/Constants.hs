@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-\section[Constants]{Info about this compilation}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\begin{code}
+\section[Constants]{Info about this compilation}
+-}
+
 module Constants (module Constants) where
 
 import Config
@@ -30,4 +30,3 @@ wORD64_SIZE = 8
 
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff
-\end{code}

@@ -1,7 +1,5 @@
-%
-% (c) The University of Glasgow, 2006
-%
-\begin{code}
+-- (c) The University of Glasgow, 2006
+
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 -- | Package manipulation
@@ -1390,5 +1388,3 @@ pprModuleMap dflags =
 
 fsPackageName :: PackageConfig -> FastString
 fsPackageName = mkFastString . packageNameString
-
-\end{code}

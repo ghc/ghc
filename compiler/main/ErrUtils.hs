@@ -1,13 +1,13 @@
-%
-% (c) The AQUA Project, Glasgow University, 1994-1998
-%
-\section[ErrsUtils]{Utilities for error reporting}
+{-
+(c) The AQUA Project, Glasgow University, 1994-1998
 
-\begin{code}
+\section[ErrsUtils]{Utilities for error reporting}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module ErrUtils (
-        MsgDoc, 
+        MsgDoc,
         Validity(..), andValid, allValid, isValid, getInvalids,
 
         ErrMsg, WarnMsg, Severity(..),
@@ -130,7 +130,7 @@ mkLocMessage severity locn msg
   where
     sev_info = case severity of
                  SevWarning -> ptext (sLit "Warning:")
-                 _other     -> empty                 
+                 _other     -> empty
       -- For warnings, print    Foo.hs:34: Warning:
       --                           <the warning message>
 
@@ -417,5 +417,3 @@ prettyPrintGhcErrors dflags
                           pprDebugAndThen dflags pgmError (text str) doc
                       _ ->
                           liftIO $ throwIO e
-\end{code}
-

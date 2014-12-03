@@ -1,9 +1,9 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section{Code output phase}
+{-
+(c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
-\begin{code}
+\section{Code output phase}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module CodeOutput( codeOutput, outputForeignStubs ) where
@@ -36,15 +36,15 @@ import Control.Exception
 import System.Directory
 import System.FilePath
 import System.IO
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Steering}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 codeOutput :: DynFlags
            -> Module
            -> FilePath
@@ -56,7 +56,7 @@ codeOutput :: DynFlags
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
 
 codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
-  = 
+  =
     do  {
         -- Lint each CmmGroup as it goes past
         ; let linted_cmm_stream =
@@ -87,16 +87,15 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
 
 doOutput :: String -> (Handle -> IO a) -> IO a
 doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{C}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 outputC :: DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup ()
@@ -104,7 +103,7 @@ outputC :: DynFlags
         -> IO ()
 
 outputC dflags filenm cmm_stream packages
-  = do 
+  = do
        -- ToDo: make the C backend consume the C-- incrementally, by
        -- pushing the cmm_stream inside (c.f. nativeCodeGen)
        rawcmms <- Stream.collect cmm_stream
@@ -116,10 +115,10 @@ outputC dflags filenm cmm_stream packages
        --   * the _stub.h file, if there is one.
        --
        let rts = getPackageDetails dflags rtsPackageKey
-                       
+
        let cc_injects = unlines (map mk_include (includes rts))
-           mk_include h_file = 
-            case h_file of 
+           mk_include h_file =
+            case h_file of
                '"':_{-"-} -> "#include "++h_file
                '<':_      -> "#include "++h_file
                _          -> "#include \""++h_file++"\""
@@ -130,16 +129,15 @@ outputC dflags filenm cmm_stream packages
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
           hPutStr h cc_injects
           writeCs dflags h rawcmms
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Assembler}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 outputAsm :: DynFlags -> Module -> FilePath -> Stream IO RawCmmGroup () -> IO ()
 outputAsm dflags this_mod filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
@@ -154,16 +152,15 @@ outputAsm dflags this_mod filenm cmm_stream
 
  | otherwise
   = panic "This compiler was built without a native code generator"
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{LLVM}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
@@ -171,16 +168,15 @@ outputLlvm dflags filenm cmm_stream
        {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
                  llvmCodeGen dflags f ncg_uniqs cmm_stream
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Foreign import/export}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
                    -> IO (Bool,         -- Header file created
                           Maybe FilePath) -- C file created
@@ -197,7 +193,7 @@ outputForeignStubs dflags mod location stubs
         let
             stub_c_output_d = pprCode CStyle c_code
             stub_c_output_w = showSDoc dflags stub_c_output_d
-        
+
             -- Header file protos for "foreign export"ed functions.
             stub_h_output_d = pprCode CStyle h_code
             stub_h_output_w = showSDoc dflags stub_h_output_d
@@ -208,7 +204,7 @@ outputForeignStubs dflags mod location stubs
                       "Foreign export header file" stub_h_output_d
 
         -- we need the #includes from the rts package for the stub files
-        let rts_includes = 
+        let rts_includes =
                let rts_pkg = getPackageDetails dflags rtsPackageKey in
                concatMap mk_include (includes rts_pkg)
             mk_include i = "#include \"" ++ i ++ "\"\n"
@@ -226,7 +222,7 @@ outputForeignStubs dflags mod location stubs
 
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
-                ("#define IN_STG_CODE 0\n" ++ 
+                ("#define IN_STG_CODE 0\n" ++
                  "#include \"Rts.h\"\n" ++
                  rts_includes ++
                  ffi_includes ++
@@ -252,4 +248,3 @@ outputForeignStubs_help _fname ""      _header _footer = return False
 outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
-\end{code}

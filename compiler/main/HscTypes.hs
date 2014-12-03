@@ -1,9 +1,9 @@
-%
-% (c) The University of Glasgow, 2006
-%
-\section[HscTypes]{Types for the per-module compiler}
+{-
+(c) The University of Glasgow, 2006
 
-\begin{code}
+\section[HscTypes]{Types for the per-module compiler}
+-}
+
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 
 -- | Types for the per-module compiler
@@ -315,15 +315,14 @@ handleFlagWarnings dflags warns
                           | L loc warn <- warns ]
 
       printOrThrowWarnings dflags bag
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{HscEnv}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- | Hscenv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
@@ -436,15 +435,15 @@ pprTargetId (TargetFile f _) = text f
 
 instance Outputable TargetId where
     ppr = pprTargetId
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Package and Module Tables}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Helps us find information about modules in the home package
 type HomePackageTable  = ModuleNameEnv HomeModInfo
         -- Domain = modules in the home package that have been fully compiled
@@ -591,15 +590,15 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
 
 hptObjs :: HomePackageTable -> [FilePath]
 hptObjs hpt = concat (map (maybe [] linkableObjs . hm_linkable) (eltsUFM hpt))
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Dealing with Annotations}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Deal with gathering annotations in from all possible places
 --   and combining them into a single 'AnnEnv'
 prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO AnnEnv
@@ -616,15 +615,15 @@ prepareAnnotations hsc_env mb_guts = do
                                                          Just home_pkg_anns,
                                                          Just other_pkg_anns]
     return ann_env
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The Finder cache}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | The 'FinderCache' maps home module names to the result of
 -- searching for that module. It records the results of searching for
 -- modules along the search path. On @:load@, we flush the entire
@@ -665,15 +664,15 @@ data FindResult
 -- home modules and package modules.  On @:load@, only home modules are
 -- purged from this cache.
 type ModLocationCache = ModuleEnv ModLocation
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Symbol tables and Module details}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
 -- and can be written out to an interface file. The 'ModDetails is after
@@ -1101,13 +1100,13 @@ data ForeignStubs
 appendStubC :: ForeignStubs -> SDoc -> ForeignStubs
 appendStubC NoStubs            c_code = ForeignStubs empty c_code
 appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{The interactive context}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [The interactive package]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1215,9 +1214,8 @@ It does *not* contain
   * CoAxioms (ditto)
 
 See also Note [Interactively-bound Ids in GHCi]
+-}
 
-
-\begin{code}
 -- | Interactive context, recording information about the state of the
 -- context in which statements are executed in a GHC session.
 data InteractiveContext
@@ -1382,13 +1380,13 @@ substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
 instance Outputable InteractiveImport where
   ppr (IIModule m) = char '*' <> ppr m
   ppr (IIDecl d)   = ppr d
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
         Building a PrintUnqualified
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Printing original names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1434,8 +1432,8 @@ another scheme is to (recursively) say which dependencies are different.
 
 NB: When we extend package keys to also have holes, we will have to disambiguate
 those as well.
+-}
 
-\begin{code}
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
@@ -1516,14 +1514,12 @@ pkgQual dflags = alwaysQualify {
         queryQualifyPackage = mkQualPackage dflags
     }
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 Implicit TyThings
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 Note [Implicit TyThings]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1548,8 +1544,8 @@ Examples:
 
   * Axioms for newtypes are implicit (same as above), but axioms
     for data/type family instances are *not* implicit (like DFunIds).
+-}
 
-\begin{code}
 -- | Determine the 'TyThing's brought into scope by another 'TyThing'
 -- /other/ than itself. For example, Id's don't have any implicit TyThings
 -- as they just bring themselves into scope, but classes bring their
@@ -1677,15 +1673,15 @@ tyThingAvailInfo (ATyCon t)
                    dcs = tyConDataCons t
 tyThingAvailInfo t
    = Avail (getName t)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 TypeEnv
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A map from 'Name's to 'TyThing's, constructed by typechecking
 -- local declarations or interface files
 type TypeEnv = NameEnv TyThing
@@ -1741,9 +1737,7 @@ extendTypeEnvList env things = foldl extendTypeEnv env things
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids
   = extendNameEnvList env [(getName id, AnId id) | id <- ids]
-\end{code}
 
-\begin{code}
 -- | Find the 'TyThing' for the given 'Name' by using all the resources
 -- at our disposal: the compiled modules in the 'HomePackageTable' and the
 -- compiled modules in other packages that live in 'PackageTypeEnv'. Note
@@ -1774,9 +1768,7 @@ lookupTypeHscEnv hsc_env name = do
   where
     dflags = hsc_dflags hsc_env
     hpt = hsc_HPT hsc_env
-\end{code}
 
-\begin{code}
 -- | Get the 'TyCon' from a 'TyThing' if it is a type constructor thing. Panics otherwise
 tyThingTyCon :: TyThing -> TyCon
 tyThingTyCon (ATyCon tc) = tc
@@ -1797,15 +1789,15 @@ tyThingId :: TyThing -> Id
 tyThingId (AnId id)                   = id
 tyThingId (AConLike (RealDataCon dc)) = dataConWrapId dc
 tyThingId other                       = pprPanic "tyThingId" (pprTyThing other)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{MonadThings and friends}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Class that abstracts out the common ability of the monads in GHC
 -- to lookup a 'TyThing' in the monadic environment by 'Name'. Provides
 -- a number of related convenience functions for accessing particular
@@ -1821,18 +1813,18 @@ class Monad m => MonadThings m where
 
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Auxiliary types}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 These types are defined here because they are mentioned in ModDetails,
 but they are mostly elaborated elsewhere
+-}
 
-\begin{code}
 ------------------ Warnings -------------------------
 -- | Warning information for a module
 data Warnings
@@ -1895,9 +1887,7 @@ plusWarns NoWarnings d = d
 plusWarns _ (WarnAll t) = WarnAll t
 plusWarns (WarnAll t) _ = WarnAll t
 plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
-\end{code}
 
-\begin{code}
 -- | Creates cached lookup for the 'mi_fix_fn' field of 'ModIface'
 mkIfaceFixCache :: [(OccName, Fixity)] -> OccName -> Fixity
 mkIfaceFixCache pairs
@@ -1925,15 +1915,15 @@ lookupFixity :: FixityEnv -> Name -> Fixity
 lookupFixity env n = case lookupNameEnv env n of
                         Just (FixItem _ fix) -> fix
                         Nothing         -> defaultFixity
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{WhatsImported}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Records whether a module has orphans. An \"orphan\" is one of:
 --
 -- * An instance declaration in a module other than the definition
@@ -2106,16 +2096,14 @@ instance Binary Usage where
             return UsageFile { usg_file_path = fp, usg_file_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 The External Package State
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 type PackageTypeEnv    = TypeEnv
 type PackageRuleBase   = RuleBase
 type PackageInstEnv    = InstEnv
@@ -2197,8 +2185,8 @@ addEpsInStats stats n_decls n_insts n_rules
           , n_decls_in  = n_decls_in stats + n_decls
           , n_insts_in  = n_insts_in stats + n_insts
           , n_rules_in  = n_rules_in stats + n_rules }
-\end{code}
 
+{-
 Names in a NameCache are always stored as a Global, and have the SrcLoc
 of their binding locations.
 
@@ -2206,8 +2194,8 @@ Actually that's not quite right.  When we first encounter the original
 name, we might not be at its binding site (e.g. we are reading an
 interface file); so we give it 'noSrcLoc' then.  Later, when we find
 its binding site, we fix it up.
+-}
 
-\begin{code}
 -- | The NameCache makes sure that there is just one Unique assigned for
 -- each original name; i.e. (module-name, occ-name) pair and provides
 -- something of a lookup mechanism for those names.
@@ -2220,10 +2208,7 @@ data NameCache
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
-\end{code}
 
-
-\begin{code}
 mkSOName :: Platform -> FilePath -> FilePath
 mkSOName platform root
     = case platformOS platform of
@@ -2240,18 +2225,17 @@ soExt platform
       OSDarwin  -> "dylib"
       OSMinGW32 -> "dll"
       _         -> "so"
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
                 The module graph and ModSummary type
         A ModSummary is a node in the compilation manager's
         dependency graph, and it's also passed to hscMain
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | A ModuleGraph contains all the nodes from the home package (only).
 -- There will be a node for each source module, plus a node for each hi-boot
 -- module.
@@ -2375,15 +2359,15 @@ hscSourceString' dflags mod HsigFile =
                (("sig of "++).showPpr dflags)
                (getSigOf dflags mod)) ++ "]"
     -- NB: -sig-of could be missing if we're just typechecking
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Recmpilation}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Indicates whether a given module's source has been modified since it
 -- was last compiled.
 data SourceModified
@@ -2400,15 +2384,15 @@ data SourceModified
        -- reasons: (a) we can omit the version check in checkOldIface,
        -- and (b) if the module used TH splices we don't need to force
        -- recompilation.
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Hpc Support}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Information about a modules use of Haskell Program Coverage
 data HpcInfo
   = HpcInfo
@@ -2431,13 +2415,13 @@ emptyHpcInfo = NoHpcInfo
 isHpcUsed :: HpcInfo -> AnyHpcUsage
 isHpcUsed (HpcInfo {})                   = True
 isHpcUsed (NoHpcInfo { hpcUsed = used }) = used
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Vectorisation Support}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 The following information is generated and consumed by the vectorisation
 subsystem.  It communicates the vectorisation status of declarations from one
@@ -2447,8 +2431,8 @@ Why do we need both f and f_v in the ModGuts/ModDetails/EPS version VectInfo
 below?  We need to know `f' when converting to IfaceVectInfo.  However, during
 vectorisation, we need to know `f_v', whose `Var' we cannot lookup based
 on just the OccName easily in a Core pass.
+-}
 
-\begin{code}
 -- |Vectorisation information for 'ModGuts', 'ModDetails' and 'ExternalPackageState'; see also
 -- documentation at 'Vectorise.Env.GlobalEnv'.
 --
@@ -2544,18 +2528,18 @@ instance Binary IfaceVectInfo where
         a4 <- get bh
         a5 <- get bh
         return (IfaceVectInfo a1 a2 a3 a4 a5)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Safe Haskell Support}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This stuff here is related to supporting the Safe Haskell extension,
 primarily about storing under what trust type a module has been compiled.
+-}
 
-\begin{code}
 -- | Is an import a safe import?
 type IsSafeImport = Bool
 
@@ -2599,15 +2583,15 @@ instance Outputable IfaceTrustInfo where
 instance Binary IfaceTrustInfo where
     put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
     get bh = getByte bh >>= (return . numToTrustInfo)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Parser result}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data HsParsedModule = HsParsedModule {
     hpm_module    :: Located (HsModule RdrName),
     hpm_src_files :: [FilePath],
@@ -2619,18 +2603,18 @@ data HsParsedModule = HsParsedModule {
     hpm_annotations :: ApiAnns
     -- See note [Api annotations] in ApiAnnotation.hs
   }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Linkable stuff}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
 This stuff is in here, rather than (say) in Linker.lhs, because the Linker.lhs
 stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
+-}
 
-\begin{code}
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
   linkableTime     :: UTCTime,          -- ^ Time at which this linkable was built
@@ -2710,15 +2694,15 @@ nameOfObject other       = pprPanic "nameOfObject" (ppr other)
 byteCodeOfObject :: Unlinked -> CompiledByteCode
 byteCodeOfObject (BCOs bc _) = bc
 byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Breakpoint Support}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -- | Breakpoint index
 type BreakIndex = Int
 
@@ -2745,4 +2729,3 @@ emptyModBreaks = ModBreaks
    , modBreaks_vars  = array (0,-1) []
    , modBreaks_decls = array (0,-1) []
    }
-\end{code}

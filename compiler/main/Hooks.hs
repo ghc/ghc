@@ -1,6 +1,5 @@
-\section[Hooks]{Low level API hooks}
+-- \section[Hooks]{Low level API hooks}
 
-\begin{code}
 module Hooks ( Hooks
              , emptyHooks
              , lookupHook
@@ -40,15 +39,14 @@ import Type
 import SrcLoc
 
 import Data.Maybe
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Hooks}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+*                                                                      *
+************************************************************************
+-}
 
 -- | Hooks can be used by GHC API clients to replace parts of
 --   the compiler pipeline. If a hook is not installed, GHC
@@ -78,6 +76,3 @@ getHooked hook def = fmap (lookupHook hook def) getDynFlags
 
 lookupHook :: (Hooks -> Maybe a) -> a -> DynFlags -> a
 lookupHook hook def = fromMaybe def . hook . hooks
-
-\end{code}
-

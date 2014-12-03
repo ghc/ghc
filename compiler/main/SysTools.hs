@@ -1,3 +1,4 @@
+{-
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2001-2003
@@ -5,8 +6,8 @@
 -- Access to system tools: gcc, cp, rm etc
 --
 -----------------------------------------------------------------------------
+-}
 
-\begin{code}
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module SysTools (
@@ -96,8 +97,8 @@ import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 #  error Unknown mingw32 arch
 # endif
 #endif
-\end{code}
 
+{-
 How GHC finds its files
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -162,13 +163,13 @@ stuff.
                 End of NOTES
 ---------------------------------------------
 
-%************************************************************************
-%*                                                                      *
+************************************************************************
+*                                                                      *
 \subsection{Initialisation}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
              -> IO Settings     -- Set all the mutable variables above, holding
                                 --      (a) the system programs
@@ -351,9 +352,7 @@ initSysTools mbMinusB
                     sOpt_lc      = [],
                     sPlatformConstants = platformConstants
              }
-\end{code}
 
-\begin{code}
 -- returns a Unix-format path (relying on getBaseDir to do so too)
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
            -> IO String    -- TopDir (in Unix format '/' separated)
@@ -365,17 +364,15 @@ findTopDir Nothing
              -- "Just" on Windows, "Nothing" on unix
              Nothing  -> throwGhcExceptionIO (InstallationError "missing -B<dir> option")
              Just dir -> return dir
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Running an external program}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-
-\begin{code}
 runUnlit :: DynFlags -> [Option] -> IO ()
 runUnlit dflags args = do
   let prog = pgm_L dflags
@@ -932,7 +929,7 @@ runLibtool dflags args = do
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let args1      = map Option (getOpts dflags opt_l)
       args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
-      libtool    = pgm_libtool dflags    
+      libtool    = pgm_libtool dflags
   mb_env <- getGccEnv args2
   runSomethingFiltered dflags id "Linker" libtool args2 mb_env
 
@@ -1019,15 +1016,15 @@ readElfSection _dflags section exe = do
            _ <- string "0]"
            skipSpaces
            munch (const True)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Managing temporary files
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
@@ -1347,15 +1344,15 @@ traceCmd dflags phase_name cmd_line action
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
                               ; throwGhcExceptionIO (PhaseFailed phase_name (ExitFailure 1)) }
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{-
+************************************************************************
+*                                                                      *
 \subsection{Support code}
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 -----------------------------------------------------------------------------
 -- Define       getBaseDir     :: IO (Maybe String)
 
@@ -1371,7 +1368,7 @@ getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
           0 -> return Nothing
           _ | ret < size -> fmap (Just . rootDir) $ peekCWString buf
             | otherwise  -> try_size (size * 2)
-    
+
     rootDir s = case splitFileName $ normalise s of
                 (d, ghc_exe)
                  | lower ghc_exe `elem` ["ghc.exe",
@@ -1591,4 +1588,3 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
               )
-\end{code}

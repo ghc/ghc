@@ -1,4 +1,3 @@
-\begin{code}
 module ErrUtils where
 
 import Outputable (SDoc)
@@ -16,5 +15,3 @@ data Severity
 type MsgDoc = SDoc
 
 mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
-\end{code}
-

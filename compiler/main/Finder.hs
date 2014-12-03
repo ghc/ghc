@@ -1,9 +1,9 @@
-%
-% (c) The University of Glasgow, 2000-2006
-%
-\section[Finder]{Module Finder}
+{-
+(c) The University of Glasgow, 2000-2006
 
-\begin{code}
+\section[Finder]{Module Finder}
+-}
+
 {-# LANGUAGE CPP #-}
 
 module Finder (
@@ -258,7 +258,7 @@ uncacheModule hsc_env mod = do
 findHomeModule :: HscEnv -> ModuleName -> IO FindResult
 findHomeModule hsc_env mod_name =
    homeSearchCache hsc_env mod_name $
-   let 
+   let
      dflags = hsc_dflags hsc_env
      home_path = importPaths dflags
      hisuf = hiSuf dflags
@@ -691,4 +691,3 @@ cantFindErr cannot_find _ dflags mod_name find_result
                  = parens (ptext (sLit "needs flag -package-key")
                     <+> ppr (packageConfigId pkg))
               | otherwise = Outputable.empty
-\end{code}

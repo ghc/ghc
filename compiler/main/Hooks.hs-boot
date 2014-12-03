@@ -1,9 +1,5 @@
-\begin{code}
 module Hooks where
 
 data Hooks
 
 emptyHooks :: Hooks
-
-\end{code}
-
