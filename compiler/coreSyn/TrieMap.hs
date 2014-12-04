@@ -784,6 +784,13 @@ lookupCME :: CmEnv -> Var -> Maybe BoundVar
 lookupCME (CME { cme_env = env }) v = lookupVarEnv env v
 
 --------- Variable binders -------------
+
+-- | A 'BndrMap' is a 'TypeMap' which allows us to distinguish between
+-- binding forms whose binders have different types.  For example,
+-- if we are doing a 'TrieMap' lookup on @\(x :: Int) -> ()@, we should
+-- not pick up an entry in the 'TrieMap' for @\(x :: Bool) -> ()@:
+-- we can disambiguate this by matching on the type (or kind, if this
+-- a binder in a type) of the binder.
 type BndrMap = TypeMap
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a

@@ -87,7 +87,7 @@ tcMatchTy tmpls ty1 ty2
     menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
         -- We're assuming that all the interesting
-        -- tyvars in tys1 are in tmpls
+        -- tyvars in ty1 are in tmpls
 
 tcMatchTys :: TyVarSet          -- Template tyvars
            -> [Type]            -- Template
@@ -139,6 +139,15 @@ ruleMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2      -- Rename for ex
 
 -- Now the internals of matching
 
+-- | Workhorse matching function.  Our goal is to find a substitution
+-- on all of the template variables (specified by @me_tmpls menv@) such
+-- that @ty1@ and @ty2@ unify.  This substitution is accumulated in @subst@.
+-- If a variable is not a template variable, we don't attempt to find a
+-- substitution for it; it must match exactly on both sides.  Furthermore,
+-- only @ty1@ can have template variables.
+--
+-- This function handles binders, see 'RnEnv2' for more details on
+-- how that works.
 match :: MatchEnv       -- For the most part this is pushed downwards
       -> TvSubstEnv     -- Substitution so far:
                         --   Domain is subset of template tyvars
@@ -160,6 +169,10 @@ match menv subst (TyVarTy tv1) ty2
   | tv1' `elemVarSet` me_tmpls menv
   = if any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
     then Nothing        -- Occurs check
+                        -- ezyang: Is this really an occurs check?  It seems
+                        -- to just reject matching \x. A against \x. x (maintaining
+                        -- the invariant that the free vars of the range of @subst@
+                        -- are a subset of the in-scope set in @me_env menv@.)
     else do { subst1 <- match_kind menv subst (tyVarKind tv1) (typeKind ty2)
                         -- Note [Matching kinds]
             ; return (extendVarEnv subst1 tv1' ty2) }
