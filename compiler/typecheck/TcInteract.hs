@@ -110,6 +110,19 @@ to float. This means that
       [w] xxx[1] ~ s
       [W] forall[2] . (xxx[1] ~ Empty)
                    => Intersect (BuriedUnder sub k Empty) inv ~ Empty
+
+Note [Running plugins on unflattened wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There is an annoying mismatch between solveFlatGivens and
+solveFlatWanteds, because the latter needs to fiddle with the inert
+set, unflatten and and zonk the wanteds.  It passes the zonked wanteds
+to runTcPluginsWanteds, which produces a replacement set of wanteds,
+some additional insolubles and a flag indicating whether to go round
+the loop again.  If so, prepareInertsForImplications is used to remove
+the previous wanteds (which will still be in the inert set).  Note
+that prepareInertsForImplications will discard the insolubles, so we
+must keep track of them separately.
 -}
 
 solveFlatGivens :: CtLoc -> [EvVar] -> TcS ()
@@ -128,21 +141,25 @@ solveFlatGivens loc givens
                    }
 
 solveFlatWanteds :: Cts -> TcS WantedConstraints
-solveFlatWanteds wanteds
-  = do { solveFlats wanteds
-       ; (implics, tv_eqs, fun_eqs, insols, others) <- getUnsolvedInerts
-       ; unflattened_eqs <- unflatten tv_eqs fun_eqs
-            -- See Note [Unflatten after solving the flat wanteds]
+solveFlatWanteds = go emptyBag
+  where
+    go insols0 wanteds
+      = do { solveFlats wanteds
+           ; (implics, tv_eqs, fun_eqs, insols, others) <- getUnsolvedInerts
+           ; unflattened_eqs <- unflatten tv_eqs fun_eqs
+              -- See Note [Unflatten after solving the flat wanteds]
 
-       ; zonked <- zonkFlats (others `andCts` unflattened_eqs)
-            -- Postcondition is that the wl_flats are zonked
+           ; zonked <- zonkFlats (others `andCts` unflattened_eqs)
+             -- Postcondition is that the wl_flats are zonked
 
-       ; (wanteds', insols', rerun) <- runTcPluginsWanted zonked
-       ; if rerun then do { updInertTcS prepareInertsForImplications
-                          ; solveFlatWanteds wanteds' }
-                  else return (WC { wc_flat  = wanteds'
-                                  , wc_insol = insols' `unionBags` insols
-                                  , wc_impl  = implics }) }
+           ; (wanteds', insols', rerun) <- runTcPluginsWanted zonked
+              -- See Note [Running plugins on unflattened wanteds]
+           ; let all_insols = insols0 `unionBags` insols `unionBags` insols'
+           ; if rerun then do { updInertTcS prepareInertsForImplications
+                              ; go all_insols wanteds' }
+                      else return (WC { wc_flat  = wanteds'
+                                      , wc_insol = all_insols
+                                      , wc_impl  = implics }) }
 
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
