@@ -124,7 +124,7 @@ linker_unload:
 	$(RM) Test.o Test.hi
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Test.hs -v0
 	# -rtsopts causes a warning
-	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main -optc-Werror -debug -optc-g
+	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main -optc-Werror -threaded
 	./linker_unload $(BASE) $(GHC_PRIM) $(INTEGER_GMP)
 
 # -----------------------------------------------------------------------------
@@ -142,7 +142,7 @@ linker_unload:
 .PHONY: linker_error1
 linker_error1:
 	"$(TEST_HC)" -c linker_error.c -o linker_error1.o
-	"$(TEST_HC)" linker_error1.o -o linker_error1 -no-hs-main -optc-g -debug
+	"$(TEST_HC)" linker_error1.o -o linker_error1 -no-hs-main -optc-g -debug -threaded
 	./linker_error1 linker_error.c
 
 # linker_error2: the object file has an unknown symbol (fails in
@@ -152,7 +152,7 @@ linker_error1:
 linker_error2:
 	"$(TEST_HC)" -c linker_error.c -o linker_error2.o
 	"$(TEST_HC)" -c linker_error2.c -o linker_error2_o.o
-	"$(TEST_HC)" linker_error2.o -o linker_error2 -no-hs-main -optc-g -debug
+	"$(TEST_HC)" linker_error2.o -o linker_error2 -no-hs-main -optc-g -debug -threaded
 	./linker_error2 linker_error2_o.o
 
 # linker_error3: the object file duplicates an existing symbol (fails
@@ -162,5 +162,5 @@ linker_error2:
 linker_error3:
 	"$(TEST_HC)" -c linker_error.c -o linker_error3.o
 	"$(TEST_HC)" -c linker_error3.c -o linker_error3_o.o
-	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug
+	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug -threaded
 	./linker_error3 linker_error3_o.o
