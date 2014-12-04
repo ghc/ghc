@@ -897,10 +897,9 @@ instance Ix Int64 where
     inRange (m,n) i     = m <= i && i <= n
 
 
-{-
-Note [Order of tests]
-
-Suppose we had a definition like:
+{- Note [Order of tests]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+(See Trac #3065, #5161.) Suppose we had a definition like:
 
     quot x y
      | y == 0                     = divZeroError
