@@ -30,6 +30,9 @@ module Foreign.Marshal.Array (
   reallocArray,
   reallocArray0,
 
+  callocArray,
+  callocArray0,
+
   -- ** Marshalling
   --
   peekArray,
@@ -66,7 +69,7 @@ module Foreign.Marshal.Array (
 
 import Foreign.Ptr      (Ptr, plusPtr)
 import Foreign.Storable (Storable(alignment,sizeOf,peekElemOff,pokeElemOff))
-import Foreign.Marshal.Alloc (mallocBytes, allocaBytesAligned, reallocBytes)
+import Foreign.Marshal.Alloc (mallocBytes, callocBytes, allocaBytesAligned, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
 import GHC.Num
@@ -90,6 +93,20 @@ mallocArray  = doMalloc undefined
 --
 mallocArray0      :: Storable a => Int -> IO (Ptr a)
 mallocArray0 size  = mallocArray (size + 1)
+
+-- |Like 'mallocArray', but allocated memory is filled with bytes of value zero.
+--
+callocArray :: Storable a => Int -> IO (Ptr a)
+callocArray  = doCalloc undefined
+  where
+    doCalloc :: Storable a' => a' -> Int -> IO (Ptr a')
+    doCalloc dummy size  = callocBytes (size * sizeOf dummy)
+
+-- |Like 'callocArray0', but allocated memory is filled with bytes of value
+-- zero.
+--
+callocArray0 :: Storable a => Int -> IO (Ptr a)
+callocArray0 size  = callocArray (size + 1)
 
 -- |Temporarily allocate space for the given number of elements
 -- (like 'Foreign.Marshal.Alloc.alloca', but for multiple elements).

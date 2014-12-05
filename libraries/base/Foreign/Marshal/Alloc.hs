@@ -49,6 +49,9 @@ module Foreign.Marshal.Alloc (
   malloc,
   mallocBytes,
 
+  calloc,
+  callocBytes,
+
   realloc,
   reallocBytes,
 
@@ -82,6 +85,15 @@ malloc  = doMalloc undefined
     doMalloc       :: Storable b => b -> IO (Ptr b)
     doMalloc dummy  = mallocBytes (sizeOf dummy)
 
+-- |Like 'malloc' but memory is filled with bytes of value zero.
+--
+{-# INLINE calloc #-}
+calloc :: Storable a => IO (Ptr a)
+calloc = doCalloc undefined
+  where
+    doCalloc       :: Storable b => b -> IO (Ptr b)
+    doCalloc dummy = callocBytes (sizeOf dummy)
+
 -- |Allocate a block of memory of the given number of bytes.
 -- The block of memory is sufficiently aligned for any of the basic
 -- foreign types that fits into a memory block of the allocated size.
@@ -91,6 +103,11 @@ malloc  = doMalloc undefined
 --
 mallocBytes      :: Int -> IO (Ptr a)
 mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
+
+-- |Llike 'mallocBytes' but memory is filled with bytes of value zero.
+--
+callocBytes :: Int -> IO (Ptr a)
+callocBytes size = failWhenNULL "calloc" $ _calloc 1 (fromIntegral size)
 
 -- |@'alloca' f@ executes the computation @f@, passing as argument
 -- a pointer to a temporarily allocated block of memory sufficient to
@@ -198,6 +215,7 @@ failWhenNULL name f = do
 -- basic C routines needed for memory allocation
 --
 foreign import ccall unsafe "stdlib.h malloc"  _malloc  ::          CSize -> IO (Ptr a)
+foreign import ccall unsafe "stdlib.h calloc"  _calloc  :: CSize -> CSize -> IO (Ptr a)
 foreign import ccall unsafe "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
 foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()
 
