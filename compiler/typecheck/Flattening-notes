@@ -7,3 +7,153 @@ ToDo:
 
 * Collapse CNonCanonical and CIrredCan
 
+===========================
+
+The inert equalities
+~~~~~~~~~~~~~~~~~~~~
+
+Definition: can-rewrite relation.  
+A "can-rewrite" relation between flavours, written f1 >= f2, is a
+binary relation with the following properties
+
+  R1.  >= is transitive
+  R2.  If f1 >= f, and f2 >= f, 
+       then either f1 >= f2 or f2 >= f1
+
+Lemma.  If f1 >= f then f1 >= f1
+Proof.  By property (R2), with f1=f2
+
+Definition: generalised substitution.
+A "generalised substitution" S is a set of triples (a -f-> t), where
+  a is a type variable
+  t is a type
+  f is a flavour
+such that
+  (WF)  if (a -f1-> t1) in S
+           (a -f2-> t2) in S
+        then neither (f1 >= f2) nor (f2 >= f1) hold
+
+Definition: applying a generalised substitution.
+If S is a generalised subsitution
+   S(f,a) = t,  if (a -fs-> t) in S, and fs >= f
+          = a,  otherwise
+Application extends naturally to types S(f,t)
+
+Theorem: S(f,a) is a function.
+Proof: Suppose (a -f1-> t1) and (a -f2-> t2) are both in S,
+               and  f1 >= f and f2 >= f
+       Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF)
+
+Notation: repeated application.
+  S^0(f,t)     = t
+  S^(n+1)(f,t) = S(f, S^n(t))
+
+Definition: inert generalised substitution
+A generalised substitution S is "inert" iff
+  there is an n such that 
+  for every f,t, S^n(f,t) = S^(n+1)(f,t)
+
+Flavours. In GHC currently drawn from {G,W,D}, but with the coercion
+solver the flavours become pairs
+    { (k,l) | k <- {G,W,D}, l <- {Nom,Rep} }
+
+----------------------------------------------------------------
+Our main invariant: 
+   the inert CTyEqCans should be an inert generalised subsitution
+----------------------------------------------------------------
+
+Note that inertness is not the same as idempotence.  To apply S to a
+type, you may have to apply it recursive.  But inertness does
+guarantee that this recursive use will terminate.
+
+The main theorem.  
+   Suppose we have a "work item" 
+       a -fw-> t
+   and an inert generalised substitution S, 
+   such that
+      (T1) S(fw,a) = a     -- LHS is a fixpoint of S
+      (T2) S(fw,t) = t     -- RHS is a fixpoint of S
+      (T3) a not in t      -- No occurs check in the work item
+
+      (K1) if (a -fs-> s) is in S then not (fw >= fs)
+      (K2) if (b -fs-> s) is in S, where b /= a, then
+              (K2a) not (fs >= fs)
+           or (K2b) not (fw >= fs)
+           or (K2c) a not in s
+     or (K3) if (b -fs-> a) is in S then not (fw >= fs)
+
+   then the extended substition T = S+(a -fw-> t) 
+   is an inert genrealised substitution.
+
+The idea is that 
+* (T1-2) are guaranteed by exhaustively rewriting the work-item
+  with S.
+
+* T3 is guaranteed by a simple occurs-check on the work item.
+
+* (K1-3) are the "kick-out" criteria.  (As stated, they are really the
+  "keep" criteria.) If the current inert S contains a triple that does
+  not satisfy (K1-3), then we remove it from S by "kicking it out",
+  and re-processing it.
+
+* Note that kicking out is a Bad Thing, becuase it means we have to
+  re-process a constraint.  The less we kick out, the better.
+
+* Assume we have  G>=G, G>=W, D>=D, and that's all.  Then, when performing
+  a unification we add a new given  a -G-> ty.  But doing so dos not require
+  us to kick out wanteds that mention a, because of (K2b).  
+
+* Lemma (L1): The conditions of the Main Theorem imply that not (fs >= fw).
+  Proof. Suppose the contrary (fs >= fw).  Then because of (T1),
+  S(fw,a)=a.  But since fs>=fw, S(fw,a) = s, hence s=a.  But now we
+  have (a -fs-> a) in S, since fs>=fw we must have fs>=fs, and hence S
+  is not inert.
+
+* (K1) plus (L1) guarantee that the extended substiution satisfies (WF).
+
+* (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
+  T^1(f,t), T^2(f,T).... must pass through the new work item infnitely
+  often, since the substution without the work item is inert; and must
+  pass through at least one of the triples in S infnitely often.
+
+  - (K2a): if not(fs>=fs) then there is no f that fs can rewrite (fs>=f),
+    and hence this triple never plays a role in application S(f,a).
+    It is always safe to extend S with such a triple.  
+
+    (NB: we could strengten K1) in this way too, but see K3.
+
+  - (K2b): If this holds, we can't pass through this triple infinitely
+    often, because if we did then fs>=f, fw>=f, hence fs>=fw,
+    contradicting (L1), or fw>=fs contradicting K2b.
+
+  - (K2c): if a not in s, we hae no further opportunity to apply the 
+    work item.
+    
+  NB: this reasoning isn't water tight.
+
+
+Completeness
+~~~~~~~~~~~~~
+K3: completeness.  (K3) is not ncessary for the extended substitution
+to be inert.  In fact K1 could be made stronger by saying
+   ... then (not (fw >= fs) or not (fs >= fs))
+But it's not enough for S to be inert; we also want completeness.
+That is, we want to be able to solve all soluble wanted equalities.
+Suppose we have
+
+   work-item   b -G-> a
+   inert-item  a -W-> b
+
+Assuming (G >= W) but not (W >= W), this fulfills all the conditions,
+so we could extend the inerts, thus:
+    
+   inert-items   b -G-> a
+                 a -W-> b
+
+But if we kicked-out the inert item, we'd get
+  
+   work-item     a -W-> b
+   inert-item    b -G-> a
+
+Then rewrite the work-item gives us (a -W-> a), which is soluble via Refl.
+So we add one more clause to the kick-out criteria
