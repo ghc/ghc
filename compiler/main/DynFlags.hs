@@ -845,7 +845,7 @@ data DynFlags = DynFlags {
   nextWrapperNum        :: IORef (ModuleEnv Int),
 
   -- | Machine dependant flags (-m<blah> stuff)
-  sseVersion            :: Maybe (Int, Int),  -- (major, minor)
+  sseVersion            :: Maybe SseVersion,
   avx                   :: Bool,
   avx2                  :: Bool,
   avx512cd              :: Bool, -- Enable AVX-512 Conflict Detection Instructions.
@@ -2503,8 +2503,11 @@ dynamic_flags = [
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
-  , defGhcFlag "msse"
-      (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
+  , defGhcFlag "msse"         (noArg (\d -> d{ sseVersion = Just SSE1 }))
+  , defGhcFlag "msse2"        (noArg (\d -> d{ sseVersion = Just SSE2 }))
+  , defGhcFlag "msse3"        (noArg (\d -> d{ sseVersion = Just SSE3 }))
+  , defGhcFlag "msse4"        (noArg (\d -> d{ sseVersion = Just SSE4 }))
+  , defGhcFlag "msse4.2"      (noArg (\d -> d{ sseVersion = Just SSE42 }))
   , defGhcFlag "mavx"         (noArg (\d -> d{ avx = True }))
   , defGhcFlag "mavx2"        (noArg (\d -> d{ avx2 = True }))
   , defGhcFlag "mavx512cd"    (noArg (\d -> d{ avx512cd = True }))
@@ -3495,9 +3498,6 @@ optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
               -> OptKind (CmdLineP DynFlags)
 optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
 
-versionSuffix :: (Int -> Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
-versionSuffix fn = VersionSuffix (\maj min -> upd (fn maj min))
-
 setDumpFlag :: DumpFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
@@ -4036,10 +4036,17 @@ setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
 -- flag.
 
+data SseVersion = SSE1
+                | SSE2
+                | SSE3
+                | SSE4
+                | SSE42
+                deriving (Eq, Ord)
+
 isSseEnabled :: DynFlags -> Bool
 isSseEnabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86_64 -> True
-    ArchX86    -> sseVersion dflags >= Just (1,0)
+    ArchX86    -> sseVersion dflags >= Just SSE1
     _          -> False
 
 isSse2Enabled :: DynFlags -> Bool
@@ -4050,11 +4057,11 @@ isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
                   -- calling convention specifies the use of xmm regs,
                   -- and possibly other places.
                   True
-    ArchX86    -> sseVersion dflags >= Just (2,0)
+    ArchX86    -> sseVersion dflags >= Just SSE2
     _          -> False
 
 isSse4_2Enabled :: DynFlags -> Bool
-isSse4_2Enabled dflags = sseVersion dflags >= Just (4,2)
+isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42
 
 isAvxEnabled :: DynFlags -> Bool
 isAvxEnabled dflags = avx dflags || avx2 dflags || avx512f dflags
