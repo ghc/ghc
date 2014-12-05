@@ -46,9 +46,9 @@ cabal06: clean
 	cd q && $(SETUP) copy
 	(cd q && $(SETUP) register --print-ipid) > tmp_second_q
 	@echo "Does the first instance of q depend on p-1.0?"
-	'$(GHC_PKG)' field --ipid `cat tmp_first_q` depends -f tmp.d | grep p-1.0 | wc -l
+	'$(GHC_PKG)' field --ipid `cat tmp_first_q` depends -f tmp.d | grep p-1.0 | wc -l | sed 's/[[:space:]]//g'
 	@echo "Does the second instance of q depend on p-1.0?"
-	'$(GHC_PKG)' field --ipid `cat tmp_second_q` depends -f tmp.d | grep p-1.1 | wc -l
+	'$(GHC_PKG)' field --ipid `cat tmp_second_q` depends -f tmp.d | grep p-1.1 | wc -l | sed 's/[[:space:]]//g'
 	cd r && $(SETUP) clean
 	cd r && ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_first_q`" --constraint="p==1.0" --prefix='$(PWD)/inst-e' --ghc-pkg-options='--enable-multi-instance'
 	cd r && $(SETUP) build
