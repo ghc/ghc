@@ -144,23 +144,28 @@ import qualified GHC.List as List ( foldr )
 class (Functor t, Foldable t) => Traversable t where
     {-# MINIMAL traverse | sequenceA #-}
 
-    -- | Map each element of a structure to an action, evaluate
+    -- | Map each element of a structure to an action, evaluate these
     -- these actions from left to right, and collect the results.
+    -- actions from left to right, and collect the results. For a
+    -- version that ignores the results see 'Data.Foldable.traverse_'.
     traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
     traverse f = sequenceA . fmap f
 
-    -- | Evaluate each action in the structure from left to right,
-    -- and collect the results.
+    -- | Evaluate each action in the structure from left to right, and
+    -- and collect the results. For a version that ignores the results
+    -- see 'Data.Foldable.sequenceA_'.
     sequenceA :: Applicative f => t (f a) -> f (t a)
     sequenceA = traverse id
 
     -- | Map each element of a structure to a monadic action, evaluate
-    -- these actions from left to right, and collect the results.
+    -- these actions from left to right, and collect the results. For
+    -- a version that ignores the results see 'Data.Foldable.mapM_'.
     mapM :: Monad m => (a -> m b) -> t a -> m (t b)
     mapM = traverse
 
-    -- | Evaluate each monadic action in the structure from left to right,
-    -- and collect the results.
+    -- | Evaluate each monadic action in the structure from left to
+    -- right, and collect the results. For a version that ignores the
+    -- results see 'Data.Foldable.sequence_'.
     sequence :: Monad m => t (m a) -> m (t a)
     sequence = sequenceA
 
@@ -202,12 +207,14 @@ instance Traversable (Const m) where
 
 -- general functions
 
--- | 'for' is 'traverse' with its arguments flipped.
+-- | 'for' is 'traverse' with its arguments flipped. For a version
+-- that ignores the results see 'Data.Foldable.for_'.
 for :: (Traversable t, Applicative f) => t a -> (a -> f b) -> f (t b)
 {-# INLINE for #-}
 for = flip traverse
 
--- | 'forM' is 'mapM' with its arguments flipped.
+-- | 'forM' is 'mapM' with its arguments flipped. For a version that
+-- ignores the results see 'Data.Foldable.forM_'.
 forM :: (Traversable t, Monad m) => t a -> (a -> m b) -> m (t b)
 {-# INLINE forM #-}
 forM = flip mapM

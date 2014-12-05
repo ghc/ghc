@@ -323,36 +323,54 @@ foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 foldlM f z0 xs = foldr f' return xs z0
   where f' x k z = f z x >>= k
 
--- | Map each element of a structure to an action, evaluate
--- these actions from left to right, and ignore the results.
+-- | Map each element of a structure to an action, evaluate these
+-- actions from left to right, and ignore the results. For a version
+-- that doesn't ignore the results see 'Data.Traversable.traverse'.
 traverse_ :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f ()
 traverse_ f = foldr ((*>) . f) (pure ())
 
--- | 'for_' is 'traverse_' with its arguments flipped.
+-- | 'for_' is 'traverse_' with its arguments flipped. For a version
+-- that doesn't ignore the results see 'Data.Traversable.for'.
+--
+-- >>> for_ [1..4] print
+-- 1
+-- 2
+-- 3
+-- 4
 for_ :: (Foldable t, Applicative f) => t a -> (a -> f b) -> f ()
 {-# INLINE for_ #-}
 for_ = flip traverse_
 
 -- | Map each element of a structure to a monadic action, evaluate
--- these actions from left to right, and ignore the results. As of
--- base 4.8.0.0, 'mapM_' is just 'traverse_', specialized to 'Monad'.
+-- these actions from left to right, and ignore the results. For a
+-- version that doesn't ignore the results see
+-- 'Data.Traversable.mapM'.
+--
+-- As of base 4.8.0.0, 'mapM_' is just 'traverse_', specialized to
+-- 'Monad'.
 mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
 mapM_ f= foldr ((>>) . f) (return ())
 
--- | 'forM_' is 'mapM_' with its arguments flipped. As of base
--- 4.8.0.0, 'forM_' is just 'for_', specialized to 'Monad'.
+-- | 'forM_' is 'mapM_' with its arguments flipped. For a version that
+-- doesn't ignore the results see 'Data.Traversable.forM'.
+--
+-- As of base 4.8.0.0, 'forM_' is just 'for_', specialized to 'Monad'.
 forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
 {-# INLINE forM_ #-}
 forM_ = flip mapM_
 
--- | Evaluate each action in the structure from left to right,
--- and ignore the results.
+-- | Evaluate each action in the structure from left to right, and
+-- ignore the results. For a version that doesn't ignore the results
+-- see 'Data.Traversable.sequenceA'.
 sequenceA_ :: (Foldable t, Applicative f) => t (f a) -> f ()
 sequenceA_ = foldr (*>) (pure ())
 
 -- | Evaluate each monadic action in the structure from left to right,
--- and ignore the results. As of base 4.8.0.0, 'sequence_' is just
--- 'sequenceA_', specialized to 'Monad'.
+-- and ignore the results. For a version that doesn't ignore the
+-- results see 'Data.Traversable.sequence'.
+--
+-- As of base 4.8.0.0, 'sequence_' is just 'sequenceA_', specialized
+-- to 'Monad'.
 sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
 sequence_ = foldr (>>) (return ())
 
