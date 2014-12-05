@@ -1,0 +1,3 @@
+ T9778.hs:8:10: Warning:
+     Unticked promoted constructor: ‘A’.
+         Use ‘'A’ instead of ‘A’.

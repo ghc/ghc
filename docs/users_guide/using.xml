@@ -1796,6 +1796,30 @@ f "2"    = 2
       </varlistentry>
 
       <varlistentry>
+        <term><option>-fwarn-unticked-promoted-constructors</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unticked-promoted-constructors</option></primary></indexterm>
+          <indexterm><primary>promoted constructor, warning</primary></indexterm>
+          <para>Warn if a promoted data constructor is used without a tick preceding it's name.
+          </para>
+          <para>For example:
+          </para>
+<programlisting>
+data Nat = Succ Nat | Zero
+
+data Vec n s where
+  Nil  :: Vec Zero a
+  Cons :: a -> Vec n a -> Vec (Succ n) a
+</programlisting>
+            <para> Will raise two warnings because <function>Zero</function>
+            and <function>Succ</function> are not written as <function>'Zero</function> and
+            <function>'Succ</function>.
+            </para>
+            <para>This warning is off by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-fwarn-unused-binds</option>:</term>
         <listitem>
           <indexterm><primary><option>-fwarn-unused-binds</option></primary></indexterm>

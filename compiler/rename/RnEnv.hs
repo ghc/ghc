@@ -699,7 +699,10 @@ lookup_demoted rdr_name
        ; case mb_demoted_name of
            Nothing -> reportUnboundName rdr_name
            Just demoted_name
-             | data_kinds -> return demoted_name
+             | data_kinds ->
+             do { whenWOptM Opt_WarnUntickedPromotedConstructors $
+                  addWarn (untickedPromConstrWarn demoted_name)
+                ; return demoted_name }
              | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }
 
   | otherwise
@@ -707,6 +710,13 @@ lookup_demoted rdr_name
 
   where
     suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean DataKinds?")
+    untickedPromConstrWarn name =
+      text "Unticked promoted constructor" <> colon <+> quotes (ppr name) <> dot
+      $$
+      hsep [ text "Use"
+           , quotes (char '\'' <> ppr name)
+           , text "instead of"
+           , quotes (ppr name) <> dot ]
 
 {-
 Note [Demotion]

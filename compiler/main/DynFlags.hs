@@ -505,6 +505,7 @@ data WarningFlag =
    | Opt_WarnTypedHoles
    | Opt_WarnPartialTypeSignatures
    | Opt_WarnMissingExportedSigs
+   | Opt_WarnUntickedPromotedConstructors
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2835,6 +2836,8 @@ fWarningFlags = [
   flagSpec "warn-unsupported-calling-conventions"
                                          Opt_WarnUnsupportedCallingConventions,
   flagSpec "warn-unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
+  flagSpec "warn-unticked-promoted-constructors"
+                                         Opt_WarnUntickedPromotedConstructors,
   flagSpec "warn-unused-binds"                Opt_WarnUnusedBinds,
   flagSpec "warn-unused-do-bind"              Opt_WarnUnusedDoBind,
   flagSpec "warn-unused-imports"              Opt_WarnUnusedImports,

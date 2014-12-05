@@ -1570,6 +1570,13 @@
           </row>
 
           <row>
+            <entry><option>-fwarn-unticked-promoted-constructors</option></entry>
+            <entry>warn if promoted constructors are not ticked </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-unticked-promoted-constructors</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fwarn-unused-binds</option></entry>
             <entry>warn about bindings that are unused</entry>
             <entry>dynamic</entry>
