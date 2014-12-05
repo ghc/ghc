@@ -1034,7 +1034,6 @@ test.hs:(5,4)-(6,7):
     program.  These are:
     <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-warnings-deprecations</option>,
-    <option>-fwarn-amp</option>,
     <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-unrecognised-pragmas</option>,
     <option>-fwarn-pointless-pragmas</option>,
@@ -1048,8 +1047,9 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-unsupported-calling-conventions</option>,
     <option>-fwarn-dodgy-foreign-imports</option>,
     <option>-fwarn-inline-rule-shadowing</option>,
-    <option>-fwarn-unsupported-llvm-version</option>, and
-    <option>-fwarn-context-quantification</option>.
+    <option>-fwarn-unsupported-llvm-version</option>,
+    <option>-fwarn-context-quantification</option>, and
+    <option>-fwarn-tabs</option>.
     The following flags are simple ways to select standard
     &ldquo;packages&rdquo; of warnings:
     </para>
@@ -1061,12 +1061,12 @@ test.hs:(5,4)-(6,7):
         <listitem>
           <indexterm><primary>-W option</primary></indexterm>
           <para>Provides the standard warnings plus
-          <option>-fwarn-incomplete-patterns</option>,
-          <option>-fwarn-dodgy-exports</option>,
-          <option>-fwarn-dodgy-imports</option>,
+          <option>-fwarn-unused-binds</option>,
           <option>-fwarn-unused-matches</option>,
-          <option>-fwarn-unused-imports</option>, and
-          <option>-fwarn-unused-binds</option>.</para>
+          <option>-fwarn-unused-imports</option>,
+          <option>-fwarn-incomplete-patterns</option>,
+          <option>-fwarn-dodgy-exports</option>, and
+          <option>-fwarn-dodgy-imports</option>.</para>
         </listitem>
       </varlistentry>
 
@@ -1078,14 +1078,13 @@ test.hs:(5,4)-(6,7):
           suspicious code.  The warnings that are
           <emphasis>not</emphasis> enabled by <option>-Wall</option>
           are
-            <option>-fwarn-tabs</option>,
-            <option>-fwarn-incomplete-uni-patterns</option>,
-            <option>-fwarn-incomplete-record-updates</option>,
-            <option>-fwarn-monomorphism-restriction</option>,
-            <option>-fwarn-auto-orphans</option>,
-            <option>-fwarn-implicit-prelude</option>,
-            <option>-fwarn-missing-local-sigs</option>,
-            <option>-fwarn-missing-import-lists</option>.</para>
+            <option>-fwarn-type-defaults</option>,
+            <option>-fwarn-name-shadowing</option>,
+            <option>-fwarn-missing-signatures</option>,
+            <option>-fwarn-warn-hi-shadowing</option>,
+            <option>-fwarn-orphans</option>,
+            <option>-fwarn-unused-do-bind</option>, and
+            <option>-fwarn-trustworthy-safe</option>.</para>
         </listitem>
       </varlistentry>
 
