@@ -147,13 +147,13 @@ instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
 
 type family EqNat (a :: Nat) (b :: Nat) where
-  EqNat a a = True
-  EqNat a b = False
+  EqNat a a = 'True
+  EqNat a b = 'False
 type instance a == b = EqNat a b
 
 type family EqSymbol (a :: Symbol) (b :: Symbol) where
-  EqSymbol a a = True
-  EqSymbol a b = False
+  EqSymbol a a = 'True
+  EqSymbol a b = 'False
 type instance a == b = EqSymbol a b
 
 --------------------------------------------------------------------------------
@@ -164,7 +164,7 @@ infixl 7 *
 infixr 8 ^
 
 -- | Comparison of type-level naturals, as a constraint.
-type x <= y = (x <=? y) ~ True
+type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison of type-level symbols, as a function.
 --

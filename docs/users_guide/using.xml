@@ -1084,7 +1084,8 @@ test.hs:(5,4)-(6,7):
             <option>-fwarn-warn-hi-shadowing</option>,
             <option>-fwarn-orphans</option>,
             <option>-fwarn-unused-do-bind</option>, and
-            <option>-fwarn-trustworthy-safe</option>.</para>
+            <option>-fwarn-trustworthy-safe</option>,
+            <option>-fwarn-unticked-promoted-constructors</option>.</para>
         </listitem>
       </varlistentry>
 

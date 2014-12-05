@@ -281,9 +281,9 @@ isRight (Right _) = True
 
 -- instance for the == Boolean type-level equality operator
 type family EqEither a b where
-  EqEither (Left x)  (Left y)  = x == y
-  EqEither (Right x) (Right y) = x == y
-  EqEither a         b         = False
+  EqEither ('Left x)  ('Left y)  = x == y
+  EqEither ('Right x) ('Right y) = x == y
+  EqEither a         b           = 'False
 type instance a == b = EqEither a b
 
 {-
