@@ -63,7 +63,7 @@ puts s = withCAStringLen (s ++ "\n") $ \(p, len) -> do
 -- Types
 
 type CFLock     = ()
-type CGroup     = ()
+data {-# CTYPE "struct group" #-} CGroup
 type CLconv     = ()
 type CPasswd    = ()
 type CSigaction = ()
