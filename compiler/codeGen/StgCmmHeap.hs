@@ -420,7 +420,8 @@ altOrNoEscapeHeapCheck checkYield regs code = do
         lret <- newLabelC
         let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) regs []
         lcont <- newLabelC
-        emitOutOfLine lret (copyin <*> mkBranch lcont)
+        tscope <- getTickScope
+        emitOutOfLine lret (copyin <*> mkBranch lcont, tscope)
         emitLabel lcont
         cannedGCReturnsTo checkYield False gc regs lret off code
 
@@ -651,8 +652,9 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
                                    CmmLit (zeroCLit dflags)]
          emit =<< mkCmmIfGoto yielding gc_id
 
-  emitOutOfLine gc_id $
-     do_gc -- this is expected to jump back somewhere
+  tscope <- getTickScope
+  emitOutOfLine gc_id
+   (do_gc, tscope) -- this is expected to jump back somewhere
 
                 -- Test for stack pointer exhaustion, then
                 -- bump heap pointer, and test for heap exhaustion

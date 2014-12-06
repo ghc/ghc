@@ -138,10 +138,10 @@ pprTop (CmmData _section (Statics lbl lits)) =
 
 pprBBlock :: CmmBlock -> SDoc
 pprBBlock block =
-  nest 4 (pprBlockId lbl <> colon) $$
+  nest 4 (pprBlockId (entryLabel block) <> colon) $$
   nest 8 (vcat (map pprStmt (blockToList nodes)) $$ pprStmt last)
  where
-  (CmmEntry lbl, nodes, last)  = blockSplit block
+  (_, nodes, last)  = blockSplit block
 
 -- --------------------------------------------------------------------------
 -- Info tables. Just arrays of words.
@@ -171,7 +171,7 @@ pprStmt :: CmmNode e x -> SDoc
 pprStmt stmt =
     sdocWithDynFlags $ \dflags ->
     case stmt of
-    CmmEntry _ -> empty
+    CmmEntry{}   -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
                           -- XXX if the string contains "*/", we need to fix it
                           -- XXX we probably want to emit these comments when

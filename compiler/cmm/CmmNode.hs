@@ -15,7 +15,10 @@ module CmmNode (
      ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
-     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors
+     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors,
+
+     -- * Tick scopes
+     CmmTickScope(..), isTickSubScope, combineTickScopes,
   ) where
 
 import CodeGen.Platform
@@ -23,12 +26,14 @@ import CmmExpr
 import DynFlags
 import FastString
 import ForeignCall
+import Outputable
 import SMRep
 import CoreSyn (Tickish)
+import qualified Unique as U
 
 import Compiler.Hoopl
 import Data.Maybe
-import Data.List (tails)
+import Data.List (tails,sort)
 import Prelude hiding (succ)
 
 
@@ -38,12 +43,13 @@ import Prelude hiding (succ)
 #define ULabel {-# UNPACK #-} !Label
 
 data CmmNode e x where
-  CmmEntry :: ULabel -> CmmNode C O
+  CmmEntry :: ULabel -> CmmTickScope -> CmmNode C O
 
   CmmComment :: FastString -> CmmNode O O
 
     -- Tick annotation, covering Cmm code in our tick scope. We only
     -- expect non-code @Tickish@ at this point (e.g. @SourceNote@).
+    -- See Note [CmmTick scoping details]
   CmmTick :: !CmmTickish -> CmmNode O O
 
   CmmAssign :: !CmmReg -> !CmmExpr -> CmmNode O O
@@ -211,7 +217,7 @@ deriving instance Eq (CmmNode e x)
 -- Hoopl instances of CmmNode
 
 instance NonLocal CmmNode where
-  entryLabel (CmmEntry l) = l
+  entryLabel (CmmEntry l _) = l
 
   successors (CmmBranch l) = [l]
   successors (CmmCondBranch {cml_true=t, cml_false=f}) = [f, t] -- meets layout constraint
@@ -440,7 +446,7 @@ wrapRecExp f (CmmLoad addr ty)    = f (CmmLoad (wrapRecExp f addr) ty)
 wrapRecExp f e                    = f e
 
 mapExp :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
-mapExp _ f@(CmmEntry _)                          = f
+mapExp _ f@(CmmEntry{})                          = f
 mapExp _ m@(CmmComment _)                        = m
 mapExp _ m@(CmmTick _)                           = m
 mapExp f   (CmmAssign r e)                       = CmmAssign r (f e)
@@ -470,7 +476,7 @@ wrapRecExpM f n@(CmmLoad addr ty)  = maybe (f n) (f . flip CmmLoad ty) (wrapRecE
 wrapRecExpM f e                    = f e
 
 mapExpM :: (CmmExpr -> Maybe CmmExpr) -> CmmNode e x -> Maybe (CmmNode e x)
-mapExpM _ (CmmEntry _)              = Nothing
+mapExpM _ (CmmEntry{})              = Nothing
 mapExpM _ (CmmComment _)            = Nothing
 mapExpM _ (CmmTick _)               = Nothing
 mapExpM f (CmmAssign r e)           = CmmAssign r `fmap` f e
@@ -549,3 +555,120 @@ mapSuccessors _ n = n
 
 -- | Tickish in Cmm context (annotations only)
 type CmmTickish = Tickish ()
+
+-- | Tick scope identifier, allowing us to reason about what
+-- annotations in a Cmm block should scope over. We especially take
+-- care to allow optimisations to reorganise blocks without losing
+-- tick association in the process.
+data CmmTickScope
+  = GlobalScope
+    -- ^ The global scope is the "root" of the scope graph. Every
+    -- scope is a sub-scope of the global scope. It doesn't make sense
+    -- to add ticks to this scope. On the other hand, this means that
+    -- setting this scope on a block means no ticks apply to it.
+
+  | SubScope U.Unique CmmTickScope
+    -- ^ Constructs a new sub-scope to an existing scope. This allows
+    -- us to translate Core-style scoping rules (see @tickishScoped@)
+    -- into the Cmm world. Suppose the following code:
+    --
+    --   tick<1> case ... of
+    --             A -> tick<2> ...
+    --             B -> tick<3> ...
+    --
+    -- We want the top-level tick annotation to apply to blocks
+    -- generated for the A and B alternatives. We can achieve that by
+    -- generating tick<1> into a block with scope a, while the code
+    -- for alternatives A and B gets generated into sub-scopes a/b and
+    -- a/c respectively.
+
+  | CombinedScope CmmTickScope CmmTickScope
+    -- ^ A combined scope scopes over everything that the two given
+    -- scopes cover. It is therefore a sub-scope of either scope. This
+    -- is required for optimisations. Consider common block elimination:
+    --
+    --   A -> tick<2> case ... of
+    --     C -> [common]
+    --   B -> tick<3> case ... of
+    --     D -> [common]
+    --
+    -- We will generate code for the C and D alternatives, and figure
+    -- out afterwards that it's actually common code. Scoping rules
+    -- dictate that the resulting common block needs to be covered by
+    -- both tick<2> and tick<3>, therefore we need to construct a
+    -- scope that is a child to *both* scope. Now we can do that - if
+    -- we assign the scopes a/c and b/d to the common-ed up blocks,
+    -- the new block could have a combined tick scope a/c+b/d, which
+    -- both tick<2> and tick<3> apply to.
+
+-- Note [CmmTick scoping details]:
+--
+-- The scope of a @CmmTick@ is given by the @CmmEntry@ node of the
+-- same block. Note that as a result of this, optimisations making
+-- tick scopes more specific can *reduce* the amount of code a tick
+-- scopes over. Fixing this would require a separate @CmmTickScope@
+-- field for @CmmTick@. Right now we do not do this simply because I
+-- couldn't find an example where it actually mattered -- multiple
+-- blocks within the same scope generally jump to each other, which
+-- prevents common block elimination from happening in the first
+-- place. But this is no strong reason, so if Cmm optimisations become
+-- more involved in future this might have to be revisited.
+
+-- | Output all scope paths.
+scopeToPaths :: CmmTickScope -> [[U.Unique]]
+scopeToPaths GlobalScope           = [[]]
+scopeToPaths (SubScope u s)        = map (u:) (scopeToPaths s)
+scopeToPaths (CombinedScope s1 s2) = scopeToPaths s1 ++ scopeToPaths s2
+
+-- | Returns the head uniques of the scopes. This is based on the
+-- assumption that the @Unique@ of @SubScope@ identifies the
+-- underlying super-scope. Used for efficient equality and comparison,
+-- see below.
+scopeUniques :: CmmTickScope -> [U.Unique]
+scopeUniques GlobalScope           = []
+scopeUniques (SubScope u _)        = [u]
+scopeUniques (CombinedScope s1 s2) = scopeUniques s1 ++ scopeUniques s2
+
+-- Equality and order is based on the head uniques defined above. We
+-- take care to short-cut the (extremly) common cases.
+instance Eq CmmTickScope where
+  GlobalScope    == GlobalScope     = True
+  GlobalScope    == _               = False
+  _              == GlobalScope     = False
+  (SubScope u _) == (SubScope u' _) = u == u'
+  (SubScope _ _) == _               = False
+  _              == (SubScope _ _)  = False
+  scope          == scope'          = sort (scopeUniques scope) ==
+                                      sort (scopeUniques scope')
+instance Ord CmmTickScope where
+  compare GlobalScope    GlobalScope     = EQ
+  compare GlobalScope    _               = LT
+  compare _              GlobalScope     = GT
+  compare (SubScope u _) (SubScope u' _) = compare u u'
+  compare scope scope'                   = compare (sort $ scopeUniques scope)
+                                                   (sort $ scopeUniques scope')
+
+instance Outputable CmmTickScope where
+  ppr GlobalScope     = text "global"
+  ppr (SubScope us s) = ppr s <> char '/' <> ppr us
+  ppr combined        = parens $ hcat $ punctuate (char '+') $
+                        map (hcat . punctuate (char '/') . map ppr . reverse) $
+                        scopeToPaths combined
+
+-- | Checks whether two tick scopes are sub-scopes of each other. True
+-- if the two scopes are equal.
+isTickSubScope :: CmmTickScope -> CmmTickScope -> Bool
+isTickSubScope = cmp
+  where cmp _              GlobalScope             = True
+        cmp GlobalScope    _                       = False
+        cmp (CombinedScope s1 s2) s'               = cmp s1 s' && cmp s2 s'
+        cmp s              (CombinedScope s1' s2') = cmp s s1' || cmp s s2'
+        cmp (SubScope u s) s'@(SubScope u' _)      = u == u' || cmp s s'
+
+-- | Combine two tick scopes. This smart constructor will catch cases
+-- where one tick scope is a sub-scope of the other already.
+combineTickScopes :: CmmTickScope -> CmmTickScope -> CmmTickScope
+combineTickScopes s1 s2
+  | s1 `isTickSubScope` s2 = s2
+  | s2 `isTickSubScope` s1 = s1
+  | otherwise              = CombinedScope s1 s2

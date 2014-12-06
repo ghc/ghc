@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns, CPP, GADTs #-}
 
 module MkGraph
-  ( CmmAGraph, CgStmt(..)
+  ( CmmAGraph, CmmAGraphScoped, CgStmt(..)
   , (<*>), catAGraphs
   , mkLabel, mkMiddle, mkLast, outOfLine
   , lgraphOfAGraph, labelAGraph
@@ -58,22 +58,24 @@ import Prelude (($),Int,Eq(..)) -- avoid importing (<*>)
 -- control flows from the first to the second.
 --
 -- A 'CmmAGraph' can be turned into a 'CmmGraph' (closed at both ends)
--- by providing a label for the entry point; see 'labelAGraph'.
---
+-- by providing a label for the entry point and a tick scope; see
+-- 'labelAGraph'.
 type CmmAGraph = OrdList CgStmt
+-- | Unlabeled graph with tick scope
+type CmmAGraphScoped = (CmmAGraph, CmmTickScope)
 
 data CgStmt
-  = CgLabel BlockId
+  = CgLabel BlockId CmmTickScope
   | CgStmt  (CmmNode O O)
   | CgLast  (CmmNode O C)
-  | CgFork  BlockId CmmAGraph
+  | CgFork  BlockId CmmAGraph CmmTickScope
 
-flattenCmmAGraph :: BlockId -> CmmAGraph -> CmmGraph
-flattenCmmAGraph id stmts =
+flattenCmmAGraph :: BlockId -> CmmAGraphScoped -> CmmGraph
+flattenCmmAGraph id (stmts_t, tscope) =
     CmmGraph { g_entry = id,
                g_graph = GMany NothingO body NothingO }
   where
-  body = foldr addBlock emptyBody $ flatten id stmts []
+  body = foldr addBlock emptyBody $ flatten id stmts_t tscope []
 
   --
   -- flatten: given an entry label and a CmmAGraph, make a list of blocks.
@@ -81,10 +83,11 @@ flattenCmmAGraph id stmts =
   -- NB. avoid the quadratic-append trap by passing in the tail of the
   -- list.  This is important for Very Long Functions (e.g. in T783).
   --
-  flatten :: Label -> CmmAGraph -> [Block CmmNode C C] -> [Block CmmNode C C]
-  flatten id g blocks
-      = flatten1 (fromOL g) (blockJoinHead (CmmEntry id) emptyBlock) blocks
-
+  flatten :: Label -> CmmAGraph -> CmmTickScope -> [Block CmmNode C C]
+          -> [Block CmmNode C C]
+  flatten id g tscope blocks
+      = flatten1 (fromOL g) block' blocks
+      where !block' = blockJoinHead (CmmEntry id tscope) emptyBlock
   --
   -- flatten0: we are outside a block at this point: any code before
   -- the first label is unreachable, so just drop it.
@@ -92,12 +95,12 @@ flattenCmmAGraph id stmts =
   flatten0 :: [CgStmt] -> [Block CmmNode C C] -> [Block CmmNode C C]
   flatten0 [] blocks = blocks
 
-  flatten0 (CgLabel id : stmts) blocks
+  flatten0 (CgLabel id tscope : stmts) blocks
     = flatten1 stmts block blocks
-    where !block = blockJoinHead (CmmEntry id) emptyBlock
+    where !block = blockJoinHead (CmmEntry id tscope) emptyBlock
 
-  flatten0 (CgFork fork_id stmts : rest) blocks
-    = flatten fork_id stmts $ flatten0 rest blocks
+  flatten0 (CgFork fork_id stmts_t tscope : rest) blocks
+    = flatten fork_id stmts_t tscope $ flatten0 rest blocks
 
   flatten0 (CgLast _ : stmts) blocks = flatten0 stmts blocks
   flatten0 (CgStmt _ : stmts) blocks = flatten0 stmts blocks
@@ -127,14 +130,14 @@ flattenCmmAGraph id stmts =
     = flatten1 stmts block' blocks
     where !block' = blockSnoc block stmt
 
-  flatten1 (CgFork fork_id stmts : rest) block blocks
-    = flatten fork_id stmts $ flatten1 rest block blocks
+  flatten1 (CgFork fork_id stmts_t tscope : rest) block blocks
+    = flatten fork_id stmts_t tscope $ flatten1 rest block blocks
 
   -- a label here means that we should start a new block, and the
   -- current block should fall through to the new block.
-  flatten1 (CgLabel id : stmts) block blocks
+  flatten1 (CgLabel id tscp : stmts) block blocks
     = blockJoinTail block (CmmBranch id) :
-      flatten1 stmts (blockJoinHead (CmmEntry id) emptyBlock) blocks
+      flatten1 stmts (blockJoinHead (CmmEntry id tscp) emptyBlock) blocks
 
 
 
@@ -147,8 +150,8 @@ catAGraphs     :: [CmmAGraph] -> CmmAGraph
 catAGraphs      = concatOL
 
 -- | created a sequence "goto id; id:" as an AGraph
-mkLabel        :: BlockId -> CmmAGraph
-mkLabel bid     = unitOL (CgLabel bid)
+mkLabel        :: BlockId -> CmmTickScope -> CmmAGraph
+mkLabel bid scp = unitOL (CgLabel bid scp)
 
 -- | creates an open AGraph from a given node
 mkMiddle        :: CmmNode O O -> CmmAGraph
@@ -159,16 +162,17 @@ mkLast         :: CmmNode O C -> CmmAGraph
 mkLast last     = unitOL (CgLast last)
 
 -- | A labelled code block; should end in a last node
-outOfLine      :: BlockId -> CmmAGraph -> CmmAGraph
-outOfLine l g   = unitOL (CgFork l g)
+outOfLine      :: BlockId -> CmmAGraphScoped -> CmmAGraph
+outOfLine l (c,s) = unitOL (CgFork l c s)
 
 -- | allocate a fresh label for the entry point
-lgraphOfAGraph :: CmmAGraph -> UniqSM CmmGraph
-lgraphOfAGraph g = do u <- getUniqueM
-                      return (labelAGraph (mkBlockId u) g)
+lgraphOfAGraph :: CmmAGraphScoped -> UniqSM CmmGraph
+lgraphOfAGraph g = do
+  u <- getUniqueM
+  return (labelAGraph (mkBlockId u) g)
 
 -- | use the given BlockId as the label of the entry point
-labelAGraph    :: BlockId -> CmmAGraph -> CmmGraph
+labelAGraph    :: BlockId -> CmmAGraphScoped -> CmmGraph
 labelAGraph lbl ag = flattenCmmAGraph lbl ag
 
 ---------- No-ops

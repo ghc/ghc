@@ -95,7 +95,8 @@ basicBlockCodeGen
                 , [NatCmmDecl CmmStatics Instr])
 
 basicBlockCodeGen block = do
-  let (CmmEntry id, nodes, tail)  = blockSplit block
+  let (_, nodes, tail)  = blockSplit block
+      id = entryLabel block
       stmts = blockToList nodes
   mid_instrs <- stmtsToInstrs stmts
   tail_instrs <- stmtToInstrs tail

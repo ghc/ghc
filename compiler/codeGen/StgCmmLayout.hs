@@ -120,7 +120,8 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
                   (off, _, copyin) = copyInOflow dflags retConv area res_regs []
                   copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
                                    extra_stack
-              emit (copyout <*> mkLabel k <*> copyin)
+              tscope <- getTickScope
+              emit (copyout <*> mkLabel k tscope <*> copyin)
               return (ReturnedTo k off)
       }
 
@@ -224,15 +225,16 @@ slowCall fun stg_args
              let correct_arity = cmmEqWord dflags (funInfoArity dflags fun_iptr)
                                                   (mkIntExpr dflags n_args)
 
+             tscope <- getTickScope
              emit (mkCbranch (cmmIsTagged dflags funv) is_tagged_lbl slow_lbl
-                   <*> mkLabel is_tagged_lbl
+                   <*> mkLabel is_tagged_lbl tscope
                    <*> mkCbranch correct_arity fast_lbl slow_lbl
-                   <*> mkLabel fast_lbl
+                   <*> mkLabel fast_lbl tscope
                    <*> fast_code
                    <*> mkBranch end_lbl
-                   <*> mkLabel slow_lbl
+                   <*> mkLabel slow_lbl tscope
                    <*> slow_code
-                   <*> mkLabel end_lbl)
+                   <*> mkLabel end_lbl tscope)
              return r
 
            else do
@@ -536,7 +538,7 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
 emitClosureAndInfoTable ::
   CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable info_tbl conv args body
-  = do { blks <- getCode body
+  = do { (_, blks) <- getCodeScoped body
        ; let entry_lbl = toEntryLbl (cit_lbl info_tbl)
        ; emitProcWithConvention conv (Just info_tbl) entry_lbl args blks
        }

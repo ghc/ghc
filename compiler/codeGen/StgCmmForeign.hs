@@ -228,6 +228,7 @@ emitForeignCall safety results target args
     k <- newLabelC
     let (off, _, copyout) = copyInOflow dflags NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
+    tscope <- getTickScope
     emit $
            (    mkStore (CmmStackSlot (Young k) (widthInBytes (wordWidth dflags)))
                         (CmmLit (CmmBlock k))
@@ -238,7 +239,7 @@ emitForeignCall safety results target args
                                        , ret_args = off
                                        , ret_off = updfr_off
                                        , intrbl = playInterruptible safety })
-            <*> mkLabel k
+            <*> mkLabel k tscope
             <*> copyout
            )
     return (ReturnedTo k off)

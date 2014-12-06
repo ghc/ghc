@@ -145,7 +145,7 @@ forward :: FwdTransfer CmmNode Status
 forward = mkFTransfer3 first middle last
     where
       first :: CmmNode C O -> Status -> Status
-      first (CmmEntry id) ProcPoint = ReachedBy $ setSingleton id
+      first (CmmEntry id _) ProcPoint = ReachedBy $ setSingleton id
       first  _ x = x
 
       middle _ x = x
@@ -282,7 +282,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      -- and replace branches to procpoints with branches to the jump-off blocks
      let add_jump_block (env, bs) (pp, l) =
            do bid <- liftM mkBlockId getUniqueM
-              let b = blockJoin (CmmEntry bid) emptyBlock jump
+              let b = blockJoin (CmmEntry bid GlobalScope) emptyBlock jump
                   live = ppLiveness pp
                   jump = CmmCall (CmmLit (CmmLabel l)) Nothing live 0 0 0
               return (mapInsert pp bid env, b : bs)

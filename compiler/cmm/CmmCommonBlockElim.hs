@@ -13,7 +13,7 @@ import Prelude hiding (iterate, succ, unzip, zip)
 
 import Hoopl hiding (ChangeFlag)
 import Data.Bits
-import Data.Maybe (fromJust)
+import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import Data.Word
 import qualified Data.Map as M
@@ -221,11 +221,18 @@ eqMaybeWith _ _ _ = False
 copyTicks :: BlockEnv BlockId -> CmmGraph -> CmmGraph
 copyTicks env g
   | mapNull env = g
-  | otherwise   = ofBlockMap (g_entry g) $ mapMap f blockMap
-  where blockMap = toBlockMap g
+  | otherwise   = ofBlockMap (g_entry g) $ mapMap copyTo blockMap
+  where -- Reverse block merge map
+        blockMap = toBlockMap g
         revEnv = mapFoldWithKey insertRev M.empty env
         insertRev k x = M.insertWith (const (k:)) x [k]
-        f block = case M.lookup (entryLabel block) revEnv of
+        -- Copy ticks and scopes into the given block
+        copyTo block = case M.lookup (entryLabel block) revEnv of
           Nothing -> block
-          Just ls -> let findTicks l = blockTicks $ fromJust $ mapLookup l blockMap
-                     in annotateBlock (concatMap findTicks ls) block
+          Just ls -> foldr copy block $ mapMaybe (flip mapLookup blockMap) ls
+        copy from to =
+          let ticks = blockTicks from
+              CmmEntry  _   scp0        = firstNode from
+              (CmmEntry lbl scp1, code) = blockSplitHead to
+          in CmmEntry lbl (combineTickScopes scp0 scp1) `blockJoinHead`
+             foldr blockCons code (map CmmTick ticks)

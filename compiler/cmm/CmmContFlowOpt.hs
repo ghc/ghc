@@ -317,18 +317,22 @@ decPreds bid edges = case mapLookup bid edges of
 canShortcut :: CmmBlock -> Maybe BlockId
 canShortcut block
     | (_, middle, CmmBranch dest) <- blockSplit block
-    , isEmptyBlock middle
+    , all dont_care $ blockToList middle
     = Just dest
     | otherwise
     = Nothing
-
+    where dont_care CmmComment{} = True
+          dont_care CmmTick{}    = True
+          dont_care _other       = False
 
 -- Concatenates two blocks. First one is assumed to be open on exit, the second
 -- is assumed to be closed on entry (i.e. it has a label attached to it, which
 -- the splice function removes by calling snd on result of blockSplitHead).
 splice :: Block CmmNode C O -> CmmBlock -> CmmBlock
-splice head rest = head `blockAppend` snd (blockSplitHead rest)
-
+splice head rest = entry `blockJoinHead` code0 `blockAppend` code1
+  where (CmmEntry lbl sc0, code0) = blockSplitHead head
+        (CmmEntry _   sc1, code1) = blockSplitHead rest
+        entry = CmmEntry lbl (combineTickScopes sc0 sc1)
 
 -- If node is a call with continuation call return Just label of that
 -- continuation. Otherwise return Nothing.
