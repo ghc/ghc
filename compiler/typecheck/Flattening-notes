@@ -6,6 +6,8 @@ ToDo:
 * Consider individual data types for CFunEqCan etc
 
 * Collapse CNonCanonical and CIrredCan
+  * RAE: I think it would be better to split off CNonCanonical into its own
+    type, and remove it completely from Ct. Then, we would keep CIrredCan
 
 ===========================
 
@@ -108,6 +110,7 @@ The idea is that
   S(fw,a)=a.  But since fs>=fw, S(fw,a) = s, hence s=a.  But now we
   have (a -fs-> a) in S, since fs>=fw we must have fs>=fs, and hence S
   is not inert.
+RAE: I don't understand this lemma statement -- fs seems out of scope here.
 
 * (K1) plus (L1) guarantee that the extended substiution satisfies (WF).
 
@@ -157,3 +160,31 @@ But if we kicked-out the inert item, we'd get
 
 Then rewrite the work-item gives us (a -W-> a), which is soluble via Refl.
 So we add one more clause to the kick-out criteria
+
+RAE: To prove that K3 is sufficient for completeness (as opposed to a rule that
+looked for `a` *anywhere* on the RHS, not just at the top), we need this property:
+All types in the inert set are "rigid". Here, rigid means that a type is one of
+two things: a type that can equal only itself, or a type variable. Because the
+inert set defines rewritings for type variables, a type variable can be considered
+rigid because it will be rewritten only to a rigid type.
+
+In the current world, this rigidity property is true: all type families are
+flattened away before adding equalities to the inert set. But, when we add
+representational equality, that is no longer true! Newtypes are not rigid
+w.r.t. representational equality. Accordingly, we would to change (K3) thus:
+
+(K3) If (b -fs-> s) is in S with (fw >= fs), then
+  (K3a) If the role of fs is nominal: s /= a
+  (K3b) If the role of fs is representational: EITHER
+          a not in s, OR
+          the path from the top of s to a includes at least one non-newtype
+
+RAE: Do we have evidence to support our belief that kicking out is bad? I can
+imagine scenarios where kicking out *more* equalities is more efficient, in that
+kicking out a Given, say, might then discover that the Given is reflexive and
+thus can be dropped. Once this happens, then the Given is no longer used in
+rewriting, making later flattenings faster. I tend to thing that, probably,
+kicking out is something to avoid, but it would be nice to have data to support
+this conclusion. And, that data is not terribly hard to produce: we can just
+twiddle some settings and then time the testsuite in some sort of controlled
+environment.
