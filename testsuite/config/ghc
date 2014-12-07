@@ -28,7 +28,8 @@ config.other_ways         = ['prof',
                              'llvm', 'debugllvm',
                              'profllvm', 'profoptllvm', 'profthreadedllvm',
                              'threaded1llvm', 'threaded2llvm',
-                             'dynllvm']
+                             'dynllvm',
+                             'debug']
 
 if (ghc_with_native_codegen == 1):
     config.compile_ways.append('optasm')
@@ -104,6 +105,7 @@ config.way_flags = lambda name : {
     'prof_hr'      : ['-O', '-prof', '-static', '-auto-all'],
     'dyn'          : ['-O', '-dynamic'],
     'static'       : ['-O', '-static'],
+    'debug'        : ['-O', '-g', '-dannot-lint'],
     # llvm variants...
     'profllvm'         : ['-prof', '-static', '-auto-all', '-fllvm'],
     'profoptllvm'      : ['-O', '-prof', '-static', '-auto-all', '-fllvm'],
@@ -136,6 +138,7 @@ config.way_rts_flags = {
     'prof_hr'      : ['-hr'],
     'dyn'          : [],
     'static'       : [],
+    'debug'        : [],
     # llvm variants...
     'profllvm'         : ['-p'],
     'profoptllvm'      : ['-hc', '-p'],

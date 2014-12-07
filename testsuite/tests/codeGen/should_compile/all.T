@@ -25,3 +25,7 @@ test('T8205', normal, compile, ['-O0'])
 test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
 test('T9329', [cmm_src], compile, [''])
+
+test('debug', extra_clean(['debug.cmm']),
+     run_command,
+     ['$MAKE -s --no-print-directory debug'])
