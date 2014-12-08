@@ -452,10 +452,12 @@ can_eq_nc' ev s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
         pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
       ; stopWith ev "Discard given polytype equality" }
 
-can_eq_nc' ev (AppTy s1 t1) ps_ty1 ty2 ps_ty2
-  = can_eq_app ev NotSwapped s1 t1 ps_ty1 ty2 ps_ty2
-can_eq_nc' ev ty1 ps_ty1 (AppTy s2 t2) ps_ty2
-  = can_eq_app ev IsSwapped s2 t2 ps_ty2 ty1 ps_ty1
+can_eq_nc' ev (AppTy {}) ps_ty1 _ ps_ty2
+  | isGiven ev = try_decompose_app ev ps_ty1 ps_ty2
+  | otherwise  = can_eq_wanted_app ev ps_ty1 ps_ty2
+can_eq_nc' ev _ ps_ty1 (AppTy {}) ps_ty2
+  | isGiven ev = try_decompose_app ev ps_ty1 ps_ty2
+  | otherwise  = can_eq_wanted_app ev ps_ty1 ps_ty2
 
 -- Everything else is a definite type error, eg LitTy ~ TyConApp
 can_eq_nc' ev _ ps_ty1 _ ps_ty2
@@ -477,56 +479,67 @@ can_eq_fam_nc ev swapped fn tys rhs ps_rhs
            Stop ev s           -> return (Stop ev s)
            ContinueWith new_ev -> can_eq_nc new_ev xi_lhs xi_lhs rhs ps_rhs }
 
-------------
-can_eq_app, can_eq_flat_app
-    :: CtEvidence -> SwapFlag
-    -> Type -> Type -> Type  -- LHS (s1 t2), after and before type-synonym expansion, resp
-    -> Type -> Type          -- RHS (ty2),   after and before type-synonym expansion, resp
-    -> TcS (StopOrContinue Ct)
+-----------------------------------
+-- Dealing with AppTy
 -- See Note [Canonicalising type applications]
-can_eq_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
-  =  do { traceTcS "can_eq_app 1" $
-          vcat [ ppr ev, ppr swapped, ppr s1, ppr t1, ppr ty2 ]
-        ; let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
-        ; (xi_s1, co_s1) <- flatten fmode s1
-        ; traceTcS "can_eq_app 2" $ vcat [ ppr ev, ppr xi_s1 ]
-        ; if s1 `tcEqType` xi_s1
-          then can_eq_flat_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
-          else
-     do { (xi_t1, co_t1) <- flatten fmode t1
-             -- We flatten t1 as well so that (xi_s1 xi_t1) is well-kinded
-             -- If we form (xi_s1 t1) that might (appear) ill-kinded,
-             -- and then crash in a call to typeKind
-        ; let xi1 = mkAppTy xi_s1 xi_t1
-              co1 = mkTcAppCo co_s1 co_t1
-        ; traceTcS "can_eq_app 3" $ vcat [ ppr ev, ppr xi1, ppr co1 ]
-        ; mb_ct <- rewriteEqEvidence ev swapped xi1 ps_ty2
-                                     co1 (mkTcNomReflCo ps_ty2)
-        ; traceTcS "can_eq_app 4" $ vcat [ ppr ev, ppr xi1, ppr co1 ]
-        ; case mb_ct of
-            Stop ev s           -> return (Stop ev s)
-            ContinueWith new_ev -> can_eq_nc new_ev xi1 xi1 ty2 ps_ty2 }}
 
--- Preconditions: s1  is already flattened
---                ty2 is not a type variable, so flattening
---                    can't turn it into an application if it
---                    doesn't look like one already
+can_eq_wanted_app :: CtEvidence -> TcType -> TcType
+                  -> TcS (StopOrContinue Ct)
+-- One or the other is an App; neither is a type variable
 -- See Note [Canonicalising type applications]
-can_eq_flat_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
-  | Just (s2,t2) <- tcSplitAppTy_maybe ty2
-  = unSwap swapped decompose_it (s1,t1) (s2,t2)
-  | otherwise
-  = unSwap swapped (canEqFailure ev) ps_ty1 ps_ty2
-  where
-    decompose_it (s1,t1) (s2,t2)
-      = do { let xevcomp [x,y] = EvCoercion (mkTcAppCo (evTermCoercion x) (evTermCoercion y))
-                 xevcomp _ = error "canEqAppTy: can't happen" -- Can't happen
-                 xevdecomp x = let xco = evTermCoercion x
-                               in [ EvCoercion (mkTcLRCo CLeft xco)
-                                  , EvCoercion (mkTcLRCo CRight xco)]
-           ; xCtEvidence ev (XEvTerm [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xevcomp xevdecomp)
-           ; stopWith ev "Decomposed AppTy" }
+can_eq_wanted_app ev ty1 ty2
+  = do { let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
+       ; (xi1, co1) <- flatten fmode ty1
+       ; (xi2, co2) <- flatten fmode ty2
+        ; mb_ct <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
+        ; case mb_ct of {
+            Stop ev s           -> return (Stop ev s) ;
+            ContinueWith new_ev -> try_decompose_app new_ev xi1 xi2 } }
 
+try_decompose_app :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
+-- Preconditions: neither is a type variable
+--                so can't turn it into an application if it
+--                   doesn't look like one already
+-- See Note [Canonicalising type applications]
+try_decompose_app ev ty1 ty2
+   | AppTy s1 t1  <- ty1
+   = case tcSplitAppTy_maybe ty2 of
+       Nothing      -> canEqFailure ev ty1 ty2
+       Just (s2,t2) -> do_decompose s1 t1 s2 t2
+
+   | AppTy s2 t2 <- ty2
+   = case tcSplitAppTy_maybe ty1 of
+       Nothing      -> canEqFailure ev ty1 ty2
+       Just (s1,t1) -> do_decompose s1 t1 s2 t2
+
+   | otherwise  -- Neither is an AppTy
+   = canEqNC ev ty1 ty2
+   where
+     -- do_decompose is like xCtEvidence, but recurses
+     -- to try_decompose_app to decompose a chain of AppTys
+     do_decompose s1 t1 s2 t2
+       | CtDerived { ctev_loc = loc } <- ev
+       = do { emitNewDerived loc (mkTcEqPred t1 t2)
+            ; try_decompose_app ev s1 s2 }
+       | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
+       = do { (ev_s,fr_s) <- newWantedEvVar loc (mkTcEqPred s1 s2)
+            ; (ev_t,fr_t) <- newWantedEvVar loc (mkTcEqPred t1 t2)
+            ; let co = mkTcAppCo (ctEvCoercion ev_s) (ctEvCoercion ev_t)
+            ; setEvBind evar (EvCoercion co)
+            ; when (isFresh fr_t) $ emitWorkNC [ev_t]
+            ; case fr_s of
+                Fresh  -> try_decompose_app ev_s s1 s2
+                Cached -> return (Stop ev (text "Decomposed app")) }
+       | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- ev
+       = do { let co   = evTermCoercion ev_tm
+                  co_s = mkTcLRCo CLeft  co
+                  co_t = mkTcLRCo CRight co
+            ; evar_s <- newGivenEvVar loc (mkTcEqPred s1 s2, EvCoercion co_s)
+            ; evar_t <- newGivenEvVar loc (mkTcEqPred t1 t2, EvCoercion co_t)
+            ; emitWorkNC [evar_t]
+            ; try_decompose_app evar_s s1 s2 }
+       | otherwise  -- Can't happen
+       = error "try_decompose_app"
 
 ------------------------
 canDecomposableTyConApp :: CtEvidence
@@ -585,11 +598,8 @@ decompose the application eagerly, yielding
 we get an error        "Can't match Array ~ Maybe",
 but we'd prefer to get "Can't match Array b ~ Maybe c".
 
-So instead can_eq_app flattens s1.  If flattening does something, it
-rewrites, and goes round can_eq_nc again.  If flattening
-does nothing, then (at least with our present state of knowledge)
-we can only decompose, and that is what can_eq_flat_app attempts
-to do.
+So instead can_eq_wanted_app flattens the LHS and RHS before using
+try_decompose_app to decompose it.
 
 Note [Make sure that insolubles are fully rewritten]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

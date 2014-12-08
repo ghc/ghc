@@ -39,7 +39,7 @@ module TcSMonad (
 
     setEvBind,
     XEvTerm(..),
-    Freshness(..), freshGoals,
+    Freshness(..), freshGoals, isFresh,
 
     StopOrContinue(..), continueWith, stopWith, andWhenContinue,
 
@@ -1561,6 +1561,10 @@ data XEvTerm
             }
 
 data Freshness = Fresh | Cached
+
+isFresh :: Freshness -> Bool
+isFresh Fresh  = True
+isFresh Cached = False
 
 freshGoals :: [(CtEvidence, Freshness)] -> [CtEvidence]
 freshGoals mns = [ ctev | (ctev, Fresh) <- mns ]
