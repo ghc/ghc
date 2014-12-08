@@ -960,17 +960,23 @@ filterFunEqs = filterTcAppMap
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m (getUnique tc) tys val
 
-insertFunEqCt :: FunEqMap Ct -> Ct -> FunEqMap Ct
-insertFunEqCt m ct@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
-  = insertFunEq m tc tys ct
-insertFunEqCt _ ct = pprPanic "insertFunEqCt" (ppr ct)
+-- insertFunEqCt :: FunEqMap Ct -> Ct -> FunEqMap Ct
+-- insertFunEqCt m ct@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
+--  = insertFunEq m tc tys ct
+-- insertFunEqCt _ ct = pprPanic "insertFunEqCt" (ppr ct)
 
 partitionFunEqs :: (Ct -> Bool) -> FunEqMap Ct -> (Bag Ct, FunEqMap Ct)
-partitionFunEqs f m = foldTcAppMap k m (emptyBag, emptyFunEqs)
+-- Optimise for the case where the predicate is false
+-- partitionFunEqs is called only from kick-out, and kick-out usually
+-- kicks out very few equalities, so we want to optimise for that case
+partitionFunEqs f m = (yeses, foldrBag del m yeses)
   where
-    k ct (yeses, noes)
-      | f ct      = (yeses `snocBag` ct, noes)
-      | otherwise = (yeses, insertFunEqCt noes ct)
+    yeses = foldTcAppMap k m emptyBag
+    k ct yeses | f ct      = yeses `snocBag` ct
+               | otherwise = yeses
+    del (CFunEqCan { cc_fun = tc, cc_tyargs = tys }) m
+        = delFunEq m tc tys
+    del ct _ = pprPanic "partitionFunEqs" (ppr ct)
 
 delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
 delFunEq m tc tys = delTcApp m (getUnique tc) tys
