@@ -968,7 +968,7 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
                 -- NB: Notice that don't rewrite
                 -- inert_solved_dicts, and inert_solved_funeqs
                 -- optimistically. But when we lookup we have to
-                -- take the subsitution into account
+                -- take the substitution into account
     inert_cans_in = IC { inert_eqs = tv_eqs_in
                        , inert_dicts = dicts_in
                        , inert_funeqs = feqs_in
@@ -2270,7 +2270,7 @@ instance would fail:
 But MkT was in scope, *and* if we used it before decomposing on T,
 we'd unwrap the newtype (on both sides) to get
   Coercible Bool (F Int)
-whic succeeds.
+which succeeds.
 
 So our current decision is to apply case 3 (newtype-unwrapping) first,
 followed by decomposition (case 4).  This is strictly more powerful

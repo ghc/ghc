@@ -161,7 +161,7 @@ data (~) a b = Eq# ((~#) a b)
 --
 --      /Since: 4.7.0.0/
 data Coercible a b = MkCoercible ((~#) a b)
--- It's really ~R# (represntational equality), not ~#,
+-- It's really ~R# (representational equality), not ~#,
 -- but  * we don't yet have syntax for ~R#,
 --      * the compiled code is the same either way
 --      * TysWiredIn has the truthful types

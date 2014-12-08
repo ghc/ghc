@@ -557,7 +557,7 @@ deriveAutoTypeable auto_typeable done_specs tycl_decls
                          | spec <- done_specs
                          , className (earlyDSClass spec) == typeableClassName ]
         -- Check if an automatically generated DS for deriving Typeable should be
-        -- ommitted because the user had manually requested an instance
+        -- omitted because the user had manually requested an instance
 
     do_one cls (L _ decl)
       = do { tc <- tcLookupTyCon (tcdName decl)

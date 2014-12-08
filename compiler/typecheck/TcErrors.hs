@@ -1467,7 +1467,7 @@ relevantBindings want_filtering ctxt ct
     ct_tvs    = tyVarsOfCt ct `unionVarSet` extra_tvs
 
     -- For *kind* errors, report the relevant bindings of the
-    -- enclosing *type* equality, becuase that's more useful for the programmer
+    -- enclosing *type* equality, because that's more useful for the programmer
     extra_tvs = case ctLocOrigin loc of
                   KindEqOrigin t1 t2 _ -> tyVarsOfTypes [t1,t2]
                   _                    -> emptyVarSet

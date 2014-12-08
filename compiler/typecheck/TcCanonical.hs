@@ -815,7 +815,7 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
 
       -- So tv1 is not a meta tyvar
       -- If only one is a meta tyvar, put it on the left
-      -- This is not because it'll be solved; but becuase
+      -- This is not because it'll be solved; but because
       -- the floating step looks for meta tyvars on the left
       | isMetaTyVar tv2 = True
 

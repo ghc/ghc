@@ -1274,7 +1274,7 @@ Here we need to instantiate 'error' with a polytype.
 
 But 'error' has an OpenTypeKind type variable, precisely so that
 we can instantiate it with Int#.  So we also allow such type variables
-to be instantiate with foralls.  It's a bit of a hack, but seems
+to be instantiated with foralls.  It's a bit of a hack, but seems
 straightforward.
 
 ************************************************************************

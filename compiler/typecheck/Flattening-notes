@@ -37,7 +37,7 @@ such that
   (WF2) if (a -f-> t) is in S, then t /= a
 
 Definition: applying a generalised substitution.
-If S is a generalised subsitution
+If S is a generalised substitution
    S(f,a) = t,  if (a -fs-> t) in S, and fs >= f
           = a,  otherwise
 Application extends naturally to types S(f,t)
@@ -62,7 +62,7 @@ A generalised substitution S is "inert" iff
 
 ----------------------------------------------------------------
 Our main invariant: 
-   the inert CTyEqCans should be an inert generalised subsitution
+   the inert CTyEqCans should be an inert generalised substitution
 ----------------------------------------------------------------
 
 Note that inertness is not the same as idempotence.  To apply S to a
@@ -100,7 +100,7 @@ The idea is that
   not satisfy (K1-3), then we remove it from S by "kicking it out",
   and re-processing it.
 
-* Note that kicking out is a Bad Thing, becuase it means we have to
+* Note that kicking out is a Bad Thing, because it means we have to
   re-process a constraint.  The less we kick out, the better.
 
 * Assume we have  G>=G, G>=W, D>=D, and that's all.  Then, when performing

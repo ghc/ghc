@@ -405,7 +405,7 @@ test('T5321Fun',
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
              # 24/06/2013: 694019152     #  (reason for re-increase unknown)
              # 12/05/2014: 614409344     #  (specialisation and inlining changes)
-             # 10/09/2014: 601629032     #  post-AMP-cleanp
+             # 10/09/2014: 601629032     #  post-AMP-cleanup
              # 06/11/2014: 541287000     #  Simon's flat-skol changes to the constraint solver
       ],
       compile,[''])

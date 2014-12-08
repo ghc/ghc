@@ -2316,7 +2316,7 @@ We often want to make a top-level auxiliary binding.  E.g. for comparison we hae
 
 Of course these top-level bindings should all have distinct name, and we are
 generating RdrNames here.  We can't just use the TyCon or DataCon to distinguish
-becuase with standalone deriving two imported TyCons might both be called T!
+because with standalone deriving two imported TyCons might both be called T!
 (See Trac #7947.)
 
 So we use the *unique* from the parent name (T in this example) as part of the

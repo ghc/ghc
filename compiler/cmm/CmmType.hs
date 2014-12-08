@@ -436,7 +436,7 @@ Cons:
 
 Currently for GHC, the foreign call point is moot, because we do our
 own promotion of sub-word-sized values to word-sized values.  The Int8
-type is represnted by an Int# which is kept sign-extended at all times
+type is represented by an Int# which is kept sign-extended at all times
 (this is slightly naughty, because we're making assumptions about the
 C calling convention rather early on in the compiler).  However, given
 this, the cons outweigh the pros.
