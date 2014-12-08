@@ -401,9 +401,9 @@ raInsn _     new_instrs _ (LiveInstr ii Nothing)
         = do    setDeltaR n
                 return (new_instrs, [])
 
-raInsn _     new_instrs _ (LiveInstr ii Nothing)
+raInsn _     new_instrs _ (LiveInstr ii@(Instr i) Nothing)
         | isMetaInstr ii
-        = return (new_instrs, [])
+        = return (i : new_instrs, [])
 
 
 raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))

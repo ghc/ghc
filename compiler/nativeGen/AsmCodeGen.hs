@@ -266,6 +266,7 @@ data NativeGenAcc statics instr
         , ngs_linearStats :: ![[Linear.RegAllocStats]]
         , ngs_labels      :: ![Label]
         , ngs_debug       :: ![DebugBlock]
+        , ngs_dwarfFiles  :: !DwarfFiles
         }
 
 nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
@@ -278,24 +279,16 @@ nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                -> IO UniqSupply
 nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
  = do
-        let split_cmms  = Stream.map add_split cmms
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
+        let ngs0 = NGS [] [] [] [] [] [] emptyUFM
         (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
-                                         split_cmms (NGS [] [] [] [] [] [])
+                                         cmms ngs0
         finishNativeGen dflags bufh ngs
 
         return us'
-
- where  add_split tops
-                | gopt Opt_SplitObjs dflags = split_marker : tops
-                | otherwise                 = tops
-
-        split_marker = CmmProc mapEmpty mkSplitMarkerLabel []
-                               (ofBlockList (panic "split_marker_entry") [])
-
 
 finishNativeGen :: Instruction instr
                 => DynFlags
@@ -355,56 +348,78 @@ cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
 cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
  = do r <- Stream.runStream cmm_stream
       case r of
-          Left () ->
-              return (ngs { ngs_imports = reverse $ ngs_imports ngs
-                          , ngs_natives = reverse $ ngs_natives ngs
-                          , ngs_colorStats = reverse $ ngs_colorStats ngs
-                          , ngs_linearStats = reverse $ ngs_linearStats ngs
-                          },
-                      us)
-          Right (cmms, cmm_stream') -> do
+        Left () ->
+          return (ngs { ngs_imports = reverse $ ngs_imports ngs
+                      , ngs_natives = reverse $ ngs_natives ngs
+                      , ngs_colorStats = reverse $ ngs_colorStats ngs
+                      , ngs_linearStats = reverse $ ngs_linearStats ngs
+                      },
+                  us)
+        Right (cmms, cmm_stream') -> do
 
-              -- Generate debug information
-              let debugFlag = gopt Opt_Debug dflags
-                  !ndbgs | debugFlag = cmmDebugGen modLoc cmms
-                         | otherwise = []
+          -- Generate debug information
+          let debugFlag = gopt Opt_Debug dflags
+              !ndbgs | debugFlag = cmmDebugGen modLoc cmms
+                     | otherwise = []
+              dbgMap = debugToMap ndbgs
 
-              -- Generate native code
-              (ngs',us') <- cmmNativeGens dflags this_mod ncgImpl h us cmms ngs 0
+          -- Insert split marker, generate native code
+          let splitFlag = gopt Opt_SplitObjs dflags
+              split_marker = CmmProc mapEmpty mkSplitMarkerLabel [] $
+                             ofBlockList (panic "split_marker_entry") []
+              cmms' | splitFlag  = split_marker : cmms
+                    | otherwise  = cmms
+          (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
+                                      cmms' ngs 0
 
-              -- Link native code information into debug blocks
-              let !ldbgs = cmmDebugLink (ngs_labels ngs') ndbgs
-              dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
-                (vcat $ map ppr ldbgs)
+          -- Link native code information into debug blocks
+          let !ldbgs = cmmDebugLink (ngs_labels ngs') ndbgs
+          dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
+            (vcat $ map ppr ldbgs)
 
-              -- Strip references to native code unless we want to dump it later
-              let ngs'' = ngs' { ngs_debug  = ngs_debug ngs' ++ ldbgs
-                               , ngs_labels = [] }
-              cmmNativeGenStream dflags this_mod modLoc ncgImpl h us'
-                  cmm_stream' ngs''
+          -- Clear DWARF info when generating split object files
+          let ngs'' | debugFlag && splitFlag
+                    = ngs' { ngs_debug = []
+                           , ngs_dwarfFiles = emptyUFM
+                           , ngs_labels = [] }
+                    | otherwise
+                    = ngs' { ngs_debug  = ngs_debug ngs' ++ ldbgs
+                           , ngs_labels = [] }
+          cmmNativeGenStream dflags this_mod modLoc ncgImpl h us'
+              cmm_stream' ngs''
 
 -- | Do native code generation on all these cmms.
 --
 cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags
-              -> Module
+              -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
+              -> LabelMap DebugBlock
               -> UniqSupply
               -> [RawCmmDecl]
               -> NativeGenAcc statics instr
               -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens _ _ _ _ us [] ngs !_
+cmmNativeGens _ _ _ _ _ _ us [] ngs !_
         = return (ngs, us)
 
-cmmNativeGens dflags this_mod ncgImpl h us (cmm : cmms) ngs count
+cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
+              (cmm : cmms) ngs count
  = do
-        (us', native, imports, colorStats, linearStats)
-                <- {-# SCC "cmmNativeGen" #-} cmmNativeGen dflags this_mod ncgImpl us cmm count
+        let fileIds = ngs_dwarfFiles ngs
+        (us', fileIds', native, imports, colorStats, linearStats)
+          <- {-# SCC "cmmNativeGen" #-}
+             cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap
+                          cmm count
+
+        let newFileIds = fileIds' `minusUFM` fileIds
+            pprDecl (f,n) = ptext (sLit "\t.file ") <> ppr n <+>
+                            doubleQuotes (ftext f)
 
         emitNativeCode dflags h $ vcat $
+          map pprDecl (eltsUFM newFileIds) ++
           map (pprNatCmmDecl ncgImpl) native
 
         -- force evaluation all this stuff to avoid space leaks
@@ -420,8 +435,10 @@ cmmNativeGens dflags this_mod ncgImpl h us (cmm : cmms) ngs count
                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs
                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
                       , ngs_labels      = ngs_labels ngs ++ labels'
+                      , ngs_dwarfFiles  = fileIds'
                       }
-        cmmNativeGens dflags this_mod ncgImpl h us' cmms ngs' (count + 1)
+        cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us'
+                      cmms ngs' (count + 1)
 
  where  seqString []            = ()
         seqString (x:xs)        = x `seq` seqString xs
@@ -444,18 +461,21 @@ emitNativeCode dflags h sdoc = do
 cmmNativeGen
         :: (Outputable statics, Outputable instr, Instruction instr)
     => DynFlags
-    -> Module
+    -> Module -> ModLocation
     -> NcgImpl statics instr jumpDest
         -> UniqSupply
+        -> DwarfFiles
+        -> LabelMap DebugBlock
         -> RawCmmDecl                                   -- ^ the cmm to generate code for
         -> Int                                          -- ^ sequence number of this top thing
         -> IO   ( UniqSupply
+                , DwarfFiles
                 , [NatCmmDecl statics instr]                -- native code
                 , [CLabel]                                  -- things imported by this cmm
                 , Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
                 , Maybe [Linear.RegAllocStats])             -- stats for the linear register allocators
 
-cmmNativeGen dflags this_mod ncgImpl us cmm count
+cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let platform = targetPlatform dflags
 
@@ -474,9 +494,11 @@ cmmNativeGen dflags this_mod ncgImpl us cmm count
                 (pprCmmGroup [opt_cmm])
 
         -- generate native code from cmm
-        let ((native, lastMinuteImports), usGen) =
+        let ((native, lastMinuteImports, fileIds'), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode dflags this_mod (cmmTopCodeGen ncgImpl) opt_cmm
+                initUs us $ genMachCode dflags this_mod modLoc
+                                        (cmmTopCodeGen ncgImpl)
+                                        fileIds dbgMap opt_cmm
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_native "Native code"
@@ -607,6 +629,7 @@ cmmNativeGen dflags this_mod ncgImpl us cmm count
                 (vcat $ map (pprNatCmmDecl ncgImpl) expanded)
 
         return  ( usAlloc
+                , fileIds'
                 , expanded
                 , lastMinuteImports ++ imports
                 , ppr_raStatsColor
@@ -862,21 +885,25 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 
 genMachCode
         :: DynFlags
-        -> Module
+        -> Module -> ModLocation
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
+        -> DwarfFiles
+        -> LabelMap DebugBlock
         -> RawCmmDecl
         -> UniqSM
                 ( [NatCmmDecl statics instr]
-                , [CLabel])
+                , [CLabel]
+                , DwarfFiles)
 
-genMachCode dflags this_mod cmmTopCodeGen cmm_top
+genMachCode dflags this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top
   = do  { initial_us <- getUniqueSupplyM
         ; let initial_st           = mkNatM_State initial_us 0 dflags this_mod
+                                                  modLoc fileIds dbgMap
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st
               final_imports        = natm_imports final_st
         ; if   final_delta == 0
-          then return (new_tops, final_imports)
+          then return (new_tops, final_imports, natm_fileid final_st)
           else pprPanic "genMachCode: nonzero final delta" (int final_delta)
     }
 
