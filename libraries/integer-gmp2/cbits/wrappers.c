@@ -417,7 +417,7 @@ integer_gmp_mpn_export1(const mp_limb_t s,
  *
  * We can't use GMP's 'mpz_import()'
  */
-inline HsWord
+HsWord
 integer_gmp_mpn_import1(const uint8_t *srcptr, const HsWord srcofs,
                         const HsWord srclen, const HsInt msbf)
 {
