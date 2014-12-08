@@ -14,12 +14,12 @@ ToDo:
 The inert equalities
 ~~~~~~~~~~~~~~~~~~~~
 
-Definition: can-rewrite relation.  
+Definition: can-rewrite relation.
 A "can-rewrite" relation between flavours, written f1 >= f2, is a
 binary relation with the following properties
 
   R1.  >= is transitive
-  R2.  If f1 >= f, and f2 >= f, 
+  R2.  If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
 
 Lemma.  If f1 >= f then f1 >= f1
@@ -31,9 +31,10 @@ A "generalised substitution" S is a set of triples (a -f-> t), where
   t is a type
   f is a flavour
 such that
-  (WF)  if (a -f1-> t1) in S
-           (a -f2-> t2) in S
+  (WF1) if (a -f1-> t1) in S
+            (a -f2-> t2) in S
         then neither (f1 >= f2) nor (f2 >= f1) hold
+  (WF2) if (a -f-> t) is in S, then t /= a
 
 Definition: applying a generalised substitution.
 If S is a generalised subsitution
@@ -41,7 +42,7 @@ If S is a generalised subsitution
           = a,  otherwise
 Application extends naturally to types S(f,t)
 
-Theorem: S(f,a) is a function.
+Theorem: S(f,a) is well defined as a function.
 Proof: Suppose (a -f1-> t1) and (a -f2-> t2) are both in S,
                and  f1 >= f and f2 >= f
        Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF)
@@ -52,12 +53,12 @@ Notation: repeated application.
 
 Definition: inert generalised substitution
 A generalised substitution S is "inert" iff
-  there is an n such that 
-  for every f,t, S^n(f,t) = S^(n+1)(f,t)
 
-Flavours. In GHC currently drawn from {G,W,D}, but with the coercion
-solver the flavours become pairs
-    { (k,l) | k <- {G,W,D}, l <- {Nom,Rep} }
+  (IG1) there is an n such that 
+        for every f,t, S^n(f,t) = S^(n+1)(f,t)
+
+  (IG2) if (b -f-> t) in S, and f >= f, then S(f,t) = t
+        that is, each individual binding is "self-stable"
 
 ----------------------------------------------------------------
 Our main invariant: 
@@ -68,13 +69,13 @@ Note that inertness is not the same as idempotence.  To apply S to a
 type, you may have to apply it recursive.  But inertness does
 guarantee that this recursive use will terminate.
 
-The main theorem.  
-   Suppose we have a "work item" 
+The main theorem.
+   Suppose we have a "work item"
        a -fw-> t
-   and an inert generalised substitution S, 
+   and an inert generalised substitution S,
    such that
-      (T1) S(fw,a) = a     -- LHS is a fixpoint of S
-      (T2) S(fw,t) = t     -- RHS is a fixpoint of S
+      (T1) S(fw,a) = a     -- LHS of work-item is a fixpoint of S(fw,_)
+      (T2) S(fw,t) = t     -- RHS of work-item is a fixpoint of S(fw,_)
       (T3) a not in t      -- No occurs check in the work item
 
       (K1) if (a -fs-> s) is in S then not (fw >= fs)
@@ -83,13 +84,14 @@ The main theorem.
            or (K2b) not (fw >= fs)
            or (K2c) a not in s
      or (K3) if (b -fs-> a) is in S then not (fw >= fs)
+             (a stronger version of (K2))
 
-   then the extended substition T = S+(a -fw-> t) 
-   is an inert genrealised substitution.
+   then the extended substition T = S+(a -fw-> t)
+   is an inert generalised substitution.
 
-The idea is that 
+The idea is that
 * (T1-2) are guaranteed by exhaustively rewriting the work-item
-  with S.
+  with S(fw,_).
 
 * T3 is guaranteed by a simple occurs-check on the work item.
 
@@ -102,17 +104,19 @@ The idea is that
   re-process a constraint.  The less we kick out, the better.
 
 * Assume we have  G>=G, G>=W, D>=D, and that's all.  Then, when performing
-  a unification we add a new given  a -G-> ty.  But doing so dos not require
-  us to kick out wanteds that mention a, because of (K2b).  
+  a unification we add a new given  a -G-> ty.  But doing so does NOT require
+  us to kick out an inert wanted that mentions a, because of (K2a).  This
+  is a common case, hence good not to kick out.
 
-* Lemma (L1): The conditions of the Main Theorem imply that not (fs >= fw).
+* Lemma (L1): The conditions of the Main Theorem imply that there is no
+              (a fs-> t) in S, s.t.  (fs >= fw).
   Proof. Suppose the contrary (fs >= fw).  Then because of (T1),
   S(fw,a)=a.  But since fs>=fw, S(fw,a) = s, hence s=a.  But now we
-  have (a -fs-> a) in S, since fs>=fw we must have fs>=fs, and hence S
-  is not inert.
-RAE: I don't understand this lemma statement -- fs seems out of scope here.
+  have (a -fs-> a) in S, which contradicts (WF2).
 
-* (K1) plus (L1) guarantee that the extended substiution satisfies (WF).
+* The extended substitution satisfies (WF1) and (WF2)
+  - (K1) plus (L1) guarantee that the extended substiution satisfies (WF1).
+  - (T3) guarantees (WF2).
 
 * (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
   T^1(f,t), T^2(f,T).... must pass through the new work item infnitely
@@ -121,7 +125,7 @@ RAE: I don't understand this lemma statement -- fs seems out of scope here.
 
   - (K2a): if not(fs>=fs) then there is no f that fs can rewrite (fs>=f),
     and hence this triple never plays a role in application S(f,a).
-    It is always safe to extend S with such a triple.  
+    It is always safe to extend S with such a triple.
 
     (NB: we could strengten K1) in this way too, but see K3.
 
@@ -129,10 +133,14 @@ RAE: I don't understand this lemma statement -- fs seems out of scope here.
     often, because if we did then fs>=f, fw>=f, hence fs>=fw,
     contradicting (L1), or fw>=fs contradicting K2b.
 
-  - (K2c): if a not in s, we hae no further opportunity to apply the 
+  - (K2c): if a not in s, we hae no further opportunity to apply the
     work item.
-    
+
   NB: this reasoning isn't water tight.
+
+Key lemma to make it watertight.
+  Under the conditions of the Main Theorem,
+  forall f st fw >= f, a is not in S^k(f,t), for any k
 
 
 Completeness
@@ -149,18 +157,26 @@ Suppose we have
 
 Assuming (G >= W) but not (W >= W), this fulfills all the conditions,
 so we could extend the inerts, thus:
-    
+
    inert-items   b -G-> a
                  a -W-> b
 
 But if we kicked-out the inert item, we'd get
-  
+
    work-item     a -W-> b
    inert-item    b -G-> a
 
 Then rewrite the work-item gives us (a -W-> a), which is soluble via Refl.
 So we add one more clause to the kick-out criteria
 
+Another way to understand (K3) is that we treat an inert item
+        a -f-> b
+in the same way as
+        b -f-> a
+So if we kick out one, we should kick out the other.  The orientation
+is somewhat accidental.
+
+-----------------------
 RAE: To prove that K3 is sufficient for completeness (as opposed to a rule that
 looked for `a` *anywhere* on the RHS, not just at the top), we need this property:
 All types in the inert set are "rigid". Here, rigid means that a type is one of
@@ -179,6 +195,9 @@ w.r.t. representational equality. Accordingly, we would to change (K3) thus:
           a not in s, OR
           the path from the top of s to a includes at least one non-newtype
 
+SPJ/DV: this looks important... follow up
+
+-----------------------
 RAE: Do we have evidence to support our belief that kicking out is bad? I can
 imagine scenarios where kicking out *more* equalities is more efficient, in that
 kicking out a Given, say, might then discover that the Given is reflexive and
@@ -188,3 +207,21 @@ kicking out is something to avoid, but it would be nice to have data to support
 this conclusion. And, that data is not terribly hard to produce: we can just
 twiddle some settings and then time the testsuite in some sort of controlled
 environment.
+
+SPJ: yes it would be good to do that. 
+
+The coercion solver
+~~~~~~~~~~~~~~~~~~~~
+Our hope. In GHC currently drawn from {G,W,D}, but with the coercion
+solver the flavours become pairs
+    { (k,l) | k <- {G,W,D}, l <- {Nom,Rep} }
+
+But can
+      a -(G,R)-> Int
+rewrite
+      b -(G,R)-> T a
+?
+
+Well, it depends on the roles at which T uses its arguments :-(.
+So it may not be enough just to look at (flavour,role) pairs?
+
