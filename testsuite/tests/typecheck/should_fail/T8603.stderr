@@ -16,7 +16,7 @@ T8603.hs:29:17:
            return False }
 
 T8603.hs:29:22:
-    Couldn't match type ‘StateT s RV t0’ with ‘RV a0’
+    Couldn't match type ‘RV a0’ with ‘StateT s RV t0’
     Expected type: [a0] -> StateT s RV t0
       Actual type: [a0] -> RV a0
     Relevant bindings include

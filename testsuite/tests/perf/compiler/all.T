@@ -314,7 +314,7 @@ test('T5030',
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
-           (wordsize(64), 385152728, 10)]),
+           (wordsize(64), 340969128, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
@@ -327,6 +327,7 @@ test('T5030',
              # 2014-07-17 409314320  (amd64/Linux)
              # general round of updates
              # 2014-09-10 385152728  post-AMP-cleanup
+             # 2014-12-08 340969128  constraint solver perf improvements (esp kick-out)
 
        only_ways(['normal'])
       ],
@@ -464,7 +465,7 @@ test('T5837',
              # 2014-09-03: 37096484  (Windows laptop, w/w for INLINABLE things
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
  
-           (wordsize(64), 271028976, 10)])
+           (wordsize(64), 234790312, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -475,6 +476,7 @@ test('T5837',
              # 2014-10-08 73639840 amd64/Linux, Burning Bridges and other small changes
              # 2014-11-06 271028976       Linux, Accept big regression;
              #   See Note [An alternative story for the inert substitution] in TcFlatten
+             # 2014-12-08 234790312 Constraint solver perf improvements (esp kick-out)
       ],
       compile_fail,['-ftype-function-depth=50'])
 

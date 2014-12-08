@@ -826,11 +826,7 @@ flattenTyVar fmode tv
                     where
                        ty' = mkTyVarTy tv'
 
-           Right (ty1, co1, True)   -- No need to recurse
-                    -> do { traceTcS "flattenTyVar2" (ppr tv $$ ppr ty1)
-                          ; return (ty1, co1) }
-
-           Right (ty1, co1, False)  -- Recurse
+           Right (ty1, co1)  -- Recurse
                     -> do { (ty2, co2) <- flatten fmode ty1
                           ; traceTcS "flattenTyVar3" (ppr tv $$ ppr ty2)
                           ; return (ty2, co2 `mkTcTransCo` co1) }
@@ -838,14 +834,13 @@ flattenTyVar fmode tv
 
 flattenTyVarOuter, flattenTyVarFinal
    :: CtEvidence -> TcTyVar
-   -> TcS (Either TyVar (TcType, TcCoercion, Bool))
+   -> TcS (Either TyVar (TcType, TcCoercion))
 -- Look up the tyvar in
 --   a) the internal MetaTyVar box
 --   b) the tyvar binds
 --   c) the inerts
--- Return (Left tv')                if it is not found, tv' has a properly zonked kind
---        (Right (ty, co, is_flat)) if found, with co :: ty ~ tv;
---                                  is_flat says if the result is guaranteed flattened
+-- Return (Left tv')      if it is not found, tv' has a properly zonked kind
+--        (Right (ty, co) if found, with co :: ty ~ tv;
 
 flattenTyVarOuter ctxt_ev tv
   | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
@@ -854,7 +849,7 @@ flattenTyVarOuter ctxt_ev tv
   = do { mb_ty <- isFilledMetaTyVar_maybe tv
        ; case mb_ty of {
            Just ty -> do { traceTcS "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
-                         ; return (Right (ty, mkTcNomReflCo ty, False)) } ;
+                         ; return (Right (ty, mkTcNomReflCo ty)) } ;
            Nothing ->
 
     -- Try in the inert equalities
@@ -866,7 +861,7 @@ flattenTyVarOuter ctxt_ev tv
              | CTyEqCan { cc_ev = ctev, cc_tyvar = tv, cc_rhs = rhs_ty } <- ct
              , eqCanRewrite ctev ctxt_ev
              ->  do { traceTcS "Following inert tyvar" (ppr tv <+> equals <+> ppr rhs_ty $$ ppr ctev)
-                    ; return (Right (rhs_ty, mkTcSymCo (ctEvCoercion ctev), True)) }
+                    ; return (Right (rhs_ty, mkTcSymCo (ctEvCoercion ctev))) }
                     -- NB: ct is Derived then (fe_ev fmode) must be also, hence
                     -- we are not going to touch the returned coercion
                     -- so ctEvCoercion is fine.
@@ -884,9 +879,12 @@ flattenTyVarFinal ctxt_ev tv
 {-
 Note [Applying the inert substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- NB: 8 Dec 14: These notes are now not correct
+  --               Need to rewrite then when matters have settled
+
 The inert CTyEqCans (a ~ ty), inert_eqs, can be treated as a
 substitution, and indeed flattenTyVarOuter applies it to the type
-being flattened.  It has the following properties:
+being flattened (recursively).  This process should terminate.
 
  * 'a' is not in fvs(ty)
  * They are *inert*; that is the eqCanRewrite relation is everywhere false

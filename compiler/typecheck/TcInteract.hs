@@ -42,7 +42,7 @@ import Data.List( partition, foldl', deleteFirstsBy )
 
 import VarEnv
 
-import Control.Monad( when, unless, forM, foldM )
+import Control.Monad
 import Pair (Pair(..))
 import Unique( hasKey )
 import FastString ( sLit )
@@ -952,7 +952,9 @@ kickOutRewritable new_ev new_tv
        ; unless (isEmptyWorkList kicked_out) $
          csTraceTcS $
          hang (ptext (sLit "Kick out, tv =") <+> ppr new_tv)
-            2 (ppr kicked_out)
+            2 (vcat [ text "n-kicked =" <+> int (workListSize kicked_out)
+                    , text "n-kept fun-eqs =" <+> int (sizeFunEqMap (inert_funeqs ics'))
+                    , ppr kicked_out ])
        ; return (workListSize kicked_out) }
 
 kick_out :: CtEvidence -> TcTyVar -> InertCans -> (WorkList, InertCans)
@@ -987,8 +989,10 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
       -- Kick out even insolubles; see Note [Kick out insolubles]
 
     kick_out_ct :: Ct -> Bool
-    kick_out_ct ct =  eqCanRewrite new_ev (ctEvidence ct)
-                   && new_tv `elemVarSet` tyVarsOfCt ct
+    kick_out_ct ct = kick_out_ctev (ctEvidence ct)
+
+    kick_out_ctev ev =  eqCanRewrite new_ev ev
+                     && new_tv `elemVarSet` tyVarsOfType (ctEvPred ev)
          -- See Note [Kicking out inert constraints]
 
     kick_out_irred :: Ct -> Bool
@@ -1003,7 +1007,17 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
                                []      -> acc_in
                                (eq1:_) -> extendVarEnv acc_in (cc_tyvar eq1) eqs_in)
       where
-        (eqs_out, eqs_in) = partition kick_out_ct eqs
+        (eqs_out, eqs_in) = partition kick_out_eq eqs
+
+    kick_out_eq (CTyEqCan { cc_tyvar = tv, cc_rhs = rhs_ty, cc_ev = ev })
+       =  eqCanRewrite new_ev ev
+       && (tv == new_tv
+           || (ev `eqCanRewrite` ev && new_tv `elemVarSet` tyVarsOfType rhs_ty)
+           || case getTyVar_maybe rhs_ty of { Just tv_r -> tv_r == new_tv; Nothing -> False })
+    kick_out_eq ct = pprPanic "kick_out_eq" (ppr ct)
+    -- SLPJ new piece: Don't kick out a constraint unless it can rewrite itself,
+    --                 If not, it can't rewrite anything else, so no point in
+    --                 kicking it out
 
 {-
 Note [Kicking out inert constraints]

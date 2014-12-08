@@ -25,3 +25,17 @@ plus_zero Zero = EQUIV
 plus_zero (Succ n) = case plus_zero n of
                        EQUIV -> EQUIV 
 
+{-
+
+From Succ branch of plus_zero
+
+[G] n ~ SUCC n1     -- n1 existentially bound
+[G] PLUS n1 ZERO ~ n1
+
+[W] PLUS n ZERO ~ n
+
+--> [W] PLUS (SUCC n1) ZERO ~ SUCC n1
+--> [W] SUCC (PLUS n1 ZERO) ~ SUCC n1
+--> [W] SUCC n1 ~ SUCC n1
+
+-}

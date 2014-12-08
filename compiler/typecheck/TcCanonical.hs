@@ -670,7 +670,7 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
   = do { traceTcS "canEqTyVar" (ppr tv1 $$ ppr ty2 $$ ppr swapped)
        ; mb_yes <- flattenTyVarOuter ev tv1
        ; case mb_yes of
-           Right (ty1, co1, _) -- co1 :: ty1 ~ tv1
+           Right (ty1, co1)  -- co1 :: ty1 ~ tv1
                      -> do { mb <- rewriteEqEvidence ev swapped  ty1 ps_ty2
                                                      co1 (mkTcNomReflCo ps_ty2)
                            ; traceTcS "canEqTyVar2" (vcat [ppr tv1, ppr ty2, ppr swapped, ppr ty1,
