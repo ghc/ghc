@@ -9174,21 +9174,29 @@ f n = \ [haskell|y|] -> y+n
 	      </para>
 	    </listitem>
 	    <listitem>
-	      <para>
-		The type environment seen by <literal>reify</literal> includes
-		all the top-level declaration up to the end of the immediately
-		preceding <emphasis>declaration group</emphasis>, but no more.
-	      </para>
-
-	      <para>
-		A <emphasis>declaration group</emphasis> is the group of
+              <para>
+		Top-level declaration splices break up a source file into
+		<emphasis>delcaration groups</emphasis>. A
+		<emphasis>declaration group</emphasis> is the group of
 		declarations created by a top-level declaration splice, plus
-		those following it, down to but not including the next top-level
-		declaration splice. The first declaration group in a module
-		includes all top-level definitions down to but not including the
-		first top-level declaration splice.
+		those following it, down to but not including the next
+		top-level declaration splice. The first declaration group in a
+		module includes all top-level definitions down to but not
+		including the first top-level declaration splice.
 	      </para>
 
+	      <para>
+		Each declaration group is mutually recursive only within
+		the group. Declaration groups can refer to definitions within
+		previous groups, but not later ones.
+	      </para>
+
+	      <para>
+		Accordingly, the type environment seen by
+		<literal>reify</literal> includes all the top-level
+		declarations up to the end of the immediately preceding
+		declaration group, but no more.
+	      </para>
 
 	      <para>
 		Concretely, consider the following code
@@ -9205,6 +9213,11 @@ module M where
               In this example
               <orderedlist>
 		<listitem>
+		  <para>
+		    The body of <literal>h</literal> would be unable to refer
+		    to the function <literal>w</literal>.
+		  </para>
+
 		  <para>
 		    A <literal>reify</literal> inside the splice <literal>$(th1
 		    ..)</literal> would see the definition of
