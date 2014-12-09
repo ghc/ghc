@@ -11,28 +11,34 @@ hang = Just ()
 {- Ambiguity check
 
  [G] Foo e ~ Maybe e
- [W] Foo e ~ Foo ee
- [W] Foo ee ~ Maybe ee)
+ [W] Foo e ~ Foo e0
+ [W] Foo e0 ~ Maybe e0
 ---
  [G] Foo e ~ fsk
  [G] fsk ~ Maybe e
 
  [W] Foo e ~ fmv1
- [W] Foo ee ~ fmv2
+ [W] Foo e0 ~ fmv2
  [W] fmv1 ~ fmv2
- [W] fmv2 ~ Maybe ee
+ [W] fmv2 ~ Maybe e0
 
 --->   fmv1 := fsk
- [W] Foo ee ~ fmv2
+ [G] Foo e ~ fsk
+ [G] fsk ~ Maybe e
+
+ [W] Foo e0 ~ fmv2
  [W] fsk ~ fmv2
- [W] fmv2 ~ Maybe ee
+ [W] fmv2 ~ Maybe e0
 
 --->
- [W] Foo ee ~ fmv2
- [W] fmv2 ~ Maybe e
- [W] fmv2 ~ Maybe ee
+ [G] Foo e ~ fsk
+ [G] fsk ~ Maybe e
 
-Now the question is whether we get a derived equality e ~ ee.  Currently
+ [W] Foo e0 ~ fmv2
+ [W] fmv2 ~ Maybe e
+ [W] fmv2 ~ Maybe e0
+
+Now the question is whether we get a derived equality e ~ e0.  Currently
 we don't, but we easily could.  But then we'd need to be careful not to
 report insoluble Int ~ Bool if we had
    F a ~ Int, F a ~ Bool

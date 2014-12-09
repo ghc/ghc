@@ -29,6 +29,7 @@ import RdrName ( GlobalRdrEnv, lookupGRE_Name, mkRdrQual, is_as,
                  is_decl, Provenance(Imported), gre_prov )
 import FunDeps
 import FamInst
+import Inst( tyVarsOfCt )
 
 import TcEvidence
 import Outputable
@@ -976,7 +977,7 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
                        , inert_insols = insols_in }
 
     kicked_out = WL { wl_eqs    = tv_eqs_out
-                    , wl_funeqs = foldrBag insertDeque emptyDeque feqs_out
+                    , wl_funeqs = feqs_out
                     , wl_rest   = bagToList (dicts_out `andCts` irs_out
                                              `andCts` insols_out)
                     , wl_implics = emptyBag }
@@ -1660,7 +1661,9 @@ shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
                   -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
 shortCutReduction old_ev fsk ax_co fam_tc tc_args
   | isGiven old_ev
-  = do { (xis, cos) <- flattenMany (FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }) tc_args
+  = runFlatten $
+    do { let fmode = FE { fe_mode = FM_FlattenAll, fe_ev = old_ev }
+       ; (xis, cos) <- flatten_many fmode tc_args
                -- ax_co :: F args ~ G tc_args
                -- cos   :: xis ~ tc_args
                -- old_ev :: F args ~ fsk
@@ -1673,12 +1676,14 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                                         `mkTcTransCo` ctEvCoercion old_ev) )
 
        ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
-       ; updWorkListTcS (extendWorkListFunEq new_ct)
+       ; emitFlatWork new_ct
        ; stopWith old_ev "Fun/Top (given, shortcut)" }
 
   | otherwise
   = ASSERT( not (isDerived old_ev) )   -- Caller ensures this
-    do { (xis, cos) <- flattenMany (FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }) tc_args
+    runFlatten $
+    do { let fmode = FE { fe_mode = FM_FlattenAll, fe_ev = old_ev }
+       ; (xis, cos) <- flatten_many fmode tc_args
                -- ax_co :: F args ~ G tc_args
                -- cos   :: xis ~ tc_args
                -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
@@ -1691,7 +1696,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                                       `mkTcTransCo` ctEvCoercion new_ev))
 
        ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
-       ; updWorkListTcS (extendWorkListFunEq new_ct)
+       ; emitFlatWork new_ct
        ; stopWith old_ev "Fun/Top (wanted, shortcut)" }
   where
     loc = ctEvLoc old_ev

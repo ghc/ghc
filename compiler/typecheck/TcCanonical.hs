@@ -197,8 +197,7 @@ canClassNC ev cls tys
     `andWhenContinue` emitSuperclasses
 
 canClass ev cls tys
-  = do { let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
-       ; (xis, cos) <- flattenMany fmode tys
+  = do { (xis, cos) <- flattenMany FM_FlattenAll ev tys
        ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
              mk_ct new_ev = CDictCan { cc_ev = new_ev
@@ -332,10 +331,9 @@ canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 -- Precondition: ty not a tuple and no other evidence form
 canIrred old_ev
   = do { let old_ty = ctEvPred old_ev
-             fmode  = FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }
-                      -- Flatten (F [a]), say, so that it can reduce to Eq a
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr old_ty)
-       ; (xi,co) <- flatten fmode old_ty -- co :: xi ~ old_ty
+       ; (xi,co) <- flatten FM_FlattenAll old_ev old_ty -- co :: xi ~ old_ty
+                      -- Flatten (F [a]), say, so that it can reduce to Eq a
        ; mb <- rewriteEvidence old_ev xi co
        ; case mb of {
              Stop ev s           -> return (Stop ev s) ;
@@ -351,9 +349,8 @@ canIrred old_ev
 
 canHole :: CtEvidence -> OccName -> HoleSort -> TcS (StopOrContinue Ct)
 canHole ev occ hole_sort
-  = do { let ty    = ctEvPred ev
-             fmode = FE { fe_ev = ev, fe_mode = FM_SubstOnly }
-       ; (xi,co) <- flatten fmode ty -- co :: xi ~ ty
+  = do { let ty = ctEvPred ev
+       ; (xi,co) <- flatten FM_SubstOnly ev ty -- co :: xi ~ ty
        ; mb <- rewriteEvidence ev xi co
        ; case mb of
            ContinueWith new_ev -> do { emitInsoluble (CHoleCan { cc_ev = new_ev
@@ -472,8 +469,7 @@ can_eq_fam_nc :: CtEvidence -> SwapFlag
 --   or the swapped version thereof
 -- Flatten both sides and go round again
 can_eq_fam_nc ev swapped fn tys rhs ps_rhs
-  = do { let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
-       ; (xi_lhs, co_lhs) <- flattenFamApp fmode fn tys
+  = do { (xi_lhs, co_lhs) <- flattenFamApp FM_FlattenAll ev fn tys
        ; mb_ct <- rewriteEqEvidence ev swapped xi_lhs rhs co_lhs (mkTcNomReflCo rhs)
        ; case mb_ct of
            Stop ev s           -> return (Stop ev s)
@@ -488,9 +484,8 @@ can_eq_wanted_app :: CtEvidence -> TcType -> TcType
 -- One or the other is an App; neither is a type variable
 -- See Note [Canonicalising type applications]
 can_eq_wanted_app ev ty1 ty2
-  = do { let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
-       ; (xi1, co1) <- flatten fmode ty1
-       ; (xi2, co2) <- flatten fmode ty2
+  = do { (xi1, co1) <- flatten FM_FlattenAll ev ty1
+       ; (xi2, co2) <- flatten FM_FlattenAll ev ty2
         ; mb_ct <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
         ; case mb_ct of {
             Stop ev s           -> return (Stop ev s) ;
@@ -568,9 +563,8 @@ canDecomposableTyConAppOK ev tc1 tys1 tys2
 canEqFailure :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqFailure ev ty1 ty2
-  = do { let fmode = FE { fe_ev = ev, fe_mode = FM_SubstOnly }
-       ; (s1, co1) <- flatten fmode ty1
-       ; (s2, co2) <- flatten fmode ty2
+  = do { (s1, co1) <- flatten FM_SubstOnly ev ty1
+       ; (s2, co2) <- flatten FM_SubstOnly ev ty2
        ; mb_ct <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; case mb_ct of
            ContinueWith new_ev -> do { emitInsoluble (mkNonCanonical new_ev)
@@ -643,8 +637,7 @@ canCFunEqCan :: CtEvidence
 -- and the RHS is a fsk, which we must *not* substitute.
 -- So just substitute in the LHS
 canCFunEqCan ev fn tys fsk
-  = do { let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
-       ; (tys', cos) <- flattenMany fmode tys
+  = do { (tys', cos) <- flattenMany FM_FlattenAll ev tys
                         -- cos :: tys' ~ tys
        ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
                         -- :: F tys' ~ F tys
@@ -683,8 +676,7 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
                              -- let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' True }
                                  -- Flatten the RHS less vigorously, to avoid gratuitous flattening
                                  -- True <=> xi2 should not itself be a type-function application
-                             let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
-                           ; (xi2, co2) <- flatten fmode ps_ty2 -- co2 :: xi2 ~ ps_ty2
+                           ; (xi2, co2) <- flatten FM_FlattenAll ev ps_ty2 -- co2 :: xi2 ~ ps_ty2
                                            -- Use ps_ty2 to preserve type synonyms if poss
                            ; dflags <- getDynFlags
                            ; canEqTyVar2 dflags ev swapped tv1' xi2 co2 } }

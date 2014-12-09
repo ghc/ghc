@@ -2,7 +2,8 @@
 
 module TcFlatten(
    FlattenEnv(..), FlattenMode(..),
-   flatten, flattenMany, flattenFamApp, flattenTyVarOuter,
+   flatten, flattenMany, flatten_many,
+   flattenFamApp, flattenTyVarOuter,
    unflatten,
    eqCanRewrite, canRewriteOrSame
  ) where
@@ -565,7 +566,8 @@ unexpanded synonym.
 
 data FlattenEnv
   = FE { fe_mode :: FlattenMode
-       , fe_ev   :: CtEvidence }
+       , fe_ev   :: CtEvidence
+       }
 
 data FlattenMode  -- Postcondition for all three: inert wrt the type substitution
   = FM_FlattenAll          -- Postcondition: function-free
@@ -607,45 +609,66 @@ Note: T5321Fun got faster when I disabled FM_Avoid
       T5837 did too, but it's pathalogical anyway
 -}
 
+------------------
+flatten :: FlattenMode -> CtEvidence -> TcType -> TcS (Xi, TcCoercion)
+flatten mode ev ty
+  = runFlatten (flatten_one fmode ty)
+  where
+    fmode = FE { fe_mode = mode, fe_ev = ev }
+
+flattenMany :: FlattenMode -> CtEvidence -> [TcType] -> TcS ([Xi], [TcCoercion])
 -- Flatten a bunch of types all at once.
-flattenMany :: FlattenEnv -> [Type] -> TcS ([Xi], [TcCoercion])
+flattenMany mode ev tys
+  = runFlatten (flatten_many fmode tys)
+  where
+    fmode = FE { fe_mode = mode, fe_ev = ev }
+
+flattenFamApp :: FlattenMode -> CtEvidence -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
+flattenFamApp mode ev tc tys
+  = runFlatten (flatten_fam_app fmode tc tys)
+  where
+    fmode = FE { fe_mode = mode, fe_ev = ev }
+
+------------------
+flatten_many :: FlattenEnv -> [Type] -> TcS ([Xi], [TcCoercion])
 -- Coercions :: Xi ~ Type
 -- Returns True iff (no flattening happened)
 -- NB: The EvVar inside the 'fe_ev :: CtEvidence' is unused,
 --     we merely want (a) Given/Solved/Derived/Wanted info
 --                    (b) the GivenLoc/WantedLoc for when we create new evidence
-flattenMany fmode tys
+flatten_many fmode tys
   = -- pprTrace "flattenMany" empty $
     go tys
   where go []       = return ([],[])
-        go (ty:tys) = do { (xi,co)    <- flatten fmode ty
+        go (ty:tys) = do { (xi,co)    <- flatten_one fmode ty
                          ; (xis,cos)  <- go tys
                          ; return (xi:xis,co:cos) }
 
-flatten :: FlattenEnv -> TcType -> TcS (Xi, TcCoercion)
+------------------
+flatten_one :: FlattenEnv -> TcType -> TcS (Xi, TcCoercion)
 -- Flatten a type to get rid of type function applications, returning
 -- the new type-function-free type, and a collection of new equality
 -- constraints.  See Note [Flattening] for more detail.
 --
 -- Postcondition: Coercion :: Xi ~ TcType
 
-flatten _ xi@(LitTy {}) = return (xi, mkTcNomReflCo xi)
+flatten_one _ xi@(LitTy {}) = return (xi, mkTcNomReflCo xi)
 
-flatten fmode (TyVarTy tv)
+flatten_one fmode (TyVarTy tv)
   = flattenTyVar fmode tv
 
-flatten fmode (AppTy ty1 ty2)
-  = do { (xi1,co1) <- flatten fmode ty1
-       ; (xi2,co2) <- flatten fmode ty2
+flatten_one fmode (AppTy ty1 ty2)
+  = do { (xi1,co1) <- flatten_one fmode ty1
+       ; (xi2,co2) <- flatten_one fmode ty2
        ; traceTcS "flatten/appty" (ppr ty1 $$ ppr ty2 $$ ppr xi1 $$ ppr co1 $$ ppr xi2 $$ ppr co2)
        ; return (mkAppTy xi1 xi2, mkTcAppCo co1 co2) }
 
-flatten fmode (FunTy ty1 ty2)
-  = do { (xi1,co1) <- flatten fmode ty1
-       ; (xi2,co2) <- flatten fmode ty2
+flatten_one fmode (FunTy ty1 ty2)
+  = do { (xi1,co1) <- flatten_one fmode ty1
+       ; (xi2,co2) <- flatten_one fmode ty2
        ; return (mkFunTy xi1 xi2, mkTcFunCo Nominal co1 co2) }
 
-flatten fmode (TyConApp tc tys)
+flatten_one fmode (TyConApp tc tys)
 
   -- Expand type synonyms that mention type families
   -- on the RHS; see Note [Flattening synonyms]
@@ -653,7 +676,7 @@ flatten fmode (TyConApp tc tys)
   , let expanded_ty = mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys'
   = case fe_mode fmode of
       FM_FlattenAll | anyNameEnv isTypeFamilyTyCon (tyConsOfType rhs)
-                   -> flatten fmode expanded_ty
+                   -> flatten_one fmode expanded_ty
                     | otherwise
                    -> flattenTyConApp fmode tc tys
       _ -> flattenTyConApp fmode tc tys
@@ -662,7 +685,7 @@ flatten fmode (TyConApp tc tys)
   -- flatten it away as well, and generate a new given equality constraint
   -- between the application and a newly generated flattening skolem variable.
   | isTypeFamilyTyCon tc
-  = flattenFamApp fmode tc tys
+  = flatten_fam_app fmode tc tys
 
   -- For * a normal data type application
   --     * data family application
@@ -675,18 +698,18 @@ flatten fmode (TyConApp tc tys)
 --                   _ -> fmode
   = flattenTyConApp fmode tc tys
 
-flatten fmode ty@(ForAllTy {})
+flatten_one fmode ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; (rho', co) <- flatten (fmode { fe_mode = FM_SubstOnly }) rho
+       ; (rho', co) <- flatten_one (fmode { fe_mode = FM_SubstOnly }) rho
                          -- Substitute only under a forall
                          -- See Note [Flattening under a forall]
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
 
 flattenTyConApp :: FlattenEnv -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
 flattenTyConApp fmode tc tys
-  = do { (xis, cos) <- flattenMany fmode tys
+  = do { (xis, cos) <- flatten_many fmode tys
        ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
 
 {-
@@ -732,43 +755,43 @@ and we have not begun to think about how to make that work!
 ************************************************************************
 -}
 
-flattenFamApp, flattenExactFamApp, flattenExactFamApp_fully
+flatten_fam_app, flatten_exact_fam_app, flatten_exact_fam_app_fully
   :: FlattenEnv -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
-  --   flattenFamApp            can be over-saturated
-  --   flattenExactFamApp       is exactly saturated
-  --   flattenExactFamApp_fully lifts out the application to top level
+  --   flatten_fam_app            can be over-saturated
+  --   flatten_exact_fam_app       is exactly saturated
+  --   flatten_exact_fam_app_fully lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
-flattenFamApp fmode tc tys  -- Can be over-saturated
+flatten_fam_app fmode tc tys  -- Can be over-saturated
     = ASSERT( tyConArity tc <= length tys )  -- Type functions are saturated
                  -- The type function might be *over* saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
       do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
-         ; (xi1, co1) <- flattenExactFamApp fmode tc tys1
+         ; (xi1, co1) <- flatten_exact_fam_app fmode tc tys1
                -- co1 :: xi1 ~ F tys1
-         ; (xis_rest, cos_rest) <- flattenMany fmode tys_rest
+         ; (xis_rest, cos_rest) <- flatten_many fmode tys_rest
                -- cos_res :: xis_rest ~ tys_rest
          ; return ( mkAppTys xi1 xis_rest   -- NB mkAppTys: rhs_xi might not be a type variable
                                             --    cf Trac #5655
                   , mkTcAppCos co1 cos_rest -- (rhs_xi :: F xis) ; (F cos :: F xis ~ F tys)
                   ) }
 
-flattenExactFamApp fmode tc tys
+flatten_exact_fam_app fmode tc tys
   = case fe_mode fmode of
-       FM_FlattenAll -> flattenExactFamApp_fully fmode tc tys
+       FM_FlattenAll -> flatten_exact_fam_app_fully fmode tc tys
 
-       FM_SubstOnly -> do { (xis, cos) <- flattenMany fmode tys
+       FM_SubstOnly -> do { (xis, cos) <- flatten_many fmode tys
                           ; return ( mkTyConApp tc xis
                                    , mkTcTyConAppCo Nominal tc cos ) }
 
-       FM_Avoid tv flat_top -> do { (xis, cos) <- flattenMany fmode tys
+       FM_Avoid tv flat_top -> do { (xis, cos) <- flatten_many fmode tys
                                   ; if flat_top || tv `elemVarSet` tyVarsOfTypes xis
-                                    then flattenExactFamApp_fully fmode tc tys
+                                    then flatten_exact_fam_app_fully fmode tc tys
                                     else return ( mkTyConApp tc xis
                                                 , mkTcTyConAppCo Nominal tc cos ) }
 
-flattenExactFamApp_fully fmode tc tys
-  = do { (xis, cos) <- flattenMany (fmode { fe_mode = FM_FlattenAll })tys
+flatten_exact_fam_app_fully fmode tc tys
+  = do { (xis, cos) <- flatten_many (fmode { fe_mode = FM_FlattenAll })tys
        ; let ret_co = mkTcTyConAppCo Nominal tc cos
               -- ret_co :: F xis ~ F tys
              ctxt_ev = fe_ev fmode
@@ -796,7 +819,7 @@ flattenExactFamApp_fully fmode tc tys
                                         , cc_fun    = tc
                                         , cc_tyargs = xis
                                         , cc_fsk    = fsk }
-                   ; updWorkListTcS (extendWorkListFunEq ct)
+                   ; emitFlatWork ct
 
                    ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk $$ ppr ev)
                    ; return (mkTyVarTy fsk, mkTcSymCo (ctEvCoercion ev) `mkTcTransCo` ret_co) } }
@@ -827,7 +850,7 @@ flattenTyVar fmode tv
                        ty' = mkTyVarTy tv'
 
            Right (ty1, co1)  -- Recurse
-                    -> do { (ty2, co2) <- flatten fmode ty1
+                    -> do { (ty2, co2) <- flatten_one fmode ty1
                           ; traceTcS "flattenTyVar3" (ppr tv $$ ppr ty2)
                           ; return (ty2, co2 `mkTcTransCo` co1) }
        }
@@ -873,7 +896,7 @@ flattenTyVarFinal ctxt_ev tv
   = -- Done, but make sure the kind is zonked
     do { let kind       = tyVarKind tv
              kind_fmode = FE { fe_ev = ctxt_ev, fe_mode = FM_SubstOnly }
-       ; (new_knd, _kind_co) <- flatten kind_fmode kind
+       ; (new_knd, _kind_co) <- flatten_one kind_fmode kind
        ; return (Left (setVarType tv new_knd)) }
 
 {-

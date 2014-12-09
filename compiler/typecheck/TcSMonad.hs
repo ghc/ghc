@@ -3,41 +3,26 @@
 -- Type definitions for the constraint solver
 module TcSMonad (
 
-       -- Canonical constraints, definition is now in TcRnTypes
-
+    -- The work list
     WorkList(..), isEmptyWorkList, emptyWorkList,
-    extendWorkListFunEq,
     extendWorkListNonEq, extendWorkListCt,
     extendWorkListCts, appendWorkList, selectWorkItem,
     workListSize,
-
     updWorkListTcS, updWorkListTcS_return,
+    runFlatten, emitFlatWork,
 
-    updInertTcS, updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
+    -- The TcS monad
+    TcS, runTcS, runTcSWithEvBinds,
+    failTcS, tryTcS, nestTcS, nestImplicTcS, recoverTcS,
 
-    Ct(..), Xi, tyVarsOfCt, tyVarsOfCts,
-    emitInsoluble, emitWorkNC,
+    runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq,
 
-    isWanted, isDerived,
-    isGivenCt, isWantedCt, isDerivedCt,
-
-    mkGivenLoc,
-
-    TcS, runTcS, runTcSWithEvBinds, failTcS, panicTcS, traceTcS, -- Basic functionality
+    -- Tracing etc
+    panicTcS, traceTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
-    tryTcS, nestTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
-    runTcPluginTcS,
 
-    -- Getting and setting the flattening cache
-    addSolvedDict,
-
-    -- Marking stuff as used
-    addUsedRdrNamesTcS,
-
-    deferTcSForAllEq,
-
-    setEvBind,
+    -- Evidence creation and transformation
     XEvTerm(..),
     Freshness(..), freshGoals, isFresh,
 
@@ -49,40 +34,47 @@ module TcSMonad (
     maybeSym,
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
+    setWantedTyBind, reportUnifications,
+    setEvBind,
     newEvVar, newGivenEvVar,
     emitNewDerived, emitNewDerivedEq,
     instDFunConstraints,
-
-       -- Creation of evidence variables
-    setWantedTyBind, reportUnifications,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getTcLevel,
     getTcEvBindsMap,
 
-    lookupFlatCache, newFlattenSkolem,            -- Flatten skolems
-
-        -- Deque
-    Deque(..), insertDeque, emptyDeque,
-
         -- Inerts
     InertSet(..), InertCans(..),
+    updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans, getInertEqs, getInertCans,
     emptyInert, getTcSInerts, setTcSInerts,
     getUnsolvedInerts, checkAllSolved,
     splitInertCans, removeInertCts,
     prepareInertsForImplications,
     addInertCan, insertInertItemTcS, insertFunEq,
+    emitInsoluble, emitWorkNC,
     EqualCtList,
-    lookupSolvedDict, extendFlatCache,
 
+    -- Inert CDictCans
     lookupInertDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
 
-    findFunEq, findTyEqs,
+    -- Inert CTyEqCans
+    findTyEqs,
+
+    -- Inert solved dictionaries
+    addSolvedDict, lookupSolvedDict,
+
+    -- The flattening cache
+    lookupFlatCache, extendFlatCache, newFlattenSkolem,            -- Flatten skolems
+
+    -- Inert CFunEqCans
+    updInertFunEqs, findFunEq, sizeFunEqMap,
     findFunEqsByTyCon, findFunEqs, partitionFunEqs,
-    sizeFunEqMap,
 
     instDFunType,                              -- Instantiation
+
+    -- MetaTyVars
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
     cloneMetaTyVar, demoteUnfilledFmv,
 
@@ -90,8 +82,11 @@ module TcSMonad (
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
     zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkFlats,
 
-    getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
+    -- References
+    newTcRef, readTcRef, updTcRef,
 
+    -- Misc
+    getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam,
     checkWellStagedDFun,
     pprEq                                    -- Smaller utils, re-exported from TcM
@@ -176,43 +171,62 @@ equalities (wl_eqs) from the rest of the canonical constraints,
 so that it's easier to deal with them first, but the separation
 is not strictly necessary. Notice that non-canonical constraints
 are also parts of the worklist.
+
+Note [The flattening work list]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "flattening work list", held in the tcs_flat_work field of TcSEnv,
+is a list of CFunEqCans generated during flattening.  The key idea
+is this.  Consider flattening (Eq (F (G Int) (H Bool)):
+  * The flattener recursively calls itself on sub-terms before building
+    the main term, so it will encounter the terms in order
+              G Int
+              H Bool
+              F (G Int) (H Bool)
+    flattening to sub-goals
+              w1: G Int ~ fuv0
+              w2: H Bool ~ fuv1
+              w3: F fuv0 fuv1 ~ fuv2
+
+  * Processing w3 first is BAD, because we can't reduce i t,so it'll
+    get put into the inert set, and later kicked out when w1, w2 are
+    solved.  In Trac #9872 this led to inert sets containing hundreds
+    of suspended calls.
+
+  * So we want to process w1, w2 first.
+
+  * So you might think that we should just use a FIFO deque for the work-list,
+    so that putting adding goals in order w1,w2,w3 would mean we processed
+    w1 first.
+
+  * BUT suppose we have 'type instance G Int = H Char'.  Then processing
+    w1 leads to a new goal
+                w4: H Char ~ fuv0
+    We do NOT want to put that on the far end of a deque!  Instead we want
+    to put it at the *front* of the work-list so that we continue to work
+    on it.
+
+So the work-list structure is this:
+
+  * The wl_funeqs is a LIFO stack; we push new goals (such as w4) on
+    top (extendWorkListFunEq), and take new work from the top
+    (selectWorkItem).
+
+  * When flattening, emitFlatWork pushes new flattening goals (like
+    w1,w2,w3) onto the flattening work list, tcs_flat_work, another
+    push-down stack.
+
+  * When we finish flattening, we *reverse* the tcs_flat_work stack
+    onto the wl_funeqs stack (which brings w1 to the top).
+
+The function runFlatten initialised the tcs_flat_work stack, and reverses
+it onto wl_fun_eqs at the end.
+
 -}
-
-data Deque a = DQ [a] [a]   -- Insert in RH field, remove from LH field
-                            -- First to remove is at head of LH field
-
-instance Outputable a => Outputable (Deque a) where
-  ppr q = ppr (dequeList q)
-
-dequeList :: Deque a -> [a]
-dequeList (DQ as bs) = as ++ reverse bs  -- First one to come out at the start
-
-emptyDeque :: Deque a
-emptyDeque = DQ [] []
-
-isEmptyDeque :: Deque a -> Bool
-isEmptyDeque (DQ as bs) = null as && null bs
-
-dequeSize :: Deque a -> Int
-dequeSize (DQ as bs) = length as + length bs
-
-insertDeque :: a -> Deque a -> Deque a
-insertDeque b (DQ as bs) = DQ as (b:bs)
-
-appendDeque :: Deque a -> Deque a -> Deque a
-appendDeque (DQ as1 bs1) (DQ as2 bs2) = DQ (as1 ++ reverse bs1 ++ as2) bs2
-
-extractDeque :: Deque a -> Maybe (Deque a, a)
-extractDeque (DQ [] [])     = Nothing
-extractDeque (DQ (a:as) bs) = Just (DQ as bs, a)
-extractDeque (DQ [] bs)     = case reverse bs of
-                                (a:as) -> Just (DQ as [], a)
-                                [] -> panic "extractDeque"
 
 -- See Note [WorkList priorities]
 data WorkList
   = WL { wl_eqs     :: [Ct]
-       , wl_funeqs  :: Deque Ct
+       , wl_funeqs  :: [Ct]  -- LIFO stack of goals
        , wl_rest    :: [Ct]
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
@@ -221,15 +235,15 @@ appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
     (WL { wl_eqs = eqs1, wl_funeqs = funeqs1, wl_rest = rest1, wl_implics = implics1 })
     (WL { wl_eqs = eqs2, wl_funeqs = funeqs2, wl_rest = rest2, wl_implics = implics2 })
-   = WL { wl_eqs     = eqs1     ++            eqs2
-        , wl_funeqs  = funeqs1  `appendDeque` funeqs2
-        , wl_rest    = rest1    ++            rest2
+   = WL { wl_eqs     = eqs1     ++ eqs2
+        , wl_funeqs  = funeqs1  ++ funeqs2
+        , wl_rest    = rest1    ++ rest2
         , wl_implics = implics1 `unionBags`   implics2 }
 
 
 workListSize :: WorkList -> Int
 workListSize (WL { wl_eqs = eqs, wl_funeqs = funeqs, wl_rest = rest })
-  = length eqs + dequeSize funeqs + length rest
+  = length eqs + length funeqs + length rest
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
 extendWorkListEq ct wl
@@ -237,7 +251,7 @@ extendWorkListEq ct wl
 
 extendWorkListFunEq :: Ct -> WorkList -> WorkList
 extendWorkListFunEq ct wl
-  = wl { wl_funeqs = insertDeque ct (wl_funeqs wl) }
+  = wl { wl_funeqs = ct : wl_funeqs wl }
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -268,20 +282,19 @@ extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 isEmptyWorkList :: WorkList -> Bool
 isEmptyWorkList (WL { wl_eqs = eqs, wl_funeqs = funeqs
                     , wl_rest = rest, wl_implics = implics })
-  = null eqs && null rest && isEmptyDeque funeqs && isEmptyBag implics
+  = null eqs && null rest && null funeqs && isEmptyBag implics
 
 emptyWorkList :: WorkList
 emptyWorkList = WL { wl_eqs  = [], wl_rest = []
-                   , wl_funeqs = emptyDeque, wl_implics = emptyBag }
+                   , wl_funeqs = [], wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> (Maybe Ct, WorkList)
 selectWorkItem wl@(WL { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
   = case (eqs,feqs,rest) of
-      (ct:cts,_,_)     -> (Just ct, wl { wl_eqs    = cts })
-      (_,fun_eqs,_)    | Just (fun_eqs', ct) <- extractDeque fun_eqs
-                       -> (Just ct, wl { wl_funeqs = fun_eqs' })
-      (_,_,(ct:cts))   -> (Just ct, wl { wl_rest   = cts })
-      (_,_,_)          -> (Nothing,wl)
+      (ct:cts,_,_) -> (Just ct, wl { wl_eqs    = cts })
+      (_,ct:fes,_) -> (Just ct, wl { wl_funeqs = fes })
+      (_,_,ct:cts) -> (Just ct, wl { wl_rest   = cts })
+      (_,_,_)      -> (Nothing,wl)
 
 -- Pretty printing
 instance Outputable WorkList where
@@ -290,13 +303,42 @@ instance Outputable WorkList where
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs) $
             ptext (sLit "Eqs =") <+> vcat (map ppr eqs)
-          , ppUnless (isEmptyDeque feqs) $
-            ptext (sLit "Funeqs =") <+> vcat (map ppr (dequeList feqs))
+          , ppUnless (null feqs) $
+            ptext (sLit "Funeqs =") <+> vcat (map ppr feqs)
           , ppUnless (null rest) $
             ptext (sLit "Non-eqs =") <+> vcat (map ppr rest)
           , ppUnless (isEmptyBag implics) $
             ptext (sLit "Implics =") <+> vcat (map ppr (bagToList implics))
           ])
+
+emitFlatWork :: Ct -> TcS ()
+-- See Note [The flattening work list]
+emitFlatWork ct
+  = TcS $ \env ->
+    do { let flat_ref = tcs_flat_work env
+       ; TcM.updTcRef flat_ref (ct :) }
+
+runFlatten :: TcS a -> TcS a
+-- Run thing_inside (which does flattening), and put all
+-- the work it generates onto the main work list
+-- See Note [The flattening work list]
+runFlatten (TcS thing_inside)
+  = TcS $ \env ->
+    do { let flat_ref = tcs_flat_work env
+       ; old_flats <- TcM.updTcRefX flat_ref (\_ -> [])
+       ; res <- thing_inside env
+       ; new_flats <- TcM.updTcRefX flat_ref (\_ -> old_flats)
+       ; TcM.updTcRef (tcs_worklist env) (add_flats new_flats)
+       ; return res }
+  where
+    add_flats new_flats wl
+      = wl { wl_funeqs = add_funeqs new_flats (wl_funeqs wl) }
+
+    add_funeqs []     wl = wl
+    add_funeqs (f:fs) wl = add_funeqs fs (f:wl)
+      -- add_funeqs fs ws = reverse fs ++ ws
+      -- e.g. add_funeqs [f1,f2,f3] [w1,w2,w3,w4]
+      --        = [f3,f2,f1,w1,w2,w3,w4]
 
 {-
 ************************************************************************
@@ -965,14 +1007,14 @@ insertFunEq m tc tys val = insertTcApp m (getUnique tc) tys val
 --  = insertFunEq m tc tys ct
 -- insertFunEqCt _ ct = pprPanic "insertFunEqCt" (ppr ct)
 
-partitionFunEqs :: (Ct -> Bool) -> FunEqMap Ct -> (Bag Ct, FunEqMap Ct)
+partitionFunEqs :: (Ct -> Bool) -> FunEqMap Ct -> ([Ct], FunEqMap Ct)
 -- Optimise for the case where the predicate is false
 -- partitionFunEqs is called only from kick-out, and kick-out usually
 -- kicks out very few equalities, so we want to optimise for that case
-partitionFunEqs f m = (yeses, foldrBag del m yeses)
+partitionFunEqs f m = (yeses, foldr del m yeses)
   where
-    yeses = foldTcAppMap k m emptyBag
-    k ct yeses | f ct      = yeses `snocBag` ct
+    yeses = foldTcAppMap k m []
+    k ct yeses | f ct      = ct : yeses
                | otherwise = yeses
     del (CFunEqCan { cc_fun = tc, cc_tyargs = tys }) m
         = delFunEq m tc tys
@@ -1012,8 +1054,13 @@ data TcSEnv
 
       tcs_count    :: IORef Int, -- Global step count
 
-      tcs_inerts   :: IORef InertSet, -- Current inert set
-      tcs_worklist :: IORef WorkList  -- Current worklist
+      tcs_inerts    :: IORef InertSet, -- Current inert set
+
+      -- The main work-list and the flattening worklist
+      -- See Note [Work list priorities] and
+      --     Note [The flattening work list]
+      tcs_worklist  :: IORef WorkList, -- Current worklist
+      tcs_flat_work :: IORef [Ct]      -- Flattening worklist
     }
 
 ---------------
@@ -1113,12 +1160,14 @@ runTcSWithEvBinds ev_binds_var tcs
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
        ; wl_var <- TcM.newTcRef emptyWorkList
+       ; fw_var <- TcM.newTcRef (panic "Flat work list")
 
-       ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
-                          , tcs_unified  = unified_var
-                          , tcs_count    = step_count
-                          , tcs_inerts   = inert_var
-                          , tcs_worklist = wl_var }
+       ; let env = TcSEnv { tcs_ev_binds  = ev_binds_var
+                          , tcs_unified   = unified_var
+                          , tcs_count     = step_count
+                          , tcs_inerts    = inert_var
+                          , tcs_worklist  = wl_var
+                          , tcs_flat_work = fw_var }
 
              -- Run the computation
        ; res <- unTcS tcs env
@@ -1166,11 +1215,13 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                                    -- See Note [Do not inherit the flat cache]
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
+       ; new_fw_var    <- TcM.newTcRef (panic "Flat work list")
        ; let nest_env = TcSEnv { tcs_ev_binds    = ref
                                , tcs_unified     = unified_var
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = new_wl_var }
+                               , tcs_worklist    = new_wl_var
+                               , tcs_flat_work   = new_fw_var }
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
 
@@ -1299,6 +1350,15 @@ emitInsoluble ct
       where
         already_there = not (isWantedCt ct) && anyBag (tcEqType this_pred . ctPred) old_insols
              -- See Note [Do not add duplicate derived insolubles]
+
+newTcRef :: a -> TcS (TcRef a)
+newTcRef x = wrapTcS (TcM.newTcRef x)
+
+readTcRef :: TcRef a -> TcS a
+readTcRef ref = wrapTcS (TcM.readTcRef ref)
+
+updTcRef :: TcRef a -> (a->a) -> TcS ()
+updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
 
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds)

@@ -1,10 +1,12 @@
 
 T4093a.hs:7:9:
-    Could not deduce (Foo e0 ~ Maybe e0)
+    Could not deduce (Foo e0 ~ Maybe e)
     from the context (Foo e ~ Maybe e)
       bound by the type signature for hang :: (Foo e ~ Maybe e) => Foo e
       at T4093a.hs:7:9-34
     The type variable ‘e0’ is ambiguous
+    Expected type: Foo e
+      Actual type: Foo e0
     In the ambiguity check for the type signature for ‘hang’:
       hang :: forall e. (Foo e ~ Maybe e) => Foo e
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes

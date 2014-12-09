@@ -19,7 +19,7 @@ FrozenErrorTests.hs:26:9:
     In an equation for ‘test1’: test1 = goo1 False undefined
 
 FrozenErrorTests.hs:29:15:
-    Couldn't match type ‘[Int]’ with ‘Int’
+    Couldn't match type ‘Int’ with ‘[Int]’
     Expected type: [[Int]]
       Actual type: F [Int] Bool
     In the first argument of ‘goo2’, namely ‘(goo1 False undefined)’
