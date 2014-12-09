@@ -217,7 +217,7 @@
 
                <para>
                  All Template Haskell datatypes now have
-                 <literal>Generic</literal> instances.
+                 <literal>Generic</literal> and <literal>Ord</literal> instances.
                </para>
 
                <para>
