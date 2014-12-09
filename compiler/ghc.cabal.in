@@ -558,6 +558,9 @@ Library
             RegAlloc.Linear.X86_64.FreeRegs
             RegAlloc.Linear.PPC.FreeRegs
             RegAlloc.Linear.SPARC.FreeRegs
+            Dwarf
+            Dwarf.Types
+            Dwarf.Constants
 
     if flag(ghci)
         Exposed-Modules:

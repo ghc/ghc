@@ -56,6 +56,7 @@ pprNatCmmDecl (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+  sdocWithDynFlags $ \dflags ->
   case topInfoTable proc of
     Nothing ->
        case blocks of
@@ -65,6 +66,8 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
            pprSectionHeader Text $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks) $$
+           (if gopt Opt_Debug dflags
+            then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
            pprSizeDecl lbl
 
     Just (Statics info_lbl _) ->
@@ -84,6 +87,8 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
                   <+> char '-'
                   <+> ppr (mkDeadStripPreventer info_lbl)
              else empty) $$
+      (if gopt Opt_Debug dflags
+       then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
 
 -- | Output the ELF .size directive.
@@ -97,10 +102,14 @@ pprSizeDecl lbl
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
-  = maybe_infotable $$
-    pprLabel (mkAsmTempLabel (getUnique blockid)) $$
-    vcat (map pprInstr instrs)
+  = sdocWithDynFlags $ \dflags ->
+    maybe_infotable $$
+    pprLabel asmLbl $$
+    vcat (map pprInstr instrs) $$
+    (if gopt Opt_Debug dflags
+     then ppr (mkAsmTempEndLabel asmLbl) <> char ':' else empty)
   where
+    asmLbl = mkAsmTempLabel (getUnique blockid)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->

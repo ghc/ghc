@@ -47,6 +47,7 @@ import Instruction
 import PIC
 import Reg
 import NCGMonad
+import Dwarf
 import Debug
 
 import BlockId
@@ -286,41 +287,46 @@ nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM
         (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
                                          cmms ngs0
-        finishNativeGen dflags bufh ngs
-
-        return us'
+        finishNativeGen dflags modLoc bufh us' ngs
 
 finishNativeGen :: Instruction instr
                 => DynFlags
+                -> ModLocation
                 -> BufHandle
+                -> UniqSupply
                 -> NativeGenAcc statics instr
-                -> IO ()
-finishNativeGen dflags bufh@(BufHandle _ _ h) ngs
+                -> IO UniqSupply
+finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
  = do
+        -- Write debug data and finish
+        let emitDw = gopt Opt_Debug dflags && not (gopt Opt_SplitObjs dflags)
+        us' <- if not emitDw then return us else do
+          (dwarf, us') <- dwarfGen dflags modLoc us (ngs_debug ngs)
+          emitNativeCode dflags bufh dwarf
+          return us'
         bFlush bufh
-
-        let platform = targetPlatform dflags
 
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
         when (not (null stats)) $ do
 
-                -- build the global register conflict graph
-                let graphGlobal
-                        = foldl Color.union Color.initGraph
-                        $ [ Color.raGraph stat
-                                | stat@Color.RegAllocStatsStart{} <- stats]
+          -- build the global register conflict graph
+          let graphGlobal
+                  = foldl Color.union Color.initGraph
+                  $ [ Color.raGraph stat
+                          | stat@Color.RegAllocStatsStart{} <- stats]
 
-                dump_stats (Color.pprStats stats graphGlobal)
+          dump_stats (Color.pprStats stats graphGlobal)
 
-                dumpIfSet_dyn dflags
-                        Opt_D_dump_asm_conflicts "Register conflict graph"
-                        $ Color.dotGraph
-                                (targetRegDotColor platform)
-                                (Color.trivColorable platform
-                                        (targetVirtualRegSqueeze platform)
-                                        (targetRealRegSqueeze platform))
-                        $ graphGlobal
+          let platform = targetPlatform dflags
+          dumpIfSet_dyn dflags
+                  Opt_D_dump_asm_conflicts "Register conflict graph"
+                  $ Color.dotGraph
+                          (targetRegDotColor platform)
+                          (Color.trivColorable platform
+                                  (targetVirtualRegSqueeze platform)
+                                  (targetRealRegSqueeze platform))
+                  $ graphGlobal
 
 
         -- dump global NCG stats for linear allocator
@@ -332,6 +338,7 @@ finishNativeGen dflags bufh@(BufHandle _ _ h) ngs
         Pretty.printDoc Pretty.LeftMode (pprCols dflags) h
                 $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat (ngs_imports ngs))
+        return us'
   where
     dump_stats = dumpSDoc dflags alwaysQualify Opt_D_dump_asm_stats "NCG stats"
 
@@ -377,15 +384,21 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
           dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
             (vcat $ map ppr ldbgs)
 
-          -- Clear DWARF info when generating split object files
-          let ngs'' | debugFlag && splitFlag
-                    = ngs' { ngs_debug = []
-                           , ngs_dwarfFiles = emptyUFM
-                           , ngs_labels = [] }
-                    | otherwise
-                    = ngs' { ngs_debug  = ngs_debug ngs' ++ ldbgs
-                           , ngs_labels = [] }
-          cmmNativeGenStream dflags this_mod modLoc ncgImpl h us'
+          -- Emit & clear DWARF information when generating split
+          -- object files, as we need it to land in the same object file
+          (ngs'', us'') <-
+            if debugFlag && splitFlag
+            then do (dwarf, us'') <- dwarfGen dflags modLoc us ldbgs
+                    emitNativeCode dflags h dwarf
+                    return (ngs' { ngs_debug = []
+                                 , ngs_dwarfFiles = emptyUFM
+                                 , ngs_labels = [] },
+                            us'')
+            else return (ngs' { ngs_debug  = ngs_debug ngs' ++ ldbgs
+                              , ngs_labels = [] },
+                         us')
+
+          cmmNativeGenStream dflags this_mod modLoc ncgImpl h us''
               cmm_stream' ngs''
 
 -- | Do native code generation on all these cmms.
