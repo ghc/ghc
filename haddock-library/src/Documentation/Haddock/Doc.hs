@@ -1,11 +1,29 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Documentation.Haddock.Doc (docParagraph, docAppend, docConcat) where
+module Documentation.Haddock.Doc (docParagraph, docAppend,
+                                  docConcat, metaDocConcat,
+                                  metaDocAppend, emptyMetaDoc) where
 
+import Data.Monoid (mempty, (<>))
 import Documentation.Haddock.Types
 import Data.Char (isSpace)
 
 docConcat :: [DocH mod id] -> DocH mod id
 docConcat = foldr docAppend DocEmpty
+
+-- | Like 'docConcat' but also joins the 'Meta' info.
+metaDocConcat :: [MetaDoc mod id] -> MetaDoc mod id
+metaDocConcat = foldr metaDocAppend emptyMetaDoc
+
+-- | We do something perhaps unexpected here and join the meta info
+-- in ‘reverse’: this results in the metadata from the ‘latest’
+-- paragraphs taking precedence.
+metaDocAppend :: MetaDoc mod id -> MetaDoc mod id -> MetaDoc mod id
+metaDocAppend (MetaDoc { _meta = m, _doc = d })
+              (MetaDoc { _meta = m', _doc = d' }) =
+  MetaDoc { _meta = m' <> m, _doc = d `docAppend` d' }
+
+emptyMetaDoc :: MetaDoc mod id
+emptyMetaDoc = MetaDoc { _meta = mempty, _doc = DocEmpty }
 
 docAppend :: DocH mod id -> DocH mod id -> DocH mod id
 docAppend (DocDefList ds1) (DocDefList ds2) = DocDefList (ds1++ds2)

@@ -15,7 +15,27 @@
 module Documentation.Haddock.Types where
 
 import Data.Foldable
+import Data.Monoid
 import Data.Traversable
+
+-- | With the advent of 'Version', we may want to start attaching more
+-- meta-data to comments. We make a structure for this ahead of time
+-- so we don't have to gut half the core each time we want to add such
+-- info.
+newtype Meta = Meta { _version :: Maybe Version } deriving (Eq, Show)
+
+instance Monoid Meta where
+  mempty = Meta { _version = Nothing }
+  Meta { _version = v } `mappend` Meta { _version = v' } =
+    Meta { _version = v `mappend` v' }
+
+data MetaDoc mod id =
+  MetaDoc { _meta :: Meta
+          , _doc :: DocH mod id
+          } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+overDoc :: (DocH a b -> DocH c d) -> MetaDoc a b -> MetaDoc c d
+overDoc f d = d { _doc = f $ _doc d }
 
 type Version = [Int]
 

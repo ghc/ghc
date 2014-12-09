@@ -283,12 +283,15 @@ render dflags flags qual ifaces installedIfaces srcMap = do
                 pretty
     copyHtmlBits odir libDir themes
 
+  -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
+  -- might want to fix that if/when these two get some work on them
   when (Flag_Hoogle `elem` flags) $ do
     let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
-    ppHoogle dflags pkgName2 pkgVer title prologue visibleIfaces odir
+    ppHoogle dflags pkgName2 pkgVer title (fmap _doc prologue) visibleIfaces
+      odir
 
   when (Flag_LaTeX `elem` flags) $ do
-    ppLaTeX title pkgStr visibleIfaces odir prologue opt_latex_style
+    ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                   libDir
 
 
@@ -449,7 +452,7 @@ updateHTMLXRefs packages = do
     mapping' = [ (moduleName m, html) | (m, html) <- mapping ]
 
 
-getPrologue :: DynFlags -> [Flag] -> IO (Maybe (Doc RdrName))
+getPrologue :: DynFlags -> [Flag] -> IO (Maybe (MDoc RdrName))
 getPrologue dflags flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing

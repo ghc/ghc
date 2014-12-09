@@ -115,7 +115,7 @@ divTopDecl :: Html -> Html
 divTopDecl = thediv ! [theclass "top"]
 
 
-type SubDecl = (Html, Maybe (Doc DocName), [Html])
+type SubDecl = (Html, Maybe (MDoc DocName), [Html])
 
 
 divSubDecls :: (HTML a) => String -> a -> Maybe Html -> Html

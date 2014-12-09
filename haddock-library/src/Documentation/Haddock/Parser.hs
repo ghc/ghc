@@ -86,9 +86,11 @@ parse p = either err id . parseOnly (p <* endOfInput)
 -- | Main entry point to the parser. Appends the newline character
 -- to the input string.
 parseParas :: String -- ^ String to parse
-           -> (Maybe Version, DocH mod Identifier)
+           -> MetaDoc mod Identifier
 parseParas input = case parseParasState input of
-  (state, a) -> (parserStateSince state, a)
+  (state, a) -> MetaDoc { _meta = Meta { _version = parserStateSince state }
+                        , _doc = a
+                        }
 
 parseParasState :: String -> (ParserState, DocH mod Identifier)
 parseParasState = parse (p <* skipSpace) . encodeUtf8 . (++ "\n")

@@ -64,7 +64,7 @@ ppHtml :: String
        -> Maybe String                 -- ^ Package
        -> [Interface]
        -> FilePath                     -- ^ Destination directory
-       -> Maybe (Doc GHC.RdrName)      -- ^ Prologue text, maybe
+       -> Maybe (MDoc GHC.RdrName)     -- ^ Prologue text, maybe
        -> Themes                       -- ^ Themes
        -> SourceURLs                   -- ^ The source URL (--source)
        -> WikiURLs                     -- ^ The wiki URL (--wiki)
@@ -246,7 +246,7 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [InstalledInterface] -> Bool -> Maybe (Doc GHC.RdrName)
+   -> [InstalledInterface] -> Bool -> Maybe (MDoc GHC.RdrName)
    -> Bool
    -> Qualification  -- ^ How to qualify names
    -> IO ()
@@ -270,7 +270,7 @@ ppHtmlContents odir doctitle _maybe_package
   ppHtmlContentsFrame odir doctitle themes ifaces debug
 
 
-ppPrologue :: Qualification -> String -> Maybe (Doc GHC.RdrName) -> Html
+ppPrologue :: Qualification -> String -> Maybe (MDoc GHC.RdrName) -> Html
 ppPrologue _ _ Nothing = noHtml
 ppPrologue qual title (Just doc) =
   divDescription << (h1 << title +++ docElement thediv (rdrDocToHtml qual doc))
@@ -590,7 +590,7 @@ processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 
       map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
     _ -> []
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
-  [groupTag lvl << docToHtml Nothing qual txt]
+  [groupTag lvl << docToHtml Nothing qual (mkMeta txt)]
 processForMiniSynopsis _ _ _ _ = []
 
 
@@ -625,7 +625,7 @@ ppModuleContents qual exports
     | otherwise = ( html:secs, rest2 )
     where
       html = linkedAnchor (groupId id0)
-             << docToHtmlNoAnchors (Just id0) qual doc +++ mk_subsections ssecs
+             << docToHtmlNoAnchors (Just id0) qual (mkMeta doc) +++ mk_subsections ssecs
       (ssecs, rest1) = process lev rest
       (secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
@@ -649,7 +649,7 @@ processExport :: Bool -> LinksInfo -> Bool -> Qualification
               -> ExportItem DocName -> Maybe Html
 processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
-  = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual doc
+  = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual (mkMeta doc)
 processExport summary links unicode qual (ExportDecl decl doc subdocs insts fixities splice)
   = processDecl summary $ ppDecl summary links decl doc insts fixities subdocs splice unicode qual
 processExport summary _ _ qual (ExportNoDecl y [])

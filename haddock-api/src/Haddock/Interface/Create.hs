@@ -14,7 +14,7 @@
 -----------------------------------------------------------------------------
 module Haddock.Interface.Create (createInterface) where
 
-import Documentation.Haddock.Doc (docAppend)
+import Documentation.Haddock.Doc (metaDocAppend)
 import Haddock.Types
 import Haddock.Options
 import Haddock.GhcUtils
@@ -256,19 +256,19 @@ mkMaps dflags gre instances decls =
     f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
     f = M.fromListWith (<>) . concat
 
-    f' :: [[(Name, Doc Name)]] -> Map Name (Doc Name)
-    f' = M.fromListWith docAppend . concat
+    f' :: [[(Name, MDoc Name)]] -> Map Name (MDoc Name)
+    f' = M.fromListWith metaDocAppend . concat
 
     mappings :: (LHsDecl Name, [HsDocString])
-             -> ( [(Name, Doc Name)]
-                , [(Name, Map Int (Doc Name))]
+             -> ( [(Name, MDoc Name)]
+                , [(Name, Map Int (MDoc Name))]
                 , [(Name, [Name])]
                 , [(Name,  [LHsDecl Name])]
                 )
     mappings (ldecl, docStrs) =
       let L l decl = ldecl
           declDoc :: [HsDocString] -> Map Int HsDocString
-                  -> (Maybe (Doc Name), Map Int (Doc Name))
+                  -> (Maybe (MDoc Name), Map Int (MDoc Name))
           declDoc strs m =
             let doc' = processDocStrings dflags gre strs
                 m' = M.map (processDocStringParas dflags gre) m
@@ -641,7 +641,8 @@ hiValExportItem dflags name doc splice fixity = do
 
 
 -- | Lookup docs for a declaration from maps.
-lookupDocs :: Name -> WarningMap -> DocMap Name -> ArgMap Name -> SubMap -> (DocForDecl Name, [(Name, DocForDecl Name)])
+lookupDocs :: Name -> WarningMap -> DocMap Name -> ArgMap Name -> SubMap
+           -> (DocForDecl Name, [(Name, DocForDecl Name)])
 lookupDocs n warnings docMap argMap subMap =
   let lookupArgDoc x = M.findWithDefault M.empty x argMap in
   let doc = (lookupDoc n, lookupArgDoc n) in
@@ -731,8 +732,8 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
     expandSig = foldr f []
       where
         f :: LHsDecl name -> [LHsDecl name] -> [LHsDecl name]
-        f (L l (SigD (TypeSig    names t)))          xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t))          : acc) xs names
-        f (L l (SigD (GenericSig names t)))          xs = foldr (\n acc -> L l (SigD (GenericSig [n] t))          : acc) xs names
+        f (L l (SigD (TypeSig    names t))) xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t)) : acc) xs names
+        f (L l (SigD (GenericSig names t))) xs = foldr (\n acc -> L l (SigD (GenericSig [n] t)) : acc) xs names
         f x xs = x : xs
 
     mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))
