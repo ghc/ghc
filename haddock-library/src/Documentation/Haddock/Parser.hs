@@ -119,8 +119,8 @@ parseStringBS = snd . parse p
 -- | Parses and processes
 -- <https://en.wikipedia.org/wiki/Numeric_character_reference Numeric character references>
 --
--- >>> parseOnly encodedChar "&#65;"
--- Right (DocString "A")
+-- >>> parseString "&#65;"
+-- DocString "A"
 encodedChar :: Parser (DocH mod a)
 encodedChar = "&#" *> c <* ";"
   where
@@ -152,16 +152,16 @@ skipSpecialChar = DocString . return <$> satisfy (`elem` specialChar)
 
 -- | Emphasis parser.
 --
--- >>> parseOnly emphasis "/Hello world/"
--- Right (DocEmphasis (DocString "Hello world"))
+-- >>> parseString "/Hello world/"
+-- DocEmphasis (DocString "Hello world")
 emphasis :: Parser (DocH mod Identifier)
 emphasis = DocEmphasis . parseStringBS <$>
   mfilter ('\n' `BS.notElem`) ("/" *> takeWhile1_ (/= '/') <* "/")
 
 -- | Bold parser.
 --
--- >>> parseOnly bold "__Hello world__"
--- Right (DocBold (DocString "Hello world"))
+-- >>> parseString "__Hello world__"
+-- DocBold (DocString "Hello world")
 bold :: Parser (DocH mod Identifier)
 bold = DocBold . parseStringBS <$> disallowNewline ("__" *> takeUntil "__")
 
@@ -183,19 +183,23 @@ takeWhile1_ = mfilter (not . BS.null) . takeWhile_
 
 -- | Text anchors to allow for jumping around the generated documentation.
 --
--- >>> parseOnly anchor "#Hello world#"
--- Right (DocAName "Hello world")
+-- >>> parseString "#Hello world#"
+-- DocAName "Hello world"
 anchor :: Parser (DocH mod a)
 anchor = DocAName . decodeUtf8 <$>
          disallowNewline ("#" *> takeWhile1_ (/= '#') <* "#")
 
 -- | Monospaced strings.
 --
--- >>> parseOnly monospace "@cruel@"
--- Right (DocMonospaced (DocString "cruel"))
+-- >>> parseString "@cruel@"
+-- DocMonospaced (DocString "cruel")
 monospace :: Parser (DocH mod Identifier)
-monospace = DocMonospaced . parseStringBS <$> ("@" *> takeWhile1_ (/= '@') <* "@")
+monospace = DocMonospaced . parseStringBS
+            <$> ("@" *> takeWhile1_ (/= '@') <* "@")
 
+-- | Module names: we try our reasonable best to only allow valid
+-- Haskell module names, with caveat about not matching on technically
+-- valid unicode symbols.
 moduleName :: Parser (DocH mod a)
 moduleName = DocModule <$> (char '"' *> modid <* char '"')
   where
@@ -211,10 +215,10 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
 -- | Picture parser, surrounded by \<\< and \>\>. It's possible to specify
 -- a title for the picture.
 --
--- >>> parseOnly picture "<<hello.png>>"
--- Right (DocPic (Picture {pictureUri = "hello.png", pictureTitle = Nothing}))
--- >>> parseOnly picture "<<hello.png world>>"
--- Right (DocPic (Picture {pictureUri = "hello.png", pictureTitle = Just "world"}))
+-- >>> parseString "<<hello.png>>"
+-- DocPic (Picture {pictureUri = "hello.png", pictureTitle = Nothing})
+-- >>> parseString "<<hello.png world>>"
+-- DocPic (Picture {pictureUri = "hello.png", pictureTitle = Just "world"})
 picture :: Parser (DocH mod a)
 picture = DocPic . makeLabeled Picture . decodeUtf8
           <$> disallowNewline ("<<" *> takeUntil ">>")
@@ -247,9 +251,9 @@ since = ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.
 --
--- >>> parseOnly header "= Hello"
+-- >>> snd <$> parseOnly header "= Hello"
 -- Right (DocHeader (Header {headerLevel = 1, headerTitle = DocString "Hello"}))
--- >>> parseOnly header "== World"
+-- >>> snd <$> parseOnly header "== World"
 -- Right (DocHeader (Header {headerLevel = 2, headerTitle = DocString "World"}))
 header :: Parser (DocH mod Identifier)
 header = do
@@ -438,7 +442,7 @@ endOfLine = void "\n" <|> endOfInput
 
 -- | Property parser.
 --
--- >>> parseOnly property "prop> hello world"
+-- >>> snd <$> parseOnly property "prop> hello world"
 -- Right (DocProperty "hello world")
 property :: Parser (DocH mod a)
 property = DocProperty . strip . decodeUtf8 <$> ("prop>" *> takeWhile1 (/= '\n'))
