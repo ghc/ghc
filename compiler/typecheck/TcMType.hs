@@ -29,7 +29,6 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newEq, newDict,
-  newWantedEvVar, newWantedEvVars,
   newTcEvBinds, addTcEvBind,
   newFlatWanted, newFlatWanteds,
 
@@ -124,12 +123,6 @@ newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
 newEvVars :: TcThetaType -> TcM [EvVar]
 newEvVars theta = mapM newEvVar theta
 
-newWantedEvVar :: TcPredType -> TcM EvVar
-newWantedEvVar = newEvVar
-
-newWantedEvVars :: TcThetaType -> TcM [EvVar]
-newWantedEvVars theta = mapM newWantedEvVar theta
-
 --------------
 
 newEvVar :: TcPredType -> TcM EvVar
@@ -165,7 +158,7 @@ predTypeOccName ty = case classifyPredType ty of
 newFlatWanted :: CtOrigin -> PredType -> TcM Ct
 newFlatWanted orig pty
   = do loc <- getCtLoc orig
-       v <- newWantedEvVar pty
+       v <- newEvVar pty
        return $ mkNonCanonical $
             CtWanted { ctev_evar = v
                      , ctev_pred = pty

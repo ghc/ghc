@@ -73,7 +73,7 @@ emitWanteds origin theta = mapM (emitWanted origin) theta
 emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred
   = do { loc <- getCtLoc origin
-       ; ev  <- newWantedEvVar pred
+       ; ev  <- newEvVar pred
        ; emitFlat $ mkNonCanonical $
              CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
        ; return ev }
