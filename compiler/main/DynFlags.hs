@@ -625,6 +625,7 @@ data ExtensionFlag
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
    | Opt_NamedWildcards
+   | Opt_StaticPointers
    deriving (Eq, Enum, Show)
 
 data SigOf = NotSigOf
@@ -3124,6 +3125,7 @@ xFlags = [
   flagSpec "RoleAnnotations"                  Opt_RoleAnnotations,
   flagSpec "ScopedTypeVariables"              Opt_ScopedTypeVariables,
   flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
+  flagSpec "StaticPointers"                   Opt_StaticPointers,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
                                               checkTemplateHaskellOk,
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,

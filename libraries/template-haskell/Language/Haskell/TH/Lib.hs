@@ -296,6 +296,10 @@ stringE = litE . stringL
 fieldExp :: Name -> ExpQ -> Q (Name, Exp)
 fieldExp s e = do { e' <- e; return (s,e') }
 
+-- | @staticE x = [| static x |]@
+staticE :: ExpQ -> ExpQ
+staticE = fmap StaticE
+
 -- ** 'arithSeqE' Shortcuts
 fromE :: ExpQ -> ExpQ
 fromE x = do { a <- x; return (ArithSeqE (FromR a)) }

@@ -349,6 +349,14 @@ basicKnownKeyNames
 
         -- GHCi Sandbox
         , ghciIoClassName, ghciStepIoMName
+
+        -- StaticPtr
+        , staticPtrTyConName
+        , staticPtrDataConName, staticPtrInfoDataConName
+
+        -- Fingerprint
+        , fingerprintDataConName
+
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
            IntegerGMP2   -> [integerSDataConName]
@@ -446,6 +454,12 @@ gHC_IP          = mkBaseModule (fsLit "GHC.IP")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
+
+gHC_STATICPTR :: Module
+gHC_STATICPTR = mkBaseModule (fsLit "GHC.StaticPtr")
+
+gHC_FINGERPRINT_TYPE :: Module
+gHC_FINGERPRINT_TYPE = mkBaseModule (fsLit "GHC.Fingerprint.Type")
 
 mAIN, rOOT_MAIN :: Module
 mAIN            = mkMainModule_ mAIN_NAME
@@ -1159,6 +1173,27 @@ pLUGINS = mkThisGhcModule (fsLit "Plugins")
 pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
 
+-- Static pointers
+staticPtrInfoTyConName :: Name
+staticPtrInfoTyConName =
+    tcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoTyConKey
+
+staticPtrInfoDataConName :: Name
+staticPtrInfoDataConName =
+    conName gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
+
+staticPtrTyConName :: Name
+staticPtrTyConName =
+    tcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrTyConKey
+
+staticPtrDataConName :: Name
+staticPtrDataConName =
+    conName gHC_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
+
+fingerprintDataConName :: Name
+fingerprintDataConName =
+    conName gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1476,6 +1511,12 @@ specTyConKey = mkPreludeTyConUnique 177
 smallArrayPrimTyConKey        = mkPreludeTyConUnique  178
 smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  179
 
+staticPtrTyConKey  :: Unique
+staticPtrTyConKey  = mkPreludeTyConUnique 180
+
+staticPtrInfoTyConKey :: Unique
+staticPtrInfoTyConKey = mkPreludeTyConUnique 181
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1538,6 +1579,15 @@ eqDataConKey                            = mkPreludeDataConUnique 28
 gtDataConKey                            = mkPreludeDataConUnique 29
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
+
+staticPtrDataConKey :: Unique
+staticPtrDataConKey                     = mkPreludeDataConUnique 33
+
+staticPtrInfoDataConKey :: Unique
+staticPtrInfoDataConKey                 = mkPreludeDataConUnique 34
+
+fingerprintDataConKey :: Unique
+fingerprintDataConKey                   = mkPreludeDataConUnique 35
 
 {-
 ************************************************************************

@@ -243,6 +243,13 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
 
+test('GcStaticPointers',
+     [ when(compiler_lt('ghc', '7.9'), skip) ],
+     compile_and_run, [''])
+test('ListStaticPointers',
+     [ when(compiler_lt('ghc', '7.9'), skip) ],
+     compile_and_run, [''])
+
 # 251 = RTS exit code for "out of memory"
 test('overflow1', [ exit_code(251) ], compile_and_run, [''])
 test('overflow2', [ exit_code(251) ], compile_and_run, [''])

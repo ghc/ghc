@@ -90,7 +90,7 @@ module Language.Haskell.TH(
         normalB, guardedB, normalG, normalGE, patG, patGE, match, clause,
 
     -- *** Expressions
-        dyn, global, varE, conE, litE, appE, uInfixE, parensE,
+        dyn, global, varE, conE, litE, appE, uInfixE, parensE, staticE,
         infixE, infixApp, sectionL, sectionR,
         lamE, lam1E, lamCaseE, tupE, condE, multiIfE, letE, caseE, appsE,
         listE, sigE, recConE, recUpdE, stringE, fieldExp,

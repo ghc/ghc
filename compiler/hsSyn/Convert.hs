@@ -688,6 +688,7 @@ cvtl e = wrapL (cvt e)
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds' <- mapM cvtFld flds
                               ; return $ RecordUpd e' (HsRecFields flds' Nothing) [] [] [] }
+    cvt (StaticE e)      = fmap HsStatic $ cvtl e
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

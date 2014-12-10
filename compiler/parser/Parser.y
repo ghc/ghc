@@ -302,6 +302,7 @@ See https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations for some background.
  'by'       { L _ ITby }        -- for list transform extension
  'using'    { L _ ITusing }     -- for list transform extension
  'pattern'      { L _ ITpattern } -- for pattern synonyms
+ 'static'       { L _ ITstatic }  -- for static pointers extension
 
  '{-# INLINE'             { L _ (ITinline_prag _ _) }
  '{-# SPECIALISE'         { L _ ITspec_prag }
@@ -2031,6 +2032,7 @@ hpc_annot :: { Located ([AddAnn],(FastString,(Int,Int),(Int,Int))) }
 
 fexp    :: { LHsExpr RdrName }
         : fexp aexp                             { sLL $1 $> $ HsApp $1 $2 }
+        | 'static' aexp                         { sLL $1 $> $ HsStatic $2 }
         | aexp                                  { $1 }
 
 aexp    :: { LHsExpr RdrName }

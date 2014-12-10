@@ -91,6 +91,7 @@ module TcRnTypes(
 #include "HsVersions.h"
 
 import HsSyn
+import CoreSyn
 import HscTypes
 import TcEvidence
 import Type
@@ -381,7 +382,10 @@ data TcGblEnv
                                              -- as -XSafe (Safe Haskell)
 
         -- | A list of user-defined plugins for the constraint solver.
-        tcg_tc_plugins :: [TcPluginSolver]
+        tcg_tc_plugins :: [TcPluginSolver],
+
+        tcg_static_wc :: TcRef WantedConstraints
+          -- ^ Wanted constraints of static forms.
     }
 
 -- Note [Signature parameters in TcGblEnv and DynFlags]
@@ -1904,6 +1908,7 @@ data CtOrigin
   | HoleOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
+  | StaticOrigin        -- A static form
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -1975,6 +1980,7 @@ pprCtO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, c
 pprCtO AnnOrigin             = ptext (sLit "an annotation")
 pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
 pprCtO ListOrigin            = ptext (sLit "an overloaded list")
+pprCtO StaticOrigin          = ptext (sLit "a static form")
 pprCtO _                     = panic "pprCtOrigin"
 
 {-

@@ -1,0 +1,6 @@
+
+RnStaticPointersFail03.hs:5:7:
+    Only identifiers of top-level bindings can appear in the body of the static form:
+      static (x . id)
+    but the following identifiers were found instead:
+      x

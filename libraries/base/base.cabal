@@ -255,6 +255,7 @@ Library
         GHC.Real
         GHC.RTS.Flags
         GHC.ST
+        GHC.StaticPtr
         GHC.STRef
         GHC.Show
         GHC.Stable

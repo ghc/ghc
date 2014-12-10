@@ -1,0 +1,8 @@
+
+RnStaticPointersFail02.hs:5:5:
+    Only identifiers of top-level bindings can appear in the body of the static form:
+      static T
+    but the following identifiers were found instead:
+      T
+
+RnStaticPointersFail02.hs:5:12: Not in scope: data constructor ‘T’

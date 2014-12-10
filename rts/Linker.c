@@ -1418,6 +1418,10 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stopProfTimer)                                      \
       SymI_HasProto(atomic_inc)                                         \
       SymI_HasProto(atomic_dec)                                         \
+      SymI_HasProto(hs_spt_lookup)                                      \
+      SymI_HasProto(hs_spt_insert)                                      \
+      SymI_HasProto(hs_spt_keys)                                        \
+      SymI_HasProto(hs_spt_key_count)                                   \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

@@ -749,6 +749,10 @@ zonkExpr env (HsProc pat body)
         ; new_body <- zonkCmdTop env1 body
         ; return (HsProc new_pat new_body) }
 
+-- StaticPointers extension
+zonkExpr env (HsStatic expr)
+  = HsStatic <$> zonkLExpr env expr
+
 zonkExpr env (HsWrap co_fn expr)
   = do (env1, new_co_fn) <- zonkCoFn env co_fn
        new_expr <- zonkExpr env1 expr

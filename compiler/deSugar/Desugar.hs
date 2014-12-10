@@ -49,6 +49,7 @@ import Coverage
 import Util
 import MonadUtils
 import OrdList
+import StaticPtrTable
 import Data.List
 import Data.IORef
 import Control.Monad( when )
@@ -91,7 +92,7 @@ deSugar hsc_env
                             tcg_tcs          = tcs,
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
-                            tcg_hpc          = other_hpc_info })
+                            tcg_hpc          = other_hpc_info})
 
   = do { let dflags = hsc_dflags hsc_env
              print_unqual = mkPrintUnqualified dflags rdr_env
@@ -121,13 +122,20 @@ deSugar hsc_env
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; ds_vects <- mapM dsVect vects
+                          ; stBinds <- dsGetStaticBindsVar >>=
+                                           liftIO . readIORef
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
+                                -- Stub to insert the static entries of the
+                                -- module into the static pointer table
+                                spt_init = sptInitCode mod stBinds
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
+                                                 `appOL` toOL (map snd stBinds)
                                    , spec_rules ++ ds_rules, ds_vects
-                                   , ds_fords `appendStubC` hpc_init) }
+                                   , ds_fords `appendStubC` hpc_init
+                                              `appendStubC` spt_init) }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;

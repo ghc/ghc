@@ -21,6 +21,13 @@ void *      removeHashTable ( HashTable *table, StgWord key, void *data );
 
 int keyCountHashTable (HashTable *table);
 
+// Puts up to keys_sz keys of the hash table into the given array. Returns the
+// actual amount of keys that have been retrieved.
+//
+// If the table is modified concurrently, the function behavior is undefined.
+//
+int keysHashTable(HashTable *table, StgWord keys[], int szKeys);
+
 /* Hash table access where the keys are C strings (the strings are
  * assumed to be allocated by the caller, and mustn't be deallocated
  * until the corresponding hash table entry has been removed).

@@ -487,6 +487,28 @@ tcExpr (HsProc pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
         ; return $ mkHsWrapCo coi (HsProc pat' cmd') }
 
+tcExpr (HsStatic expr) res_ty
+  = do  { staticPtrTyCon  <- tcLookupTyCon staticPtrTyConName
+        ; (co, [expr_ty]) <- matchExpectedTyConApp staticPtrTyCon res_ty
+        ; (expr', lie)    <- captureConstraints $
+            addErrCtxt (hang (ptext (sLit "In the body of a static form:"))
+                             2 (ppr expr)
+                       ) $
+            tcPolyExprNC expr expr_ty
+        -- Require the type of the argument to be Typeable.
+        -- The evidence is not used, but asking the constraint ensures that
+        -- the current implementation is as restrictive as future versions
+        -- of the StaticPointers extension.
+        ; typeableClass <- tcLookupClass typeableClassName
+        ; _ <- emitWanted StaticOrigin $
+                  mkTyConApp (classTyCon typeableClass)
+                             [liftedTypeKind, expr_ty]
+        -- Insert the static form in a global list for later validation.
+        ; stWC <- tcg_static_wc <$> getGblEnv
+        ; updTcRef stWC (andWC lie)
+        ; return $ mkHsWrapCo co $ HsStatic expr'
+        }
+
 {-
 Note [Rebindable syntax for if]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

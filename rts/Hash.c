@@ -206,6 +206,29 @@ lookupHashTable(HashTable *table, StgWord key)
     return NULL;
 }
 
+// Puts up to keys_sz keys of the hash table into the given array. Returns the
+// actual amount of keys that have been retrieved.
+//
+// If the table is modified concurrently, the function behavior is undefined.
+//
+int keysHashTable(HashTable *table, StgWord keys[], int szKeys) {
+    int segment;
+    int k = 0;
+    for(segment=0;segment<HDIRSIZE && table->dir[segment];segment+=1) {
+        int index;
+        for(index=0;index<HSEGSIZE;index+=1) {
+            HashList *hl;
+            for(hl=table->dir[segment][index];hl;hl=hl->next) {
+                if (k == szKeys)
+                  return k;
+                keys[k] = hl->key;
+                k += 1;
+            }
+        }
+    }
+    return k;
+}
+
 /* -----------------------------------------------------------------------------
  * We allocate the hashlist cells in large chunks to cut down on malloc
  * overhead.  Although we keep a free list of hashlist cells, we make

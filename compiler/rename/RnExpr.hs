@@ -307,6 +307,43 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 {-
 ************************************************************************
 *                                                                      *
+        Static values
+*                                                                      *
+************************************************************************
+
+For the static form we check that the free variables are all top-level
+value bindings. This is done by checking that the name is external or
+wired-in. See the Note about the NameSorts in Name.lhs.
+-}
+
+rnExpr e@(HsStatic expr) = do
+    (expr',fvExpr) <- rnLExpr expr
+    stage <- getStage
+    case stage of
+      Brack _ _ -> return () -- Don't check names if we are inside brackets.
+                             -- We don't want to reject cases like:
+                             -- \e -> [| static $(e) |]
+                             -- if $(e) turns out to produce a legal expression.
+      Splice _ -> addErr $ sep
+             [ text "static forms cannot be used in splices:"
+             , nest 2 $ ppr e
+             ]
+      _ -> do
+       let isTopLevelName n = isExternalName n || isWiredInName n
+       case nameSetElems $ filterNameSet (not . isTopLevelName) fvExpr of
+         [] -> return ()
+         fvNonGlobal -> addErr $ cat
+             [ text $ "Only identifiers of top-level bindings can "
+                      ++ "appear in the body of the static form:"
+             , nest 2 $ ppr e
+             , text "but the following identifiers were found instead:"
+             , nest 2 $ vcat $ map ppr fvNonGlobal
+             ]
+    return (HsStatic expr', fvExpr)
+
+{-
+************************************************************************
+*                                                                      *
         Arrow notation
 *                                                                      *
 ************************************************************************

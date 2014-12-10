@@ -10388,6 +10388,131 @@ Assertion failures can be caught, see the documentation for the
 
 </sect1>
 
+<!-- =============================== STATIC POINTERS ===========================  -->
+
+<sect1 id="static-pointers">
+<title>Static pointers
+<indexterm><primary>Static pointers</primary></indexterm>
+</title>
+
+<para>
+The language extension <literal>-XStaticPointers</literal> adds a new
+syntactic form <literal>static <replaceable>e</replaceable></literal>,
+which stands for a reference to the closed expression
+<replaceable>e</replaceable>. This reference is stable and portable,
+in the sense that it remains valid across different processes on
+possibly different machines. Thus, a process can create a reference
+and send it to another process that can resolve it to
+<replaceable>e</replaceable>.
+</para>
+<para>
+With this extension turned on, <literal>static</literal> is no longer
+a valid identifier.
+</para>
+<para>
+Static pointers were first proposed in the paper <ulink
+url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/remote.pdf">
+Towards Haskell in the cloud</ulink>, Jeff Epstein, Andrew P. Black and Simon
+Peyton-Jones, Proceedings of the 4th ACM Symposium on Haskell, pp.
+118-129, ACM, 2011.
+</para>
+
+<sect2 id="using-static-pointers">
+<title>Using static pointers</title>
+
+<para>
+Each reference is given a key which can be used to locate it at runtime with
+<ulink url="&libraryBaseLocation;/GHC.StaticPtr.html#v%3AunsafeLookupStaticPtr"><literal>unsafeLookupStaticPtr</literal></ulink>
+which uses a global and immutable table called the Static Pointer Table.
+The compiler includes entries in this table for all static forms found in
+the linked modules. The value can be obtained from the reference via
+<ulink url="&libraryBaseLocation;/GHC.StaticPtr.html#v%3AdeRefStaticPtr"><literal>deRefStaticPtr</literal></ulink>
+</para>
+
+<para>
+The body <literal>e</literal> of a <literal>static
+e</literal> expression must be a closed expression. That is, there can
+be no free variables occurring in <literal>e</literal>, i.e. lambda-
+or let-bound variables bound locally in the context of the expression.
+</para>
+
+<para>
+All of the following are permissible:
+<programlisting>
+inc :: Int -> Int
+inc x = x + 1
+
+ref1 = static 1
+ref2 = static inc
+ref3 = static (inc 1)
+ref4 = static ((\x -> x + 1) (1 :: Int))
+ref5 y = static (let x = 1 in x)
+</programlisting>
+While the following definitions are rejected:
+<programlisting>
+ref6 = let x = 1 in static x
+ref7 y = static (let x = 1 in y)
+</programlisting>
+Note that currently, the body <literal>e</literal> in <literal>static
+e</literal> is restricted to a single identifier when at the GHCi
+prompt.
+</para>
+</sect2>
+
+<sect2 id="typechecking-static-pointers">
+<title>Static semantics of static pointers</title>
+
+<para>
+
+Informally, if we have a closed expression
+<programlisting>
+e :: forall a_1 ... a_n . t
+</programlisting>
+the static form is of type
+<programlisting>
+static e :: (Typeable a_1, ... , Typeable a_n) => StaticPtr t
+</programlisting>
+Furthermore, type <literal>t</literal> is constrained to have a
+<literal>Typeable</literal> instance.
+
+The following are therefore illegal:
+<programlisting>
+static show                    -- No Typeable instance for (Show a => a -> String)
+static Control.Monad.ST.runST  -- No Typeable instance for ((forall s. ST s a) -> a)
+</programlisting>
+
+That being said, with the appropriate use of wrapper datatypes, the
+above limitations induce no loss of generality:
+<programlisting>
+{-# LANGUAGE ConstraintKinds           #-}
+{-# LANGUAGE DerivingDataTypeable      #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE Rank2Types                #-}
+{-# LANGUAGE StandaloneDeriving        #-}
+{-# LANGUAGE StaticPointers            #-}
+
+import Control.Monad.ST
+import GHC.StaticPtr
+
+data Dict c = c => Dict
+  deriving Typeable
+
+g1 :: Typeable a => StaticPtr (Dict (Show a) -> a -> String)
+g1 = static (\Dict -> show)
+
+data Rank2Wrapper f = R2W (forall s. f s)
+  deriving Typeable
+newtype Flip f a s = Flip { unFlip :: f s a }
+  deriving Typeable
+
+g2 :: Typeable a => StaticPtr (Rank2Wrapper (Flip ST a) -> a)
+g2 = static (\(R2W f) -> runST (unFlip f))
+</programlisting>
+</para>
+</sect2>
+
+</sect1>
+
 
 <!-- =============================== PRAGMAS ===========================  -->
 

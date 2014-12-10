@@ -40,5 +40,7 @@ test('mc08', normal, compile_and_run, [''])
 test('T5742', normal, compile_and_run, [''])
 test('DsLambdaCase', when(compiler_lt('ghc', '7.5'), skip), compile_and_run, [''])
 test('DsMultiWayIf', when(compiler_lt('ghc', '7.5'), skip), compile_and_run, [''])
+test('DsStaticPointers',
+     when(compiler_lt('ghc', '7.9'), skip), compile_and_run, [''])
 test('T8952', normal, compile_and_run, [''])
 test('T9844', normal, compile_and_run, [''])

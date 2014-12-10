@@ -464,6 +464,8 @@ tcRnSrcDecls boot_iface exports decls
       ; traceTc "Tc8" empty ;
       ; setEnvs (tcg_env, tcl_env) $
    do {
+        -- wanted constraints from static forms
+        stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;
 
              --         Finish simplifying class constraints
              --
@@ -480,7 +482,7 @@ tcRnSrcDecls boot_iface exports decls
              --  * the local env exposes the local Ids to simplifyTop,
              --    so that we get better error messages (monomorphism restriction)
         new_ev_binds <- {-# SCC "simplifyTop" #-}
-                        simplifyTop lie ;
+                        simplifyTop (andWC stWC lie) ;
         traceTc "Tc9" empty ;
 
         failIfErrsM ;   -- Don't zonk if there have been errors
@@ -1669,9 +1671,12 @@ tcGhciStmts stmts
                         -- Look up the names right in the middle,
                         -- where they will all be in scope
 
+        -- wanted constraints from static forms
+        stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;
+
         -- Simplify the context
         traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
-        const_binds <- checkNoErrs (simplifyInteractive lie) ;
+        const_binds <- checkNoErrs (simplifyInteractive (andWC stWC lie)) ;
                 -- checkNoErrs ensures that the plan fails if context redn fails
 
         traceTc "TcRnDriver.tcGhciStmts: done" empty ;
@@ -1756,7 +1761,11 @@ tcRnExpr hsc_env rdr_expr
                                                     False {- No MR for now -}
                                                     [(fresh_it, res_ty)]
                                                     lie ;
-    _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
+    -- wanted constraints from static forms
+    stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;
+
+    -- Ignore the dictionary bindings
+    _ <- simplifyInteractive (andWC stWC lie_top) ;
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
     zonkTcType all_expr_ty
@@ -1833,7 +1842,11 @@ tcRnDeclsi hsc_env local_decls =
         captureConstraints $ tc_rn_src_decls emptyModDetails local_decls
     setEnvs (tcg_env, tclcl_env) $ do
 
-    new_ev_binds <- simplifyTop lie
+    -- wanted constraints from static forms
+    stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef
+
+    new_ev_binds <- simplifyTop (andWC stWC lie)
+
     failIfErrsM
     let TcGblEnv { tcg_type_env  = type_env,
                    tcg_binds     = binds,

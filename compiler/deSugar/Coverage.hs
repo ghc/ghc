@@ -533,6 +533,9 @@ addTickHsExpr (ExplicitPArr ty es) =
         liftM2 ExplicitPArr
                 (return ty)
                 (mapM (addTickLHsExpr) es)
+
+addTickHsExpr (HsStatic e) = HsStatic <$> addTickLHsExpr e
+
 addTickHsExpr (RecordCon id ty rec_binds) =
         liftM3 RecordCon
                 (return id)

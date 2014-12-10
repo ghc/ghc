@@ -31,6 +31,7 @@ import DsMeta
 
 import HsSyn
 
+import Platform
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
 import TcType
@@ -52,6 +53,7 @@ import VarEnv
 import ConLike
 import DataCon
 import TysWiredIn
+import PrelNames
 import BasicTypes
 import Maybes
 import SrcLoc
@@ -60,7 +62,11 @@ import Bag
 import Outputable
 import FastString
 
+import IdInfo
+import Data.IORef       ( atomicModifyIORef, modifyIORef )
+
 import Control.Monad
+import GHC.Fingerprint
 
 {-
 ************************************************************************
@@ -388,6 +394,78 @@ dsExpr (PArrSeq _ _)
   = panic "DsExpr.dsExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer and typechecker
     -- shouldn't have let it through
+
+{-
+\noindent
+\underline{\bf Static Pointers}
+               ~~~~~~~~~~~~~~~
+\begin{verbatim}
+    g = ... static f ...
+==>
+    sptEntry:N = StaticPtr
+        (fingerprintString "pkgId:module.sptEntry:N")
+        (StaticPtrInfo "current pkg id" "current module" "sptEntry:0")
+        f
+    g = ... sptEntry:N
+\end{verbatim}
+-}
+
+dsExpr (HsStatic expr@(L loc _)) = do
+    expr_ds <- dsLExpr expr
+    let ty = exprType expr_ds
+    n' <- mkSptEntryName loc
+    static_binds_var <- dsGetStaticBindsVar
+
+    staticPtrTyCon       <- dsLookupTyCon   staticPtrTyConName
+    staticPtrInfoDataCon <- dsLookupDataCon staticPtrInfoDataConName
+    staticPtrDataCon     <- dsLookupDataCon staticPtrDataConName
+    fingerprintDataCon   <- dsLookupDataCon fingerprintDataConName
+
+    dflags <- getDynFlags
+    let (line, col) = case loc of
+           RealSrcSpan r -> ( srcLocLine $ realSrcSpanStart r
+                            , srcLocCol  $ realSrcSpanStart r
+                            )
+           _             -> (0, 0)
+        srcLoc = mkCoreConApps (tupleCon BoxedTuple 2)
+                     [ Type intTy              , Type intTy
+                     , mkIntExprInt dflags line, mkIntExprInt dflags col
+                     ]
+    info <- mkConApp staticPtrInfoDataCon <$>
+            (++[srcLoc]) <$>
+            mapM mkStringExprFS
+                 [ packageKeyFS $ modulePackageKey $ nameModule n'
+                 , moduleNameFS $ moduleName $ nameModule n'
+                 , occNameFS    $ nameOccName n'
+                 ]
+    let tvars = varSetElems $ tyVarsOfType ty
+        speTy = mkForAllTys tvars $ mkTyConApp staticPtrTyCon [ty]
+        speId = mkExportedLocalId VanillaId n' speTy
+        fp@(Fingerprint w0 w1) = fingerprintName $ idName speId
+        fp_core = mkConApp fingerprintDataCon
+                    [ mkWord64LitWordRep dflags w0
+                    , mkWord64LitWordRep dflags w1
+                    ]
+        sp    = mkConApp staticPtrDataCon [Type ty, fp_core, info, expr_ds]
+    liftIO $ modifyIORef static_binds_var ((fp, (speId, mkLams tvars sp)) :)
+    putSrcSpanDs loc $ return $ mkTyApps (Var speId) (map mkTyVarTy tvars)
+
+  where
+
+    -- | Choose either 'Word64#' or 'Word#' to represent the arguments of the
+    -- 'Fingerprint' data constructor.
+    mkWord64LitWordRep dflags
+      | platformWordSize (targetPlatform dflags) < 8 = mkWord64LitWord64
+      | otherwise = mkWordLit dflags . toInteger
+
+    fingerprintName :: Name -> Fingerprint
+    fingerprintName n = fingerprintString $ unpackFS $ concatFS
+        [ packageKeyFS $ modulePackageKey $ nameModule n
+        , fsLit ":"
+        , moduleNameFS (moduleName $ nameModule n)
+        , fsLit "."
+        , occNameFS $ occName n
+        ]
 
 {-
 \noindent
@@ -857,3 +935,34 @@ badMonadBind rhs elt_ty flag_doc
          , hang (ptext (sLit "Suppress this warning by saying"))
               2 (quotes $ ptext (sLit "_ <-") <+> ppr rhs)
          , ptext (sLit "or by using the flag") <+>  flag_doc ]
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Static pointers}
+*                                                                      *
+************************************************************************
+-}
+
+-- | Creates an name for an entry in the Static Pointer Table.
+--
+-- The name has the form @sptEntry:<N>@ where @<N>@ is generated from a
+-- per-module counter.
+--
+mkSptEntryName :: SrcSpan -> DsM Name
+mkSptEntryName loc = do
+    uniq <- newUnique
+    mod  <- getModule
+    occ  <- mkWrapperName "sptEntry"
+    return $ mkExternalName uniq mod occ loc
+  where
+    mkWrapperName what
+      = do dflags <- getDynFlags
+           thisMod <- getModule
+           let -- Note [Generating fresh names for ccall wrapper]
+               -- in compiler/typecheck/TcEnv.hs
+               wrapperRef = nextWrapperNum dflags
+           wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
+               let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
+                in (extendModuleEnv mod_env thisMod (num+1), num)
+           return $ mkVarOcc $ what ++ ":" ++ show wrapperNum

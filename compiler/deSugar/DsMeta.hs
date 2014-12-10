@@ -1092,6 +1092,7 @@ repE (ArithSeq _ _ aseq) =
                              repFromThenTo ds1 ds2 ds3
 
 repE (HsSpliceE _ splice)  = repSplice splice
+repE (HsStatic e)          = repLE e >>= rep2 staticEName . (:[]) . unC
 repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
@@ -2125,7 +2126,7 @@ templateHaskellNames = [
     tupEName, unboxedTupEName,
     condEName, multiIfEName, letEName, caseEName, doEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
-    listEName, sigEName, recConEName, recUpdEName,
+    listEName, sigEName, recConEName, recUpdEName, staticEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -2307,7 +2308,7 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 varEName, conEName, litEName, appEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
     unboxedTupEName, condEName, multiIfEName, letEName, caseEName,
-    doEName, compEName :: Name
+    doEName, compEName, staticEName :: Name
 varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
 litEName        = libFun (fsLit "litE")        litEIdKey
@@ -2338,6 +2339,7 @@ listEName       = libFun (fsLit "listE")       listEIdKey
 sigEName        = libFun (fsLit "sigE")        sigEIdKey
 recConEName     = libFun (fsLit "recConE")     recConEIdKey
 recUpdEName     = libFun (fsLit "recUpdE")     recUpdEIdKey
+staticEName     = libFun (fsLit "staticE")     staticEIdKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -2680,7 +2682,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
     unboxedTupEIdKey, condEIdKey, multiIfEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
-    listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey :: Unique
+    listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey :: Unique
 varEIdKey         = mkPreludeMiscIdUnique 270
 conEIdKey         = mkPreludeMiscIdUnique 271
 litEIdKey         = mkPreludeMiscIdUnique 272
@@ -2707,6 +2709,7 @@ listEIdKey        = mkPreludeMiscIdUnique 292
 sigEIdKey         = mkPreludeMiscIdUnique 293
 recConEIdKey      = mkPreludeMiscIdUnique 294
 recUpdEIdKey      = mkPreludeMiscIdUnique 295
+staticEIdKey      = mkPreludeMiscIdUnique 296
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
