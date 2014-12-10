@@ -1,6 +1,11 @@
 {-# LANGUAGE CPP #-}
 
-module TcCanonical( canonicalize ) where
+module TcCanonical( 
+     canonicalize,
+     unifyDerived,
+
+     StopOrContinue(..), stopWith, continueWith
+  ) where
 
 #include "HsVersions.h"
 
@@ -18,12 +23,14 @@ import Var
 import Name( isSystemName )
 import OccName( OccName )
 import Outputable
-import Control.Monad    ( when )
+import Control.Monad
 import DynFlags( DynFlags )
 import VarSet
 
+import Pair
 import Util
 import BasicTypes
+import FastString
 
 {-
 ************************************************************************
@@ -427,7 +434,9 @@ can_eq_nc' ev (TyConApp tc1 _) ps_ty1 (FunTy {}) ps_ty2
   = canEqFailure ev ps_ty1 ps_ty2
 
 can_eq_nc' ev (FunTy s1 t1) _ (FunTy s2 t2) _
-  = canDecomposableTyConAppOK ev funTyCon [s1,t1] [s2,t2]
+  = do { canDecomposableTyConAppOK ev funTyCon [s1,t1] [s2,t2]
+       ; stopWith ev "Decomposed FunTyCon" }
+
 
 can_eq_nc' ev (FunTy {}) ps_ty1 (TyConApp tc2 _) ps_ty2
   | isDecomposableTyCon tc2
@@ -517,14 +526,11 @@ try_decompose_app ev ty1 ty2
        = do { emitNewDerived loc (mkTcEqPred t1 t2)
             ; try_decompose_app ev s1 s2 }
        | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
-       = do { (ev_s,fr_s) <- newWantedEvVar loc (mkTcEqPred s1 s2)
-            ; (ev_t,fr_t) <- newWantedEvVar loc (mkTcEqPred t1 t2)
-            ; let co = mkTcAppCo (ctEvCoercion ev_s) (ctEvCoercion ev_t)
+       = do { ev_s <- newWantedEvVarNC loc (mkTcEqPred s1 s2)
+            ; co_t <- unifyWanted loc t1 t2
+            ; let co = mkTcAppCo (ctEvCoercion ev_s) co_t
             ; setEvBind evar (EvCoercion co)
-            ; when (isFresh fr_t) $ emitWorkNC [ev_t]
-            ; case fr_s of
-                Fresh  -> try_decompose_app ev_s s1 s2
-                Cached -> return (Stop ev (text "Decomposed app")) }
+            ; try_decompose_app ev_s s1 s2 }
        | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- ev
        = do { let co   = evTermCoercion ev_tm
                   co_s = mkTcLRCo CLeft  co
@@ -541,25 +547,38 @@ canDecomposableTyConApp :: CtEvidence
                         -> TyCon -> [TcType]
                         -> TyCon -> [TcType]
                         -> TcS (StopOrContinue Ct)
+-- See Note [Decomposing TyConApps]
 canDecomposableTyConApp ev tc1 tys1 tc2 tys2
   | tc1 /= tc2 || length tys1 /= length tys2
     -- Fail straight away for better error messages
   = canEqFailure ev (mkTyConApp tc1 tys1) (mkTyConApp tc2 tys2)
   | otherwise
   = do { traceTcS "canDecomposableTyConApp" (ppr ev $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
-       ; canDecomposableTyConAppOK ev tc1 tys1 tys2 }
+       ; canDecomposableTyConAppOK ev tc1 tys1 tys2
+       ; stopWith ev "Decomposed TyConApp" }
 
 canDecomposableTyConAppOK :: CtEvidence
                           -> TyCon -> [TcType] -> [TcType]
-                          -> TcS (StopOrContinue Ct)
-
+                          -> TcS ()
+-- Precondition: tys1 and tys2 are the same length, hence "OK"
 canDecomposableTyConAppOK ev tc1 tys1 tys2
-  = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo Nominal tc1 (map evTermCoercion xs))
-             xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
-             xev = XEvTerm (zipWith mkTcEqPred tys1 tys2) xcomp xdecomp
-       ; xCtEvidence ev xev
-       ; stopWith ev "Decomposed TyConApp" }
+  = case ev of
+     CtDerived { ctev_loc = loc }
+        -> mapM_ (unifyDerived loc) (zipWith Pair tys1 tys2)
 
+     CtWanted { ctev_evar = evar, ctev_loc = loc }
+        -> do { cos <- zipWithM (unifyWanted loc) tys1 tys2
+              ; setEvBind evar (EvCoercion (mkTcTyConAppCo Nominal tc1 cos)) }
+
+     CtGiven { ctev_evtm = ev_tm, ctev_loc = loc }
+        -> do { given_evs <- newGivenEvVars loc $
+                             zipWith3 (mk_given ev_tm) tys1 tys2 [0..]
+              ; emitWorkNC given_evs }
+  where
+    mk_given ev_tm ty1 ty2 i
+       = (mkTcEqPred ty1 ty2, EvCoercion (mkTcNthCo i (evTermCoercion ev_tm)))
+
+--------------------
 canEqFailure :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqFailure ev ty1 ty2
@@ -572,6 +591,20 @@ canEqFailure ev ty1 ty2
            Stop ev s -> pprPanic "canEqFailure" (s $$ ppr ev $$ ppr ty1 $$ ppr ty2) }
 
 {-
+Note [Decomposing TyConApps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we see (T s1 t1 ~ T s2 t2), then we can just decompose to
+  (s1 ~ s2, t1 ~ t2)
+and push those back into the work list.  But if
+  s1 = K k1    s2 = K k2
+then we will jus decomopose s1~s2, and it might be better to
+do so on the spot.  An important special case is where s1=s2,
+and we get just Refl.
+
+So canDecomposableTyCon is a fast-path decomposition that uses
+unifyWanted etc to short-cut that work.
+
+
 Note [Canonicalising type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given (s1 t1) ~ ty2, how should we proceed?
@@ -1027,3 +1060,321 @@ we first try expanding each of the ti to types which no longer contain
 a.  If this turns out to be impossible, we next try expanding F
 itself, and so on.  See Note [Occurs check expansion] in TcType
 -}
+
+{-
+************************************************************************
+*                                                                      *
+                  Evidence transformation
+*                                                                      *
+************************************************************************
+-}
+
+{-
+Note [xCtEvidence]
+~~~~~~~~~~~~~~~~~~
+A call might look like this:
+
+    xCtEvidence ev evidence-transformer
+
+  ev is Given   => use ev_decomp to create new Givens for ev_preds,
+                   and return them
+
+  ev is Wanted  => create new wanteds for ev_preds,
+                   use ev_comp to bind ev,
+                   return fresh wanteds (ie ones not cached in inert_cans or solved)
+
+  ev is Derived => create new deriveds for ev_preds
+                      (unless cached in inert_cans or solved)
+
+Note: The [CtEvidence] returned is a subset of the subgoal-preds passed in
+      Ones that are already cached are not returned
+
+Example
+    ev : Tree a b ~ Tree c d
+    xCtEvidence ev [a~c, b~d] (XEvTerm { ev_comp = \[c1 c2]. <Tree> c1 c2
+                                       , ev_decomp = \c. [nth 1 c, nth 2 c] })
+              (\fresh-goals.  stuff)
+
+Note [Bind new Givens immediately]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For Givens we make new EvVars and bind them immediately. We don't worry
+about caching, but we don't expect complicated calculations among Givens.
+It is important to bind each given:
+      class (a~b) => C a b where ....
+      f :: C a b => ....
+Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
+But that superclass selector can't (yet) appear in a coercion
+(see evTermCoercion), so the easy thing is to bind it to an Id.
+
+See Note [Coercion evidence terms] in TcEvidence.
+-}
+
+xCtEvidence :: CtEvidence            -- Original evidence
+            -> XEvTerm               -- Instructions about how to manipulate evidence
+            -> TcS ()
+
+xCtEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
+  = do { new_evars <- mapM (newWantedEvVar loc) ptys
+       ; setEvBind evar (comp_fn (map (ctEvTerm . fst) new_evars))
+       ; emitWorkNC (freshGoals new_evars) }
+         -- Note the "NC": these are fresh goals, not necessarily canonical
+
+xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
+  = ASSERT( equalLength ptys (decomp_fn tm) )
+    do { given_evs <- newGivenEvVars loc (ptys `zip` decomp_fn tm)
+       ; emitWorkNC given_evs }
+
+xCtEvidence (CtDerived { ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys })
+  = mapM_ (emitNewDerived loc) ptys
+
+-----------------------------
+data StopOrContinue a
+  = ContinueWith a    -- The constraint was not solved, although it may have
+                      --   been rewritten
+
+  | Stop CtEvidence   -- The (rewritten) constraint was solved
+         SDoc         -- Tells how it was solved
+                      -- Any new sub-goals have been put on the work list
+
+instance Functor StopOrContinue where
+  fmap f (ContinueWith x) = ContinueWith (f x)
+  fmap _ (Stop ev s)      = Stop ev s
+
+instance Outputable a => Outputable (StopOrContinue a) where
+  ppr (Stop ev s)      = ptext (sLit "Stop") <> parens s <+> ppr ev
+  ppr (ContinueWith w) = ptext (sLit "ContinueWith") <+> ppr w
+
+continueWith :: a -> TcS (StopOrContinue a)
+continueWith = return . ContinueWith
+
+stopWith :: CtEvidence -> String -> TcS (StopOrContinue a)
+stopWith ev s = return (Stop ev (text s))
+
+andWhenContinue :: TcS (StopOrContinue a)
+                -> (a -> TcS (StopOrContinue b))
+                -> TcS (StopOrContinue b)
+andWhenContinue tcs1 tcs2
+  = do { r <- tcs1
+       ; case r of
+           Stop ev s       -> return (Stop ev s)
+           ContinueWith ct -> tcs2 ct }
+
+rewriteEvidence :: CtEvidence   -- old evidence
+                -> TcPredType   -- new predicate
+                -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
+                -> TcS (StopOrContinue CtEvidence)
+-- Returns Just new_ev iff either (i)  'co' is reflexivity
+--                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
+-- In either case, there is nothing new to do with new_ev
+{-
+     rewriteEvidence old_ev new_pred co
+Main purpose: create new evidence for new_pred;
+              unless new_pred is cached already
+* Returns a new_ev : new_pred, with same wanted/given/derived flag as old_ev
+* If old_ev was wanted, create a binding for old_ev, in terms of new_ev
+* If old_ev was given, AND not cached, create a binding for new_ev, in terms of old_ev
+* Returns Nothing if new_ev is already cached
+
+        Old evidence    New predicate is               Return new evidence
+        flavour                                        of same flavor
+        -------------------------------------------------------------------
+        Wanted          Already solved or in inert     Nothing
+        or Derived      Not                            Just new_evidence
+
+        Given           Already in inert               Nothing
+                        Not                            Just new_evidence
+
+Note [Rewriting with Refl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the coercion is just reflexivity then you may re-use the same
+variable.  But be careful!  Although the coercion is Refl, new_pred
+may reflect the result of unification alpha := ty, so new_pred might
+not _look_ the same as old_pred, and it's vital to proceed from now on
+using new_pred.
+
+The flattener preserves type synonyms, so they should appear in new_pred
+as well as in old_pred; that is important for good error messages.
+ -}
+
+
+rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
+  = -- If derived, don't even look at the coercion.
+    -- This is very important, DO NOT re-order the equations for
+    -- rewriteEvidence to put the isTcReflCo test first!
+    -- Why?  Because for *Derived* constraints, c, the coercion, which
+    -- was produced by flattening, may contain suspended calls to
+    -- (ctEvTerm c), which fails for Derived constraints.
+    -- (Getting this wrong caused Trac #7384.)
+    do { mb_ev <- newDerived loc new_pred
+       ; case mb_ev of
+           Just new_ev -> continueWith new_ev
+           Nothing     -> stopWith old_ev "Cached derived" }
+
+rewriteEvidence old_ev new_pred co
+  | isTcReflCo co -- See Note [Rewriting with Refl]
+  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+
+rewriteEvidence (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
+  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
+       ; return (ContinueWith new_ev) }
+  where
+    new_tm = mkEvCast old_tm (mkTcSubCo (mkTcSymCo co))  -- mkEvCast optimises ReflCo
+
+rewriteEvidence ev@(CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
+  = do { (new_ev, freshness) <- newWantedEvVar loc new_pred
+       ; MASSERT( tcCoercionRole co == Nominal )
+       ; setEvBind evar (mkEvCast (ctEvTerm new_ev) (mkTcSubCo co))
+       ; case freshness of
+            Fresh  -> continueWith new_ev
+            Cached -> stopWith ev "Cached wanted" }
+
+
+rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
+                                        --              or orhs ~ olhs (swapped)
+                  -> SwapFlag
+                  -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
+                                        -- Should be zonked, because we use typeKind on nlhs/nrhs
+                  -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
+                  -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
+                  -> TcS (StopOrContinue CtEvidence)  -- Of type nlhs ~ nrhs
+-- For (rewriteEqEvidence (Given g olhs orhs) False nlhs nrhs lhs_co rhs_co)
+-- we generate
+-- If not swapped
+--      g1 : nlhs ~ nrhs = lhs_co ; g ; sym rhs_co
+-- If 'swapped'
+--      g1 : nlhs ~ nrhs = lhs_co ; Sym g ; sym rhs_co
+--
+-- For (Wanted w) we do the dual thing.
+-- New  w1 : nlhs ~ nrhs
+-- If not swapped
+--      w : olhs ~ orhs = sym lhs_co ; w1 ; rhs_co
+-- If swapped
+--      w : orhs ~ olhs = sym rhs_co ; sym w1 ; lhs_co
+--
+-- It's all a form of rewwriteEvidence, specialised for equalities
+rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
+  | CtDerived { ctev_loc = loc } <- old_ev
+  = do { mb <- newDerived loc new_pred
+       ; case mb of
+           Just new_ev -> continueWith new_ev
+           Nothing     -> stopWith old_ev "Cached derived" }
+
+  | NotSwapped <- swapped
+  , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
+  , isTcReflCo rhs_co
+  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+
+  | CtGiven { ctev_evtm = old_tm , ctev_loc = loc } <- old_ev
+  = do { let new_tm = EvCoercion (lhs_co
+                                  `mkTcTransCo` maybeSym swapped (evTermCoercion old_tm)
+                                  `mkTcTransCo` mkTcSymCo rhs_co)
+       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
+       ; return (ContinueWith new_ev) }
+
+  | CtWanted { ctev_evar = evar, ctev_loc = loc } <- old_ev
+  = do { new_evar <- newWantedEvVarNC loc new_pred
+       ; let co = maybeSym swapped $
+                  mkTcSymCo lhs_co
+                  `mkTcTransCo` ctEvCoercion new_evar
+                  `mkTcTransCo` rhs_co
+       ; setEvBind evar (EvCoercion co)
+       ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
+       ; return (ContinueWith new_evar) }
+
+  | otherwise
+  = panic "rewriteEvidence"
+  where
+    new_pred = mkTcEqPred nlhs nrhs
+
+{- Note [unifyWanted and unifyDerived]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When decomposing equalities we often create new wanted constraints for
+(s ~ t).  But what if s=t?  Then it'd be faster to return Refl right away.
+Similar remarks apply for Derived.
+
+Rather than making an equality test (which traverses the structure of the
+type, perhaps fruitlessly, unifyWanted traverses the common structure, and
+bales out when it finds a difference by creating a new Wanted constraint.
+But where it succeeds in finding common structure, it just builds a coercion
+to reflect it.
+-}
+
+unifyWanted :: CtLoc -> TcType -> TcType -> TcS TcCoercion
+-- Return coercion witnessing the equality of the two types,
+-- emitting new work equalities where necessary to achieve that
+-- Very good short-cut when the two types are equal, or nearly so
+-- See Note [unifyWanted and unifyDerived]
+unifyWanted loc orig_ty1 orig_ty2
+  = go orig_ty1 orig_ty2
+  where
+    go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
+
+    go (FunTy s1 t1) (FunTy s2 t2)
+      = do { co_s <- unifyWanted loc s1 s2
+           ; co_t <- unifyWanted loc t1 t2
+           ; return (mkTcTyConAppCo Nominal funTyCon [co_s,co_t]) }
+    go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+      | tc1 == tc2, isDecomposableTyCon tc1, tys1 `equalLength` tys2
+      = do { cos <- zipWithM (unifyWanted loc) tys1 tys2
+           ; return (mkTcTyConAppCo Nominal tc1 cos) }
+    go (TyVarTy tv) ty2
+      = do { mb_ty <- isFilledMetaTyVar_maybe tv
+           ; case mb_ty of
+                Just ty1' -> go ty1' ty2
+                Nothing   -> bale_out }
+    go ty1 (TyVarTy tv)
+      = do { mb_ty <- isFilledMetaTyVar_maybe tv
+           ; case mb_ty of
+                Just ty2' -> go ty1 ty2'
+                Nothing   -> bale_out }
+    go _ _ = bale_out
+
+    bale_out = do { ev <- newWantedEvVarNC loc (mkTcEqPred orig_ty1 orig_ty2)
+                  ; emitWorkNC [ev]
+                  ; return (ctEvCoercion ev) }
+
+unifyDeriveds :: CtLoc -> [TcType] -> [TcType] -> TcS ()
+-- See Note [unifyWanted and unifyDerived]
+unifyDeriveds loc tys1 tys2 = zipWithM_ (unify_derived loc) tys1 tys2
+
+unifyDerived :: CtLoc -> Pair TcType -> TcS ()
+-- See Note [unifyWanted and unifyDerived]
+unifyDerived loc (Pair ty1 ty2) = unify_derived loc ty1 ty2
+
+unify_derived :: CtLoc -> TcType -> TcType -> TcS ()
+-- Create new Derived and put it in the work list
+-- Should do nothing if the two types are equal
+-- See Note [unifyWanted and unifyDerived]
+unify_derived loc orig_ty1 orig_ty2
+  = go orig_ty1 orig_ty2
+  where
+    go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
+
+    go (FunTy s1 t1) (FunTy s2 t2)
+      = do { unify_derived loc s1 s2
+           ; unify_derived loc t1 t2 }
+    go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+      | tc1 == tc2, isDecomposableTyCon tc1, tys1 `equalLength` tys2
+      = unifyDeriveds loc tys1 tys2
+    go (TyVarTy tv) ty2
+      = do { mb_ty <- isFilledMetaTyVar_maybe tv
+           ; case mb_ty of
+                Just ty1' -> go ty1' ty2
+                Nothing   -> bale_out }
+    go ty1 (TyVarTy tv)
+      = do { mb_ty <- isFilledMetaTyVar_maybe tv
+           ; case mb_ty of
+                Just ty2' -> go ty1 ty2'
+                Nothing   -> bale_out }
+    go _ _ = bale_out
+
+    bale_out = emitNewDerived loc (mkTcEqPred orig_ty1 orig_ty2)
+
+maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
+maybeSym IsSwapped  co = mkTcSymCo co
+maybeSym NotSwapped co = co

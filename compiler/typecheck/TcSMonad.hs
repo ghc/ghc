@@ -26,18 +26,11 @@ module TcSMonad (
     XEvTerm(..),
     Freshness(..), freshGoals, isFresh,
 
-    StopOrContinue(..), continueWith, stopWith, andWhenContinue,
-
-    xCtEvidence,        -- Transform a CtEvidence during a step
-    rewriteEvidence,    -- Specialized version of xCtEvidence for coercions
-    rewriteEqEvidence,  -- Yet more specialised, for equality coercions
-    maybeSym,
-
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
     setWantedTyBind, reportUnifications,
     setEvBind,
-    newEvVar, newGivenEvVar,
-    emitNewDerived, emitNewDerivedEq,
+    newEvVar, newGivenEvVar, newGivenEvVars,
+    newDerived, emitNewDerived,
     instDFunConstraints,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
@@ -134,13 +127,12 @@ import Util
 import Id
 import TcRnTypes
 
-import BasicTypes
 import Unique
 import UniqFM
 import Maybes ( orElse, firstJusts )
 
 import TrieMap
-import Control.Monad( ap, when, unless )
+import Control.Monad( ap, when, unless, MonadPlus(..) )
 import MonadUtils
 import Data.IORef
 import Data.List ( partition, foldl' )
@@ -821,16 +813,12 @@ lookupFlatCache fam_tc tys
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
 lookupInInerts loc pty
+  | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
-       ; return $ case (classifyPredType pty) of
-           ClassPred cls tys
-              | Just ev <- lookupSolvedDict inerts loc cls tys
-              -> Just ev
-              | otherwise
-              -> lookupInertDict (inert_cans inerts) loc cls tys
-
-           _other -> Nothing -- NB: No caching for equalities, IPs, holes, or errors
-      }
+       ; return (lookupSolvedDict inerts loc cls tys `mplus`
+                 lookupInertDict (inert_cans inerts) loc cls tys) }
+  | otherwise -- NB: No caching for equalities, IPs, holes, or errors
+  = return Nothing
 
 lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
@@ -1647,98 +1635,27 @@ newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
+-- Precondition: this is not a kind equality
+--               See Note [Do not create Given kind equalities]
 newGivenEvVar loc (pred, rhs)
-  = do { new_ev <- newEvVar pred
+  = ASSERT2( not (isKindEquality pred), ppr pred $$ pprCtOrigin (ctLocOrigin loc) )
+    do { new_ev <- newEvVar pred
        ; setEvBind new_ev rhs
        ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev, ctev_loc = loc }) }
 
-newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
--- Don't look up in the solved/inerts; we know it's not there
-newWantedEvVarNC loc pty
-  = do { new_ev <- newEvVar pty
-       ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
+newGivenEvVars :: CtLoc -> [(TcPredType, EvTerm)] -> TcS [CtEvidence]
+-- Like newGivenEvVar, but automatically discard kind equalities
+-- See Note [Do not create Given kind equalities]
+newGivenEvVars loc pts = mapM (newGivenEvVar loc) (filterOut (isKindEquality . fst) pts)
 
-newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
-newWantedEvVar loc pty
-  = do { mb_ct <- lookupInInerts loc pty
-       ; case mb_ct of
-            Just ctev | not (isDerived ctev)
-                      -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
-                            ; return (ctev, Cached) }
-            _ -> do { ctev <- newWantedEvVarNC loc pty
-                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
-                    ; return (ctev, Fresh) } }
+isKindEquality :: TcPredType -> Bool
+-- See Note [Do not create Given kind equalities]
+isKindEquality pred = case classifyPredType pred of
+                        EqPred t1 _ -> isKind t1
+                        _           -> False
 
-emitNewDerivedEq :: CtLoc -> Pair TcType -> TcS ()
--- Create new Derived and put it in the work list
-emitNewDerivedEq loc (Pair ty1 ty2)
-  | ty1 `tcEqType` ty2   -- Quite common!
-  = return ()
-  | otherwise
-  = emitNewDerived loc (mkTcEqPred ty1 ty2)
-
-emitNewDerived :: CtLoc -> TcPredType -> TcS ()
--- Create new Derived and put it in the work list
-emitNewDerived loc pred
-  = do { mb_ev <- newDerived loc pred
-       ; case mb_ev of
-           Nothing -> return ()
-           Just ev -> do { traceTcS "Emitting [D]" (ppr ev)
-                         ; updWorkListTcS (extendWorkListCt (mkNonCanonical ev)) } }
-
-newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
--- Returns Nothing    if cached,
---         Just pred  if not cached
-newDerived loc pred
-  = do { mb_ct <- lookupInInerts loc pred
-       ; return (case mb_ct of
-                    Just {} -> Nothing
-                    Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }
-
-instDFunConstraints :: CtLoc -> TcThetaType -> TcS [(CtEvidence, Freshness)]
-instDFunConstraints loc = mapM (newWantedEvVar loc)
-
-{-
-Note [xCtEvidence]
-~~~~~~~~~~~~~~~~~~
-A call might look like this:
-
-    xCtEvidence ev evidence-transformer
-
-  ev is Given   => use ev_decomp to create new Givens for ev_preds,
-                   and return them
-
-  ev is Wanted  => create new wanteds for ev_preds,
-                   use ev_comp to bind ev,
-                   return fresh wanteds (ie ones not cached in inert_cans or solved)
-
-  ev is Derived => create new deriveds for ev_preds
-                      (unless cached in inert_cans or solved)
-
-Note: The [CtEvidence] returned is a subset of the subgoal-preds passed in
-      Ones that are already cached are not returned
-
-Example
-    ev : Tree a b ~ Tree c d
-    xCtEvidence ev [a~c, b~d] (XEvTerm { ev_comp = \[c1 c2]. <Tree> c1 c2
-                                       , ev_decomp = \c. [nth 1 c, nth 2 c] })
-              (\fresh-goals.  stuff)
-
-Note [Bind new Givens immediately]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For Givens we make new EvVars and bind them immediately. We don't worry
-about caching, but we don't expect complicated calculations among Givens.
-It is important to bind each given:
-      class (a~b) => C a b where ....
-      f :: C a b => ....
-Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
-But that superclass selector can't (yet) appear in a coercion
-(see evTermCoercion), so the easy thing is to bind it to an Id.
-
-See Note [Coercion evidence terms] in TcEvidence.
-
-Note [Do not create Given kind equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Do not create Given kind equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do not want to create a Given kind equality like
 
    [G]  kv ~ k   -- kv is a skolem kind variable
@@ -1772,198 +1689,45 @@ as an Irreducible (see Note [Equalities with incompatible kinds] in
 TcCanonical), and will do no harm.
 -}
 
-xCtEvidence :: CtEvidence            -- Original evidence
-            -> XEvTerm               -- Instructions about how to manipulate evidence
-            -> TcS ()
+newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
+-- Don't look up in the solved/inerts; we know it's not there
+newWantedEvVarNC loc pty
+  = do { new_ev <- newEvVar pty
+       ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
-xCtEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
-  = do { new_evars <- mapM (newWantedEvVar loc) ptys
-       ; setEvBind evar (comp_fn (map (ctEvTerm . fst) new_evars))
-       ; emitWorkNC (freshGoals new_evars) }
-         -- Note the "NC": these are fresh goals, not necessarily canonical
+newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
+-- For anything except ClassPred, this is the same as newWantedEvVarNC
+newWantedEvVar loc pty
+  = do { mb_ct <- lookupInInerts loc pty
+       ; case mb_ct of
+            Just ctev | not (isDerived ctev)
+                      -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
+                            ; return (ctev, Cached) }
+            _ -> do { ctev <- newWantedEvVarNC loc pty
+                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
+                    ; return (ctev, Fresh) } }
 
-xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
-  = ASSERT( equalLength ptys (decomp_fn tm) )
-    do { given_evs <- mapM (newGivenEvVar loc) $    -- See Note [Bind new Givens immediately]
-                      filterOut bad_given_pred (ptys `zip` decomp_fn tm)
-       ; emitWorkNC given_evs }
-  where
-    -- See Note [Do not create Given kind equalities]
-    bad_given_pred (pred_ty, _)
-      | EqPred t1 _ <- classifyPredType pred_ty
-      = isKind t1
-      | otherwise
-      = False
-
-xCtEvidence (CtDerived { ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys })
-  = mapM_ (emitNewDerived loc) ptys
-
------------------------------
-data StopOrContinue a
-  = ContinueWith a    -- The constraint was not solved, although it may have
-                      --   been rewritten
-
-  | Stop CtEvidence   -- The (rewritten) constraint was solved
-         SDoc         -- Tells how it was solved
-                      -- Any new sub-goals have been put on the work list
-
-instance Functor StopOrContinue where
-  fmap f (ContinueWith x) = ContinueWith (f x)
-  fmap _ (Stop ev s)      = Stop ev s
-
-instance Outputable a => Outputable (StopOrContinue a) where
-  ppr (Stop ev s)      = ptext (sLit "Stop") <> parens s <+> ppr ev
-  ppr (ContinueWith w) = ptext (sLit "ContinueWith") <+> ppr w
-
-continueWith :: a -> TcS (StopOrContinue a)
-continueWith = return . ContinueWith
-
-stopWith :: CtEvidence -> String -> TcS (StopOrContinue a)
-stopWith ev s = return (Stop ev (text s))
-
-andWhenContinue :: TcS (StopOrContinue a)
-                -> (a -> TcS (StopOrContinue b))
-                -> TcS (StopOrContinue b)
-andWhenContinue tcs1 tcs2
-  = do { r <- tcs1
-       ; case r of
-           Stop ev s       -> return (Stop ev s)
-           ContinueWith ct -> tcs2 ct }
-
-rewriteEvidence :: CtEvidence   -- old evidence
-                -> TcPredType   -- new predicate
-                -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
-                -> TcS (StopOrContinue CtEvidence)
--- Returns Just new_ev iff either (i)  'co' is reflexivity
---                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
--- In either case, there is nothing new to do with new_ev
-{-
-     rewriteEvidence old_ev new_pred co
-Main purpose: create new evidence for new_pred;
-              unless new_pred is cached already
-* Returns a new_ev : new_pred, with same wanted/given/derived flag as old_ev
-* If old_ev was wanted, create a binding for old_ev, in terms of new_ev
-* If old_ev was given, AND not cached, create a binding for new_ev, in terms of old_ev
-* Returns Nothing if new_ev is already cached
-
-        Old evidence    New predicate is               Return new evidence
-        flavour                                        of same flavor
-        -------------------------------------------------------------------
-        Wanted          Already solved or in inert     Nothing
-        or Derived      Not                            Just new_evidence
-
-        Given           Already in inert               Nothing
-                        Not                            Just new_evidence
-
-Note [Rewriting with Refl]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the coercion is just reflexivity then you may re-use the same
-variable.  But be careful!  Although the coercion is Refl, new_pred
-may reflect the result of unification alpha := ty, so new_pred might
-not _look_ the same as old_pred, and it's vital to proceed from now on
-using new_pred.
-
-The flattener preserves type synonyms, so they should appear in new_pred
-as well as in old_pred; that is important for good error messages.
- -}
-
-
-rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
-  = -- If derived, don't even look at the coercion.
-    -- This is very important, DO NOT re-order the equations for
-    -- rewriteEvidence to put the isTcReflCo test first!
-    -- Why?  Because for *Derived* constraints, c, the coercion, which
-    -- was produced by flattening, may contain suspended calls to
-    -- (ctEvTerm c), which fails for Derived constraints.
-    -- (Getting this wrong caused Trac #7384.)
-    do { mb_ev <- newDerived loc new_pred
+emitNewDerived :: CtLoc -> TcPredType -> TcS ()
+-- Create new Derived and put it in the work list
+emitNewDerived loc pred
+  = do { mb_ev <- newDerived loc pred
        ; case mb_ev of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
+           Nothing -> return ()
+           Just ev -> do { traceTcS "Emitting [D]" (ppr ev)
+                         ; updWorkListTcS (extendWorkListCt (mkNonCanonical ev)) } }
 
-rewriteEvidence old_ev new_pred co
-  | isTcReflCo co -- See Note [Rewriting with Refl]
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
+-- Returns Nothing    if cached,
+--         Just pred  if not cached
+newDerived loc pred
+  = do { mb_ct <- lookupInInerts loc pred
+       ; return (case mb_ct of
+                    Just {} -> Nothing
+                    Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }
 
-rewriteEvidence (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
-  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
-       ; return (ContinueWith new_ev) }
-  where
-    new_tm = mkEvCast old_tm (mkTcSubCo (mkTcSymCo co))  -- mkEvCast optimises ReflCo
+instDFunConstraints :: CtLoc -> TcThetaType -> TcS [(CtEvidence, Freshness)]
+instDFunConstraints loc = mapM (newWantedEvVar loc)
 
-rewriteEvidence ev@(CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
-  = do { (new_ev, freshness) <- newWantedEvVar loc new_pred
-       ; MASSERT( tcCoercionRole co == Nominal )
-       ; setEvBind evar (mkEvCast (ctEvTerm new_ev) (mkTcSubCo co))
-       ; case freshness of
-            Fresh  -> continueWith new_ev
-            Cached -> stopWith ev "Cached wanted" }
-
-
-rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
-                                        --              or orhs ~ olhs (swapped)
-                  -> SwapFlag
-                  -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
-                                        -- Should be zonked, because we use typeKind on nlhs/nrhs
-                  -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
-                  -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
-                  -> TcS (StopOrContinue CtEvidence)  -- Of type nlhs ~ nrhs
--- For (rewriteEqEvidence (Given g olhs orhs) False nlhs nrhs lhs_co rhs_co)
--- we generate
--- If not swapped
---      g1 : nlhs ~ nrhs = lhs_co ; g ; sym rhs_co
--- If 'swapped'
---      g1 : nlhs ~ nrhs = lhs_co ; Sym g ; sym rhs_co
---
--- For (Wanted w) we do the dual thing.
--- New  w1 : nlhs ~ nrhs
--- If not swapped
---      w : olhs ~ orhs = sym lhs_co ; w1 ; rhs_co
--- If swapped
---      w : orhs ~ olhs = sym rhs_co ; sym w1 ; lhs_co
---
--- It's all a form of rewwriteEvidence, specialised for equalities
-rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
-  | CtDerived { ctev_loc = loc } <- old_ev
-  = do { mb <- newDerived loc (mkTcEqPred nlhs nrhs)
-       ; case mb of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
-
-  | NotSwapped <- swapped
-  , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
-  , isTcReflCo rhs_co
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
-
-  | CtGiven { ctev_evtm = old_tm , ctev_loc = loc } <- old_ev
-  = do { let new_tm = EvCoercion (lhs_co
-                                  `mkTcTransCo` maybeSym swapped (evTermCoercion old_tm)
-                                  `mkTcTransCo` mkTcSymCo rhs_co)
-       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
-       ; return (ContinueWith new_ev) }
-
-  | CtWanted { ctev_evar = evar, ctev_loc = loc } <- old_ev
-  = do { new_evar <- newWantedEvVarNC loc new_pred
-                     -- Not much point in seeking exact-match equality evidence
-       ; let co = maybeSym swapped $
-                  mkTcSymCo lhs_co
-                  `mkTcTransCo` ctEvCoercion new_evar
-                  `mkTcTransCo` rhs_co
-       ; setEvBind evar (EvCoercion co)
-       ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
-       ; return (ContinueWith new_evar) }
-
-  | otherwise
-  = panic "rewriteEvidence"
-  where
-    new_pred = mkTcEqPred nlhs nrhs
-
-maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
-maybeSym IsSwapped  co = mkTcSymCo co
-maybeSym NotSwapped co = co
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
@@ -2053,3 +1817,4 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; return (TcLetCo ev_binds new_co) }
 
         ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs) }
+

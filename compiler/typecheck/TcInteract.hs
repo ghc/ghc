@@ -684,7 +684,7 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
   = do { let matching_funeqs = findFunEqsByTyCon funeqs tc
        ; let interact = sfInteractInert ops args (lookupFlattenTyVar eqs fsk)
              do_one (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = iev })
-                = mapM_ (emitNewDerivedEq (ctEvLoc iev))
+                = mapM_ (unifyDerived (ctEvLoc iev))
                         (interact iargs (lookupFlattenTyVar eqs ifsk))
              do_one ct = pprPanic "interactFunEq" (ppr ct)
        ; mapM_ do_one matching_funeqs
@@ -1496,7 +1496,7 @@ instFunDepEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
        ; mapM_ (do_one subst) eqs }
   where
     do_one subst (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
-       = emitNewDerivedEq loc (Pair (Type.substTy subst ty1) (Type.substTy subst ty2))
+       = unifyDerived loc (Pair (Type.substTy subst ty1) (Type.substTy subst ty2))
 
 {-
 *********************************************************************************
@@ -1629,6 +1629,9 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
     | otherwise -- We must not assign ufsk := ...ufsk...!
     -> do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
           ; new_ev <- newWantedEvVarNC loc (mkTcEqPred alpha_ty rhs_ty)
+          ; emitWorkNC [new_ev]
+              -- By emitting this as non-canonical, we deal with all
+              -- flattening, occurs-check, and ufsk := ufsk issues
           ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
               --    ax_co :: fam_tc args ~ rhs_ty
               --       ev :: alpha ~ rhs_ty
@@ -1639,9 +1642,6 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
             vcat [ text "old_ev:" <+> ppr old_ev
                  , nest 2 (text ":=") <+> ppr final_co
                  , text "new_ev:" <+> ppr new_ev ]
-          ; emitWorkNC [new_ev]
-              -- By emitting this as non-canonical, we deal with all
-              -- flattening, occurs-check, and ufsk := ufsk issues
           ; stopWith old_ev "Fun/Top (wanted)" } } }
   where
     loc = ctEvLoc old_ev
@@ -1651,7 +1651,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       = do { inert_eqs <- getInertEqs
            ; let eqns = sfInteractTop ops args (lookupFlattenTyVar inert_eqs fsk)
-           ; mapM_ (emitNewDerivedEq loc) eqns }
+           ; mapM_ (unifyDerived loc) eqns }
       | otherwise
       = return ()
 
@@ -2190,9 +2190,8 @@ requestCoercible :: CtLoc -> TcType -> TcType
                         , TcCoercion )      -- Coercion witnessing (Coercible t1 t2)
 requestCoercible loc ty1 ty2
   = ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
-    do { (new_ev, freshness) <- newWantedEvVar loc' (mkCoerciblePred ty1 ty2)
-       ; return ( case freshness of { Fresh -> [new_ev]; Cached -> [] }
-                , ctEvCoercion new_ev) }
+    do { new_ev <- newWantedEvVarNC loc' (mkCoerciblePred ty1 ty2)
+       ; return ( [new_ev], ctEvCoercion new_ev) }
            -- Evidence for a Coercible constraint is always a coercion t1 ~R t2
   where
      loc' = bumpCtLocDepth CountConstraints loc
