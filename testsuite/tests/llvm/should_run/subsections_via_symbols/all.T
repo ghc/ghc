@@ -3,6 +3,10 @@ if config.os == 'darwin':
 else:
   only_darwin = skip
 
+def f( name, opts ):
+  opts.only_ways = ['optllvm', 'llvm', 'debugllvm']
+
+setTestOpts(f)
 
 # Note [_ffi_call_unix64]
 #
