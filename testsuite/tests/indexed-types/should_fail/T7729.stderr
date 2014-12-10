@@ -1,9 +1,8 @@
 
 T7729.hs:36:14:
-    Couldn't match type ‘BasePrimMonad (Rand m)’
-                  with ‘t0 (BasePrimMonad (Rand m))’
+    Couldn't match type ‘t0 (BasePrimMonad m)’ with ‘BasePrimMonad m’
     The type variable ‘t0’ is ambiguous
-    Expected type: t0 (BasePrimMonad (Rand m)) a -> Rand m a
+    Expected type: t0 (BasePrimMonad m) a -> Rand m a
       Actual type: BasePrimMonad (Rand m) a -> Rand m a
     Relevant bindings include
       liftPrim :: BasePrimMonad (Rand m) a -> Rand m a
