@@ -649,7 +649,7 @@ canCFunEqCan ev fn tys fsk
            Stop ev s        -> return (Stop ev s) ;
            ContinueWith ev' ->
 
-    do { extendFlatCache fn tys' (ctEvCoercion ev', fsk)
+    do { extendFlatCache fn tys' (ctEvCoercion ev', fsk_ty, ev')
        ; continueWith (CFunEqCan { cc_ev = ev', cc_fun = fn
                                  , cc_tyargs = tys', cc_fsk = fsk }) } } }
 

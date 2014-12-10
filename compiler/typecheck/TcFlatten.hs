@@ -798,20 +798,32 @@ flatten_exact_fam_app_fully fmode tc tys
 
        ; mb_ct <- lookupFlatCache tc xis
        ; case mb_ct of
-           Just (co, fsk)  -- co :: F xis ~ fsk
-             | isFskTyVar fsk || not (isGiven ctxt_ev)
+           Just (co, rhs_ty, ev)  -- co :: F xis ~ fsk
+             | ev `canRewriteOrSame` ctxt_ev
              ->  -- Usable hit in the flat-cache
-                 -- isFskTyVar checks for a "given" in the cache
-                do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr fsk $$ ppr co)
-                   ; (fsk_xi, fsk_co) <- flattenTyVar fmode fsk
+                 -- We certainly *can* use a Wanted for a Wanted
+                do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr rhs_ty $$ ppr co)
+                   ; (fsk_xi, fsk_co) <- flatten_one fmode rhs_ty
                           -- The fsk may already have been unified, so flatten it
                           -- fsk_co :: fsk_xi ~ fsk
                    ; return (fsk_xi, fsk_co `mkTcTransCo` mkTcSymCo co `mkTcTransCo` ret_co) }
                                     -- :: fsk_xi ~ F xis
 
-           _ -> do { let fam_ty = mkTyConApp tc xis
+           -- Try to reduce the family application right now
+           -- See Note [Reduce type family applications eagerly]
+           _ -> do { mb_match <- matchFam tc xis
+                   ; case mb_match of {
+                        Just (norm_co, norm_ty)
+                            -> do { (xi, final_co) <- flatten_one fmode norm_ty
+                                  ; let co = norm_co `mkTcTransCo` mkTcSymCo final_co
+                                  ; extendFlatCache tc xis (co, xi, ctxt_ev)
+                                  ; return (xi, mkTcSymCo co `mkTcTransCo` ret_co) } ;
+                        Nothing ->
+                do { let fam_ty = mkTyConApp tc xis
                    ; (ev, fsk) <- newFlattenSkolem ctxt_ev fam_ty
-                   ; extendFlatCache tc xis (ctEvCoercion ev, fsk)
+                   ; let fsk_ty = mkTyVarTy fsk
+                         co     = ctEvCoercion ev
+                   ; extendFlatCache tc xis (co, fsk_ty, ev)
 
                    -- The new constraint (F xis ~ fsk) is not necessarily inert
                    -- (e.g. the LHS may be a redex) so we must put it in the work list
@@ -822,9 +834,26 @@ flatten_exact_fam_app_fully fmode tc tys
                    ; emitFlatWork ct
 
                    ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk $$ ppr ev)
-                   ; return (mkTyVarTy fsk, mkTcSymCo (ctEvCoercion ev) `mkTcTransCo` ret_co) } }
+                   ; return (fsk_ty, mkTcSymCo co `mkTcTransCo` ret_co) }
+        } } }
 
-{-
+{- Note [Reduce type family applications eagerly]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we come across a type-family application like (Append (Cons x Nil) t),
+then, rather than flattening to a skolem etc, we may as well just reduce
+it on the spot to (Cons x t).  This saves a lot of intermediate steps.
+Examples that are helped are tests T9872, and T5321Fun.
+
+So just before we create the new skolem, we attempt to reduce it by one
+step (using matchFam).  If that works, then recursively flatten the rhs,
+which may in turn do lots more reductions.
+
+Once we've got a flat rhs, we extend the flatten-cache to record the
+result.  Doing so can save lots of work when the same redex shows up
+more than once.  Note that we record the link from the redex all the
+way to its *final* value, not just the single step reduction.
+
+
 ************************************************************************
 *                                                                      *
              Flattening a type variable

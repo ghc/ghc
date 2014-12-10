@@ -430,10 +430,13 @@ data InertSet
               -- Canonical Given, Wanted, Derived (no Solved)
               -- Sometimes called "the inert set"
 
-       , inert_flat_cache :: FunEqMap (TcCoercion, TcTyVar)
+       , inert_flat_cache :: FunEqMap (TcCoercion, TcType, CtEvidence)
               -- See Note [Type family equations]
-              -- If    F tys :-> (co, fsk),
-              -- then  co :: F tys ~ fsk
+              -- If    F tys :-> (co, ty, ev),
+              -- then  co :: F tys ~ ty
+              --
+              -- The 'ev' field is just for the G/W/D flavour, nothing more!
+              --
               -- Just a hash-cons cache for use when flattening only
               -- These include entirely un-processed goals, so don't use
               -- them to solve a top-level goal, else you may end up solving
@@ -799,7 +802,7 @@ checkAllSolved
                      || unsolved_dicts || unsolved_funeqs
                      || not (isEmptyBag (inert_insols icans)))) }
 
-lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcTyVar))
+lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtEvidence))
 lookupFlatCache fam_tc tys
   = do { IS { inert_flat_cache = flat_cache
             , inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
@@ -809,7 +812,7 @@ lookupFlatCache fam_tc tys
     lookup_inerts inert_funeqs
       | Just (CFunEqCan { cc_ev = ctev, cc_fsk = fsk })
            <- findFunEqs inert_funeqs fam_tc tys
-      = Just (ctEvCoercion ctev, fsk)
+      = Just (ctEvCoercion ctev, mkTyVarTy fsk, ctev)
       | otherwise = Nothing
 
     lookup_flats flat_cache = findFunEq flat_cache fam_tc tys
@@ -1546,12 +1549,12 @@ newFlattenSkolem ctxt_ev fam_ty
   where
     loc = ctEvLoc ctxt_ev
 
-extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcTyVar) -> TcS ()
-extendFlatCache tc xi_args (co, fsk)
+extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType, CtEvidence) -> TcS ()
+extendFlatCache tc xi_args stuff
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FlatCache dflags) $
          updInertTcS $ \ is@(IS { inert_flat_cache = fc }) ->
-            is { inert_flat_cache = insertFunEq fc tc xi_args (co, fsk) } }
+            is { inert_flat_cache = insertFunEq fc tc xi_args stuff } }
 
 -- Instantiations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
