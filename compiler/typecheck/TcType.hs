@@ -522,8 +522,8 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   where
     pp_info = case info of
                 ReturnTv    -> ptext (sLit "ret")
-                TauTv True  -> ptext (sLit "tau")
-                TauTv False -> ptext (sLit "twc")
+                TauTv True  -> ptext (sLit "twc")
+                TauTv False -> ptext (sLit "tau")
                 SigTv       -> ptext (sLit "sig")
                 FlatMetaTv  -> ptext (sLit "fuv")
 
