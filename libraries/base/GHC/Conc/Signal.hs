@@ -6,15 +6,17 @@ module GHC.Conc.Signal
         , HandlerFun
         , setHandler
         , runHandlers
+        , runHandlersPtr
         ) where
 
 import Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import Data.Dynamic (Dynamic)
 import Foreign.C.Types (CInt)
-import Foreign.ForeignPtr (ForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, newForeignPtr)
 import Foreign.StablePtr (castPtrToStablePtr, castStablePtrToPtr,
                           deRefStablePtr, freeStablePtr, newStablePtr)
 import Foreign.Ptr (Ptr, castPtr)
+import Foreign.Marshal.Alloc (finalizerFree)
 import GHC.Arr (inRange)
 import GHC.Base
 import GHC.Conc.Sync (forkIO)
@@ -69,6 +71,13 @@ runHandlers p_info sig = do
                 Nothing -> return ()
                 Just (f,_)  -> do _ <- forkIO (f p_info)
                                   return ()
+
+-- It is our responsibility to free the memory buffer, so we create a
+-- foreignPtr.
+runHandlersPtr :: Ptr Word8 -> Signal -> IO ()
+runHandlersPtr p s = do
+  fp <- newForeignPtr finalizerFree p
+  runHandlers fp s
 
 -- Machinery needed to ensure that we only have one copy of certain
 -- CAFs in this module even when the base package is present twice, as
