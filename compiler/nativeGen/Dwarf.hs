@@ -3,6 +3,7 @@ module Dwarf (
   ) where
 
 import CLabel
+import CmmExpr         ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )
 import CoreSyn         ( Tickish(..) )
 import Debug
@@ -18,6 +19,9 @@ import Dwarf.Constants
 import Dwarf.Types
 
 import Data.Maybe
+import Data.List        ( sortBy )
+import Data.Ord         ( comparing )
+import qualified Data.Map as Map
 import System.FilePath
 import System.Directory ( getCurrentDirectory )
 
@@ -62,7 +66,13 @@ dwarfGen df modLoc us blocks = do
   let lineSct = dwarfLineSection $$
                 ptext dwarfLineLabel <> colon
 
-  return (infoSct $$ abbrevSct $$ lineSct, us')
+  -- .debug_frame section: Information about the layout of the GHC stack
+  let (framesU, us'') = takeUniqFromSupply us'
+      frameSct = dwarfFrameSection $$
+                 ptext dwarfFrameLabel <> colon $$
+                 pprDwarfFrame (debugFrame framesU procs)
+
+  return (infoSct $$ abbrevSct $$ lineSct $$ frameSct, us'')
 
 -- | Header for a compilation unit, establishing global format
 -- parameters
@@ -118,3 +128,36 @@ blockToDwarf blk dws
                         , dwLabel    = dblCLabel blk
                         , dwMarker   = mkAsmTempLabel (dblLabel blk)
                         }
+
+-- | Generates the data for the debug frame section, which encodes the
+-- desired stack unwind behaviour for the debugger
+debugFrame :: Unique -> [DebugBlock] -> DwarfFrame
+debugFrame u procs
+  = DwarfFrame { dwCieLabel = mkAsmTempLabel u
+               , dwCieInit  = initUws
+               , dwCieProcs = map (procToFrame initUws) procs
+               }
+  where initUws = Map.fromList [(Sp, UwReg Sp 0)]
+
+-- | Generates unwind information for a procedure debug block
+procToFrame :: UnwindTable -> DebugBlock -> DwarfFrameProc
+procToFrame initUws blk
+  = DwarfFrameProc { dwFdeProc    = dblCLabel blk
+                   , dwFdeHasInfo = dblHasInfoTbl blk
+                   , dwFdeBlocks  = map (uncurry blockToFrame) blockUws
+                   }
+  where blockUws :: [(DebugBlock, UnwindTable)]
+        blockUws = map snd $ sortBy (comparing fst) $ flatten initUws blk
+        flatten uws0 b@DebugBlock{ dblPosition=pos, dblUnwind=uws,
+                                   dblBlocks=blocks }
+          | Just p <- pos  = (p, (b, uws')):nested
+          | otherwise      = nested -- block was optimized out
+          where uws'   = uws `Map.union` uws0
+                nested = concatMap (flatten uws') blocks
+
+blockToFrame :: DebugBlock -> UnwindTable -> DwarfFrameBlock
+blockToFrame blk uws
+  = DwarfFrameBlock { dwFdeBlock      = mkAsmTempLabel $ dblLabel blk
+                    , dwFdeBlkHasInfo = dblHasInfoTbl blk
+                    , dwFdeUnwind     = uws
+                    }

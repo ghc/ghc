@@ -114,8 +114,14 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
        Nothing   -> empty
        Just (Statics info_lbl info) ->
            pprSectionHeader Text $$
+           infoTableLoc $$
            vcat (map pprData info) $$
            pprLabel info_lbl
+    -- Make sure the info table has the right .loc for the block
+    -- coming right after it. See [Note: Info Offset]
+    infoTableLoc = case instrs of
+      (l@LOCATION{} : _) -> pprInstr l
+      _other             -> empty
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 pprDatas (align, (Statics lbl dats))

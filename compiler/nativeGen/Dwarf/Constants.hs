@@ -7,6 +7,9 @@ import FastString
 import Platform
 import Outputable
 
+import Reg
+import X86.Regs
+
 import Data.Word
 
 -- | Language ID used for Haskell.
@@ -126,7 +129,66 @@ dwarfSection name = sdocWithPlatform $ \plat ->
                   ".section .debug_" ++ name ++ ",\"\",@progbits"
 
 -- | Dwarf section labels
-dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel :: LitString
+dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: LitString
 dwarfInfoLabel   = sLit ".Lsection_info"
 dwarfAbbrevLabel = sLit ".Lsection_abbrev"
 dwarfLineLabel   = sLit ".Lsection_line"
+dwarfFrameLabel  = sLit ".Lsection_frame"
+
+-- | Mapping of registers to DWARF register numbers
+dwarfRegNo :: Platform -> Reg -> Word8
+dwarfRegNo p r = case platformArch p of
+  ArchX86
+    | r == eax  -> 0
+    | r == ecx  -> 1  -- yes, no typo
+    | r == edx  -> 2
+    | r == ebx  -> 3
+    | r == esp  -> 4
+    | r == ebp  -> 5
+    | r == esi  -> 6
+    | r == edi  -> 7
+  ArchX86_64
+    | r == rax  -> 0
+    | r == rdx  -> 1 -- this neither. The order GCC allocates registers in?
+    | r == rcx  -> 2
+    | r == rbx  -> 3
+    | r == rsi  -> 4
+    | r == rdi  -> 5
+    | r == rbp  -> 6
+    | r == rsp  -> 7
+    | r == r8   -> 8
+    | r == r9   -> 9
+    | r == r10  -> 10
+    | r == r11  -> 11
+    | r == r12  -> 12
+    | r == r13  -> 13
+    | r == r14  -> 14
+    | r == r15  -> 15
+    | r == xmm0 -> 17
+    | r == xmm1 -> 18
+    | r == xmm2 -> 19
+    | r == xmm3 -> 20
+    | r == xmm4 -> 21
+    | r == xmm5 -> 22
+    | r == xmm6 -> 23
+    | r == xmm7 -> 24
+    | r == xmm8 -> 25
+    | r == xmm9 -> 26
+    | r == xmm10 -> 27
+    | r == xmm11 -> 28
+    | r == xmm12 -> 29
+    | r == xmm13 -> 30
+    | r == xmm14 -> 31
+    | r == xmm15 -> 32
+  _other -> error "dwarfRegNo: Unsupported platform or unknown register!"
+
+-- | Virtual register number to use for return address.
+dwarfReturnRegNo :: Platform -> Word8
+dwarfReturnRegNo p
+  -- We "overwrite" IP with our pseudo register - that makes sense, as
+  -- when using this mechanism gdb already knows the IP anyway. Clang
+  -- does this too, so it must be safe.
+  = case platformArch p of
+    ArchX86    -> 8  -- eip
+    ArchX86_64 -> 16 -- rip
+    _other     -> error "dwarfReturnRegNo: Unsupported platform!"
