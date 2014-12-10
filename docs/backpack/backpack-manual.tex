@@ -161,8 +161,6 @@ been instantiated multiple ways and giving its modules unique names.}
 
 There are three fields of an entry in the installed package database of note.
 
-\begin{color}{red}
-
 \paragraph{exposed-modules} A comma-separated list of
 module names which this package makes available for import, possibly with two extra, optional pieces of information
 about the module in question: what the \emph{original module/signature}
@@ -183,21 +181,9 @@ exposed-modules:
 \end{verbatim}
 
 If no reexports or signatures are used, the commas can be omitted
-(making this syntax backwards compatible with the original syntax.)
-
-ToDo: What is currently implemented is
-that \texttt{reexported-modules} has a seperate field, where the
-original module is always set and backing implementation is always empty.
-I came to this generalization when I found I needed to add support for
-signatures and reexported signatures.  An alternate design is just to
-have a separate list for every parameter: however, we end up with a lot
-of duplication in the validation and handling code GHC side.  I do like
-the parametric approach better, but since the original
-\texttt{exposed-modules} was space separated, there's not an easy way to
-extend the syntax in a backwards-compatible way.  The current proposal
-suggests we add the comma variant because it is unambiguous with the old
-syntax.
-\end{color}
+(making this syntax backwards compatible with the original syntax.)\footnote{Actually,
+the parser is a bit more lenient than that and can figure out commas when it's
+omitted. But it's better to just put commas in.}
 
 \paragraph{instantiated-with} A map from hole name to the \emph{original
 module} which instantiated the hole (i.e., what \texttt{-sig-of}
@@ -300,6 +286,41 @@ This mapping says that this package reexports \texttt{pkg:AImpl} as
 \texttt{pkg:AImpl}, and reexports a signature from \texttt{other-pkg}
 which itself was compiled against \texttt{pkg:AImpl}.
 
+When Haskell code makes an import, we either load the backing implementation,
+if it is available as a direct reexport or original definition, \Red{or else
+load \emph{all} of the interface files available as signatures.  Loading
+all of the interfaces is guaranteed to not cause conflicts, as the
+backing implementation of all the signatures is guaranteed to be identical
+(assuming that it is unambiguous.)}
+
+\begin{color}{red}
+\paragraph{Home package signatures}  In some circumstances, we may
+both define a signature in the home package, as well as import a
+signature with the same name from an external package.  While multiple
+signatures from external packages are always merged together, in some
+cases, we will ignore the external package signature and \emph{only}
+use the home package signature: in particular, if an external signature
+is not exposed from an explicit \texttt{-package} flag, it is not
+merged in.
+\end{color}
+
+\paragraph{Package imports} A package import, e.g.,
+
+\begin{verbatim}
+import "foobar" Baz
+\end{verbatim}
+
+operates as follows: ignore all exposed modules under the name which
+were not directly exposed by the package in question.  If the same
+package name was included multiple times, all instances of it are
+considered (thus, package imports cannot be used to disambiguate
+between multiple versions or instantiations of the same package.
+For complex disambiguation, use thinning and renaming.)
+
+In particular, package imports consider the \emph{immediate} package
+which exposed a module, not the original package which defined the
+module.
+
 \paragraph{Typechecking}  \Red{When typechecking only, there is not
 necessarily a backing implementation associated with a signature.  In
 this case, even if the original names match up, we must perform an
@@ -308,9 +329,82 @@ This check is not necessary during compilation, because \texttt{-sig-of}
 will ensure that the signatures are compatible with a common, unique
 backing implementation.
 
+\begin{color}{red}
+\paragraph{User-interface}  A number of operations in the compiler
+accept a module name, and perform some operation assuming that, if
+the name successfully resolves, it will identify a unique module.  In
+the presence of signatures, this assumption no longer holds.   In this
+section, we describe how to adjust the behavior of these various
+operations:
+
+\begin{itemize}
+    \item \verb|ghc --abi-hash M| fails if \texttt{M} resolves to multiple
+        signatures.  Same rules for home/external package resolution apply,
+        so in the absence of any other flags we will hash the signature
+        interface in the home package.
+    \item
+\end{itemize}
+\end{color}
+
 \subsection{Indefinite external packages}
 
 \Red{Not implemented yet.}
+
+\section{Backpack}
+
+\Red{This entire section is a proposed and has not been implemented.}
+
+A Backpack language is an intermediate representation which can be
+thought of as a more user friendly way to specify \texttt{-shape-of},
+\texttt{-sig-of} and \texttt{-package} flags as well as create entries
+in the installed package database, without resorting to a full-fledged
+Cabal file (which contains a lot of metadata that is not directly
+relevant to programming with modules and packages).  The intent is
+the Backpack language is something that could be incorporated into
+the Haskell language specification, without necessitating the inclusion
+the Cabal specification.
+
+A Backpack file contains any number of \emph{source packages} and
+\emph{installed packages}.  It can be compiled using \texttt{ghc --backpack file.bkp},
+which produces object files as well as a local, inplace installed package database.
+A source package is specified as:
+
+\begin{verbatim}
+package package-name
+    field-name: field-value
+    ...
+\end{verbatim}
+
+Valid fields for a source package are as follows:
+
+\begin{itemize}
+    \item \texttt{includes}, a list of packages to import with thinnings and renamings.  This field is analogous to Cabal's \texttt{build-depends}, but no version bounds are allowed.  A package may be included multiple times.
+    \item \texttt{exposed-modules}, \texttt{other-modules}, \texttt{exposed-signatures}, \texttt{required-signatures}, \texttt{reexported-modules}, which have the same meaning as in a Cabal file. \Red{Or, since we are liberated from such petty concerns as backwards-compatibility, perhaps a more parsimonious syntax could be designed.}
+    \item \texttt{source-dir}, which specifies where the source files of the package live.
+    \item Any field which is valid in the \emph{installed package database},
+        except for \texttt{name}, \texttt{id}, \texttt{key} and \texttt{instantiated-with},
+        \texttt{depends}.\footnote{\texttt{name} is excluded because it is redundant with the \texttt{package package-name} preeamble.  \texttt{id}, \texttt{key} and \texttt{instantiated-with} are excluded because they presuppose that a package description has been fully instantiated, but package descriptions in the Backpack file are not instantiated: that's the job of the compiler.}
+\end{itemize}
+
+The names of all packages live in the global namespace.
+A possible future addition would be the ability to specify private
+packages which are not exposed.
+
+An \emph{installed package} specifies a specific preexisting package
+which is already in the installed package database.  An installed
+package is specified as:
+
+\begin{verbatim}
+installed package package-name
+    id: installed-package-id
+\end{verbatim}
+
+Multiple installed package IDs can be specified if they have
+distinct package keys, as might be the case for an indefinite package
+which has been installed multiple times with different hole instantiations.
+
+Handling version number resolution is \emph{explicitly} a non-goal for
+Backpack files.
 
 \section{Cabal}
 
