@@ -1,0 +1,66 @@
+
+T9872a.hs:16:8:
+    No instance for (Show
+                       (Proxy
+                          (Cons
+                             (Cons
+                                (Cube G B W R B G)
+                                (Cons
+                                   (Cube W G B W R R)
+                                   (Cons (Cube R W R B G R) (Cons (Cube B R G G W W) Nil))))
+                             (Cons
+                                (Cons
+                                   (Cube G B R W B G)
+                                   (Cons
+                                      (Cube R R W B G W)
+                                      (Cons (Cube R G B R W R) (Cons (Cube W W G G R B) Nil))))
+                                (Cons
+                                   (Cons
+                                      (Cube G W R B B G)
+                                      (Cons
+                                         (Cube W B W R G R)
+                                         (Cons (Cube R R B G W R) (Cons (Cube B G G W R W) Nil))))
+                                   (Cons
+                                      (Cons
+                                         (Cube G R W B B G)
+                                         (Cons
+                                            (Cube R W B G R W)
+                                            (Cons
+                                               (Cube R B R W G R) (Cons (Cube W G G R W B) Nil))))
+                                      (Cons
+                                         (Cons
+                                            (Cube G R B B W G)
+                                            (Cons
+                                               (Cube W W R G B R)
+                                               (Cons
+                                                  (Cube R B G W R R)
+                                                  (Cons (Cube B G W R G W) Nil))))
+                                         (Cons
+                                            (Cons
+                                               (Cube G W B B R G)
+                                               (Cons
+                                                  (Cube R B G R W W)
+                                                  (Cons
+                                                     (Cube R R W G B R)
+                                                     (Cons (Cube W G R W G B) Nil))))
+                                            (Cons
+                                               (Cons
+                                                  (Cube G B B W R G)
+                                                  (Cons
+                                                     (Cube W R G B W R)
+                                                     (Cons
+                                                        (Cube R G W R B R)
+                                                        (Cons (Cube B W R G G W) Nil))))
+                                               (Cons
+                                                  (Cons
+                                                     (Cube G B B R W G)
+                                                     (Cons
+                                                        (Cube R G R W B W)
+                                                        (Cons
+                                                           (Cube R W G B R R)
+                                                           (Cons (Cube W R W G G B) Nil))))
+                                                  Nil))))))))))
+      arising from a use of ‘print’
+    In the expression: print (Proxy :: Proxy (Solutions Cubes))
+    In an equation for ‘main’:
+        main = print (Proxy :: Proxy (Solutions Cubes))

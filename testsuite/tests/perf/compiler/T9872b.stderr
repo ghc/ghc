@@ -1,0 +1,24 @@
+
+T9872b.hs:19:8:
+    No instance for (Show
+                       (Proxy
+                          '['['Cube 'G 'B 'W 'R 'B 'G, 'Cube 'W 'G 'B 'W 'R 'R,
+                              'Cube 'R 'W 'R 'B 'G 'R, 'Cube 'B 'R 'G 'G 'W 'W],
+                            '['Cube 'G 'B 'R 'W 'B 'G, 'Cube 'R 'R 'W 'B 'G 'W,
+                              'Cube 'R 'G 'B 'R 'W 'R, 'Cube 'W 'W 'G 'G 'R 'B],
+                            '['Cube 'G 'W 'R 'B 'B 'G, 'Cube 'W 'B 'W 'R 'G 'R,
+                              'Cube 'R 'R 'B 'G 'W 'R, 'Cube 'B 'G 'G 'W 'R 'W],
+                            '['Cube 'G 'R 'W 'B 'B 'G, 'Cube 'R 'W 'B 'G 'R 'W,
+                              'Cube 'R 'B 'R 'W 'G 'R, 'Cube 'W 'G 'G 'R 'W 'B],
+                            '['Cube 'G 'R 'B 'B 'W 'G, 'Cube 'W 'W 'R 'G 'B 'R,
+                              'Cube 'R 'B 'G 'W 'R 'R, 'Cube 'B 'G 'W 'R 'G 'W],
+                            '['Cube 'G 'W 'B 'B 'R 'G, 'Cube 'R 'B 'G 'R 'W 'W,
+                              'Cube 'R 'R 'W 'G 'B 'R, 'Cube 'W 'G 'R 'W 'G 'B],
+                            '['Cube 'G 'B 'B 'W 'R 'G, 'Cube 'W 'R 'G 'B 'W 'R,
+                              'Cube 'R 'G 'W 'R 'B 'R, 'Cube 'B 'W 'R 'G 'G 'W],
+                            '['Cube 'G 'B 'B 'R 'W 'G, 'Cube 'R 'G 'R 'W 'B 'W,
+                              'Cube 'R 'W 'G 'B 'R 'R, 'Cube 'W 'R 'W 'G 'G 'B]]))
+      arising from a use of ‘print’
+    In the expression: print (Proxy :: Proxy (Solutions Cubes))
+    In an equation for ‘main’:
+        main = print (Proxy :: Proxy (Solutions Cubes))

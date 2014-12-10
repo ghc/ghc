@@ -545,3 +545,23 @@ test('T9675',
       ],
      compile,
      [''])
+
+test('T9872a',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 5521332656, 5)
+          # 2014-12-10    5521332656    Initally created
+          ]),
+      ],
+     compile_fail,
+     [''])
+
+test('T9872b',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 6483306280, 5)
+          # 2014-12-10    6483306280    Initally created
+          ]),
+      ],
+     compile_fail,
+     [''])
