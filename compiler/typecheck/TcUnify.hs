@@ -145,8 +145,19 @@ matchExpectedFunTys herald arity orig_ty
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
-       -- number of arrows doesn't match up, so we can add a bit
-       -- more context to the error message (cf Trac #7869)
+       -- number of arguments doesn't match arity of the original
+       -- type, so we can add a bit more context to the error message
+       -- (cf Trac #7869).
+       --
+       -- It is not always an error, because specialized type may have
+       -- different arity, for example:
+       --
+       -- > f1 = f2 'a'
+       -- > f2 :: Monad m => m Bool
+       -- > f2 = undefined
+       --
+       -- But in that case we add specialized type into error context
+       -- anyway, because it may be useful. See also Trac #9605.
     go n_req ty = addErrCtxtM mk_ctxt $
                   defer n_req ty
 
@@ -160,16 +171,21 @@ matchExpectedFunTys herald arity orig_ty
 
     ------------
     mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt env = do { (env', orig_ty) <- zonkTidyTcType env orig_ty
-                     ; let (args, _) = tcSplitFunTys orig_ty
+    mk_ctxt env = do { (env', ty) <- zonkTidyTcType env orig_ty
+                     ; let (args, _) = tcSplitFunTys ty
                            n_actual = length args
-                     ; return (env', mk_msg orig_ty n_actual) }
+                           (env'', orig_ty') = tidyOpenType env' orig_ty
+                     ; return (env'', mk_msg orig_ty' ty n_actual) }
 
-    mk_msg ty n_args
+    mk_msg orig_ty ty n_args
       = herald <+> speakNOf arity (ptext (sLit "argument")) <> comma $$
-        sep [ptext (sLit "but its type") <+> quotes (pprType ty),
-             if n_args == 0 then ptext (sLit "has none")
-             else ptext (sLit "has only") <+> speakN n_args]
+        if n_args == arity
+          then ptext (sLit "its type is") <+> quotes (pprType orig_ty) <>
+               comma $$
+               ptext (sLit "it is specialized to") <+> quotes (pprType ty)
+          else sep [ptext (sLit "but its type") <+> quotes (pprType ty),
+                    if n_args == 0 then ptext (sLit "has none")
+                    else ptext (sLit "has only") <+> speakN n_args]
 
 {-
 Note [Foralls to left of arrow]
