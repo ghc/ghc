@@ -74,7 +74,7 @@ emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred
   = do { loc <- getCtLoc origin
        ; ev  <- newEvVar pred
-       ; emitFlat $ mkNonCanonical $
+       ; emitSimple $ mkNonCanonical $
              CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
        ; return ev }
 
@@ -600,8 +600,8 @@ tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
 
 tyVarsOfWC :: WantedConstraints -> TyVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
-  = tyVarsOfCts flat `unionVarSet`
+tyVarsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
+  = tyVarsOfCts simple `unionVarSet`
     tyVarsOfBag tyVarsOfImplic implic `unionVarSet`
     tyVarsOfCts insol
 

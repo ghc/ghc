@@ -1,8 +1,8 @@
 {-# LANGUAGE CPP #-}
 
 module TcInteract (
-     solveFlatGivens,    -- Solves [EvVar],GivenLoc
-     solveFlatWanteds    -- Solves Cts
+     solveSimpleGivens,    -- Solves [EvVar],GivenLoc
+     solveSimpleWanteds    -- Solves Cts
   ) where
 
 #include "HsVersions.h"
@@ -75,12 +75,12 @@ Note [Basic Simplifier Plan]
 If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
 
-Note [Unflatten after solving the flat wanteds]
+Note [Unflatten after solving the simple wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We unflatten after solving the wc_flats of an implication, and before attempting
+We unflatten after solving the wc_simples of an implication, and before attempting
 to float. This means that
 
- * The fsk/fmv flatten-skolems only survive during solveFlats.  We don't
+ * The fsk/fmv flatten-skolems only survive during solveSimples.  We don't
    need to worry about then across successive passes over the constraint tree.
    (E.g. we don't need the old ic_fsk field of an implication.
 
@@ -96,7 +96,7 @@ to float. This means that
        (c ~ False) => b ~ gamma
 
    Obviously this is soluble with gamma := F c a b, and unflattening
-   will do exactly that after solving the flat constraints and before
+   will do exactly that after solving the simple constraints and before
    attempting the implications.  Before, when we were not unflattening,
    we had to push Wanted funeqs in as new givens.  Yuk!
 
@@ -110,8 +110,8 @@ to float. This means that
 Note [Running plugins on unflattened wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There is an annoying mismatch between solveFlatGivens and
-solveFlatWanteds, because the latter needs to fiddle with the inert
+There is an annoying mismatch between solveSimpleGivens and
+solveSimpleWanteds, because the latter needs to fiddle with the inert
 set, unflatten and and zonk the wanteds.  It passes the zonked wanteds
 to runTcPluginsWanteds, which produces a replacement set of wanteds,
 some additional insolubles and a flag indicating whether to go round
@@ -121,8 +121,8 @@ that prepareInertsForImplications will discard the insolubles, so we
 must keep track of them separately.
 -}
 
-solveFlatGivens :: CtLoc -> [EvVar] -> TcS ()
-solveFlatGivens loc givens
+solveSimpleGivens :: CtLoc -> [EvVar] -> TcS ()
+solveSimpleGivens loc givens
   | null givens  -- Shortcut for common case
   = return ()
   | otherwise
@@ -131,42 +131,42 @@ solveFlatGivens loc givens
     mk_given_ct ev_id = mkNonCanonical (CtGiven { ctev_evtm = EvId ev_id
                                                 , ctev_pred = evVarPred ev_id
                                                 , ctev_loc  = loc })
-    go givens = do { solveFlats (listToBag givens)
+    go givens = do { solveSimples (listToBag givens)
                    ; new_givens <- runTcPluginsGiven
                    ; when (notNull new_givens) (go new_givens)
                    }
 
-solveFlatWanteds :: Cts -> TcS WantedConstraints
-solveFlatWanteds = go emptyBag
+solveSimpleWanteds :: Cts -> TcS WantedConstraints
+solveSimpleWanteds = go emptyBag
   where
     go insols0 wanteds
-      = do { solveFlats wanteds
+      = do { solveSimples wanteds
            ; (implics, tv_eqs, fun_eqs, insols, others) <- getUnsolvedInerts
            ; unflattened_eqs <- unflatten tv_eqs fun_eqs
-              -- See Note [Unflatten after solving the flat wanteds]
+              -- See Note [Unflatten after solving the simple wanteds]
 
-           ; zonked <- zonkFlats (others `andCts` unflattened_eqs)
-             -- Postcondition is that the wl_flats are zonked
+           ; zonked <- zonkSimples (others `andCts` unflattened_eqs)
+             -- Postcondition is that the wl_simples are zonked
 
            ; (wanteds', insols', rerun) <- runTcPluginsWanted zonked
               -- See Note [Running plugins on unflattened wanteds]
            ; let all_insols = insols0 `unionBags` insols `unionBags` insols'
            ; if rerun then do { updInertTcS prepareInertsForImplications
                               ; go all_insols wanteds' }
-                      else return (WC { wc_flat  = wanteds'
-                                      , wc_insol = all_insols
-                                      , wc_impl  = implics }) }
+                      else return (WC { wc_simple = wanteds'
+                                      , wc_insol  = all_insols
+                                      , wc_impl   = implics }) }
 
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
-solveFlats :: Cts -> TcS ()
+solveSimples :: Cts -> TcS ()
 -- Returns the final InertSet in TcS
 -- Has no effect on work-list or residual-iplications
 -- The constraints are initially examined in left-to-right order
 
-solveFlats cts
-  = {-# SCC "solveFlats" #-}
+solveSimples cts
+  = {-# SCC "solveSimples" #-}
     do { dyn_flags <- getDynFlags
        ; updWorkListTcS (\wl -> foldrBag extendWorkListCt wl cts)
        ; solve_loop (maxSubGoalDepth dyn_flags) }
@@ -185,7 +185,7 @@ solveFlats cts
 
 -- | Extract the (inert) givens and invoke the plugins on them.
 -- Remove solved givens from the inert set and emit insolubles, but
--- return new work produced so that 'solveFlatGivens' can feed it back
+-- return new work produced so that 'solveSimpleGivens' can feed it back
 -- into the main solver.
 runTcPluginsGiven :: TcS [Ct]
 runTcPluginsGiven = do
@@ -202,7 +202,7 @@ runTcPluginsGiven = do
 -- | Given a bag of (flattened, zonked) wanteds, invoke the plugins on
 -- them and produce an updated bag of wanteds (possibly with some new
 -- work) and a bag of insolubles.  The boolean indicates whether
--- 'solveFlatWanteds' should feed the updated wanteds back into the
+-- 'solveSimpleWanteds' should feed the updated wanteds back into the
 -- main solver.
 runTcPluginsWanted :: Cts -> TcS (Cts, Cts, Bool)
 runTcPluginsWanted zonked_wanteds

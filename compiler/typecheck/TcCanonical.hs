@@ -50,7 +50,7 @@ import FastString
 Note [Canonicalization]
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Canonicalization converts a flat constraint to a canonical form. It is
+Canonicalization converts a simple constraint to a canonical form. It is
 unary (i.e. treats individual constraints one at a time), does not do
 any zonking, but lives in TcS monad because it needs to create fresh
 variables (for flattening) and consult the inerts (for efficiency).

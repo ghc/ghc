@@ -56,7 +56,7 @@ module TcRnTypes(
         ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
-        andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
+        andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         dropDerivedWC,
 
         Implication(..),
@@ -1188,8 +1188,8 @@ ctEqRel = ctEvEqRel . ctEvidence
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
-dropDerivedWC wc@(WC { wc_flat = flats })
-  = wc { wc_flat  = filterBag isWantedCt flats }
+dropDerivedWC wc@(WC { wc_simple = simples })
+  = wc { wc_simple  = filterBag isWantedCt simples }
     -- The wc_impl implications are already (recursively) filtered
 
 {-
@@ -1330,22 +1330,22 @@ v%************************************************************************
 -}
 
 data WantedConstraints
-  = WC { wc_flat  :: Cts               -- Unsolved constraints, all wanted
-       , wc_impl  :: Bag Implication
-       , wc_insol :: Cts               -- Insoluble constraints, can be
+  = WC { wc_simple :: Cts              -- Unsolved constraints, all wanted
+       , wc_impl   :: Bag Implication
+       , wc_insol  :: Cts              -- Insoluble constraints, can be
                                        -- wanted, given, or derived
                                        -- See Note [Insoluble constraints]
     }
 
 emptyWC :: WantedConstraints
-emptyWC = WC { wc_flat = emptyBag, wc_impl = emptyBag, wc_insol = emptyBag }
+emptyWC = WC { wc_simple = emptyBag, wc_impl = emptyBag, wc_insol = emptyBag }
 
-mkFlatWC :: [Ct] -> WantedConstraints
-mkFlatWC cts
-  = WC { wc_flat = listToBag cts, wc_impl = emptyBag, wc_insol = emptyBag }
+mkSimpleWC :: [Ct] -> WantedConstraints
+mkSimpleWC cts
+  = WC { wc_simple = listToBag cts, wc_impl = emptyBag, wc_insol = emptyBag }
 
 isEmptyWC :: WantedConstraints -> Bool
-isEmptyWC (WC { wc_flat = f, wc_impl = i, wc_insol = n })
+isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_insol = n })
   = isEmptyBag f && isEmptyBag i && isEmptyBag n
 
 insolubleWC :: WantedConstraints -> Bool
@@ -1357,18 +1357,18 @@ insolubleWC wc = not (isEmptyBag (filterBag (not . isPartialTypeSigCt)
                || anyBag ic_insol (wc_impl wc)
 
 andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
-andWC (WC { wc_flat = f1, wc_impl = i1, wc_insol = n1 })
-      (WC { wc_flat = f2, wc_impl = i2, wc_insol = n2 })
-  = WC { wc_flat  = f1 `unionBags` f2
-       , wc_impl  = i1 `unionBags` i2
-       , wc_insol = n1 `unionBags` n2 }
+andWC (WC { wc_simple = f1, wc_impl = i1, wc_insol = n1 })
+      (WC { wc_simple = f2, wc_impl = i2, wc_insol = n2 })
+  = WC { wc_simple = f1 `unionBags` f2
+       , wc_impl   = i1 `unionBags` i2
+       , wc_insol  = n1 `unionBags` n2 }
 
 unionsWC :: [WantedConstraints] -> WantedConstraints
 unionsWC = foldr andWC emptyWC
 
-addFlats :: WantedConstraints -> Bag Ct -> WantedConstraints
-addFlats wc cts
-  = wc { wc_flat = wc_flat wc `unionBags` cts }
+addSimples :: WantedConstraints -> Bag Ct -> WantedConstraints
+addSimples wc cts
+  = wc { wc_simple = wc_simple wc `unionBags` cts }
 
 addImplics :: WantedConstraints -> Bag Implication -> WantedConstraints
 addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
@@ -1378,9 +1378,9 @@ addInsols wc cts
   = wc { wc_insol = wc_insol wc `unionBags` cts }
 
 instance Outputable WantedConstraints where
-  ppr (WC {wc_flat = f, wc_impl = i, wc_insol = n})
+  ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
    = ptext (sLit "WC") <+> braces (vcat
-        [ ppr_bag (ptext (sLit "wc_flat")) f
+        [ ppr_bag (ptext (sLit "wc_simple")) s
         , ppr_bag (ptext (sLit "wc_insol")) n
         , ppr_bag (ptext (sLit "wc_impl")) i ])
 

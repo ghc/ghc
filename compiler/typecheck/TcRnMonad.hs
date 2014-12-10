@@ -1105,15 +1105,15 @@ emitConstraints ct
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`andWC` ct) }
 
-emitFlat :: Ct -> TcM ()
-emitFlat ct
+emitSimple :: Ct -> TcM ()
+emitSimple ct
   = do { lie_var <- getConstraintVar ;
-         updTcRef lie_var (`addFlats` unitBag ct) }
+         updTcRef lie_var (`addSimples` unitBag ct) }
 
-emitFlats :: Cts -> TcM ()
-emitFlats cts
+emitSimples :: Cts -> TcM ()
+emitSimples cts
   = do { lie_var <- getConstraintVar ;
-         updTcRef lie_var (`addFlats` cts) }
+         updTcRef lie_var (`addSimples` cts) }
 
 emitImplication :: Implication -> TcM ()
 emitImplication ct

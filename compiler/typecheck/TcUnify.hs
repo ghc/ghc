@@ -670,7 +670,7 @@ uType, uType_defer
 uType_defer origin ty1 ty2
   = do { eqv <- newEq ty1 ty2
        ; loc <- getCtLoc origin
-       ; emitFlat $ mkNonCanonical $
+       ; emitSimple $ mkNonCanonical $
              CtWanted { ctev_evar = eqv
                       , ctev_pred = mkTcEqPred ty1 ty2
                       , ctev_loc = loc }

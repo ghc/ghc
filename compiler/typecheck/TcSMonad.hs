@@ -73,7 +73,7 @@ module TcSMonad (
 
     TcLevel, isTouchableMetaTyVarTcS,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
-    zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkFlats,
+    zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkSimples,
 
     -- References
     newTcRef, readTcRef, updTcRef,
@@ -1285,7 +1285,7 @@ dictionaries from the thing_inside.
 Consider
    Eq [a]
    forall b. empty =>  Eq [a]
-We solve the flat (Eq [a]), under nestTcS, and then turn our attention to
+We solve the simple (Eq [a]), under nestTcS, and then turn our attention to
 the implications.  It's definitely fine to use the solved dictionaries on
 the inner implications, and it can make a signficant performance difference
 if you do so.
@@ -1465,8 +1465,8 @@ zonkTcType ty = wrapTcS (TcM.zonkTcType ty)
 zonkTcTyVar :: TcTyVar -> TcS TcType
 zonkTcTyVar tv = wrapTcS (TcM.zonkTcTyVar tv)
 
-zonkFlats :: Cts -> TcS Cts
-zonkFlats cts = wrapTcS (TcM.zonkFlats cts)
+zonkSimples :: Cts -> TcS Cts
+zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
 
 {-
 Note [Do not add duplicate derived insolubles]
@@ -1498,11 +1498,11 @@ Example of (b): assume a top-level class and instance declaration:
 
 Assume we have started with an implication:
 
-  forall c. Eq c => { wc_flat = D [c] c [W] }
+  forall c. Eq c => { wc_simple = D [c] c [W] }
 
 which we have simplified to:
 
-  forall c. Eq c => { wc_flat = D [c] c [W]
+  forall c. Eq c => { wc_simple = D [c] c [W]
                     , wc_insols = (c ~ [c]) [D] }
 
 For some reason, e.g. because we floated an equality somewhere else,
@@ -1515,7 +1515,7 @@ constraints the second time:
 
 which will result in two Deriveds to end up in the insoluble set:
 
-  wc_flat   = D [c] c [W]
+  wc_simple   = D [c] c [W]
   wc_insols = (c ~ [c]) [D], (c ~ [c]) [D]
 -}
 
@@ -1786,9 +1786,9 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                                new_ct = mkNonCanonical ctev
                                new_co = ctEvCoercion ctev
                                new_tclvl = pushTcLevel (tcl_tclvl env)
-                         ; let wc = WC { wc_flat  = singleCt new_ct
-                                       , wc_impl  = emptyBag
-                                       , wc_insol = emptyCts }
+                         ; let wc = WC { wc_simple = singleCt new_ct
+                                       , wc_impl   = emptyBag
+                                       , wc_insol  = emptyCts }
                                imp = Implic { ic_tclvl  = new_tclvl
                                             , ic_skols  = skol_tvs
                                             , ic_no_eqs = True

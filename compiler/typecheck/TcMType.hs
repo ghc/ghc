@@ -30,7 +30,7 @@ module TcMType (
   -- Creating new evidence variables
   newEvVar, newEvVars, newEq, newDict,
   newTcEvBinds, addTcEvBind,
-  newFlatWanted, newFlatWanteds,
+  newSimpleWanted, newSimpleWanteds,
 
   --------------------------------
   -- Instantiation
@@ -53,7 +53,7 @@ module TcMType (
   zonkTcTyVarBndr, zonkTcType, zonkTcTypes, zonkTcThetaType,
 
   zonkTcKind, defaultKindVarToStar,
-  zonkEvVar, zonkWC, zonkFlats, zonkId, zonkCt, zonkSkolemInfo,
+  zonkEvVar, zonkWC, zonkSimples, zonkId, zonkCt, zonkSkolemInfo,
 
   tcGetGlobalTyVars,
 
@@ -155,8 +155,8 @@ predTypeOccName ty = case classifyPredType ty of
 *********************************************************************************
 -}
 
-newFlatWanted :: CtOrigin -> PredType -> TcM Ct
-newFlatWanted orig pty
+newSimpleWanted :: CtOrigin -> PredType -> TcM Ct
+newSimpleWanted orig pty
   = do loc <- getCtLoc orig
        v <- newEvVar pty
        return $ mkNonCanonical $
@@ -164,8 +164,8 @@ newFlatWanted orig pty
                      , ctev_pred = pty
                      , ctev_loc = loc }
 
-newFlatWanteds :: CtOrigin -> ThetaType -> TcM [Ct]
-newFlatWanteds orig = mapM (newFlatWanted orig)
+newSimpleWanteds :: CtOrigin -> ThetaType -> TcM [Ct]
+newSimpleWanteds orig = mapM (newSimpleWanted orig)
 
 {-
 ************************************************************************
@@ -769,16 +769,16 @@ zonkWC :: WantedConstraints -> TcM WantedConstraints
 zonkWC wc = zonkWCRec wc
 
 zonkWCRec :: WantedConstraints -> TcM WantedConstraints
-zonkWCRec (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
-  = do { flat'   <- zonkFlats flat
+zonkWCRec (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
+  = do { simple' <- zonkSimples simple
        ; implic' <- flatMapBagM zonkImplication implic
-       ; insol'  <- zonkFlats insol
-       ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
+       ; insol'  <- zonkSimples insol
+       ; return (WC { wc_simple = simple', wc_impl = implic', wc_insol = insol' }) }
 
-zonkFlats :: Cts -> TcM Cts
-zonkFlats cts = do { cts' <- mapBagM zonkCt' cts
-                   ; traceTc "zonkFlats done:" (ppr cts')
-                   ; return cts' }
+zonkSimples :: Cts -> TcM Cts
+zonkSimples cts = do { cts' <- mapBagM zonkCt' cts
+                     ; traceTc "zonkSimples done:" (ppr cts')
+                     ; return cts' }
 
 zonkCt' :: Ct -> TcM Ct
 zonkCt' ct = zonkCt ct

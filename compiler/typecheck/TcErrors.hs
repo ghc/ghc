@@ -195,8 +195,8 @@ Specifically (see reportWanteds)
   * If there are insoluble Givens, then we are in unreachable code and all bets
     are off.  So don't report any further errors.
   * If there are any insolubles (eg Int~Bool), here or in a nested implication,
-    then suppress errors from the flat constraints here.  Sometimes the
-    flat-constraint errors are a knock-on effect of the insolubles.
+    then suppress errors from the simple constraints here.  Sometimes the
+    simple-constraint errors are a knock-on effect of the insolubles.
 -}
 
 reportImplic :: ReportErrCtxt -> Implication -> TcM ()
@@ -224,11 +224,11 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
                                  Just {} -> Just evb }
 
 reportWanteds :: ReportErrCtxt -> WantedConstraints -> TcM ()
-reportWanteds ctxt wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
-  = do { reportFlats ctxt  (mapBag (tidyCt env) insol_given)
-       ; reportFlats ctxt1 (mapBag (tidyCt env) insol_wanted)
-       ; reportFlats ctxt2 (mapBag (tidyCt env) flats)
-            -- All the Derived ones have been filtered out of flats
+reportWanteds ctxt wanted@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+  = do { reportSimples ctxt  (mapBag (tidyCt env) insol_given)
+       ; reportSimples ctxt1 (mapBag (tidyCt env) insol_wanted)
+       ; reportSimples ctxt2 (mapBag (tidyCt env) simples)
+            -- All the Derived ones have been filtered out of simples
             -- by the constraint solver. This is ok; we don't want
             -- to report unsolved Derived goals as errors
             -- See Note [Do not report derived but soluble errors]
@@ -247,10 +247,10 @@ reportWanteds ctxt wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = im
     ctxt1     = ctxt { cec_suppress = suppress1 }
     ctxt2     = ctxt { cec_suppress = suppress2 }
 
-reportFlats :: ReportErrCtxt -> Cts -> TcM ()
-reportFlats ctxt flats    -- Here 'flats' includes insolble goals
-  =  traceTc "reportFlats" (vcat [ ptext (sLit "Flats =") <+> ppr flats
-                                 , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)])
+reportSimples :: ReportErrCtxt -> Cts -> TcM ()
+reportSimples ctxt simples    -- Here 'simples' includes insolble goals
+  =  traceTc "reportSimples" (vcat [ ptext (sLit "Simples =") <+> ppr simples
+                                   , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)])
   >> tryReporters
       [ -- First deal with things that are utterly wrong
         -- Like Int ~ Bool (incl nullary TyCons)
@@ -270,7 +270,7 @@ reportFlats ctxt flats    -- Here 'flats' includes insolble goals
       , ("Irreds",          is_irred,    False, mkGroupReporter mkIrredErr)
       , ("Dicts",           is_dict,     False, mkGroupReporter mkDictErr)
       ]
-      panicReporter ctxt (bagToList flats)
+      panicReporter ctxt (bagToList simples)
           -- TuplePreds should have been expanded away by the constraint
           -- simplifier, so they shouldn't show up at this point
   where
@@ -331,7 +331,7 @@ type ReporterSpec
 panicReporter :: Reporter
 panicReporter _ cts
   | null cts  = return ()
-  | otherwise =  pprPanic "reportFlats" (ppr cts)
+  | otherwise =  pprPanic "reportSimples" (ppr cts)
 
 mkSkolReporter :: Reporter
 -- Suppress duplicates with the same LHS
@@ -510,7 +510,7 @@ is perhaps a bit *over*-consistent! Again, an easy choice to change.
 
 Note [Do not report derived but soluble errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The wc_flats include Derived constraints that have not been solved, but are
+The wc_simples include Derived constraints that have not been solved, but are
 not insoluble (in that case they'd be in wc_insols).  We do not want to report
 these as errors:
 
@@ -536,7 +536,7 @@ these as errors:
   Here we get [G] C Int b, [W] C Int a, hence [D] a~b.
   But again f (MkT True True) is a legitimate call.
 
-(We leave the Deriveds in wc_flat until reportErrors, so that we don't lose
+(We leave the Deriveds in wc_simple until reportErrors, so that we don't lose
 derived superclasses between iterations of the solver.)
 
 For functional dependencies, here is a real example,
