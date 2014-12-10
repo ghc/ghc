@@ -1010,15 +1010,14 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
       where
         (eqs_out, eqs_in) = partition kick_out_eq eqs
 
+    -- kick_out_eq implements kick-out criteria (K1-3)
+    -- in the main theorem of Note [The inert equalities] in TcFlatten
     kick_out_eq (CTyEqCan { cc_tyvar = tv, cc_rhs = rhs_ty, cc_ev = ev })
        =  eqCanRewrite new_ev ev
        && (tv == new_tv
            || (ev `eqCanRewrite` ev && new_tv `elemVarSet` tyVarsOfType rhs_ty)
            || case getTyVar_maybe rhs_ty of { Just tv_r -> tv_r == new_tv; Nothing -> False })
     kick_out_eq ct = pprPanic "kick_out_eq" (ppr ct)
-    -- SLPJ new piece: Don't kick out a constraint unless it can rewrite itself,
-    --                 If not, it can't rewrite anything else, so no point in
-    --                 kicking it out
 
 {-
 Note [Kicking out inert constraints]
@@ -1060,50 +1059,6 @@ Now it can be decomposed.  Otherwise we end up with a "Can't match
 [Int] ~ [[Int]]" which is true, but a bit confusing because the
 outer type constructors match.
 
-Note [Delicate equality kick-out]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When adding an fully-rewritten work-item CTyEqCan (a ~ xi), we kick
-out an inert CTyEqCan (b ~ phi) when
-
-  a) the work item can rewrite the inert item
-
-AND one of the following hold
-
-(0) If the new tyvar is the same as the old one
-      Work item: [G] a ~ blah
-      Inert:     [W] a ~ foo
-    A particular case is when flatten-skolems get their value we must propagate
-
-(1) If the new tyvar appears in the kind vars of the LHS or RHS of
-    the inert.  Example:
-    Work item: [G] k ~ *
-    Inert:     [W] (a:k) ~ ty
-               [W] (b:*) ~ c :: k
-    We must kick out those blocked inerts so that we rewrite them
-    and can subsequently unify.
-
-(2) If the new tyvar appears in the RHS of the inert
-    AND not (the inert can rewrite the work item)   <---------------------------------
-
-          Work item:  [G] a ~ b
-          Inert:      [W] b ~ [a]
-    Now at this point the work item cannot be further rewritten by the
-    inert (due to the weaker inert flavor). But we can't add the work item
-    as-is because the inert set would then have a cyclic substitution,
-    when rewriting a wanted type mentioning 'a'. So we must kick the inert out.
-
-    We have to do this only if the inert *cannot* rewrite the work item;
-    it it can, then the work item will have been fully rewritten by the
-    inert set during canonicalisation.  So for example:
-         Work item: [W] a ~ Int
-         Inert:     [W] b ~ [a]
-    No need to kick out the inert, beause the inert substitution is not
-    necessarily idemopotent.  See Note [Non-idempotent inert substitution]
-    in TcFlatten.
-
-          Work item:  [G] a ~ Int
-          Inert:      [G] b ~ [a]
-See also Note [Detailed InertCans Invariants]
 
 Note [Avoid double unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
