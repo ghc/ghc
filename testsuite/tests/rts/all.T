@@ -142,6 +142,8 @@ def checkDynAsm(actual_file, normaliser):
     elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
         if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
         return 1
+    elif opsys('darwin') and actual == ['modInitFunc1', 'modInitFunc2', 'success']:
+        return 1
     elif opsys('mingw32') and actual == ['ctors1', 'ctors2', 'success']:
         return 1
     else:
