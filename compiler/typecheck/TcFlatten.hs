@@ -882,7 +882,7 @@ A "generalised substitution" S is a set of triples (a -f-> t), where
   f is a flavour
 such that
   (WF1) if (a -f1-> t1) in S
-            (a -f2-> t2) in S
+           (a -f2-> t2) in S
         then neither (f1 >= f2) nor (f2 >= f1) hold
   (WF2) if (a -f-> t) is in S, then t /= a
 
