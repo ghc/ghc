@@ -19,15 +19,16 @@ module SimplUtils (
         -- The continuation type
         SimplCont(..), DupFlag(..),
         isSimplified,
-        contIsDupable, contResultType, contInputType,
-        contIsTrivial, contArgs, dropArgs,
-        pushSimplifiedArgs, countValArgs, countArgs,
+        contIsDupable, contResultType, contHoleType,
+        contIsTrivial, contArgs, 
+        countValArgs, countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
         interestingCallContext, interestingArg,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), mkArgInfo, addArgTo, addCastTo,
-        argInfoExpr, argInfoValArgs,
+        ArgInfo(..), ArgSpec(..), mkArgInfo,
+        addValArgTo, addCastTo, addTyArgTo,
+        argInfoExpr, argInfoAppArgs, pushSimplifiedArgs,
 
         abstractFloats
     ) where
@@ -66,7 +67,7 @@ import Control.Monad    ( when )
 {-
 ************************************************************************
 *                                                                      *
-                The SimplCont type
+                The SimplCont and DupFlag types
 *                                                                      *
 ************************************************************************
 
@@ -100,18 +101,25 @@ data SimplCont
                         -- Specifically:
                         --     This is an argument of a function that has RULES
                         --     Inlining the call might allow the rule to fire
-                        -- Never ValAppCxt (use ApplyTo instead)
+                        -- Never ValAppCxt (use ApplyToVal instead)
                         -- or CaseCtxt (use Select instead)
 
-  | CoerceIt            -- <hole> `cast` co
+  | CastIt            -- <hole> `cast` co
         OutCoercion             -- The coercion simplified
                                 -- Invariant: never an identity coercion
         SimplCont
 
-  | ApplyTo             -- <hole> arg
-        DupFlag                 -- See Note [DupFlag invariants]
-        InExpr StaticEnv        -- The argument and its static env
-        SimplCont
+  | ApplyToVal {        -- <hole> arg
+        sc_dup  :: DupFlag,          -- See Note [DupFlag invariants]
+        sc_arg  :: InExpr,           -- The argument,
+        sc_env  :: StaticEnv,        --     and its static env
+        sc_cont :: SimplCont }
+
+  | ApplyToTy {         -- <hole> ty
+        sc_arg_ty  :: OutType,     -- Argument type
+        sc_hole_ty :: OutType,     -- Type of the function, presumably (forall a. blah)
+                                   -- See Note [The hole type in ApplyToTy]
+        sc_cont    :: SimplCont }
 
   | Select              -- case <hole> of alts
         DupFlag                 -- See Note [DupFlag invariants]
@@ -134,6 +142,76 @@ data SimplCont
         (Tickish Id)    -- Tick tickish <hole>
         SimplCont
 
+data DupFlag = NoDup       -- Unsimplified, might be big
+             | Simplified  -- Simplified
+             | OkToDup     -- Simplified and small
+
+isSimplified :: DupFlag -> Bool
+isSimplified NoDup = False
+isSimplified _     = True       -- Invariant: the subst-env is empty
+
+perhapsSubstTy :: DupFlag -> StaticEnv -> Type -> Type
+perhapsSubstTy dup env ty
+  | isSimplified dup = ty
+  | otherwise        = substTy env ty
+
+{-
+Note [DupFlag invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+In both (ApplyToVal dup _ env k)
+   and  (Select dup _ _ env k)
+the following invariants hold
+
+  (a) if dup = OkToDup, then continuation k is also ok-to-dup
+  (b) if dup = OkToDup or Simplified, the subst-env is empty
+      (and and hence no need to re-simplify)
+-}
+
+instance Outputable DupFlag where
+  ppr OkToDup    = ptext (sLit "ok")
+  ppr NoDup      = ptext (sLit "nodup")
+  ppr Simplified = ptext (sLit "simpl")
+
+instance Outputable SimplCont where
+  ppr (Stop ty interesting)           = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
+  ppr (ApplyToTy  { sc_arg_ty = ty
+                  , sc_cont = cont }) = (ptext (sLit "ApplyToTy") <+> pprParendType ty) $$ ppr cont
+  ppr (ApplyToVal { sc_arg = arg
+                  , sc_dup = dup
+                  , sc_cont = cont }) = (ptext (sLit "ApplyToVal") <+> ppr dup <+> pprParendExpr arg)
+                                        $$ ppr cont
+  ppr (StrictBind b _ _ _ cont)       = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
+  ppr (StrictArg ai _ cont)           = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
+  ppr (Select dup bndr alts se cont)  = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$
+                                        ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
+  ppr (CastIt co cont  )              = (ptext (sLit "CastIt") <+> ppr co) $$ ppr cont
+  ppr (TickIt t cont)                 = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
+
+
+{- Note [The hole type in ApplyToTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The sc_hole_ty field of ApplyToTy records the type of the "hole" in the
+continuation.  It is absolutely necessary to compute contHoleType, but it is
+not used for anything else (and hence may not be evaluated).
+
+Why is it necessary for contHoleType?  Consider the continuation
+     ApplyToType Int (Stop Int)
+corresponding to
+     (<hole> @Int) :: Int
+What is the type of <hole>?  It could be (forall a. Int) or (forall a. a),
+and there is no way to know which, so we must record it.
+
+In a chain of applications  (f @t1 @t2 @t3) we'll lazily compute exprType
+for (f @t1) and (f @t1 @t2), which is potentially non-linear; but it probably
+doesn't matter because we'll never compute them all.
+
+************************************************************************
+*                                                                      *
+                ArgInfo and ArgSpec
+*                                                                      *
+************************************************************************
+-}
+
 data ArgInfo
   = ArgInfo {
         ai_fun   :: OutId,      -- The function
@@ -154,75 +232,70 @@ data ArgInfo
                                 --   Always infinite
     }
 
-data ArgSpec = ValArg OutExpr       -- Apply to this
-             | CastBy OutCoercion   -- Cast by this
+data ArgSpec
+  = ValArg OutExpr                    -- Apply to this (coercion or value); c.f. ApplyToVal
+  | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
+          , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
+  | CastBy OutCoercion                -- Cast by this; c.f. CastIt
 
 instance Outputable ArgSpec where
-  ppr (ValArg e) = ptext (sLit "ValArg") <+> ppr e
-  ppr (CastBy c) = ptext (sLit "CastBy") <+> ppr c
+  ppr (ValArg e)                 = ptext (sLit "ValArg") <+> ppr e
+  ppr (TyArg { as_arg_ty = ty }) = ptext (sLit "TyArg") <+> ppr ty
+  ppr (CastBy c)                 = ptext (sLit "CastBy") <+> ppr c
 
-addArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
-                     , ai_type = applyTypeToArg (ai_type ai) arg  }
+addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
+addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
+                        , ai_type = funResultTy (ai_type ai) }
+
+addTyArgTo :: ArgInfo -> OutType -> ArgInfo
+addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
+                          , ai_type = applyTy poly_fun_ty arg_ty }
+  where
+    poly_fun_ty = ai_type ai
+    arg_spec    = TyArg { as_arg_ty = arg_ty, as_hole_ty = poly_fun_ty }
 
 addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
 addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
                      , ai_type = pSnd (coercionKind co) }
 
-argInfoValArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> ([OutExpr], SimplCont)
-argInfoValArgs env args cont
-  = go args [] cont
+argInfoAppArgs :: [ArgSpec] -> [OutExpr]
+argInfoAppArgs []                              = []
+argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
+argInfoAppArgs (ValArg e                 : as) = e       : argInfoAppArgs as
+argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
+
+pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
+pushSimplifiedArgs _env []           k = k
+pushSimplifiedArgs env  (arg : args) k
+  = case arg of
+      TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
+               -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
+      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest }
+      CastBy c -> CastIt c rest
   where
-    go :: [ArgSpec] -> [OutExpr] -> SimplCont -> ([OutExpr], SimplCont)
-    go (ValArg e  : as) acc cont = go as (e:acc) cont
-    go (CastBy co : as) acc cont = go as [] (CoerceIt co (pushSimplifiedArgs env acc cont))
-    go []               acc cont = (acc, cont)
+    rest = pushSimplifiedArgs env args k
+           -- The env has an empty SubstEnv
 
 argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
-argInfoExpr fun args
-  = go args
+-- NB: the [ArgSpec] is reversed so that the first arg
+-- in the list is the last one in the application
+argInfoExpr fun rev_args
+  = go rev_args
   where
-    go []               = Var fun
-    go (ValArg a : as)  = go as `App` a
-    go (CastBy co : as) = mkCast (go as) co
+    go []                              = Var fun
+    go (ValArg a                 : as) = go as `App` a
+    go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
+    go (CastBy co                : as) = mkCast (go as) co
 
-instance Outputable SimplCont where
-  ppr (Stop ty interesting)          = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
-  ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
-                                          {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
-  ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$
-                                       ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
-  ppr (CoerceIt co cont)             = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
-  ppr (TickIt t cont)                = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
-
-data DupFlag = NoDup       -- Unsimplified, might be big
-             | Simplified  -- Simplified
-             | OkToDup     -- Simplified and small
-
-isSimplified :: DupFlag -> Bool
-isSimplified NoDup = False
-isSimplified _     = True       -- Invariant: the subst-env is empty
-
-instance Outputable DupFlag where
-  ppr OkToDup    = ptext (sLit "ok")
-  ppr NoDup      = ptext (sLit "nodup")
-  ppr Simplified = ptext (sLit "simpl")
 
 {-
-Note [DupFlag invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-In both (ApplyTo dup _ env k)
-   and  (Select dup _ _ env k)
-the following invariants hold
-
-  (a) if dup = OkToDup, then continuation k is also ok-to-dup
-  (b) if dup = OkToDup or Simplified, the subst-env is empty
-      (and and hence no need to re-simplify)
+************************************************************************
+*                                                                      *
+                Functions on SimplCont
+*                                                                      *
+************************************************************************
 -}
 
--------------------
 mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty BoringCtxt
 
@@ -245,54 +318,57 @@ contIsRhs _                = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop {})                  = True
-contIsDupable (ApplyTo  OkToDup _ _ _)   = True -- See Note [DupFlag invariants]
-contIsDupable (Select   OkToDup _ _ _ _) = True -- ...ditto...
-contIsDupable (CoerceIt _ cont)          = contIsDupable cont
-contIsDupable _                          = False
+contIsDupable (Stop {})                         = True
+contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
+contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag invariants]
+contIsDupable (Select   OkToDup _ _ _ _)        = True -- ...ditto...
+contIsDupable (CastIt _ k)                      = contIsDupable k
+contIsDupable _                                 = False
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
-contIsTrivial (Stop {})                   = True
-contIsTrivial (ApplyTo _ (Type _) _ cont) = contIsTrivial cont
-contIsTrivial (ApplyTo _ (Coercion _) _ cont) = contIsTrivial cont
-contIsTrivial (CoerceIt _ cont)           = contIsTrivial cont
-contIsTrivial _                           = False
+contIsTrivial (Stop {})                                         = True
+contIsTrivial (ApplyToTy { sc_cont = k })                       = contIsTrivial k
+contIsTrivial (ApplyToVal { sc_arg = Coercion _, sc_cont = k }) = contIsTrivial k
+contIsTrivial (CastIt _ k)                                      = contIsTrivial k
+contIsTrivial _                                                 = False
 
 -------------------
 contResultType :: SimplCont -> OutType
-contResultType (Stop ty _)            = ty
-contResultType (CoerceIt _ k)         = contResultType k
-contResultType (StrictBind _ _ _ _ k) = contResultType k
-contResultType (StrictArg _ _ k)      = contResultType k
-contResultType (Select _ _ _ _ k)     = contResultType k
-contResultType (ApplyTo _ _ _ k)      = contResultType k
-contResultType (TickIt _ k)           = contResultType k
+contResultType (Stop ty _)                  = ty
+contResultType (CastIt _ k)                 = contResultType k
+contResultType (StrictBind _ _ _ _ k)       = contResultType k
+contResultType (StrictArg _ _ k)            = contResultType k
+contResultType (Select _ _ _ _ k)           = contResultType k
+contResultType (ApplyToTy  { sc_cont = k }) = contResultType k
+contResultType (ApplyToVal { sc_cont = k }) = contResultType k
+contResultType (TickIt _ k)                 = contResultType k
 
-contInputType :: SimplCont -> OutType
-contInputType (Stop ty _)             = ty
-contInputType (CoerceIt co _)         = pFst (coercionKind co)
-contInputType (Select d b _ se _)     = perhapsSubstTy d se (idType b)
-contInputType (StrictBind b _ _ se _) = substTy se (idType b)
-contInputType (StrictArg ai _ _)      = funArgTy (ai_type ai)
-contInputType (ApplyTo d e se k)      = mkFunTy (perhapsSubstTy d se (exprType e)) (contInputType k)
-contInputType (TickIt _ k)            = contInputType k
-
-perhapsSubstTy :: DupFlag -> SimplEnv -> InType -> OutType
-perhapsSubstTy dup_flag se ty
-  | isSimplified dup_flag = ty
-  | otherwise             = substTy se ty
+contHoleType :: SimplCont -> OutType
+contHoleType (Stop ty _)                      = ty
+contHoleType (TickIt _ k)                     = contHoleType k
+contHoleType (CastIt co _)                    = pFst (coercionKind co)
+contHoleType (Select d b _ se _)              = perhapsSubstTy d se (idType b)
+contHoleType (StrictBind b _ _ se _)          = substTy se (idType b)
+contHoleType (StrictArg ai _ _)               = funArgTy (ai_type ai)
+contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
+contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
+  = mkFunTy (perhapsSubstTy dup se (exprType e))
+            (contHoleType k)
 
 -------------------
 countValArgs :: SimplCont -> Int
-countValArgs (ApplyTo _ (Type _) _ cont) = countValArgs cont
-countValArgs (ApplyTo _ (Coercion _) _ cont) = countValArgs cont
-countValArgs (ApplyTo _ _        _ cont) = 1 + countValArgs cont
-countValArgs _                           = 0
+-- Count value arguments excluding coercions
+countValArgs (ApplyToVal { sc_arg = arg, sc_cont = cont })
+  | Coercion {} <- arg = countValArgs cont
+  | otherwise          = 1 + countValArgs cont
+countValArgs _         = 0
 
 countArgs :: SimplCont -> Int
-countArgs (ApplyTo _ _ _ cont) = 1 + countArgs cont
-countArgs _                    = 0
+-- Count all arguments, including types, coercions, and other values
+countArgs (ApplyToTy  { sc_cont = cont }) = 1 + countArgs cont
+countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
+countArgs _                               = 0
 
 contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
@@ -302,29 +378,20 @@ contArgs cont
   | lone cont = (True, [], cont)
   | otherwise = go [] cont
   where
-    lone (ApplyTo {})  = False  -- See Note [Lone variables] in CoreUnfold
-    lone (CoerceIt {}) = False
-    lone _             = True
+    lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in CoreUnfold
+    lone (ApplyToVal {}) = False
+    lone (CastIt {})     = False
+    lone _               = True
 
-    go args (ApplyTo _ arg se cont)
-      | isTypeArg arg         = go args                           cont
-      | otherwise             = go (is_interesting arg se : args) cont
-    go args (CoerceIt _ cont) = go args cont
-    go args cont              = (False, reverse args, cont)
+    go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
+                                        = go (is_interesting arg se : args) k
+    go args (ApplyToTy { sc_cont = k }) = go args k
+    go args (CastIt _ k)                = go args k
+    go args k                           = (False, reverse args, k)
 
     is_interesting arg se = interestingArg (substExpr (text "contArgs") se arg)
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
-
-pushSimplifiedArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
-pushSimplifiedArgs _env []         cont = cont
-pushSimplifiedArgs env  (arg:args) cont = ApplyTo Simplified arg env (pushSimplifiedArgs env args cont)
-                   -- The env has an empty SubstEnv
-
-dropArgs :: Int -> SimplCont -> SimplCont
-dropArgs 0 cont = cont
-dropArgs n (ApplyTo _ _ _ cont) = dropArgs (n-1) cont
-dropArgs n other                = pprPanic "dropArgs" (ppr n <+> ppr other)
 
 {-
 Note [Interesting call context]
@@ -367,19 +434,17 @@ interestingCallContext cont
   = interesting cont
   where
     interesting (Select _ _bndr _ _ _) = CaseCtxt
-
-    interesting (ApplyTo _ arg _ cont)
-        | isTypeArg arg = interesting cont
-        | otherwise     = ValAppCtxt    -- Can happen if we have (f Int |> co) y
-                                        -- If f has an INLINE prag we need to give it some
-                                        -- motivation to inline. See Note [Cast then apply]
-                                        -- in CoreUnfold
-
-    interesting (StrictArg _ cci _) = cci
-    interesting (StrictBind {})     = BoringCtxt
-    interesting (Stop _ cci)        = cci
-    interesting (TickIt _ cci)      = interesting cci
-    interesting (CoerceIt _ cont)   = interesting cont
+    interesting (ApplyToVal {})        = ValAppCtxt
+        -- Can happen if we have (f Int |> co) y
+        -- If f has an INLINE prag we need to give it some
+        -- motivation to inline. See Note [Cast then apply]
+        -- in CoreUnfold
+    interesting (StrictArg _ cci _)         = cci
+    interesting (StrictBind {})             = BoringCtxt
+    interesting (Stop _ cci)                = cci
+    interesting (TickIt _ k)                = interesting k
+    interesting (ApplyToTy { sc_cont = k }) = interesting k
+    interesting (CastIt _ k)                = interesting k
         -- If this call is the arg of a strict function, the context
         -- is a bit interesting.  If we inline here, we may get useful
         -- evaluation information to avoid repeated evals: e.g.
@@ -493,16 +558,20 @@ interestingArgContext :: [CoreRule] -> SimplCont -> Bool
 -- The alternative would be to *always* inline an INLINE function,
 -- regardless of how boring its context is; but that seems overkill
 -- For example, it'd mean that wrapper functions were always inlined
+--
+-- The call_cont passed to interestingArgContext is the context of
+-- the call itself, e.g. g <hole> in the example above
 interestingArgContext rules call_cont
   = notNull rules || enclosing_fn_has_rules
   where
     enclosing_fn_has_rules = go call_cont
 
     go (Select {})         = False
-    go (ApplyTo {})        = False
+    go (ApplyToVal {})     = False  -- Shouldn't really happen
+    go (ApplyToTy  {})     = False  -- Ditto
     go (StrictArg _ cci _) = interesting cci
     go (StrictBind {})     = False      -- ??
-    go (CoerceIt _ c)      = go c
+    go (CastIt _ c)        = go c
     go (Stop _ cci)        = interesting cci
     go (TickIt _ c)        = go c
 
