@@ -88,11 +88,12 @@ test('haddock.compiler',
             # 2012-11-27: 28708374824 (amd64/Linux)
             # 2014-09-10: 30353349160 (amd64/Linux) post-AMP cleanup
             # 2014-11-22: 33562468736 (amd64/Linux)
-          ,(platform('i386-unknown-mingw32'), 104140852, 10)
+          ,(platform('i386-unknown-mingw32'), 217933548, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
             # 2013-11-13:                     14328363592 (x86/Windows, 64bit machine)
             # 2014-12-01:                       104140852 (x86/Windows, sudden shrinkage!)
+            # 2014-12-10:                       217933548 increased again
           ,(wordsize(32), 15110426000, 1)])
             # 2012-08-14: 13471797488 (x86/OSX)
             # 2014-01-22: 14581475024 (x86/Linux - new haddock)

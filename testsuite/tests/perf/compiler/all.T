@@ -311,10 +311,13 @@ test('T4007',
 
 test('T5030',
      [compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 198573456, 10),
+          [(wordsize(32), 227205560, 10),
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
+           # 2014-12-10:  227205560 constraint solver got worse again; more agressive solving
+           #                        of family-applications leads to less sharing, I think
+
            (wordsize(64), 449042120, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
@@ -397,11 +400,12 @@ test('T783',
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
        compiler_stats_num_field('bytes allocated',
-           [(wordsize(32), 299656164, 10),
+           [(wordsize(32), 206406188, 10),
              # prev:       300000000
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
+             # 10/12/2014: 206406188     #  Improvements in constraint solver
             (wordsize(64), 408110888, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
@@ -443,10 +447,11 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-           [(wordsize(32), 753045568, 10),
+           [(wordsize(32), 641085256, 10),
                      # sample from x86/Linux
             # prev:        650000000
             # 2014-09-03:  753045568 
+            # 2014-12-10:  641085256 Improvements in constraints solver
 
             (wordsize(64), 1282916024, 10)])
             # prev:        1300000000
@@ -465,11 +470,12 @@ test('T5642',
 test('T5837',
      [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 135914136, 10),
+          [(wordsize(32), 115905208, 10),
              # 40000000 (x86/Linux)
-             # 2013-11-13: 45520936  (x86/Windows, 64bit machine)
-             # 2014-09-03: 37096484  (Windows laptop, w/w for INLINABLE things
+             # 2013-11-13:  45520936 (x86/Windows, 64bit machine)
+             # 2014-09-03:  37096484 (Windows laptop, w/w for INLINABLE things
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
+             # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
  
            (wordsize(64), 234790312, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
@@ -541,6 +547,7 @@ test('T9675',
        compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 544489040, 10)
           # 2014-10-13    544489040
+          ,(wordsize(32), 250000000, 10)
           ]),
       ],
      compile,
