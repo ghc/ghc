@@ -565,3 +565,12 @@ test('T9872b',
       ],
      compile_fail,
      [''])
+test('T9872c',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 5495850096, 5)
+          # 2014-12-10    5495850096    Initally created
+          ]),
+      ],
+     compile_fail,
+     [''])
