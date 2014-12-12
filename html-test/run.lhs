@@ -54,7 +54,7 @@ test = do
   let mods' = map (testDir </>) mods
 
   -- add haddock_datadir to environment for subprocesses
-  env <- Just . (:) ("haddock_datadir", dataDir) <$> getEnvironment
+  env <- Just . (:) ("haddock_datadir", Main.dataDir) <$> getEnvironment
 
   putStrLn ""
   putStrLn "Haddock version: "

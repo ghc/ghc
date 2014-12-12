@@ -1,5 +1,5 @@
 name:                 haddock-api
-version:              2.15.1
+version:              2.16.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -45,10 +45,10 @@ library
     , array
     , xhtml >= 3000.2 && < 3000.3
     , Cabal >= 1.10
-    , ghc >= 7.8.2 && < 7.8.4
+    , ghc == 7.9.*
 
     , ghc-paths
-    , haddock-library == 1.1.1.*
+    , haddock-library == 1.20.0.*
 
   hs-source-dirs:
       src

@@ -17,7 +17,7 @@ module Haddock.Backends.Hoogle (
 
 
 import Haddock.GhcUtils
-import Haddock.Types
+import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
 import GHC
 import Outputable

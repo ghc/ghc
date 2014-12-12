@@ -828,9 +828,8 @@ ppKind unicode qual ki = ppr_mono_ty pREC_TOP ki unicode qual
 
 ppForAllCon :: HsExplicitFlag -> LHsTyVarBndrs DocName
          -> Located (HsContext DocName) -> Unicode -> Qualification -> Html
-ppForAllCon expl tvs cxt unicode qual
-  | show_forall = forall_part <+> ppLContext cxt unicode qual
-  | otherwise   = ppLContext cxt unicode qual
+ppForAllCon expl tvs cxt unicode qual =
+  forall_part <+> ppLContext cxt unicode qual
   where
     forall_part = ppLTyVarBndrs expl tvs unicode qual
 
@@ -850,7 +849,7 @@ ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
 
 ppr_mono_ty :: Int -> HsType DocName -> Unicode -> Qualification -> Html
-ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode qual
+ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $ ppForAllCon expl tvs ctxt' unicode qual
                                     <+> ppr_mono_lty pREC_TOP ty unicode qual
  where ctxt' = case extra of

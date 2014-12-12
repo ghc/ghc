@@ -35,9 +35,6 @@ import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
-#if !MIN_VERSION_base(4,7,0)
-import Control.Monad.Instances ( ) -- for Functor Either a
-#endif
 import Data.Char             ( toUpper )
 import Data.Functor          ( (<$>) )
 import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )

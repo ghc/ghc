@@ -26,11 +26,11 @@ $(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html $(INPLACE_LIB)/la
 
 $(INPLACE_LIB)/html:
 	$(call removeTrees,$@)
-	"$(CP)" -RL utils/haddock/resources/html $@
+	"$(CP)" -RL utils/haddock/haddock-api/resources/html $@
 
 $(INPLACE_LIB)/latex:
 	$(call removeTrees,$@)
-	"$(CP)" -RL utils/haddock/resources/latex $@
+	"$(CP)" -RL utils/haddock/haddock-api/resources/latex $@
 
 endif
 
@@ -48,7 +48,7 @@ install_utils/haddock_data:
 	$(foreach i,$(sort $(dir $(utils/haddock_dist_DATA_FILES))), \
 	    $(call make-command,$(call INSTALL_DIR,"$(DESTDIR)$(ghclibdir)/$i")))
 	$(foreach i,$(utils/haddock_dist_DATA_FILES), \
-	    $(call make-command,$(call INSTALL_DATA,$(INSTALL_OPTS),utils/haddock/resources/$i,"$(DESTDIR)$(ghclibdir)/$(dir $i)")))
+	    $(call make-command,$(call INSTALL_DATA,$(INSTALL_OPTS),utils/haddock/haddock-api/resources/$i,"$(DESTDIR)$(ghclibdir)/$(dir $i)")))
 
 .PHONY: install_utils/haddock_link
 install_utils/haddock_link:
@@ -56,4 +56,3 @@ install_utils/haddock_link:
 	$(LN_S) $(utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME) "$(DESTDIR)$(bindir)/haddock"
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/resources/,$(utils/haddock_dist_DATA_FILES))
-
