@@ -3,3 +3,8 @@
 :l GhciKinds
 :kind F [[[Int]]]
 :kind! F [[[Int]]]
+:kind! F (Maybe Int)
+:kind! F (Maybe Bool)
+
+:seti -XRankNTypes
+:kind! forall a. F (Maybe a)

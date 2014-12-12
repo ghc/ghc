@@ -28,9 +28,11 @@ deriving instance Show (f (Fix f)) => Show (Fix f)
 
 -- This ensures that explicitly given constraints are consulted, even 
 -- at higher depths
-data Oracle where Oracle :: Coercible (Fix (Either Age)) (Fix  (Either Int)) => Oracle
-foo :: Oracle -> Either Age (Fix (Either Age)) -> Fix (Either Int)
-foo Oracle = coerce
+-- This stopped working with the fix to #9117
+--data Oracle where Oracle :: Coercible (Fix (Either Age))
+--                                      (Fix (Either Int)) => Oracle
+--foo :: Oracle -> Either Age (Fix (Either Age)) -> Fix (Either Int)
+--foo Oracle = coerce
 
 -- This ensures that Coercible looks into newtype instances (#8548)
 data family Fam k
@@ -60,13 +62,14 @@ main = do
     print (coerce $ (Fix (Left ()) :: Fix (Either ())) :: Either () (Fix (Either ())))
     print (coerce $ (Left () :: Either () (Fix (Either ()))) :: Fix (Either ()))
 
-    -- print (coerce $ (FixEither (Left age) :: FixEither Age) :: Either Int (FixEither Int))
-    -- print (coerce $ (Left one :: Either Int (FixEither Age)) :: FixEither Age)
+--    print (coerce $ (FixEither (Left age) :: FixEither Age)
+--               :: Either Int (FixEither Int))
+--    print (coerce $ (Left one :: Either Int (FixEither Age)) :: FixEither Age)
 
     print (coerce $ True :: Fam Int)
     print (coerce $ FamInt True :: Bool)
 
-    foo `seq` return ()
+--    foo `seq` return ()
 
 
   where one = 1 :: Int

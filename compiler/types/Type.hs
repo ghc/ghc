@@ -29,7 +29,7 @@ module Type (
 
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
-        splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
+        splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys,
         mkPiKinds, mkPiType, mkPiTypes,
@@ -52,9 +52,10 @@ module Type (
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
 
         -- Deconstructing predicate types
-        PredTree(..), classifyPredType,
+        PredTree(..), EqRel(..), eqRelRole, classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
         getEqPredTys, getEqPredTys_maybe, getEqPredRole,
+        predTypeEqRel,
 
         -- ** Common type constructors
         funTyCon,
@@ -169,6 +170,7 @@ import CoAxiom
 import Unique           ( Unique, hasKey )
 import BasicTypes       ( Arity, RepArity )
 import Util
+import ListSetOps       ( getNth )
 import Outputable
 import FastString
 
@@ -559,6 +561,20 @@ splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitTyConApp_maybe _                 = Nothing
+
+-- | What is the role assigned to the next parameter of this type? Usually,
+-- this will be 'Nominal', but if the type is a 'TyConApp', we may be able to
+-- do better. The type does *not* have to be well-kinded when applied for this
+-- to work!
+nextRole :: Type -> Role
+nextRole ty
+  | Just (tc, tys) <- splitTyConApp_maybe ty
+  , let num_tys = length tys
+  , num_tys < tyConArity tc
+  = tyConRoles tc `getNth` num_tys
+
+  | otherwise
+  = Nominal
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
@@ -971,18 +987,36 @@ constraints build tuples.
 Decomposing PredType
 -}
 
+-- | A choice of equality relation. This is separate from the type 'Role'
+-- because 'Phantom' does not define a (non-trivial) equality relation.
+data EqRel = NomEq | ReprEq
+  deriving (Eq, Ord)
+
+instance Outputable EqRel where
+  ppr NomEq  = text "nominal equality"
+  ppr ReprEq = text "representational equality"
+
+eqRelRole :: EqRel -> Role
+eqRelRole NomEq  = Nominal
+eqRelRole ReprEq = Representational
+
 data PredTree = ClassPred Class [Type]
-              | EqPred Type Type
+              | EqPred EqRel Type Type
               | TuplePred [PredType]
               | IrredPred PredType
 
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
-    Just (tc, tys) | Just clas <- tyConClass_maybe tc
-                   -> ClassPred clas tys
+    Just (tc, tys) | tc `hasKey` coercibleTyConKey
+                   , let [_, ty1, ty2] = tys
+                   -> EqPred ReprEq ty1 ty2
     Just (tc, tys) | tc `hasKey` eqTyConKey
                    , let [_, ty1, ty2] = tys
-                   -> EqPred ty1 ty2
+                   -> EqPred NomEq ty1 ty2
+     -- NB: Coercible is also a class, so this check must come *after*
+     -- the Coercible check
+    Just (tc, tys) | Just clas <- tyConClass_maybe tc
+                   -> ClassPred clas tys
     Just (tc, tys) | isTupleTyCon tc
                    -> TuplePred tys
     _ -> IrredPred ev_ty
@@ -1001,7 +1035,8 @@ getEqPredTys :: PredType -> (Type, Type)
 getEqPredTys ty
   = case splitTyConApp_maybe ty of
       Just (tc, (_ : ty1 : ty2 : tys)) ->
-        ASSERT( null tys && (tc `hasKey` eqTyConKey || tc `hasKey` coercibleTyConKey) )
+        ASSERT( null tys && (tc `hasKey` eqTyConKey
+                             || tc `hasKey` coercibleTyConKey) )
         (ty1, ty2)
       _ -> pprPanic "getEqPredTys" (ppr ty)
 
@@ -1021,9 +1056,18 @@ getEqPredRole ty
         | tc `hasKey` coercibleTyConKey -> Representational
       _ -> pprPanic "getEqPredRole" (ppr ty)
 
+-- | Get the equality relation relevant for a pred type.
+predTypeEqRel :: PredType -> EqRel
+predTypeEqRel ty
+  | Just (tc, _) <- splitTyConApp_maybe ty
+  , tc `hasKey` coercibleTyConKey
+  = ReprEq
+  | otherwise
+  = NomEq
+
 {-
-************************************************************************
-*                                                                      *
+%************************************************************************
+%*                                                                      *
                    Size
 *                                                                      *
 ************************************************************************

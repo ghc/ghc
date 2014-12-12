@@ -1,66 +1,67 @@
 
 TcCoercibleFail.hs:11:8:
-    Could not coerce from ‘Int’ to ‘()’
-      because ‘Int’
-          and ‘()’
-          are different types.
-      arising from a use of ‘coerce’
+    Couldn't match representation of type ‘()’ with that of ‘Int’
     In the expression: coerce
     In the expression: coerce $ one :: ()
     In an equation for ‘foo1’: foo1 = coerce $ one :: ()
 
 TcCoercibleFail.hs:14:8:
-    Could not coerce from ‘m Int’ to ‘m Age’
-      because ‘m Int’
-          and ‘m Age’
-          are different types.
-      arising from a use of ‘coerce’
-    from the context (Monad m)
-      bound by the type signature for foo2 :: Monad m => m Age
-      at TcCoercibleFail.hs:13:9-34
+    Couldn't match representation of type ‘m Age’ with that of ‘m Int’
+    NB: We cannot know what roles the parameters to ‘m’ have;
+      we must assume that the role is nominal
+    Relevant bindings include
+      foo2 :: m Age (bound at TcCoercibleFail.hs:14:1)
     In the expression: coerce
     In the expression: coerce $ (return one :: m Int)
     In an equation for ‘foo2’: foo2 = coerce $ (return one :: m Int)
 
 TcCoercibleFail.hs:16:8:
-    Could not coerce from ‘Map Int ()’ to ‘Map Age ()’
-      because the first type argument of ‘Map’ has role Nominal,
-      but the arguments ‘Int’ and ‘Age’ differ
-      arising from a use of ‘coerce’
+    Couldn't match type ‘Int’ with ‘Age’
+    arising from trying to show that the representations of
+      ‘Map Int ()’ and
+      ‘Map Age ()’ are the same
+    Relevant role signatures: type role Map nominal representational
     In the expression: coerce
     In the expression: coerce $ Map one () :: Map Age ()
     In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
 TcCoercibleFail.hs:18:8:
-    Could not coerce from ‘Int’ to ‘Down Int’
-    because the data constructor ‘Data.Ord.Down’
+    Couldn't match representation of type ‘Down Int’ with that of ‘Int’
+    Relevant role signatures: type role Down representational
+    The data constructor ‘Data.Ord.Down’
       of newtype ‘Down’ is not in scope
-      arising from a use of ‘coerce’
     In the expression: coerce
     In the expression: coerce $ one :: Down Int
     In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
 
 TcCoercibleFail.hs:21:8:
-    Context reduction stack overflow; size = 101
-    Use -fcontext-stack=N to increase stack size to N
-      Coercible Void ()
+    Couldn't match representation of type ‘()’ with that of ‘Void’
     In the expression: coerce :: Void -> ()
     In an equation for ‘foo5’: foo5 = coerce :: Void -> ()
 
-TcCoercibleFail.hs:30:8:
+TcCoercibleFail.hs:24:9:
+    Couldn't match representation of type ‘()’
+                             with that of ‘VoidBad ()’
+    Relevant role signatures: type role VoidBad phantom
+    In the expression: coerce :: (VoidBad ()) -> ()
+    In an equation for ‘foo5'’: foo5' = coerce :: (VoidBad ()) -> ()
+
+TcCoercibleFail.hs:28:8:
     Context reduction stack overflow; size = 101
     Use -fcontext-stack=N to increase stack size to N
-      Coercible
-        (Either Int (Fix (Either Int))) (Either Age (Fix (Either Age)))
+      Coercible (Fix (Either Int)) (Fix (Either Age))
     In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
     In an equation for ‘foo6’:
         foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
 
-TcCoercibleFail.hs:31:8:
-    Could not coerce from ‘Either Int (Fix (Either Int))’ to ‘()’
-      because ‘Either Int (Fix (Either Int))’
-          and ‘()’
-          are different types.
-      arising from a use of ‘coerce’
+TcCoercibleFail.hs:29:8:
+    Couldn't match representation of type ‘()’
+                             with that of ‘Either Int (Fix (Either Int))’
+    arising from trying to show that the representations of
+      ‘Fix (Either Int)’ and
+      ‘()’ are the same
+    Relevant role signatures:
+      type role Either representational representational
+      type role Fix nominal
     In the expression: coerce :: Fix (Either Int) -> ()
     In an equation for ‘foo7’: foo7 = coerce :: Fix (Either Int) -> ()

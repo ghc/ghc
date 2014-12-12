@@ -31,13 +31,16 @@ module Coercion (
 
         -- ** Decomposition
         instNewTyCon_maybe,
-        topNormaliseNewType_maybe,
+
+        NormaliseStepper, NormaliseStepResult(..), composeSteppers,
+        modifyStepResultCo, unwrapNewTypeStepper,
+        topNormaliseNewType_maybe, topNormaliseTypeX_maybe,
 
         decomposeCo, getCoVar_maybe,
         splitAppCo_maybe,
         splitForAllCo_maybe,
         nthRole, tyConRolesX,
-        nextRole, setNominalRole_maybe,
+        setNominalRole_maybe,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
@@ -73,7 +76,7 @@ module Coercion (
         tidyCo, tidyCos,
 
         -- * Other
-        applyCo
+        applyCo,
        ) where
 
 #include "HsVersions.h"
@@ -98,7 +101,7 @@ import Unique
 import Pair
 import SrcLoc
 import PrelNames        ( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
-import Control.Applicative
+import Control.Applicative hiding ( empty )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse, sequenceA)
 #endif
@@ -1159,15 +1162,7 @@ ltRole Representational _       = False
 ltRole Nominal          Nominal = False
 ltRole Nominal          _       = True
 
--- if we wish to apply `co` to some other coercion, what would be its best
--- role?
-nextRole :: Coercion -> Role
-nextRole (Refl r (TyConApp tc tys)) = head $ dropList tys (tyConRolesX r tc)
-nextRole (TyConAppCo r tc cos)      = head $ dropList cos (tyConRolesX r tc)
-nextRole _                          = Nominal
-
 -- See note [Newtype coercions] in TyCon
-
 -- | Create a coercion constructor (axiom) suitable for the given
 --   newtype 'TyCon'. The 'Name' should be that of a new coercion
 --   'CoAxiom', the 'TyVar's the arguments expected by the @newtype@ and
@@ -1225,16 +1220,94 @@ instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, Coercion)
 instNewTyCon_maybe tc tys
   | Just (tvs, ty, co_tc) <- unwrapNewTyConEtad_maybe tc  -- Check for newtype
   , tvs `leLength` tys                                    -- Check saturated enough
-  = Just (applyTysX tvs ty tys, mkUnbranchedAxInstCo Representational co_tc tys)
+  = Just ( applyTysX tvs ty tys
+         , mkUnbranchedAxInstCo Representational co_tc tys)
   | otherwise
   = Nothing
+
+{-
+************************************************************************
+*                                                                      *
+         Type normalisation
+*                                                                      *
+************************************************************************
+-}
+
+-- | A function to check if we can reduce a type by one step. Used
+-- with 'topNormaliseTypeX_maybe'.
+type NormaliseStepper = RecTcChecker
+                     -> TyCon     -- tc
+                     -> [Type]    -- tys
+                     -> NormaliseStepResult
+
+-- | The result of stepping in a normalisation function.
+-- See 'topNormaliseTypeX_maybe'.
+data NormaliseStepResult
+  = NS_Done   -- ^ nothing more to do
+  | NS_Abort  -- ^ utter failure. The outer function should fail too.
+  | NS_Step RecTcChecker Type Coercion  -- ^ we stepped, yielding new bits;
+                                        -- ^ co :: old type ~ new type
+
+modifyStepResultCo :: (Coercion -> Coercion)
+                   -> NormaliseStepResult -> NormaliseStepResult
+modifyStepResultCo f (NS_Step rec_nts ty co) = NS_Step rec_nts ty (f co)
+modifyStepResultCo _ result                  = result
+
+-- | Try one stepper and then try the next, if the first doesn't make
+-- progress.
+composeSteppers :: NormaliseStepper -> NormaliseStepper
+                -> NormaliseStepper
+composeSteppers step1 step2 rec_nts tc tys
+  = case step1 rec_nts tc tys of
+      success@(NS_Step {}) -> success
+      NS_Done              -> step2 rec_nts tc tys
+      NS_Abort             -> NS_Abort
+
+-- | A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
+-- a loop. If it would fall into a loop, it produces 'NS_Abort'.
+unwrapNewTypeStepper :: NormaliseStepper
+unwrapNewTypeStepper rec_nts tc tys
+  | Just (ty', co) <- instNewTyCon_maybe tc tys
+  = case checkRecTc rec_nts tc of
+      Just rec_nts' -> NS_Step rec_nts' ty' co
+      Nothing       -> NS_Abort
+
+  | otherwise
+  = NS_Done
+
+-- | A general function for normalising the top-level of a type. It continues
+-- to use the provided 'NormaliseStepper' until that function fails, and then
+-- this function returns. The roles of the coercions produced by the
+-- 'NormaliseStepper' must all be the same, which is the role returned from
+-- the call to 'topNormaliseTypeX_maybe'.
+topNormaliseTypeX_maybe :: NormaliseStepper -> Type -> Maybe (Coercion, Type)
+topNormaliseTypeX_maybe stepper
+  = go initRecTc Nothing
+  where
+    go rec_nts mb_co1 ty
+      | Just (tc, tys) <- splitTyConApp_maybe ty
+      = case stepper rec_nts tc tys of
+          NS_Step rec_nts' ty' co2
+            -> go rec_nts' (mb_co1 `trans` co2) ty'
+
+          NS_Done  -> all_done
+          NS_Abort -> Nothing
+
+      | otherwise
+      = all_done
+      where
+        all_done | Just co <- mb_co1 = Just (co, ty)
+                 | otherwise         = Nothing
+
+    Nothing    `trans` co2 = Just co2
+    (Just co1) `trans` co2 = Just (co1 `mkTransCo` co2)
 
 topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 -- ^ Sometimes we want to look through a @newtype@ and get its associated coercion.
 -- This function strips off @newtype@ layers enough to reveal something that isn't
--- a @newtype@.  Specifically, here's the invariant:
+-- a @newtype@, or responds False to ok_tc.  Specifically, here's the invariant:
 --
--- > topNormaliseNewType_maybe rec_nts ty = Just (co, ty')
+-- > topNormaliseNewType_maybe ty = Just (co, ty')
 --
 -- then (a)  @co : ty0 ~ ty'@.
 --      (b)  ty' is not a newtype.
@@ -1248,26 +1321,7 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 -- topNormaliseNewType_maybe
 --
 topNormaliseNewType_maybe ty
-  = go initRecTc Nothing ty
-  where
-    go rec_nts mb_co1 ty
-       | Just (tc, tys) <- splitTyConApp_maybe ty
-       , Just (ty', co2) <- instNewTyCon_maybe tc tys
-       , let co' = case mb_co1 of
-                      Nothing  -> co2
-                      Just co1 -> mkTransCo co1 co2
-       = case checkRecTc rec_nts tc of
-           Just rec_nts' -> go rec_nts' (Just co') ty'
-           Nothing       -> Nothing
-                  -- Return Nothing overall if we get stuck
-                  -- so that the return invariant is satisfied
-                  -- See Note [Expanding newtypes] in TyCon
-
-       | Just co1 <- mb_co1     -- Progress, but stopped on a non-newtype
-       = Just (co1, ty)
-
-       | otherwise              -- No progress
-       = Nothing
+  = topNormaliseTypeX_maybe unwrapNewTypeStepper ty
 
 {-
 ************************************************************************
@@ -1923,3 +1977,4 @@ Kind coercions are only of the form: Refl kind. They are only used to
 instantiate kind polymorphic type constructors in TyConAppCo. Remember
 that kind instantiation only happens with TyConApp, not AppTy.
 -}
+

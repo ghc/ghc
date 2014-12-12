@@ -220,8 +220,21 @@ instCallConstraints orig preds
      = do  { co <- unifyType ty1 ty2
            ; return (EvCoercion co) }
      | otherwise
-     = do { ev_var <- emitWanted orig pred
+     = do { ev_var <- emitWanted modified_orig pred
           ; return (EvId ev_var) }
+      where
+        -- Coercible constraints appear as normal class constraints, but
+        -- are aggressively canonicalized and manipulated during solving.
+        -- The final equality to solve may barely resemble the initial
+        -- constraint. Here, we remember the initial constraint in a
+        -- CtOrigin for better error messages. It's perhaps worthwhile
+        -- considering making this approach general, for other class
+        -- constraints, too.
+        modified_orig
+          | Just (Representational, ty1, ty2) <- getEqPredTys_maybe pred
+          = CoercibleOrigin ty1 ty2
+          | otherwise
+          = orig
 
 ----------------
 instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()

@@ -1,11 +1,14 @@
 
 T7148a.hs:19:50:
-    Could not coerce from ‘Result a b’ to ‘b’
-      because ‘Result a b’ and ‘b’ are different types.
-      arising from the coercion of the method ‘coerce’ from type
-                   ‘forall b. Proxy b -> a -> Result a b’ to type
-                   ‘forall b. Proxy b -> IS_NO_LONGER a -> Result (IS_NO_LONGER a) b’
-    Possible fix:
-      use a standalone 'deriving instance' declaration,
-        so you can specify the instance context yourself
+    Couldn't match representation of type ‘b’ with that of ‘Result a b’
+      ‘b’ is a rigid type variable bound by
+          the type forall b1. Proxy b1 -> a -> Result a b1 at T7148a.hs:19:50
+    arising from the coercion of the method ‘coerce’
+      from type ‘forall b. Proxy b -> a -> Result a b’
+        to type ‘forall b.
+                 Proxy b -> IS_NO_LONGER a -> Result (IS_NO_LONGER a) b’
+    Relevant role signatures:
+      type role IS_NO_LONGER representational
+      type role Result nominal nominal
+      type role Proxy phantom
     When deriving the instance for (Convert (IS_NO_LONGER a))

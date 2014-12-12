@@ -45,7 +45,7 @@ module TcType (
 
   --------------------------------
   -- Builders
-  mkPhiTy, mkSigmaTy, mkTcEqPred,
+  mkPhiTy, mkSigmaTy, mkTcEqPred, mkTcReprEqPred, mkTcEqPredRole,
 
   --------------------------------
   -- Splitters
@@ -56,7 +56,7 @@ module TcType (
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, repSplitAppTy_maybe,
   tcInstHeadTyNotSynonym, tcInstHeadTyAppAllTyVars,
-  tcGetTyVar_maybe, tcGetTyVar,
+  tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcDeepSplitSigmaTy_maybe,
 
   ---------------------------------
@@ -68,7 +68,7 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred,
+  isPredTy, isTyVarClassPred, isTyVarExposed,
 
   ---------------------------------
   -- Misc type manipulators
@@ -834,6 +834,19 @@ mkTcEqPred ty1 ty2
   where
     k = typeKind ty1
 
+-- | Make a representational equality predicate
+mkTcReprEqPred :: TcType -> TcType -> Type
+mkTcReprEqPred ty1 ty2
+  = mkTyConApp coercibleTyCon [k, ty1, ty2]
+  where
+    k = typeKind ty1
+
+-- | Make an equality predicate at a given role. The role must not be Phantom.
+mkTcEqPredRole :: Role -> TcType -> TcType -> Type
+mkTcEqPredRole Nominal          = mkTcEqPred
+mkTcEqPredRole Representational = mkTcReprEqPred
+mkTcEqPredRole Phantom          = panic "mkTcEqPredRole Phantom"
+
 -- @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
 
 isTauTy :: Type -> Bool
@@ -1392,6 +1405,21 @@ is_tc :: Unique -> Type -> Bool
 is_tc uniq ty = case tcSplitTyConApp_maybe ty of
                         Just (tc, _) -> uniq == getUnique tc
                         Nothing      -> False
+
+-- | Does the given tyvar appear in the given type outside of any
+-- non-newtypes? Assume we're looking for @a@. Says "yes" for
+-- @a@, @N a@, @b a@, @a b@, @b (N a)@. Says "no" for
+-- @[a]@, @Maybe a@, @T a@, where @N@ is a newtype and @T@ is a datatype.
+isTyVarExposed :: TcTyVar -> TcType -> Bool
+isTyVarExposed tv (TyVarTy tv')   = tv == tv'
+isTyVarExposed tv (TyConApp tc tys)
+  | isNewTyCon tc                 = any (isTyVarExposed tv) tys
+  | otherwise                     = False
+isTyVarExposed _  (LitTy {})      = False
+isTyVarExposed _  (FunTy {})      = False
+isTyVarExposed tv (AppTy fun arg) = isTyVarExposed tv fun
+                                 || isTyVarExposed tv arg
+isTyVarExposed _  (ForAllTy {})   = False
 
 {-
 ************************************************************************

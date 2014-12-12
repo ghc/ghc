@@ -20,7 +20,8 @@ import TcSMonad as TcS
 import TcInteract
 import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
-import Type     ( classifyPredType, isIPClass, PredTree(..), getClassPredTys_maybe )
+import Type     ( classifyPredType, isIPClass, PredTree(..)
+                , getClassPredTys_maybe, EqRel(..) )
 import TyCon    ( isTypeFamilyTyCon )
 import Class    ( Class )
 import Id       ( idType )
@@ -446,11 +447,13 @@ quantifyPred :: TyVarSet           -- Quantifying over these
 quantifyPred qtvs pred
   = case classifyPredType pred of
       ClassPred cls tys
-         | isIPClass cls -> True  -- See note [Inheriting implicit parameters]
-         | otherwise     -> tyVarsOfTypes tys `intersectsVarSet` qtvs
-      EqPred ty1 ty2     -> quant_fun ty1 || quant_fun ty2
-      IrredPred ty       -> tyVarsOfType ty `intersectsVarSet` qtvs
-      TuplePred {}       -> False
+         | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
+         | otherwise        -> tyVarsOfTypes tys `intersectsVarSet` qtvs
+      EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
+        -- representational equality is like a class constraint
+      EqPred ReprEq ty1 ty2 -> tyVarsOfTypes [ty1, ty2] `intersectsVarSet` qtvs
+      IrredPred ty          -> tyVarsOfType ty `intersectsVarSet` qtvs
+      TuplePred {}          -> False
   where
     -- Only quantify over (F tys ~ ty) if tys mentions a quantifed variable
     -- In particular, quanitifying over (F Int ~ ty) is a bit like quantifying
@@ -648,7 +651,7 @@ simplifyRule name lhs_wanted rhs_wanted
              quantify_insol ct = not (isEqPred (ctPred ct))
 
              quantify_normal ct
-               | EqPred t1 t2 <- classifyPredType (ctPred ct)
+               | EqPred NomEq t1 t2 <- classifyPredType (ctPred ct)
                = not (t1 `tcEqType` t2)
                | otherwise
                = True
@@ -1253,7 +1256,7 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
     float_me :: Ct -> Bool
     float_me ct   -- The constraint is un-flattened and de-cannonicalised
        | let pred = ctPred ct
-       , EqPred ty1 ty2 <- classifyPredType pred
+       , EqPred NomEq ty1 ty2 <- classifyPredType pred
        , tyVarsOfType pred `disjointVarSet` skol_set
        , useful_to_float ty1 ty2
        = True

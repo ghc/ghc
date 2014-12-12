@@ -38,6 +38,7 @@ import TypeRep     -- We can see the representation of types
 import TcType
 import TcMType ( defaultKindVarToStar, zonkQuantifiedTyVar, writeMetaTyVar )
 import TcEvidence
+import Coercion
 import TysPrim
 import TysWiredIn
 import Type
@@ -1283,6 +1284,7 @@ zonkEvBind env (EvBind var term)
          -- See Note [Optimise coercion zonking]
          -- This has a very big effect on some programs (eg Trac #5030)
        ; let ty' = idType var'
+
        ; case getEqPredTys_maybe ty' of
            Just (r, ty1, ty2) | ty1 `eqType` ty2
                   -> return (EvBind var' (EvCoercion (mkTcReflCo r ty1)))
@@ -1409,7 +1411,7 @@ zonkTcTypeToType env ty
         -- The two interesting cases!
     go (TyVarTy tv) = zonkTyVarOcc env tv
 
-    go (ForAllTy tv ty) = ASSERT( isImmutableTyVar tv ) do
+    go (ForAllTy tv ty) = ASSERT( isImmutableTyVar tv )
                           do { (env', tv') <- zonkTyBndrX env tv
                              ; ty' <- zonkTcTypeToType env' ty
                              ; return (ForAllTy tv' ty') }
@@ -1417,6 +1419,32 @@ zonkTcTypeToType env ty
 zonkTcTypeToTypes :: ZonkEnv -> [TcType] -> TcM [Type]
 zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
 
+zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
+zonkCoToCo env co
+  = go co
+  where
+    go (Refl r ty)               = mkReflCo r <$> zonkTcTypeToType env ty
+    go (TyConAppCo r tc args)    = mkTyConAppCo r tc <$> mapM go args
+    go (AppCo co arg)            = mkAppCo <$> go co <*> go arg
+    go (AxiomInstCo ax ind args) = AxiomInstCo ax ind <$> mapM go args
+    go (UnivCo r ty1 ty2)        = mkUnivCo r <$> zonkTcTypeToType env ty1
+                                              <*> zonkTcTypeToType env ty2
+    go (SymCo co)                = mkSymCo <$> go co
+    go (TransCo co1 co2)         = mkTransCo <$> go co1 <*> go co2
+    go (NthCo n co)              = mkNthCo n <$> go co
+    go (LRCo lr co)              = mkLRCo lr <$> go co
+    go (InstCo co arg)           = mkInstCo <$> go co <*> zonkTcTypeToType env arg
+    go (SubCo co)                = mkSubCo <$> go co
+    go (AxiomRuleCo ax ts cs)    = AxiomRuleCo ax <$> mapM (zonkTcTypeToType env) ts
+                                                  <*> mapM go cs
+
+    -- The two interesting cases!
+    go (CoVarCo cv)              = return (mkCoVarCo $ zonkIdOcc env cv)
+    go (ForAllCo tv co)          = ASSERT( isImmutableTyVar tv )
+                                   do { (env', tv') <- zonkTyBndrX env tv
+                                      ; co' <- zonkCoToCo env' co
+                                      ; return (mkForAllCo tv' co') }
+                                   
 zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- This variant collects unbound type variables in a mutable variable
 -- Works on both types and kinds
@@ -1479,3 +1507,5 @@ zonkTcCoToCo env co
                                      ; cs' <- mapM go cs
                                      ; return (TcAxiomRuleCo co ts' cs')
                                      }
+    go (TcCoercion co)        = do { co' <- zonkCoToCo env co
+                                   ; return (TcCoercion co') }

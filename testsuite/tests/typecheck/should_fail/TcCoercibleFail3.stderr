@@ -1,7 +1,12 @@
 
 TcCoercibleFail3.hs:12:7:
-    Could not coerce from ‘NT1’ to ‘NT2’
-      because ‘NT1’ and ‘NT2’ are different types.
-      arising from a use of ‘coerce’
+    Couldn't match representation of type ‘NT2’ with that of ‘NT1’
+    arising from trying to show that the representations of
+      ‘T NT1’ and
+      ‘T NT2’ are the same
+    Relevant role signatures:
+      type role NT2 representational
+      type role NT1 representational
+      type role T representational
     In the expression: coerce
     In an equation for ‘foo’: foo = coerce

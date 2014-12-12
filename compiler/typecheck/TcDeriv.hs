@@ -1807,7 +1807,6 @@ inferInstanceContexts infer_specs
         do { theta <- simplifyDeriv the_pred tyvars deriv_rhs
                 -- checkValidInstance tyvars theta clas inst_tys
                 -- Not necessary; see Note [Exotic derived instance contexts]
-                --                in TcSimplify
 
            ; traceTc "TcDeriv" (ppr deriv_rhs $$ ppr theta)
                 -- Claim: the result instance declaration is guaranteed valid

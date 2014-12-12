@@ -480,9 +480,9 @@ oclose preds fixed_tvs
                do let (cls_tvs, cls_fds) = classTvsFds cls
                   fd <- cls_fds
                   return (instFD fd cls_tvs tys)
-            EqPred t1 t2      -> [([t1],[t2]), ([t2],[t1])]
-            TuplePred ts      -> concatMap determined ts
-            _                 -> []
+            EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
+            TuplePred ts       -> concatMap determined ts
+            _                  -> []
 
 {-
 ************************************************************************

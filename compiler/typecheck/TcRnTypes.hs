@@ -50,9 +50,10 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isTypedHoleCt, isPartialTypeSigCt,
-        ctEvidence, ctLoc, ctPred,
+        ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvLoc, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
+        ctEvPred, ctEvLoc, ctEvEqRel,
+        ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
@@ -73,10 +74,13 @@ module TcRnTypes(
         CtEvidence(..),
         mkGivenLoc,
         isWanted, isGiven, isDerived,
+        ctEvRole,
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
         TcPluginM, runTcPluginM, unsafeTcPluginTcM,
+
+        CtFlavour(..), ctEvFlavour,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -95,6 +99,7 @@ import CoreSyn
 import HscTypes
 import TcEvidence
 import Type
+import CoAxiom  ( Role )
 import Class    ( Class )
 import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
@@ -1026,7 +1031,7 @@ data Ct
   | CTyEqCan {  -- tv ~ rhs
        -- Invariants:
        --   * See Note [Applying the inert substitution] in TcFlatten
-       --   * tv not in tvs(xi)   (occurs check)
+       --   * tv not in tvs(rhs)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * typeKind ty `subKind` typeKind tv
@@ -1035,12 +1040,16 @@ data Ct
        --       but it has no top-level function.
        --     E.g. a ~ [F b]  is fine
        --     but  a ~ F b    is not
+       --   * If the equality is representational, rhs has no top-level newtype
+       --     See Note [No top-level newtypes on RHS of representational
+       --     equalities] in TcCanonical
        --   * If rhs is also a tv, then it is oriented to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
-      cc_rhs    :: TcType      -- Not necessarily function-free (hence not Xi)
+      cc_rhs    :: TcType,     -- Not necessarily function-free (hence not Xi)
                                -- See invariants above
+      cc_eq_rel :: EqRel
     }
 
   | CFunEqCan {  -- F xis ~ fsk
@@ -1168,6 +1177,14 @@ ctLoc = ctEvLoc . ctEvidence
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
+
+-- | Get the flavour of the given 'Ct'
+ctFlavour :: Ct -> CtFlavour
+ctFlavour = ctEvFlavour . ctEvidence
+
+-- | Get the equality relation for the given 'Ct'
+ctEqRel :: Ct -> EqRel
+ctEqRel = ctEvEqRel . ctEvidence
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
@@ -1532,6 +1549,14 @@ ctEvPred = ctev_pred
 ctEvLoc :: CtEvidence -> CtLoc
 ctEvLoc = ctev_loc
 
+-- | Get the equality relation relevant for a 'CtEvidence'
+ctEvEqRel :: CtEvidence -> EqRel
+ctEvEqRel = predTypeEqRel . ctEvPred
+
+-- | Get the role relevant for a 'CtEvidence'
+ctEvRole :: CtEvidence -> Role
+ctEvRole = eqRelRole . ctEvEqRel
+
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
 ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
@@ -1567,6 +1592,31 @@ isGiven _ = False
 isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
+
+{-
+%************************************************************************
+%*                                                                      *
+            CtFlavour
+%*                                                                      *
+%************************************************************************
+
+Just an enum type that tracks whether a constraint is wanted, derived,
+or given, when we need to separate that info from the constraint itself.
+
+-}
+
+data CtFlavour = Given | Wanted | Derived
+  deriving Eq
+
+instance Outputable CtFlavour where
+  ppr Given   = text "[G]"
+  ppr Wanted  = text "[W]"
+  ppr Derived = text "[D]"
+
+ctEvFlavour :: CtEvidence -> CtFlavour
+ctEvFlavour (CtWanted {})  = Wanted
+ctEvFlavour (CtGiven {})   = Given
+ctEvFlavour (CtDerived {}) = Derived
 
 {-
 ************************************************************************
@@ -1864,6 +1914,7 @@ data CtOrigin
   | KindEqOrigin
       TcType TcType             -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
+  | CoercibleOrigin TcType TcType  -- a Coercible constraint
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
 
@@ -1945,8 +1996,13 @@ pprCtOrigin (DerivOriginDC dc n)
 
 pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
   = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))
-       2 (sep [ ptext (sLit "from type") <+> quotes (ppr ty1)
-              , ptext (sLit "  to type") <+> quotes (ppr ty2) ])
+       2 (sep [ text "from type" <+> quotes (ppr ty1)
+              , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
+
+pprCtOrigin (CoercibleOrigin ty1 ty2)
+  = hang (ctoHerald <+> text "trying to show that the representations of")
+       2 (quotes (ppr ty1) <+> text "and" $$
+          quotes (ppr ty2) <+> text "are the same")
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
