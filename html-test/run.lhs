@@ -41,7 +41,7 @@ main = do
 test :: IO ()
 test = do
   x <- doesFileExist haddockPath
-  unless x $ die "you need to run 'cabal build' successfully first"
+  unless x $ System.Exit.die "you need to run 'cabal build' successfully first"
 
   contents <- getDirectoryContents testDir
   args <- getArgs

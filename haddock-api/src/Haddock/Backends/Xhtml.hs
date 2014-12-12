@@ -306,7 +306,7 @@ mkNode qual ss p (Node s leaf pkg short ts) =
 
     htmlModule = thespan ! modAttrs << (cBtn +++
       if leaf
-        then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg))
+        then ppModule (mkModule (stringToPackageKey (fromMaybe "" pkg))
                                        (mkModuleName mdl))
         else toHtml s
       )
