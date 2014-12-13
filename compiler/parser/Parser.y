@@ -121,7 +121,7 @@ would think the two should never occur in the same context.
 
 Conflicts: 34 shift/reduce
            1 reduce/reduce
-q
+
 The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
 would think the two should never occur in the same context.
 
@@ -1060,12 +1060,6 @@ ptype :: { Located ([AddAnn]
 decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
 decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
           | decl                        { $1 }
-
-          -- A 'default' signature used with the generic-programming extension
-          | 'default' infixexp '::' sigtypedoc
-                    {% do { (TypeSig l ty _) <- checkValSig $2 $4
-                          ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
-                                [mj AnnDefault $1,mj AnnDcolon $3] } }
 
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
