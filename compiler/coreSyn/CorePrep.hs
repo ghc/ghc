@@ -21,7 +21,8 @@ import PrelNames
 import CoreUtils
 import CoreArity
 import CoreFVs
-import CoreMonad        ( endPassIO, CoreToDo(..) )
+import CoreMonad        ( CoreToDo(..) )
+import CoreLint         ( endPassIO )
 import CoreSyn
 import CoreSubst
 import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here

@@ -21,6 +21,7 @@ import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize )
+import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult )
 import Simplify         ( simplTopBinds, simplExpr )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv

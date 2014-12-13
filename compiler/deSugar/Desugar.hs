@@ -39,7 +39,8 @@ import Rules
 import TysPrim (eqReprPrimTyCon)
 import TysWiredIn (coercibleTyCon )
 import BasicTypes       ( Activation(.. ) )
-import CoreMonad        ( endPassIO, CoreToDo(..) )
+import CoreMonad        ( CoreToDo(..) )
+import CoreLint         ( endPassIO )
 import MkCore
 import FastString
 import ErrUtils

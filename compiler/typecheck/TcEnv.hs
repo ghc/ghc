@@ -64,7 +64,7 @@ import IfaceEnv
 import TcRnMonad
 import TcMType
 import TcType
-import TcIface
+import LoadIface
 import PrelNames
 import TysWiredIn
 import Id

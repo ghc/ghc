@@ -21,6 +21,7 @@ import CoreTidy
 import CoreMonad
 import CorePrep
 import CoreUtils
+import CoreLint
 import Literal
 import Rules
 import PatSyn
@@ -142,12 +143,12 @@ mkBootModDetailsTc hsc_env
   = do  { let dflags = hsc_dflags hsc_env
         ; showPassIO dflags CoreTidy
 
-        ; let { insts'      = map (tidyClsInstDFun globaliseAndTidyId) insts
+        ; let { insts'     = map (tidyClsInstDFun globaliseAndTidyId) insts
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
-              ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
+              ; pat_syns'  = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
               ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
-              ; dfun_ids    = map instanceDFunId insts'
+              ; dfun_ids   = map instanceDFunId insts'
               ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
               }
         ; return (ModDetails { md_types     = type_env'

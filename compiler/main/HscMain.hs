@@ -93,7 +93,7 @@ import CoreTidy         ( tidyExpr )
 import Type             ( Type )
 import PrelNames
 import {- Kind parts of -} Type         ( Kind )
-import CoreMonad        ( lintInteractiveExpr )
+import CoreLint         ( lintInteractiveExpr )
 import DsMeta           ( templateHaskellNames )
 import VarEnv           ( emptyTidyEnv )
 import Panic

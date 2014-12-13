@@ -9,13 +9,22 @@ A ``lint'' pass to check for Core correctness
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fprof-auto #-}
 
-module CoreLint ( lintCoreBindings, lintUnfolding, lintExpr ) where
+module CoreLint ( 
+    lintCoreBindings, lintUnfolding, 
+    lintPassResult, lintInteractiveExpr, lintExpr,
+
+    -- ** Debug output
+    CoreLint.showPass, showPassIO, endPass, endPassIO, 
+    dumpPassResult, 
+    CoreLint.dumpIfSet,
+ ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import CoreMonad
 import Bag
 import Literal
 import DataCon
@@ -36,13 +45,18 @@ import TypeRep
 import TyCon
 import CoAxiom
 import BasicTypes
+import ErrUtils as Err
 import StaticFlags
 import ListSetOps
 import PrelNames
 import Outputable
 import FastString
 import Util
+import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
+
+import HscTypes
+import DynFlags
 import Control.Monad
 import MonadUtils
 import Data.Maybe
@@ -61,12 +75,8 @@ just about anything in this file or you change other types/functions throughout
 the Core language (all signposted to this note), you should update that
 formalism. See docs/core-spec/README for more info about how to do so.
 
-************************************************************************
-*                                                                      *
-\subsection[lintCoreBindings]{@lintCoreBindings@: Top-level interface}
-*                                                                      *
-************************************************************************
-
+Summary of checks
+~~~~~~~~~~~~~~~~~
 Checks that a set of core bindings is well-formed.  The PprStyle and String
 just control what we print in the event of an error.  The Bool value
 indicates whether we have done any specialisation yet (in which case we do
@@ -83,7 +93,6 @@ If we have done specialisation the we check that there are
 
 Outstanding issues:
 
-    --
     -- Things are *not* OK if:
     --
     --  * Unsaturated type app before specialisation has been done;
@@ -110,14 +119,212 @@ to the type of the binding variable.  lintBinders does this.
 For Ids, the type-substituted Id is added to the in_scope set (which
 itself is part of the TvSubst we are carrying down), and when we
 find an occurrence of an Id, we fetch it from the in-scope set.
+
+************************************************************************
+*                                                                      *
+                 Beginning and ending passes
+*                                                                      *
+************************************************************************
+
+These functions are not CoreM monad stuff, but they probably ought to
+be, and it makes a conveneint place.  place for them.  They print out
+stuff before and after core passes, and do Core Lint when necessary.
 -}
 
-lintCoreBindings :: [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
+showPass :: CoreToDo -> CoreM ()
+showPass pass = do { dflags <- getDynFlags
+                   ; liftIO $ showPassIO dflags pass }
+
+showPassIO :: DynFlags -> CoreToDo -> IO ()
+showPassIO dflags pass = Err.showPass dflags (showPpr dflags pass)
+
+endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
+endPass pass binds rules
+  = do { hsc_env <- getHscEnv
+       ; print_unqual <- getPrintUnqualified
+       ; liftIO $ endPassIO hsc_env print_unqual pass binds rules }
+
+endPassIO :: HscEnv -> PrintUnqualified
+          -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
+-- Used by the IO-is CorePrep too
+endPassIO hsc_env print_unqual pass binds rules
+  = do { dumpPassResult dflags print_unqual mb_flag
+                        (ppr pass) (pprPassDetails pass) binds rules
+       ; lintPassResult hsc_env pass binds }
+  where
+    dflags  = hsc_dflags hsc_env
+    mb_flag = case coreDumpFlag pass of
+                Just flag | dopt flag dflags                    -> Just flag
+                          | dopt Opt_D_verbose_core2core dflags -> Just flag
+                _ -> Nothing
+
+dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
+dumpIfSet dflags dump_me pass extra_info doc
+  = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
+
+dumpPassResult :: DynFlags
+               -> PrintUnqualified
+               -> Maybe DumpFlag        -- Just df => show details in a file whose
+                                        --            name is specified by df
+               -> SDoc                  -- Header
+               -> SDoc                  -- Extra info to appear after header
+               -> CoreProgram -> [CoreRule]
+               -> IO ()
+dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
+  | Just flag <- mb_flag
+  = Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
+
+  | otherwise
+  = Err.debugTraceMsg dflags 2 size_doc
+          -- Report result size
+          -- This has the side effect of forcing the intermediate to be evaluated
+
+  where
+    size_doc = sep [text "Result size of" <+> hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
+
+    dump_doc  = vcat [ nest 2 extra_info
+                     , size_doc
+                     , blankLine
+                     , pprCoreBindings binds
+                     , ppUnless (null rules) pp_rules ]
+    pp_rules = vcat [ blankLine
+                    , ptext (sLit "------ Local rules for imported ids --------")
+                    , pprRules rules ]
+
+coreDumpFlag :: CoreToDo -> Maybe DumpFlag
+coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
+coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoStaticArgs         = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
+coreDumpFlag CoreDoStrictness         = Just Opt_D_dump_stranal
+coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
+coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
+coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
+coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
+coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
+coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds
+coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
+coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
+coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
+
+coreDumpFlag CoreDoPrintCore          = Nothing
+coreDumpFlag (CoreDoRuleCheck {})     = Nothing
+coreDumpFlag CoreDoNothing            = Nothing
+coreDumpFlag (CoreDoPasses {})        = Nothing
+
+{-
+************************************************************************
+*                                                                      *
+                 Top-level interfaces
+*                                                                      *
+************************************************************************
+-}
+
+lintPassResult :: HscEnv -> CoreToDo -> CoreProgram -> IO ()
+lintPassResult hsc_env pass binds
+  | not (gopt Opt_DoCoreLinting dflags)
+  = return ()
+  | otherwise
+  = do { let (warns, errs) = lintCoreBindings pass (interactiveInScope hsc_env) binds
+       ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
+       ; displayLintResults dflags pass warns errs binds  }
+  where
+    dflags = hsc_dflags hsc_env
+
+displayLintResults :: DynFlags -> CoreToDo
+                   -> Bag Err.MsgDoc -> Bag Err.MsgDoc -> CoreProgram
+                   -> IO ()
+displayLintResults dflags pass warns errs binds
+  | not (isEmptyBag errs)
+  = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
+           (vcat [ lint_banner "errors" (ppr pass), Err.pprMessageBag errs
+                 , ptext (sLit "*** Offending Program ***")
+                 , pprCoreBindings binds
+                 , ptext (sLit "*** End of Offense ***") ])
+       ; Err.ghcExit dflags 1 }
+
+  | not (isEmptyBag warns)
+  , not (case pass of { CoreDesugar -> True; _ -> False })
+        -- Suppress warnings after desugaring pass because some
+        -- are legitimate. Notably, the desugarer generates instance
+        -- methods with INLINE pragmas that form a mutually recursive
+        -- group.  Only afer a round of simplification are they unravelled.
+  , not opt_NoDebugOutput
+  , showLintWarnings pass
+  = log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
+        (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag warns)
+
+  | otherwise = return ()
+  where
+
+lint_banner :: String -> SDoc -> SDoc
+lint_banner string pass = ptext (sLit "*** Core Lint")      <+> text string
+                          <+> ptext (sLit ": in result of") <+> pass
+                          <+> ptext (sLit "***")
+
+showLintWarnings :: CoreToDo -> Bool
+-- Disable Lint warnings on the first simplifier pass, because
+-- there may be some INLINE knots still tied, which is tiresomely noisy
+showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
+showLintWarnings _ = True
+
+lintInteractiveExpr :: String -> HscEnv -> CoreExpr -> IO ()
+lintInteractiveExpr what hsc_env expr
+  | not (gopt Opt_DoCoreLinting dflags)
+  = return ()
+  | Just err <- lintExpr (interactiveInScope hsc_env) expr
+  = do { display_lint_err err
+       ; Err.ghcExit dflags 1 }
+  | otherwise
+  = return ()
+  where
+    dflags = hsc_dflags hsc_env
+
+    display_lint_err err
+      = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
+               (vcat [ lint_banner "errors" (text what)
+                     , err
+                     , ptext (sLit "*** Offending Program ***")
+                     , pprCoreExpr expr
+                     , ptext (sLit "*** End of Offense ***") ])
+           ; Err.ghcExit dflags 1 }
+
+interactiveInScope :: HscEnv -> [Var]
+-- In GHCi we may lint expressions, or bindings arising from 'deriving'
+-- clauses, that mention variables bound in the interactive context.
+-- These are Local things (see Note [Interactively-bound Ids in GHCi] in HscTypes).
+-- So we have to tell Lint about them, lest it reports them as out of scope.
+--
+-- We do this by find local-named things that may appear free in interactive
+-- context.  This function is pretty revolting and quite possibly not quite right.
+-- When we are not in GHCi, the interactive context (hsc_IC hsc_env) is empty
+-- so this is a (cheap) no-op.
+--
+-- See Trac #8215 for an example
+interactiveInScope hsc_env
+  = varSetElems tyvars ++ ids
+  where
+    -- C.f. TcRnDriver.setInteractiveContext, Desugar.deSugarExpr
+    ictxt                   = hsc_IC hsc_env
+    (cls_insts, _fam_insts) = ic_instances ictxt
+    te1    = mkTypeEnvWithImplicits (ic_tythings ictxt)
+    te     = extendTypeEnvWithIds te1 (map instanceDFunId cls_insts)
+    ids    = typeEnvIds te
+    tyvars = mapUnionVarSet (tyVarsOfType . idType) ids
+              -- Why the type variables?  How can the top level envt have free tyvars?
+              -- I think it's because of the GHCi debugger, which can bind variables
+              --   f :: [t] -> [t]
+              -- where t is a RuntimeUnk (see TcType)
+
+lintCoreBindings :: CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings local_in_scope binds
-  = initL $
+lintCoreBindings pass local_in_scope binds
+  = initL flags $
     addLoc TopLevelBindings        $
     addInScopeVars local_in_scope  $
     addInScopeVars binders         $
@@ -128,6 +335,14 @@ lintCoreBindings local_in_scope binds
        ; checkL (null ext_dups) (dupExtVars ext_dups)
        ; mapM lint_bind binds }
   where
+    flags = LF { lf_check_global_ids = check_globals }
+
+    -- See Note [Checking for global Ids]
+    check_globals = case pass of
+                      CoreTidy -> False
+                      CorePrep -> False
+                      _        -> True
+
     binders = bindersOfBinds binds
     (_, dups) = removeDups compare binders
 
@@ -168,9 +383,10 @@ lintUnfolding locn vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    (_warns, errs) = initL (addLoc (ImportedUnfolding locn) $
-                            addInScopeVars vars            $
-                            lintCoreExpr expr)
+    (_warns, errs) = initL defaultLintFlags linter
+    linter = addLoc (ImportedUnfolding locn) $
+             addInScopeVars vars             $
+             lintCoreExpr expr
 
 lintExpr :: [Var]               -- Treat these as in scope
          -> CoreExpr
@@ -180,9 +396,10 @@ lintExpr vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    (_warns, errs) = initL (addLoc TopLevelBindings $
-                            addInScopeVars vars     $
-                            lintCoreExpr expr)
+    (_warns, errs) = initL defaultLintFlags linter
+    linter = addLoc TopLevelBindings $
+             addInScopeVars vars     $
+             lintCoreExpr expr
 
 {-
 ************************************************************************
@@ -664,7 +881,11 @@ lintAndScopeIds ids linterF
 
 lintAndScopeId :: InVar -> (OutVar -> LintM a) -> LintM a
 lintAndScopeId id linterF
-  = do { ty <- lintInTy (idType id)
+  = do { flags <- getLintFlags
+       ; checkL (not (lf_check_global_ids flags) || isLocalId id)
+                (ptext (sLit "Non-local Id binder") <+> ppr id)
+                -- See Note [Checking for global Ids]
+       ; ty <- lintInTy (idType id)
        ; let id' = setIdType id ty
        ; addInScopeVar id' $ (linterF id') }
 
@@ -1047,19 +1268,35 @@ lintCoercion this@(AxiomRuleCo co ts cs)
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
+data LintEnv 
+  = LE { le_flags :: LintFlags       -- Linting the result of this pass
+       , le_loc   :: [LintLocInfo]   -- Locations
+       , le_subst :: TvSubst         -- Current type substitution; we also use this
+    }                                -- to keep track of all the variables in scope,
+                                     -- both Ids and TyVars
+
+newtype LintFlags      -- Currently only one flag
+  = LF { lf_check_global_ids :: Bool -- See Note [Checking for global Ids]
+    }
+
+defaultLintFlags :: LintFlags
+defaultLintFlags = LF { lf_check_global_ids = False }
+
 newtype LintM a =
    LintM { unLintM ::
-            [LintLocInfo] ->         -- Locations
-            TvSubst ->               -- Current type substitution; we also use this
-                                     -- to keep track of all the variables in scope,
-                                     -- both Ids and TyVars
+            LintEnv ->
             WarnsAndErrs ->           -- Error and warning messages so far
             (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
 
 type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
 
-{-      Note [Type substitution]
-        ~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Checking for global Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before CoreTidy, all locally-bound Ids must be LocalIds, even
+top-level ones. See Note [Exported LocalIds] and Trac #9857.
+
+Note [Type substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~
 Why do we need a type substitution?  Consider
         /\(a:*). \(x:a). /\(a:*). id a x
 This is ill typed, because (renaming variables) it is really
@@ -1081,12 +1318,12 @@ instance Applicative LintM where
       (<*>) = ap
 
 instance Monad LintM where
-  return x = LintM (\ _   _     errs -> (Just x, errs))
+  return x = LintM (\ _ errs -> (Just x, errs))
   fail err = failWithL (text err)
-  m >>= k  = LintM (\ loc subst errs ->
-                       let (res, errs') = unLintM m loc subst errs in
+  m >>= k  = LintM (\ env errs ->
+                       let (res, errs') = unLintM m env errs in
                          case res of
-                           Just r -> unLintM (k r) loc subst errs'
+                           Just r -> unLintM (k r) env errs'
                            Nothing -> (Nothing, errs'))
 
 data LintLocInfo
@@ -1101,77 +1338,88 @@ data LintLocInfo
   | InType Type         -- Inside a type
   | InCo   Coercion     -- Inside a coercion
 
-initL :: LintM a -> WarnsAndErrs    -- Errors and warnings
-initL m
-  = case unLintM m [] emptyTvSubst (emptyBag, emptyBag) of
+initL :: LintFlags -> LintM a -> WarnsAndErrs    -- Errors and warnings
+initL flags m
+  = case unLintM m env (emptyBag, emptyBag) of
       (_, errs) -> errs
+  where
+    env = LE { le_flags = flags, le_subst = emptyTvSubst, le_loc = [] }
+
+getLintFlags :: LintM LintFlags
+getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)
 
 checkL :: Bool -> MsgDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
 
 failWithL :: MsgDoc -> LintM a
-failWithL msg = LintM $ \ loc subst (warns,errs) ->
-                (Nothing, (warns, addMsg subst errs msg loc))
+failWithL msg = LintM $ \ env (warns,errs) ->
+                (Nothing, (warns, addMsg env errs msg))
 
 addErrL :: MsgDoc -> LintM ()
-addErrL msg = LintM $ \ loc subst (warns,errs) ->
-              (Just (), (warns, addMsg subst errs msg loc))
+addErrL msg = LintM $ \ env (warns,errs) ->
+              (Just (), (warns, addMsg env errs msg))
 
 addWarnL :: MsgDoc -> LintM ()
-addWarnL msg = LintM $ \ loc subst (warns,errs) ->
-              (Just (), (addMsg subst warns msg loc, errs))
+addWarnL msg = LintM $ \ env (warns,errs) ->
+              (Just (), (addMsg env warns msg, errs))
 
-addMsg :: TvSubst ->  Bag MsgDoc -> MsgDoc -> [LintLocInfo] -> Bag MsgDoc
-addMsg subst msgs msg locs
+addMsg :: LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
+addMsg env msgs msg
   = ASSERT( notNull locs )
     msgs `snocBag` mk_msg msg
   where
+   locs = le_loc env
    (loc, cxt1) = dumpLoc (head locs)
    cxts        = [snd (dumpLoc loc) | loc <- locs]
    context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1 $$
-                                      ptext (sLit "Substitution:") <+> ppr subst
+                                      ptext (sLit "Substitution:") <+> ppr (le_subst env)
                | otherwise          = cxt1
 
    mk_msg msg = mkLocMessage SevWarning (mkSrcSpan loc loc) (context $$ msg)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m =
-  LintM (\ loc subst errs -> unLintM m (extra_loc:loc) subst errs)
+addLoc extra_loc m
+  = LintM $ \ env errs -> 
+    unLintM m (env { le_loc = extra_loc : le_loc env }) errs
 
 inCasePat :: LintM Bool         -- A slight hack; see the unique call site
-inCasePat = LintM $ \ loc _ errs -> (Just (is_case_pat loc), errs)
+inCasePat = LintM $ \ env errs -> (Just (is_case_pat env), errs)
   where
-    is_case_pat (CasePat {} : _) = True
-    is_case_pat _other           = False
+    is_case_pat (LE { le_loc = CasePat {} : _ }) = True
+    is_case_pat _other                           = False
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m
-  = LintM (\ loc subst errs -> unLintM m loc (extendTvInScopeList subst vars) errs)
+  = LintM $ \ env errs -> 
+    unLintM m (env { le_subst = extendTvInScopeList (le_subst env) vars }) 
+              errs
 
 addInScopeVar :: Var -> LintM a -> LintM a
 addInScopeVar var m
-  = LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst var) errs)
+  = LintM $ \ env errs -> 
+    unLintM m (env { le_subst = extendTvInScope (le_subst env) var }) errs
+
+extendSubstL :: TyVar -> Type -> LintM a -> LintM a
+extendSubstL tv ty m
+  = LintM $ \ env errs -> 
+    unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
 
 updateTvSubst :: TvSubst -> LintM a -> LintM a
-updateTvSubst subst' m =
-  LintM (\ loc _ errs -> unLintM m loc subst' errs)
+updateTvSubst subst' m
+  = LintM $ \ env errs -> unLintM m (env { le_subst = subst' }) errs
 
 getTvSubst :: LintM TvSubst
-getTvSubst = LintM (\ _ subst errs -> (Just subst, errs))
+getTvSubst = LintM (\ env errs -> (Just (le_subst env), errs))
 
 getInScope :: LintM InScopeSet
-getInScope = LintM (\ _ subst errs -> (Just (getTvInScope subst), errs))
+getInScope = LintM (\ env errs -> (Just (getTvInScope (le_subst env)), errs))
 
 applySubstTy :: InType -> LintM OutType
 applySubstTy ty = do { subst <- getTvSubst; return (Type.substTy subst ty) }
 
 applySubstCo :: InCoercion -> LintM OutCoercion
 applySubstCo co = do { subst <- getTvSubst; return (substCo (tvCvSubst subst) co) }
-
-extendSubstL :: TyVar -> Type -> LintM a -> LintM a
-extendSubstL tv ty m
-  = LintM (\ loc subst errs -> unLintM m loc (Type.extendTvSubst subst tv ty) errs)
 
 lookupIdInScope :: Id -> LintM Id
 lookupIdInScope id

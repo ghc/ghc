@@ -42,10 +42,6 @@ module CoreMonad (
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
 
-    -- ** Debug output
-    showPass, showPassIO, endPass, endPassIO, dumpPassResult, lintPassResult,
-    lintInteractiveExpr, dumpIfSet,
-
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS,
     fatalErrorMsg, fatalErrorMsgS,
@@ -62,9 +58,6 @@ module CoreMonad (
 import Name( Name )
 #endif
 import CoreSyn
-import PprCore
-import CoreUtils
-import CoreLint         ( lintCoreBindings, lintExpr )
 import HscTypes
 import Module
 import DynFlags
@@ -77,18 +70,11 @@ import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
 import TcEnv            ( tcLookupGlobal )
 import TcRnMonad        ( initTcForLookup )
-import InstEnv          ( instanceDFunId )
-import Type             ( tyVarsOfType )
-import Id               ( idType )
 import Var
-import VarSet
-
 import Outputable
 import FastString
 import qualified ErrUtils as Err
-import Bag
 import Maybes
-import SrcLoc
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
@@ -119,173 +105,6 @@ restoreLinkerGlobals :: () -> IO ()
 restoreLinkerGlobals () = return ()
 #endif
 
-{-
-************************************************************************
-*                                                                      *
-                       Debug output
-*                                                                      *
-************************************************************************
-
-These functions are not CoreM monad stuff, but they probably ought to
-be, and it makes a conveneint place.  place for them.  They print out
-stuff before and after core passes, and do Core Lint when necessary.
--}
-
-showPass :: CoreToDo -> CoreM ()
-showPass pass = do { dflags <- getDynFlags
-                   ; liftIO $ showPassIO dflags pass }
-
-showPassIO :: DynFlags -> CoreToDo -> IO ()
-showPassIO dflags pass = Err.showPass dflags (showPpr dflags pass)
-
-endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
-endPass pass binds rules
-  = do { hsc_env <- getHscEnv
-       ; print_unqual <- getPrintUnqualified
-       ; liftIO $ endPassIO hsc_env print_unqual pass binds rules }
-
-endPassIO :: HscEnv -> PrintUnqualified
-          -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
--- Used by the IO-is CorePrep too
-endPassIO hsc_env print_unqual pass binds rules
-  = do { dumpPassResult dflags print_unqual mb_flag
-                        (ppr pass) (pprPassDetails pass) binds rules
-       ; lintPassResult hsc_env pass binds }
-  where
-    dflags  = hsc_dflags hsc_env
-    mb_flag = case coreDumpFlag pass of
-                Just flag | dopt flag dflags                    -> Just flag
-                          | dopt Opt_D_verbose_core2core dflags -> Just flag
-                _ -> Nothing
-
-dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
-dumpIfSet dflags dump_me pass extra_info doc
-  = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
-
-dumpPassResult :: DynFlags
-               -> PrintUnqualified
-               -> Maybe DumpFlag        -- Just df => show details in a file whose
-                                        --            name is specified by df
-               -> SDoc                  -- Header
-               -> SDoc                  -- Extra info to appear after header
-               -> CoreProgram -> [CoreRule]
-               -> IO ()
-dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
-  | Just flag <- mb_flag
-  = Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
-
-  | otherwise
-  = Err.debugTraceMsg dflags 2 size_doc
-          -- Report result size
-          -- This has the side effect of forcing the intermediate to be evaluated
-
-  where
-    size_doc = sep [text "Result size of" <+> hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
-
-    dump_doc  = vcat [ nest 2 extra_info
-                     , size_doc
-                     , blankLine
-                     , pprCoreBindings binds
-                     , ppUnless (null rules) pp_rules ]
-    pp_rules = vcat [ blankLine
-                    , ptext (sLit "------ Local rules for imported ids --------")
-                    , pprRules rules ]
-
-lintPassResult :: HscEnv -> CoreToDo -> CoreProgram -> IO ()
-lintPassResult hsc_env pass binds
-  | not (gopt Opt_DoCoreLinting dflags)
-  = return ()
-  | otherwise
-  = do { let (warns, errs) = lintCoreBindings (interactiveInScope hsc_env) binds
-       ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
-       ; displayLintResults dflags pass warns errs binds  }
-  where
-    dflags = hsc_dflags hsc_env
-
-displayLintResults :: DynFlags -> CoreToDo
-                   -> Bag Err.MsgDoc -> Bag Err.MsgDoc -> CoreProgram
-                   -> IO ()
-displayLintResults dflags pass warns errs binds
-  | not (isEmptyBag errs)
-  = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
-           (vcat [ lint_banner "errors" (ppr pass), Err.pprMessageBag errs
-                 , ptext (sLit "*** Offending Program ***")
-                 , pprCoreBindings binds
-                 , ptext (sLit "*** End of Offense ***") ])
-       ; Err.ghcExit dflags 1 }
-
-  | not (isEmptyBag warns)
-  , not (case pass of { CoreDesugar -> True; _ -> False })
-        -- Suppress warnings after desugaring pass because some
-        -- are legitimate. Notably, the desugarer generates instance
-        -- methods with INLINE pragmas that form a mutually recursive
-        -- group.  Only afer a round of simplification are they unravelled.
-  , not opt_NoDebugOutput
-  , showLintWarnings pass
-  = log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
-        (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag warns)
-
-  | otherwise = return ()
-  where
-
-lint_banner :: String -> SDoc -> SDoc
-lint_banner string pass = ptext (sLit "*** Core Lint")      <+> text string
-                          <+> ptext (sLit ": in result of") <+> pass
-                          <+> ptext (sLit "***")
-
-showLintWarnings :: CoreToDo -> Bool
--- Disable Lint warnings on the first simplifier pass, because
--- there may be some INLINE knots still tied, which is tiresomely noisy
-showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
-showLintWarnings _ = True
-
-lintInteractiveExpr :: String -> HscEnv -> CoreExpr -> IO ()
-lintInteractiveExpr what hsc_env expr
-  | not (gopt Opt_DoCoreLinting dflags)
-  = return ()
-  | Just err <- lintExpr (interactiveInScope hsc_env) expr
-  = do { display_lint_err err
-       ; Err.ghcExit dflags 1 }
-  | otherwise
-  = return ()
-  where
-    dflags = hsc_dflags hsc_env
-
-    display_lint_err err
-      = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
-               (vcat [ lint_banner "errors" (text what)
-                     , err
-                     , ptext (sLit "*** Offending Program ***")
-                     , pprCoreExpr expr
-                     , ptext (sLit "*** End of Offense ***") ])
-           ; Err.ghcExit dflags 1 }
-
-interactiveInScope :: HscEnv -> [Var]
--- In GHCi we may lint expressions, or bindings arising from 'deriving'
--- clauses, that mention variables bound in the interactive context.
--- These are Local things (see Note [Interactively-bound Ids in GHCi] in HscTypes).
--- So we have to tell Lint about them, lest it reports them as out of scope.
---
--- We do this by find local-named things that may appear free in interactive
--- context.  This function is pretty revolting and quite possibly not quite right.
--- When we are not in GHCi, the interactive context (hsc_IC hsc_env) is empty
--- so this is a (cheap) no-op.
---
--- See Trac #8215 for an example
-interactiveInScope hsc_env
-  = varSetElems tyvars ++ ids
-  where
-    -- C.f. TcRnDriver.setInteractiveContext, Desugar.deSugarExpr
-    ictxt                   = hsc_IC hsc_env
-    (cls_insts, _fam_insts) = ic_instances ictxt
-    te1    = mkTypeEnvWithImplicits (ic_tythings ictxt)
-    te     = extendTypeEnvWithIds te1 (map instanceDFunId cls_insts)
-    ids    = typeEnvIds te
-    tyvars = mapUnionVarSet (tyVarsOfType . idType) ids
-              -- Why the type variables?  How can the top level envt have free tyvars?
-              -- I think it's because of the GHCi debugger, which can bind variables
-              --   f :: [t] -> [t]
-              -- where t is a RuntimeUnk (see TcType)
 
 {-
 ************************************************************************
@@ -327,30 +146,6 @@ data CoreToDo           -- These are diff core-to-core passes,
 
   | CoreTidy
   | CorePrep
-
-coreDumpFlag :: CoreToDo -> Maybe DumpFlag
-coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
-coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
-coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
-coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoStaticArgs         = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
-coreDumpFlag CoreDoStrictness         = Just Opt_D_dump_stranal
-coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
-coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
-coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
-coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
-coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
-coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds
-coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
-coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
-coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
-
-coreDumpFlag CoreDoPrintCore          = Nothing
-coreDumpFlag (CoreDoRuleCheck {})     = Nothing
-coreDumpFlag CoreDoNothing            = Nothing
-coreDumpFlag (CoreDoPasses {})        = Nothing
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = ptext (sLit "Simplifier")
