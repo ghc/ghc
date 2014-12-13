@@ -25,7 +25,7 @@ module FamInstEnv (
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
-        reduceTyFamApp_maybe,
+        reduceTyFamApp_maybe, chooseBranch,
 
         -- Flattening
         flattenTys
@@ -788,10 +788,9 @@ reduceTyFamApp_maybe :: FamInstEnvs
 --    but *not* newtypes
 -- Works on type-synonym families always; data-families only if
 --     the role we seek is representational
--- It first normalises the type arguments, wrt functions but *not* newtypes,
---    to be sure that nested calls like
---       F (G Int)
---    are correctly reduced
+-- It does *not* normlise the type arguments first, so this may not
+--     go as far as you want. If you want normalised type arguments,
+--     use normaliseTcArgs first.
 --
 -- The TyCon can be oversaturated.
 -- Works on both open and closed families
@@ -808,31 +807,27 @@ reduceTyFamApp_maybe envs role tc tys
        -- unwrap data families as well as type-synonym families;
        -- otherwise only type-synonym families
   , FamInstMatch { fim_instance = fam_inst
-                 , fim_tys =      inst_tys } : _ <- lookupFamInstEnv envs tc ntys
+                 , fim_tys =      inst_tys } : _ <- lookupFamInstEnv envs tc tys
       -- NB: Allow multiple matches because of compatible overlap
                                                     
   = let ax     = famInstAxiom fam_inst
         co     = mkUnbranchedAxInstCo role ax inst_tys
         ty     = pSnd (coercionKind co)
-    in Just (args_co `mkTransCo` co, ty)
+    in Just (co, ty)
 
   | Just ax <- isClosedSynFamilyTyCon_maybe tc
-  , Just (ind, inst_tys) <- chooseBranch ax ntys
+  , Just (ind, inst_tys) <- chooseBranch ax tys
   = let co     = mkAxInstCo role ax ind inst_tys
         ty     = pSnd (coercionKind co)
-    in Just (args_co `mkTransCo` co, ty)
+    in Just (co, ty)
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
-  , Just (coax,ts,ty) <- sfMatchFam ax ntys
+  , Just (coax,ts,ty) <- sfMatchFam ax tys
   = let co = mkAxiomRuleCo coax ts []
-    in Just (args_co `mkTransCo` co, ty)
+    in Just (co, ty)
 
   | otherwise
   = Nothing
-
-  where
-    (args_co, ntys) = normaliseTcArgs envs role tc tys
-
 
 -- The axiom can be oversaturated. (Closed families only.)
 chooseBranch :: CoAxiom Branched -> [Type] -> Maybe (BranchIndex, [Type])
@@ -908,8 +903,9 @@ topNormaliseType_maybe env ty
       = unwrapNewTypeStepper
         `composeSteppers`
         \ rec_nts tc tys ->
-        case reduceTyFamApp_maybe env Representational tc tys of
-          Just (co, rhs) -> NS_Step rec_nts rhs co
+        let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
+        case reduceTyFamApp_maybe env Representational tc ntys of
+          Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
           Nothing        -> NS_Done
 
 ---------------
@@ -917,20 +913,21 @@ normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
   | isTypeSynonymTyCon tc
-  , (co1, ntys) <- normaliseTcArgs env role tc tys
   , Just (tenv, rhs, ntys') <- tcExpandTyCon_maybe tc ntys
   , (co2, ninst_rhs) <- normaliseType env role (Type.substTy (mkTopTvSubst tenv) rhs)
-  = if isReflCo co2 then (co1,                 mkTyConApp tc ntys)
-                    else (co1 `mkTransCo` co2, mkAppTys ninst_rhs ntys')
+  = if isReflCo co2 then (args_co,                 mkTyConApp tc ntys)
+                    else (args_co `mkTransCo` co2, mkAppTys ninst_rhs ntys')
 
-  | Just (first_co, ty') <- reduceTyFamApp_maybe env role tc tys
+  | Just (first_co, ty') <- reduceTyFamApp_maybe env role tc ntys
   , (rest_co,nty) <- normaliseType env role ty'
-  = (first_co `mkTransCo` rest_co, nty)
+  = (args_co `mkTransCo` first_co `mkTransCo` rest_co, nty)
 
   | otherwise   -- No unique matching family instance exists;
                 -- we do not do anything
-  = let (co, ntys) = normaliseTcArgs env role tc tys in
-    (co, mkTyConApp tc ntys)
+  = (args_co, mkTyConApp tc ntys)
+
+  where
+    (args_co, ntys) = normaliseTcArgs env role tc tys
 
 
 ---------------
