@@ -26,6 +26,7 @@ import Outputable
 import FastString
 import Var
 import Id
+import IdInfo( IdDetails(..) )
 import TcBinds
 import BasicTypes
 import TcSimplify
@@ -254,7 +255,8 @@ tcPatSynMatcher (L loc name) lpat
 
        ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id    = mkVanillaGlobal matcher_name matcher_sigma
+             matcher_id    = mkExportedLocalId VanillaId matcher_name matcher_sigma
+                             -- See Note [Exported LocalIds] in Id
 
              cont_dicts = map nlHsVar prov_dicts
              cont' = mkLHsWrap (mkWpLet prov_ev_binds) $
@@ -326,7 +328,8 @@ mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty
   | otherwise
   = do { builder_name <- newImplicitBinder name mkDataConWorkerOcc
        ; let builder_sigma = mkSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
-             builder_id    = mkVanillaGlobal builder_name builder_sigma
+             builder_id    = mkExportedLocalId VanillaId builder_name builder_sigma
+                             -- See Note [Exported LocalIds] in Id
        ; return (Just (builder_id, need_dummy_arg)) }
   where
     builder_arg_tys | need_dummy_arg = [voidPrimTy]

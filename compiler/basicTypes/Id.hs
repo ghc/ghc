@@ -314,6 +314,7 @@ We use mkExportedLocalId for things like
  - Dictionary functions (DFunId)
  - Wrapper and matcher Ids for pattern synonyms
  - Default methods for classes
+ - Pattern-synonym matcher and builder Ids
  - etc
 
 They marked as "exported" in the sense that they should be kept alive
@@ -329,7 +330,9 @@ of reasons:
    dependency analysis (e.g. CoreFVs.exprFreeVars).
 
  * Look them up in the current substitution when we come across
-   occurrences of them (in Subst.lookupIdSubst)
+   occurrences of them (in Subst.lookupIdSubst). Lacking this we
+   can get an out-of-date unfolding, which can in turn make the
+   simplifier go into an infinite loop (Trac #9857)
 
  * Ensure that for dfuns that the specialiser does not float dict uses
    above their defns, which would prevent good simplifications happening.
