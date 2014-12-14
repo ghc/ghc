@@ -71,6 +71,9 @@ V = 1
 
 GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
 
+# Only use -fasm by default on platforms that support it.
+GhcFAsm = $(if $(filter $(GhcWithNativeCodeGen),YES),-fasm,)
+
 # ----------- A Performance/Distribution build --------------------------------
 
 ifeq "$(BuildFlavour)" "perf"
@@ -78,8 +81,8 @@ ifeq "$(BuildFlavour)" "perf"
 # perf matches the default settings, repeated here for comparison:
 
 SRC_HC_OPTS     = -O -H64m
-GhcStage1HcOpts = -O -fasm
-GhcStage2HcOpts = -O2 -fasm
+GhcStage1HcOpts = -O $(GhcFAsm)
+GhcStage2HcOpts = -O2 $(GhcFAsm)
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
 GhcLibWays     += p
@@ -130,10 +133,10 @@ endif
 
 ifeq "$(BuildFlavour)" "quickest"
 
-SRC_HC_OPTS        = -H64m -O0 -fasm
-GhcStage1HcOpts    = -O -fasm
-GhcStage2HcOpts    = -O0 -fasm
-GhcLibHcOpts       = -O0 -fasm
+SRC_HC_OPTS        = -H64m -O0 $(GhcFAsm)
+GhcStage1HcOpts    = -O $(GhcFAsm)
+GhcStage2HcOpts    = -O0 $(GhcFAsm)
+GhcLibHcOpts       = -O0 $(GhcFAsm)
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -146,10 +149,10 @@ endif
 
 ifeq "$(BuildFlavour)" "quick"
 
-SRC_HC_OPTS        = -H64m -O0 -fasm
-GhcStage1HcOpts    = -O -fasm
-GhcStage2HcOpts    = -O0 -fasm
-GhcLibHcOpts       = -O -fasm
+SRC_HC_OPTS        = -H64m -O0 $(GhcFAsm)
+GhcStage1HcOpts    = -O $(GhcFAsm)
+GhcStage2HcOpts    = -O0 $(GhcFAsm)
+GhcLibHcOpts       = -O $(GhcFAsm)
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -199,10 +202,10 @@ endif
 
 ifeq "$(BuildFlavour)" "prof"
 
-SRC_HC_OPTS        = -H64m -O0 -fasm
-GhcStage1HcOpts    = -O -fasm
-GhcStage2HcOpts    = -O -fasm
-GhcLibHcOpts       = -O -fasm
+SRC_HC_OPTS        = -H64m -O0 $(GhcFAsm)
+GhcStage1HcOpts    = -O $(GhcFAsm)
+GhcStage2HcOpts    = -O $(GhcFAsm)
+GhcLibHcOpts       = -O $(GhcFAsm)
 
 GhcLibWays         += p
 GhcProfiled        = YES
@@ -219,10 +222,10 @@ endif
 
 ifeq "$(BuildFlavour)" "devel1"
 
-SRC_HC_OPTS        = -H64m -O -fasm
+SRC_HC_OPTS        = -H64m -O $(GhcFAsm)
 GhcLibHcOpts       = -O -dcore-lint
 GhcStage1HcOpts    = -Rghc-timing -O0 -DDEBUG
-GhcStage2HcOpts    = -Rghc-timing -O -fasm
+GhcStage2HcOpts    = -Rghc-timing -O $(GhcFAsm)
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -236,9 +239,9 @@ endif
 
 ifeq "$(BuildFlavour)" "devel2"
 
-SRC_HC_OPTS        = -H64m -O -fasm
+SRC_HC_OPTS        = -H64m -O $(GhcFAsm)
 GhcLibHcOpts       = -O -dcore-lint
-GhcStage1HcOpts    = -Rghc-timing -O -fasm
+GhcStage1HcOpts    = -Rghc-timing -O $(GhcFAsm)
 GhcStage2HcOpts    = -Rghc-timing -O0 -DDEBUG
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
@@ -254,9 +257,9 @@ endif
 ifeq "$(BuildFlavour)" "bench"
 
 SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O -fasm
-GhcStage2HcOpts    = -O0 -fasm
-GhcLibHcOpts       = -O2 -fasm
+GhcStage1HcOpts    = -O $(GhcFAsm)
+GhcStage2HcOpts    = -O0 $(GhcFAsm)
+GhcLibHcOpts       = -O2 $(GhcFAsm)
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -286,9 +289,9 @@ endif
 ifeq "$(BuildFlavour)" "bench-cross"
 
 SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O -fasm
-GhcStage2HcOpts    = -O0 -fasm
-GhcLibHcOpts       = -O2 -fasm
+GhcStage1HcOpts    = -O $(GhcFAsm)
+GhcStage2HcOpts    = -O0 $(GhcFAsm)
+GhcLibHcOpts       = -O2 $(GhcFAsm)
 SplitObjs          = NO
 INTEGER_LIBRARY    = integer-simple
 Stage1Only         = YES
