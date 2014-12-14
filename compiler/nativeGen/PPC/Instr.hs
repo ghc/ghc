@@ -205,8 +205,11 @@ data Instr
     | ADD     Reg Reg RI            -- dst, src1, src2
     | ADDC    Reg Reg Reg           -- (carrying) dst, src1, src2
     | ADDE    Reg Reg Reg           -- (extend) dst, src1, src2
+    | ADDI    Reg Reg Imm           -- Add Immediate dst, src1, src2
     | ADDIS   Reg Reg Imm           -- Add Immediate Shifted dst, src1, src2
     | SUBF    Reg Reg Reg           -- dst, src1, src2 ; dst = src2 - src1
+    | SUBFC   Reg Reg Reg           -- (carrying) dst, src1, src2 ; dst = src2 - src1
+    | SUBFE   Reg Reg Reg           -- (extend) dst, src1, src2 ; dst = src2 - src1
     | MULLW   Reg Reg RI
     | DIVW    Reg Reg Reg
     | DIVWU   Reg Reg Reg
@@ -284,8 +287,11 @@ ppc_regUsageOfInstr platform instr
     ADD     reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
     ADDC    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     ADDE    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    ADDI    reg1 reg2 _      -> usage ([reg2], [reg1])
     ADDIS   reg1 reg2 _      -> usage ([reg2], [reg1])
     SUBF    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    SUBFC   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    SUBFE   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     MULLW   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
     DIVW    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     DIVWU   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
@@ -358,8 +364,11 @@ ppc_patchRegsOfInstr instr env
     ADD     reg1 reg2 ri    -> ADD (env reg1) (env reg2) (fixRI ri)
     ADDC    reg1 reg2 reg3  -> ADDC (env reg1) (env reg2) (env reg3)
     ADDE    reg1 reg2 reg3  -> ADDE (env reg1) (env reg2) (env reg3)
+    ADDI    reg1 reg2 imm   -> ADDI (env reg1) (env reg2) imm
     ADDIS   reg1 reg2 imm   -> ADDIS (env reg1) (env reg2) imm
     SUBF    reg1 reg2 reg3  -> SUBF (env reg1) (env reg2) (env reg3)
+    SUBFC   reg1 reg2 reg3  -> SUBFC (env reg1) (env reg2) (env reg3)
+    SUBFE   reg1 reg2 reg3  -> SUBFE (env reg1) (env reg2) (env reg3)
     MULLW   reg1 reg2 ri    -> MULLW (env reg1) (env reg2) (fixRI ri)
     DIVW    reg1 reg2 reg3  -> DIVW (env reg1) (env reg2) (env reg3)
     DIVWU   reg1 reg2 reg3  -> DIVWU (env reg1) (env reg2) (env reg3)

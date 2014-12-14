@@ -54,7 +54,7 @@ import Outputable
 import Unique
 import DynFlags
 
-import Control.Monad    ( mapAndUnzipM )
+import Control.Monad    ( mapAndUnzipM, when )
 import Data.Bits
 import Data.Word
 
@@ -353,6 +353,19 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
                 code2 `appOL`
                 toOL [ ADDC rlo r1lo r2lo,
                        ADDE rhi r1hi r2hi ]
+   return (ChildCode64 code rlo)
+
+iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
+   ChildCode64 code1 r1lo <- iselExpr64 e1
+   ChildCode64 code2 r2lo <- iselExpr64 e2
+   (rlo,rhi) <- getNewRegPairNat II32
+   let
+        r1hi = getHiVRegFromLo r1lo
+        r2hi = getHiVRegFromLo r2lo
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ SUBFC rlo r2lo r1lo,
+                       SUBFE rhi r2hi r1hi ]
    return (ChildCode64 code rlo)
 
 iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
@@ -918,8 +931,12 @@ genCCall' dflags gcp target dest_regs args0
                                                         (toOL []) []
 
         (labelOrExpr, reduceToFF32) <- case target of
-            ForeignTarget (CmmLit (CmmLabel lbl)) _ -> return (Left lbl, False)
-            ForeignTarget expr _ -> return  (Right expr, False)
+            ForeignTarget (CmmLit (CmmLabel lbl)) _ -> do
+                uses_pic_base_implicitly
+                return (Left lbl, False)
+            ForeignTarget expr _ -> do
+                uses_pic_base_implicitly
+                return (Right expr, False)
             PrimTarget mop -> outOfLineMachOp mop
 
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode
@@ -939,6 +956,13 @@ genCCall' dflags gcp target dest_regs args0
                         `appOL`  codeAfter)
     where
         platform = targetPlatform dflags
+
+        uses_pic_base_implicitly = do
+            -- See Note [implicit register in PPC PIC code]
+            -- on why we claim to use PIC register here
+            when (gopt Opt_PIC dflags) $ do
+                _ <- getPicBaseNat archWordSize
+                return ()
 
         initialStackOffset = case gcp of
                              GCPDarwin -> 24
@@ -1431,3 +1455,21 @@ coerceFP2Int _ toRep x = do
                 -- read low word of value (high word is undefined)
             LD II32 dst (spRel dflags 3)]
     return (Any (intSize toRep) code')
+
+-- Note [.LCTOC1 in PPC PIC code]
+-- The .LCTOC1 label is defined to point 32768 bytes into the GOT table
+-- to make the most of the PPC's 16-bit displacements.
+-- As 16-bit signed offset is used (usually via addi/lwz instructions)
+-- first element will have '-32768' offset against .LCTOC1.
+
+-- Note [implicit register in PPC PIC code]
+-- PPC generates calls by labels in assembly
+-- in form of:
+--     bl puts+32768@plt
+-- in this form it's not seen directly (by GHC NCG)
+-- that r30 (PicBaseReg) is used,
+-- but r30 is a required part of PLT code setup:
+--   puts+32768@plt:
+--       lwz     r11,-30484(r30) ; offset in .LCTOC1
+--       mtctr   r11
+--       bctr

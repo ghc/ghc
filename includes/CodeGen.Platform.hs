@@ -881,6 +881,8 @@ freeReg 1 = fastBool False -- The Stack Pointer
 # if !MACHREGS_darwin
 -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
 freeReg 2 = fastBool False
+-- at least linux in -fPIC relies on r30 in PLT stubs
+freeReg 30 = fastBool False
 # endif
 # ifdef REG_Base
 freeReg REG_Base = fastBool False

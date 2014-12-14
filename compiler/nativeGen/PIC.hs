@@ -54,7 +54,6 @@ import qualified X86.Instr      as X86
 
 import Platform
 import Instruction
-import Size
 import Reg
 import NCGMonad
 
@@ -468,11 +467,8 @@ pprGotDeclaration dflags ArchX86 OSDarwin
 pprGotDeclaration _ _ OSDarwin
         = empty
 
--- pprGotDeclaration
+-- Emit GOT declaration
 -- Output whatever needs to be output once per .s file.
--- The .LCTOC1 label is defined to point 32768 bytes into the table,
--- to make the most of the PPC's 16-bit displacements.
--- Only needed for PIC.
 pprGotDeclaration dflags arch os
         | osElfTarget os
         , arch  /= ArchPPC_64
@@ -482,6 +478,7 @@ pprGotDeclaration dflags arch os
         | osElfTarget os
         , arch  /= ArchPPC_64
         = vcat [
+                -- See Note [.LCTOC1 in PPC PIC code]
                 ptext (sLit ".section \".got2\",\"aw\""),
                 ptext (sLit ".LCTOC1 = .+32768") ]
 
@@ -688,12 +685,7 @@ pprImportedSymbol _ _ _
 
 
 -- Get a pointer to our own fake GOT, which is defined on a per-module basis.
--- This is exactly how GCC does it, and it's quite horrible:
--- We first fetch the address of a local label (mkPicBaseLabel).
--- Then we add a 16-bit offset to that to get the address of a .long that we
--- define in .text space right next to the proc. This .long literal contains
--- the (32-bit) offset from our local label to our global offset table
--- (.LCTOC1 aka gotOffLabel).
+-- This is exactly how GCC does it in linux.
 
 initializePicBase_ppc
         :: Arch -> OS -> Reg
@@ -704,18 +696,9 @@ initializePicBase_ppc ArchPPC os picReg
     (CmmProc info lab live (ListGraph blocks) : statics)
     | osElfTarget os
     = do
-        dflags <- getDynFlags
-        gotOffLabel <- getNewLabelNat
-        tmp <- getNewRegNat $ intSize (wordWidth dflags)
         let
-            gotOffset = CmmData Text $ Statics gotOffLabel [
-                            CmmStaticLit (CmmLabelDiffOff gotLabel
-                                                          mkPicBaseLabel
-                                                          0)
-                        ]
-            offsetToOffset
-                        = PPC.ImmConstantDiff
-                                (PPC.ImmCLbl gotOffLabel)
+            gotOffset = PPC.ImmConstantDiff
+                                (PPC.ImmCLbl gotLabel)
                                 (PPC.ImmCLbl mkPicBaseLabel)
 
             blocks' = case blocks of
@@ -726,15 +709,23 @@ initializePicBase_ppc ArchPPC os picReg
               | bID `mapMember` info = fetchPC b
               | otherwise            = b
 
+            -- GCC does PIC prologs thusly:
+            --     bcl 20,31,.L1
+            -- .L1:
+            --     mflr 30
+            --     addis 30,30,.LCTOC1-.L1@ha
+            --     addi 30,30,.LCTOC1-.L1@l
+            -- TODO: below we use it over temporary register,
+            -- it can and should be optimised by picking
+            -- correct PIC reg.
             fetchPC (BasicBlock bID insns) =
               BasicBlock bID (PPC.FETCHPC picReg
-                              : PPC.ADDIS tmp picReg (PPC.HI offsetToOffset)
-                              : PPC.LD PPC.archWordSize tmp
-                                   (PPC.AddrRegImm tmp (PPC.LO offsetToOffset))
-                              : PPC.ADD picReg picReg (PPC.RIReg picReg)
+                              : PPC.ADDIS picReg picReg (PPC.HA gotOffset)
+                              : PPC.ADDI picReg picReg (PPC.LO gotOffset)
+                              : PPC.MR PPC.r30 picReg
                               : insns)
 
-        return (CmmProc info lab live (ListGraph blocks') : gotOffset : statics)
+        return (CmmProc info lab live (ListGraph blocks') : statics)
 
 
 initializePicBase_ppc ArchPPC OSDarwin picReg

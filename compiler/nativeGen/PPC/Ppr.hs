@@ -525,6 +525,16 @@ pprInstr (BCTRL _) = hcat [
         ptext (sLit "bctrl")
     ]
 pprInstr (ADD reg1 reg2 ri) = pprLogic (sLit "add") reg1 reg2 ri
+pprInstr (ADDI reg1 reg2 imm) = hcat [
+        char '\t',
+        ptext (sLit "addi"),
+        char '\t',
+        pprReg reg1,
+        ptext (sLit ", "),
+        pprReg reg2,
+        ptext (sLit ", "),
+        pprImm imm
+    ]
 pprInstr (ADDIS reg1 reg2 imm) = hcat [
         char '\t',
         ptext (sLit "addis"),
@@ -539,6 +549,8 @@ pprInstr (ADDIS reg1 reg2 imm) = hcat [
 pprInstr (ADDC reg1 reg2 reg3) = pprLogic (sLit "addc") reg1 reg2 (RIReg reg3)
 pprInstr (ADDE reg1 reg2 reg3) = pprLogic (sLit "adde") reg1 reg2 (RIReg reg3)
 pprInstr (SUBF reg1 reg2 reg3) = pprLogic (sLit "subf") reg1 reg2 (RIReg reg3)
+pprInstr (SUBFC reg1 reg2 reg3) = pprLogic (sLit "subfc") reg1 reg2 (RIReg reg3)
+pprInstr (SUBFE reg1 reg2 reg3) = pprLogic (sLit "subfe") reg1 reg2 (RIReg reg3)
 pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic (sLit "mullw") reg1 reg2 ri
 pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic (sLit "mull") reg1 reg2 ri
 pprInstr (DIVW reg1 reg2 reg3) = pprLogic (sLit "divw") reg1 reg2 (RIReg reg3)
