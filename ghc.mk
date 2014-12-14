@@ -36,6 +36,19 @@ endif
 
 utils/haddock_dist_MODULES += Paths_haddock
 
+utils/haddock_dist_DATA_FILES += html/frames.html
+utils/haddock_dist_DATA_FILES += html/haddock-util.js
+utils/haddock_dist_DATA_FILES += html/Classic.theme/haskell_icon.gif
+utils/haddock_dist_DATA_FILES += html/Classic.theme/minus.gif
+utils/haddock_dist_DATA_FILES += html/Classic.theme/plus.gif
+utils/haddock_dist_DATA_FILES += html/Classic.theme/xhaddock.css
+utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/hslogo-16.png
+utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/minus.gif
+utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/ocean.css
+utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/plus.gif
+utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/synopsis.png
+utils/haddock_dist_DATA_FILES += latex/haddock.sty
+
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_utils/haddock_data
 ifeq "$(Windows_Host)" "NO"
@@ -55,4 +68,4 @@ install_utils/haddock_link:
 	$(call removeFiles,"$(DESTDIR)$(bindir)/haddock")
 	$(LN_S) $(utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME) "$(DESTDIR)$(bindir)/haddock"
 
-BINDIST_EXTRAS += $(addprefix utils/haddock/resources/,$(utils/haddock_dist_DATA_FILES))
+BINDIST_EXTRAS += $(addprefix utils/haddock/haddock-api/resources/,$(utils/haddock_dist_DATA_FILES))
