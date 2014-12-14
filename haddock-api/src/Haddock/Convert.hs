@@ -173,7 +173,6 @@ synifyTyCon coax tc
                   (brListMap (noLoc . synifyAxBranch tc) branches)
               BuiltInSynFamTyCon {} -> return $ ClosedTypeFamily []
               AbstractClosedSynFamilyTyCon {} -> return $ ClosedTypeFamily []
-              _ -> Left "synifyTyCon: type/data family confusion"
         in info >>= \i ->
            return (FamDecl
                    (FamilyDecl { fdInfo = i
