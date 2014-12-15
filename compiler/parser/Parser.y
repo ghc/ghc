@@ -2081,7 +2081,10 @@ aexp2   :: { LHsExpr RdrName }
         | TH_TY_QUOTE gtycon    { sLL $1 $> $ HsBracket (VarBr False (unLoc $2)) }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2)) [mo $1,mc $3] }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2)) [mo $1,mc $3]}
-        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
+        | '[t|' ctype '|]'    {% checkNoPartialType
+                                   (text "in type brackets" <> colon
+                                    <+> quotes (text "[t|" <+> ppr $2 <+> text "|]")) $2 >>
+                                 ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
                                       ams (sLL $1 $> $ HsBracket (PatBr p))
                                           [mo $1,mc $3] }
