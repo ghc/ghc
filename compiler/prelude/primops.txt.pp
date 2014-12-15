@@ -2933,20 +2933,21 @@ section "Prefetch"
   architectures or vendor hardware. The manual can be found at
   http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html .
 
-  The {\tt prefetchMutableByteArray} family of operations has the order of operations
+  The {\tt prefetch*} family of operations has the order of operations
   determined by passing around the {\tt State#} token.
 
-  For the {\tt prefetchByteArray}
-  and {\tt prefetchAddr} families of operations, consider the following example:
+  To get a "pure" version of these operations, use {\tt inlinePerformIO} which is quite safe in this context.
 
-  {\tt let a1 = prefetchByteArray2# a n in ...a1... }
-
-  In the above fragement, {\tt a} is the input variable for the prefetch
-  and {\tt a1 == a} will be true. To ensure that the prefetch is not treated as deadcode,
-  the body of the let should only use {\tt a1} and NOT {\tt a}. The same principle
-  applies for uses of prefetch in a loop.
-
+  It is important to note that while the prefetch operations will never change the
+  answer to a pure computation, They CAN change the memory locations resident
+  in a CPU cache and that may change the performance and timing characteristics
+  of an application. The prefetch operations are marked has_side_effects=True
+  to reflect that these operations have side effects with respect to the runtime
+  performance characteristics of the resulting code. Additionally, if the prefetchValue
+  operations did not have this attribute, GHC does a float out transformation that
+  results in a let/app violation, at least with the current design.
   }
+
 
 
 ------------------------------------------------------------------------
@@ -2956,48 +2957,75 @@ section "Prefetch"
 
 ---
 primop PrefetchByteArrayOp3 "prefetchByteArray3#" GenPrimOp
-   ByteArray# -> Int# -> ByteArray#
+  ByteArray# -> Int# ->  State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp3 "prefetchMutableByteArray3#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchAddrOp3 "prefetchAddr3#" GenPrimOp
-    Addr# -> Int# -> Addr#
+  Addr# -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
+primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
+   a -> State# s -> State# s
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topRes }
+        has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp2 "prefetchByteArray2#" GenPrimOp
-   ByteArray# -> Int# -> ByteArray#
+  ByteArray# -> Int# ->  State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp2 "prefetchMutableByteArray2#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchAddrOp2 "prefetchAddr2#" GenPrimOp
-   Addr# -> Int# -> Addr#
+  Addr# -> Int# ->  State# s -> State# s
+  with has_side_effects =  True
 
+primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
+   a ->  State# s -> State# s
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topRes }
+        has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp1 "prefetchByteArray1#" GenPrimOp
-   ByteArray# -> Int# -> ByteArray#
+   ByteArray# -> Int# -> State# s -> State# s
+   with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp1 "prefetchMutableByteArray1#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchAddrOp1 "prefetchAddr1#" GenPrimOp
-   Addr# -> Int# -> Addr#
+  Addr# -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
+primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
+   a -> State# s -> State# s
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topRes }
+        has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp0 "prefetchByteArray0#" GenPrimOp
-   ByteArray# -> Int# -> ByteArray#
+  ByteArray# -> Int# ->  State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp0 "prefetchMutableByteArray0#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
 primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
-   Addr# -> Int# -> Addr#
+  Addr# -> Int# -> State# s -> State# s
+  with has_side_effects =  True
 
-
+primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
+   a -> State# s -> State# s
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topRes }
+        has_side_effects =  True
 
 ------------------------------------------------------------------------
 ---                                                                  ---
