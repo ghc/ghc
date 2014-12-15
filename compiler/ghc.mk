@@ -473,12 +473,10 @@ compiler_stage2_dll0_MODULES = \
 	Avail \
 	Bag \
 	BasicTypes \
-	BinIface \
 	Binary \
 	BooleanFormula \
 	BreakArray \
 	BufWrite \
-	BuildTyCl \
 	Class \
 	CmdLineParser \
 	CmmType \
@@ -489,7 +487,6 @@ compiler_stage2_dll0_MODULES = \
 	Constants \
 	CoreArity \
 	CoreFVs \
-	CoreLint \
 	CoreSubst \
 	CoreSyn \
 	CoreTidy \
@@ -501,7 +498,6 @@ compiler_stage2_dll0_MODULES = \
 	Demand \
 	Digraph \
 	DriverPhases \
-	DsMonad \
 	DynFlags \
 	Encoding \
 	ErrUtils \
@@ -512,7 +508,6 @@ compiler_stage2_dll0_MODULES = \
 	FastMutInt \
 	FastString \
 	FastTypes \
-	Finder \
 	Fingerprint \
 	FiniteMap \
 	ForeignCall \
@@ -532,7 +527,6 @@ compiler_stage2_dll0_MODULES = \
 	IOEnv \
 	Id \
 	IdInfo \
-	IfaceEnv \
 	IfaceSyn \
 	IfaceType \
 	InstEnv \
@@ -541,7 +535,6 @@ compiler_stage2_dll0_MODULES = \
 	Lexer \
 	ListSetOps \
 	Literal \
-	LoadIface \
 	Maybes \
 	MkCore \
 	MkId \
@@ -564,7 +557,6 @@ compiler_stage2_dll0_MODULES = \
 	Platform \
 	PlatformConstants \
 	PprCore \
-	PrelInfo \
 	PrelNames \
 	PrelRules \
 	Pretty \
@@ -576,11 +568,8 @@ compiler_stage2_dll0_MODULES = \
 	StaticFlags \
 	StringBuffer \
 	TcEvidence \
-	TcIface \
-	TcRnMonad \
 	TcRnTypes \
 	TcType \
-	TcTypeNats \
 	TrieMap \
 	TyCon \
 	Type \

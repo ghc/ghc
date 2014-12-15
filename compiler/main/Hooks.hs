@@ -1,5 +1,10 @@
 -- \section[Hooks]{Low level API hooks}
 
+-- NB: this module is SOURCE-imported by DynFlags, and should primarily
+--     refer to *types*, rather than *code*
+-- If you import too muchhere , then the revolting compiler_stage2_dll0_MODULES
+-- stuff in compiler/ghc.mk makes DynFlags link to too much stuff
+
 module Hooks ( Hooks
              , emptyHooks
              , lookupHook
@@ -27,7 +32,6 @@ import HscTypes
 import HsDecls
 import HsBinds
 import HsExpr
-import {-# SOURCE #-} DsMonad
 import OrdList
 import Id
 import TcRnTypes

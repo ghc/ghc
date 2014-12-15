@@ -78,7 +78,7 @@ dsBracket :: HsBracket Name -> [PendingTcSplice] -> DsM CoreExpr
 dsBracket brack splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
-    new_bit = mkNameEnv [(n, Splice (unLoc e)) | PendSplice n e <- splices]
+    new_bit = mkNameEnv [(n, DsSplice (unLoc e)) | PendSplice n e <- splices]
 
     do_brack (VarBr _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr e)   = do { MkC e1  <- repLE e     ; return e1 }
@@ -970,8 +970,8 @@ repSplice :: HsSplice Name -> DsM (Core a)
 repSplice (HsSplice n _)
  = do { mb_val <- dsLookupMetaEnv n
        ; case mb_val of
-           Just (Splice e) -> do { e' <- dsExpr e
-                                 ; return (MkC e') }
+           Just (DsSplice e) -> do { e' <- dsExpr e
+                                   ; return (MkC e') }
            _ -> pprPanic "HsSplice" (ppr n) }
                         -- Should not happen; statically checked
 
@@ -994,8 +994,8 @@ repE (HsVar x)            =
      ; case mb_val of
         Nothing          -> do { str <- globalVar x
                                ; repVarOrCon x str }
-        Just (Bound y)   -> repVarOrCon x (coreVar y)
-        Just (Splice e)  -> do { e' <- dsExpr e
+        Just (DsBound y)   -> repVarOrCon x (coreVar y)
+        Just (DsSplice e)  -> do { e' <- dsExpr e
                                ; return (MkC e') } }
 repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 
@@ -1434,7 +1434,7 @@ addBinds :: [GenSymBind] -> DsM a -> DsM a
 -- Add a list of fresh names for locally bound entities to the
 -- meta environment (which is part of the state carried around
 -- by the desugarer monad)
-addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,Bound id) | (n,id) <- bs]) m
+addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,DsBound id) | (n,id) <- bs]) m
 
 dupBinder :: (Name, Name) -> DsM (Name, DsMetaVal)
 dupBinder (new, old)
@@ -1469,9 +1469,9 @@ lookupOcc :: Name -> DsM (Core TH.Name)
 lookupOcc n
   = do {  mb_val <- dsLookupMetaEnv n ;
           case mb_val of
-                Nothing         -> globalVar n
-                Just (Bound x)  -> return (coreVar x)
-                Just (Splice _) -> pprPanic "repE:lookupOcc" (ppr n)
+                Nothing           -> globalVar n
+                Just (DsBound x)  -> return (coreVar x)
+                Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n)
     }
 
 globalVar :: Name -> DsM (Core TH.Name)

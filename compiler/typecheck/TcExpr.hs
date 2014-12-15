@@ -36,7 +36,7 @@ import TcPatSyn( tcPatSynBuilderOcc )
 import TcPat
 import TcMType
 import TcType
-import DsMonad hiding (Splice)
+import DsMonad
 import Id
 import ConLike
 import DataCon

@@ -36,6 +36,10 @@ module TcRnTypes(
         TcTypeEnv, TcIdBinder(..), TcTyThing(..), PromotionErr(..),
         pprTcTyThingCategory, pprPECategory,
 
+        -- Desugaring types
+        DsM, DsLclEnv(..), DsGblEnv(..), PArrBuiltin(..),
+        DsMetaEnv, DsMetaVal(..),
+
         -- Template Haskell
         ThStage(..), PendingStuff(..), topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
@@ -88,7 +92,7 @@ module TcRnTypes(
         pprArising, pprArisingAt,
 
         -- Misc other types
-        TcId, TcIdSet, TcTyVarBind(..), TcTyVarBinds, HoleSort(..)
+        TcId, TcIdSet, HoleSort(..)
 
   ) where
 
@@ -130,6 +134,7 @@ import DynFlags
 import Outputable
 import ListSetOps
 import FastString
+import GHC.Fingerprint
 
 import Data.Set (Set)
 import Control.Monad (ap, liftM)
@@ -153,53 +158,25 @@ import qualified Language.Haskell.TH as TH
 The monad itself has to be defined here, because it is mentioned by ErrCtxt
 -}
 
--- | Type alias for 'IORef'; the convention is we'll use this for mutable
--- bits of data in 'TcGblEnv' which are updated during typechecking and
--- returned at the end.
-type TcRef a     = IORef a
--- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
-type TcId        = Id
-type TcIdSet     = IdSet
-
-
 type TcRnIf a b = IOEnv (Env a b)
-type IfM lcl  = TcRnIf IfGblEnv lcl         -- Iface stuff
+type TcRn       = TcRnIf TcGblEnv TcLclEnv    -- Type inference
+type IfM lcl    = TcRnIf IfGblEnv lcl         -- Iface stuff
+type IfG        = IfM ()                      --    Top level
+type IfL        = IfM IfLclEnv                --    Nested
+type DsM        = TcRnIf DsGblEnv DsLclEnv    -- Desugaring
 
-type IfG  = IfM ()                          -- Top level
-type IfL  = IfM IfLclEnv                    -- Nested
-
--- | Type-checking and renaming monad: the main monad that most type-checking
--- takes place in.  The global environment is 'TcGblEnv', which tracks
--- all of the top-level type-checking information we've accumulated while
--- checking a module, while the local environment is 'TcLclEnv', which
--- tracks local information as we move inside expressions.
-type TcRn = TcRnIf TcGblEnv TcLclEnv
+-- TcRn is the type-checking and renaming monad: the main monad that
+-- most type-checking takes place in.  The global environment is
+-- 'TcGblEnv', which tracks all of the top-level type-checking
+-- information we've accumulated while checking a module, while the
+-- local environment is 'TcLclEnv', which tracks local information as
+-- we move inside expressions.
 
 -- | Historical "renaming monad" (now it's just 'TcRn').
 type RnM  = TcRn
 
 -- | Historical "type-checking monad" (now it's just 'TcRn').
 type TcM  = TcRn
-
-{-
-Representation of type bindings to uninstantiated meta variables used during
-constraint solving.
--}
-
-data TcTyVarBind = TcTyVarBind TcTyVar TcType
-
-type TcTyVarBinds = Bag TcTyVarBind
-
-instance Outputable TcTyVarBind where
-  ppr (TcTyVarBind tv ty) = ppr tv <+> text ":=" <+> ppr ty
-
-{-
-************************************************************************
-*                                                                      *
-                The main environment types
-*                                                                      *
-************************************************************************
--}
 
 -- We 'stack' these envs through the Reader like monad infastructure
 -- as we move into an expression (although the change is focused in
@@ -225,6 +202,125 @@ instance ContainsDynFlags (Env gbl lcl) where
 
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)
+
+
+{-
+************************************************************************
+*                                                                      *
+                The interface environments
+              Used when dealing with IfaceDecls
+*                                                                      *
+************************************************************************
+-}
+
+data IfGblEnv
+  = IfGblEnv {
+        -- The type environment for the module being compiled,
+        -- in case the interface refers back to it via a reference that
+        -- was originally a hi-boot file.
+        -- We need the module name so we can test when it's appropriate
+        -- to look in this env.
+        if_rec_types :: Maybe (Module, IfG TypeEnv)
+                -- Allows a read effect, so it can be in a mutable
+                -- variable; c.f. handling the external package type env
+                -- Nothing => interactive stuff, no loops possible
+    }
+
+data IfLclEnv
+  = IfLclEnv {
+        -- The module for the current IfaceDecl
+        -- So if we see   f = \x -> x
+        -- it means M.f = \x -> x, where M is the if_mod
+        if_mod :: Module,
+
+        -- The field is used only for error reporting
+        -- if (say) there's a Lint error in it
+        if_loc :: SDoc,
+                -- Where the interface came from:
+                --      .hi file, or GHCi state, or ext core
+                -- plus which bit is currently being examined
+
+        if_tv_env  :: UniqFM TyVar,     -- Nested tyvar bindings
+                                        -- (and coercions)
+        if_id_env  :: UniqFM Id         -- Nested id binding
+    }
+
+{-
+************************************************************************
+*                                                                      *
+                Desugarer monad
+*                                                                      *
+************************************************************************
+
+Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
+a @UniqueSupply@ and some annotations, which
+presumably include source-file location information:
+-}
+
+-- If '-XParallelArrays' is given, the desugarer populates this table with the corresponding
+-- variables found in 'Data.Array.Parallel'.
+--
+data PArrBuiltin
+        = PArrBuiltin
+        { lengthPVar         :: Var     -- ^ lengthP
+        , replicatePVar      :: Var     -- ^ replicateP
+        , singletonPVar      :: Var     -- ^ singletonP
+        , mapPVar            :: Var     -- ^ mapP
+        , filterPVar         :: Var     -- ^ filterP
+        , zipPVar            :: Var     -- ^ zipP
+        , crossMapPVar       :: Var     -- ^ crossMapP
+        , indexPVar          :: Var     -- ^ (!:)
+        , emptyPVar          :: Var     -- ^ emptyP
+        , appPVar            :: Var     -- ^ (+:+)
+        , enumFromToPVar     :: Var     -- ^ enumFromToP
+        , enumFromThenToPVar :: Var     -- ^ enumFromThenToP
+        }
+
+data DsGblEnv
+        = DsGblEnv
+        { ds_mod          :: Module             -- For SCC profiling
+        , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
+        , ds_unqual  :: PrintUnqualified
+        , ds_msgs    :: IORef Messages          -- Warning messages
+        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
+                                                -- possibly-imported things
+        , ds_dph_env :: GlobalRdrEnv            -- exported entities of 'Data.Array.Parallel.Prim'
+                                                -- iff '-fvectorise' flag was given as well as
+                                                -- exported entities of 'Data.Array.Parallel' iff
+                                                -- '-XParallelArrays' was given; otherwise, empty
+        , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
+        , ds_static_binds :: IORef [(Fingerprint, (Id,CoreExpr))]
+          -- ^ Bindings resulted from floating static forms
+        }
+
+instance ContainsModule DsGblEnv where
+    extractModule = ds_mod
+
+data DsLclEnv = DsLclEnv {
+        dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
+        dsl_loc     :: SrcSpan           -- to put in pattern-matching error msgs
+     }
+
+-- Inside [| |] brackets, the desugarer looks
+-- up variables in the DsMetaEnv
+type DsMetaEnv = NameEnv DsMetaVal
+
+data DsMetaVal
+   = DsBound Id         -- Bound by a pattern inside the [| |].
+                        -- Will be dynamically alpha renamed.
+                        -- The Id has type THSyntax.Var
+
+   | DsSplice (HsExpr Id) -- These bindings are introduced by
+                          -- the PendingSplices on a HsBracketOut
+
+
+{-
+************************************************************************
+*                                                                      *
+                Global typechecker environment
+*                                                                      *
+************************************************************************
+-}
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
@@ -482,47 +578,6 @@ We gather two sorts of usage information
 
 ************************************************************************
 *                                                                      *
-                The interface environments
-              Used when dealing with IfaceDecls
-*                                                                      *
-************************************************************************
--}
-
-data IfGblEnv
-  = IfGblEnv {
-        -- The type environment for the module being compiled,
-        -- in case the interface refers back to it via a reference that
-        -- was originally a hi-boot file.
-        -- We need the module name so we can test when it's appropriate
-        -- to look in this env.
-        if_rec_types :: Maybe (Module, IfG TypeEnv)
-                -- Allows a read effect, so it can be in a mutable
-                -- variable; c.f. handling the external package type env
-                -- Nothing => interactive stuff, no loops possible
-    }
-
-data IfLclEnv
-  = IfLclEnv {
-        -- The module for the current IfaceDecl
-        -- So if we see   f = \x -> x
-        -- it means M.f = \x -> x, where M is the if_mod
-        if_mod :: Module,
-
-        -- The field is used only for error reporting
-        -- if (say) there's a Lint error in it
-        if_loc :: SDoc,
-                -- Where the interface came from:
-                --      .hi file, or GHCi state, or ext core
-                -- plus which bit is currently being examined
-
-        if_tv_env  :: UniqFM TyVar,     -- Nested tyvar bindings
-                                        -- (and coercions)
-        if_id_env  :: UniqFM Id         -- Nested id binding
-    }
-
-{-
-************************************************************************
-*                                                                      *
                 The local typechecker environment
 *                                                                      *
 ************************************************************************
@@ -618,6 +673,14 @@ Well, we have it, because Eq a refines to Eq [b], but we can only spot that if w
 pass it inwards.
 
 -}
+
+-- | Type alias for 'IORef'; the convention is we'll use this for mutable
+-- bits of data in 'TcGblEnv' which are updated during typechecking and
+-- returned at the end.
+type TcRef a     = IORef a
+-- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
+type TcId        = Id
+type TcIdSet     = IdSet
 
 ---------------------------
 -- Template Haskell stages and levels

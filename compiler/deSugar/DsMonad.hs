@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 
 module DsMonad (
         DsM, mapM, mapAndUnzipM,
@@ -64,10 +65,10 @@ import DynFlags
 import ErrUtils
 import FastString
 import Maybes
+import GHC.Fingerprint
 
 import Data.IORef
 import Control.Monad
-import GHC.Fingerprint
 
 {-
 ************************************************************************
@@ -115,16 +116,10 @@ orFail _        _        = CanFail
 {-
 ************************************************************************
 *                                                                      *
-                Monad stuff
+                Monad functions
 *                                                                      *
 ************************************************************************
-
-Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
-a @UniqueSupply@ and some annotations, which
-presumably include source-file location information:
 -}
-
-type DsM result = TcRnIf DsGblEnv DsLclEnv result
 
 -- Compatibility functions
 fixDs :: (a -> DsM a) -> DsM a
@@ -134,62 +129,6 @@ type DsWarning = (SrcSpan, SDoc)
         -- Not quite the same as a WarnMsg, we have an SDoc here
         -- and we'll do the print_unqual stuff later on to turn it
         -- into a Doc.
-
--- If '-XParallelArrays' is given, the desugarer populates this table with the corresponding
--- variables found in 'Data.Array.Parallel'.
---
-data PArrBuiltin
-        = PArrBuiltin
-        { lengthPVar         :: Var     -- ^ lengthP
-        , replicatePVar      :: Var     -- ^ replicateP
-        , singletonPVar      :: Var     -- ^ singletonP
-        , mapPVar            :: Var     -- ^ mapP
-        , filterPVar         :: Var     -- ^ filterP
-        , zipPVar            :: Var     -- ^ zipP
-        , crossMapPVar       :: Var     -- ^ crossMapP
-        , indexPVar          :: Var     -- ^ (!:)
-        , emptyPVar          :: Var     -- ^ emptyP
-        , appPVar            :: Var     -- ^ (+:+)
-        , enumFromToPVar     :: Var     -- ^ enumFromToP
-        , enumFromThenToPVar :: Var     -- ^ enumFromThenToP
-        }
-
-data DsGblEnv
-        = DsGblEnv
-        { ds_mod          :: Module             -- For SCC profiling
-        , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
-        , ds_unqual  :: PrintUnqualified
-        , ds_msgs    :: IORef Messages          -- Warning messages
-        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
-                                                -- possibly-imported things
-        , ds_dph_env :: GlobalRdrEnv            -- exported entities of 'Data.Array.Parallel.Prim'
-                                                -- iff '-fvectorise' flag was given as well as
-                                                -- exported entities of 'Data.Array.Parallel' iff
-                                                -- '-XParallelArrays' was given; otherwise, empty
-        , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
-        , ds_static_binds :: IORef [(Fingerprint, (Id,CoreExpr))]
-          -- ^ Bindings resulted from floating static forms
-        }
-
-instance ContainsModule DsGblEnv where
-    extractModule = ds_mod
-
-data DsLclEnv = DsLclEnv {
-        ds_meta    :: DsMetaEnv,        -- Template Haskell bindings
-        ds_loc     :: SrcSpan           -- to put in pattern-matching error msgs
-     }
-
--- Inside [| |] brackets, the desugarer looks
--- up variables in the DsMetaEnv
-type DsMetaEnv = NameEnv DsMetaVal
-
-data DsMetaVal
-   = Bound Id           -- Bound by a pattern inside the [| |].
-                        -- Will be dynamically alpha renamed.
-                        -- The Id has type THSyntax.Var
-
-   | Splice (HsExpr Id) -- These bindings are introduced by
-                        -- the PendingSplices on a HsBracketOut
 
 initDs :: HscEnv
        -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
@@ -302,8 +241,8 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var
                            , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
                            , ds_static_binds = static_binds_var
                            }
-        lcl_env = DsLclEnv { ds_meta = emptyNameEnv
-                           , ds_loc  = noSrcSpan
+        lcl_env = DsLclEnv { dsl_meta = emptyNameEnv
+                           , dsl_loc  = noSrcSpan
                            }
     in (gbl_env, lcl_env)
 
@@ -366,11 +305,10 @@ getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
 getSrcSpanDs :: DsM SrcSpan
-getSrcSpanDs = do { env <- getLclEnv; return (ds_loc env) }
+getSrcSpanDs = do { env <- getLclEnv; return (dsl_loc env) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
-putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
-
+putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {dsl_loc = new_loc}) thing_inside
 warnDs :: SDoc -> DsM ()
 warnDs warn = do { env <- getGblEnv
                  ; loc <- getSrcSpanDs
@@ -489,14 +427,14 @@ dsGetFamInstEnvs
        ; return (eps_fam_inst_env eps, ds_fam_inst_env env) }
 
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
-dsGetMetaEnv = do { env <- getLclEnv; return (ds_meta env) }
+dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
-dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (ds_meta env) name) }
+dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (dsl_meta env) name) }
 
 dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
 dsExtendMetaEnv menv thing_inside
-  = updLclEnv (\env -> env { ds_meta = ds_meta env `plusNameEnv` menv }) thing_inside
+  = updLclEnv (\env -> env { dsl_meta = dsl_meta env `plusNameEnv` menv }) thing_inside
 
 -- | Gets a reference to the SPT entries created so far.
 dsGetStaticBindsVar :: DsM (IORef [(Fingerprint, (Id,CoreExpr))])

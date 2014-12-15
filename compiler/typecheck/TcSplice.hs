@@ -77,7 +77,7 @@ import TcEvidence( TcEvBinds(..) )
 import Id
 import IdInfo
 import DsExpr
-import DsMonad hiding (Splice)
+import DsMonad
 import Serialized
 import ErrUtils
 import SrcLoc
