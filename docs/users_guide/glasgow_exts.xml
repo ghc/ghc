@@ -6882,9 +6882,9 @@ is a single quote.</para>
 </sect2>
 
 <sect2 id="promoted-lists-and-tuples">
-<title>Promoted lists and tuples types</title>
+<title>Promoted list and tuple types</title>
 <para>
-Haskell's list and tuple types are natively promoted to kinds, and enjoy the
+With <option>-XTypeOperators</option>, Haskell's list and tuple types are natively promoted to kinds, and enjoy the
 same convenient syntax at the type level, albeit prefixed with a quote:
 <programlisting>
 data HList :: [*] -> * where
@@ -6893,8 +6893,21 @@ data HList :: [*] -> * where
 
 data Tuple :: (*,*) -> * where
   Tuple :: a -> b -> Tuple '(a,b)
+
+foo0 :: HList '[]
+foo0 = HNil
+
+foo1 :: HList '[Int]
+foo1 = HCons (3::Int) HNil
+
+foo2 :: HList [Int, Bool]
+foo2 = ...
 </programlisting>
-Note that this requires <option>-XTypeOperators</option>.
+For type-level lists of <emphasis>two or more elements</emphasis>,
+such as the signature of <literal>foo2</literal> above, the quote may be omitted because the meaning is
+umambiguous. But for lists of one or zero elements (as in <literal>foo0</literal>
+and <literal>foo1</literal>), the quote is required, becuase the types <literal>[]</literal>
+and <literal>[Int]</literal> have existing meanings in Haskell.
 </para>
 </sect2>
 

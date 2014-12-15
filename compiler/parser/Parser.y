@@ -1483,6 +1483,10 @@ atype :: { LHsType RdrName }
                                                        [mo $2,mc $4] }
         | SIMPLEQUOTE var                       { sLL $1 $> $ HsTyVar $ unLoc $2 }
 
+        -- Two or more [ty, ty, ty] must be a promoted list type, just as
+        -- if you had written '[ty, ty, ty]
+        -- (One means a list type, zero means the list type constructor, 
+        -- so you have to quote those.)
         | '[' ctype ',' comma_types1 ']'  {% ams (sLL $1 $> $ HsExplicitListTy
                                                      placeHolderKind ($2 : $4))
                                                  [mo $1, mj AnnComma $3,mc $5] }
@@ -1503,11 +1507,11 @@ inst_types1 :: { [LHsType RdrName] }
         | inst_type ',' inst_types1    {% addAnnotation (gl $1) AnnComma (gl $2)
                                           >> return ($1 : $3) }
 
-comma_types0  :: { [LHsType RdrName] }
+comma_types0  :: { [LHsType RdrName] }  -- Zero or more:  ty,ty,ty
         : comma_types1                  { $1 }
         | {- empty -}                   { [] }
 
-comma_types1    :: { [LHsType RdrName] }
+comma_types1    :: { [LHsType RdrName] }  -- One or more:  ty,ty,ty
         : ctype                        { [$1] }
         | ctype  ',' comma_types1      {% addAnnotation (gl $1) AnnComma (gl $2)
                                           >> return ($1 : $3) }
