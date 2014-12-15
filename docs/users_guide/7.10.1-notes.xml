@@ -31,6 +31,20 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    There is a new extension,
+                    <link linkend="static-pointers">StaticPointers</link>,
+                    which allows you to create pointers to expressions which
+                    remain valid accross processes. This is useful for
+                    referencing higher-order values in distributed
+                    systems. The pointers are created with a new keyword
+                    <literal>static</literal> as in
+                    <literal>x = static ("abc" ++ "123") :: StaticPtr String</literal>.
+                    All processes which dereference <literal>x</literal> get the
+                    same result, that is, the body of the static form.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     Added support for <link linkend="binary-literals">binary integer literals</link>
                </para>
            </listitem>
