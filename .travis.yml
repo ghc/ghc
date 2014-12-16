@@ -12,9 +12,11 @@ env:
 
 before_install:
  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
+ - travis_retry sudo add-apt-repository -y ppa:h-rayflood/gcc-upper
+ - travis_retry sudo add-apt-repository -y ppa:h-rayflood/llvm-upper
  - travis_retry sudo apt-get update
- - travis_retry sudo apt-get install cabal-install-1.18 ghc-7.6.3 alex-3.1.3 happy-1.19.4
- - export PATH=/opt/ghc/7.6.3/bin:/opt/cabal/1.18/bin:/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:$PATH
+ - travis_retry sudo apt-get install cabal-install-1.18 ghc-7.6.3 alex-3.1.3 happy-1.19.4 llvm-3.5
+ - export PATH=/opt/ghc/7.6.3/bin:/opt/cabal/1.18/bin:/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:/usr/lib/llvm-3.5/bin:$PATH
  - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
  - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
  - git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
