@@ -197,8 +197,6 @@ tc_cmd env cmd@(HsCmdArrApp fun arg _ ho_app lr) (_, res_ty)
     do  { arg_ty <- newFlexiTyVarTy openTypeKind
         ; let fun_ty = mkCmdArrTy env arg_ty res_ty
         ; fun' <- select_arrow_scope (tcMonoExpr fun fun_ty)
-             -- ToDo: There should be no need for the escapeArrowScope stuff
-             -- See Note [Escaping the arrow scope] in TcRnTypes
 
         ; arg' <- tcMonoExpr arg arg_ty
 
@@ -208,6 +206,7 @@ tc_cmd env cmd@(HsCmdArrApp fun arg _ ho_app lr) (_, res_ty)
        -- proc for the (-<) case.
        -- Local bindings, inside the enclosing proc, are not in scope
        -- inside f.  In the higher-order case (-<<), they are.
+       -- See Note [Escaping the arrow scope] in TcRnTypes
     select_arrow_scope tc = case ho_app of
         HsHigherOrderApp -> tc
         HsFirstOrderApp  -> escapeArrowScope tc

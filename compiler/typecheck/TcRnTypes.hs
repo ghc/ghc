@@ -45,7 +45,7 @@ module TcRnTypes(
         ThLevel, impLevel, outerLevel, thLevel,
 
         -- Arrows
-        ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
+        ArrowCtxt(..),
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
@@ -603,7 +603,7 @@ data TcLclEnv           -- Changes as we move inside an expression
   = TcLclEnv {
         tcl_loc        :: SrcSpan,         -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_tclvl      :: TcLevel,    -- Birthplace for new unification variables
+        tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
         tcl_th_bndrs   :: ThBindEnv,       -- Binding level of in-scope Names
@@ -761,26 +761,22 @@ recording the environment when passing a proc (using newArrowScope),
 and returning to that (using escapeArrowScope) on the left of -< and the
 head of (|..|).
 
-All this can be dealt with by the *renamer*; by the time we get to
-the *type checker* we have sorted out the scopes
+All this can be dealt with by the *renamer*. But the type checker needs
+to be involved too.  Example (arrowfail001)
+  class Foo a where foo :: a -> ()
+  data Bar = forall a. Foo a => Bar a
+  get :: Bar -> ()
+  get = proc x -> case x of Bar a -> foo -< a
+Here the call of 'foo' gives rise to a (Foo a) constraint that should not
+be captured by the pattern match on 'Bar'.  Rather it should join the
+constraints from further out.  So we must capture the constraint bag
+from further out in the ArrowCtxt that we push inwards.
 -}
 
-data ArrowCtxt
+data ArrowCtxt   -- Note [Escaping the arrow scope]
   = NoArrowCtxt
-  | ArrowCtxt (Env TcGblEnv TcLclEnv)
+  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints)
 
--- Record the current environment (outside a proc)
-newArrowScope :: TcM a -> TcM a
-newArrowScope
-  = updEnv $ \env ->
-        env { env_lcl = (env_lcl env) { tcl_arrow_ctxt = ArrowCtxt env } }
-
--- Return to the stored environment (from the enclosing proc)
-escapeArrowScope :: TcM a -> TcM a
-escapeArrowScope
-  = updEnv $ \ env -> case tcl_arrow_ctxt (env_lcl env) of
-        NoArrowCtxt -> env
-        ArrowCtxt env' -> env'
 
 ---------------------------
 -- TcTyThing

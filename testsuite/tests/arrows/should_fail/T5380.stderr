@@ -24,4 +24,4 @@ T5380.hs:7:34:
       testB :: not_bool -> (() -> ()) -> () -> not_unit
         (bound at T5380.hs:7:1)
     In the expression: f
-    In the expression: proc () -> if b then f -< () else f -< ()
+    In the command: f -< ()
