@@ -116,7 +116,7 @@ bindSuspensions t = do
       let (names, tys, hvals) = unzip3 stuff
       let ids = [ mkVanillaGlobal name ty 
                 | (name,ty) <- zip names tys]
-          new_ic = extendInteractiveContext ictxt (map AnId ids)
+          new_ic = extendInteractiveContextWithIds ictxt ids
       liftIO $ extendLinkEnv (zip names hvals)
       modifySession $ \_ -> hsc_env {hsc_IC = new_ic }
       return t'
@@ -193,8 +193,8 @@ showTerm term = do
 
   bindToFreshName hsc_env ty userName = do
     name <- newGrimName userName
-    let id       = AnId $ mkVanillaGlobal name ty 
-        new_ic   = extendInteractiveContext (hsc_IC hsc_env) [id]
+    let id       = mkVanillaGlobal name ty 
+        new_ic   = extendInteractiveContextWithIds (hsc_IC hsc_env) [id]
     return (hsc_env {hsc_IC = new_ic }, name)
 
 --    Create new uniques and give them sequentially numbered names

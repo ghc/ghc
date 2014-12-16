@@ -464,12 +464,13 @@ addLocalInst (home_ie, my_insts) ispec
          ; isGHCi <- getIsGHCi
          ; eps    <- getEps
          ; tcg_env <- getGblEnv
-         ; let (home_ie', my_insts')
-                 | isGHCi    = ( deleteFromInstEnv home_ie ispec
-                               , filterOut (identicalInstHead ispec) my_insts)
-                 | otherwise = (home_ie, my_insts)
-               -- If there is a home-package duplicate instance,
-               -- silently delete it
+
+           -- In GHCi, we *override* any identical instances
+           -- that are also defined in the interactive context
+           -- See Note [Override identical instances in GHCi]
+         ; let home_ie'
+                 | isGHCi    = deleteFromInstEnv home_ie ispec
+                 | otherwise = home_ie
 
                (_tvs, cls, tys) = instanceHead ispec
                -- If we're compiling sig-of and there's an external duplicate
@@ -484,7 +485,7 @@ addLocalInst (home_ie, my_insts) ispec
                                           , ie_local   = home_ie'
                                           , ie_visible = tcg_visible_orphan_mods tcg_env }
                (matches, _, _) = lookupInstEnv inst_envs cls tys
-               dups            = filter (identicalInstHead ispec) (map fst matches)
+               dups            = filter (identicalClsInstHead ispec) (map fst matches)
 
              -- Check functional dependencies
          ; case checkFunDeps inst_envs ispec of
@@ -495,7 +496,7 @@ addLocalInst (home_ie, my_insts) ispec
          ; unless (null dups) $
            dupInstErr ispec (head dups)
 
-         ; return (extendInstEnv home_ie' ispec, ispec:my_insts') }
+         ; return (extendInstEnv home_ie' ispec, ispec : my_insts) }
 
 {-
 Note [Signature files and type class instances]

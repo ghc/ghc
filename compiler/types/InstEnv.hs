@@ -20,7 +20,7 @@ module InstEnv (
         IsOrphan(..), isOrphan, notOrphan,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
-        emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead,
+        emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalClsInstHead,
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
         memberInstEnv, instIsVisible,
         classInstances, orphNamesOfClsInst, instanceBindFun,
@@ -490,7 +490,7 @@ orphNamesOfClsInst = orphNamesOfDFunHead . idType . instanceDFunId
 -- We use this when we do signature checking in TcRnDriver
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
-    maybe False (\(ClsIE items) -> any (identicalInstHead ins_item) items)
+    maybe False (\(ClsIE items) -> any (identicalClsInstHead ins_item) items)
           (lookupUFM inst_env cls_nm)
 
 extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
@@ -506,14 +506,15 @@ deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
 deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
   = adjustUFM adjust inst_env cls_nm
   where
-    adjust (ClsIE items) = ClsIE (filterOut (identicalInstHead ins_item) items)
+    adjust (ClsIE items) = ClsIE (filterOut (identicalClsInstHead ins_item) items)
 
-identicalInstHead :: ClsInst -> ClsInst -> Bool
+identicalClsInstHead :: ClsInst -> ClsInst -> Bool
 -- ^ True when when the instance heads are the same
 -- e.g.  both are   Eq [(a,b)]
+-- Used for overriding in GHCi
 -- Obviously should be insenstive to alpha-renaming
-identicalInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = tvs1, is_tys = tys1 })
-                  (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tvs = tvs2, is_tys = tys2 })
+identicalClsInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = tvs1, is_tys = tys1 })
+                     (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tvs = tvs2, is_tys = tys2 })
   =  cls_nm1 == cls_nm2
   && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
   && isJust (tcMatchTys (mkVarSet tvs1) tys1 tys2)

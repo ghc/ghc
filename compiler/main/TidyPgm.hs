@@ -303,7 +303,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_exports   = exports
                               , mg_rdr_env   = rdr_env
                               , mg_tcs       = tcs
-                              , mg_insts     = insts
+                              , mg_insts     = cls_insts
                               , mg_fam_insts = fam_insts
                               , mg_binds     = binds
                               , mg_patsyns   = patsyns
@@ -343,11 +343,11 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                                     isExternalName (idName id)]
               ; type_env1  = extendTypeEnvWithIds type_env final_ids
 
-              ; tidy_insts = map (tidyClsInstDFun (lookup_aux_id tidy_type_env)) insts
+              ; tidy_cls_insts = map (tidyClsInstDFun (lookup_aux_id tidy_type_env)) cls_insts
                 -- A DFunId will have a binding in tidy_binds, and so will now be in
                 -- tidy_type_env, replete with IdInfo.  Its name will be unchanged since
                 -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
-                -- tidy_insts.  Similarly the Ids inside a PatSyn.
+                -- tidy_cls_insts.  Similarly the Ids inside a PatSyn.
 
               ; tidy_rules = tidyRules tidy_env trimmed_rules
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
@@ -408,7 +408,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
                    ModDetails { md_types     = tidy_type_env,
                                 md_rules     = tidy_rules,
-                                md_insts     = tidy_insts,
+                                md_insts     = tidy_cls_insts,
                                 md_vect_info = tidy_vect_info,
                                 md_fam_insts = fam_insts,
                                 md_exports   = exports,

@@ -1413,8 +1413,6 @@ runTcInteractive hsc_env thing_inside
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt
                          , tcg_type_env     = type_env
-                         , tcg_insts        = ic_insts
-                         , tcg_fam_insts    = ic_finsts
                          , tcg_inst_env     = extendInstEnvList
                                                (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
                                                home_insts

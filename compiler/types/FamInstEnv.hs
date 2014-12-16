@@ -12,7 +12,7 @@ module FamInstEnv (
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, deleteFromFamInstEnv, extendFamInstEnvList,
-        identicalFamInst, famInstEnvElts, familyInstances, orphNamesOfFamInst,
+        identicalFamInstHead, famInstEnvElts, familyInstances, orphNamesOfFamInst,
 
         -- * CoAxioms
         mkCoAxBranch, mkBranchedCoAxiom, mkUnbranchedCoAxiom, mkSingleCoAxiom,
@@ -369,12 +369,12 @@ deleteFromFamInstEnv inst_env fam_inst@(FamInst {fi_fam = fam_nm})
  where
    adjust :: FamilyInstEnv -> FamilyInstEnv
    adjust (FamIE items)
-     = FamIE (filterOut (identicalFamInst fam_inst) items)
+     = FamIE (filterOut (identicalFamInstHead fam_inst) items)
 
-identicalFamInst :: FamInst -> FamInst -> Bool
--- Same LHS, *and* both instances are on the interactive command line
+identicalFamInstHead :: FamInst -> FamInst -> Bool
+-- ^ True when the LHSs are identical
 -- Used for overriding in GHCi
-identicalFamInst (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
+identicalFamInstHead (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
   =  coAxiomTyCon ax1 == coAxiomTyCon ax2
   && brListLength brs1 == brListLength brs2
   && and (brListZipWith identical_branch brs1 brs2)

@@ -667,9 +667,10 @@ Prelude>
       an attempt to distinguish it from the new <literal>T</literal>,
       which is displayed as simply <literal>T</literal>.</para>
 
-    <para>Class and type-family instance declarations are simply added to the list of available instances, with one
-    exception. Since type-family instances are not permitted to overlap, but you might want to re-define one,
-    a type-family instance <emphasis>replaces</emphasis> any earlier type instance with an identical left hand side.
+    <para>Class and type-family instance declarations are simply added to the list of available instances,
+    with one exception. Since you might want to re-define one,
+    a class or type-family instance <emphasis>replaces</emphasis> any earlier instance with
+    an identical head or left hand side (respectively).
     (See <xref linkend="type-families"/>.)</para>
     </sect2>
 

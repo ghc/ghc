@@ -1465,9 +1465,6 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     -- We grab the whole environment because of the overlapping that may have
     -- been done. See the notes at the definition of InteractiveContext
     -- (ic_instances) for more details.
-    let finsts = tcg_fam_insts tc_gblenv
-        insts  = tcg_insts     tc_gblenv
-
     let defaults = tcg_default tc_gblenv
 
     {- Desugar it -}
@@ -1481,13 +1478,18 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     simpl_mg <- liftIO $ hscSimplify hsc_env ds_result
 
     {- Tidy -}
-    (tidy_cg, _mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
+    (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
 
     let dflags = hsc_dflags hsc_env
         !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
                  cg_tycons    = tycons,
                  cg_modBreaks = mod_breaks } = tidy_cg
+
+        !ModDetails { md_insts     = cls_insts
+                    , md_fam_insts = fam_insts } = mod_details
+            -- Get the *tidied* cls_insts and fam_insts
+
         data_tycons = filter isDataTyCon tycons
 
     {- Prepare For Code Generation -}
@@ -1510,16 +1512,14 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
             -- We only need to keep around the external bindings
             -- (as decided by TidyPgm), since those are the only ones
             -- that might be referenced elsewhere.
-            -- The DFunIds are in 'insts' (see Note [ic_tythings] in HscTypes
+            -- The DFunIds are in 'cls_insts' (see Note [ic_tythings] in HscTypes
             -- Implicit Ids are implicit in tcs
 
         tythings =  map AnId ext_ids ++ map ATyCon tcs
 
     let icontext = hsc_IC hsc_env
-        ictxt1   = extendInteractiveContext icontext tythings
-        ictxt    = ictxt1 { ic_instances = (insts, finsts)
-                          , ic_default   = defaults }
-
+        ictxt    = extendInteractiveContext icontext ext_ids tcs
+                                            cls_insts fam_insts defaults
     return (tythings, ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)

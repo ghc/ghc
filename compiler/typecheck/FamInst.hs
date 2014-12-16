@@ -328,11 +328,10 @@ addLocalFamInst (home_fie, my_fis) fam_inst
 
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
-           -- Trac #7102
-       ; let (home_fie', my_fis')
-               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst
-                             , filterOut (identicalFamInst fam_inst) my_fis)
-               | otherwise = (home_fie, my_fis)
+           -- See Note [Override identical instances in GHCi] in HscTypes
+       ; let home_fie'
+               | isGHCi    = deleteFromFamInstEnv home_fie fam_inst
+               | otherwise = home_fie
 
            -- Load imported instances, so that we report
            -- overlaps correctly
@@ -343,7 +342,7 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- Check for conflicting instance decls
        ; no_conflict <- checkForConflicts inst_envs fam_inst
        ; if no_conflict then
-            return (home_fie'', fam_inst : my_fis')
+            return (home_fie'', fam_inst : my_fis)
          else
             return (home_fie,   my_fis) }
 
