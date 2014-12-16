@@ -50,7 +50,7 @@ module GHC.Exts
         --
         -- | These are available from the /Trustworthy/ module "Data.Coerce" as well
         --
-        -- /Since: 4.7.0.0/
+        -- @since 4.7.0.0
         Data.Coerce.coerce, Data.Coerce.Coercible,
 
         -- * Transform comprehensions
@@ -151,7 +151,7 @@ data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
 -- | The 'IsList' class and its methods are intended to be used in
 --   conjunction with the OverloadedLists extension.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 class IsList l where
   -- | The 'Item' type function returns the type of items of the structure
   --   @l@.

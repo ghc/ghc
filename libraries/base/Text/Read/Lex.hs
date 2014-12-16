@@ -63,11 +63,11 @@ data Lexeme
   | Punc   String       -- ^ Punctuation or reserved symbol, e.g. @(@, @::@
   | Ident  String       -- ^ Haskell identifier, e.g. @foo@, @Baz@
   | Symbol String       -- ^ Haskell symbol, e.g. @>>@, @:%@
-  | Number Number       -- ^ /Since: 4.6.0.0/
+  | Number Number       -- ^ @since 4.6.0.0
   | EOF
  deriving (Eq, Show)
 
--- | /Since: 4.7.0.0/
+-- | @since 4.7.0.0
 data Number = MkNumber Int              -- Base
                        Digits           -- Integral part
             | MkDecimal Digits          -- Integral part
@@ -75,13 +75,13 @@ data Number = MkNumber Int              -- Base
                         (Maybe Integer) -- Exponent
  deriving (Eq, Show)
 
--- | /Since: 4.5.1.0/
+-- | @since 4.5.1.0
 numberToInteger :: Number -> Maybe Integer
 numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
 numberToInteger _ = Nothing
 
--- | /Since: 4.7.0.0/
+-- | @since 4.7.0.0
 numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
 numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart, 0)
 numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart, 0)
@@ -109,7 +109,7 @@ numberToFixed _ _ = Nothing
 -- * We only worry about numbers that have an exponent. If they don't
 --   have an exponent then the Rational won't be much larger than the
 --   Number, so there is no problem
--- | /Since: 4.5.1.0/
+-- | @since 4.5.1.0
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
 numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
@@ -139,7 +139,7 @@ numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
                 else Just (numberToRational n)
 numberToRangedRational _ n = Just (numberToRational n)
 
--- | /Since: 4.6.0.0/
+-- | @since 4.6.0.0
 numberToRational :: Number -> Rational
 numberToRational (MkNumber base iPart) = val (fromIntegral base) 0 iPart % 1
 numberToRational (MkDecimal iPart mFPart mExp)
@@ -162,7 +162,7 @@ numberToRational (MkDecimal iPart mFPart mExp)
 lex :: ReadP Lexeme
 lex = skipSpaces >> lexToken
 
--- | /Since: 4.7.0.0/
+-- | @since 4.7.0.0
 expect :: Lexeme -> ReadP ()
 expect lexeme = do { skipSpaces
                    ; thing <- lexToken

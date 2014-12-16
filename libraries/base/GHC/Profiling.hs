@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | /Since: 4.7.0.0/
+-- | @since 4.7.0.0
 module GHC.Profiling where
 
 import GHC.Base

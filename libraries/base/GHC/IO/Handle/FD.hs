@@ -157,7 +157,7 @@ openFile fp im =
 -- non-blocking mode then the open will fail if there are no writers,
 -- whereas a blocking open will block until a writer appears.
 --
--- /Since: 4.4.0.0/
+-- @since 4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
   catchException

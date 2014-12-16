@@ -219,7 +219,7 @@ A typical use of 'tryJust' for recovery looks like this:
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
 --
--- /Since: 4.4.0.0/
+-- @since 4.4.0.0
 allowInterrupt :: IO ()
 allowInterrupt = unsafeUnmask $ return ()
 

@@ -14,7 +14,7 @@
 --
 -- The arbitrary-precision 'Natural' number type.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 -----------------------------------------------------------------------------
 
 module Numeric.Natural

@@ -218,7 +218,7 @@ partitionEithers = foldr (either left right) ([],[])
 
 -- | Return `True` if the given value is a `Left`-value, `False` otherwise.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 --
 -- ==== __Examples__
 --
@@ -250,7 +250,7 @@ isLeft (Right _) = False
 
 -- | Return `True` if the given value is a `Right`-value, `False` otherwise.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 --
 -- ==== __Examples__
 --

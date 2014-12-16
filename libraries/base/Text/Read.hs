@@ -62,7 +62,7 @@ reads = readsPrec minPrec
 -- Succeeds if there is exactly one valid result.
 -- A 'Left' value indicates a parse error.
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 readEither :: Read a => String -> Either String a
 readEither s =
   case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
@@ -78,7 +78,7 @@ readEither s =
 -- | Parse a string using the 'Read' instance.
 -- Succeeds if there is exactly one valid result.
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 readMaybe :: Read a => String -> Maybe a
 readMaybe s = case readEither s of
                 Left _  -> Nothing

@@ -23,7 +23,7 @@
 -- Definition of propositional equality @(:~:)@. Pattern-matching on a variable
 -- of type @(a :~: b)@ produces a proof that @a ~ b@.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 -----------------------------------------------------------------------------
 
 
@@ -56,7 +56,7 @@ infix 4 :~:
 -- in practice, pattern-match on the @a :~: b@ to get out the @Refl@ constructor;
 -- in the body of the pattern-match, the compiler knows that @a ~ b@.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 data a :~: b where
   Refl :: a :~: a
 

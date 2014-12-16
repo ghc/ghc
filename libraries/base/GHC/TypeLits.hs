@@ -17,7 +17,7 @@
 in the implementation of type-level natural numbers.  The programmer interface
 for working with type-level naturals should be defined in a separate library.
 
-/Since: 4.6.0.0/
+@since 4.6.0.0
 -}
 
 module GHC.TypeLits
@@ -61,33 +61,33 @@ data Symbol
 -- | This class gives the integer associated with a type-level natural.
 -- There are instances of the class for every concrete literal: 0, 1, 2, etc.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 class KnownNat (n :: Nat) where
   natSing :: SNat n
 
 -- | This class gives the string associated with a type-level symbol.
 -- There are instances of the class for every concrete literal: "hello", etc.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 class KnownSymbol (n :: Symbol) where
   symbolSing :: SSymbol n
 
--- | /Since: 4.7.0.0/
+-- | @since 4.7.0.0
 natVal :: forall n proxy. KnownNat n => proxy n -> Integer
 natVal _ = case natSing :: SNat n of
              SNat x -> x
 
--- | /Since: 4.7.0.0/
+-- | @since 4.7.0.0
 symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
 
--- | /Since: 4.8.0.0/
+-- | @since 4.8.0.0
 natVal' :: forall n. KnownNat n => Proxy# n -> Integer
 natVal' _ = case natSing :: SNat n of
              SNat x -> x
 
--- | /Since: 4.8.0.0/
+-- | @since 4.8.0.0
 symbolVal' :: forall n. KnownSymbol n => Proxy# n -> String
 symbolVal' _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
@@ -96,15 +96,15 @@ symbolVal' _ = case symbolSing :: SSymbol n of
 
 -- | This type represents unknown type-level natural numbers.
 data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
-                  -- ^ /Since: 4.7.0.0/
+                  -- ^ @since 4.7.0.0
 
 -- | This type represents unknown type-level symbols.
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
-                  -- ^ /Since: 4.7.0.0/
+                  -- ^ @since 4.7.0.0
 
 -- | Convert an integer into an unknown type-level natural.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 someNatVal :: Integer -> Maybe SomeNat
 someNatVal n
   | n >= 0        = Just (withSNat SomeNat (SNat n) Proxy)
@@ -112,7 +112,7 @@ someNatVal n
 
 -- | Convert a string into an unknown type-level symbol.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 someSymbolVal :: String -> SomeSymbol
 someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
 
@@ -168,12 +168,12 @@ type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison of type-level symbols, as a function.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
 
 -- | Comparison of type-level naturals, as a function.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 type family CmpNat    (m :: Nat)    (n :: Nat)    :: Ordering
 
 {- | Comparison of type-level naturals, as a function.
@@ -193,7 +193,7 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 -- | Subtraction of type-level naturals.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
 
 
@@ -202,7 +202,7 @@ type family (m :: Nat) - (n :: Nat) :: Nat
 -- | We either get evidence that this function was instantiated with the
 -- same type-level numbers, or 'Nothing'.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 sameNat :: (KnownNat a, KnownNat b) =>
            Proxy a -> Proxy b -> Maybe (a :~: b)
 sameNat x y
@@ -212,7 +212,7 @@ sameNat x y
 -- | We either get evidence that this function was instantiated with the
 -- same type-level symbols, or 'Nothing'.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
               Proxy a -> Proxy b -> Maybe (a :~: b)
 sameSymbol x y

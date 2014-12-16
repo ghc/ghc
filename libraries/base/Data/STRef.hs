@@ -46,7 +46,7 @@ modifySTRef ref f = writeSTRef ref . f =<< readSTRef ref
 
 -- | Strict version of 'modifySTRef'
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 modifySTRef' :: STRef s a -> (a -> a) -> ST s ()
 modifySTRef' ref f = do
     x <- readSTRef ref

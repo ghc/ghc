@@ -69,7 +69,7 @@ import Data.List
 -- | The 'traceIO' function outputs the trace message from the IO monad.
 -- This sequences the output with respect to other IO actions.
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 traceIO :: String -> IO ()
 traceIO msg = do
     withCString "%s\n" $ \cfmt -> do
@@ -115,7 +115,7 @@ trace string expr = unsafePerformIO $ do
 {-|
 Like 'trace' but returns the message instead of a third value.
 
-/Since: 4.7.0.0/
+@since 4.7.0.0
 -}
 traceId :: String -> String
 traceId a = trace a a
@@ -139,7 +139,7 @@ traceShow = trace . show
 {-|
 Like 'traceShow' but returns the shown value instead of a third value.
 
-/Since: 4.7.0.0/
+@since 4.7.0.0
 -}
 traceShowId :: (Show a) => a -> a
 traceShowId a = trace (show a) a
@@ -155,7 +155,7 @@ monad, as 'traceIO' is in the 'IO' monad.
 >   y <- ...
 >   traceM $ "y: " ++ show y
 
-/Since: 4.7.0.0/
+@since 4.7.0.0
 -}
 traceM :: (Monad m) => String -> m ()
 traceM string = trace string $ return ()
@@ -169,7 +169,7 @@ Like 'traceM', but uses 'show' on the argument to convert it to a 'String'.
 >   y <- ...
 >   traceMShow $ x + y
 
-/Since: 4.7.0.0/
+@since 4.7.0.0
 -}
 traceShowM :: (Show a, Monad m) => a -> m ()
 traceShowM = traceM . show
@@ -183,7 +183,7 @@ traceShowM = traceM . show
 -- stack correspond to @SCC@ annotations, so it is a good idea to use
 -- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 traceStack :: String -> a -> a
 traceStack str expr = unsafePerformIO $ do
    traceIO str
@@ -216,7 +216,7 @@ traceStack str expr = unsafePerformIO $ do
 -- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
 -- that uses 'traceEvent'.
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 traceEvent :: String -> a -> a
 traceEvent msg expr = unsafeDupablePerformIO $ do
     traceEventIO msg
@@ -228,7 +228,7 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
 -- Compared to 'traceEvent', 'traceEventIO' sequences the event with respect to
 -- other IO actions.
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 traceEventIO :: String -> IO ()
 traceEventIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
@@ -266,7 +266,7 @@ traceEventIO msg =
 -- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
 -- that uses 'traceMarker'.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 traceMarker :: String -> a -> a
 traceMarker msg expr = unsafeDupablePerformIO $ do
     traceMarkerIO msg
@@ -278,7 +278,7 @@ traceMarker msg expr = unsafeDupablePerformIO $ do
 -- Compared to 'traceMarker', 'traceMarkerIO' sequences the event with respect to
 -- other IO actions.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 traceMarkerIO :: String -> IO ()
 traceMarkerIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->

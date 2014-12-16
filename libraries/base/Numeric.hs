@@ -187,7 +187,7 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 -- This behaves as 'showFFloat', except that a decimal point
 -- is always guaranteed, even if not needed.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 showFFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
 
 -- | Show a signed 'RealFloat' value
@@ -197,7 +197,7 @@ showFFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
 -- This behaves as 'showFFloat', except that a decimal point
 -- is always guaranteed, even if not needed.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 showGFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
 
 showFFloatAlt d x =  showString (formatRealFloatAlt FFFixed d True x)

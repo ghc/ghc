@@ -40,7 +40,7 @@ import Control.Exception
 -- In this case, the child thread will receive a @NonTermination@
 -- exception instead of waiting for the value of @r@ to be computed.
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 unsafeFixIO :: (a -> IO a) -> IO a
 unsafeFixIO k = do
   ref <- newIORef (throw NonTermination)

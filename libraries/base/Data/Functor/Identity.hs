@@ -25,7 +25,7 @@
 --   applying the transformer to 'Identity'.  For example, @State s@
 --   is an abbreviation for @StateT s 'Identity'@.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 -----------------------------------------------------------------------------
 
 module Data.Functor.Identity (
@@ -38,7 +38,7 @@ import Data.Foldable
 
 -- | Identity functor and monad. (a non-strict monad)
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
     deriving (Eq, Ord, Traversable)
 

@@ -19,7 +19,7 @@
 --
 -- Definition of representational equality ('Coercion').
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 -----------------------------------------------------------------------------
 
 module Data.Type.Coercion
@@ -44,7 +44,7 @@ import GHC.Base
 -- To use this equality in practice, pattern-match on the @Coercion a b@ to get out
 -- the @Coercible a b@ instance, and then use 'coerce' to apply it.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 data Coercion a b where
   Coercion :: Coercible a b => Coercion a b
 

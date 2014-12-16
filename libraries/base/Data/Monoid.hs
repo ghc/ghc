@@ -60,7 +60,7 @@ infixr 6 <>
 
 -- | An infix synonym for 'mappend'.
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 (<>) :: Monoid m => m -> m -> m
 (<>) = mappend
 {-# INLINE (<>) #-}
@@ -177,7 +177,7 @@ instance Monoid (Last a) where
 
 -- | Monoid under '<|>'.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 newtype Alt f a = Alt {getAlt :: f a}
   deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
             Monad, MonadPlus, Applicative, Alternative, Functor)

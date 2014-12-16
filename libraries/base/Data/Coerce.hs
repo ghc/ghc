@@ -16,7 +16,7 @@
 -- More in-depth information can be found on the
 -- <https://ghc.haskell.org/trac/ghc/wiki/Roles Roles wiki page>
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 -----------------------------------------------------------------------------
 
 module Data.Coerce

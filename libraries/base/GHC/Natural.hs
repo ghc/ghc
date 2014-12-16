@@ -26,7 +26,7 @@
 -- change.  It's recommended use the "Numeric.Natural" module to import
 -- the 'Natural' type.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 -----------------------------------------------------------------------------
 module GHC.Natural
     ( -- * The 'Natural' number type
@@ -81,7 +81,7 @@ default ()
 -- Operations whose result would be negative
 -- @'throw' ('Underflow' :: 'ArithException')@.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
              | NatJ# {-# UNPACK #-} !BigNat   -- ^ in @]maxBound::Word, +inf[@
                                               --
@@ -96,7 +96,7 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
 -- This operation is mostly useful for test-suites and/or code which
 -- constructs 'Integer' values directly.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 isValidNatural :: Natural -> Bool
 isValidNatural (NatS# _)  = True
 isValidNatural (NatJ# bn) = isTrue# (isValidBigNat# bn)
@@ -381,7 +381,7 @@ minusNatural (NatJ# x) (NatJ# y)
 
 -- | 'Natural' subtraction. Returns 'Nothing's for non-positive results.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 minusNaturalMaybe :: Natural -> Natural -> Maybe Natural
 minusNaturalMaybe x         (NatS# 0##) = Just x
 minusNaturalMaybe (NatS# x) (NatS# y) = case subWordC# x y of
@@ -439,7 +439,7 @@ naturalToInt (NatJ# bn) = I# (bigNatToInt bn)
 -- Operations whose result would be negative
 -- @'throw' ('Underflow' :: 'ArithException')@.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
                 deriving (Eq,Ord,Ix)
 
@@ -448,7 +448,7 @@ newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
 -- This operation is mostly useful for test-suites and/or code which
 -- constructs 'Integer' values directly.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 isValidNatural :: Natural -> Bool
 isValidNatural (Natural i) = i >= 0
 
@@ -479,7 +479,7 @@ instance Num Natural where
 
 -- | 'Natural' subtraction. Returns 'Nothing's for non-positive results.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 minusNaturalMaybe :: Natural -> Natural -> Maybe Natural
 minusNaturalMaybe x y
   | x >= y    = Just (x - y)
@@ -572,7 +572,7 @@ instance Integral Natural where
 
 -- | Construct 'Natural' from 'Word' value.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 wordToNatural :: Word -> Natural
 #if HAVE_GMP_BIGNAT
 wordToNatural (W# w#) = NatS# w#
@@ -583,7 +583,7 @@ wordToNatural w = Natural (fromIntegral w)
 -- | Try downcasting 'Natural' to 'Word' value.
 -- Returns 'Nothing' if value doesn't fit in 'Word'.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 naturalToWordMaybe :: Natural -> Maybe Word
 #if HAVE_GMP_BIGNAT
 naturalToWordMaybe (NatS# w#) = Just (W# w#)
@@ -612,7 +612,7 @@ instance Data Natural where
 -- | \"@'powModNatural' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 powModNatural :: Natural -> Natural -> Natural -> Natural
 #if HAVE_GMP_BIGNAT
 powModNatural _           _           (NatS# 0##) = throw DivideByZero

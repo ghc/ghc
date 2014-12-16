@@ -55,7 +55,7 @@ import GHC.IORef
 utf16  :: TextEncoding
 utf16 = mkUTF16 ErrorOnCodingFailure
 
--- | /Since: 4.4.0.0/
+-- | @since 4.4.0.0
 mkUTF16 :: CodingFailureMode -> TextEncoding
 mkUTF16 cfm =  TextEncoding { textEncodingName = "UTF-16",
                               mkTextDecoder = utf16_DF cfm,
@@ -141,7 +141,7 @@ bom2 = bomL
 utf16be :: TextEncoding
 utf16be = mkUTF16be ErrorOnCodingFailure
 
--- | /Since: 4.4.0.0/
+-- | @since 4.4.0.0
 mkUTF16be :: CodingFailureMode -> TextEncoding
 mkUTF16be cfm = TextEncoding { textEncodingName = "UTF-16BE",
                                mkTextDecoder = utf16be_DF cfm,
@@ -170,7 +170,7 @@ utf16be_EF cfm =
 utf16le :: TextEncoding
 utf16le = mkUTF16le ErrorOnCodingFailure
 
--- | /Since: 4.4.0.0/
+-- | @since 4.4.0.0
 mkUTF16le :: CodingFailureMode -> TextEncoding
 mkUTF16le cfm = TextEncoding { textEncodingName = "UTF16-LE",
                                mkTextDecoder = utf16le_DF cfm,

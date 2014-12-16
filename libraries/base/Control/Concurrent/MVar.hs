@@ -193,7 +193,7 @@ withMVar m io =
   Like 'withMVar', but the @IO@ action in the second argument is executed
   with asynchronous exceptions masked.
 
-  /Since: 4.7.0.0/
+  @since 4.7.0.0
 -}
 {-# INLINE withMVarMasked #-}
 withMVarMasked :: MVar a -> (a -> IO b) -> IO b
@@ -236,7 +236,7 @@ modifyMVar m io =
   Like 'modifyMVar_', but the @IO@ action in the second argument is executed with
   asynchronous exceptions masked.
 
-  /Since: 4.6.0.0/
+  @since 4.6.0.0
 -}
 {-# INLINE modifyMVarMasked_ #-}
 modifyMVarMasked_ :: MVar a -> (a -> IO a) -> IO ()
@@ -250,7 +250,7 @@ modifyMVarMasked_ m io =
   Like 'modifyMVar', but the @IO@ action in the second argument is executed with
   asynchronous exceptions masked.
 
-  /Since: 4.6.0.0/
+  @since 4.6.0.0
 -}
 {-# INLINE modifyMVarMasked #-}
 modifyMVarMasked :: MVar a -> (a -> IO (a,b)) -> IO b
@@ -268,7 +268,7 @@ addMVarFinalizer = GHC.MVar.addMVarFinalizer
 -- | Make a 'Weak' pointer to an 'MVar', using the second argument as
 -- a finalizer to run when 'MVar' is garbage-collected
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 mkWeakMVar :: MVar a -> IO () -> IO (Weak (MVar a))
 mkWeakMVar m@(MVar m#) f = IO $ \s ->
   case mkWeak# m# m f s of (# s1, w #) -> (# s1, Weak w #)

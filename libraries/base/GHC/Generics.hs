@@ -18,7 +18,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 --
 -- If you're using @GHC.Generics@, you should consider using the
 -- <http://hackage.haskell.org/package/generic-deriving> package, which

@@ -94,9 +94,9 @@ instance Ord TypeRep where
 -- be built using 'mkTyCon'.
 data TyCon = TyCon {
    tyConHash    :: {-# UNPACK #-} !Fingerprint,
-   tyConPackage :: String, -- ^ /Since: 4.5.0.0/
-   tyConModule  :: String, -- ^ /Since: 4.5.0.0/
-   tyConName    :: String  -- ^ /Since: 4.5.0.0/
+   tyConPackage :: String, -- ^ @since 4.5.0.0
+   tyConModule  :: String, -- ^ @since 4.5.0.0
+   tyConName    :: String  -- ^ @since 4.5.0.0
  }
 
 instance Eq TyCon where
@@ -205,7 +205,7 @@ class Typeable a where
 -- | Takes a value of type @a@ and returns a concrete representation
 -- of that type.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 typeRep :: forall proxy a. Typeable a => proxy a -> TypeRep
 typeRep _ = typeRep# (proxy# :: Proxy# a)
 {-# INLINE typeRep #-}

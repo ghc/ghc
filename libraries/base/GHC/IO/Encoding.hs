@@ -103,7 +103,7 @@ utf32be = UTF32.utf32be
 
 -- | The Unicode encoding of the current locale
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 getLocaleEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but allowing arbitrary
@@ -116,17 +116,17 @@ getLocaleEncoding :: IO TextEncoding
 -- the use of code pages is deprecated: Strings should be retrieved
 -- via the "wide" W-family of UTF-16 APIs instead
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 getFileSystemEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but where undecodable
 -- bytes are replaced with their closest visual match. Used for
 -- the 'CString' marshalling functions in "Foreign.C.String"
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 getForeignEncoding :: IO TextEncoding
 
--- | /Since: 4.5.0.0/
+-- | @since 4.5.0.0
 setLocaleEncoding, setFileSystemEncoding, setForeignEncoding :: TextEncoding -> IO ()
 
 (getLocaleEncoding, setLocaleEncoding)         = mkGlobal initLocaleEncoding
@@ -138,7 +138,7 @@ mkGlobal x = unsafePerformIO $ do
     x_ref <- newIORef x
     return (readIORef x_ref, writeIORef x_ref)
 
--- | /Since: 4.5.0.0/
+-- | @since 4.5.0.0
 initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
 
 #if !defined(mingw32_HOST_OS)
@@ -169,7 +169,7 @@ initForeignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
 -- discards information, so encode followed by decode is not the
 -- identity.
 --
--- /Since: 4.4.0.0/
+-- @since 4.4.0.0
 char8 :: TextEncoding
 char8 = Latin1.latin1
 

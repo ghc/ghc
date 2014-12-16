@@ -231,7 +231,7 @@ infix 5 \\ -- comment to fool cpp: https://www.haskell.org/ghc/docs/latest/html/
 -- > dropWhileEnd isSpace "foo bar" == "foo bar"
 -- > dropWhileEnd isSpace ("foo\n" ++ undefined) == "foo" ++ undefined
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
@@ -974,7 +974,7 @@ rqpart cmp x (y:ys) rle rgt r =
 -- input list.  This is called the decorate-sort-undecorate paradigm, or
 -- Schwartzian transform.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =
   map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))

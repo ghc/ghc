@@ -785,7 +785,7 @@ gcdInt x# y#
 
 -- | Compute greatest common divisor.
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 gcdWord :: Word# -> Word# -> Word#
 gcdWord = gcdWord#
 
@@ -1261,7 +1261,7 @@ gcdBigNat x@(BN# x#) y@(BN# y#)
 -- For @/a/@ and @/b/@, compute their greatest common divisor @/g/@
 -- and the coefficient @/s/@ satisfying @/a//s/ + /b//t/ = /g/@.
 --
--- /Since: 0.5.1.0/
+-- @since 0.5.1.0
 {-# NOINLINE gcdExtInteger #-}
 gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
 gcdExtInteger a b = case gcdExtSBigNat a' b' of
@@ -1312,7 +1312,7 @@ gcdExtSBigNat x y = case runS go of (g,s) -> (# g, s #)
 -- Future versions of @integer_gmp@ may not support negative @/e/@
 -- values anymore.
 --
--- /Since: 0.5.1.0/
+-- @since 0.5.1.0
 {-# NOINLINE powModInteger #-}
 powModInteger :: Integer -> Integer -> Integer -> Integer
 powModInteger (S# b#) (S# e#) (S# m#)
@@ -1329,19 +1329,19 @@ powModInteger b e m = case m of
 
 -- | Version of 'powModInteger' operating on 'BigNat's
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 powModBigNat :: BigNat -> BigNat -> BigNat -> BigNat
 powModBigNat b e m = inline powModSBigNat (PosBN b) (PosBN e) m
 
 -- | Version of 'powModInteger' for 'Word#'-sized moduli
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 powModBigNatWord :: BigNat -> BigNat -> GmpLimb# -> GmpLimb#
 powModBigNatWord b e m# = inline powModSBigNatWord (PosBN b) (PosBN e) m#
 
 -- | Version of 'powModInteger' operating on 'Word#'s
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 foreign import ccall unsafe "integer_gmp_powm_word"
   powModWord :: GmpLimb# -> GmpLimb# -> GmpLimb# -> GmpLimb#
 
@@ -1384,7 +1384,7 @@ foreign import ccall unsafe "integer_gmp_powm1"
 -- the inverse exists, the return value @/y/@ will satisfy @0 < /y/ <
 -- abs(/m/)@, otherwise the result is @0@.
 --
--- /Since: 0.5.1.0/
+-- @since 0.5.1.0
 {-# NOINLINE recipModInteger #-}
 recipModInteger :: Integer -> Integer -> Integer
 recipModInteger (S# x#) (S# m#)
@@ -1397,13 +1397,13 @@ recipModInteger x m = bigNatToInteger (recipModSBigNat x' m')
 
 -- | Version of 'recipModInteger' operating on 'BigNat's
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 recipModBigNat :: BigNat -> BigNat -> BigNat
 recipModBigNat x m = inline recipModSBigNat (PosBN x) m
 
 -- | Version of 'recipModInteger' operating on 'Word#'s
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 foreign import ccall unsafe "integer_gmp_invert_word"
   recipModWord :: GmpLimb# -> GmpLimb# -> GmpLimb#
 
@@ -1748,7 +1748,7 @@ byteArrayToBigNat# ba# n0#
 --
 -- See description of 'importIntegerFromByteArray' for more details.
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 importIntegerFromAddr :: Addr# -> Word# -> Int# -> IO Integer
 importIntegerFromAddr addr len msbf = IO $ do
     bn <- liftIO (importBigNatFromAddr addr len msbf)
@@ -1802,7 +1802,7 @@ foreign import ccall unsafe "integer_gmp_mpn_import"
 --
 -- * returns a new 'Integer'
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
 importIntegerFromByteArray ba ofs len msbf
     = bigNatToInteger (importBigNatFromByteArray ba ofs len msbf)
@@ -1860,7 +1860,7 @@ isValidBigNat# (BN# ba#)
 
 -- | Version of 'nextPrimeInteger' operating on 'BigNat's
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 nextPrimeBigNat :: BigNat -> BigNat
 nextPrimeBigNat bn@(BN# ba#) = runS $ do
     mbn@(MBN# mba#) <- newBigNat# n#

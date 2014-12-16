@@ -171,7 +171,7 @@ moveBytes dest src size  = do _ <- memmove dest src (fromIntegral size)
 
 -- |Fill a given number of bytes in memory area with a byte value.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 fillBytes               :: Ptr a -> Word8 -> Int -> IO ()
 fillBytes dest char size = do
   _ <- memset dest (fromIntegral char) (fromIntegral size)

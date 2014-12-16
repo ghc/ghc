@@ -193,7 +193,7 @@ instance Ord ThreadId where
 --
 -- Allocation accounting is accurate only to about 4Kbytes.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 setAllocationCounter :: Int64 -> IO ()
 setAllocationCounter i = do
   ThreadId t <- myThreadId
@@ -202,7 +202,7 @@ setAllocationCounter i = do
 -- | Return the current value of the allocation counter for the
 -- current thread.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 getAllocationCounter :: IO Int64
 getAllocationCounter = do
   ThreadId t <- myThreadId
@@ -227,7 +227,7 @@ getAllocationCounter = do
 -- Compared to using timeouts, allocation limits don't count time
 -- spent blocked or in foreign calls.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 enableAllocationLimit :: IO ()
 enableAllocationLimit = do
   ThreadId t <- myThreadId
@@ -235,7 +235,7 @@ enableAllocationLimit = do
 
 -- | Disable allocation limit processing for the current thread.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 disableAllocationLimit :: IO ()
 disableAllocationLimit = do
   ThreadId t <- myThreadId
@@ -296,7 +296,7 @@ forkIO action = IO $ \ s ->
 -- only be used in that thread; the behaviour is undefined if it is
 -- invoked in a different thread.
 --
--- /Since: 4.4.0.0/
+-- @since 4.4.0.0
 forkIOWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkIOWithUnmask io = forkIO (io unsafeUnmask)
 
@@ -321,7 +321,7 @@ system supports that, although in practice this is usually unnecessary
 (and may actually degrade performance in some cases - experimentation
 is recommended).
 
-/Since: 4.4.0.0/
+@since 4.4.0.0
 -}
 forkOn :: Int -> IO () -> IO ThreadId
 forkOn (I# cpu) action = IO $ \ s ->
@@ -332,7 +332,7 @@ forkOn (I# cpu) action = IO $ \ s ->
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
 -- given CPU, as with 'forkOn'.
 --
--- /Since: 4.4.0.0/
+-- @since 4.4.0.0
 forkOnWithUnmask :: Int -> ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkOnWithUnmask cpu io = forkOn cpu (io unsafeUnmask)
 
@@ -352,7 +352,7 @@ Returns the number of Haskell threads that can run truly
 simultaneously (on separate physical processors) at any given time.  To change
 this value, use 'setNumCapabilities'.
 
-/Since: 4.4.0.0/
+@since 4.4.0.0
 -}
 getNumCapabilities :: IO Int
 getNumCapabilities = do
@@ -371,7 +371,7 @@ capabilities is not set larger than the number of physical processor
 cores, and it may often be beneficial to leave one or more cores free
 to avoid contention with other processes in the machine.
 
-/Since: 4.5.0.0/
+@since 4.5.0.0
 -}
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
@@ -381,7 +381,7 @@ foreign import ccall safe "setNumCapabilities"
 
 -- | Returns the number of CPUs that the machine has
 --
--- /Since: 4.5.0.0/
+-- @since 4.5.0.0
 getNumProcessors :: IO Int
 getNumProcessors = fmap fromIntegral c_getNumberOfProcessors
 
@@ -585,7 +585,7 @@ threadStatus (ThreadId t) = IO $ \s ->
 -- that capability or not.  A thread is locked to a capability if it
 -- was created with @forkOn@.
 --
--- /Since: 4.4.0.0/
+-- @since 4.4.0.0
 threadCapability :: ThreadId -> IO (Int, Bool)
 threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
@@ -606,7 +606,7 @@ threadCapability (ThreadId t) = IO $ \s ->
 -- caller must use @deRefWeak@ first to determine whether the thread
 -- still exists.
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
 mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
    case mkWeakNoFinalizer# t# t s of

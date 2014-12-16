@@ -144,7 +144,7 @@ class (Typeable e, Show e) => Exception e where
     --
     -- Default implementation: @'show'@.
     --
-    -- /Since: 4.8.0.0/
+    -- @since 4.8.0.0
     displayException :: e -> String
     displayException = show
 
@@ -178,7 +178,7 @@ data ArithException
   | LossOfPrecision
   | DivideByZero
   | Denormal
-  | RatioZeroDenominator -- ^ /Since: 4.6.0.0/
+  | RatioZeroDenominator -- ^ @since 4.6.0.0
   deriving (Eq, Ord, Typeable)
 
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException

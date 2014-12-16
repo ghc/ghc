@@ -104,7 +104,7 @@ cast x = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
 
 -- | Extract a witness of equality of two types
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~: b)
 eqT = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
       then Just $ unsafeCoerce Refl

@@ -45,7 +45,7 @@ comparing p x y = compare (p x) (p y)
 --
 -- Provides 'Show' and 'Read' instances (/since: 4.7.0.0/).
 --
--- /Since: 4.6.0.0/
+-- @since 4.6.0.0
 newtype Down a = Down a deriving (Eq, Show, Read)
 
 instance Ord a => Ord (Down a) where

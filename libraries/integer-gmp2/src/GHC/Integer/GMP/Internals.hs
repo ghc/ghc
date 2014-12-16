@@ -190,7 +190,7 @@ default ()
 -- * \"@'sizeInBaseInteger' /i/ 2#@\" can be used to determine the most
 --   significant bit of @/i/@.
 --
--- /Since: 0.5.1.0/
+-- @since 0.5.1.0
 sizeInBaseInteger :: Integer -> Int# -> Word#
 sizeInBaseInteger (S# i#)  = sizeInBaseWord# (int2Word# (absI# i#))
 sizeInBaseInteger (Jp# bn) = sizeInBaseBigNat bn
@@ -198,7 +198,7 @@ sizeInBaseInteger (Jn# bn) = sizeInBaseBigNat bn
 
 -- | Version of 'sizeInBaseInteger' operating on 'BigNat'
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 sizeInBaseBigNat :: BigNat -> Int# -> Word#
 sizeInBaseBigNat bn@(BN# ba#) = c_mpn_sizeinbase# ba# (sizeofBigNat# bn)
 
@@ -207,7 +207,7 @@ foreign import ccall unsafe "integer_gmp_mpn_sizeinbase"
 
 -- | Version of 'sizeInBaseInteger' operating on 'Word#'
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 foreign import ccall unsafe "integer_gmp_mpn_sizeinbase1"
   sizeInBaseWord# :: Word# -> Int# -> Word#
 
@@ -217,7 +217,7 @@ foreign import ccall unsafe "integer_gmp_mpn_sizeinbase1"
 --
 -- See description of 'exportIntegerToMutableByteArray' for more details.
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 exportIntegerToAddr :: Integer -> Addr# -> Int# -> IO Word
 exportIntegerToAddr (S# i#)  = exportWordToAddr (W# (int2Word# (absI# i#)))
 exportIntegerToAddr (Jp# bn) = exportBigNatToAddr bn
@@ -268,7 +268,7 @@ foreign import ccall unsafe "integer_gmp_mpn_export1"
 -- integers as this function would currently convert those to big
 -- integers in msbf to call @mpz_export()@.
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 exportIntegerToMutableByteArray :: Integer -> MutableByteArray# RealWorld
                                 -> Word# -> Int# -> IO Word
 exportIntegerToMutableByteArray (S# i#)
@@ -278,7 +278,7 @@ exportIntegerToMutableByteArray (Jn# bn) = exportBigNatToMutableByteArray bn
 
 -- | Version of 'exportIntegerToMutableByteArray' operating on 'BigNat's.
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 exportBigNatToMutableByteArray :: BigNat -> MutableByteArray# RealWorld -> Word#
                                -> Int# -> IO Word
 exportBigNatToMutableByteArray bn@(BN# ba#)
@@ -291,7 +291,7 @@ foreign import ccall unsafe "integer_gmp_mpn_export"
 
 -- | Version of 'exportIntegerToMutableByteArray' operating on 'Word's.
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 exportWordToMutableByteArray :: Word -> MutableByteArray# RealWorld -> Word#
                              -> Int# -> IO Word
 exportWordToMutableByteArray (W# w#) = c_mpn_export1ToMutableByteArray# w#
@@ -316,7 +316,7 @@ foreign import ccall unsafe "integer_gmp_mpn_export1"
 -- determining a /probable prime/. For more details, see
 -- <http://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fprobab_005fprime_005fp-360 GMP documentation for `mpz_probab_prime_p()`>.
 --
--- /Since: 0.5.1.0/
+-- @since 0.5.1.0
 {-# NOINLINE testPrimeInteger #-}
 testPrimeInteger :: Integer -> Int# -> Int#
 testPrimeInteger (S# i#) = testPrimeWord# (int2Word# (absI# i#))
@@ -325,7 +325,7 @@ testPrimeInteger (Jn# n) = testPrimeBigNat n
 
 -- | Version of 'testPrimeInteger' operating on 'BigNat's
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 testPrimeBigNat :: BigNat -> Int# -> Int#
 testPrimeBigNat bn@(BN# ba#) = c_integer_gmp_test_prime# ba# (sizeofBigNat# bn)
 
@@ -334,7 +334,7 @@ foreign import ccall unsafe "integer_gmp_test_prime"
 
 -- | Version of 'testPrimeInteger' operating on 'Word#'s
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 foreign import ccall unsafe "integer_gmp_test_prime1"
   testPrimeWord# :: GmpLimb# -> Int# -> Int#
 
@@ -346,7 +346,7 @@ foreign import ccall unsafe "integer_gmp_test_prime1"
 -- primes. For practical purposes it's adequate, the chance of a
 -- composite passing will be extremely small.\"
 --
--- /Since: 0.5.1.0/
+-- @since 0.5.1.0
 {-# NOINLINE nextPrimeInteger #-}
 nextPrimeInteger :: Integer -> Integer
 nextPrimeInteger (S# i#)
@@ -357,6 +357,6 @@ nextPrimeInteger (Jn# _)  = S# 2#
 
 -- | Version of 'nextPrimeInteger' operating on 'Word#'s
 --
--- /Since: 1.0.0.0/
+-- @since 1.0.0.0
 foreign import ccall unsafe "integer_gmp_next_prime1"
   nextPrimeWord# :: GmpLimb# -> GmpLimb#

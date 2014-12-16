@@ -159,7 +159,7 @@ data (~) a b = Eq# ((~#) a b)
 --      <http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf Safe Coercions>
 --      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
 --
---      /Since: 4.7.0.0/
+--      @since 4.7.0.0
 data Coercible a b = MkCoercible ((~#) a b)
 -- It's really ~R# (representational equality), not ~#,
 -- but  * we don't yet have syntax for ~R#,

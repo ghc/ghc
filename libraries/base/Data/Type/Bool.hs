@@ -13,7 +13,7 @@
 --
 -- Basic operations on type-level Booleans.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 -----------------------------------------------------------------------------
 
 module Data.Type.Bool (

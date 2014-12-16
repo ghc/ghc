@@ -103,7 +103,7 @@ instance Show Deadlock where
 -- 'GHC.Conc.setAllocationCounter' and
 -- 'GHC.Conc.enableAllocationLimit'.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 data AllocationLimitExceeded = AllocationLimitExceeded
     deriving Typeable
 
@@ -131,7 +131,7 @@ instance Show AssertionFailed where
 
 -- |Superclass for asynchronous exceptions.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 data SomeAsyncException = forall e . Exception e => SomeAsyncException e
   deriving Typeable
 
@@ -140,11 +140,11 @@ instance Show SomeAsyncException where
 
 instance Exception SomeAsyncException
 
--- |/Since: 4.7.0.0/
+-- |@since 4.7.0.0
 asyncExceptionToException :: Exception e => e -> SomeException
 asyncExceptionToException = toException . SomeAsyncException
 
--- |/Since: 4.7.0.0/
+-- |@since 4.7.0.0
 asyncExceptionFromException :: Exception e => SomeException -> Maybe e
 asyncExceptionFromException x = do
     SomeAsyncException a <- fromException x

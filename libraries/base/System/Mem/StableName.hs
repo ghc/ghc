@@ -115,7 +115,7 @@ instance Eq (StableName a) where
 -- | Equality on 'StableName' that does not require that the types of
 -- the arguments match.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 eqStableName :: StableName a -> StableName b -> Bool
 eqStableName (StableName sn1) (StableName sn2) =
        case eqStableName# sn1 sn2 of

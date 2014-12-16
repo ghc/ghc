@@ -35,7 +35,7 @@ import GHC.Base
 -- think of it as an if-then-else construct with its arguments
 -- reordered.
 --
--- /Since: 4.7.0.0/
+-- @since 4.7.0.0
 --
 -- ==== __Examples__
 --

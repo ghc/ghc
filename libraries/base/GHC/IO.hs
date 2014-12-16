@@ -174,7 +174,7 @@ of the duplicated IO actions is only run partially, and then interrupted
 in the middle without an exception being raised. Therefore, functions
 like 'bracket' cannot be used safely within 'unsafeDupablePerformIO'.
 
-/Since: 4.4.0.0/
+@since 4.4.0.0
 -}
 {-# NOINLINE unsafeDupablePerformIO #-}
     -- See Note [unsafeDupablePerformIO is NOINLINE]

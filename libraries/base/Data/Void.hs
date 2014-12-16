@@ -17,7 +17,7 @@
 -- A logically uninhabited data type, used to indicate that a given
 -- term should not exist.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 ----------------------------------------------------------------------------
 module Data.Void
     ( Void
@@ -32,7 +32,7 @@ import GHC.Generics
 
 -- | Uninhabited data type
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 data Void deriving (Generic)
 
 deriving instance Data Void
@@ -62,13 +62,13 @@ instance Exception Void
 -- | Since 'Void' values logically don't exist, this witnesses the
 -- logical reasoning tool of \"ex falso quodlibet\".
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 absurd :: Void -> a
 absurd a = case a of {}
 
 -- | If 'Void' is uninhabited then any 'Functor' that holds only
 -- values of type 'Void' is holding no values.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 vacuous :: Functor f => f Void -> f a
 vacuous = fmap absurd

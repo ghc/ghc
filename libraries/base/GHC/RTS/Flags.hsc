@@ -6,7 +6,7 @@
 -- <https://www.haskell.org/ghc/docs/latest/html/users_guide/runtime-control.html GHC User's Guide>,
 -- or by running RTS help message using @+RTS --help@.
 --
--- /Since: 4.8.0.0/
+-- @since 4.8.0.0
 --
 module GHC.RTS.Flags
   ( RTSFlags (..)
