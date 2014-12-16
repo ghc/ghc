@@ -1105,7 +1105,8 @@ tidyTopBinds :: HscEnv
 tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
   = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
        integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-       return $ tidy mkIntegerId integerSDataCon init_env binds
+       let cvt_integer = cvtLitInteger dflags mkIntegerId integerSDataCon
+       return $ tidy cvt_integer init_env binds
   where
     dflags = hsc_dflags hsc_env
 
@@ -1113,37 +1114,35 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     this_pkg = thisPackage dflags
 
-    tidy _           _                 env []     = (env, [])
-    tidy mkIntegerId integerSDataCon env (b:bs)
+    tidy _           env []     = (env, [])
+    tidy cvt_integer env (b:bs)
         = let (env1, b')  = tidyTopBind dflags this_pkg this_mod
-                            mkIntegerId integerSDataCon unfold_env env b
-              (env2, bs') = tidy mkIntegerId integerSDataCon env1 bs
+                                        cvt_integer unfold_env env b
+              (env2, bs') = tidy cvt_integer env1 bs
           in  (env2, b':bs')
 
 ------------------------
 tidyTopBind  :: DynFlags
              -> PackageKey
              -> Module
-             -> Id
-             -> Maybe DataCon
+             -> (Integer -> CoreExpr)
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_pkg this_mod mkIntegerId integerSDataCon unfold_env
+tidyTopBind dflags this_pkg this_mod cvt_integer unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_pkg this_mod
-                    (mkIntegerId, integerSDataCon, subst1) (idArity bndr) rhs
+    caf_info      = hasCafRefs dflags this_pkg this_mod (subst1, cvt_integer) (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_pkg this_mod mkIntegerId integerSDataCon unfold_env
-            (occ_env,subst1) (Rec prs)
+tidyTopBind dflags this_pkg this_mod cvt_integer unfold_env
+            (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
     prs' = [ tidyTopPair dflags show_unfold tidy_env2 caf_info name' (id,rhs)
@@ -1161,8 +1160,8 @@ tidyTopBind dflags this_pkg this_mod mkIntegerId integerSDataCon unfold_env
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
         | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg this_mod
-                               (mkIntegerId, integerSDataCon, subst1)
-                               (idArity bndr) rhs)
+                                          (subst1, cvt_integer)
+                                          (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
         | otherwise                = NoCafRefs
 
@@ -1296,18 +1295,32 @@ hence the size of the SRTs) down, we could also look at the expression and
 decide whether it requires a small bounded amount of heap, so we can ignore
 it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.
+
+Note [Disgusting computation of CafRefs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We compute hasCafRefs here, because IdInfo is supposed to be finalised
+after TidyPgm.  But CorePrep does some transformations that affect CAF-hood.
+So we have to *predict* the result here, which is revolting.
+
+In particular CorePrep expands Integer literals.  So in the prediction code
+here we resort to applying the same expansion (cvt_integer). Ugh!
 -}
 
+type CafRefEnv = (VarEnv Id, Integer -> CoreExpr)
+  -- The env finds the Caf-ness of the Id
+  -- The Integer -> CoreExpr is the desugaring function for Integer literals
+  -- See Note [Disgusting computation of CafRefs]
+
 hasCafRefs :: DynFlags -> PackageKey -> Module
-           -> (Id, Maybe DataCon, VarEnv Var) -> Arity -> CoreExpr
+           -> CafRefEnv -> Arity -> CoreExpr
            -> CafInfo
-hasCafRefs dflags this_pkg this_mod p arity expr
+hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
-  mentions_cafs = isFastTrue (cafRefsE dflags p expr)
+  mentions_cafs   = isFastTrue (cafRefsE p expr)
   is_dynamic_name = isDllName dflags this_pkg this_mod
-  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name expr)
+  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name cvt_integer expr)
 
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
@@ -1315,35 +1328,34 @@ hasCafRefs dflags this_pkg this_mod p arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: DynFlags -> (Id, Maybe DataCon, VarEnv Id) -> Expr a -> FastBool
-cafRefsE _      p (Var id)            = cafRefsV p id
-cafRefsE dflags p (Lit lit)           = cafRefsL dflags p lit
-cafRefsE dflags p (App f a)           = fastOr (cafRefsE dflags p f) (cafRefsE dflags p) a
-cafRefsE dflags p (Lam _ e)           = cafRefsE dflags p e
-cafRefsE dflags p (Let b e)           = fastOr (cafRefsEs dflags p (rhssOfBind b)) (cafRefsE dflags p) e
-cafRefsE dflags p (Case e _bndr _ alts) = fastOr (cafRefsE dflags p e) (cafRefsEs dflags p) (rhssOfAlts alts)
-cafRefsE dflags p (Tick _n e)         = cafRefsE dflags p e
-cafRefsE dflags p (Cast e _co)        = cafRefsE dflags p e
-cafRefsE _      _ (Type _)            = fastBool False
-cafRefsE _      _ (Coercion _)        = fastBool False
+cafRefsE :: CafRefEnv -> Expr a -> FastBool
+cafRefsE p (Var id)            = cafRefsV p id
+cafRefsE p (Lit lit)           = cafRefsL p lit
+cafRefsE p (App f a)           = fastOr (cafRefsE p f) (cafRefsE p) a
+cafRefsE p (Lam _ e)           = cafRefsE p e
+cafRefsE p (Let b e)           = fastOr (cafRefsEs p (rhssOfBind b)) (cafRefsE p) e
+cafRefsE p (Case e _bndr _ alts) = fastOr (cafRefsE p e) (cafRefsEs p) (rhssOfAlts alts)
+cafRefsE p (Tick _n e)         = cafRefsE p e
+cafRefsE p (Cast e _co)        = cafRefsE p e
+cafRefsE _ (Type _)            = fastBool False
+cafRefsE _ (Coercion _)        = fastBool False
 
-cafRefsEs :: DynFlags -> (Id, Maybe DataCon, VarEnv Id) -> [Expr a] -> FastBool
-cafRefsEs _      _ []     = fastBool False
-cafRefsEs dflags p (e:es) = fastOr (cafRefsE dflags p e) (cafRefsEs dflags p) es
+cafRefsEs :: CafRefEnv -> [Expr a] -> FastBool
+cafRefsEs _ []     = fastBool False
+cafRefsEs p (e:es) = fastOr (cafRefsE p e) (cafRefsEs p) es
 
-cafRefsL :: DynFlags -> (Id, Maybe DataCon, VarEnv Id) -> Literal -> FastBool
+cafRefsL :: CafRefEnv -> Literal -> FastBool
 -- Don't forget that mk_integer id might have Caf refs!
 -- We first need to convert the Integer into its final form, to
 -- see whether mkInteger is used.
-cafRefsL dflags p@(mk_integer, sdatacon, _) (LitInteger i _)
-    = cafRefsE dflags p (cvtLitInteger dflags mk_integer sdatacon i)
-cafRefsL _      _ _                         = fastBool False
+cafRefsL p@(_, cvt_integer) (LitInteger i _) = cafRefsE p (cvt_integer i)
+cafRefsL _                  _                = fastBool False
 
-cafRefsV :: (Id, Maybe DataCon, VarEnv Id) -> Id -> FastBool
-cafRefsV (_, _, p) id
-  | not (isLocalId id)            = fastBool (mayHaveCafRefs (idCafInfo id))
-  | Just id' <- lookupVarEnv p id = fastBool (mayHaveCafRefs (idCafInfo id'))
-  | otherwise                     = fastBool False
+cafRefsV :: CafRefEnv -> Id -> FastBool
+cafRefsV (subst, _) id
+  | not (isLocalId id)                = fastBool (mayHaveCafRefs (idCafInfo id))
+  | Just id' <- lookupVarEnv subst id = fastBool (mayHaveCafRefs (idCafInfo id'))
+  | otherwise                         = fastBool False
 
 fastOr :: FastBool -> (a -> FastBool) -> a -> FastBool
 -- hack for lazy-or over FastBool.

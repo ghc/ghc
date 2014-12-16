@@ -1109,6 +1109,8 @@ canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs
     -- the new binding is static. However it can't mention
     -- any non-static things or it would *already* be Caffy
     rhs_ok = rhsIsStatic platform (\_ -> False)
+                         (\i -> pprPanic "rhsIsStatic" (integer i))
+                         -- Integer literals should not show up 
 
 wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec strict_or_unlifted floats rhs

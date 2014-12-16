@@ -1964,7 +1964,12 @@ and 'execute' it rather than allocating it statically.
 -- | This function is called only on *top-level* right-hand sides.
 -- Returns @True@ if the RHS can be allocated statically in the output,
 -- with no thunks involved at all.
-rhsIsStatic :: Platform -> (Name -> Bool) -> CoreExpr -> Bool
+rhsIsStatic :: Platform
+            -> (Name -> Bool)         -- Which names are dynamic
+            -> (Integer -> CoreExpr)  -- Desugaring for integer literals (disgusting)
+                                      -- C.f. Note [Disgusting computation of CafRefs]
+                                      --      in TidyPgm
+            -> CoreExpr -> Bool
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
@@ -2019,19 +2024,19 @@ rhsIsStatic :: Platform -> (Name -> Bool) -> CoreExpr -> Bool
 --
 --    c) don't look through unfolding of f in (f x).
 
-rhsIsStatic platform is_dynamic_name rhs = is_static False rhs
+rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
   where
   is_static :: Bool     -- True <=> in a constructor argument; must be atomic
             -> CoreExpr -> Bool
 
-  is_static False (Lam b e)             = isRuntimeVar b || is_static False e
-  is_static in_arg (Tick n e)           = not (tickishIsCode n)
-                                            && is_static in_arg e
-  is_static in_arg (Cast e _)           = is_static in_arg e
-  is_static _      (Coercion {})        = True   -- Behaves just like a literal
-  is_static _      (Lit (LitInteger {})) = False
-  is_static _      (Lit (MachLabel {})) = False
-  is_static _      (Lit _)              = True
+  is_static False  (Lam b e)              = isRuntimeVar b || is_static False e
+  is_static in_arg (Tick n e)             = not (tickishIsCode n)
+                                              && is_static in_arg e
+  is_static in_arg (Cast e _)             = is_static in_arg e
+  is_static _      (Coercion {})          = True   -- Behaves just like a literal
+  is_static in_arg (Lit (LitInteger i _)) = is_static in_arg (cvt_integer i)
+  is_static _      (Lit (MachLabel {}))   = False
+  is_static _      (Lit _)                = True
         -- A MachLabel (foreign import "&foo") in an argument
         -- prevents a constructor application from being static.  The
         -- reason is that it might give rise to unresolvable symbols
