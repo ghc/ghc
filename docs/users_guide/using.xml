@@ -3308,13 +3308,29 @@ data D = D !C
           <listitem>
             <para><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
               Use <replaceable>x</replaceable> simultaneous threads when
-              running the program.  Normally <replaceable>x</replaceable>
-              should be chosen to match the number of CPU cores on the
-              machine<footnote><para>Whether hyperthreading cores should be counted or not is an
-              open question; please feel free to experiment and let us know what
-                  results you find.</para></footnote>.  For example,
-              on a dual-core machine we would probably use
-              <literal>+RTS -N2 -RTS</literal>.</para>
+              running the program.</para>
+
+              <para>The runtime manages a set of virtual processors,
+              which we call <emphasis>capabilities</emphasis>, the
+              number of which is determined by the <option>-N</option>
+              option.  Each capability can run one Haskell thread at a
+              time, so the number of capabilities is equal to the
+              number of Haskell threads that can run physically in
+              parallel.  A capability is animated by one or more OS
+              threads; the runtime manages a pool of OS threads for
+              each capability, so that if a Haskell thread makes a
+              foreign call (see <xref linkend="ffi-threads" />)
+              another OS thread can take over that capability.
+              </para>
+
+              <para>Normally <replaceable>x</replaceable> should be
+              chosen to match the number of CPU cores on the
+              machine<footnote><para>Whether hyperthreading cores
+              should be counted or not is an open question; please
+              feel free to experiment and let us know what results you
+              find.</para></footnote>.  For example, on a dual-core
+              machine we would probably use <literal>+RTS -N2
+              -RTS</literal>.</para>
 
             <para>Omitting <replaceable>x</replaceable>,
               i.e. <literal>+RTS -N -RTS</literal>, lets the runtime
@@ -3331,10 +3347,11 @@ data D = D !C
               <xref linkend="rts-options-gc" />).</para>
 
             <para>The current value of the <option>-N</option> option
-              is available to the Haskell program
-              via <literal>Control.Concurrent.getNumCapabilities</literal>, and
-              it may be changed while the program is running by
-              calling <literal>Control.Concurrent.setNumCapabilities</literal>.</para>
+            is available to the Haskell program via
+            <literal>Control.Concurrent.getNumCapabilities</literal>,
+            and it may be changed while the program is running by
+            calling
+            <literal>Control.Concurrent.setNumCapabilities</literal>.</para>
           </listitem>
         </varlistentry>
       </variablelist>
@@ -3349,9 +3366,18 @@ data D = D !C
           option</secondary></indexterm>
           <listitem>
             <para>Use the OS's affinity facilities to try to pin OS
-              threads to CPU cores.  This is an experimental feature,
-              and may or may not be useful.  Please let us know
-              whether it helps for you!</para>
+            threads to CPU cores.</para>
+
+            <para>When this option is enabled, the OS threads for a
+            capability <emphasis>i</emphasis> are bound to the CPU
+            core <emphasis>i</emphasis> using the API provided by the
+            OS for setting thread affinity.  e.g. on Linux
+            GHC uses <literal>sched_setaffinity()</literal>.</para>
+
+            <para>Depending on your workload and the other activity on
+            the machine, this may or may not result in a performance
+            improvement.  We recommend trying it out and measuring the
+            difference.</para>
           </listitem>
         </varlistentry>
         <varlistentry>
