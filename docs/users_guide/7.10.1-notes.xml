@@ -34,7 +34,7 @@
                     There is a new extension,
                     <link linkend="static-pointers">StaticPointers</link>,
                     which allows you to create pointers to expressions which
-                    remain valid accross processes. This is useful for
+                    remain valid across processes. This is useful for
                     referencing higher-order values in distributed
                     systems. The pointers are created with a new keyword
                     <literal>static</literal> as in
