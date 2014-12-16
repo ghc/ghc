@@ -77,6 +77,9 @@ zipWith3M_ f as bs cs = do { _ <- zipWith3M f as bs cs
 
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])
+{-# INLINE zipWithAndUnzipM #-}
+-- See Note [flatten_many performance] in TcFlatten for why this
+-- pragma is essential.
 zipWithAndUnzipM f (x:xs) (y:ys)
   = do { (c, d) <- f x y
        ; (cs, ds) <- zipWithAndUnzipM f xs ys

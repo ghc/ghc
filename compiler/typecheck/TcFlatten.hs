@@ -28,10 +28,11 @@ import TcSMonad as TcS
 import DynFlags( DynFlags )
 
 import Util
-import MonadUtils   ( zipWithAndUnzipM )
 import Bag
 import FastString
 import Control.Monad( when, liftM )
+import MonadUtils ( zipWithAndUnzipM )
+import GHC.Exts ( inline )
 
 {-
 Note [The flattening story]
@@ -643,6 +644,37 @@ soon throw out the phantoms when decomposing a TyConApp. (Or, the
 canonicaliser will emit an insoluble, in which case the unflattened version
 yields a better error message anyway.)
 
+Note [flatten_many performance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In programs with lots of type-level evaluation, flatten_many becomes
+part of a tight loop. For example, see test perf/compiler/T9872a, which
+calls flatten_many a whopping 7,106,808 times. It is thus important
+that flatten_many be efficient.
+
+Performance testing showed that the current implementation is indeed
+efficient. It's critically important that zipWithAndUnzipM be
+specialized to TcS, and it's also quite helpful to actually `inline`
+it. On test T9872a, here are the allocation stats (Dec 16, 2014):
+
+ * Unspecialized, uninlined:     8,472,613,440 bytes allocated in the heap
+ * Specialized, uninlined:       6,639,253,488 bytes allocated in the heap
+ * Specialized, inlined:         6,281,539,792 bytes allocated in the heap
+
+To improve performance even further, flatten_many_nom is split off
+from flatten_many, as nominal equality is the common case. This would
+be natural to write using mapAndUnzipM, but even inlined, that function
+is not as performant as a hand-written loop.
+
+ * mapAndUnzipM, inlined:        7,463,047,432 bytes allocated in the heap
+ * hand-written recursion:       5,848,602,848 bytes allocated in the heap
+
+If you make any change here, pay close attention to the T9872{a,b,c} tests
+and T5321Fun.
+
+If we need to make this yet more performant, a possible way forward is to
+duplicate the flattener code for the nominal case, and make that case
+faster. This doesn't seem quite worth it, yet.
+
 -}
 
 ------------------
@@ -676,12 +708,23 @@ flatten_many :: FlattenEnv -> [Role] -> [Type] -> TcS ([Xi], [TcCoercion])
 --     we merely want (a) Given/Solved/Derived/Wanted info
 --                    (b) the GivenLoc/WantedLoc for when we create new evidence
 flatten_many fmode roles tys
-  = zipWithAndUnzipM go roles tys
+-- See Note [flatten_many performance]
+  = inline zipWithAndUnzipM go roles tys
   where
-    go Nominal          ty = flatten_one (fmode { fe_eq_rel = NomEq })  ty
-    go Representational ty = flatten_one (fmode { fe_eq_rel = ReprEq }) ty
+    go Nominal          ty = flatten_one (setFEEqRel fmode NomEq)  ty
+    go Representational ty = flatten_one (setFEEqRel fmode ReprEq) ty
     go Phantom          ty = -- See Note [Phantoms in the flattener]
                              return (ty, mkTcPhantomCo ty ty)
+
+-- | Like 'flatten_many', but assumes that every role is nominal.
+flatten_many_nom :: FlattenEnv -> [Type] -> TcS ([Xi], [TcCoercion])
+flatten_many_nom _     [] = return ([], [])
+-- See Note [flatten_many performance]
+flatten_many_nom fmode (ty:tys)
+  = ASSERT( fe_eq_rel fmode == NomEq )
+    do { (xi, co) <- flatten_one fmode ty
+       ; (xis, cos) <- flatten_many_nom fmode tys
+       ; return (xi:xis, co:cos) }
 
 ------------------
 flatten_one :: FlattenEnv -> TcType -> TcS (Xi, TcCoercion)
@@ -707,7 +750,7 @@ flatten_one fmode (AppTy ty1 ty2)
              return (mkAppTy xi1 ty2, co1 `mkTcAppCo` mkTcNomReflCo ty2) }
   where
     flatten_rhs xi1 co1 eq_rel2
-      = do { (xi2,co2) <- flatten_one (fmode { fe_eq_rel = eq_rel2 }) ty2
+      = do { (xi2,co2) <- flatten_one (setFEEqRel fmode eq_rel2) ty2
            ; traceTcS "flatten/appty"
                       (ppr ty1 $$ ppr ty2 $$ ppr xi1 $$
                        ppr co1 $$ ppr xi2 $$ ppr co2)
@@ -757,14 +800,16 @@ flatten_one fmode ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; (rho', co) <- flatten_one (fmode { fe_mode = FM_SubstOnly }) rho
+       ; (rho', co) <- flatten_one (setFEMode fmode FM_SubstOnly) rho
                          -- Substitute only under a forall
                          -- See Note [Flattening under a forall]
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
 
 flattenTyConApp :: FlattenEnv -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
 flattenTyConApp fmode tc tys
-  = do { (xis, cos) <- flatten_many fmode (tyConRolesX role tc) tys
+  = do { (xis, cos) <- case fe_eq_rel fmode of
+                         NomEq  -> flatten_many_nom fmode tys
+                         ReprEq -> flatten_many fmode (tyConRolesX role tc) tys
        ; return (mkTyConApp tc xis, mkTcTyConAppCo role tc cos) }
   where
     role = feRole fmode
@@ -855,8 +900,7 @@ flatten_exact_fam_app fmode tc tys
     roles = tyConRolesX (feRole fmode) tc
 
 flatten_exact_fam_app_fully fmode tc tys
-  = do { let roles = tyConRolesX (feRole fmode) tc
-       ; (xis, cos) <- flatten_many (fmode { fe_mode = FM_FlattenAll }) roles tys
+  = do { (xis, cos) <- flatten_many_nom (setFEEqRel (setFEMode fmode FM_FlattenAll) NomEq) tys
        ; let ret_co = mkTcTyConAppCo (feRole fmode) tc cos
               -- ret_co :: F xis ~ F tys
 
@@ -1222,7 +1266,7 @@ flattenTyVarFinal :: FlattenEnv -> TcTyVar -> TcS TyVar
 flattenTyVarFinal fmode tv
   = -- Done, but make sure the kind is zonked
     do { let kind       = tyVarKind tv
-             kind_fmode = fmode { fe_mode = FM_SubstOnly }
+             kind_fmode = setFEMode fmode FM_SubstOnly
        ; (new_knd, _kind_co) <- flatten_one kind_fmode kind
        ; return (setVarType tv new_knd) }
 
@@ -1506,3 +1550,22 @@ unsolved constraints.  The flat form will be
 
 Flatten using the fun-eqs first.
 -}
+
+-- | Change the 'EqRel' in a 'FlattenEnv'. Avoids allocating a
+-- new 'FlattenEnv' where possible.
+setFEEqRel :: FlattenEnv -> EqRel -> FlattenEnv
+setFEEqRel fmode@(FE { fe_eq_rel = old_eq_rel }) new_eq_rel
+  | old_eq_rel == new_eq_rel = fmode
+  | otherwise                = fmode { fe_eq_rel = new_eq_rel }
+
+-- | Change the 'FlattenMode' in a 'FlattenEnv'. Avoids allocating
+-- a new 'FlattenEnv' where possible.
+setFEMode :: FlattenEnv -> FlattenMode -> FlattenEnv
+setFEMode fmode@(FE { fe_mode = old_mode }) new_mode
+  | old_mode `eq` new_mode = fmode
+  | otherwise            = fmode { fe_mode = new_mode }
+  where
+    FM_FlattenAll   `eq` FM_FlattenAll   = True
+    FM_SubstOnly    `eq` FM_SubstOnly    = True
+    FM_Avoid tv1 b1 `eq` FM_Avoid tv2 b2 = tv1 == tv2 && b1 == b2
+    _               `eq` _               = False

@@ -406,7 +406,7 @@ test('T5321Fun',
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
              # 10/12/2014: 206406188     #  Improvements in constraint solver
-            (wordsize(64), 408110888, 10)])
+            (wordsize(64), 429921312, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
@@ -415,6 +415,7 @@ test('T5321Fun',
              # 10/09/2014: 601629032     #  post-AMP-cleanup
              # 06/11/2014: 541287000     #  Simon's flat-skol changes to the constraint solver
              # 10/12/2014: 408110888     #  Improvements in constraint solver
+             # 16/12/2014: 429921312     #  Flattener parameterized over roles
       ],
       compile,[''])
 
@@ -477,7 +478,7 @@ test('T5837',
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
              # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
  
-           (wordsize(64), 234790312, 10)])
+           (wordsize(64), 231155640, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -489,6 +490,8 @@ test('T5837',
              # 2014-11-06 271028976       Linux, Accept big regression;
              #   See Note [An alternative story for the inert substitution] in TcFlatten
              # 2014-12-08 234790312 Constraint solver perf improvements (esp kick-out)
+             # 2014-12-16 231155640 Mac  Flattener parameterized over roles;
+             #                           some optimization
       ],
       compile_fail,['-ftype-function-depth=50'])
 
@@ -556,8 +559,9 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 5521332656, 5)
+          [(wordsize(64), 5848657456, 5)
           # 2014-12-10    5521332656    Initally created
+          # 2014-12-16    5848657456    Flattener parameterized over roles
           ]),
       ],
      compile_fail,
@@ -566,8 +570,9 @@ test('T9872a',
 test('T9872b',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 6483306280, 5)
+          [(wordsize(64), 6892251912, 5)
           # 2014-12-10    6483306280    Initally created
+          # 2014-12-16    6892251912    Flattener parameterized over roles
           ]),
       ],
      compile_fail,
@@ -575,8 +580,9 @@ test('T9872b',
 test('T9872c',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 5495850096, 5)
+          [(wordsize(64), 5842024784, 5)
           # 2014-12-10    5495850096    Initally created
+          # 2014-12-16    5842024784    Flattener parameterized over roles
           ]),
       ],
      compile_fail,
