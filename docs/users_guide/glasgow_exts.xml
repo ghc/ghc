@@ -9015,11 +9015,13 @@ Wiki page</ulink>.
 		    have type <literal>Q Pat</literal></para></listitem>
 		    <listitem><para> a type; the spliced expression must
 		    have type <literal>Q Type</literal></para></listitem>
-		    <listitem><para> a list of declarations; the spliced expression
+		    <listitem><para> a list of declarations at top level; the spliced expression
                     must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
             Inside a splice you can only call functions defined in imported modules,
-	    not functions defined elsewhere in the same module.</para></listitem>
+	    not functions defined elsewhere in the same module. Note that
+	    declaration splices are not allowed anywhere except at top level
+	      (outside any other declarations).</para></listitem>
 
 	      <listitem><para>
 		  A expression quotation is written in Oxford brackets, thus:
