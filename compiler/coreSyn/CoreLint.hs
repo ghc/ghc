@@ -249,11 +249,6 @@ displayLintResults dflags pass warns errs binds
        ; Err.ghcExit dflags 1 }
 
   | not (isEmptyBag warns)
-  , not (case pass of { CoreDesugar -> True; _ -> False })
-        -- Suppress warnings after desugaring pass because some
-        -- are legitimate. Notably, the desugarer generates instance
-        -- methods with INLINE pragmas that form a mutually recursive
-        -- group.  Only afer a round of simplification are they unravelled.
   , not opt_NoDebugOutput
   , showLintWarnings pass
   = log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
@@ -337,13 +332,20 @@ lintCoreBindings pass local_in_scope binds
        ; checkL (null ext_dups) (dupExtVars ext_dups)
        ; mapM lint_bind binds }
   where
-    flags = LF { lf_check_global_ids = check_globals }
+    flags = LF { lf_check_global_ids = check_globals
+               , lf_check_inline_loop_breakers = check_lbs }
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
                       CoreTidy -> False
                       CorePrep -> False
                       _        -> True
+
+    -- See Note [Checking for INLINE loop breakers]
+    check_lbs = case pass of
+                      CoreDesugar    -> False
+                      CoreDesugarOpt -> False
+                      _              -> True
 
     binders = bindersOfBinds binds
     (_, dups) = removeDups compare binders
@@ -446,7 +448,10 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
         -- Check whether binder's specialisations contain any out-of-scope variables
        ; mapM_ (checkBndrIdInScope binder) bndr_vars
 
-       ; when (isStrongLoopBreaker (idOccInfo binder) && isInlinePragma (idInlinePragma binder))
+       ; flags <- getLintFlags
+       ; when (lf_check_inline_loop_breakers flags
+               && isStrongLoopBreaker (idOccInfo binder)
+               && isInlinePragma (idInlinePragma binder))
               (addWarnL (ptext (sLit "INLINE binder is (non-rule) loop breaker:") <+> ppr binder))
               -- Only non-rule loop breakers inhibit inlining
 
@@ -482,6 +487,15 @@ lintIdUnfolding  _ _ _
   = return ()       -- We could check more
 
 {-
+Note [Checking for INLINE loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very suspicious if a strong loop breaker is marked INLINE.
+
+However, the desugarer generates instance methods with INLINE pragmas
+that form a mutually recursive group.  Only afer a round of
+simplification are they unravelled.  So we suppress the test for
+the desugarer.
+
 ************************************************************************
 *                                                                      *
 \subsection[lintCoreExpr]{lintCoreExpr}
@@ -1277,12 +1291,14 @@ data LintEnv
     }                                -- to keep track of all the variables in scope,
                                      -- both Ids and TyVars
 
-newtype LintFlags      -- Currently only one flag
-  = LF { lf_check_global_ids :: Bool -- See Note [Checking for global Ids]
+data LintFlags
+  = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
+       , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
     }
 
 defaultLintFlags :: LintFlags
-defaultLintFlags = LF { lf_check_global_ids = False }
+defaultLintFlags = LF { lf_check_global_ids = False
+                      , lf_check_inline_loop_breakers = True }
 
 newtype LintM a =
    LintM { unLintM ::
