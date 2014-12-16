@@ -444,10 +444,10 @@ Furthermore, the 'Monad' and 'Applicative' operations should relate as follows:
 * @'pure' = 'return'@
 * @('<*>') = 'ap'@
 
-The above laws imply that
+The above laws imply:
 
-* @'fmap' f xs  =  xs '>>=' 'return' . f@,
-* @('>>') = ('*>')
+* @'fmap' f xs  =  xs '>>=' 'return' . f@
+* @('>>') = ('*>')@
 
 and that 'pure' and ('<*>') satisfy the applicative functor laws.
 
