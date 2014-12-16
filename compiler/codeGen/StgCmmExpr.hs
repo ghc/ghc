@@ -642,7 +642,7 @@ cgConApp con stg_args
        ; emitReturn arg_exprs }
 
   | otherwise   --  Boxed constructors; allocate and return
-  = ASSERT( stg_args `lengthIs` dataConRepRepArity con )
+  = ASSERT2( stg_args `lengthIs` dataConRepRepArity con, ppr con <+> ppr stg_args )
     do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con) False
                                      currentCCS con stg_args
                 -- The first "con" says that the name bound to this
