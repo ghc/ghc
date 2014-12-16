@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
-             RoleAnnotations, DeriveGeneric, TypeSynonymInstances,
-             FlexibleInstances #-}
+             RoleAnnotations, DeriveGeneric, FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,7 +26,9 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
-import Data.Word        ( Word8 )
+import Data.Int
+import Data.Word
+import Data.Ratio
 import GHC.Generics     ( Generic )
 
 -----------------------------------------------------
@@ -36,7 +37,7 @@ import GHC.Generics     ( Generic )
 --
 -----------------------------------------------------
 
-class (Monad m, Applicative m) => Quasi m where
+class Monad m => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -457,8 +458,41 @@ instance Lift Integer where
 instance Lift Int where
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
-instance Lift Rational where
-  lift x = return (LitE (RationalL x))
+instance Lift Int8 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Int16 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Int32 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Int64 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Word where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Word8 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Word16 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Word32 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Word64 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Integral a => Lift (Ratio a) where
+  lift x = return (LitE (RationalL (toRational x)))
+
+instance Lift Float where
+  lift x = return (LitE (RationalL (toRational x)))
+
+instance Lift Double where
+  lift x = return (LitE (RationalL (toRational x)))
 
 instance Lift Char where
   lift x = return (LitE (CharL x))

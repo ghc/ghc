@@ -211,6 +211,9 @@ pprBody eq body = case body of
               | otherwise = arrow
 
 ------------------------------
+instance Ppr Lit where
+  ppr = pprLit noPrec
+
 pprLit :: Precedence -> Lit -> Doc
 pprLit i (IntPrimL x)    = parensIf (i > noPrec && x < 0)
                                     (integer x <> char '#')
@@ -576,3 +579,14 @@ hashParens d = text "(# " <> d <> text " #)"
 
 quoteParens :: Doc -> Doc
 quoteParens d = text "'(" <> d <> text ")"
+
+-----------------------------
+instance Ppr Loc where
+  ppr (Loc { loc_module = md
+           , loc_package = pkg
+           , loc_start = (start_ln, start_col)
+           , loc_end = (end_ln, end_col) })
+    = hcat [ text pkg, colon, text md, colon
+           , parens $ int start_ln <> comma <> int start_col
+           , text "-"
+           , parens $ int end_ln <> comma <> int end_col ]
