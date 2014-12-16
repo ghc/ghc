@@ -1,6 +1,16 @@
 {-# LANGUAGE CPP, LambdaCase, BangPatterns, MagicHash, TupleSections, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -w #-}  -- Suppress warnings for unimplemented methods
 
+------------- WARNING ---------------------
+--
+-- This program is utterly bogus. It takes a value of type ()
+-- and unsafe-coerces it to a function, and applies it.
+-- This is caught by an ASSERT with a debug compiler.
+--
+-- See Trac #9208 for discussio
+--
+--------------------------------------------
+
 {- | Evaluate Template Haskell splices on node.js,
      using pipes to communicate with GHCJS
  -}
