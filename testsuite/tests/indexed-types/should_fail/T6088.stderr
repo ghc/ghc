@@ -1,0 +1,4 @@
+
+T6088.hs:16:33:
+    Couldn't match type ‘Pos n’ with ‘True’
+    When deriving the instance for (C (B n))

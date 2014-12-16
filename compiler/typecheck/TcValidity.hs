@@ -878,10 +878,8 @@ validDerivPred :: TyVarSet -> PredType -> Bool
 validDerivPred tv_set pred
   = case classifyPredType pred of
        ClassPred _ tys       -> check_tys tys
-                  -- EqPred ReprEq is a Coercible constraint; treat
-                  -- like a class
-       EqPred ReprEq ty1 ty2 -> check_tys [ty1, ty2]
        TuplePred ps          -> all (validDerivPred tv_set) ps
+       EqPred {}             -> False  -- reject equality constraints
        _                     -> True   -- Non-class predicates are ok
   where
     check_tys tys = hasNoDups fvs

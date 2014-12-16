@@ -194,7 +194,6 @@ test('T6152',
      run_command,
      ['$MAKE -s --no-print-directory T6152'])
 
-test('T6088', normal, compile, [''])
 test('T7082', normal, compile, [''])
 
 test('Overlap1', normal, compile, [''])
