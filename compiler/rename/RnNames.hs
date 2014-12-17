@@ -40,6 +40,7 @@ import ErrUtils
 import Util
 import FastString
 import ListSetOps
+import Bag
 
 import Control.Monad
 import Data.Map         ( Map )
@@ -507,11 +508,11 @@ getLocalNonValBinders fixity_env
         ; nti_avails <- concatMapM new_assoc inst_decls
 
           -- Finish off with value binders:
-          --    foreign decls for an ordinary module
+          --    foreign decls and pattern synonyms for an ordinary module
           --    type sigs in case of a hs-boot file only
         ; is_boot <- tcIsHsBootOrSig
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
-                        | otherwise = for_hs_bndrs
+                        | otherwise = for_hs_bndrs ++ patsyn_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = nti_avails ++ val_avails
@@ -525,11 +526,15 @@ getLocalNonValBinders fixity_env
     for_hs_bndrs = [ L decl_loc (unLoc nm)
                    | L decl_loc (ForeignImport nm _ _ _) <- foreign_decls]
 
+    patsyn_hs_bndrs :: [Located RdrName]
+    patsyn_hs_bndrs = [ L decl_loc (unLoc n)
+                      | L decl_loc (PatSynBind PSB{ psb_id = n }) <- bagToList val_bag]
+
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     hs_boot_sig_bndrs = [ L decl_loc (unLoc n)
                         | L decl_loc (TypeSig ns _ _) <- val_sigs, n <- ns]
-    ValBindsIn _ val_sigs = val_binds
+    ValBindsIn val_bag val_sigs = val_binds
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name

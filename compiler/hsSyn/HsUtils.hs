@@ -61,6 +61,7 @@ module HsUtils(
 
   -- Collecting binders
   collectLocalBinders, collectHsValBinders, collectHsBindListBinders,
+  collectHsValNewBinders,
   collectHsBindsBinders, collectHsBindBinders, collectMethodBinders,
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
@@ -604,31 +605,36 @@ collectHsValBinders :: HsValBindsLR idL idR -> [idL]
 collectHsValBinders (ValBindsIn  binds _) = collectHsBindsBinders binds
 collectHsValBinders (ValBindsOut binds _) = foldr collect_one [] binds
   where
-   collect_one (_,binds) acc = collect_binds binds acc
+   collect_one (_,binds) acc = collect_binds False binds acc
+
+collectHsValNewBinders :: HsValBindsLR Name idR -> [Name]
+collectHsValNewBinders (ValBindsIn  binds _) = collect_binds True binds []
+collectHsValNewBinders ValBindsOut{} = panic "collectHsValNewBinders"
 
 collectHsBindBinders :: HsBindLR idL idR -> [idL]
-collectHsBindBinders b = collect_bind b []
+collectHsBindBinders b = collect_bind False b []
 
-collect_bind :: HsBindLR idL idR -> [idL] -> [idL]
-collect_bind (PatBind { pat_lhs = p })    acc = collect_lpat p acc
-collect_bind (FunBind { fun_id = L _ f }) acc = f : acc
-collect_bind (VarBind { var_id = f })     acc = f : acc
-collect_bind (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
+collect_bind :: Bool -> HsBindLR idL idR -> [idL] -> [idL]
+collect_bind _ (PatBind { pat_lhs = p })    acc = collect_lpat p acc
+collect_bind _ (FunBind { fun_id = L _ f }) acc = f : acc
+collect_bind _ (VarBind { var_id = f })     acc = f : acc
+collect_bind _ (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
   = map abe_poly dbinds ++ acc
         -- ++ foldr collect_bind acc binds
         -- I don't think we want the binders from the nested binds
         -- The only time we collect binders from a typechecked
         -- binding (hence see AbsBinds) is in zonking in TcHsSyn
-collect_bind (PatSynBind (PSB { psb_id = L _ ps })) acc = ps : acc
+collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc =
+    if omitPatSyn then acc else ps : acc
 
 collectHsBindsBinders :: LHsBindsLR idL idR -> [idL]
-collectHsBindsBinders binds = collect_binds binds []
+collectHsBindsBinders binds = collect_binds False binds []
 
 collectHsBindListBinders :: [LHsBindLR idL idR] -> [idL]
-collectHsBindListBinders = foldr (collect_bind . unLoc) []
+collectHsBindListBinders = foldr (collect_bind False . unLoc) []
 
-collect_binds :: LHsBindsLR idL idR -> [idL] -> [idL]
-collect_binds binds acc = foldrBag (collect_bind . unLoc) acc binds
+collect_binds :: Bool -> LHsBindsLR idL idR -> [idL] -> [idL]
+collect_binds omitPatSyn binds acc = foldrBag (collect_bind omitPatSyn . unLoc) acc binds
 
 collectMethodBinders :: LHsBindsLR RdrName idR -> [Located RdrName]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds

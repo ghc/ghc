@@ -114,7 +114,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
    -- bind the LHSes (and their fixities) in the global rdr environment
-   let { val_binders = collectHsValBinders new_lhs ;
+   let { val_binders = collectHsValNewBinders new_lhs ;
          all_bndrs   = extendNameSetList tc_bndrs val_binders ;
          val_avails  = map Avail val_binders  } ;
    traceRn (text "rnSrcDecls" <+> ppr val_avails) ;

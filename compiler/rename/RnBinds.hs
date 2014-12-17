@@ -436,12 +436,12 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
        ; return (bind { fun_id = L nameLoc newname
                       , bind_fvs = placeHolderNamesTc }) }
 
-rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname@(L nameLoc _) })
+rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
   = do { unless (isTopRecNameMaker name_maker) $
            addErr localPatternSynonymErr
        ; addLocM checkConName rdrname
-       ; name <- applyNameMaker name_maker rdrname
-       ; return (PatSynBind psb{ psb_id = L nameLoc name }) }
+       ; name <- lookupLocatedTopBndrRn rdrname
+       ; return (PatSynBind psb{ psb_id = name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
