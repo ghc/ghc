@@ -212,6 +212,11 @@ rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
 rnHsSigCps sig
   = CpsRn (rnHsBndrSig PatCtx sig)
 
+newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
+newPatLName name_maker rdr_name@(L loc _)
+  = do { name <- newPatName name_maker rdr_name
+       ; return (L loc name) }
+
 newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside ->
@@ -307,8 +312,9 @@ rnPat :: HsMatchContext Name -- for error messages
 rnPat ctxt pat thing_inside
   = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
 
-applyNameMaker :: NameMaker -> Located RdrName -> RnM Name
-applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatName mk rdr); return n }
+applyNameMaker :: NameMaker -> Located RdrName -> RnM (Located Name)
+applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
+                           ; return n }
 
 -- ----------- Entry point 2: rnBindPat -------------------
 -- Binds local names; in a recursive scope that involves other bound vars
@@ -392,17 +398,17 @@ rnPatAndThen _ (NPat lit mb_neg _eq)
        ; return (NPat lit' mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat rdr lit _ _)
-  = do { new_name <- newPatName mk rdr
+  = do { new_name <- newPatLName mk rdr
        ; lit'  <- liftCpsFV $ rnOverLit lit
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
-       ; return (NPlusKPat (L (nameSrcSpan new_name) new_name) lit' ge minus) }
+       ; return (NPlusKPat new_name lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat rdr pat)
-  = do { new_name <- newPatName mk rdr
+  = do { new_name <- newPatLName mk rdr
        ; pat' <- rnLPatAndThen mk pat
-       ; return (AsPat (L (nameSrcSpan new_name) new_name) pat') }
+       ; return (AsPat new_name pat') }
 
 rnPatAndThen mk p@(ViewPat expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM Opt_ViewPatterns

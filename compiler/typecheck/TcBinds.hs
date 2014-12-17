@@ -362,9 +362,9 @@ tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
         -- We want to keep non-recursive things non-recursive
         -- so that we desugar unlifted bindings correctly
   = do { let bind = case bagToList binds of
-                 [] -> panic "tc_group: empty list of binds"
                  [bind] -> bind
-                 _ -> panic "tc_group: NonRecursive binds is not a singleton bag"
+                 []     -> panic "tc_group: empty list of binds"
+                 _      -> panic "tc_group: NonRecursive binds is not a singleton bag"
        ; (bind', thing) <- tc_single top_lvl sig_fn prag_fn bind thing_inside
        ; return ( [(NonRecursive, bind')], thing) }
 
@@ -375,9 +375,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
         -- (This used to be optional, but isn't now.)
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
         ; when hasPatSyn $ recursivePatSynErr binds
-        ; (binds1, _ids, thing) <- go sccs
-             -- Here is where we should do bindInstsOfLocalFuns
-             -- if we start having Methods again
+        ; (binds1, thing) <- go sccs
         ; return ([(Recursive, binds1)], thing) }
                 -- Rec them all together
   where
@@ -388,12 +386,12 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
     sccs :: [SCC (LHsBind Name)]
     sccs = stronglyConnCompFromEdgedVertices (mkEdges sig_fn binds)
 
-    go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, [TcId], thing)
+    go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, thing)
     go (scc:sccs) = do  { (binds1, ids1, closed) <- tc_scc scc
-                        ; (binds2, ids2, thing)  <- tcExtendLetEnv top_lvl closed ids1 $
-                                                    go sccs
-                        ; return (binds1 `unionBags` binds2, ids1 ++ ids2, thing) }
-    go []         = do  { thing <- thing_inside; return (emptyBag, [], thing) }
+                        ; (binds2, thing) <- tcExtendLetEnv top_lvl closed ids1 $
+                                             go sccs
+                        ; return (binds1 `unionBags` binds2, thing) }
+    go []         = do  { thing <- thing_inside; return (emptyBag, thing) }
 
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
     tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
@@ -417,20 +415,14 @@ tc_single :: forall thing.
 tc_single _top_lvl sig_fn _prag_fn (L _ (PatSynBind psb@PSB{ psb_id = L _ name })) thing_inside
   = do { (pat_syn, aux_binds) <- tc_pat_syn_decl
        ; let tything = AConLike (PatSynCon pat_syn)
--- SLPJ: Why is this necessary?
---             implicit_ids = patSynMatcher pat_syn :
---                            maybeToList (patSynWorker pat_syn)
-
-       ; thing <- tcExtendGlobalEnv [tything] $
---                  tcExtendGlobalEnvImplicit (map AnId implicit_ids) $
-                  thing_inside
+       ; thing <- tcExtendGlobalEnv [tything] thing_inside
        ; return (aux_binds, thing)
        }
   where
     tc_pat_syn_decl = case sig_fn name of
-        Nothing -> tcInferPatSynDecl psb
+        Nothing                  -> tcInferPatSynDecl psb
         Just (TcPatSynInfo tpsi) -> tcCheckPatSynDecl psb tpsi
-        Just _  -> panic "tc_single"
+        Just                  _  -> panic "tc_single"
 
 tc_single top_lvl sig_fn prag_fn lbind thing_inside
   = do { (binds1, ids, closed) <- tcPolyBinds top_lvl sig_fn prag_fn
@@ -445,10 +437,9 @@ noCompleteSig Nothing    = True
 noCompleteSig (Just sig) = isPartialSig sig
 
 ------------------------
-mkEdges :: TcSigFun -> LHsBinds Name
-        -> [(LHsBind Name, BKey, [BKey])]
+mkEdges :: TcSigFun -> LHsBinds Name -> [Node BKey (LHsBind Name)]
 
-type BKey  = Int -- Just number off the bindings
+type BKey = Int -- Just number off the bindings
 
 mkEdges sig_fn binds
   = [ (bind, key, [key | n <- nameSetElems (bind_fvs (unLoc bind)),
@@ -463,24 +454,17 @@ mkEdges sig_fn binds
 
     key_map :: NameEnv BKey     -- Which binding it comes from
     key_map = mkNameEnv [(bndr, key) | (L _ bind, key) <- keyd_binds
-                                     , bndr <- bindersOfHsBind bind ]
-
-bindersOfHsBind :: HsBind Name -> [Name]
-bindersOfHsBind (PatBind { pat_lhs = pat })           = collectPatBinders pat
-bindersOfHsBind (FunBind { fun_id = L _ f })          = [f]
-bindersOfHsBind (PatSynBind PSB{ psb_id = L _ psyn }) = [psyn]
-bindersOfHsBind (AbsBinds {})                         = panic "bindersOfHsBind AbsBinds"
-bindersOfHsBind (VarBind {})                          = panic "bindersOfHsBind VarBind"
+                                     , bndr <- collectHsBindBinders bind ]
 
 ------------------------
 tcPolyBinds :: TopLevelFlag -> TcSigFun -> PragFun
-            -> RecFlag       -- Whether the group is really recursive
-            -> RecFlag       -- Whether it's recursive after breaking
-                             -- dependencies based on type signatures
-            -> [LHsBind Name]
+            -> RecFlag         -- Whether the group is really recursive
+            -> RecFlag         -- Whether it's recursive after breaking
+                               -- dependencies based on type signatures
+            -> [LHsBind Name]  -- None are PatSynBind
             -> TcM (LHsBinds TcId, [TcId], TopLevelFlag)
 
--- Typechecks a single bunch of bindings all together,
+-- Typechecks a single bunch of values bindings all together,
 -- and generalises them.  The bunch may be only part of a recursive
 -- group, because we use type signatures to maximise polymorphism
 --
@@ -489,6 +473,7 @@ tcPolyBinds :: TopLevelFlag -> TcSigFun -> PragFun
 -- important.
 --
 -- Knows nothing about the scope of the bindings
+-- None of the bindings are pattern synonyms
 
 tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
   = setSrcSpan loc                              $

@@ -94,9 +94,19 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    local_fix_env <- makeMiniFixityEnv fix_decls ;
 
    -- (B) Bring top level binders (and their fixities) into scope,
-   --     *except* for the value bindings, which get brought in below.
-   --     However *do* include class ops, data constructors
-   --     And for hs-boot files *do* include the value signatures
+   --     *except* for the value bindings, which get done in step (D)
+   --     with collectHsIdBinders. However *do* include
+   --
+   --        * Class ops, data constructors, and record fields,
+   --          because they do not have value declarations.
+   --          Aso step (C) depends on datacons and record fields
+   --
+   --        * Pattern synonyms, becuase they (and data constructors)
+   --          are needed for rnTopBindLHS (Trac #9889)
+   --
+   --        * For hs-boot files, include the value signatures
+   --          Again, they have no value declarations
+   --
    (tc_envs, tc_bndrs) <- getLocalNonValBinders local_fix_env group ;
    setEnvs tc_envs $ do {
 
@@ -114,12 +124,13 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
    -- bind the LHSes (and their fixities) in the global rdr environment
-   let { val_binders = collectHsValBinders new_lhs ;
+   let { val_binders = collectHsIdBinders new_lhs ;
+                       -- Not pattern-synonym binders, because we did
+                       -- them in step (B)
          all_bndrs   = extendNameSetList tc_bndrs val_binders ;
          val_avails  = map Avail val_binders  } ;
    traceRn (text "rnSrcDecls" <+> ppr val_avails) ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
-   traceRn (ptext (sLit "Val binders") <+> (ppr val_binders)) ;
    setEnvs (tcg_env, tcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
@@ -185,9 +196,8 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                              hs_vects  = rn_vect_decls,
                              hs_docs   = rn_docs } ;
 
-        tycl_bndrs = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
-        ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
-        other_def  = (Just (mkNameSet tycl_bndrs `unionNameSet` mkNameSet ford_bndrs), emptyNameSet) ;
+        tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_inst_decls rn_foreign_decls ;
+        other_def  = (Just (mkNameSet tcf_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
                               src_fvs5, src_fvs6, src_fvs7, src_fvs8,
                               src_fvs9] ;

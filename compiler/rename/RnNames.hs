@@ -499,14 +499,15 @@ getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
 -- Get all the top-level binders bound the group *except*
 -- for value bindings, which are treated separately
 -- Specifically we return AvailInfo for
---      type decls (incl constructors and record selectors)
---      class decls (including class ops)
---      associated types
---      foreign imports
---      (in hs-boot files) value signatures
+--      * type decls (incl constructors and record selectors)
+--      * class decls (including class ops)
+--      * associated types
+--      * foreign imports
+--      * pattern synonyms
+--      * value signatures (in hs-boot files)
 
 getLocalNonValBinders fixity_env
-     (HsGroup { hs_valds  = val_binds,
+     (HsGroup { hs_valds  = binds,
                 hs_tyclds = tycl_decls,
                 hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
@@ -523,11 +524,11 @@ getLocalNonValBinders fixity_env
         ; nti_avails <- concatMapM new_assoc inst_decls
 
           -- Finish off with value binders:
-          --    foreign decls for an ordinary module
+          --    foreign decls and pattern synonyms for an ordinary module
           --    type sigs in case of a hs-boot file only
         ; is_boot <- tcIsHsBootOrSig
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
-                        | otherwise = for_hs_bndrs
+                        | otherwise = for_hs_bndrs ++ patsyn_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = nti_avails ++ val_avails
@@ -537,15 +538,18 @@ getLocalNonValBinders fixity_env
         ; envs <- extendGlobalRdrEnvRn avails fixity_env
         ; return (envs, new_bndrs) } }
   where
+    ValBindsIn val_binds val_sigs = binds
+
     for_hs_bndrs :: [Located RdrName]
-    for_hs_bndrs = [ L decl_loc (unLoc nm)
-                   | L decl_loc (ForeignImport nm _ _ _) <- foreign_decls]
+    for_hs_bndrs = hsForeignDeclsBinders foreign_decls
+
+    patsyn_hs_bndrs :: [Located RdrName]
+    patsyn_hs_bndrs = hsPatSynBinders val_binds
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     hs_boot_sig_bndrs = [ L decl_loc (unLoc n)
                         | L decl_loc (TypeSig ns _ _) <- val_sigs, n <- ns]
-    ValBindsIn _ val_sigs = val_binds
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name

@@ -258,6 +258,9 @@ rnLocalValBindsLHS fix_env binds
          --   g = let f = ... in f
          -- should.
        ; let bound_names = collectHsValBinders binds'
+             -- There should be only Ids, but if there are any bogus
+             -- pattern synonyms, we'll collect them anyway, so that
+             -- we don't generate subsequent out-of-scope messages
        ; envs <- getRdrEnvs
        ; checkDupAndShadowedNames envs bound_names
 
@@ -431,22 +434,27 @@ rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
                 -- gets updated to the FVs of the whole bind
                 -- when doing the RHS below
 
-rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
-  = do { newname <- applyNameMaker name_maker name
-       ; return (bind { fun_id = L nameLoc newname
+rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
+  = do { name <- applyNameMaker name_maker rdr_name
+       ; return (bind { fun_id   = name
                       , bind_fvs = placeHolderNamesTc }) }
 
-rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname@(L nameLoc _) })
-  = do { unless (isTopRecNameMaker name_maker) $
-           addErr localPatternSynonymErr
-       ; addLocM checkConName rdrname
+rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
+  | isTopRecNameMaker name_maker
+  = do { addLocM checkConName rdrname
+       ; name <- lookupLocatedTopBndrRn rdrname   -- Should be bound at top level already
+       ; return (PatSynBind psb{ psb_id = name }) }
+
+  | otherwise  -- Pattern synonym, not at top level
+  = do { addErr localPatternSynonymErr  -- Complain, but make up a fake
+                                        -- name so that we can carry on
        ; name <- applyNameMaker name_maker rdrname
-       ; return (PatSynBind psb{ psb_id = L nameLoc name }) }
+       ; return (PatSynBind psb{ psb_id = name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
-      = hang (ptext (sLit "Illegal pattern synonym declaration"))
-           2 (ptext (sLit "Pattern synonym declarations are only valid in the top-level scope"))
+      = hang (ptext (sLit "Illegal pattern synonym declaration for") <+> quotes (ppr rdrname))
+           2 (ptext (sLit "Pattern synonym declarations are only valid at top level"))
 
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 

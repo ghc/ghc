@@ -61,12 +61,13 @@ module HsUtils(
 
   -- Collecting binders
   collectLocalBinders, collectHsValBinders, collectHsBindListBinders,
+  collectHsIdBinders,
   collectHsBindsBinders, collectHsBindBinders, collectMethodBinders,
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
 
-  hsLTyClDeclBinders, hsTyClDeclsBinders,
+  hsLTyClDeclBinders, hsTyClForeignBinders, hsPatSynBinders,
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
 
   -- Collecting implicit binders
@@ -596,39 +597,48 @@ So these functions should not be applied to (HsSyn RdrName)
 
 ----------------- Bindings --------------------------
 collectLocalBinders :: HsLocalBindsLR idL idR -> [idL]
-collectLocalBinders (HsValBinds val_binds) = collectHsValBinders val_binds
-collectLocalBinders (HsIPBinds _)   = []
-collectLocalBinders EmptyLocalBinds = []
+collectLocalBinders (HsValBinds binds) = collectHsIdBinders binds
+                                         -- No pattern synonyms here
+collectLocalBinders (HsIPBinds _)      = []
+collectLocalBinders EmptyLocalBinds    = []
 
-collectHsValBinders :: HsValBindsLR idL idR -> [idL]
-collectHsValBinders (ValBindsIn  binds _) = collectHsBindsBinders binds
-collectHsValBinders (ValBindsOut binds _) = foldr collect_one [] binds
-  where
-   collect_one (_,binds) acc = collect_binds binds acc
+collectHsIdBinders, collectHsValBinders :: HsValBindsLR idL idR -> [idL]
+-- Collect Id binders only, or Ids + pattern synonmys, respectively
+collectHsIdBinders  = collect_hs_val_binders True
+collectHsValBinders = collect_hs_val_binders False
 
 collectHsBindBinders :: HsBindLR idL idR -> [idL]
-collectHsBindBinders b = collect_bind b []
-
-collect_bind :: HsBindLR idL idR -> [idL] -> [idL]
-collect_bind (PatBind { pat_lhs = p })    acc = collect_lpat p acc
-collect_bind (FunBind { fun_id = L _ f }) acc = f : acc
-collect_bind (VarBind { var_id = f })     acc = f : acc
-collect_bind (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
-  = map abe_poly dbinds ++ acc
-        -- ++ foldr collect_bind acc binds
-        -- I don't think we want the binders from the nested binds
-        -- The only time we collect binders from a typechecked
-        -- binding (hence see AbsBinds) is in zonking in TcHsSyn
-collect_bind (PatSynBind (PSB { psb_id = L _ ps })) acc = ps : acc
+-- Collect both Ids and pattern-synonym binders
+collectHsBindBinders b = collect_bind False b []
 
 collectHsBindsBinders :: LHsBindsLR idL idR -> [idL]
-collectHsBindsBinders binds = collect_binds binds []
+collectHsBindsBinders binds = collect_binds False binds []
 
 collectHsBindListBinders :: [LHsBindLR idL idR] -> [idL]
-collectHsBindListBinders = foldr (collect_bind . unLoc) []
+-- Same as collectHsBindsBinders, but works over a list of bindings
+collectHsBindListBinders = foldr (collect_bind False . unLoc) []
 
-collect_binds :: LHsBindsLR idL idR -> [idL] -> [idL]
-collect_binds binds acc = foldrBag (collect_bind . unLoc) acc binds
+collect_hs_val_binders :: Bool -> HsValBindsLR idL idR -> [idL]
+collect_hs_val_binders ps (ValBindsIn  binds _) = collect_binds     ps binds []
+collect_hs_val_binders ps (ValBindsOut binds _) = collect_out_binds ps binds
+
+collect_out_binds :: Bool -> [(RecFlag, LHsBinds id)] -> [id]
+collect_out_binds ps = foldr (collect_binds ps . snd) []
+
+collect_binds :: Bool -> LHsBindsLR idL idR -> [idL] -> [idL]
+-- Collect Ids, or Ids + patter synonyms, depending on boolean flag
+collect_binds ps binds acc = foldrBag (collect_bind ps . unLoc) acc binds
+
+collect_bind :: Bool -> HsBindLR idL idR -> [idL] -> [idL]
+collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
+collect_bind _ (FunBind { fun_id = L _ f })        acc = f : acc
+collect_bind _ (VarBind { var_id = f })            acc = f : acc
+collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
+        -- I don't think we want the binders from the abe_binds
+        -- The only time we collect binders from a typechecked
+        -- binding (hence see AbsBinds) is in zonking in TcHsSyn
+collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc =
+    if omitPatSyn then acc else ps : acc
 
 collectMethodBinders :: LHsBindsLR RdrName idR -> [Located RdrName]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
@@ -728,21 +738,18 @@ So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
 hsGroupBinders :: HsGroup Name -> [Name]
 hsGroupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
                           hs_instds = inst_decls, hs_fords = foreign_decls })
--- Collect the binders of a Group
   =  collectHsValBinders val_decls
-  ++ hsTyClDeclsBinders tycl_decls inst_decls
-  ++ hsForeignDeclsBinders foreign_decls
+  ++ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
 
-hsForeignDeclsBinders :: [LForeignDecl Name] -> [Name]
-hsForeignDeclsBinders foreign_decls
-  = [n | L _ (ForeignImport (L _ n) _ _ _) <- foreign_decls]
-
-hsTyClDeclsBinders :: [TyClGroup Name] -> [Located (InstDecl Name)] -> [Name]
+hsTyClForeignBinders :: [TyClGroup Name] -> [LInstDecl Name]
+                     -> [LForeignDecl Name] -> [Name]
 -- We need to look at instance declarations too,
 -- because their associated types may bind data constructors
-hsTyClDeclsBinders tycl_decls inst_decls
-  = map unLoc (concatMap (concatMap hsLTyClDeclBinders . group_tyclds) tycl_decls ++
-               concatMap (hsInstDeclBinders . unLoc) inst_decls)
+hsTyClForeignBinders tycl_decls inst_decls foreign_decls
+  = map unLoc $
+    hsForeignDeclsBinders foreign_decls ++
+    concatMap (concatMap hsLTyClDeclBinders . group_tyclds) tycl_decls ++
+    concatMap hsLInstDeclBinders inst_decls
 
 -------------------
 hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
@@ -751,11 +758,8 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- mentioned in multiple constructors, the SrcLoc will be from the first
 -- occurrence.  We use the equality to filter out duplicate field names.
 --
--- Each returned (Located name) is wrapped in a @SrcSpan@ of the whole
--- /declaration/, not just the name itself (which is how it appears in
--- the syntax tree).  This SrcSpan (for the entire declaration) is used
--- as the SrcSpan for the Name that is finally produced, and hence for
--- error messages.  (See Trac #8607.)
+-- Each returned (Located name) has a SrcSpan for the /whole/ declaration.
+-- See Note [SrcSpan for binders]
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
   = [L loc name]
@@ -769,11 +773,33 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn
   = L loc name : hsDataDefnBinders defn
 
 -------------------
-hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
-hsInstDeclBinders (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } })
+hsForeignDeclsBinders :: [LForeignDecl name] -> [Located name]
+-- See Note [SrcSpan for binders]
+hsForeignDeclsBinders foreign_decls
+  = [ L decl_loc n
+    | L decl_loc (ForeignImport (L _ n) _ _ _) <- foreign_decls]
+
+-------------------
+hsPatSynBinders :: LHsBindsLR idL idR -> [Located idL]
+-- Collect pattern-synonym binders only, not Ids
+-- See Note [SrcSpan for binders]
+hsPatSynBinders binds = foldrBag addPatSynBndr [] binds
+
+addPatSynBndr :: LHsBindLR idL idR -> [Located idL] -> [Located idL]
+-- See Note [SrcSpan for binders]
+addPatSynBndr bind pss
+  | L bind_loc (PatSynBind (PSB { psb_id = L _ n })) <- bind
+  = L bind_loc n : pss
+  | otherwise
+  = pss
+
+-------------------
+hsLInstDeclBinders :: Eq name => LInstDecl name -> [Located name]
+hsLInstDeclBinders (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } }))
   = concatMap (hsDataFamInstBinders . unLoc) dfis
-hsInstDeclBinders (DataFamInstD { dfid_inst = fi }) = hsDataFamInstBinders fi
-hsInstDeclBinders (TyFamInstD {}) = []
+hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
+  = hsDataFamInstBinders fi
+hsLInstDeclBinders (L _ (TyFamInstD {})) = []
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
@@ -811,6 +837,16 @@ hsConDeclsBinders cons = go id cons
                 (map (L loc . unLoc) names) ++ go remSeen rs
 
 {-
+
+Note [SrcSpan for binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+When extracting the (Located RdrNme) for a binder, at least for the
+main name (the TyCon of a type declaration etc), we want to give it
+the @SrcSpan@ of the whole /declaration/, not just the name itself
+(which is how it appears in the syntax tree).  This SrcSpan (for the
+entire declaration) is used as the SrcSpan for the Name that is
+finally produced, and hence for error messages.  (See Trac #8607.)
+
 Note [Binders in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a type or data family instance declaration, the type
