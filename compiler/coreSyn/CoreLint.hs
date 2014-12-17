@@ -492,7 +492,7 @@ Note [Checking for INLINE loop breakers]
 It's very suspicious if a strong loop breaker is marked INLINE.
 
 However, the desugarer generates instance methods with INLINE pragmas
-that form a mutually recursive group.  Only afer a round of
+that form a mutually recursive group.  Only after a round of
 simplification are they unravelled.  So we suppress the test for
 the desugarer.
 
