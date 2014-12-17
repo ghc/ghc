@@ -19,8 +19,8 @@ debug:
 		> debug.cmm
 	cat debug.cmm | grep -o src\<debug.hs:.*\> | sort -u
 
-	# Common block elimination should elimation should merge the
-	# blocks corresponding to alternatives 1 and 2, therefore there
+	# Common block elimination should merge the blocks
+	# corresponding to alternatives 1 and 2, therefore there
 	# must be a block containing exactly these two annotations
 	# directly next to each other.
 	echo == CBE ==

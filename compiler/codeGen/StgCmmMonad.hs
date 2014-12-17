@@ -285,7 +285,7 @@ data ReturnKind
 -- clean up.
 --
 -- There are some rarer cases of common blocks that we don't catch
--- this way, but that's ok.  Common-block-elimation is still available
+-- this way, but that's ok.  Common-block-elimination is still available
 -- to catch them when optimisation is enabled.  Some examples are:
 --
 --   - when both the True and False branches do a heap check, we
