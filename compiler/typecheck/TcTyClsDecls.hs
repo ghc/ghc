@@ -1095,7 +1095,7 @@ Then in the family instance we want to
                      KindFam (Maybe k) k' a b = T k k' a b -> Int
 
 Notice that in the third step we quantify over all the visibly-mentioned
-type variables (a,b), but also over the implicitly mentioned kind varaibles
+type variables (a,b), but also over the implicitly mentioned kind variables
 (k, k').  In this case one is bound explicitly but often there will be
 none. The role of the kind signature (a :: Maybe k) is to add a constraint
 that 'a' must have that kind, and to bring 'k' into scope.

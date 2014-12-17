@@ -634,7 +634,7 @@ and if so refrain from quantifying over *any* equalites.
 simplifyRule :: RuleName
              -> WantedConstraints       -- Constraints from LHS
              -> WantedConstraints       -- Constraints from RHS
-             -> TcM ([EvVar], WantedConstraints)   -- LHS evidence varaibles
+             -> TcM ([EvVar], WantedConstraints)   -- LHS evidence variables
 -- See Note [Simplifying RULE constraints] in TcRule
 simplifyRule name lhs_wanted rhs_wanted
   = do {         -- We allow ourselves to unify environment

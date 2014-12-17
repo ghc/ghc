@@ -2644,7 +2644,7 @@ Note [Funky mkPiTypes]
 ~~~~~~~~~~~~~~~~~~~~~~
 Notice the funky mkPiTypes.  If the contructor has existentials
 it's possible that the join point will be abstracted over
-type varaibles as well as term variables.
+type variables as well as term variables.
  Example:  Suppose we have
         data T = forall t.  C [t]
  Then faced with

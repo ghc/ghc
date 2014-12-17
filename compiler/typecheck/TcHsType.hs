@@ -1374,7 +1374,7 @@ Here the type of x's first component is called 'a1' in one branch and
 they definitely won't have the sane lexical Name.
 
 I think we could solve this by recording in a SigTv a list of all the
-in-scope varaibles that it should not unify with, but it's fiddly.
+in-scope variables that it should not unify with, but it's fiddly.
 
 
 ************************************************************************
