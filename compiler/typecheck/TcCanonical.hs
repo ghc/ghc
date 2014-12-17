@@ -626,7 +626,9 @@ try_decompose_app :: CtEvidence -> EqRel
 --                so can't turn it into an application if it
 --                   doesn't look like one already
 -- See Note [Canonicalising type applications]
-try_decompose_app ev NomEq  ty1 ty2 = try_decompose_nom_app ev ty1 ty2
+try_decompose_app ev NomEq  ty1 ty2
+  = try_decompose_nom_app ev ty1 ty2
+
 try_decompose_app ev ReprEq ty1 ty2
   | ty1 `eqType` ty2   -- See Note [AppTy reflexivity check]
   = canEqReflexive ev ReprEq ty1
@@ -654,17 +656,17 @@ try_decompose_nom_app ev ty1 ty2
    = canEqNC ev NomEq ty1 ty2
    where
      -- do_decompose is like xCtEvidence, but recurses
-     -- to try_decompose_app to decompose a chain of AppTys
+     -- to try_decompose_nom_app to decompose a chain of AppTys
      do_decompose s1 t1 s2 t2
        | CtDerived { ctev_loc = loc } <- ev
        = do { emitNewDerived loc (mkTcEqPred t1 t2)
-            ; try_decompose_nom_app ev s1 s2 }
+            ; canEqNC ev NomEq s1 s2 }
        | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
        = do { ev_s <- newWantedEvVarNC loc (mkTcEqPred s1 s2)
             ; co_t <- unifyWanted loc Nominal t1 t2
             ; let co = mkTcAppCo (ctEvCoercion ev_s) co_t
             ; setEvBind evar (EvCoercion co)
-            ; try_decompose_nom_app ev_s s1 s2 }
+            ; canEqNC ev_s NomEq s1 s2 }
        | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- ev
        = do { let co   = evTermCoercion ev_tm
                   co_s = mkTcLRCo CLeft  co
@@ -672,7 +674,7 @@ try_decompose_nom_app ev ty1 ty2
             ; evar_s <- newGivenEvVar loc (mkTcEqPred s1 s2, EvCoercion co_s)
             ; evar_t <- newGivenEvVar loc (mkTcEqPred t1 t2, EvCoercion co_t)
             ; emitWorkNC [evar_t]
-            ; try_decompose_nom_app evar_s s1 s2 }
+            ; canEqNC evar_s NomEq s1 s2 }
        | otherwise  -- Can't happen
        = error "try_decompose_app"
 

@@ -436,3 +436,5 @@ test('T9497b', normal, compile, ['-fdefer-typed-holes -fno-warn-typed-holes'])
 test('T9497c', normal, compile, ['-fdefer-type-errors -fno-warn-typed-holes'])
 test('T7643', normal, compile, [''])
 test('T9834', normal, compile, [''])
+test('T9892', normal, compile, [''])
+
