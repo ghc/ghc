@@ -23,7 +23,9 @@ of arguments of combining function.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqFM (
@@ -211,8 +213,10 @@ instance Monoid (UniqFM a) where
 -}
 
 newtype UniqFM ele = UFM (M.IntMap ele)
-  deriving (Data, Eq, Foldable.Foldable, Functor, Traversable.Traversable,
+  deriving (Data, Eq, Functor, Traversable.Traversable,
             Typeable)
+
+deriving instance Foldable.Foldable UniqFM
 
 emptyUFM = UFM M.empty
 isNullUFM (UFM m) = M.null m
