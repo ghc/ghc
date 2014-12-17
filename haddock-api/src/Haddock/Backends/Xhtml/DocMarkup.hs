@@ -22,12 +22,12 @@ module Haddock.Backends.Xhtml.DocMarkup (
 import Control.Applicative ((<$>))
 
 import Data.List
-import Data.Monoid (mconcat)
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils
-import Haddock.Doc (combineDocumentation, emptyMetaDoc, metaDocAppend)
+import Haddock.Doc (combineDocumentation, emptyMetaDoc,
+                    metaDocAppend, metaConcat)
 
 import Text.XHtml hiding ( name, p, quote )
 import Data.Maybe (fromMaybe)
@@ -152,7 +152,7 @@ flatten x = [x]
 hackMarkup :: DocMarkup id Html -> Hack (ModuleName, OccName) id -> Html
 hackMarkup fmt' h' =
   let (html, ms) = hackMarkup' fmt' h'
-  in html +++ renderMeta fmt' (mconcat ms)
+  in html +++ renderMeta fmt' (metaConcat ms)
   where
     hackMarkup' :: DocMarkup id Html -> Hack (ModuleName, OccName) id
                 -> (Html, [Meta])

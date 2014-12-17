@@ -15,7 +15,6 @@
 module Documentation.Haddock.Types where
 
 import Data.Foldable
-import Data.Monoid
 import Data.Traversable
 
 -- | With the advent of 'Version', we may want to start attaching more
@@ -23,11 +22,6 @@ import Data.Traversable
 -- so we don't have to gut half the core each time we want to add such
 -- info.
 newtype Meta = Meta { _version :: Maybe Version } deriving (Eq, Show)
-
-instance Monoid Meta where
-  mempty = Meta { _version = Nothing }
-  Meta { _version = v } `mappend` Meta { _version = v' } =
-    Meta { _version = v `mappend` v' }
 
 data MetaDoc mod id =
   MetaDoc { _meta :: Meta
