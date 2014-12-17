@@ -73,15 +73,24 @@ type HsLocalBinds id = HsLocalBindsLR id id
 -- or a 'where' clause
 data HsLocalBindsLR idL idR
   = HsValBinds (HsValBindsLR idL idR)
+         -- There should be no pattern synonyms in the HsValBindsLR
+         -- These are *local* (not top level) bindings
+         -- The parser accepts them, however, leaving the the
+         -- renamer to report them
+
   | HsIPBinds  (HsIPBinds idR)
+
   | EmptyLocalBinds
   deriving (Typeable)
+
 deriving instance (DataId idL, DataId idR)
   => Data (HsLocalBindsLR idL idR)
 
 type HsValBinds id = HsValBindsLR id id
 
 -- | Value bindings (not implicit parameters)
+-- Used for both top level and nested bindings
+-- May contain pattern synonym bindings
 data HsValBindsLR idL idR
   = -- | Before renaming RHS; idR is always RdrName
     -- Not dependency analysed
@@ -97,6 +106,7 @@ data HsValBindsLR idL idR
         [(RecFlag, LHsBinds idL)]
         [LSig Name]
   deriving (Typeable)
+
 deriving instance (DataId idL, DataId idR)
   => Data (HsValBindsLR idL idR)
 

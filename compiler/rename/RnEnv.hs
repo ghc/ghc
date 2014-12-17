@@ -260,7 +260,7 @@ lookupTopBndrRn :: RdrName -> RnM Name
 lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
                        case nopt of
                          Just n' -> return n'
-                         Nothing -> do traceRn $ text "lookupTopBndrRn"
+                         Nothing -> do traceRn $ (text "lookupTopBndrRn fail" <+> ppr n)
                                        unboundName WL_LocalTop n
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
