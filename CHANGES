@@ -14,6 +14,18 @@ Changes in version 2.16.0
 
  * Print missing docs by default and add --no-print-missing-docs
 
+ * parser: now parses out some meta data too, breaking the API
+
+ * parser: markdown syntax for images and URLs is now accepted:
+   <<foo>> style for images and <foo bar> style for links is now
+   considered deprecated. <foo> for links is still OK.
+
+ * parser: add support for @since element: this is paragraph-level
+   element of the form ‘@since x.y.z’ where x.y.z is the version
+   number. The way it is rendered is subject to change.
+
+ * properly render package ID (not package key) in index (#329)
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
