@@ -2210,6 +2210,40 @@ This belongs to the list above!
 
       </section>
 
+      <section>
+        <title>Metadata</title>
+        <para>Since Haddock 2.16.0, some support for embedding
+        metadata in the comments has started to appear. The use of
+        such data aims to standardise various community conventions in
+        how such information is conveyed and to provide uniform
+        rendering.
+        </para>
+
+        <section>
+          <title>Since</title>
+          <para><literal>@since</literal> annotation can be used to
+          convey information about when the function was introduced or
+          when it has changed in the way significant to the user.
+          <literal>@since</literal> is a paragraph-level element.
+          While multiple such annotations are not an error, only the
+          one to appear in the comment last will be used.
+          <literal>@since</literal> has to be followed with a version
+          number, no further description is currently allowed. The
+          meaning of this feature is subject to change in the future
+          per user feedback.
+          </para>
+
+<programlisting>
+-- |
+-- Some comment
+--
+-- @since 1.2.3
+</programlisting>
+
+        </section>
+
+      </section>
+
     </section>
   </chapter>
   <index/>
