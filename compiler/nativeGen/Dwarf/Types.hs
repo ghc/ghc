@@ -14,6 +14,7 @@ module Dwarf.Types
   , pprLEBWord
   , pprLEBInt
   , wordAlign
+  , sectionOffset
   )
   where
 
@@ -94,7 +95,9 @@ pprAbbrevDecls haveDebugLine =
        [ (dW_AT_name, dW_FORM_string)
        , (dW_AT_low_pc, dW_FORM_addr)
        , (dW_AT_high_pc, dW_FORM_addr)
-       ]
+       ] $$
+     pprByte 0
+
 -- | Generate assembly for DWARF data
 pprDwarfInfo :: Bool -> DwarfInfo -> SDoc
 pprDwarfInfo haveSrc d
@@ -113,7 +116,7 @@ pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lineLbl) =
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
   $$ if haveSrc
-     then pprData4' (ptext lineLbl <> char '-' <> ptext dwarfLineLabel)
+     then pprData4' (sectionOffset lineLbl dwarfLineLabel)
      else empty
 pprDwarfInfoOpen _ (DwarfSubprogram _ name label) = sdocWithDynFlags $ \df ->
   pprAbbrev DwAbbrSubprogram
@@ -416,3 +419,14 @@ pprString = pprString' . hcat . map escape
                          char (intToDigit (ch `div` 64)) <>
                          char (intToDigit ((ch `div` 8) `mod` 8)) <>
                          char (intToDigit (ch `mod` 8))
+
+-- | Generate an offset into another section. This is tricky because
+-- this is handled differently depending on platform: Mac Os expects
+-- us to calculate the offset using assembler arithmetic. Meanwhile,
+-- GNU tools expect us to just reference the target directly, and will
+-- figure out on their own that we actually need an offset.
+sectionOffset :: LitString -> LitString -> SDoc
+sectionOffset target section = sdocWithPlatform $ \plat ->
+  case platformOS plat of
+    OSDarwin -> ptext target <> char '-' <> ptext section
+    _other   -> ptext target

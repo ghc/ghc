@@ -660,6 +660,8 @@ instance Ord CmmTickScope where
 
 instance Outputable CmmTickScope where
   ppr GlobalScope     = text "global"
+  ppr (SubScope us GlobalScope)
+                      = ppr us
   ppr (SubScope us s) = ppr s <> char '/' <> ppr us
   ppr combined        = parens $ hcat $ punctuate (char '+') $
                         map (hcat . punctuate (char '/') . map ppr . reverse) $
@@ -675,10 +677,11 @@ isTickSubScope = cmp
         cmp s              (CombinedScope s1' s2') = cmp s s1' || cmp s s2'
         cmp (SubScope u s) s'@(SubScope u' _)      = u == u' || cmp s s'
 
--- | Combine two tick scopes. This smart constructor will catch cases
--- where one tick scope is a sub-scope of the other already.
+-- | Combine two tick scopes. The new scope should be sub-scope of
+-- both parameters. We simplfy automatically if one tick scope is a
+-- sub-scope of the other already.
 combineTickScopes :: CmmTickScope -> CmmTickScope -> CmmTickScope
 combineTickScopes s1 s2
-  | s1 `isTickSubScope` s2 = s2
-  | s2 `isTickSubScope` s1 = s1
+  | s1 `isTickSubScope` s2 = s1
+  | s2 `isTickSubScope` s1 = s2
   | otherwise              = CombinedScope s1 s2
