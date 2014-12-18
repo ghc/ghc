@@ -10,8 +10,12 @@ module TcPluginM (
         tcPluginTrace,
         unsafeTcPluginTcM,
 
-        -- * Lookup
-        lookupRdrName,
+        -- * Finding Modules and Names
+        FindResult(..),
+        findImportedModule,
+        lookupOrig,
+
+        -- * Looking up Names in the typechecking environment
         tcLookupGlobal,
         tcLookupTyCon,
         tcLookupDataCon,
@@ -24,6 +28,7 @@ module TcPluginM (
         getEnvs,
         getInstEnvs,
         getFamInstEnvs,
+        matchFam,
 
         -- * Type variables
         newFlexiTyVar,
@@ -37,29 +42,32 @@ module TcPluginM (
 
 #ifdef GHCI
 import qualified TcRnMonad
+import qualified TcSMonad
 import qualified TcEnv
 import qualified TcMType
 import qualified Inst
 import qualified FamInst
+import qualified IfaceEnv
+import qualified Finder
 
 import FamInstEnv ( FamInstEnv )
 import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, TcPluginM
                   , unsafeTcPluginTcM, liftIO, traceTc )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
+import TcEvidence ( TcCoercion )
 
 import Module
 import Name
-import RdrName
 import TyCon
 import DataCon
 import Class
 import HscTypes
 import Outputable
 import Type
-import DynamicLoading
 import Id
 import InstEnv
+import FastString
 
 
 -- | Perform some IO, typically to interact with an external tool.
@@ -71,10 +79,14 @@ tcPluginTrace :: String -> SDoc -> TcPluginM ()
 tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 
 
-lookupRdrName :: ModuleName -> RdrName -> TcPluginM (Maybe Name)
-lookupRdrName mod rdr = do
-  hsc_env <- getTopEnv
-  tcPluginIO $ lookupRdrNameInModuleForPlugins hsc_env mod rdr
+findImportedModule :: ModuleName -> Maybe FastString -> TcPluginM FindResult
+findImportedModule mod_name mb_pkg = do
+    hsc_env <- getTopEnv
+    tcPluginIO $ Finder.findImportedModule hsc_env mod_name mb_pkg
+
+lookupOrig :: Module -> OccName -> TcPluginM Name
+lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod
+
 
 tcLookupGlobal :: Name -> TcPluginM TyThing
 tcLookupGlobal = unsafeTcPluginTcM . TcEnv.tcLookupGlobal
@@ -106,6 +118,9 @@ getInstEnvs = unsafeTcPluginTcM Inst.tcGetInstEnvs
 
 getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)
 getFamInstEnvs = unsafeTcPluginTcM FamInst.tcGetFamInstEnvs
+
+matchFam :: TyCon -> [Type] -> TcPluginM (Maybe (TcCoercion, TcType))
+matchFam tycon args = unsafeTcPluginTcM $ TcSMonad.matchFamTcM tycon args
 
 
 newFlexiTyVar :: Kind -> TcPluginM TcTyVar

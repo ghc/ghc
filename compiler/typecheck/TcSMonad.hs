@@ -80,7 +80,7 @@ module TcSMonad (
 
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
-    matchFam,
+    matchFam, matchFamTcM,
     checkWellStagedDFun,
     pprEq                                    -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the
@@ -1739,9 +1739,12 @@ instDFunConstraints loc = mapM (newWantedEvVar loc)
 
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+matchFam tycon args = wrapTcS $ matchFamTcM tycon args
+
+matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (TcCoercion, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
-matchFam tycon args
-  = do { fam_envs <- getFamInstEnvs
+matchFamTcM tycon args
+  = do { fam_envs <- FamInst.tcGetFamInstEnvs
        ; return $ fmap (first TcCoercion) $
          reduceTyFamApp_maybe fam_envs Nominal tycon args }
 

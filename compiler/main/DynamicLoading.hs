@@ -184,14 +184,20 @@ lessUnsafeCoerce dflags context what = do
     return output
 
 
--- | Finds the 'Name' corresponding to the given 'RdrName' in the context of the 'ModuleName'. Returns @Nothing@ if no
--- such 'Name' could be found. Any other condition results in an exception:
+-- | Finds the 'Name' corresponding to the given 'RdrName' in the
+-- context of the 'ModuleName'. Returns @Nothing@ if no such 'Name'
+-- could be found. Any other condition results in an exception:
 --
 -- * If the module could not be found
 -- * If we could not determine the imports of the module
 --
--- Can only be used for lookuping up names while handling plugins.
--- This was introduced by 57d6798.
+-- Can only be used for looking up names while loading plugins (and is
+-- *not* suitable for use within plugins).  The interface file is
+-- loaded very partially: just enough that it can be used, without its
+-- rules and instances affecting (and being linked from!) the module
+-- being compiled.  This was introduced by 57d6798.
+--
+-- See Note [Care with plugin imports] in LoadIface.
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the package the module resides in by searching exposed packages and home modules
