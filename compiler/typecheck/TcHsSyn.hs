@@ -1427,8 +1427,8 @@ zonkCoToCo env co
     go (TyConAppCo r tc args)    = mkTyConAppCo r tc <$> mapM go args
     go (AppCo co arg)            = mkAppCo <$> go co <*> go arg
     go (AxiomInstCo ax ind args) = AxiomInstCo ax ind <$> mapM go args
-    go (UnivCo r ty1 ty2)        = mkUnivCo r <$> zonkTcTypeToType env ty1
-                                              <*> zonkTcTypeToType env ty2
+    go (UnivCo s r ty1 ty2)      = mkUnivCo s r <$> zonkTcTypeToType env ty1
+                                                <*> zonkTcTypeToType env ty2
     go (SymCo co)                = mkSymCo <$> go co
     go (TransCo co1 co2)         = mkTransCo <$> go co1 <*> go co2
     go (NthCo n co)              = mkNthCo n <$> go co

@@ -199,9 +199,9 @@ opt_co4 env sym rep r (AxiomInstCo con ind cos)
                                  cos)
       -- Note that the_co does *not* have sym pushed into it
 
-opt_co4 env sym rep r (UnivCo _r oty1 oty2)
+opt_co4 env sym rep r (UnivCo s _r oty1 oty2)
   = ASSERT( r == _r )
-    opt_univ env (chooseRole rep r) a b
+    opt_univ env s (chooseRole rep r) a b
   where
     (a,b) = if sym then (oty2,oty1) else (oty1,oty2)
 
@@ -266,24 +266,24 @@ opt_co4 env sym rep r (AxiomRuleCo co ts cs)
 opt_phantom :: CvSubst -> SymFlag -> Coercion -> NormalCo
 opt_phantom env sym co
   = if sym
-    then opt_univ env Phantom ty2 ty1
-    else opt_univ env Phantom ty1 ty2
+    then opt_univ env (fsLit "opt_phantom") Phantom ty2 ty1
+    else opt_univ env (fsLit "opt_phantom") Phantom ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
 
-opt_univ :: CvSubst -> Role -> Type -> Type -> Coercion
-opt_univ env role oty1 oty2
+opt_univ :: CvSubst -> FastString -> Role -> Type -> Type -> Coercion
+opt_univ env prov role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
-  = mkTyConAppCo role tc1 (zipWith3 (opt_univ env) (tyConRolesX role tc1) tys1 tys2)
+  = mkTyConAppCo role tc1 (zipWith3 (opt_univ env prov) (tyConRolesX role tc1) tys1 tys2)
 
   | Just (l1, r1) <- splitAppTy_maybe oty1
   , Just (l2, r2) <- splitAppTy_maybe oty2
   , typeKind l1 `eqType` typeKind l2   -- kind(r1) == kind(r2) by consequence
   = let role' = if role == Phantom then Phantom else Nominal in
        -- role' is to comform to mkAppCo's precondition
-    mkAppCo (opt_univ env role l1 l2) (opt_univ env role' r1 r2)
+    mkAppCo (opt_univ env prov role l1 l2) (opt_univ env prov role' r1 r2)
 
   | Just (tv1, ty1) <- splitForAllTy_maybe oty1
   , Just (tv2, ty2) <- splitForAllTy_maybe oty2
@@ -291,10 +291,10 @@ opt_univ env role oty1 oty2
   = case substTyVarBndr2 env tv1 tv2 of { (env1, env2, tv') ->
     let ty1' = substTy env1 ty1
         ty2' = substTy env2 ty2 in
-    mkForAllCo tv' (opt_univ (zapCvSubstEnv2 env1 env2) role ty1' ty2') }
+    mkForAllCo tv' (opt_univ (zapCvSubstEnv2 env1 env2) prov role ty1' ty2') }
 
   | otherwise
-  = mkUnivCo role (substTy env oty1) (substTy env oty2)
+  = mkUnivCo prov role (substTy env oty1) (substTy env oty2)
 
 -------------
 -- NthCo must be handled separately, because it's the one case where we can't

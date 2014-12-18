@@ -528,7 +528,9 @@ lkC env co m
     go (AxiomInstCo ax ind cs) = km_axiom  >.> lkNamed ax >=> lookupTM ind >=> lkList (lkC env) cs
     go (AppCo c1 c2)           = km_app    >.> lkC env c1 >=> lkC env c2
     go (TransCo c1 c2)         = km_trans  >.> lkC env c1 >=> lkC env c2
-    go (UnivCo r t1 t2)        = km_univ   >.> lookupTM r >=> lkT env t1 >=> lkT env t2
+
+    -- the provenance is not used in the map
+    go (UnivCo _ r t1 t2)      = km_univ   >.> lookupTM r >=> lkT env t1 >=> lkT env t2
     go (InstCo c t)            = km_inst   >.> lkC env c  >=> lkT env t
     go (ForAllCo v c)          = km_forall >.> lkC (extendCME env v) c >=> lkBndr env v
     go (CoVarCo v)             = km_var    >.> lkVar env v
@@ -550,7 +552,8 @@ xtC env (TyConAppCo r tc cs)    f m = m { km_tc_app = km_tc_app m |> xtR r |>> x
 xtC env (AxiomInstCo ax ind cs) f m = m { km_axiom  = km_axiom m  |> xtNamed ax |>> xtInt ind |>> xtList (xtC env) cs f }
 xtC env (AppCo c1 c2)           f m = m { km_app    = km_app m    |> xtC env c1 |>> xtC env c2 f }
 xtC env (TransCo c1 c2)         f m = m { km_trans  = km_trans m  |> xtC env c1 |>> xtC env c2 f }
-xtC env (UnivCo r t1 t2)        f m = m { km_univ   = km_univ   m |> xtR r |>> xtT env t1 |>> xtT env t2 f }
+-- the provenance is not used in the map
+xtC env (UnivCo _ r t1 t2)        f m = m { km_univ   = km_univ   m |> xtR r |>> xtT env t1 |>> xtT env t2 f }
 xtC env (InstCo c t)            f m = m { km_inst   = km_inst m   |> xtC env c  |>> xtT env t  f }
 xtC env (ForAllCo v c)          f m = m { km_forall = km_forall m |> xtC (extendCME env v) c
                                                       |>> xtBndr env v f }

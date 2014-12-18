@@ -1124,7 +1124,7 @@ lintCoercion (CoVarCo cv)
                                      2 (ppr cv)) }
        ; return (k, s, t, r) }
 
-lintCoercion (UnivCo r ty1 ty2)
+lintCoercion (UnivCo _prov r ty1 ty2)
   = do { k1 <- lintType ty1
        ; _k2 <- lintType ty2
 --       ; unless (k1 `eqKind` k2) $

@@ -957,7 +957,7 @@ ds_tc_coercion subst tc_co
                                 (subst', tv') = Coercion.substTyVarBndr subst tv
     go (TcAxiomInstCo ax ind cos)
                                 = AxiomInstCo ax ind (map go cos)
-    go (TcPhantomCo ty1 ty2)    = UnivCo Phantom ty1 ty2
+    go (TcPhantomCo ty1 ty2)    = UnivCo (fsLit "ds_tc_coercion") Phantom ty1 ty2
     go (TcSymCo co)             = mkSymCo (go co)
     go (TcTransCo co1 co2)      = mkTransCo (go co1) (go co2)
     go (TcNthCo n co)           = mkNthCo n (go co)

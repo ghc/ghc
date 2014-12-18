@@ -177,7 +177,8 @@ data Coercion
      -- See [Coercion axioms applied to coercions]
 
          -- see Note [UnivCo]
-  | UnivCo Role Type Type      -- :: "e" -> _ -> _ -> e
+  | UnivCo FastString Role Type Type -- :: "e" -> _ -> _ -> e
+                               -- the FastString is just a note for provenance
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
 
@@ -524,7 +525,7 @@ tyCoVarsOfCo (AppCo co1 co2)       = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo
 tyCoVarsOfCo (ForAllCo tv co)      = tyCoVarsOfCo co `delVarSet` tv
 tyCoVarsOfCo (CoVarCo v)           = unitVarSet v
 tyCoVarsOfCo (AxiomInstCo _ _ cos) = tyCoVarsOfCos cos
-tyCoVarsOfCo (UnivCo _ ty1 ty2)    = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
+tyCoVarsOfCo (UnivCo _ _ ty1 ty2)  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 tyCoVarsOfCo (SymCo co)            = tyCoVarsOfCo co
 tyCoVarsOfCo (TransCo co1 co2)     = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
 tyCoVarsOfCo (NthCo _ co)          = tyCoVarsOfCo co
@@ -544,7 +545,7 @@ coVarsOfCo (AppCo co1 co2)       = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (ForAllCo _ co)       = coVarsOfCo co
 coVarsOfCo (CoVarCo v)           = unitVarSet v
 coVarsOfCo (AxiomInstCo _ _ cos) = coVarsOfCos cos
-coVarsOfCo (UnivCo _ _ _)        = emptyVarSet
+coVarsOfCo (UnivCo _ _ _ _)      = emptyVarSet
 coVarsOfCo (SymCo co)            = coVarsOfCo co
 coVarsOfCo (TransCo co1 co2)     = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (NthCo _ co)          = coVarsOfCo co
@@ -563,7 +564,7 @@ coercionSize (AppCo co1 co2)       = coercionSize co1 + coercionSize co2
 coercionSize (ForAllCo _ co)       = 1 + coercionSize co
 coercionSize (CoVarCo _)           = 1
 coercionSize (AxiomInstCo _ _ cos) = 1 + sum (map coercionSize cos)
-coercionSize (UnivCo _ ty1 ty2)  = typeSize ty1 + typeSize ty2
+coercionSize (UnivCo _ _ ty1 ty2)  = typeSize ty1 + typeSize ty2
 coercionSize (SymCo co)            = 1 + coercionSize co
 coercionSize (TransCo co1 co2)     = 1 + coercionSize co1 + coercionSize co2
 coercionSize (NthCo _ co)          = 1 + coercionSize co
@@ -597,7 +598,7 @@ tidyCo env@(_, subst) co
                                   Just cv' -> CoVarCo cv'
     go (AxiomInstCo con ind cos) = let args = tidyCos env cos
                                    in args `seqList` AxiomInstCo con ind args
-    go (UnivCo r ty1 ty2)     = (UnivCo r $! tidyType env ty1) $! tidyType env ty2
+    go (UnivCo s r ty1 ty2)   = (UnivCo s r $! tidyType env ty1) $! tidyType env ty2
     go (SymCo co)             = SymCo $! go co
     go (TransCo co1 co2)      = (TransCo $! go co1) $! go co2
     go (NthCo d co)           = NthCo d $! go co
@@ -658,7 +659,7 @@ ppr_co p co@(TransCo {}) = maybeParen p FunPrec $
 ppr_co p (InstCo co ty) = maybeParen p TyConPrec $
                           pprParendCo co <> ptext (sLit "@") <> pprType ty
 
-ppr_co p (UnivCo r ty1 ty2) = pprPrefixApp p (ptext (sLit "UnivCo") <+> ppr r)
+ppr_co p (UnivCo s r ty1 ty2) = pprPrefixApp p (ptext (sLit "UnivCo") <+> ftext s <+> ppr r)
                                            [pprParendType ty1, pprParendType ty2]
 ppr_co p (SymCo co)         = pprPrefixApp p (ptext (sLit "Sym")) [pprParendCo co]
 ppr_co p (NthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <> int n) [pprParendCo co]
@@ -1008,7 +1009,7 @@ mkSymCo :: Coercion -> Coercion
 -- Do a few simple optimizations, but don't bother pushing occurrences
 -- of symmetry to the leaves; the optimizer will take care of that.
 mkSymCo co@(Refl {})             = co
-mkSymCo    (UnivCo r ty1 ty2)    = UnivCo r ty2 ty1
+mkSymCo    (UnivCo s r ty1 ty2)  = UnivCo s r ty2 ty1
 mkSymCo    (SymCo co)            = co
 mkSymCo co                       = SymCo co
 
@@ -1056,12 +1057,12 @@ mkInstCo co ty = InstCo co ty
 --   @unsafeCoerce#@ primitive.  Optimise by pushing
 --   down through type constructors.
 mkUnsafeCo :: Type -> Type -> Coercion
-mkUnsafeCo = mkUnivCo Representational
+mkUnsafeCo = mkUnivCo (fsLit "mkUnsafeCo") Representational
 
-mkUnivCo :: Role -> Type -> Type -> Coercion
-mkUnivCo role ty1 ty2
+mkUnivCo :: FastString -> Role -> Type -> Type -> Coercion
+mkUnivCo prov role ty1 ty2
   | ty1 `eqType` ty2 = Refl role ty1
-  | otherwise        = UnivCo role ty1 ty2
+  | otherwise        = UnivCo prov role ty1 ty2
 
 mkAxiomRuleCo :: CoAxiomRule -> [Type] -> [Coercion] -> Coercion
 mkAxiomRuleCo = AxiomRuleCo
@@ -1071,7 +1072,7 @@ mkSubCo :: Coercion -> Coercion
 mkSubCo (Refl Nominal ty) = Refl Representational ty
 mkSubCo (TyConAppCo Nominal tc cos)
   = TyConAppCo Representational tc (applyRoles tc cos)
-mkSubCo (UnivCo Nominal ty1 ty2) = UnivCo Representational ty1 ty2
+mkSubCo (UnivCo s Nominal ty1 ty2) = UnivCo s Representational ty1 ty2
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
 
@@ -1106,7 +1107,7 @@ setNominalRole_maybe (Refl _ ty) = Just $ Refl Nominal ty
 setNominalRole_maybe (TyConAppCo Representational tc coes)
   = do { cos' <- mapM setNominalRole_maybe coes
        ; return $ TyConAppCo Nominal tc cos' }
-setNominalRole_maybe (UnivCo Representational ty1 ty2) = Just $ UnivCo Nominal ty1 ty2
+setNominalRole_maybe (UnivCo s Representational ty1 ty2) = Just $ UnivCo s Nominal ty1 ty2
   -- We do *not* promote UnivCo Phantom, as that's unsafe.
   -- UnivCo Nominal is no more unsafe than UnivCo Representational
 setNominalRole_maybe (TransCo co1 co2)
@@ -1125,7 +1126,7 @@ setNominalRole_maybe _ = Nothing
 mkPhantomCo :: Coercion -> Coercion
 mkPhantomCo co
   | Just ty <- isReflCo_maybe co    = Refl Phantom ty
-  | Pair ty1 ty2 <- coercionKind co = UnivCo Phantom ty1 ty2
+  | Pair ty1 ty2 <- coercionKind co = UnivCo (fsLit "mkPhantomCo") Phantom ty1 ty2
   -- don't optimise here... wait for OptCoercion
 
 -- All input coercions are assumed to be Nominal,
@@ -1355,7 +1356,8 @@ coreEqCoercion2 env (AxiomInstCo con1 ind1 cos1) (AxiomInstCo con2 ind2 cos2)
     && ind1 == ind2
     && all2 (coreEqCoercion2 env) cos1 cos2
 
-coreEqCoercion2 env (UnivCo r1 ty11 ty12) (UnivCo r2 ty21 ty22)
+-- the provenance string is just a note, so don't use in comparisons
+coreEqCoercion2 env (UnivCo _ r1 ty11 ty12) (UnivCo _ r2 ty21 ty22)
   = r1 == r2 && eqTypeX env ty11 ty21 && eqTypeX env ty12 ty22
 
 coreEqCoercion2 env (SymCo co1) (SymCo co2)
@@ -1517,7 +1519,7 @@ subst_co subst co
                                    ForAllCo tv' $! subst_co subst' co
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! map go cos
-    go (UnivCo r ty1 ty2)    = (UnivCo r $! go_ty ty1) $! go_ty ty2
+    go (UnivCo s r ty1 ty2)  = (UnivCo s r $! go_ty ty1) $! go_ty ty2
     go (SymCo co)            = mkSymCo (go co)
     go (TransCo co1 co2)     = mkTransCo (go co1) (go co2)
     go (NthCo d co)          = mkNthCo d (go co)
@@ -1646,7 +1648,8 @@ ty_co_subst subst role ty
     go role ty@(LitTy {})     = ASSERT( role == Nominal )
                                 mkReflCo role ty
 
-    lift_phantom ty = mkUnivCo Phantom (liftCoSubstLeft  subst ty)
+    lift_phantom ty = mkUnivCo (fsLit "lift_phantom")
+                               Phantom (liftCoSubstLeft  subst ty)
                                        (liftCoSubstRight subst ty)
 
 {-
@@ -1817,7 +1820,7 @@ seqCo (AppCo co1 co2)           = seqCo co1 `seq` seqCo co2
 seqCo (ForAllCo tv co)          = tv `seq` seqCo co
 seqCo (CoVarCo cv)              = cv `seq` ()
 seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
-seqCo (UnivCo r ty1 ty2)        = r `seq` seqType ty1 `seq` seqType ty2
+seqCo (UnivCo s r ty1 ty2)      = s `seq` r `seq` seqType ty1 `seq` seqType ty2
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
 seqCo (NthCo _ co)              = seqCo co
@@ -1877,7 +1880,7 @@ coercionKind co = go co
                                          -- exactly saturate the axiom branch
         Pair (substTyWith tvs tys1 (mkTyConApp (coAxiomTyCon ax) lhs))
              (substTyWith tvs tys2 rhs)
-    go (UnivCo _ ty1 ty2)    = Pair ty1 ty2
+    go (UnivCo _ _ ty1 ty2)  = Pair ty1 ty2
     go (SymCo co)            = swap $ go co
     go (TransCo co1 co2)     = Pair (pFst $ go co1) (pSnd $ go co2)
     go (NthCo d co)          = tyConAppArgN d <$> go co
@@ -1915,7 +1918,7 @@ coercionKindRole = go
         (mkForAllTy tv <$> tys, r)
     go (CoVarCo cv) = (toPair $ coVarKind cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
-    go (UnivCo r ty1 ty2) = (Pair ty1 ty2, r)
+    go (UnivCo _ r ty1 ty2) = (Pair ty1 ty2, r)
     go (SymCo co) = first swap $ go co
     go (TransCo co1 co2)
       = let (tys1, r) = go co1 in

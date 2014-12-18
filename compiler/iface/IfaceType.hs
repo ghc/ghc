@@ -141,7 +141,7 @@ data IfaceCoercion
   | IfaceForAllCo    IfaceTvBndr IfaceCoercion
   | IfaceCoVarCo     IfLclName
   | IfaceAxiomInstCo IfExtName BranchIndex [IfaceCoercion]
-  | IfaceUnivCo      Role IfaceType IfaceType
+  | IfaceUnivCo      FastString Role IfaceType IfaceType
   | IfaceSymCo       IfaceCoercion
   | IfaceTransCo     IfaceCoercion IfaceCoercion
   | IfaceNthCo       Int IfaceCoercion
@@ -593,9 +593,9 @@ ppr_co ctxt_prec co@(IfaceForAllCo _ _)
 
 ppr_co _         (IfaceCoVarCo covar)       = ppr covar
 
-ppr_co ctxt_prec (IfaceUnivCo r ty1 ty2)
+ppr_co ctxt_prec (IfaceUnivCo s r ty1 ty2)
   = maybeParen ctxt_prec TyConPrec $
-    ptext (sLit "UnivCo") <+> ppr r <+>
+    ptext (sLit "UnivCo") <+> ftext s <+> ppr r <+>
     pprParendIfaceType ty1 <+> pprParendIfaceType ty2
 
 ppr_co ctxt_prec (IfaceInstCo co ty)
@@ -788,11 +788,12 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ bh (IfaceUnivCo a b c) = do
+  put_ bh (IfaceUnivCo a b c d) = do
           putByte bh 8
           put_ bh a
           put_ bh b
           put_ bh c
+          put_ bh d
   put_ bh (IfaceSymCo a) = do
           putByte bh 9
           put_ bh a
@@ -850,7 +851,8 @@ instance Binary IfaceCoercion where
            8 -> do a <- get bh
                    b <- get bh
                    c <- get bh
-                   return $ IfaceUnivCo a b c
+                   d <- get bh
+                   return $ IfaceUnivCo a b c d
            9 -> do a <- get bh
                    return $ IfaceSymCo a
            10-> do a <- get bh
@@ -954,7 +956,7 @@ toIfaceCoercion (CoVarCo cv)        = IfaceCoVarCo  (toIfaceCoVar cv)
 toIfaceCoercion (AxiomInstCo con ind cos)
                                     = IfaceAxiomInstCo (coAxiomName con) ind
                                                        (map toIfaceCoercion cos)
-toIfaceCoercion (UnivCo r ty1 ty2)  = IfaceUnivCo r (toIfaceType ty1)
+toIfaceCoercion (UnivCo s r ty1 ty2)= IfaceUnivCo s r (toIfaceType ty1)
                                                   (toIfaceType ty2)
 toIfaceCoercion (SymCo co)          = IfaceSymCo (toIfaceCoercion co)
 toIfaceCoercion (TransCo co1 co2)   = IfaceTransCo (toIfaceCoercion co1)

@@ -880,7 +880,7 @@ tcIfaceCo (IfaceCoVarCo n)          = mkCoVarCo <$> tcIfaceCoVar n
 tcIfaceCo (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n
                                                   <*> pure i
                                                   <*> mapM tcIfaceCo cs
-tcIfaceCo (IfaceUnivCo r t1 t2)     = UnivCo r <$> tcIfaceType t1
+tcIfaceCo (IfaceUnivCo s r t1 t2)   = UnivCo s r <$> tcIfaceType t1
                                                <*> tcIfaceType t2
 tcIfaceCo (IfaceSymCo c)            = SymCo    <$> tcIfaceCo c
 tcIfaceCo (IfaceTransCo c1 c2)      = TransCo  <$> tcIfaceCo c1
