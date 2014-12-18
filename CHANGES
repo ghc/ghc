@@ -12,6 +12,8 @@ Changes in version 2.16.0
 
  * Fix parsing of infix identifiers such as ``elem``.
 
+ * Print missing docs by default and add --no-print-missing-docs
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
