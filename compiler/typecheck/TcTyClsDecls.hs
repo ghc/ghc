@@ -2223,8 +2223,8 @@ wrongKindOfFamily family
   = ptext (sLit "Wrong category of family instance; declaration was for a")
     <+> kindOfFamily
   where
-    kindOfFamily | isTypeSynonymTyCon family = text "type synonym"
-                 | isAlgTyCon         family = text "data type"
+    kindOfFamily | isTypeFamilyTyCon family = text "type family"
+                 | isDataFamilyTyCon family = text "data family"
                  | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
 wrongNumberOfParmsErr :: Arity -> SDoc
