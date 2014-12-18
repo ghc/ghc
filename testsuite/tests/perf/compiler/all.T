@@ -559,9 +559,10 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 5848657456, 5)
+          [(wordsize(64), 2680733672, 5)
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
+          # 2014-12-18    2680733672    Reduce type families even more eagerly
           ]),
       ],
      compile_fail,
@@ -570,9 +571,10 @@ test('T9872a',
 test('T9872b',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 6892251912, 5)
+          [(wordsize(64), 3480212048, 5)
           # 2014-12-10    6483306280    Initally created
           # 2014-12-16    6892251912    Flattener parameterized over roles
+          # 2014-12-18    3480212048    Reduce type families even more eagerly
           ]),
       ],
      compile_fail,
@@ -580,9 +582,10 @@ test('T9872b',
 test('T9872c',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 5842024784, 5)
+          [(wordsize(64), 2963554096, 5)
           # 2014-12-10    5495850096    Initally created
           # 2014-12-16    5842024784    Flattener parameterized over roles
+          # 2014-12-18    2963554096    Reduce type families even more eagerly
           ]),
       ],
      compile_fail,
@@ -590,8 +593,9 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 796071864, 5)
-          # 2014-12-19    796071864   Initally created
+          [(wordsize(64), 739189056, 5)
+          # 2014-12-18    796071864   Initally created
+          # 2014-12-18    739189056   Reduce type families even more eagerly
           ]),
       ],
      compile,

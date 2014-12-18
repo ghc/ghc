@@ -900,7 +900,9 @@ flatten_exact_fam_app fmode tc tys
     roles = tyConRolesX (feRole fmode) tc
 
 flatten_exact_fam_app_fully fmode tc tys
-  = do { (xis, cos) <- flatten_many_nom (setFEEqRel (setFEMode fmode FM_FlattenAll) NomEq) tys
+  -- See Note [Reduce type family applications eagerly]
+  = try_to_reduce tc tys False id $
+    do { (xis, cos) <- flatten_many_nom (setFEEqRel (setFEMode fmode FM_FlattenAll) NomEq) tys
        ; let ret_co = mkTcTyConAppCo (feRole fmode) tc cos
               -- ret_co :: F xis ~ F tys
 
@@ -922,15 +924,7 @@ flatten_exact_fam_app_fully fmode tc tys
 
            -- Try to reduce the family application right now
            -- See Note [Reduce type family applications eagerly]
-           _ -> do { mb_match <- matchFam tc xis
-                   ; case mb_match of {
-                        Just (norm_co, norm_ty)
-                            -> do { (xi, final_co) <- flatten_one fmode norm_ty
-                                  ; let co = norm_co `mkTcTransCo` mkTcSymCo final_co
-                                  ; extendFlatCache tc xis ( co, xi
-                                                           , fe_flavour fmode )
-                                  ; return (xi, mkTcSymCo co `mkTcTransCo` ret_co) } ;
-                        Nothing ->
+           _ -> try_to_reduce tc xis True (`mkTcTransCo` ret_co) $
                 do { let fam_ty = mkTyConApp tc xis
                    ; (ev, fsk) <- newFlattenSkolem (fe_flavour fmode)
                                                    (fe_loc fmode)
@@ -951,7 +945,28 @@ flatten_exact_fam_app_fully fmode tc tys
                    ; return (fsk_ty, maybeTcSubCo (fe_eq_rel fmode)
                                                   (mkTcSymCo co)
                                      `mkTcTransCo` ret_co) }
-        } } }
+        }
+
+  where
+    try_to_reduce :: TyCon   -- F, family tycon
+                  -> [Type]  -- args, not necessarily flattened
+                  -> Bool    -- add to the flat cache?
+                  -> (   TcCoercion     -- :: xi ~ F args
+                      -> TcCoercion )   -- what to return from outer function
+                  -> TcS (Xi, TcCoercion)  -- continuation upon failure
+                  -> TcS (Xi, TcCoercion)
+    try_to_reduce tc tys cache update_co k
+      = do { mb_match <- matchFam tc tys
+           ; case mb_match of
+               Just (norm_co, norm_ty)
+                 -> do { traceTcS "Eager T.F. reduction success" $
+                         vcat [ppr tc, ppr tys, ppr norm_ty, ppr cache]
+                       ; (xi, final_co) <- flatten_one fmode norm_ty
+                       ; let co = norm_co `mkTcTransCo` mkTcSymCo final_co
+                       ; when cache $
+                         extendFlatCache tc tys (co, xi, fe_flavour fmode)
+                       ; return (xi, update_co $ mkTcSymCo co) }
+               Nothing -> k }
 
 {- Note [Reduce type family applications eagerly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -960,9 +975,13 @@ then, rather than flattening to a skolem etc, we may as well just reduce
 it on the spot to (Cons x t).  This saves a lot of intermediate steps.
 Examples that are helped are tests T9872, and T5321Fun.
 
-So just before we create the new skolem, we attempt to reduce it by one
-step (using matchFam).  If that works, then recursively flatten the rhs,
-which may in turn do lots more reductions.
+Performance testing indicates that it's best to try this *twice*, once
+before flattening arguments and once after flattening arguments.
+Adding the extra reduction attempt before flattening arguments cut
+the allocation amounts for the T9872{a,b,c} tests by half. Testing
+also indicated that the early reduction should not use the flat-cache,
+but that the later reduction should. It's possible that with more
+examples, we might learn that these knobs should be set differently.
 
 Once we've got a flat rhs, we extend the flatten-cache to record the
 result.  Doing so can save lots of work when the same redex shows up
