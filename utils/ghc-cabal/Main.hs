@@ -10,6 +10,7 @@ import Distribution.System
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
+import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
@@ -224,8 +225,7 @@ doRegister directory distDir ghc ghcpkg topdir
                 configurePrograms ps conf = foldM (flip (configureProgram verbosity)) conf ps
 
             progs' <- configurePrograms [ghcProgram', ghcPkgProgram'] progs
-            let Just ghcPkgProg = lookupProgram ghcPkgProgram' progs'
-            instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
+            instInfos <- dump (hcPkgInfo progs') verbosity GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
             let updateComponentConfig (cn, clbi, deps)
                     = (cn, updateComponentLocalBuildInfo clbi, deps)
