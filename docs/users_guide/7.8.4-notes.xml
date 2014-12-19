@@ -146,6 +146,13 @@
             has been fixed (#9563).
           </para>
        </listitem>
+       <listitem>
+          <para>
+            A bug that caused type inference to infer the incorrect
+            type in the presence of certain type families and
+            constraints has been fixed (issue #9316).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 </sect1>
