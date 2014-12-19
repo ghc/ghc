@@ -72,6 +72,17 @@
                     <literal>[t|forall a. Ord a => a|]</literal>.
                 </para>
            </listitem>
+
+           <listitem>
+             <para>
+               Instance contexts inferred while processing <literal>deriving</literal>
+               directives attached to <literal>data</literal> and <literal>newtype</literal>
+               declarations now forbid equality constraints. This is a regression in
+               obscure cases, but it will yield better error messages in more common
+               cases. Users caught by the regression can simply use standalone-deriving,
+               where you specify the context yourself.
+             </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -191,7 +202,9 @@
                     Added support for generating LINE pragma declarations
                     (<xref linkend="line-pragma"/>).
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                     The type <literal>Pred</literal> (which stores a type
                     constraint) is now a synonym for <literal>Type</literal>,
@@ -199,17 +212,23 @@
                     extension. This is a breaking change and may require
                     some rewriting of Template Haskell code.
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                  Pattern splices now work.
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                  <literal>reifyInstances</literal> now treats unbound type
                  variables as univerally quantified, allowing lookup of, say,
                  the instance for <literal>Eq [a]</literal>.
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                  More kind annotations appear in reified types, in order to
                  disambiguate types that would otherwise be ambiguous in the
@@ -218,22 +237,40 @@
                  <literal>KindedTV</literal>s. (This does not affect Template
                  Haskell quotations, just calls to <literal>reify</literal>.)
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                  Various features unsupported in quotations were previously
                  silently ignored. These now cause errors.
                </para>
+            </listitem>
 
+            <listitem>
                 <para>
                     <literal>Lift</literal> instances were added for
-                    <literal>()</literal> and <literal>Ratio</literal>.
+                    many more types: all of the <literal>IntXX</literal>
+                    and <literal>WordXX</literal> types, <literal>Ratio a</literal>,
+                    <literal>()</literal>, <literal>Float</literal>, and
+                    <literal>Double</literal>.
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                  All Template Haskell datatypes now have
                  <literal>Generic</literal> and <literal>Ord</literal> instances.
                </para>
+            </listitem>
 
+            <listitem>
+               <para>
+                 <literal>Ppr</literal> instances were added for <literal>Lit</literal>
+                 and <literal>Loc</literal>.
+               </para>
+            </listitem>
+                 
+            <listitem>
                <para>
                  Two new declaration forms are now supported:
                  standalone-deriving declarations and generic method
@@ -241,7 +278,9 @@
                  a class). This means an expansion to the <literal>Dec</literal>
                  type.
                </para>
+            </listitem>
 
+            <listitem>
                <para>
                  Template Haskell is now more pedantic about splicing in
                  bogus variable names, like those containing whitespace. If you
