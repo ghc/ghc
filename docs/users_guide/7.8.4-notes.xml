@@ -98,6 +98,54 @@
 	    type family applications has been fixed (issue #9433).
           </para>
        </listitem>
+       <listitem>
+          <para>
+            Several bugs have been fixed causing problems with
+            building GHC on ARM (issues #8951, #9620, #9336, and
+            #9552).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the typechecker that could cause an infinite loop
+            when using superclasses in a cycle has been fixed (issue #9415).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug causing corruption in signal handling with the
+            single-threaded runtime system has been fixed (issue
+            #9817).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that could cause compiled programs to crash due to
+            use of overlapping type families has been fixed (issue
+            #9371).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the inliner that caused certain expressions
+            within unboxed tuples to not be properly evaluated has
+            been fixed (issue #9390).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that caused the compiler to not always properly
+            detect LLVM tools (particularly on Windows) has been fixed
+            (issue #7143).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that prevented GHC from deriving
+            <literal>Generic1</literal> instances for data families
+            has been fixed (#9563).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 </sect1>
