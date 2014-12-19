@@ -146,6 +146,7 @@ extern ObjectCode *unloaded_objects;
 
 #ifdef THREADED_RTS
 extern Mutex linker_mutex;
+extern Mutex linker_unloaded_mutex;
 #endif
 
 void exitLinker( void );
