@@ -12,6 +12,12 @@
 
   * Add `System.Exit.die`
 
+  * Deprecate `versionTags` field of `Data.Version.Version`.
+    Add `makeVersion :: [Int] -> Version` constructor function to aid
+    migration to a future `versionTags`-less `Version`.
+
+  * Add `IsList Version` instance
+
   * Weaken RealFloat constraints on some `Data.Complex` functions
 
   * Add `Control.Monad.(<$!>)` as a strict version of `(<$>)`

@@ -84,6 +84,7 @@ import Data.String
 import Data.OldList
 import Data.Data
 import Data.Ord
+import Data.Version ( Version(..), makeVersion )
 import qualified Debug.Trace
 
 -- XXX This should really be in Data.Tuple, where the definitions are
@@ -177,3 +178,9 @@ instance IsList [a] where
   type (Item [a]) = a
   fromList = id
   toList = id
+
+-- | @since 4.8.0.0
+instance IsList Version where
+  type (Item Version) = Int
+  fromList = makeVersion
+  toList = versionBranch

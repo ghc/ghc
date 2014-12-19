@@ -32,6 +32,8 @@ module Data.Version (
         Version(..),
         -- * A concrete representation of @Version@
         showVersion, parseVersion,
+        -- * Constructor function
+        makeVersion
   ) where
 
 import Control.Monad    ( Monad(..), liftM )
@@ -121,3 +123,9 @@ parseVersion :: ReadP Version
 parseVersion = do branch <- sepBy1 (liftM read (munch1 isDigit)) (char '.')
                   tags   <- many (char '-' >> munch1 isAlphaNum)
                   return Version{versionBranch=branch, versionTags=tags}
+
+-- | Construct tag-less 'Version'
+--
+-- @since 4.8.0.0
+makeVersion :: [Int] -> Version
+makeVersion b = Version b []
