@@ -176,6 +176,25 @@ renameLKind = renameLType
 renameMaybeLKind :: Maybe (LHsKind Name) -> RnM (Maybe (LHsKind DocName))
 renameMaybeLKind = traverse renameLKind
 
+renameFamilyResultSig :: LFamilyResultSig Name -> RnM (LFamilyResultSig DocName)
+renameFamilyResultSig (L loc NoSig)
+    = return (L loc NoSig)
+renameFamilyResultSig (L loc (KindSig ki))
+    = do { ki' <- renameLKind ki
+         ; return (L loc (KindSig ki')) }
+renameFamilyResultSig (L loc (TyVarSig bndr))
+    = do { bndr' <- renameLTyVarBndr bndr
+         ; return (L loc (TyVarSig bndr')) }
+
+renameInjectivityAnn :: LInjectivityAnn Name -> RnM (LInjectivityAnn DocName)
+renameInjectivityAnn (L loc (InjectivityAnn lhs rhs))
+    = do { lhs' <- renameL lhs
+         ; rhs' <- mapM renameL rhs
+         ; return (L loc (InjectivityAnn lhs' rhs')) }
+
+renameMaybeInjectivityAnn :: Maybe (LInjectivityAnn Name)
+                          -> RnM (Maybe (LInjectivityAnn DocName))
+renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
@@ -343,13 +362,16 @@ renameTyClD d = case d of
 
 renameFamilyDecl :: FamilyDecl Name -> RnM (FamilyDecl DocName)
 renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
-                             , fdTyVars = ltyvars, fdKindSig = tckind }) = do
-    info'    <- renameFamilyInfo info
-    lname'   <- renameL lname
-    ltyvars' <- renameLTyVarBndrs ltyvars
-    tckind'  <- renameMaybeLKind tckind
+                             , fdTyVars = ltyvars, fdResultSig = result
+                             , fdInjectivityAnn = injectivity }) = do
+    info'        <- renameFamilyInfo info
+    lname'       <- renameL lname
+    ltyvars'     <- renameLTyVarBndrs ltyvars
+    result'      <- renameFamilyResultSig result
+    injectivity' <- renameMaybeInjectivityAnn injectivity
     return (FamilyDecl { fdInfo = info', fdLName = lname'
-                       , fdTyVars = ltyvars', fdKindSig = tckind' })
+                       , fdTyVars = ltyvars', fdResultSig = result'
+                       , fdInjectivityAnn = injectivity' })
 
 
 renamePseudoFamilyDecl :: PseudoFamilyDecl Name

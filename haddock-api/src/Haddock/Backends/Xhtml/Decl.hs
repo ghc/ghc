@@ -257,12 +257,32 @@ ppFamilyKind _ _ Nothing = noHtml
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName
               -> Unicode -> Qualification -> Html
 ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
-                                               , fdKindSig = mkind })
+                                             , fdResultSig = L _ result
+                                             , fdInjectivityAnn = injectivity })
               unicode qual =
-    ppFamilyInfo associated info <+>
-    ppFamDeclBinderWithVars summary d <+>
-    ppFamilyKind unicode qual mkind
+  (case info of
+     OpenTypeFamily
+       | associated -> keyword "type"
+       | otherwise  -> keyword "type family"
+     DataFamily
+       | associated -> keyword "data"
+       | otherwise  -> keyword "data family"
+     ClosedTypeFamily _
+                    -> keyword "type family"
+  ) <+>
 
+  ppFamDeclBinderWithVars summary d <+>
+
+  (case result of
+    NoSig               -> noHtml
+    KindSig kind        -> dcolon unicode  <+> ppLKind unicode qual kind
+    TyVarSig (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
+  ) <+>
+
+  (case injectivity of
+     Nothing                   -> noHtml
+     Just (L _ injectivityAnn) -> ppInjectivityAnn unicode qual injectivityAnn
+  )
 
 ppPseudoFamilyHeader :: Unicode -> Qualification -> PseudoFamilyDecl DocName
                      -> Html
@@ -270,6 +290,11 @@ ppPseudoFamilyHeader unicode qual (PseudoFamilyDecl { .. }) =
     ppFamilyInfo True pfdInfo <+>
     ppAppNameTypes (unLoc pfdLName) [] (map unLoc pfdTyVars) unicode qual <+>
     ppFamilyKind unicode qual pfdKindSig
+
+ppInjectivityAnn :: Bool -> Qualification -> InjectivityAnn DocName -> Html
+ppInjectivityAnn unicode qual (InjectivityAnn lhs rhs) =
+    char '|' <+> ppLDocName qual Raw lhs <+> arrow unicode <+>
+    hsep (map (ppLDocName qual Raw) rhs)
 
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocName] ->
@@ -912,6 +937,13 @@ ppType       unicode qual ty = ppr_mono_ty pREC_TOP ty unicode qual
 ppCtxType    unicode qual ty = ppr_mono_ty pREC_CTX ty unicode qual
 ppParendType unicode qual ty = ppr_mono_ty pREC_CON ty unicode qual
 ppFunLhType  unicode qual ty = ppr_mono_ty pREC_FUN ty unicode qual
+
+ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr DocName -> Html
+ppHsTyVarBndr _       qual (UserTyVar   name     ) =
+    ppDocName qual Raw False name
+ppHsTyVarBndr unicode qual (KindedTyVar name kind) =
+    parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
+            ppLKind unicode qual kind)
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocName -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
