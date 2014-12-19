@@ -466,6 +466,15 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 
     <itemizedlist>
       <listitem>
+	<para>GHC has a bug in 7.8 that causes the new extension
+	<literal>-XAutoDeriveTypeable</literal> to not take affect -
+	however, you can easily work around this by merely using
+	<literal>-XDeriveDataTypeable</literal> and using
+	<literal>deriving Typeable</literal> instead. See GHC issue
+	#9575.</para>
+      </listitem>
+
+      <listitem>
 	<para> GHC can warn about non-exhaustive or overlapping
         patterns (see <xref linkend="options-sanity"/>), and usually
         does so correctly.  But not always.  It gets confused by
