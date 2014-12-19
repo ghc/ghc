@@ -260,7 +260,7 @@ void checkUnload (StgClosure *static_objects)
 
   if (unloaded_objects == NULL) return;
 
-  ACQUIRE_LOCK(&linker_mutex);
+  ACQUIRE_LOCK(&linker_unloaded_mutex);
 
   // Mark every unloadable object as unreferenced initially
   for (oc = unloaded_objects; oc; oc = oc->next) {
@@ -320,5 +320,5 @@ void checkUnload (StgClosure *static_objects)
 
   freeHashTable(addrs, NULL);
 
-  RELEASE_LOCK(&linker_mutex);
+  RELEASE_LOCK(&linker_unloaded_mutex);
 }
