@@ -230,7 +230,8 @@ ppTyName = ppName Prefix
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName
               -> Unicode -> Qualification -> Html
 ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
-                                               , fdKindSig = mkind })
+                                             , fdResultSig = L _ result
+                                             , fdInjectivityAnn = injectivity })
               unicode qual =
   (case info of
      OpenTypeFamily
@@ -245,10 +246,23 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
 
   ppFamDeclBinderWithVars summary d <+>
 
-  (case mkind of
-    Just kind -> dcolon unicode  <+> ppLKind unicode qual kind
-    Nothing   -> noHtml
+  (case result of
+    NoSig               -> noHtml
+    KindSig kind        -> dcolon unicode  <+> ppLKind unicode qual kind
+    TyVarSig (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
+  ) <+>
+
+  (case injectivity of
+     Nothing                   -> noHtml
+     Just (L _ injectivityAnn) -> ppInjectivityAnn unicode qual injectivityAnn
   )
+
+
+ppInjectivityAnn :: Bool -> Qualification -> InjectivityAnn DocName -> Html
+ppInjectivityAnn unicode qual (InjectivityAnn lhs rhs) =
+    char '|' <+> ppLDocName qual Raw lhs <+> arrow unicode <+>
+    hsep (map (ppLDocName qual Raw) rhs)
+
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocName] ->
            [(DocName, Fixity)] -> SrcSpan -> Documentation DocName ->
@@ -816,6 +830,13 @@ ppType       unicode qual ty = ppr_mono_ty pREC_TOP ty unicode qual
 ppCtxType    unicode qual ty = ppr_mono_ty pREC_CTX ty unicode qual
 ppParendType unicode qual ty = ppr_mono_ty pREC_CON ty unicode qual
 ppFunLhType  unicode qual ty = ppr_mono_ty pREC_FUN ty unicode qual
+
+ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr DocName -> Html
+ppHsTyVarBndr _       qual (UserTyVar   name     ) =
+    ppDocName qual Raw False name
+ppHsTyVarBndr unicode qual (KindedTyVar name kind) =
+    parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
+            ppLKind unicode qual kind)
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocName -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
