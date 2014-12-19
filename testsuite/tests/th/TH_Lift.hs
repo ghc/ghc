@@ -8,6 +8,7 @@ import Language.Haskell.TH.Syntax
 import Data.Ratio
 import Data.Word
 import Data.Int
+import Numeric.Natural
 
 a :: Integer
 a = $( (\x -> [| x |]) (5 :: Integer) )
@@ -41,6 +42,9 @@ f = $( (\x -> [| x |]) (5 :: Word32) )
 
 g :: Word64
 g = $( (\x -> [| x |]) (5 :: Word64) )
+
+g1 :: Natural
+g1 = $( (\x -> [| x |]) (5 :: Natural) )
 
 h :: Rational
 h = $( (\x -> [| x |]) (5 % 3 :: Rational) )

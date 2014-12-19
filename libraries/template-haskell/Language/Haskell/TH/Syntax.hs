@@ -29,6 +29,7 @@ import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Int
 import Data.Word
 import Data.Ratio
+import Numeric.Natural
 import GHC.Generics     ( Generic )
 
 -----------------------------------------------------
@@ -452,6 +453,7 @@ sequenceQ = sequence
 class Lift t where
   lift :: t -> Q Exp
 
+-- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
   lift x = return (LitE (IntegerL x))
 
@@ -483,6 +485,9 @@ instance Lift Word32 where
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word64 where
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Natural where
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Integral a => Lift (Ratio a) where
