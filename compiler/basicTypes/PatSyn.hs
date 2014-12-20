@@ -83,7 +83,7 @@ data PatSyn
         psBuilder     :: Maybe (Id, Bool)
              -- Nothing  => uni-directional pattern synonym
              -- Just (builder, is_unlifted) => bi-directional
-             -- Wrapper function, of type
+             -- Builder function, of type
              --  forall univ_tvs, ex_tvs. (prov_theta, req_theta)
              --                       =>  arg_tys -> res_ty
              -- See Note [Builder for pattern synonyms with unboxed type]
@@ -161,12 +161,12 @@ For *bidirectional* pattern synonyms, we also generate a "builder"
 function which implements the pattern synonym in an expression
 context. For our running example, it will be:
 
-        $WP :: forall t b. (Show (Maybe t), Ord b, Eq t, Num t)
+        $bP :: forall t b. (Show (Maybe t), Ord b, Eq t, Num t)
             => b -> T (Maybe t)
-        $WP x = MkT [x] (Just 42)
+        $bP x = MkT [x] (Just 42)
 
 NB: the existential/universal and required/provided split does not
-apply to the wrapper since you are only putting stuff in, not getting
+apply to the builder since you are only putting stuff in, not getting
 stuff out.
 
 Injectivity of bidirectional pattern synonyms is checked in
@@ -181,8 +181,8 @@ would be a top-level declaration with an unboxed type.
 
         pattern P = 0#
 
-        $WP :: Void# -> Int#
-        $WP _ = 0#
+        $bP :: Void# -> Int#
+        $bP _ = 0#
 
 This means that when typechecking an occurrence of P in an expression,
 we must remember that the builder has this void argument. This is

@@ -53,7 +53,9 @@ module OccName (
 
         -- ** Derived 'OccName's
         isDerivedOccName,
-        mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
+        mkDataConWrapperOcc, mkWorkerOcc,
+        mkMatcherOcc, mkBuilderOcc,
+        mkDefaultMethodOcc,
         mkGenDefMethodOcc,
         mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
@@ -595,7 +597,9 @@ isDerivedOccName occ =
      ':':c:_ | isAlphaNum c -> True
      _other                 -> False
 
-mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
+mkDataConWrapperOcc, mkWorkerOcc,
+        mkMatcherOcc, mkBuilderOcc,
+        mkDefaultMethodOcc,
         mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
         mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
         mkGenD, mkGenR, mkGen1R, mkGenRCo,
@@ -608,6 +612,7 @@ mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
 mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
 mkMatcherOcc        = mk_simple_deriv varName  "$m"
+mkBuilderOcc        = mk_simple_deriv varName  "$b"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
 mkGenDefMethodOcc   = mk_simple_deriv varName  "$gdm"
 mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"

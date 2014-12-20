@@ -326,7 +326,7 @@ mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty
   | isUnidirectional dir
   = return Nothing
   | otherwise
-  = do { builder_name <- newImplicitBinder name mkDataConWorkerOcc
+  = do { builder_name <- newImplicitBinder name mkBuilderOcc
        ; let builder_sigma = mkSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
              builder_id    = mkExportedLocalId VanillaId builder_name builder_sigma
                              -- See Note [Exported LocalIds] in Id
