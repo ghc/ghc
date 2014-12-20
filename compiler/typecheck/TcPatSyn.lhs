@@ -37,12 +37,10 @@ import BuildTyCl
 \end{code}
 
 \begin{code}
-tcPatSynDecl :: Located Name
-             -> HsPatSynDetails (Located Name)
-             -> LPat Name
-             -> HsPatSynDir Name
+tcPatSynDecl :: PatSynBind Name Name
              -> TcM (PatSyn, LHsBinds Id)
-tcPatSynDecl lname@(L _ name) details lpat dir
+tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
+                  psb_def = lpat, psb_dir = dir }
   = do { traceTc "tcPatSynDecl {" $ ppr name $$ ppr lpat
        ; tcCheckPatSynPat lpat
        ; pat_ty <- newFlexiTyVarTy openTypeKind

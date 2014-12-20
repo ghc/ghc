@@ -502,11 +502,13 @@ mkVarBind var rhs = L (getLoc rhs) $
 		    VarBind { var_id = var, var_rhs = rhs, var_inline = False }
 
 mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName) -> LPat RdrName -> HsPatSynDir RdrName -> HsBind RdrName
-mkPatSynBind name details lpat dir = PatSynBind{ patsyn_id = name
-                                               , patsyn_args = details
-                                               , patsyn_def = lpat
-                                               , patsyn_dir = dir
-                                               , bind_fvs = placeHolderNames }
+mkPatSynBind name details lpat dir = PatSynBind psb
+  where
+    psb = PSB{ psb_id = name
+             , psb_args = details
+             , psb_def = lpat
+             , psb_dir = dir
+             , psb_fvs = placeHolderNames }
 
 ------------
 mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
@@ -574,7 +576,7 @@ collect_bind (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
 	-- I don't think we want the binders from the nested binds
 	-- The only time we collect binders from a typechecked 
 	-- binding (hence see AbsBinds) is in zonking in TcHsSyn
-collect_bind (PatSynBind { patsyn_id = L _ ps }) acc = ps : acc
+collect_bind (PatSynBind (PSB { psb_id = L _ ps })) acc = ps : acc
 
 collectHsBindsBinders :: LHsBindsLR idL idR -> [idL]
 collectHsBindsBinders binds = collect_binds binds []

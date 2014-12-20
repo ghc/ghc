@@ -318,7 +318,7 @@ tcValBinds top_lvl binds sigs thing_inside
     patsyn_placeholder_kinds -- See Note [Placeholder PatSyn kinds]
        = [ (name, placeholder_patsyn_tything)
          | (_, lbinds) <- binds
-         , L _ (PatSynBind{ patsyn_id = L _ name }) <- bagToList lbinds ]
+         , L _ (PatSynBind PSB{ psb_id = L _ name }) <- bagToList lbinds ]
     placeholder_patsyn_tything
        = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
@@ -409,9 +409,8 @@ tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> PragFun
           -> LHsBind Name -> TcM thing
           -> TcM (LHsBinds TcId, thing)
-tc_single _top_lvl _sig_fn _prag_fn (L _ ps@PatSynBind{}) thing_inside
-  = do { (pat_syn, aux_binds) <-
-              tcPatSynDecl (patsyn_id ps) (patsyn_args ps) (patsyn_def ps) (patsyn_dir ps)
+tc_single _top_lvl _sig_fn _prag_fn (L _ (PatSynBind psb)) thing_inside
+  = do { (pat_syn, aux_binds) <- tcPatSynDecl psb
 
        ; let tything = AConLike (PatSynCon pat_syn)
              implicit_ids = (patSynMatcher pat_syn) :
@@ -453,7 +452,7 @@ mkEdges sig_fn binds
 bindersOfHsBind :: HsBind Name -> [Name]
 bindersOfHsBind (PatBind { pat_lhs = pat })           = collectPatBinders pat
 bindersOfHsBind (FunBind { fun_id = L _ f })          = [f]
-bindersOfHsBind (PatSynBind { patsyn_id = L _ psyn }) = [psyn]
+bindersOfHsBind (PatSynBind PSB{ psb_id = L _ psyn }) = [psyn]
 bindersOfHsBind (AbsBinds {})                         = panic "bindersOfHsBind AbsBinds"
 bindersOfHsBind (VarBind {})                          = panic "bindersOfHsBind VarBind"
 

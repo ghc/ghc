@@ -466,18 +466,19 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 
-zonk_bind env _sig_warn bind@(PatSynBind { patsyn_id = L loc id
-                                         , patsyn_args = details
-                                         , patsyn_def = lpat
-                                         , patsyn_dir = dir })
+zonk_bind env _sig_warn (PatSynBind bind@(PSB { psb_id = L loc id
+                                              , psb_args = details
+                                              , psb_def = lpat
+                                              , psb_dir = dir }))
   = do { id' <- zonkIdBndr env id
        ; details' <- zonkPatSynDetails env details
        ;(env1, lpat') <- zonkPat env lpat
        ; (_env2, dir') <- zonkPatSynDir env1 dir
-       ; return (bind { patsyn_id = L loc id'
-                      , patsyn_args = details'
-                      , patsyn_def = lpat'
-                      , patsyn_dir = dir' }) }
+       ; return $ PatSynBind $
+                  bind { psb_id = L loc id'
+                       , psb_args = details'
+                       , psb_def = lpat'
+                       , psb_dir = dir' } }
 
 zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails (Located TcId)

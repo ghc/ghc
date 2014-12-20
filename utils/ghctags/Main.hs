@@ -284,7 +284,7 @@ boundThings modname lbinding =
     PatBind { pat_lhs = lhs } -> patThings lhs []
     VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
     AbsBinds { } -> [] -- nothing interesting in a type abstraction
-    PatSynBind { patsyn_id = id } -> [thing id]
+    PatSynBind PSB{ psb_id = id } -> [thing id]
   where thing = foundOfLName modname
         patThings lpat tl =
           let loc = startOfLocated lpat
