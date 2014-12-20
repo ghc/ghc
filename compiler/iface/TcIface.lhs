@@ -584,8 +584,8 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
        ; return (ACoAxiom axiom) }
 
 tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
-                              , ifPatMatcher = matcher_name
-                              , ifPatWrapper = wrapper_name
+                              , ifPatMatcher = if_matcher
+                              , ifPatBuilder = if_builder
                               , ifPatIsInfix = is_infix
                               , ifPatUnivTvs = univ_tvs
                               , ifPatExTvs = ex_tvs
@@ -595,11 +595,8 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                               , ifPatTy = pat_ty })
   = do { name <- lookupIfaceTop occ_name
        ; traceIf (ptext (sLit "tc_iface_decl") <+> ppr name)
-       ; matcher <- tcExt "Matcher" matcher_name
-       ; wrapper <- case wrapper_name of
-                        Nothing -> return Nothing
-                        Just wn -> do { wid <- tcExt "Wrapper" wn
-                                      ; return (Just wid) }
+       ; matcher <- tc_pr if_matcher
+       ; builder <- fmapMaybeM tc_pr if_builder
        ; bindIfaceTyVars univ_tvs $ \univ_tvs -> do
        { bindIfaceTyVars ex_tvs $ \ex_tvs -> do
        { patsyn <- forkM (mk_doc name) $
@@ -607,13 +604,15 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                 ; req_theta  <- tcIfaceCtxt req_ctxt
                 ; pat_ty     <- tcIfaceType pat_ty
                 ; arg_tys    <- mapM tcIfaceType args
-                ; return $ buildPatSyn name is_infix matcher wrapper
+                ; return $ buildPatSyn name is_infix matcher builder
                                        (univ_tvs, req_theta) (ex_tvs, prov_theta)
                                        arg_tys pat_ty }
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
      mk_doc n = ptext (sLit "Pattern synonym") <+> ppr n
-     tcExt s name = forkM (ptext (sLit s) <+> ppr name) $ tcIfaceExtId name
+     tc_pr :: (IfExtName, Bool) -> IfL (Id, Bool)
+     tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
+                        ; return (id, b) }
 
 tc_ax_branches :: TyCon -> [IfaceAxBranch] -> IfL [CoAxBranch]
 tc_ax_branches tc if_branches = foldlM (tc_ax_branch (tyConKind tc)) [] if_branches

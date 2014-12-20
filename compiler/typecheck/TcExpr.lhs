@@ -30,6 +30,7 @@ import TcEnv
 import TcArrows
 import TcMatches
 import TcHsType
+import TcPatSyn( tcPatSynBuilderOcc )
 import TcPat
 import TcMType
 import TcType
@@ -37,7 +38,6 @@ import DsMonad hiding (Splice)
 import Id
 import ConLike
 import DataCon
-import PatSyn
 import RdrName
 import Name
 import TyCon
@@ -1047,6 +1047,7 @@ in the other order, the extra signature in f2 is reqd.
 tcCheckId :: Name -> TcRhoType -> TcM (HsExpr TcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
+       ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addErrCtxtM (funResCtxt False (HsVar name) actual_res_ty res_ty) $
          tcWrapResult expr actual_res_ty res_ty }
 
@@ -1060,31 +1061,33 @@ tcInferIdWithOrig :: CtOrigin -> Name -> TcM (HsExpr TcId, TcRhoType)
 -- Look up an occurrence of an Id, and instantiate it (deeply)
 
 tcInferIdWithOrig orig id_name
-  = do { id <- lookup_id
-       ; (id_expr, id_rho) <- instantiateOuter orig id
-       ; (wrap, rho) <- deeplyInstantiate orig id_rho
-       ; return (mkHsWrap wrap id_expr, rho) }
+  = do { id_or_expr <- lookup_id
+       ; case id_or_expr of
+           Left id ->
+               do { (id_expr, id_rho) <- instantiateOuter orig id
+                  ; (wrap, rho) <- deeplyInstantiate orig id_rho
+                  ; return (mkHsWrap wrap id_expr, rho) }
+           Right (expr, rho) ->
+               do { return (expr, rho) }}
   where
-    lookup_id :: TcM TcId
+    lookup_id :: TcM (Either TcId (HsExpr TcId, TcRhoType))
     lookup_id
        = do { thing <- tcLookup id_name
             ; case thing of
                  ATcId { tct_id = id }
                    -> do { check_naughty id        -- Note [Local record selectors]
                          ; checkThLocalId id
-                         ; return id }
+                         ; return $ Left id }
 
                  AGlobal (AnId id)
-                   -> do { check_naughty id; return id }
+                   -> do { check_naughty id; return $ Left id }
                         -- A global cannot possibly be ill-staged
                         -- nor does it need the 'lifting' treatment
                         -- hence no checkTh stuff here
 
                  AGlobal (AConLike cl) -> case cl of
-                     RealDataCon con -> return (dataConWrapId con)
-                     PatSynCon ps -> case patSynWrapper ps of
-                         Nothing -> failWithTc (bad_patsyn ps)
-                         Just id -> return id
+                     RealDataCon con -> return $ Left $ dataConWrapId con
+                     PatSynCon ps -> fmap Right $ tcPatSynBuilderOcc orig ps
 
                  other -> failWithTc (bad_lookup other) }
 

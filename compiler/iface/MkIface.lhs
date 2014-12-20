@@ -1488,8 +1488,8 @@ dataConToIfaceDecl dataCon
 patSynToIfaceDecl :: PatSyn -> IfaceDecl
 patSynToIfaceDecl ps
   = IfacePatSyn { ifName          = getOccName . getName $ ps
-                , ifPatMatcher    = matcher
-                , ifPatWrapper    = wrapper
+                , ifPatMatcher    = to_if_pr (patSynMatcher ps)
+                , ifPatBuilder    = fmap to_if_pr (patSynBuilder ps)
                 , ifPatIsInfix    = patSynIsInfix ps
                 , ifPatUnivTvs    = toIfaceTvBndrs univ_tvs'
                 , ifPatExTvs      = toIfaceTvBndrs ex_tvs'
@@ -1502,10 +1502,7 @@ patSynToIfaceDecl ps
     (univ_tvs, ex_tvs, prov_theta, req_theta, args, rhs_ty) = patSynSig ps
     (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
     (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
-
-    matcher = idName (patSynMatcher ps)
-    wrapper = fmap idName (patSynWrapper ps)
-
+    to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 --------------------------
 coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl

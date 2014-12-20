@@ -184,13 +184,13 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
-            -> Id -> Maybe Id
+            -> (Id,Bool) -> Maybe (Id, Bool)
             -> ([TyVar], ThetaType) -- ^ Univ and req
             -> ([TyVar], ThetaType) -- ^ Ex and prov
             -> [Type]               -- ^ Argument types
             -> Type                 -- ^ Result type
             -> PatSyn
-buildPatSyn src_name declared_infix matcher wrapper
+buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
             (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys pat_ty
   = ASSERT((and [ univ_tvs == univ_tvs'
                 , ex_tvs == ex_tvs'
@@ -202,9 +202,9 @@ buildPatSyn src_name declared_infix matcher wrapper
     mkPatSyn src_name declared_infix
              (univ_tvs, req_theta) (ex_tvs, prov_theta)
              arg_tys pat_ty
-             matcher wrapper
+             matcher builder
   where
-    ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher
+    ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher_id
     ([pat_ty', cont_sigma, _], _) = tcSplitFunTys tau
     (ex_tvs', prov_theta', cont_tau) = tcSplitSigmaTy cont_sigma
     (arg_tys', _) = tcSplitFunTys cont_tau

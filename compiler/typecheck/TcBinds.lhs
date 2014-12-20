@@ -27,7 +27,6 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import PatSyn
 import ConLike
 import Type( tidyOpenType )
 import FunDeps( growThetaTyVars )
@@ -413,11 +412,8 @@ tc_single _top_lvl _sig_fn _prag_fn (L _ (PatSynBind psb)) thing_inside
   = do { (pat_syn, aux_binds) <- tcPatSynDecl psb
 
        ; let tything = AConLike (PatSynCon pat_syn)
-             implicit_ids = (patSynMatcher pat_syn) :
-                            (maybeToList (patSynWrapper pat_syn))
 
        ; thing <- tcExtendGlobalEnv [tything] $
-                  tcExtendGlobalEnvImplicit (map AnId implicit_ids) $
                   thing_inside
        ; return (aux_binds, thing)
        }

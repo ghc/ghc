@@ -122,8 +122,8 @@ data IfaceDecl
 
   | IfacePatSyn { ifName          :: OccName,           -- Name of the pattern synonym
                   ifPatIsInfix    :: Bool,
-                  ifPatMatcher    :: IfExtName,
-                  ifPatWrapper    :: Maybe IfExtName,
+                  ifPatMatcher    :: (IfExtName, Bool),
+                  ifPatBuilder    :: Maybe (IfExtName, Bool),
                   -- Everything below is redundant,
                   -- but needed to implement pprIfaceDecl
                   ifPatUnivTvs    :: [IfaceTvBndr],
@@ -1104,15 +1104,15 @@ pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branche
   = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
        2 (vcat $ map (pprAxBranch $ Just tycon) branches)
 
-pprIfaceDecl (IfacePatSyn { ifName = name, ifPatWrapper = wrapper,
+pprIfaceDecl (IfacePatSyn { ifName = name, ifPatBuilder = builder,
                             ifPatIsInfix = is_infix,
                             ifPatUnivTvs = _univ_tvs, ifPatExTvs = _ex_tvs,
                             ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
                             ifPatArgs = args,
                             ifPatTy = ty })
-  = pprPatSynSig name has_wrap args' ty' (pprCtxt prov_ctxt) (pprCtxt req_ctxt)
+  = pprPatSynSig name has_builder args' ty' (pprCtxt prov_ctxt) (pprCtxt req_ctxt)
   where
-    has_wrap = isJust wrapper
+    has_builder = isJust builder
     args' = case (is_infix, args) of
         (True, [left_ty, right_ty]) ->
             InfixPatSyn (pprParendIfaceType left_ty) (pprParendIfaceType right_ty)
@@ -1394,8 +1394,8 @@ freeNamesIfDecl d@IfaceAxiom{} =
   freeNamesIfTc (ifTyCon d) &&&
   fnList freeNamesIfAxBranch (ifAxBranches d)
 freeNamesIfDecl d@IfacePatSyn{} =
-  unitNameSet (ifPatMatcher d) &&&
-  maybe emptyNameSet unitNameSet (ifPatWrapper d) &&&
+  unitNameSet (fst (ifPatMatcher d)) &&&
+  maybe emptyNameSet (unitNameSet . fst) (ifPatBuilder d) &&&
   freeNamesIfTvBndrs (ifPatUnivTvs d) &&&
   freeNamesIfTvBndrs (ifPatExTvs d) &&&
   freeNamesIfContext (ifPatProvCtxt d) &&&
