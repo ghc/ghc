@@ -46,6 +46,12 @@ module HscTypes (
 
         mkSOName, mkHsSOName, soExt,
 
+        -- * Metaprogramming
+        MetaRequest(..),
+        MetaResult, -- data constructors not exported to ensure correct response type
+        metaRequestE, metaRequestP, metaRequestT, metaRequestD, metaRequestAW,
+        MetaHook,
+
         -- * Annotations
         prepareAnnotations,
 
@@ -177,6 +183,7 @@ import Binary
 import ErrUtils
 import Platform
 import Util
+import Serialized       ( Serialized )
 
 import Control.Monad    ( guard, liftM, when, ap )
 import Data.Array       ( Array, array )
@@ -591,6 +598,47 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
 
 hptObjs :: HomePackageTable -> [FilePath]
 hptObjs hpt = concat (map (maybe [] linkableObjs . hm_linkable) (eltsUFM hpt))
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Metaprogramming}
+*                                                                      *
+************************************************************************
+-}
+
+-- | The supported metaprogramming result types
+data MetaRequest
+  = MetaE  (LHsExpr RdrName   -> MetaResult)
+  | MetaP  (LPat RdrName      -> MetaResult)
+  | MetaT  (LHsType RdrName   -> MetaResult)
+  | MetaD  ([LHsDecl RdrName] -> MetaResult)
+  | MetaAW (Serialized        -> MetaResult)
+
+-- | data constructors not exported to ensure correct result type
+data MetaResult
+  = MetaResE  { unMetaResE  :: LHsExpr RdrName   }
+  | MetaResP  { unMetaResP  :: LPat RdrName      }
+  | MetaResT  { unMetaResT  :: LHsType RdrName   }
+  | MetaResD  { unMetaResD  :: [LHsDecl RdrName] }
+  | MetaResAW { unMetaResAW :: Serialized        }
+
+type MetaHook f = MetaRequest -> LHsExpr Id -> f MetaResult
+
+metaRequestE :: Functor f => MetaHook f -> LHsExpr Id -> f (LHsExpr RdrName)
+metaRequestE h = fmap unMetaResE . h (MetaE MetaResE)
+
+metaRequestP :: Functor f => MetaHook f -> LHsExpr Id -> f (LPat RdrName)
+metaRequestP h = fmap unMetaResP . h (MetaP MetaResP)
+
+metaRequestT :: Functor f => MetaHook f -> LHsExpr Id -> f (LHsType RdrName)
+metaRequestT h = fmap unMetaResT . h (MetaT MetaResT)
+
+metaRequestD :: Functor f => MetaHook f -> LHsExpr Id -> f [LHsDecl RdrName]
+metaRequestD h = fmap unMetaResD . h (MetaD MetaResD)
+
+metaRequestAW :: Functor f => MetaHook f -> LHsExpr Id -> f Serialized
+metaRequestAW h = fmap unMetaResAW . h (MetaAW MetaResAW)
 
 {-
 ************************************************************************

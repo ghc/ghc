@@ -18,6 +18,7 @@ module Hooks ( Hooks
              , hscCompileCoreExprHook
              , ghcPrimIfaceHook
              , runPhaseHook
+             , runMetaHook
              , linkHook
              , runQuasiQuoteHook
              , runRnSpliceHook
@@ -59,6 +60,7 @@ import Data.Maybe
 emptyHooks :: Hooks
 emptyHooks = Hooks Nothing Nothing Nothing Nothing Nothing Nothing
                    Nothing Nothing Nothing Nothing Nothing Nothing
+                   Nothing
 
 data Hooks = Hooks
   { dsForeignsHook         :: Maybe ([LForeignDecl Id] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
@@ -69,6 +71,7 @@ data Hooks = Hooks
   , hscCompileCoreExprHook :: Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO HValue)
   , ghcPrimIfaceHook       :: Maybe ModIface
   , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath))
+  , runMetaHook            :: Maybe (MetaHook TcM)
   , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool -> HomePackageTable -> IO SuccessFlag)
   , runQuasiQuoteHook      :: Maybe (HsQuasiQuote Name -> RnM (HsQuasiQuote Name))
   , runRnSpliceHook        :: Maybe (LHsExpr Name -> RnM (LHsExpr Name))

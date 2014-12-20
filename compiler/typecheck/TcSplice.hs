@@ -22,6 +22,7 @@ module TcSplice(
      -- called only in stage2 (ie GHCI is on)
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
+     defaultRunMeta, runMeta'
 #endif
       ) where
 
@@ -555,7 +556,14 @@ runAnnotation target expr = do
     -- the annotation and its dictionaries. The return value is of
     -- type AnnotationWrapper by construction, so this conversion is
     -- safe
-    flip runMetaAW zonked_wrapped_expr' $ \annotation_wrapper ->
+    serialized <- runMetaAW zonked_wrapped_expr'
+    return Annotation {
+               ann_target = target,
+               ann_value = serialized
+           }
+
+convertAnnotationWrapper :: AnnotationWrapper -> Either MsgDoc Serialized
+convertAnnotationWrapper  annotation_wrapper = Right $
         case annotation_wrapper of
             AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
                 -- Got the value and dictionaries: build the serialized value and
@@ -564,10 +572,8 @@ runAnnotation target expr = do
                 -- annotation are exposed at this point.  This is also why we are
                 -- doing all this stuff inside the context of runMeta: it has the
                 -- facilities to deal with user error in a meta-level expression
-                seqSerialized serialized `seq` Annotation {
-                    ann_target = target,
-                    ann_value = serialized
-                }
+                seqSerialized serialized `seq` serialized
+
 
 {-
 ************************************************************************
@@ -606,9 +612,10 @@ runQuasiQuote :: Outputable hs_syn
               => HsQuasiQuote RdrName   -- Contains term of type QuasiQuoter, and the String
               -> Name                   -- Of type QuasiQuoter -> String -> Q th_syn
               -> Name                   -- Name of th_syn type
-              -> MetaOps th_syn hs_syn
+              -> String                 -- Description of splice type
+              -> (MetaHook RnM -> LHsExpr Id -> RnM hs_syn)
               -> RnM hs_syn
-runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
+runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty descr meta_req
   = do  {     -- Drop the leading "$" from the quoter name, if present
               -- This is old-style syntax, now deprecated
               -- NB: when removing this backward-compat, remove
@@ -652,15 +659,19 @@ runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
         ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr meta_exp_ty)
 
         -- Run the expression
-        ; result <- runMetaQ meta_ops zonked_q_expr
-        ; showSplice (mt_desc meta_ops) quoteExpr (ppr result)
+        ; result <- runMeta meta_req zonked_q_expr
+        ; showSplice descr quoteExpr (ppr result)
 
         ; return result }
 
-runQuasiQuoteExpr qq = runQuasiQuote qq quoteExpName  expQTyConName  exprMetaOps
-runQuasiQuotePat  qq = runQuasiQuote qq quotePatName  patQTyConName  patMetaOps
-runQuasiQuoteType qq = runQuasiQuote qq quoteTypeName typeQTyConName typeMetaOps
-runQuasiQuoteDecl qq = runQuasiQuote qq quoteDecName  decsQTyConName declMetaOps
+runQuasiQuoteExpr qq
+  = runQuasiQuote qq quoteExpName  expQTyConName  "expression"   metaRequestE
+runQuasiQuotePat  qq
+  = runQuasiQuote qq quotePatName  patQTyConName  "pattern"      metaRequestP
+runQuasiQuoteType qq
+  = runQuasiQuote qq quoteTypeName typeQTyConName "type"         metaRequestT
+runQuasiQuoteDecl qq
+  = runQuasiQuote qq quoteDecName  decsQTyConName "declarations" metaRequestD
 
 quoteStageError :: Name -> SDoc
 quoteStageError quoter
@@ -684,70 +695,62 @@ deprecatedDollar quoter
 runQuasi :: TH.Q a -> TcM a
 runQuasi act = TH.runQ act
 
-data MetaOps th_syn hs_syn
-  = MT { mt_desc :: String             -- Type of beast (expression, type etc)
-       , mt_show :: th_syn -> String   -- How to show the th_syn thing
-       , mt_cvt  :: SrcSpan -> th_syn -> Either MsgDoc hs_syn
-                                       -- How to convert to hs_syn
-    }
+runQResult :: (a -> String) -> (SrcSpan -> a -> b) -> SrcSpan -> TH.Q a -> TcM b
+runQResult show_th f expr_span hval
+  = do { th_result <- TH.runQ hval
+       ; traceTc "Got TH result:" (text (show_th th_result))
+       ; return (f expr_span th_result) }
 
-exprMetaOps :: MetaOps TH.Exp (LHsExpr RdrName)
-exprMetaOps = MT { mt_desc = "expression", mt_show = TH.pprint, mt_cvt = convertToHsExpr }
+-----------------
+runMeta :: (MetaHook TcM -> LHsExpr Id -> TcM hs_syn)
+        -> LHsExpr Id
+        -> TcM hs_syn
+runMeta unwrap e
+  = do { h <- getHooked runMetaHook defaultRunMeta
+       ; unwrap h e }
 
-patMetaOps :: MetaOps TH.Pat (LPat RdrName)
-patMetaOps = MT { mt_desc = "pattern", mt_show = TH.pprint, mt_cvt = convertToPat }
-
-typeMetaOps :: MetaOps TH.Type (LHsType RdrName)
-typeMetaOps = MT { mt_desc = "type", mt_show = TH.pprint, mt_cvt = convertToHsType }
-
-declMetaOps :: MetaOps [TH.Dec] [LHsDecl RdrName]
-declMetaOps = MT { mt_desc = "declarations", mt_show = TH.pprint, mt_cvt = convertToHsDecls }
-
-----------------
-runMetaAW :: Outputable output
-          => (AnnotationWrapper -> output)
-          -> LHsExpr Id         -- Of type AnnotationWrapper
-          -> TcM output
-runMetaAW k = runMeta False (\_ -> return . Right . k)
+defaultRunMeta :: MetaHook TcM
+defaultRunMeta (MetaE r)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr)
+defaultRunMeta (MetaP r)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat)
+defaultRunMeta (MetaT r)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType)
+defaultRunMeta (MetaD r)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls)
+defaultRunMeta (MetaAW r)
+  = fmap r . runMeta' False (const empty) (const (return . convertAnnotationWrapper))
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the users code
 
------------------
-runMetaQ :: Outputable hs_syn
-         => MetaOps th_syn hs_syn
-         -> LHsExpr Id
-         -> TcM hs_syn
-runMetaQ (MT { mt_show = show_th, mt_cvt = cvt }) expr
-  = runMeta True run_and_cvt expr
-  where
-    run_and_cvt expr_span hval
-       = do { th_result <- TH.runQ hval
-            ; traceTc "Got TH result:" (text (show_th th_result))
-            ; return (cvt expr_span th_result) }
+----------------
+runMetaAW :: LHsExpr Id         -- Of type AnnotationWrapper
+          -> TcM Serialized
+runMetaAW = runMeta metaRequestAW
 
 runMetaE :: LHsExpr Id          -- Of type (Q Exp)
          -> TcM (LHsExpr RdrName)
-runMetaE = runMetaQ exprMetaOps
+runMetaE = runMeta metaRequestE
 
 runMetaP :: LHsExpr Id          -- Of type (Q Pat)
          -> TcM (LPat RdrName)
-runMetaP = runMetaQ patMetaOps
+runMetaP = runMeta metaRequestP
 
 runMetaT :: LHsExpr Id          -- Of type (Q Type)
          -> TcM (LHsType RdrName)
-runMetaT = runMetaQ typeMetaOps
+runMetaT = runMeta metaRequestT
 
 runMetaD :: LHsExpr Id          -- Of type Q [Dec]
          -> TcM [LHsDecl RdrName]
-runMetaD = runMetaQ declMetaOps
+runMetaD = runMeta metaRequestD
 
 ---------------
-runMeta :: (Outputable hs_syn)
-        => Bool                 -- Whether code should be printed in the exception message
-        -> (SrcSpan -> x -> TcM (Either MsgDoc hs_syn))        -- How to run x
-        -> LHsExpr Id           -- Of type x; typically x = Q TH.Exp, or something like that
-        -> TcM hs_syn           -- Of type t
-runMeta show_code run_and_convert expr
+runMeta' :: Bool                 -- Whether code should be printed in the exception message
+         -> (hs_syn -> SDoc)                                    -- how to print the code
+         -> (SrcSpan -> x -> TcM (Either MsgDoc hs_syn))        -- How to run x
+         -> LHsExpr Id           -- Of type x; typically x = Q TH.Exp, or something like that
+         -> TcM hs_syn           -- Of type t
+runMeta' show_code ppr_hs run_and_convert expr
   = do  { traceTc "About to run" (ppr expr)
         ; recordThSpliceUse -- seems to be the best place to do this,
                             -- we catch all kinds of splices and annotations.
@@ -792,7 +795,7 @@ runMeta show_code run_and_convert expr
              do { mb_result <- run_and_convert expr_span (unsafeCoerce# hval)
                 ; case mb_result of
                     Left err     -> failWithTc err
-                    Right result -> do { traceTc "Got HsSyn result:" (ppr result)
+                    Right result -> do { traceTc "Got HsSyn result:" (ppr_hs result)
                                        ; return $! result } }
 
         ; case either_tval of
