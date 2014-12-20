@@ -22,12 +22,12 @@ import Outputable
 import FastString
 import Var
 import Id
-import IdInfo( IdDetails( VanillaId ) )
 import TcBinds
 import BasicTypes
 import TcSimplify
 import TcType
 import VarSet
+import MkId
 import Data.Monoid
 import Bag
 import TcEvidence
@@ -121,25 +121,29 @@ tcPatSynMatcher :: Located Name
                 -> TcM (Id, LHsBinds Id)
 -- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
 tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_dicts prov_theta req_theta pat_ty
-  = do { res_tv <- zonkQuantifiedTyVar =<< newFlexiTyVar liftedTypeKind
+  = do { res_tv <- do
+              { uniq <- newUnique
+              ; let tv_name = mkInternalName uniq (mkTyVarOcc "r") loc
+              ; return $ mkTcTyVar tv_name openTypeKind (SkolemTv False) }
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
        ; let res_ty = TyVarTy res_tv
+             cont_args = if null args then [voidPrimId] else args
              cont_ty = mkSigmaTy ex_tvs prov_theta $
-                       mkFunTys (map varType args) res_ty
+                       mkFunTys (map varType cont_args) res_ty
+             fail_ty = mkFunTy voidPrimTy res_ty
 
-       ; let matcher_tau = mkFunTys [pat_ty, cont_ty, res_ty] res_ty
+       ; let matcher_tau = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id = mkExportedLocalId VanillaId matcher_name matcher_sigma
+             matcher_id = mkVanillaGlobal matcher_name matcher_sigma
 
        ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; let matcher_lid = L loc matcher_id
 
        ; scrutinee <- mkId "scrut" pat_ty
        ; cont <- mkId "cont" cont_ty
-       ; let cont' = nlHsApps cont $ map nlHsVar (ex_tvs ++ prov_dicts ++ args)
-       ; fail <- mkId "fail" res_ty
-       ; let fail' = nlHsVar fail
-
+       ; let cont' = nlHsApps cont $ map nlHsVar (ex_tvs ++ prov_dicts ++ cont_args)
+       ; fail <- mkId "fail" fail_ty
+       ; let fail' = nlHsApps fail [nlHsVar voidPrimId]
 
        ; let args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLoc $ WildPat pat_ty
@@ -182,9 +186,7 @@ tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_d
 
        ; return (matcher_id, matcher_bind) }
   where
-    mkId s ty = do
-        name <- newName . mkVarOccFS . fsLit $ s
-        return $ mkLocalId name ty
+    mkId s ty = mkSysLocalM (fsLit s) ty
 
 tcPatSynWrapper :: Located Name
                 -> LPat Name
@@ -222,12 +224,11 @@ tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_t
              wrapper_sigma = mkSigmaTy wrapper_tvs wrapper_theta wrapper_tau
 
        ; wrapper_name <- newImplicitBinder name mkDataConWrapperOcc
-       ; let wrapper_lname = L loc wrapper_name
-             wrapper_id = mkExportedLocalId VanillaId wrapper_name wrapper_sigma
+       ; let wrapper_id = mkVanillaGlobal wrapper_name wrapper_sigma
 
        ; let wrapper_args = map (noLoc . VarPat . Var.varName) args'
              wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
-             bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
+             bind = mkTopFunBind Generated (L loc wrapper_name) [wrapper_match]
              lbind = noLoc bind
        ; let sig = TcSigInfo{ sig_id = wrapper_id
                             , sig_tvs = map (\tv -> (Nothing, tv)) wrapper_tvs
