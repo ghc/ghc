@@ -354,57 +354,181 @@ operations:
 
 \Red{This entire section is a proposed and has not been implemented.}
 
-A Backpack language is an intermediate representation which can be
-thought of as a more user friendly way to specify \texttt{-shape-of},
-\texttt{-sig-of} and \texttt{-package} flags as well as create entries
-in the installed package database, without resorting to a full-fledged
-Cabal file (which contains a lot of metadata that is not directly
-relevant to programming with modules and packages).  The intent is
-the Backpack language is something that could be incorporated into
-the Haskell language specification, without necessitating the inclusion
-the Cabal specification.
+In this section, we describe an expanded version of the package language
+described in the Backpack paper which GHC accepts as input.  Given a
+\emph{Backpack file}, GHC performs shaping analysis, typechecking,
+compilation and registration of multiple packages (whose source code is
+specified by the Backpack file).  A Backpack file replaces use of
+\texttt{-shape-of}, \texttt{-sig-of} and \texttt{-package} flags.\footnote{Backpack files are \emph{generated} by Cabal.  Cabal is responsible for downloading source files, resolving what versions of packages are to be used, executing conditional statements.  Once the Cabal files are compiled into a Backpack file, it is passed to GHC, which is responsible for instantiating holes and compiling the packages.  The package descriptions in a Backpack file are not full Cabal packages, but contain the minimum information necessary for GHC to work: they are more akin to entries in the installed package database (with some differences).}\footnote{One design goal of this separate package language from Cabal is that it can more easily be incorporated into a language specification, without needing the specification to pull in a full description of Cabal.}
 
-A Backpack file contains any number of \emph{source packages} and
-\emph{installed packages}.  It can be compiled using \texttt{ghc --backpack file.bkp},
-which produces object files as well as a local, inplace installed package database.
-A source package is specified as:
+A Backpack file consists of a list of named packages, each of which
+is composed of fields (similar to fields in Cabal package description)
+which specify various aspects of the package.  A package may optionally
+be an \emph{installed} package (specified by the \texttt{installed}
+keyword), in which case the package refers to an existing package
+(with no holes) in the installed package database; in this case,
+all fields are omitted except for \texttt{id}, which identifies the
+specific package in use.
 
-\begin{verbatim}
-package package-name
-    field-name: field-value
-    ...
-\end{verbatim}
-
-Valid fields for a source package are as follows:
-
-\begin{itemize}
-    \item \texttt{includes}, a list of packages to import with thinnings and renamings.  This field is analogous to Cabal's \texttt{build-depends}, but no version bounds are allowed.  A package may be included multiple times.
-    \item \texttt{exposed-modules}, \texttt{other-modules}, \texttt{exposed-signatures}, \texttt{required-signatures}, \texttt{reexported-modules}, which have the same meaning as in a Cabal file. \Red{Or, since we are liberated from such petty concerns as backwards-compatibility, perhaps a more parsimonious syntax could be designed.}
-    \item \texttt{source-dir}, which specifies where the source files of the package live.
-    \item Any field which is valid in the \emph{installed package database},
-        except for \texttt{name}, \texttt{id}, \texttt{key} and \texttt{instantiated-with},
-        \texttt{depends}.\footnote{\texttt{name} is excluded because it is redundant with the \texttt{package package-name} preeamble.  \texttt{id}, \texttt{key} and \texttt{instantiated-with} are excluded because they presuppose that a package description has been fully instantiated, but package descriptions in the Backpack file are not instantiated: that's the job of the compiler.}
-\end{itemize}
-
-The names of all packages live in the global namespace.
-A possible future addition would be the ability to specify private
-packages which are not exposed.
-
-An \emph{installed package} specifies a specific preexisting package
-which is already in the installed package database.  An installed
-package is specified as:
+All packages in a Backpack file live in the global namespace.
+\Red{A possible future addition would be the ability to specify private
+packages which are not exposed.}
 
 \begin{verbatim}
-installed package package-name
-    id: installed-package-id
+backpack ::= package_0
+             ...
+             package_n
+
+package ::= ["installed"] "package" pkgname
+                field_0
+                ...
+                field_n
+
+pkgname ::= /* package name, e.g. containers (no version!) */
+
+field ::= "includes:"            includes
+        | "exposed-modules:"     modnames
+        | "other-modules:"       modnames
+        | "exposed-signatures:"  modnames
+        | "required-signatures:" modnames
+        | "reexported-modules:"  reexports
+        | "source-dir:"          path
+        | "installed-ids:"       ipids
+        | pkgdb_field
 \end{verbatim}
 
-Multiple installed package IDs can be specified if they have
-distinct package keys, as might be the case for an indefinite package
-which has been installed multiple times with different hole instantiations.
+We now describe the package fields in more detail.
 
-Handling version number resolution is \emph{explicitly} a non-goal for
-Backpack files.
+\subsection{\texttt{includes}}
+
+\begin{verbatim}
+includes ::= include_0 "," ... "," include_n
+include ::= pkgname ["(" renames ")"]
+
+renames ::= rename_0 "," ... "," rename_n
+rename ::= modname
+         | modname "as" modname
+\end{verbatim}
+
+The \texttt{includes} field consists of a comma-separated list of
+packages to include.  This field is similar to the Cabal
+\texttt{build-depends} field, except that no version numbers are
+allowed.  Each package has all exposed modules and signatures are
+brought into scope under their original names, unless there is a
+parenthesized, comma-separated thinning and renaming specification which
+causes only the specified modules are brought into scope (under new
+names, if the \texttt{as} keyword is used).
+
+Package inclusion is the mechanism by which holes are instantiated:
+a hole and an implementation which are brought in the same scope with
+the same name are linked together.  If a package is included multiple
+times, it is treated as a separate instantiation for the purpose of
+filling holes.
+
+\subsection{\texttt{exposed-modules}, \texttt{other-modules}, \texttt{exposed-signatures}, \texttt{required-signatures}}
+
+\begin{verbatim}
+modnames ::= modname_0 ... modname_n
+\end{verbatim}
+
+The \texttt{exposed-modules}, \texttt{other-modules},
+\texttt{exposed-signatures} and \texttt{required-signatures} are exactly
+analogous to their Cabal counterparts, and consist of lists of module names
+which are to be compiled from the package's source directory.
+
+\subsection{\texttt{reexported-modules}}
+
+\begin{verbatim}
+reexports ::= modname "as" modname
+\end{verbatim}
+
+The \texttt{reexported-modules} field is exactly analogous to its Cabal
+counterpart, and allows reexporting an in-scope module under a different name.\footnote{This is different from \emph{aliasing} in the original Backpack language, since reexported modules are not visible in the current package.}
+
+\subsection{\texttt{source-dir}}
+
+\begin{verbatim}
+path ::=  /* file path, e.g. /home/alice/src/containers */
+\end{verbatim}
+
+The \texttt{source-dir} field specifies where the source files of
+the package in question live, e.g. if \texttt{source-dir: /foo}
+then we expect the \texttt{hs} file for module \texttt{A} to live
+in \texttt{/foo/A.hs}.
+
+\subsection{\texttt{installed-ids}}
+
+\begin{verbatim}
+ipids ::= ipid_0 ... ipid_n
+ipid ::= /* installed package ID, e.g. containers-0.8-HASH */
+\end{verbatim}
+
+The \texttt{installed-ids} field specifies existing, \emph{compiled} packages in
+the installed package database, which should be used when possible
+instead of recompiling the package in question.  If the package in
+question is an \emph{indefinite} package (with holes), there may be
+multiple \texttt{installed-ids}, corresponding to compilations of the package
+with different hole instantiations.
+
+The \texttt{installed-ids} field is mandatory for an \texttt{installed package}:
+it specifies the installed package database entry which can be used
+to find the omitted installed package database fields.
+
+\subsection{Installed package database fields}
+
+GHC's installed package database supports a number of other fields
+which are necessary for GHC to build some packages, e.g., the \texttt{extraLibraries}
+field which specifies operating system libraries which also have to
+be linked in.  Backpack packages accept any fields which are valid in the
+installed package database, except for: \texttt{name}, \texttt{id}, \texttt{key}
+and \texttt{instantiated-with} (which are computed by GHC itself).
+
+\subsection{Structure of a Backpack file}
+
+In general, a Backpack file must contain the package descriptions of
+\emph{all} packages which are transitively depended on (in case
+one of those packages must be rebuilt.)  However, if we know a specific
+version of a package is already in the installed package database,
+its description may be replaced with an \texttt{installed package}
+entry, in which case the description (and description of its dependencies)
+can be omitted.  \Red{An alternative is to have an indefinite package
+database, in which case this database is simply always in scope.  This
+might be better if we want to save interface files associated with indefinite
+packages.}
+
+It should be emphasized that while the Backpack file leaves the instantiation
+of holes implicit (to be resolved by looking at the included packages and
+linking modules together), \emph{all package versions} must be resolved
+prior to writing a Backpack file.  A Backpack file assumes that the
+versions of all packages are consistent (e.g., any reference to \texttt{foo}
+will always be a reference to \texttt{foo-1.2}).
+
+% Confusion:
+%   - It's not really clear what 'installed package foo' refers to
+%   - What does it mean to "install" an indefinite package?
+%   - So I guess having the 'installed package' qualifier is not useful,
+%     because "indefinite" ones also have precompiled indefinite ones
+%   - The Cabal compilation process: write it out
+%       1. Cabal copies relevant q-3.4.cabal into .bkp
+%       2. Resolves version
+%       3. Selects bits GHC needs
+%       4. Downloads source code
+%       5. Executes conditionals
+%   - Want to distinguish different names from installed package
+%     database, local names, Hackage names (invariant: Hackage names
+%     never show up)
+%   - SPJ trap: version resolution versus hole instantiation
+%   - Another red herring: couldn't Cabal pick different versions for
+%     the same package
+%   - Halfway house: definite packages can be snipped off, but
+%     put in all the indefinite ones
+%       This is BETTER than having an indefinite package database,
+%       because all that's doing is saving us from having to write
+%       some characters into a file, it doesn't save us compilation
+%       time. (So NO INDEFINITE PACKAGE DATABASE)
+%   - Update: version versus holes is REALLY CONFUSING (NO HOLES!)
+%   - But for TYPECHECKING you probably do want the indefinite package
+%     database, for the INTERFACE FILES
 
 \section{Cabal}
 
@@ -470,9 +594,7 @@ onto a home \texttt{hsig} signature.
 This field has been extended with new syntax
 to provide the access to GHC's new thinning and renaming functionality
 and to have the ability to include an indefinite package \emph{multiple times}
-(with different instantiations for its holes).  Renaming is the
-\emph{primary} mechanism by which holes are instantiated in a mix-in module
-system, however, this instantiation only occurs when running \texttt{cabal-install}.
+(with different instantiations for its holes).
 
 Here is an example entry in \texttt{build-depends}:
 \verb|foo >= 0.8 (ASig as A1, B as B1; ASig as A2, ...)|.  This statement includes the
