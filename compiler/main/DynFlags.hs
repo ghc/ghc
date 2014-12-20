@@ -65,7 +65,7 @@ module DynFlags (
 
         -- ** System tool settings and locations
         Settings(..),
-        targetPlatform,
+        targetPlatform, programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
@@ -901,6 +901,8 @@ data Settings = Settings {
   sGhciUsagePath         :: FilePath,    -- ditto
   sTopDir                :: FilePath,
   sTmpDir                :: String,      -- no trailing '/'
+  sProgramName           :: String,
+  sProjectVersion        :: String,
   -- You shouldn't need to look things up in rawSettings directly.
   -- They should have their own fields instead.
   sRawSettings           :: [(String, String)],
@@ -941,7 +943,10 @@ data Settings = Settings {
 
 targetPlatform :: DynFlags -> Platform
 targetPlatform dflags = sTargetPlatform (settings dflags)
-
+programName :: DynFlags -> String
+programName dflags = sProgramName (settings dflags)
+projectVersion :: DynFlags -> String
+projectVersion dflags = sProjectVersion (settings dflags)
 ghcUsagePath          :: DynFlags -> FilePath
 ghcUsagePath dflags = sGhcUsagePath (settings dflags)
 ghciUsagePath         :: DynFlags -> FilePath
@@ -3914,7 +3919,7 @@ compilerInfo dflags
       -- in the settings file (as "lookup" uses the first match for the
       -- key)
     : rawSettings dflags
-   ++ [("Project version",             cProjectVersion),
+   ++ [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),

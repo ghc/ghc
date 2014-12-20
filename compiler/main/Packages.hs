@@ -53,7 +53,6 @@ where
 import GHC.PackageDb
 import PackageConfig
 import DynFlags
-import Config           ( cProjectVersion )
 import Name             ( Name, nameModule_maybe )
 import UniqFM
 import Module
@@ -72,6 +71,7 @@ import System.Directory
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
+import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
 #if __GLASGOW_HASKELL__ < 709
@@ -338,7 +338,7 @@ getPackageConfRefs :: DynFlags -> IO [PkgConfRef]
 getPackageConfRefs dflags = do
   let system_conf_refs = [UserPkgConf, GlobalPkgConf]
 
-  e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
+  e_pkg_path <- tryIO (getEnv $ map toUpper (programName dflags) ++ "_PACKAGE_PATH")
   let base_conf_refs = case e_pkg_path of
         Left _ -> system_conf_refs
         Right path
@@ -354,9 +354,9 @@ getPackageConfRefs dflags = do
 
 resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
 resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
-resolvePackageConfig _ UserPkgConf = handleIO (\_ -> return Nothing) $ do
-  appdir <- getAppUserDataDirectory "ghc"
-  let dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+resolvePackageConfig dflags UserPkgConf = handleIO (\_ -> return Nothing) $ do
+  appdir <- getAppUserDataDirectory (programName dflags)
+  let dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':projectVersion dflags)
       pkgconf = dir </> "package.conf.d"
   exist <- doesDirectoryExist pkgconf
   return $ if exist then Just pkgconf else Nothing
@@ -1107,7 +1107,8 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
 
         mkDynName x
          | gopt Opt_Static dflags       = x
-         | "HS" `isPrefixOf` x          = x ++ "-ghc" ++ cProjectVersion
+         | "HS" `isPrefixOf` x          =
+              x ++ '-':programName dflags ++ projectVersion dflags
            -- For non-Haskell libraries, we use the name "Cfoo". The .a
            -- file is libCfoo.a, and the .so is libfoo.so. That way the
            -- linker knows what we mean for the vanilla (-lCfoo) and dyn

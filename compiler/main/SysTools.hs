@@ -325,6 +325,8 @@ initSysTools mbMinusB
                     sLdSupportsBuildId       = ldSupportsBuildId,
                     sLdSupportsFilelist      = ldSupportsFilelist,
                     sLdIsGnuLd               = ldIsGnuLd,
+                    sProgramName             = "ghc",
+                    sProjectVersion          = cProjectVersion,
                     sPgm_L   = unlit_path,
                     sPgm_P   = (cpp_prog, cpp_args),
                     sPgm_F   = "",

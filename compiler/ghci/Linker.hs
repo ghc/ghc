@@ -50,7 +50,6 @@ import SrcLoc
 import qualified Maybes
 import UniqSet
 import FastString
-import Config
 import Platform
 import SysTools
 
@@ -1217,7 +1216,7 @@ locateLib dflags is_hs dirs lib
      mk_dyn_obj_path  dir = dir </> (lib <.> "dyn_o")
      mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
 
-     hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
+     hs_dyn_lib_name = lib ++ '-':programName dflags ++ projectVersion dflags
      mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
