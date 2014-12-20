@@ -259,7 +259,7 @@ test('T3064',
             # 2014-01-22: 162457940 (x86/Linux)
             # 2014-12-01: 162457940 (Windows)
 
-           (wordsize(64), 363103840, 5)]),
+           (wordsize(64), 350418600, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -273,6 +273,7 @@ test('T3064',
             # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
             # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
             # (amd64/Linux) (10/12/2014): 363103840, improvements in constraint solver
+            # (Mac)         (18/12/2014): 350418600, improvements to flattener
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
