@@ -877,9 +877,17 @@ enqueueCommands cmds = do
 
 -- | If we one of these strings prefixes a command, then we treat it as a decl
 -- rather than a stmt.
-declPrefixes :: [String]
-declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving ",
-                "foreign ", "default ", "default("]
+declPrefixes :: DynFlags -> [String]
+declPrefixes dflags = keywords ++ concat opt_keywords
+  where
+    keywords = [ "class ", "instance "
+               , "data ", "newtype ", "type "
+               , "default ", "default("
+               ]
+
+    opt_keywords = [ ["foreign "  | xopt Opt_ForeignFunctionInterface dflags]
+                   , ["deriving " | xopt Opt_StandaloneDeriving dflags]
+                   ]
 
 -- | Entry point to execute some haskell code from user
 runStmt :: String -> SingleStep -> GHCi Bool
@@ -892,23 +900,28 @@ runStmt stmt step
  | "import " `isPrefixOf` stmt
  = do addImportToContext stmt; return False
 
- -- data, class, newtype...
- | any (flip isPrefixOf stmt) declPrefixes
- = do _ <- liftIO $ tryIO $ hFlushAll stdin
-      result <- GhciMonad.runDecls stmt
-      afterRunStmt (const True) (GHC.RunOk result)
-
  | otherwise
- = do -- In the new IO library, read handles buffer data even if the Handle
-      -- is set to NoBuffering.  This causes problems for GHCi where there
-      -- are really two stdin Handles.  So we flush any bufferred data in
-      -- GHCi's stdin Handle here (only relevant if stdin is attached to
-      -- a file, otherwise the read buffer can't be flushed).
-      _ <- liftIO $ tryIO $ hFlushAll stdin
-      m_result <- GhciMonad.runStmt stmt step
-      case m_result of
-        Nothing     -> return False
-        Just result -> afterRunStmt (const True) result
+ = do dflags <- getDynFlags
+      if any (`isPrefixOf` stmt) (declPrefixes dflags)
+        then run_decl
+        else run_stmt
+  where
+    run_decl =
+        do _ <- liftIO $ tryIO $ hFlushAll stdin
+           result <- GhciMonad.runDecls stmt
+           afterRunStmt (const True) (GHC.RunOk result)
+
+    run_stmt =
+        do -- In the new IO library, read handles buffer data even if the Handle
+           -- is set to NoBuffering.  This causes problems for GHCi where there
+           -- are really two stdin Handles.  So we flush any bufferred data in
+           -- GHCi's stdin Handle here (only relevant if stdin is attached to
+           -- a file, otherwise the read buffer can't be flushed).
+           _ <- liftIO $ tryIO $ hFlushAll stdin
+           m_result <- GhciMonad.runStmt stmt step
+           case m_result of
+               Nothing     -> return False
+               Just result -> afterRunStmt (const True) result
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
