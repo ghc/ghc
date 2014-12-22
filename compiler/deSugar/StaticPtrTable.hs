@@ -24,8 +24,7 @@
 -- >
 -- > }
 --
--- where constants are values of a fingerprint of the string
--- "<package_id>:<module_name>.sptEntry:<N>"
+-- where the constants are fingerprints produced from the static forms.
 --
 module StaticPtrTable (sptInitCode) where
 
@@ -38,7 +37,7 @@ import GHC.Fingerprint
 
 
 -- | @sptInitCode module statics@ is a C stub to insert the static entries
--- @statics@ of @module@ into the static pointer table
+-- @statics@ of @module@ into the static pointer table.
 --
 -- Each entry contains the fingerprint used to locate the entry and the
 -- top-level binding for the entry.

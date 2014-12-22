@@ -313,7 +313,7 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 
 For the static form we check that the free variables are all top-level
 value bindings. This is done by checking that the name is external or
-wired-in. See the Note about the NameSorts in Name.lhs.
+wired-in. See the Notes about the NameSorts in Name.hs.
 -}
 
 rnExpr e@(HsStatic expr) = do

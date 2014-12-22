@@ -21,7 +21,7 @@ void *      removeHashTable ( HashTable *table, StgWord key, void *data );
 
 int keyCountHashTable (HashTable *table);
 
-// Puts up to keys_sz keys of the hash table into the given array. Returns the
+// Puts up to szKeys keys of the hash table into the given array. Returns the
 // actual amount of keys that have been retrieved.
 //
 // If the table is modified concurrently, the function behavior is undefined.

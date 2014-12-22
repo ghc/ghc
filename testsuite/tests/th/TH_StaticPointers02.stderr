@@ -1,5 +1,5 @@
 
-TH_StaticPointers02.hs:13:34:
+TH_StaticPointers02.hs:11:34:
     static forms cannot be used in splices: static 'a'
     In the splice:
       $(case staticKey (static 'a') of {
