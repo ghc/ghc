@@ -983,10 +983,26 @@ also indicated that the early reduction should not use the flat-cache,
 but that the later reduction should. It's possible that with more
 examples, we might learn that these knobs should be set differently.
 
-Once we've got a flat rhs, we extend the flatten-cache to record the
-result.  Doing so can save lots of work when the same redex shows up
-more than once.  Note that we record the link from the redex all the
-way to its *final* value, not just the single step reduction.
+An example of where the early reduction appears helpful:
+
+  type family Last x where
+    Last '[x]     = x
+    Last (h ': t) = Last t
+
+  workitem: (x ~ Last '[1,2,3,4,5,6])
+
+Flattening the argument never gets us anywhere, but trying to flatten
+it at every step is quadratic in the length of the list. Reducing more
+eagerly makes simplifying the right-hand type linear in its length.
+
+At the end, once we've got a flat rhs, we extend the flatten-cache to record
+the result. Doing so can save lots of work when the same redex shows up more
+than once. Note that we record the link from the redex all the way to its
+*final* value, not just the single step reduction. Interestingly, using the
+flat-cache for the first reduction resulted in an increase in allocations
+of about 3% for the four T9872x tests. However, using the flat-cache in
+the later reduction is a similar gain. I (Richard E) don't currently (Dec '14)
+have any knowledge as to *why* these facts are true.
 
 ************************************************************************
 *                                                                      *
