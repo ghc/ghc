@@ -59,7 +59,7 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
-      ghc >= 7.9 && < 7.12,
+      ghc >= 7.11 && < 7.13,
       bytestring,
       transformers
 
