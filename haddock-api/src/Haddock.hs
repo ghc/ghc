@@ -59,6 +59,7 @@ import System.FilePath
 #else
 import qualified GHC.Paths as GhcPaths
 import Paths_haddock_api (getDataDir)
+import System.Directory (doesDirectoryExist)
 #endif
 
 import GHC hiding (verbosity)
