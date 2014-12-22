@@ -1,10 +1,10 @@
 
 package01e.hs:2:1:
     Failed to load interface for ‘Data.Map’
-    It is a member of the hidden package ‘containers-0.5.6.1’.
+    It is a member of the hidden package ‘containers-0.5.6.2’.
     Use -v to see a list of the files searched for.
 
 package01e.hs:3:1:
     Failed to load interface for ‘Data.IntMap’
-    It is a member of the hidden package ‘containers-0.5.6.1’.
+    It is a member of the hidden package ‘containers-0.5.6.2’.
     Use -v to see a list of the files searched for.
