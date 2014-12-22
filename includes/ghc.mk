@@ -68,7 +68,7 @@ $(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
 	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $(ProjectPatchLevel1)" >> $@; \
 	fi
 	@if [ -n "$(ProjectPatchLevel2)" ]; then \
-	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $(ProjectPatchLevel2)" >> $@; \
+	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ $(ProjectPatchLevel2)" >> $@; \
 	fi
 	@echo >> $@
 	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\\'     >> $@
