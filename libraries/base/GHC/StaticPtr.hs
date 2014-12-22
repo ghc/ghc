@@ -24,7 +24,7 @@
 --
 -- To solve such concern, the references provided by this module offer a key
 -- that can be used to locate the values on each process. Each process maintains
--- a global and inmutable table of references which can be looked up with a
+-- a global and immutable table of references which can be looked up with a
 -- given key. This table is known as the Static Pointer Table. The reference can
 -- then be dereferenced to obtain the value.
 --
@@ -88,7 +88,7 @@ data StaticPtrInfo = StaticPtrInfo
     , spInfoName       :: String
       -- | Source location of the definition of the static pointer as a
       -- @(Line, Column)@ pair.
-    , spIntoSrcLoc     :: (Int, Int)
+    , spInfoSrcLoc     :: (Int, Int)
     }
   deriving (Show, Typeable)
 
