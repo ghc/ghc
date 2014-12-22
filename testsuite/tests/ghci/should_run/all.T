@@ -20,4 +20,5 @@ test('T3171',
 
 test('ghcirun004', just_ghci, compile_and_run, [''])
 test('T8377',      just_ghci, compile_and_run, [''])
+test('T9914',      just_ghci, ghci_script, ['T9914.script'])
 test('T9915',      just_ghci, ghci_script, ['T9915.script'])

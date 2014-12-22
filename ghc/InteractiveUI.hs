@@ -897,12 +897,12 @@ runStmt stmt step
  = return False
 
  -- import
- | "import " `isPrefixOf` stmt
+ | stmt `looks_like` "import "
  = do addImportToContext stmt; return False
 
  | otherwise
  = do dflags <- getDynFlags
-      if any (`isPrefixOf` stmt) (declPrefixes dflags)
+      if any (stmt `looks_like`) (declPrefixes dflags)
         then run_decl
         else run_stmt
   where
@@ -922,6 +922,8 @@ runStmt stmt step
            case m_result of
                Nothing     -> return False
                Just result -> afterRunStmt (const True) result
+
+    s `looks_like` prefix = prefix `isPrefixOf` dropWhile isSpace s
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
