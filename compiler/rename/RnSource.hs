@@ -73,7 +73,7 @@ Checks the @(..)@ etc constraints in the export list.
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
 rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
--- Rename a HsGroup; used for normal source files *and* hs-boot files
+-- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                                        hs_splcds  = splice_decls,
                                        hs_tyclds  = tycl_decls,
