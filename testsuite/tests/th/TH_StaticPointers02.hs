@@ -1,9 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE StaticPointers #-}
 
--- | A test to try the static form in splices.
---
--- A static form is defined in a splice and then it is used in the program.
+-- | A test to try the static form in splices, which should fail.
 --
 module Main(main) where
 

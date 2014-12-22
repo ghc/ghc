@@ -10470,9 +10470,6 @@ While the following definitions are rejected:
 ref6 = let x = 1 in static x
 ref7 y = static (let x = 1 in y)
 </programlisting>
-Note that currently, the body <literal>e</literal> in <literal>static
-e</literal> is restricted to a single identifier when at the GHCi
-prompt.
 </para>
 </sect2>
 
@@ -10502,13 +10499,14 @@ That being said, with the appropriate use of wrapper datatypes, the
 above limitations induce no loss of generality:
 <programlisting>
 {-# LANGUAGE ConstraintKinds           #-}
-{-# LANGUAGE DerivingDataTypeable      #-}
+{-# LANGUAGE DeriveDataTypeable        #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Rank2Types                #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE StaticPointers            #-}
 
 import Control.Monad.ST
+import Data.Typeable
 import GHC.StaticPtr
 
 data Dict c = c => Dict
