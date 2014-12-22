@@ -10,7 +10,7 @@ module RnEnv (
         newTopSrcBinder,
         lookupLocatedTopBndrRn, lookupTopBndrRn,
         lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
-        lookupLocalOccRn_maybe,
+        lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
@@ -75,6 +75,7 @@ import FastString
 import Control.Monad
 import Data.List
 import qualified Data.Set as Set
+import ListSetOps       ( minusList )
 import Constants        ( mAX_TUPLE_SIZE )
 
 {-
@@ -763,10 +764,12 @@ lookupOccRn_maybe rdr_name
        ; case mb_name of {
                 Just name  -> return (Just name) ;
                 Nothing -> do
-       { dflags  <- getDynFlags
-       ; is_ghci <- getIsGHCi   -- This test is not expensive,
-                                -- and only happens for failed lookups
-       ; lookupQualifiedNameGHCi dflags is_ghci rdr_name } } } } }
+       { ns <- lookupQualifiedNameGHCi rdr_name
+                      -- This test is not expensive,
+                      -- and only happens for failed lookups
+       ; case ns of
+           (n:_) -> return (Just n)  -- Unlikely to be more than one...?
+           []    -> return Nothing } } } } }
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
@@ -777,6 +780,25 @@ lookupGlobalOccRn rdr_name
            Just n  -> return n
            Nothing -> do { traceRn (text "lookupGlobalOccRn" <+> ppr rdr_name)
                          ; unboundName WL_Global rdr_name } }
+
+lookupInfoOccRn :: RdrName -> RnM [Name]
+-- lookupInfoOccRn is intended for use in GHCi's ":info" command
+-- It finds all the GREs that RdrName could mean, not complaining
+-- about ambiguity, but rather returning them all
+-- C.f. Trac #9881
+lookupInfoOccRn rdr_name
+  | Just n <- isExact_maybe rdr_name   -- e.g. (->)
+  = return [n]
+
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = do { n <- lookupOrig rdr_mod rdr_occ
+       ; return [n] }
+
+  | otherwise
+  = do { rdr_env <- getGlobalRdrEnv
+       ; let ns = map gre_name (lookupGRE_RdrName rdr_name rdr_env)
+       ; qual_ns <- lookupQualifiedNameGHCi rdr_name
+       ; return (ns ++ (qual_ns `minusList` ns)) }
 
 lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- No filter function; does not report an error on failure
@@ -957,32 +979,37 @@ and should instead check the qualified import but at the moment
 this requires some refactoring so leave as a TODO
 -}
 
-lookupQualifiedNameGHCi :: DynFlags -> Bool -> RdrName -> RnM (Maybe Name)
-lookupQualifiedNameGHCi dflags is_ghci rdr_name
-  | Just (mod,occ) <- isQual_maybe rdr_name
-  , is_ghci
-  , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
-  , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
+lookupQualifiedNameGHCi :: RdrName -> RnM [Name]
+lookupQualifiedNameGHCi rdr_name
   = -- We want to behave as we would for a source file import here,
     -- and respect hiddenness of modules/packages, hence loadSrcInterface.
-    do { res <- loadSrcInterface_maybe doc mod False Nothing
-       ; case res of
-           Succeeded ifaces
-             | (n:ns) <- [ name
-                         | iface <- ifaces
-                         , avail <- mi_exports iface
-                         , name  <- availNames avail
-                         , nameOccName name == occ ]
-             -> ASSERT(all (==n) ns) return (Just n)
+    do { dflags  <- getDynFlags
+       ; is_ghci <- getIsGHCi
+       ; go_for_it dflags is_ghci }
 
-           _ -> -- Either we couldn't load the interface, or
-                -- we could but we didn't find the name in it
-                do { traceRn (text "lookupQualifiedNameGHCi" <+> ppr rdr_name)
-                   ; return Nothing } }
-
-  | otherwise
-  = return Nothing
   where
+    go_for_it dflags is_ghci
+      | Just (mod,occ) <- isQual_maybe rdr_name
+      , is_ghci
+      , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
+      , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
+      = do { res <- loadSrcInterface_maybe doc mod False Nothing
+           ; case res of
+                Succeeded ifaces
+                  -> return [ name
+                            | iface <- ifaces
+                            , avail <- mi_exports iface
+                            , name  <- availNames avail
+                            , nameOccName name == occ ]
+
+                _ -> -- Either we couldn't load the interface, or
+                     -- we could but we didn't find the name in it
+                     do { traceRn (text "lookupQualifiedNameGHCi" <+> ppr rdr_name)
+                        ; return [] } }
+
+      | otherwise
+      = return []
+
     doc = ptext (sLit "Need to find") <+> ppr rdr_name
 
 {-

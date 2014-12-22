@@ -1892,38 +1892,17 @@ getModuleInterface hsc_env mod
     loadModuleInterface (ptext (sLit "getModuleInterface")) mod
 
 tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Messages, Maybe [Name])
+-- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env rdr_name
   = runTcInteractive hsc_env $
-    lookup_rdr_name rdr_name
-
-lookup_rdr_name :: RdrName -> TcM [Name]
-lookup_rdr_name rdr_name = do
-        -- If the identifier is a constructor (begins with an
-        -- upper-case letter), then we need to consider both
-        -- constructor and type class identifiers.
-    let rdr_names = dataTcOccs rdr_name
-
-        -- results :: [Either Messages Name]
-    results <- mapM (tryTcErrs . lookupOccRn) rdr_names
-
-    traceRn (text "xx" <+> vcat [ppr rdr_names, ppr (map snd results)])
-        -- The successful lookups will be (Just name)
-    let (warns_s, good_names) = unzip [ (msgs, name)
-                                      | (msgs, Just name) <- results]
-        errs_s = [msgs | (msgs, Nothing) <- results]
-
-        -- Fail if nothing good happened, else add warnings
-    if null good_names
-      then  addMessages (head errs_s) >> failM
-                -- No lookup succeeded, so
-                -- pick the first error message and report it
-                -- ToDo: If one of the errors is "could be Foo.X or Baz.X",
-                --       while the other is "X is not in scope",
-                --       we definitely want the former; but we might pick the latter
-      else      mapM_ addMessages warns_s
-                -- Add deprecation warnings
-    return good_names
-
+    do {   -- If the identifier is a constructor (begins with an
+           -- upper-case letter), then we need to consider both
+           -- constructor and type class identifiers.
+         let rdr_names = dataTcOccs rdr_name
+       ; names_s <- mapM lookupInfoOccRn rdr_names
+       ; let names = concat names_s
+       ; when (null names) (addErrTc (ptext (sLit "Not in scope:") <+> quotes (ppr rdr_name)))
+       ; return names }
 #endif
 
 tcRnLookupName :: HscEnv -> Name -> IO (Messages, Maybe TyThing)
