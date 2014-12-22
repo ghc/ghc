@@ -876,7 +876,8 @@ enqueueCommands cmds = do
   setGHCiState st{ cmdqueue = cmds ++ cmdqueue st }
 
 -- | If we one of these strings prefixes a command, then we treat it as a decl
--- rather than a stmt.
+-- rather than a stmt. NB that the appropriate decl prefixes depends on the
+-- flag settings (Trac #9915)
 declPrefixes :: DynFlags -> [String]
 declPrefixes dflags = keywords ++ concat opt_keywords
   where
@@ -924,6 +925,9 @@ runStmt stmt step
                Just result -> afterRunStmt (const True) result
 
     s `looks_like` prefix = prefix `isPrefixOf` dropWhile isSpace s
+       -- Ignore leading spaces (see Trac #9914), so that
+       --    ghci>   data T = T
+       -- (note leading spaces) works properly
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
