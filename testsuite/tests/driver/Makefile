@@ -571,6 +571,7 @@ T703:
 
 .PHONY: T2182
 T2182:
+	$(RM) T2182_A.hi T2182.hi
 	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T2182_A.hs T2182.hs -v0
 	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T2182.hs T2182_A.hs -v0
 
