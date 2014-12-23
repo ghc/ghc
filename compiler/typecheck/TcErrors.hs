@@ -32,7 +32,7 @@ import VarSet
 import VarEnv
 import NameEnv
 import Bag
-import ErrUtils         ( ErrMsg, makeIntoWarning, pprLocErrMsg, isWarning )
+import ErrUtils         ( ErrMsg, makeIntoWarning, pprLocErrMsg )
 import BasicTypes
 import Util
 import FastString
@@ -42,7 +42,6 @@ import DynFlags
 import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
-import Control.Monad    ( when )
 import Data.Maybe
 import Data.List        ( partition, mapAccumL, nub, sortBy )
 
@@ -99,32 +98,37 @@ reportUnsolved :: WantedConstraints -> TcM (Bag EvBind)
 reportUnsolved wanted
   = do { binds_var <- newTcEvBinds
        ; defer_errors <- goptM Opt_DeferTypeErrors
+
        ; defer_holes <- goptM Opt_DeferTypedHoles
-       ; warn_holes <- woptM Opt_WarnTypedHoles
+       ; warn_holes  <- woptM Opt_WarnTypedHoles
+       ; let expr_holes | not defer_holes = HoleError
+                        | warn_holes      = HoleWarn
+                        | otherwise       = HoleDefer
+
+       ; partial_sigs      <- xoptM Opt_PartialTypeSignatures
        ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
-       ; report_unsolved (Just binds_var) defer_errors defer_holes
-             warn_holes warn_partial_sigs wanted
+       ; let type_holes | not partial_sigs  = HoleError
+                        | warn_partial_sigs = HoleWarn
+                        | otherwise         = HoleDefer
+
+       ; report_unsolved (Just binds_var) defer_errors expr_holes type_holes wanted
        ; getTcEvBinds binds_var }
 
 reportAllUnsolved :: WantedConstraints -> TcM ()
--- Report all unsolved goals, even if -fdefer-type-errors is on
+-- Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- See Note [Deferring coercion errors to runtime]
-reportAllUnsolved wanted = do
-    warn_holes <- woptM Opt_WarnTypedHoles
-    warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
-    report_unsolved Nothing False False warn_holes warn_partial_sigs wanted
+reportAllUnsolved wanted
+  = report_unsolved Nothing False HoleError HoleError wanted
 
 report_unsolved :: Maybe EvBindsVar  -- cec_binds
                 -> Bool              -- cec_defer_type_errors
-                -> Bool              -- cec_defer_holes
-                -> Bool              -- cec_warn_holes
-                -> Bool              -- cec_warn_partial_type_signatures
+                -> HoleChoice        -- Expression holes
+                -> HoleChoice        -- Type holes
                 -> WantedConstraints -> TcM ()
 -- Important precondition:
 -- WantedConstraints are fully zonked and unflattened, that is,
 -- zonkWC has already been applied to these constraints.
-report_unsolved mb_binds_var defer_errors defer_holes warn_holes
-                warn_partial_sigs wanted
+report_unsolved mb_binds_var defer_errors expr_holes type_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
@@ -139,9 +143,8 @@ report_unsolved mb_binds_var defer_errors defer_holes warn_holes
              err_ctxt = CEC { cec_encl  = []
                             , cec_tidy  = tidy_env
                             , cec_defer_type_errors = defer_errors
-                            , cec_defer_holes = defer_holes
-                            , cec_warn_holes = warn_holes
-                            , cec_warn_partial_type_signatures = warn_partial_sigs
+                            , cec_expr_holes = expr_holes
+                            , cec_type_holes = type_holes
                             , cec_suppress = False -- See Note [Suppressing error messages]
                             , cec_binds    = mb_binds_var }
 
@@ -154,6 +157,11 @@ report_unsolved mb_binds_var defer_errors defer_holes warn_holes
 --------------------------------------------
 --      Internal functions
 --------------------------------------------
+
+data HoleChoice
+  = HoleError     -- A hole is a compile-time error
+  | HoleWarn      -- Defer to runtime, emit a compile-time warning
+  | HoleDefer     -- Defer to runtime, no warning
 
 data ReportErrCtxt
     = CEC { cec_encl :: [Implication]  -- Enclosing implications
@@ -170,16 +178,9 @@ data ReportErrCtxt
                                           -- Defer type errors until runtime
                                           -- Irrelevant if cec_binds = Nothing
 
-          , cec_defer_holes :: Bool     -- True <=> -fdefer-typed-holes
-                                        -- Turn typed holes into runtime errors
-                                        -- Irrelevant if cec_binds = Nothing
+          , cec_expr_holes :: HoleChoice  -- Holes in expressions
+          , cec_type_holes :: HoleChoice  -- Holes in types
 
-          , cec_warn_holes :: Bool  -- True <=> -fwarn-typed-holes
-                                    -- Controls whether typed holes produce warnings
-          , cec_warn_partial_type_signatures :: Bool
-                                    -- True <=> -fwarn-partial-type-signatures
-                                    -- Controls whether holes in partial type
-                                    -- signatures produce warnings
           , cec_suppress :: Bool    -- True <=> More important errors have occurred,
                                     --          so create bindings if need be, but
                                     --          don't issue any more errors/warnings
@@ -189,8 +190,9 @@ data ReportErrCtxt
 {-
 Note [Suppressing error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The cec_suppress flag says "don't report any errors.  Instead, just create
+The cec_suppress flag says "don't report any errors".  Instead, just create
 evidence bindings (as usual).  It's used when more important errors have occurred.
+
 Specifically (see reportWanteds)
   * If there are insoluble Givens, then we are in unreachable code and all bets
     are off.  So don't report any further errors.
@@ -256,7 +258,7 @@ reportSimples ctxt simples    -- Here 'simples' includes insolble goals
         -- Like Int ~ Bool (incl nullary TyCons)
         -- or  Int ~ t a   (AppTy on one side)
         ("Utterly wrong",  utterly_wrong,   True,  mkGroupReporter mkEqErr)
-      , ("Holes",          is_hole,         False, mkHoleReporter mkHoleError)
+      , ("Holes",          is_hole,         False, mkHoleReporter)
 
         -- Report equalities of form (a~ty).  They are usually
         -- skolem-equalities, and they cause confusing knock-on
@@ -344,12 +346,12 @@ mkSkolReporter ctxt cts
              (eq_rel1 `compare` eq_rel2) `thenCmp` (ty1 `cmpType` ty2)
            _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
 
-mkHoleReporter :: (ReportErrCtxt -> Ct -> TcM ErrMsg) -> Reporter
+mkHoleReporter :: Reporter
 -- Reports errors one at a time
-mkHoleReporter mk_err ctxt
+mkHoleReporter ctxt
   = mapM_ $ \ct ->
-    do { err <- mk_err ctxt ct
-       ; maybeReportHoleError ctxt err
+    do { err <- mkHoleError ctxt ct
+       ; maybeReportHoleError ctxt ct err
        ; maybeAddDeferredHoleBinding ctxt err ct }
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
@@ -371,20 +373,27 @@ reportGroup mk_err ctxt cts
                -- Add deferred bindings for all
                -- But see Note [Always warn with -fdefer-type-errors]
 
-maybeReportHoleError :: ReportErrCtxt -> ErrMsg -> TcM ()
-maybeReportHoleError ctxt err
+maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
+maybeReportHoleError ctxt ct err
   -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
   -- generated for holes in partial type signatures. Unless
   -- -fwarn_partial_type_signatures is not on, in which case the messages are
   -- discarded.
-  | isWarning err
-  = when (cec_warn_partial_type_signatures ctxt)
-            (reportWarning err)
-  | cec_defer_holes ctxt
-  = when (cec_warn_holes ctxt)
-            (reportWarning (makeIntoWarning err))
+  | isTypeHoleCt ct
+  = -- For partial type signatures, generate warnings only, and do that
+    -- only if -fwarn_partial_type_signatures is on
+    case cec_type_holes ctxt of
+       HoleError -> reportError err
+       HoleWarn  -> reportWarning (makeIntoWarning err)
+       HoleDefer -> return ()
+
+  -- Otherwise this is a typed hole in an expression
   | otherwise
-  = reportError err
+  = -- If deferring, report a warning only if -fwarn-typed-holds is on
+    case cec_expr_holes ctxt of
+       HoleError -> reportError err
+       HoleWarn  -> reportWarning (makeIntoWarning err)
+       HoleDefer -> return ()
 
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
@@ -416,9 +425,13 @@ addDeferredBinding ctxt err ct
 
 maybeAddDeferredHoleBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 maybeAddDeferredHoleBinding ctxt err ct
-    | cec_defer_holes ctxt && isTypedHoleCt ct
-    = addDeferredBinding ctxt err ct
-    | otherwise
+    | isExprHoleCt ct
+    , case cec_expr_holes ctxt of
+        HoleDefer -> True
+        HoleWarn  -> True
+        HoleError -> False
+    = addDeferredBinding ctxt err ct  -- Only add bindings for holes in expressions
+    | otherwise                       -- not for holes in partial type signatures
     = return ()
 
 maybeAddDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
@@ -577,23 +590,24 @@ mkIrredErr ctxt cts
 
 ----------------
 mkHoleError :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkHoleError ctxt ct@(CHoleCan { cc_occ = occ })
-  = do { partial_sigs <- xoptM Opt_PartialTypeSignatures
-       ; let tyvars = varSetElems (tyVarsOfCt ct)
+mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
+  = do { let tyvars = varSetElems (tyVarsOfCt ct)
              tyvars_msg = map loc_msg tyvars
              msg = vcat [ hang (ptext (sLit "Found hole") <+> quotes (ppr occ))
                              2 (ptext (sLit "with type:") <+> pprType (ctEvPred (ctEvidence ct)))
                         , ppUnless (null tyvars_msg) (ptext (sLit "Where:") <+> vcat tyvars_msg)
-                        , if in_typesig && not partial_sigs then pts_hint else empty ]
+                        , pts_hint ]
        ; (ctxt, binds_doc) <- relevantBindings False ctxt ct
-               -- The 'False' means "don't filter the bindings; see Trac #8191
-       ; errMsg <- mkErrorMsg ctxt ct (msg $$ binds_doc)
-       ; if in_typesig && partial_sigs
-           then return $ makeIntoWarning errMsg
-           else return errMsg }
+               -- The 'False' means "don't filter the bindings"; see Trac #8191
+       ; mkErrorMsg ctxt ct (msg $$ binds_doc) }
   where
-    in_typesig = not $ isTypedHoleCt ct
-    pts_hint = ptext (sLit "To use the inferred type, enable PartialTypeSignatures")
+    pts_hint
+      | TypeHole  <- hole_sort
+      , HoleError <- cec_type_holes ctxt
+      = ptext (sLit "To use the inferred type, enable PartialTypeSignatures")
+      | otherwise
+      = empty
+
     loc_msg tv
        = case tcTyVarDetails tv of
           SkolemTv {} -> quotes (ppr tv) <+> skol_msg

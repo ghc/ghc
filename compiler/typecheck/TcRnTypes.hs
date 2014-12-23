@@ -53,7 +53,7 @@ module TcRnTypes(
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt, isTypedHoleCt, isPartialTypeSigCt,
+        isGivenCt, isHoleCt, isExprHoleCt, isTypeHoleCt,
         ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvEqRel,
@@ -1135,8 +1135,9 @@ data Ct
       cc_ev  :: CtEvidence
     }
 
-  | CHoleCan {             -- Treated as an "insoluble" constraint
-                           -- See Note [Insoluble constraints]
+  | CHoleCan {             -- See Note [Hole constraints]
+       -- Treated as an "insoluble" constraint
+       -- See Note [Insoluble constraints]
       cc_ev   :: CtEvidence,
       cc_occ  :: OccName,   -- The name of this hole
       cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
@@ -1147,6 +1148,18 @@ data HoleSort = ExprHole  -- ^ A hole in an expression (TypedHoles)
               | TypeHole  -- ^ A hole in a type (PartialTypeSignatures)
 
 {-
+Note [Hole constraints]
+~~~~~~~~~~~~~~~~~~~~~~~
+CHoleCan constraints are used for two kinds of holes,
+distinguished by cc_hole:
+
+  * For holes in expressions
+    e.g.   f x = g _ x
+
+  * For holes in type signatures
+    e.g.   f :: _ -> _
+           f x = [x,True]
+
 Note [Kind orientation for CTyEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given an equality (t:* ~ s:Open), we can't solve it by updating t:=s,
@@ -1324,13 +1337,13 @@ isHoleCt:: Ct -> Bool
 isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
-isTypedHoleCt :: Ct -> Bool
-isTypedHoleCt (CHoleCan { cc_hole = ExprHole }) = True
-isTypedHoleCt _ = False
+isExprHoleCt :: Ct -> Bool
+isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
+isExprHoleCt _ = False
 
-isPartialTypeSigCt :: Ct -> Bool
-isPartialTypeSigCt (CHoleCan { cc_hole = TypeHole }) = True
-isPartialTypeSigCt _ = False
+isTypeHoleCt :: Ct -> Bool
+isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
+isTypeHoleCt _ = False
 
 instance Outputable Ct where
   ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)
@@ -1412,7 +1425,7 @@ insolubleWC :: WantedConstraints -> Bool
 -- True if there are any insoluble constraints in the wanted bag. Ignore
 -- constraints arising from PartialTypeSignatures to solve as much of the
 -- constraints as possible before reporting the holes.
-insolubleWC wc = not (isEmptyBag (filterBag (not . isPartialTypeSigCt)
+insolubleWC wc = not (isEmptyBag (filterBag (not . isTypeHoleCt)
                                   (wc_insol wc)))
                || anyBag ic_insol (wc_impl wc)
 
