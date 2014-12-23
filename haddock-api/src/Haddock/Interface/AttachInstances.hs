@@ -82,7 +82,7 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
                           , let opaque = isTypeHidden expInfo (fi_rhs i)
                           ]
               cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L eSpan (tcdName d)))
-                          | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
+                          | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                           , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                           , not $ isInstanceHidden expInfo cls tys
                           ]
@@ -130,20 +130,6 @@ instLookup f name iface ifaceMap instIfaceMap =
       let ifaceMaps = Map.union (fmap toInstalledIface ifaceMap) instIfaceMap
       iface' <- Map.lookup (nameModule name) ifaceMaps
       Map.lookup name (f iface')
-
--- | Like GHC's 'instanceHead' but drops "silent" arguments.
-instanceHead' :: ClsInst -> ([TyVar], ThetaType, Class, [Type])
-instanceHead' ispec = (tvs, dropSilentArgs dfun theta, cls, tys)
-  where
-    dfun = is_dfun ispec
-    (tvs, cls, tys) = instanceHead ispec
-    (_, theta, _) = tcSplitSigmaTy (idType dfun)
-
--- | Drop "silent" arguments. See GHC Note [Silent superclass
--- arguments].
-dropSilentArgs :: DFunId -> ThetaType -> ThetaType
-dropSilentArgs dfun theta = drop (dfunNSilent dfun) theta
-
 
 -- | Like GHC's getInfo but doesn't cut things out depending on the
 -- interative context, which we don't set sufficiently anyway.
