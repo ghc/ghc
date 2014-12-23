@@ -193,4 +193,6 @@ test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
 test('T9658', normal, ghci_script, ['T9658.script'])
 test('T9293', normal, ghci_script_without_flag('-fno-warn-tabs'), ['T9293.script'])
+test('T9762', [pre_cmd('$MAKE -s --no-print-directory T9762_prep')],
+     ghci_script, ['T9762.script'])
 test('T9881', normal, ghci_script, ['T9881.script'])
