@@ -157,12 +157,14 @@ isEqVar v = case tyConAppTyCon_maybe (varType v) of
                Nothing -> False
 
 isTcReflCo_maybe :: TcCoercion -> Maybe TcType
-isTcReflCo_maybe (TcRefl _ ty) = Just ty
-isTcReflCo_maybe _             = Nothing
+isTcReflCo_maybe (TcRefl _ ty)   = Just ty
+isTcReflCo_maybe (TcCoercion co) = isReflCo_maybe co
+isTcReflCo_maybe _               = Nothing
 
 isTcReflCo :: TcCoercion -> Bool
-isTcReflCo (TcRefl {}) = True
-isTcReflCo _           = False
+isTcReflCo (TcRefl {})     = True
+isTcReflCo (TcCoercion co) = isReflCo co
+isTcReflCo _               = False
 
 getTcCoVar_maybe :: TcCoercion -> Maybe CoVar
 getTcCoVar_maybe (TcCoVarCo v) = Just v
