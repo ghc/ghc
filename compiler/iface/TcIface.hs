@@ -1106,8 +1106,8 @@ tcIfaceDataAlt con inst_tys arg_strs rhs
 
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
-tcIdDetails ty (IfDFunId ns)
-  = return (DFunId ns (isNewTyCon (classTyCon cls)))
+tcIdDetails ty IfDFunId
+  = return (DFunId (isNewTyCon (classTyCon cls)))
   where
     (_, _, cls, _) = tcSplitDFunTy ty
 

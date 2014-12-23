@@ -247,10 +247,10 @@ test('tcfail220', normal, multimod_compile_fail, ['tcfail220.hsig', '-sig-of bas
 test('tcfail221', normal, multimod_compile_fail, ['tcfail221.hsig', '-sig-of base:Prelude'])
 test('tcfail222', normal, multimod_compile_fail, ['tcfail222.hsig', '-sig-of base:Data.STRef'])
 
-test('SilentParametersOverlapping', normal, compile_fail, [''])
+test('SilentParametersOverlapping', normal, compile, [''])
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])
 test('LongWayOverlapping', normal, compile_fail, [''])
-test('T5051', normal, compile_fail, [''])
+test('T5051', normal, compile, [''])
 test('T5236',normal,compile_fail,[''])
 test('T5246',normal,compile_fail,[''])
 test('T5300',normal,compile_fail,[''])

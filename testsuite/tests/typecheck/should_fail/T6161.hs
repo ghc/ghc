@@ -27,3 +27,22 @@ instance Foo Float where
 
 testProg :: Float
 testProg = testDup (FamFloat 3.0)
+
+{- Reasoning:
+
+dfDuperFam :: Foo a -> Duper (Fam a)
+dfDuperFam d = Duper (sc (sc d)) (...testDup...)
+
+dfFooFloat :: Foo Float
+dfFooFloat = Foo (dfDuperFloat dx) ...
+
+dx :: Foo Float
+dx = dfFooFloat
+
+
+[W] d1 :: Duper (Fam Float)
+
+    -- Use Duper instnance
+    d1 = dfDuperFam d2
+[W] d2 :: Foo Float
+-}

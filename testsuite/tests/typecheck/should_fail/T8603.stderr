@@ -1,4 +1,9 @@
 
+T8603.hs:13:10:
+    No instance for (Applicative RV)
+      arising from the superclasses of an instance declaration
+    In the instance declaration for ‘Monad RV’
+
 T8603.hs:29:17:
     Couldn't match kind ‘* -> *’ with ‘*’
     When matching types

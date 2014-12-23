@@ -63,7 +63,8 @@ module OccName (
         mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
         mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
-        mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
+        mkSuperDictSelOcc, mkSuperDictAuxOcc,
+        mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
         mkInstTyCoOcc, mkEqPredCoOcc,
         mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
         mkPDataTyConOcc,  mkPDataDataConOcc,
@@ -685,6 +686,10 @@ mk_simple_deriv_with sp px (Just with) occ = mk_deriv sp (px ++ with ++ "_") (oc
 -- of the data constructor OccName (which should be a DataName)
 -- to VarName
 mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
+
+mkSuperDictAuxOcc :: Int -> OccName -> OccName
+mkSuperDictAuxOcc index cls_tc_occ
+  = mk_deriv varName "$cp" (show index ++ occNameString cls_tc_occ)
 
 mkSuperDictSelOcc :: Int        -- ^ Index of superclass, e.g. 3
                   -> OccName    -- ^ Class, e.g. @Ord@

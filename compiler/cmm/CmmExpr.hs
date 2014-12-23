@@ -347,7 +347,9 @@ instance Ord r => DefinerOfRegs r r where
 instance Ord r => UserOfRegs r (RegSet r) where
     foldRegsUsed _ f = Set.fold (flip f)
 
-instance UserOfRegs r CmmReg => UserOfRegs r CmmExpr where
+instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
+  -- The (Ord r) in the context is necessary here
+  -- See Note [Recursive superclasses] in TcInstDcls
   foldRegsUsed dflags f z e = expr z e
     where expr z (CmmLit _)          = z
           expr z (CmmLoad addr _)    = foldRegsUsed dflags f z addr

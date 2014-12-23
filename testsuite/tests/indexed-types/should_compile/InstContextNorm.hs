@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls, FlexibleInstances #-}
+{-# LANGUAGE EmptyDataDecls, FlexibleInstances, UndecidableInstances #-}
 
 module InstContextNorm
 where

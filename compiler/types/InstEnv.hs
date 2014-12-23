@@ -76,9 +76,6 @@ data ClsInst
                 -- (modulo alpha conversion)
 
              , is_dfun :: DFunId -- See Note [Haddock assumptions]
-                    -- See Note [Silent superclass arguments] in TcInstDcls
-                    -- for how to map the DFun's type back to the source
-                    -- language instance decl
 
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
@@ -187,14 +184,7 @@ pprInstance ispec
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
-  = getPprStyle $ \ sty ->
-    let dfun_ty = idType dfun
-        (tvs, theta, res_ty) = tcSplitSigmaTy dfun_ty
-        theta_to_print = drop (dfunNSilent dfun) theta
-          -- See Note [Silent superclass arguments] in TcInstDcls
-        ty_to_print | debugStyle sty = dfun_ty
-                    | otherwise      = mkSigmaTy tvs theta_to_print res_ty
-    in ptext (sLit "instance") <+> ppr flag <+> pprSigmaType ty_to_print
+  = ptext (sLit "instance") <+> ppr flag <+> pprSigmaType (idType dfun)
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)

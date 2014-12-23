@@ -31,7 +31,6 @@ module TcSMonad (
     setEvBind,
     newEvVar, newGivenEvVar, newGivenEvVars,
     newDerived, emitNewDerived,
-    instDFunConstraints,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getTcLevel,
@@ -93,7 +92,7 @@ module TcSMonad (
 
 import HscTypes
 
-import Inst
+import qualified Inst as TcM
 import InstEnv
 import FamInst
 import FamInstEnv
@@ -123,7 +122,6 @@ import UniqSupply
 
 import FastString
 import Util
-import Id
 import TcRnTypes
 
 import Unique
@@ -1405,7 +1403,7 @@ getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 getInstEnvs :: TcS InstEnvs
-getInstEnvs = wrapTcS $ Inst.tcGetInstEnvs
+getInstEnvs = wrapTcS $ TcM.tcGetInstEnvs
 
 getFamInstEnvs :: TcS (FamInstEnv, FamInstEnv)
 getFamInstEnvs = wrapTcS $ FamInst.tcGetFamInstEnvs
@@ -1556,24 +1554,9 @@ extendFlatCache tc xi_args stuff
 -- Instantiations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-instDFunType :: DFunId -> [DFunInstType] -> TcS ([TcType], TcType)
-instDFunType dfun_id mb_inst_tys
-  = wrapTcS $ go dfun_tvs mb_inst_tys (mkTopTvSubst [])
-  where
-    (dfun_tvs, dfun_phi) = tcSplitForAllTys (idType dfun_id)
-
-    go :: [TyVar] -> [DFunInstType] -> TvSubst -> TcM ([TcType], TcType)
-    go [] [] subst = return ([], substTy subst dfun_phi)
-    go (tv:tvs) (Just ty : mb_tys) subst
-      = do { (tys, phi) <- go tvs mb_tys (extendTvSubst subst tv ty)
-           ; return (ty : tys, phi) }
-    go (tv:tvs) (Nothing : mb_tys) subst
-      = do { ty <- instFlexiTcSHelper (tyVarName tv) (substTy subst (tyVarKind tv))
-                         -- Don't forget to instantiate the kind!
-                         -- cf TcMType.tcInstTyVarX
-           ; (tys, phi) <- go tvs mb_tys (extendTvSubst subst tv ty)
-           ; return (ty : tys, phi) }
-    go _ _ _ = pprPanic "instDFunTypes" (ppr dfun_id $$ ppr mb_inst_tys)
+instDFunType :: DFunId -> [DFunInstType] -> TcS ([TcType], TcThetaType)
+instDFunType dfun_id inst_tys
+  = wrapTcS $ TcM.instDFunType dfun_id inst_tys
 
 newFlexiTcSTy :: Kind -> TcS TcType
 newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
@@ -1733,9 +1716,6 @@ newDerived loc pred
        ; return (case mb_ct of
                     Just {} -> Nothing
                     Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }
-
-instDFunConstraints :: CtLoc -> TcThetaType -> TcS [(CtEvidence, Freshness)]
-instDFunConstraints loc = mapM (newWantedEvVar loc)
 
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))

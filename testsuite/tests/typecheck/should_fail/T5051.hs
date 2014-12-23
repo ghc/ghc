@@ -32,3 +32,5 @@ foo x = x >= x
 -- and if we have Ord a (which we do) we should be done.
 -- A very good reason for not having silent parameters!
 -- But, alas, we need them!
+--
+-- Dec 14: now we don't have them any more, the test passes!

@@ -130,7 +130,7 @@ test('T9433', normal, compile_fail, [''])
 test('BadSock', normal, compile_fail, [''])
 test('T9580', normal, multimod_compile_fail, ['T9580', ''])
 test('T9662', normal, compile_fail, [''])
-test('T7862', normal, compile_fail, [''])
+test('T7862', normal, compile, [''])
 test('T9896', normal, compile_fail, [''])
 test('T6088', normal, compile_fail, [''])
 

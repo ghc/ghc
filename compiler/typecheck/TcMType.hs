@@ -34,7 +34,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVars, newSigTyVar,
+  tcInstTyVars, tcInstTyVarX, newSigTyVar,
   tcInstType,
   tcInstSkolTyVars, tcInstSuperSkolTyVarsX,
   tcInstSigTyVarsLoc, tcInstSigTyVars,

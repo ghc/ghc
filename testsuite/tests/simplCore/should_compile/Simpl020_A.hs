@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 module Simpl020_A where
 
 class GUIValue a
@@ -16,7 +17,7 @@ class HasSize w => HasGeometry w where
 
 class GUIObject w => Window w where
 
-instance Window w => HasSize w where
+instance (GUIObject w, Window w) => HasSize w where
   width w = geometry w
 
 instance Window w => HasGeometry w where

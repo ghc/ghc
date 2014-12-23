@@ -1,17 +1,7 @@
 
-T7862.hs:17:24:
-    Overlapping instances for Num (Tower s0 a)
-      arising from a use of ‘<+>’
-    Matching givens (or their superclasses):
-      (Num (Tower s a))
-        bound by the instance declaration at T7862.hs:14:10-36
-    Matching instances:
-      instance Num a => Num (Tower s a) -- Defined at T7862.hs:19:10
-    (The choice depends on the instantiation of ‘a, s0’)
-    In the expression: (Tower as) <+> (Tower as)
-    In a pattern binding: _ = (Tower as) <+> (Tower as)
-    In an equation for ‘<+>’:
-        (Tower as) <+> _
-          = undefined
-          where
-              _ = (Tower as) <+> (Tower as)
+T7862.hs:22:10: Warning:
+    No explicit implementation for
+      ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
+                                                            or
+                                                            ‘-’)
+    In the instance declaration for ‘Num (Tower s a)’

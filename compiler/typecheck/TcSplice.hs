@@ -1352,7 +1352,7 @@ reifyClassInstance :: [Bool]  -- True <=> the corresponding tv is poly-kinded
                               -- variables, not *kind* variables
                    -> ClsInst -> TcM TH.Dec
 reifyClassInstance is_poly_tvs i
-  = do { cxt <- reifyCxt (drop n_silent theta)
+  = do { cxt <- reifyCxt theta
        ; let types_only = filterOut isKind types
        ; thtypes <- reifyTypes types_only
        ; annot_thtypes <- zipWith3M annotThType is_poly_tvs types_only thtypes
@@ -1360,8 +1360,7 @@ reifyClassInstance is_poly_tvs i
        ; return $ (TH.InstanceD cxt head_ty []) }
   where
      (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
-     dfun     = instanceDFunId i
-     n_silent = dfunNSilent dfun
+     dfun = instanceDFunId i
 
 ------------------------------
 reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]

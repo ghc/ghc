@@ -1064,7 +1064,7 @@ expr_ok primop_ok other_expr
 app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
-      DFunId _ new_type ->  not new_type
+      DFunId new_type ->  not new_type
          -- DFuns terminate, unless the dict is implemented
          -- with a newtype in which case they may not
 

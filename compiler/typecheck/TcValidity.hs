@@ -11,7 +11,7 @@ module TcValidity (
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
   checkInstTermination, checkValidTyFamInst, checkTyFamFreeness,
-  checkConsistentFamInst,
+  checkConsistentFamInst, sizeTypes,
   arityErr, badATErr
   ) where
 
@@ -883,7 +883,7 @@ validDerivPred tv_set pred
        _                     -> True   -- Non-class predicates are ok
   where
     check_tys tys = hasNoDups fvs
-                    && sizeTypes tys == length fvs
+                    && sizeTypes tys == fromIntegral (length fvs)
                     && all (`elemVarSet` tv_set) fvs
     fvs = fvType pred
 
@@ -1258,58 +1258,10 @@ smallerAppMsg = ptext (sLit "Application is no smaller than the instance head")
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Auxiliary functions}
+        The "Paterson size" of a type
 *                                                                      *
 ************************************************************************
 -}
-
--- Free variables of a type, retaining repetitions, and expanding synonyms
-fvType :: Type -> [TyVar]
-fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
-fvType (TyVarTy tv)        = [tv]
-fvType (TyConApp _ tys)    = fvTypes tys
-fvType (LitTy {})          = []
-fvType (FunTy arg res)     = fvType arg ++ fvType res
-fvType (AppTy fun arg)     = fvType fun ++ fvType arg
-fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
-
-fvTypes :: [Type] -> [TyVar]
-fvTypes tys                = concat (map fvType tys)
-
-sizeType :: Type -> Int
--- Size of a type: the number of variables and constructors
-sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
-sizeType (TyVarTy {})      = 1
-sizeType (TyConApp _ tys)  = sizeTypes tys + 1
-sizeType (LitTy {})        = 1
-sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
-sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (ForAllTy _ ty)   = sizeType ty
-
-sizeTypes :: [Type] -> Int
--- IA0_NOTE: Avoid kinds.
-sizeTypes xs = sum (map sizeType tys)
-  where tys = filter (not . isKind) xs
-
--- Size of a predicate
---
--- We are considering whether class constraints terminate.
--- Equality constraints and constraints for the implicit
--- parameter class always termiante so it is safe to say "size 0".
--- (Implicit parameter constraints always terminate because
--- there are no instances for them---they are only solved by
--- "local instances" in expressions).
--- See Trac #4200.
-sizePred :: PredType -> Int
-sizePred ty = goClass ty
-  where
-    goClass p | isIPPred p = 0
-              | otherwise  = go (classifyPredType p)
-
-    go (ClassPred _ tys') = sizeTypes tys'
-    go (EqPred {})        = 0
-    go (TuplePred ts)     = sum (map goClass ts)
-    go (IrredPred ty)     = sizeType ty
 
 {-
 Note [Paterson conditions on PredTypes]
@@ -1339,3 +1291,86 @@ NB: we don't want to detect PredTypes in sizeType (and then call
 sizePred on them), or we might get an infinite loop if that PredType
 is irreducible. See Trac #5581.
 -}
+
+data TypeSize = TS Int | TSBig   -- TSBig behaves like positive infinity
+                                 -- Used when we encounter a type function
+
+instance Num TypeSize where
+  fromInteger n = TS (fromInteger n)
+  TS a + TS b = TS (a+b)
+  _    + _    = TSBig
+  negate = panic "TypeSize:negate"
+  abs    = panic "TypeSize:abs"
+  signum = panic "TypeSize:signum"
+  (*)    = panic "TypeSize:*"
+  (-)    = panic "TypeSize:-"
+
+instance Eq TypeSize where
+  TS a  == TS b  = a==b
+  TSBig == TSBig = True
+  _     == _     = False
+
+instance Ord TypeSize where
+  TS a  `compare` TS b  = a `compare` b
+  TS _  `compare` TSBig = LT
+  TSBig `compare` TS _  = GT
+  TSBig `compare` TSBig = EQ
+
+sizeType :: Type -> TypeSize
+-- Size of a type: the number of variables and constructors
+sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
+sizeType (TyVarTy {})      = 1
+sizeType (TyConApp tc tys)
+  | isTypeFamilyTyCon tc   = TSBig  -- Type-family applications can
+                                    -- expand to any arbitrary size
+  | otherwise              = sizeTypes tys + 1
+sizeType (LitTy {})        = 1
+sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
+sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
+sizeType (ForAllTy _ ty)   = sizeType ty
+
+sizeTypes :: [Type] -> TypeSize
+-- IA0_NOTE: Avoid kinds.
+sizeTypes xs = sum (map sizeType tys)
+  where tys = filter (not . isKind) xs
+
+-- Note [Size of a predicate]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We are considering whether class constraints terminate.
+-- Equality constraints and constraints for the implicit
+-- parameter class always termiante so it is safe to say "size 0".
+-- (Implicit parameter constraints always terminate because
+-- there are no instances for them---they are only solved by
+-- "local instances" in expressions).
+-- See Trac #4200.
+sizePred :: PredType -> TypeSize
+sizePred p = go (classifyPredType p)
+  where
+    go (ClassPred cls tys')
+      | isIPClass cls     = 0  -- See Note [Size of a predicate]
+      | otherwise         = sizeTypes tys'
+    go (EqPred {})        = 0  -- See Note [Size of a predicate]
+    go (TuplePred ts)     = sum (map sizePred ts)
+    go (IrredPred ty)     = sizeType ty
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Auxiliary functions}
+*                                                                      *
+************************************************************************
+-}
+
+-- Free variables of a type, retaining repetitions, and expanding synonyms
+fvType :: Type -> [TyVar]
+fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
+fvType (TyVarTy tv)        = [tv]
+fvType (TyConApp _ tys)    = fvTypes tys
+fvType (LitTy {})          = []
+fvType (FunTy arg res)     = fvType arg ++ fvType res
+fvType (AppTy fun arg)     = fvType fun ++ fvType arg
+fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
+
+fvTypes :: [Type] -> [TyVar]
+fvTypes tys                = concat (map fvType tys)
+

@@ -215,7 +215,7 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method                 -- Default methods are *always* inlined
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
-  | DFunId _ is_newtype <- idDetails gbl_id
+  | DFunId is_newtype <- idDetails gbl_id
   = (mk_dfun_w_stuff is_newtype, rhs)
 
   | otherwise

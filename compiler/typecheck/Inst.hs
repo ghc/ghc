@@ -9,8 +9,8 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP #-}
 
 module Inst (
-       deeplySkolemise,
-       deeplyInstantiate, instCall, instStupidTheta,
+       deeplySkolemise, deeplyInstantiate, 
+       instCall, instDFunType, instStupidTheta,
        emitWanted, emitWanteds,
 
        newOverloadedLit, mkOverLit,
@@ -235,6 +235,25 @@ instCallConstraints orig preds
           = CoercibleOrigin ty1 ty2
           | otherwise
           = orig
+
+instDFunType :: DFunId -> [DFunInstType] -> TcM ([TcType], TcThetaType)
+-- See Note [DFunInstType: instantiating types] in InstEnv
+instDFunType dfun_id dfun_inst_tys
+  = do { (subst, inst_tys) <- go (mkTopTvSubst []) dfun_tvs dfun_inst_tys
+       ; return (inst_tys, substTheta subst dfun_theta) }
+  where
+    (dfun_tvs, dfun_theta, _) = tcSplitSigmaTy (idType dfun_id)
+
+    go :: TvSubst -> [TyVar] -> [DFunInstType] -> TcM (TvSubst, [TcType])
+    go subst [] [] = return (subst, [])
+    go subst (tv:tvs) (Just ty : mb_tys)
+      = do { (subst', tys) <- go (extendTvSubst subst tv ty) tvs mb_tys
+           ; return (subst', ty : tys) }
+    go subst (tv:tvs) (Nothing : mb_tys)
+      = do { (subst', tv') <- tcInstTyVarX subst tv
+           ; (subst'', tys) <- go subst' tvs mb_tys
+           ; return (subst'', mkTyVarTy tv' : tys) }
+    go _ _ _ = pprPanic "instDFunTypes" (ppr dfun_id $$ ppr dfun_inst_tys)
 
 ----------------
 instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()

@@ -239,7 +239,7 @@ test('T3064',
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
-           (wordsize(64), 38, 20)]),
+           (wordsize(64), 27, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -250,6 +250,7 @@ test('T3064',
             # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
             # (amd64/Linux) (09/09/2014): 42, AMP changes (larger interfaces, more loading)
             # (amd64/Linux) 2014-10-13: 38: Stricter seqDmdType
+            # (amd64/Linux) 2014-12-22: 27: death to silent superclasses
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 188697088, 10),
@@ -259,7 +260,7 @@ test('T3064',
             # 2014-01-22: 162457940 (x86/Linux)
             # 2014-12-01: 162457940 (Windows)
 
-           (wordsize(64), 350418600, 5)]),
+           (wordsize(64), 243670824, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -274,6 +275,8 @@ test('T3064',
             # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
             # (amd64/Linux) (10/12/2014): 363103840, improvements in constraint solver
             # (Mac)         (18/12/2014): 350418600, improvements to flattener
+            # (amd64/Linux) (22/12/2014): 243670824, Ha! Death to superclass constraints, makes
+            #                                        much less code for Monad instances
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
