@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedWildcards #-}
+{-# LANGUAGE NamedWildCards #-}
 module NamedWildcardsEnabled where
 
 foo :: _a -> _b

@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, NamedWildcards #-}
+{-# LANGUAGE PartialTypeSignatures, NamedWildCards #-}
 
 module ScopedNamedWildcards where
 

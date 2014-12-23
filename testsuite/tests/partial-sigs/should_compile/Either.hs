@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, NamedWildcards #-}
+{-# LANGUAGE PartialTypeSignatures, NamedWildCards #-}
 module Either where
 
 barry :: _a -> (_b _a, _b _)

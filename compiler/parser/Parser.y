@@ -2961,7 +2961,7 @@ hintExplicitForall span = do
       ]
 
 namedWildcardsEnabled :: P Bool
-namedWildcardsEnabled = liftM ((Opt_NamedWildcards `xopt`) . dflags) getPState
+namedWildcardsEnabled = liftM ((Opt_NamedWildCards `xopt`) . dflags) getPState
 
 {-
 %************************************************************************

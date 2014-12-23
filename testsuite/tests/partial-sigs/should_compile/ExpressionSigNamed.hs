@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, NamedWildcards #-}
+{-# LANGUAGE PartialTypeSignatures, NamedWildCards #-}
 module ExpressionSigNamed where
 
 bar :: _a -> _a

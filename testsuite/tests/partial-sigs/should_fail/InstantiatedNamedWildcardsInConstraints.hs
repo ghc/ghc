@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedWildcards #-}
+{-# LANGUAGE NamedWildCards #-}
 module InstantiatedNamedWildcardsInConstraints where
 
 foo :: (Enum _a, _) => _a -> (String, b)

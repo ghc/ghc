@@ -630,7 +630,7 @@ data ExtensionFlag
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
-   | Opt_NamedWildcards
+   | Opt_NamedWildCards
    | Opt_StaticPointers
    deriving (Eq, Enum, Show)
 
@@ -3107,7 +3107,7 @@ xFlags = [
   flagSpec "MultiWayIf"                       Opt_MultiWayIf,
   flagSpec "NPlusKPatterns"                   Opt_NPlusKPatterns,
   flagSpec "NamedFieldPuns"                   Opt_RecordPuns,
-  flagSpec "NamedWildcards"                   Opt_NamedWildcards,
+  flagSpec "NamedWildCards"                   Opt_NamedWildCards,
   flagSpec "NegativeLiterals"                 Opt_NegativeLiterals,
   flagSpec "NondecreasingIndentation"         Opt_NondecreasingIndentation,
   flagSpec' "NullaryTypeClasses"              Opt_NullaryTypeClasses
