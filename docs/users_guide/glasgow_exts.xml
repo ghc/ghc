@@ -8729,7 +8729,7 @@ Bool</literal> can be simplified away.
 <para>
 By default, GHC (as the Haskell 2010 standard prescribes) parses identifiers
 starting with an underscore in a type as type variables. To treat them as
-named wildcards, the <option>-XNamedWildcards</option> flag should be enabled.
+named wildcards, the <option>-XNamedWildCards</option> flag should be enabled.
 The example below demonstrated the effect.
 </para>
 
@@ -8739,7 +8739,7 @@ foo _ = False
 </programlisting>
 
 <para>
-Compiling this program without enabling <option>-XNamedWildcards</option>
+Compiling this program without enabling <option>-XNamedWildCards</option>
 produces the following error message complaining about the type variable
 <literal>_a</literal> no matching the actual type <literal>Bool</literal>.
 </para>
@@ -8755,7 +8755,7 @@ Test.hs:5:9:
 </programlisting>
 
 <para>
-Compiling this program with <option>-XNamedWildcards</option> enabled produces
+Compiling this program with <option>-XNamedWildCards</option> enabled produces
 the following error message reporting the inferred type of the named wildcard
 <literal>_a</literal>.
 </para>

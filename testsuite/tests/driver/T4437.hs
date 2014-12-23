@@ -36,7 +36,7 @@ expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "DeriveAnyClass",
                              "PatternSynonyms",
                              "PartialTypeSignatures",
-                             "NamedWildcards",
+                             "NamedWildCards",
                              "StaticPointers"]
 
 expectedCabalOnlyExtensions :: [String]

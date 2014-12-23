@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, NamedWildcards #-}
+{-# LANGUAGE PartialTypeSignatures, NamedWildCards #-}
 module NamedTyVar where
 
 foo :: (_a, b) -> (a, _b)
