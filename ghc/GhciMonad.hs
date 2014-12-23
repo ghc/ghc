@@ -277,15 +277,17 @@ runStmt expr step = do
           r <- GHC.runStmtWithLocation (progname st) (line_number st) expr step
           return (Just r)
 
-runDecls :: String -> GHCi [GHC.Name]
+runDecls :: String -> GHCi (Maybe [GHC.Name])
 runDecls decls = do
   st <- getGHCiState
   reifyGHCi $ \x ->
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.handleSourceError (\e -> do GHC.printException e; return []) $ do
-          GHC.runDeclsWithLocation (progname st) (line_number st) decls
+        GHC.handleSourceError (\e -> do GHC.printException e;
+                                        return Nothing) $ do
+          r <- GHC.runDeclsWithLocation (progname st) (line_number st) decls
+          return (Just r)
 
 resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
 resume canLogSpan step = do

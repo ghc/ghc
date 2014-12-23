@@ -18,6 +18,9 @@ ghc-e004:
 ghc-e005:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -main-is foo ghc-e005.hs -e ":set prog ghc-e005-prog" -e ":main [\"the\",\"args\"]"; echo $$?
 
+ghc-e006:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "data X = X deriving Show" -e "X"
+
 T2228:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2228.hs
 

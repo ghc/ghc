@@ -915,8 +915,10 @@ runStmt stmt step
   where
     run_decl =
         do _ <- liftIO $ tryIO $ hFlushAll stdin
-           result <- GhciMonad.runDecls stmt
-           afterRunStmt (const True) (GHC.RunOk result)
+           m_result <- GhciMonad.runDecls stmt
+           case m_result of
+               Nothing     -> return False
+               Just result -> afterRunStmt (const True) (GHC.RunOk result)
 
     run_stmt =
         do -- In the new IO library, read handles buffer data even if the Handle
