@@ -1,0 +1,2 @@
+echo "Running autoconf... (not really)"
+echo "$(cat $(dirname $0)/configure.ac) $(date)...\"" > $(dirname $0)/configure
