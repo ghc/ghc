@@ -729,7 +729,11 @@ runCommands' eh sourceErrorHandler gCmd = do
         when (not success) $ maybe (return ()) lift sourceErrorHandler
         runCommands' eh sourceErrorHandler gCmd
 
--- | Evaluate a single line of user input (either :<command> or Haskell code)
+-- | Evaluate a single line of user input (either :<command> or Haskell code).
+-- A result of Nothing means there was no more input to process.
+-- Otherwise the result is Just b where b is True if the command succeeded;
+-- this is relevant only to ghc -e, which will exit with status 1
+-- if the commmand was unsuccessful. GHCi will continue in either case.
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
 runOneCommand eh gCmd = do
@@ -740,14 +744,14 @@ runOneCommand eh gCmd = do
   case mb_cmd1 of
     Nothing -> return Nothing
     Just c  -> ghciHandle (\e -> lift $ eh e >>= return . Just) $
-             handleSourceError printErrorAndKeepGoing
+             handleSourceError printErrorAndFail
                (doCommand c)
                -- source error's are handled by runStmt
                -- is the handler necessary here?
   where
-    printErrorAndKeepGoing err = do
+    printErrorAndFail err = do
         GHC.printException err
-        return $ Just True
+        return $ Just False     -- Exit ghc -e, but not GHCi
 
     noSpace q = q >>= maybe (return Nothing)
                             (\c -> case removeSpaces c of
@@ -890,16 +894,18 @@ declPrefixes dflags = keywords ++ concat opt_keywords
                    , ["deriving " | xopt Opt_StandaloneDeriving dflags]
                    ]
 
--- | Entry point to execute some haskell code from user
+-- | Entry point to execute some haskell code from user.
+-- The return value True indicates success, as in `runOneCommand`.
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
- -- empty
+ -- empty; this should be impossible anyways since we filtered out
+ -- whitespace-only input in runOneCommand's noSpace
  | null (filter (not.isSpace) stmt)
- = return False
+ = return True
 
  -- import
  | stmt `looks_like` "import "
- = do addImportToContext stmt; return False
+ = do addImportToContext stmt; return True
 
  | otherwise
  = do dflags <- getDynFlags

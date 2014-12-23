@@ -63,6 +63,7 @@ import Control.Applicative (Applicative(..))
 -----------------------------------------------------------------------------
 -- GHCi monad
 
+-- the Bool means: True = we should exit GHCi (:quit)
 type Command = (String, String -> InputT GHCi Bool, CompletionFunc GHCi)
 
 data GHCiState = GHCiState
