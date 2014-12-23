@@ -44,3 +44,6 @@ T9367:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci                   < T9367.script > T9367-raw.run.stdout
 	cmp T9367-raw.run.stdout T9367-raw.stdout
 
+.PHONY: T9762_prep
+T9762_prep:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -fhpc -dynamic T9762B.hs

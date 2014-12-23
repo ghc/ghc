@@ -897,7 +897,7 @@ labelDynamic dflags this_pkg this_mod lbl =
 
    PlainModuleInitLabel m -> not (gopt Opt_Static dflags) && this_pkg /= (modulePackageKey m)
 
-   HpcTicksLabel m        -> not (gopt Opt_Static dflags) && this_pkg /= (modulePackageKey m)
+   HpcTicksLabel m        -> not (gopt Opt_Static dflags) && this_mod /= m
 
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
