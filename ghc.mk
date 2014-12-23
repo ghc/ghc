@@ -1150,10 +1150,10 @@ EXTRA_PACKAGES=parallel stm random primitive vector dph
 sdist-ghc-prep :
 	$(call removeTrees,$(SRC_DIST_GHC_ROOT))
 	$(call removeFiles,$(SRC_DIST_GHC_TARBALL))
-	-mkdir $(SRC_DIST_ROOT)
-	mkdir $(SRC_DIST_GHC_ROOT)
-	mkdir $(SRC_DIST_GHC_DIR)
-	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
+	mkdir -p $(SRC_DIST_ROOT)
+	mkdir -p $(SRC_DIST_GHC_ROOT)
+	mkdir -p $(SRC_DIST_GHC_DIR)
+	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_DIRS); do mkdir -p $$i; ( cd $$i && lndir $(TOP)/$$i ); done
 	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_FILES); do $(LN_S) $(TOP)/$$i .; done
 	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
@@ -1174,10 +1174,10 @@ sdist-ghc-prep :
 sdist-windows-tarballs-prep :
 	$(call removeTrees,$(SRC_DIST_WINDOWS_TARBALLS_ROOT))
 	$(call removeFiles,$(SRC_DIST_WINDOWS_TARBALLS_TARBALL))
-	-mkdir $(SRC_DIST_ROOT)
-	mkdir $(SRC_DIST_WINDOWS_TARBALLS_ROOT)
-	mkdir $(SRC_DIST_WINDOWS_TARBALLS_DIR)
-	mkdir $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs
+	mkdir -p $(SRC_DIST_ROOT)
+	mkdir -p $(SRC_DIST_WINDOWS_TARBALLS_ROOT)
+	mkdir -p $(SRC_DIST_WINDOWS_TARBALLS_DIR)
+	mkdir -p $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs
 	cd $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs && lndir $(TOP)/ghc-tarballs
 	$(call removeTrees,$(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs/.git)
 
@@ -1185,10 +1185,10 @@ sdist-windows-tarballs-prep :
 sdist-testsuite-prep :
 	$(call removeTrees,$(SRC_DIST_TESTSUITE_ROOT))
 	$(call removeFiles,$(SRC_DIST_TESTSUITE_TARBALL))
-	-mkdir $(SRC_DIST_ROOT)
-	mkdir $(SRC_DIST_TESTSUITE_ROOT)
-	mkdir $(SRC_DIST_TESTSUITE_DIR)
-	mkdir $(SRC_DIST_TESTSUITE_DIR)/testsuite
+	mkdir -p $(SRC_DIST_ROOT)
+	mkdir -p $(SRC_DIST_TESTSUITE_ROOT)
+	mkdir -p $(SRC_DIST_TESTSUITE_DIR)
+	mkdir -p $(SRC_DIST_TESTSUITE_DIR)/testsuite
 	cd $(SRC_DIST_TESTSUITE_DIR)/testsuite && lndir $(TOP)/testsuite
 
 .PHONY: sdist-ghc
