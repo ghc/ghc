@@ -663,6 +663,7 @@ getIdFromTrivialExpr :: CoreExpr -> Id
 getIdFromTrivialExpr e = go e
   where go (Var v) = v
         go (App f t) | not (isRuntimeArg t) = go f
+        go (Tick t e) | not (tickishIsCode t) = go e
         go (Cast e _) = go e
         go (Lam b e) | not (isRuntimeVar b) = go e
         go e = pprPanic "getIdFromTrivialExpr" (ppr e)
