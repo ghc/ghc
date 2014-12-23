@@ -1,0 +1,39 @@
+commit that introduced the weird sed stuff:
+
+commit a49e9cf3ff5af48c011c7ade9338b49b667b2201
+Author: Ian Lynagh <ian@well-typed.com>
+Date:   Fri Feb 22 22:18:50 2013 +0000
+
+     Add separate rules for all .hi files, rather than using %.hi style
+
+     If a file is created by a %.hi rule, and the actual filename isn't
+     mentioned in the makefiles, then make will treat it as an 'intermediate
+     file' and delete it when it is finished.
+
+     We'd been lucky so far that .hi files weren't actually being built due
+     to our rules (but rather, as side-effects of the .o rules). However,
+     when using -dynamic-too to build, we had a rule
+         $1/$2/build/%.$$(dyn_osuf): $1/$2/build/%.$$(v_hisuf)
+     which meant that building a .dyn_o could cause the rule for the
+     corresponding .hi to be used, and the .hi may then be deleted later on.
+     This was exacerbated by a bug in GNU make 3.81 which caused make to
+     enter an infinite loop if running in parallel mode:
+         http://lists.gnu.org/archive/html/bug-make/2013-02/msg00020.html
+
+     Adding
+         .SECONDARY:
+     would stop make from deleting the intermediate files. However, this
+     caused make to take a pathologically long time (it appeared to be
+     live-locked for 2 hours before I killed it) with our build system.
+
+     This patch instead creates lines like
+         $(eval $(call
+hi-rule,libraries/base/dist-install/build/Unsafe/Coerce.dyn_hi
+libraries/base/dist-install/build/Unsafe/Coerce.hi  : %hi: %o
+libraries/base/Unsafe/Coerce.hs))
+     in the .depend files, which results in a rule like
+         libraries/base/dist-install/build/Unsafe/Coerce.dyn_hi
+libraries/base/dist-install/build/Unsafe/Coerce.hi  : %hi: %o libraries/base/Unsafe/Coerce.hs ;
+     which, as the files are now all named in the makefiles, means they are
+     no longer intermediate files so do not get deleted.
+

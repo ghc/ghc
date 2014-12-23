@@ -1,0 +1,300 @@
+Skipping:
+"inplace/bin/ghc-cabal.exe" check libraries/deepseq
+
+Done: 
+"inplace/bin/ghc-cabal.exe" configure libraries/deepseq dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   "  --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       "  --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar"                                    --with-alex="/usr/local/bin/alex"            --with-happy="/usr/local/bin/happy"
+ inplace/bin/ghc-cabal.exe  configure libraries\deepseq dist-install    --with-ghc= C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe  --with-ghc-pkg= C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe   --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=  -fno-stack-protector      --configure-option=LDFLAGS=      --configure-option=CPPFLAGS=      --gcc-options=  -fno-stack-protector          --with-gcc= C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe  --with-ld= C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe  --configure-option=--with-cc= C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe  --with-ar=C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ar.exe --with-alex=C:/msys64/usr/local/bin/alex.exe --with-happy=C:/msys64/usr/local/bin/happy.exe
+Configuring deepseq-1.4.0.0...
+
+
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/deepseq/dist-install/inplace-pkg-config
+ C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe  update --force  libraries\deepseq\dist-install\inplace-pkg-config
+
+Reading package info from "libraries/deepseq/dist-install/inplace-pkg-config" ... done.
+
+
+"inplace/bin/ghc-cabal.exe" check libraries/bytestring
+'ghc-options: -O2' is rarely needed. Check that it is giving a real benefit and not just imposing longer compile times on your users.
+"inplace/bin/ghc-cabal.exe" configure libraries/bytestring dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring bytestring-0.10.5.0...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/bytestring/dist-install/inplace-pkg-config
+Reading package info from "libraries/bytestring/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/containers
+'ghc-options: -O2' is rarely needed. Check that it is giving a real benefit and not just imposing longer compile times on your users.
+"inplace/bin/ghc-cabal.exe" configure libraries/containers dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring containers-0.5.5.1...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/containers/dist-install/inplace-pkg-config
+Reading package info from "libraries/containers/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/Win32
+"inplace/bin/ghc-cabal.exe" configure libraries/Win32 dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring Win32-2.3.0.2...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/Win32/dist-install/inplace-pkg-config
+Reading package info from "libraries/Win32/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/time
+"inplace/bin/ghc-cabal.exe" configure libraries/time dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring time-1.5...
+checking for gcc... C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.exe
+checking for suffix of executables... .exe
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe accepts -g... yes
+checking for C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe option to accept ISO C89... none needed
+checking how to run the C preprocessor... C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe -E
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking time.h usability... yes
+checking time.h presence... yes
+checking for time.h... yes
+checking for gmtime_r... no
+checking for localtime_r... no
+checking whether struct tm is in sys/time.h or time.h... time.h
+checking for struct tm.tm_zone... no
+checking whether tzname is declared... yes
+checking for tzname... yes
+checking whether time.h and sys/time.h may both be included... yes
+checking sys/time.h usability... yes
+checking sys/time.h presence... yes
+checking for sys/time.h... yes
+checking whether altzone is declared... no
+configure: creating ./config.status
+config.status: creating lib/include/HsTimeConfig.h
+config.status: lib/include/HsTimeConfig.h is unchanged
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/time/dist-install/inplace-pkg-config
+Reading package info from "libraries/time/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/directory
+"inplace/bin/ghc-cabal.exe" configure libraries/directory dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring directory-1.2.1.1...
+checking for gcc... C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.exe
+checking for suffix of executables... .exe
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe accepts -g... yes
+checking for C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe option to accept ISO C89... none needed
+checking how to run the C preprocessor... C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe -E
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking for sys/types.h... (cached) yes
+checking for unistd.h... (cached) yes
+checking for sys/stat.h... (cached) yes
+configure: creating ./config.status
+config.status: creating include/HsDirectoryConfig.h
+config.status: include/HsDirectoryConfig.h is unchanged
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/directory/dist-install/inplace-pkg-config
+Reading package info from "libraries/directory/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/process
+"inplace/bin/ghc-cabal.exe" configure libraries/process dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring process-1.2.0.1...
+checking for gcc... C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.exe
+checking for suffix of executables... .exe
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe accepts -g... yes
+checking for C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe option to accept ISO C89... none needed
+checking how to run the C preprocessor... C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe -E
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking for pid_t... yes
+checking vfork.h usability... no
+checking vfork.h presence... no
+checking for vfork.h... no
+checking for fork... no
+checking for vfork... no
+checking signal.h usability... yes
+checking signal.h presence... yes
+checking for signal.h... yes
+checking sys/wait.h usability... no
+checking sys/wait.h presence... no
+checking for sys/wait.h... no
+checking fcntl.h usability... yes
+checking fcntl.h presence... yes
+checking for fcntl.h... yes
+checking for setitimer... no
+checking for sysconf... no
+checking value of SIG_DFL... -1
+checking value of SIG_IGN... -1
+configure: creating ./config.status
+config.status: creating include/HsProcessConfig.h
+config.status: include/HsProcessConfig.h is unchanged
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/process/dist-install/inplace-pkg-config
+Reading package info from "libraries/process/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/hpc
+"inplace/bin/ghc-cabal.exe" configure libraries/hpc dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring hpc-0.6.0.2...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/hpc/dist-install/inplace-pkg-config
+Reading package info from "libraries/hpc/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/pretty
+"inplace/bin/ghc-cabal.exe" configure libraries/pretty dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring pretty-1.1.1.1...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/pretty/dist-install/inplace-pkg-config
+Reading package info from "libraries/pretty/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/template-haskell
+"inplace/bin/ghc-cabal.exe" configure libraries/template-haskell dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring template-haskell-2.10.0.0...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/template-haskell/dist-install/inplace-pkg-config
+Reading package info from "libraries/template-haskell/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/binary
+'ghc-options: -O2' is rarely needed. Check that it is giving a real benefit and not just imposing longer compile times on your users.
+"inplace/bin/ghc-cabal.exe" configure libraries/binary dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring binary-0.7.1.0...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/binary/dist-install/inplace-pkg-config
+Reading package info from "libraries/binary/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/Cabal/Cabal
+"inplace/bin/ghc-cabal.exe" configure libraries/Cabal/Cabal dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring Cabal-1.21.1.0...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/Cabal/Cabal/dist-install/inplace-pkg-config
+Reading package info from "libraries/Cabal/Cabal/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/bin-package-db
+No 'category' field.
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure libraries/bin-package-db dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring bin-package-db-0.0.0.0...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/bin-package-db/dist-install/inplace-pkg-config
+Reading package info from "libraries/bin-package-db/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/hoopl
+"inplace/bin/ghc-cabal.exe" configure libraries/hoopl dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring hoopl-3.10.0.2...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/hoopl/dist-install/inplace-pkg-config
+Reading package info from "libraries/hoopl/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/transformers
+"inplace/bin/ghc-cabal.exe" configure libraries/transformers dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring transformers-0.4.2.0...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/transformers/dist-install/inplace-pkg-config
+Reading package info from "libraries/transformers/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/xhtml
+"inplace/bin/ghc-cabal.exe" configure libraries/xhtml dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring xhtml-3000.2.1...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/xhtml/dist-install/inplace-pkg-config
+Reading package info from "libraries/xhtml/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/haskeline
+"inplace/bin/ghc-cabal.exe" configure libraries/haskeline dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring haskeline-0.7.1.3...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/haskeline/dist-install/inplace-pkg-config
+Reading package info from "libraries/haskeline/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" configure compiler stage2 "Annotations Avail Bag BasicTypes BinIface Binary BooleanFormula BreakArray BufWrite BuildTyCl Class CmdLineParser CmmType CoAxiom ConLike Coercion Config Constants CoreArity CoreFVs CoreLint CoreSubst CoreSyn CoreTidy CoreUnfold CoreUtils CostCentre DataCon Demand Digraph DriverPhases DsMonad DynFlags Encoding ErrUtils Exception ExtsCompat46 FamInstEnv FastFunctions FastMutInt FastString FastTypes Finder Fingerprint FiniteMap ForeignCall Hooks HsBinds HsDecls HsDoc HsExpr HsImpExp HsLit PlaceHolder HsPat HsSyn HsTypes HsUtils HscTypes IOEnv Id IdInfo IfaceEnv IfaceSyn IfaceType InstEnv Kind ListSetOps Literal LoadIface Maybes MkCore MkId Module MonadUtils Name NameEnv NameSet OccName OccurAnal OptCoercion OrdList Outputable PackageConfig Packages Pair Panic PatSyn PipelineMonad Platform PlatformConstants PprCore PrelInfo PrelNames PrelRules Pretty PrimOp RdrName Rules Serialized SrcLoc StaticFlags StringBuffer TcEvidence TcIface TcMType TcRnMonad TcRnTypes TcType TcTypeNats TrieMap TyCon Type TypeRep TysPrim TysWiredIn Unify UniqFM UniqSet UniqSupply Unique Util Var VarEnv VarSet Bitmap BlockId ByteCodeAsm ByteCodeInstr ByteCodeItbls CLabel Cmm CmmCallConv CmmExpr CmmInfo CmmMachOp CmmNode CmmUtils CodeGen.Platform CodeGen.Platform.ARM CodeGen.Platform.ARM64 CodeGen.Platform.NoRegs CodeGen.Platform.PPC CodeGen.Platform.PPC_Darwin CodeGen.Platform.SPARC CodeGen.Platform.X86 CodeGen.Platform.X86_64 FastBool Hoopl Hoopl.Dataflow InteractiveEvalTypes MkGraph PprCmm PprCmmDecl PprCmmExpr Reg RegClass SMRep StgCmmArgRep StgCmmClosure StgCmmEnv StgCmmLayout StgCmmMonad StgCmmProf StgCmmTicky StgCmmUtils StgSyn Stream" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --flags=stage2 --ghc-option=-optc-DTHREADED_RTS --flags=ncg --flags=ghci --ghc-option=-DGHCI_TABLES_NEXT_TO_CODE --ghc-option=-DSTAGE=2 --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="  -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header  " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy" --disable-library-for-ghci
+Configuring ghc-7.9.20141121...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  compiler/stage2/inplace-pkg-config
+Reading package info from "compiler/stage2/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/parallel
+"inplace/bin/ghc-cabal.exe" configure libraries/parallel dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring parallel-3.2.0.5...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/parallel/dist-install/inplace-pkg-config
+Reading package info from "libraries/parallel/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check libraries/stm
+"inplace/bin/ghc-cabal.exe" configure libraries/stm dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring stm-2.4.3.1...
+"C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/stm/dist-install/inplace-pkg-config
+Reading package info from "libraries/stm/dist-install/inplace-pkg-config" ... done.
+"inplace/bin/ghc-cabal.exe" check utils/haddock
+'ghc-options: -O2' is rarely needed. Check that it is giving a real benefit and not just imposing longer compile times on your users.
+"inplace/bin/ghc-cabal.exe" configure utils/haddock dist "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe" --flag in-ghc-tree --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring haddock-2.15.0...
+"inplace/bin/ghc-cabal.exe" check utils/hsc2hs
+"inplace/bin/ghc-cabal.exe" configure utils/hsc2hs dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring hsc2hs-0.67...
+"inplace/bin/ghc-cabal.exe" check utils/ghc-pkg
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/ghc-pkg dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring ghc-pkg-6.9...
+"inplace/bin/ghc-cabal.exe" check utils/ghctags
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/ghctags dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring ghctags-0.1...
+"inplace/bin/ghc-cabal.exe" check utils/dll-split
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/dll-split dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring dll-split-0.1...
+"inplace/bin/ghc-cabal.exe" check utils/ghc-pwd
+No 'category' field.
+No 'maintainer' field.
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/ghc-pwd dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring ghc-pwd-0.1...
+"inplace/bin/ghc-cabal.exe" check utils/ghc-cabal
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/ghc-cabal dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring ghc-cabal-0.1...
+"inplace/bin/ghc-cabal.exe" check utils/hpc
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/hpc dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring hpc-bin-0.67...
+"inplace/bin/ghc-cabal.exe" check utils/runghc
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/runghc dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring runghc-7.9.20141121...
+"inplace/bin/ghc-cabal.exe" configure ghc stage2 "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --flags=stage2 --flags=ghci --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring ghc-bin-7.9.20141121...
+"inplace/bin/ghc-cabal.exe" check utils/mkUserGuidePart
+No 'category' field.
+No 'maintainer' field.
+A 'license-file' is not specified.
+"inplace/bin/ghc-cabal.exe" configure utils/mkUserGuidePart dist "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring mkUserGuidePart-0.1...
+"inplace/bin/ghc-cabal.exe" check utils/compare_sizes
+No 'maintainer' field.
+"inplace/bin/ghc-cabal.exe" configure utils/compare_sizes dist-install "" --with-ghc="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys64/home/b-anmokh/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --disable-library-vanilla --disable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/mingw64/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
+Configuring compareSizes-0.1.0.0...
+===--- building final phase
+make -r --no-print-directory -f ghc.mk phase=final all_libraries/deepseq
+"rm" -f libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp  
+"rm" -f libraries/deepseq/dist-install/build/.depend-v-p.c_asm.bit  
+echo "libraries/deepseq_dist-install_depfile_c_asm_EXISTS = YES" >> libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp
+mv libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp libraries/deepseq/dist-install/build/.depend-v-p.c_asm
+"rm" -f libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp  
+"inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_B1kWlp3pxi67AFTMHOGMnu -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_8yK4sGG5jjg0GLbd4IAH2k -package-key base_Fk2bxXXwDEyIsDbL6nDNHy -package-key ghcpr_BE58KUgBe9ELCsPXiJ1Q2r -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
+echo "libraries/deepseq_dist-install_depfile_haskell_EXISTS = YES" >> libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp
+for dir in libraries/deepseq/dist-install/build/Control/; do if test ! -d $dir; then mkdir -p $dir; fi done
+grep -v ' : [a-zA-Z]:/' libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp > libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp2
+sed -e '/hs$/ p' -e '/hs$/ s/o /hi /g' -e '/hs$/ s/:/ : %hi: %o /' -e '/hs$/ s/^/$(eval $(call hi-rule,/' -e '/hs$/ s/$/))/' -e '/hs-boot$/ p' -e '/hs-boot$/ s/o-boot /hi-boot /g' -e '/hs-boot$/ s/:/ : %hi-boot: %o-boot /' -e '/hs-boot$/ s/^/$(eval $(call hi-rule,/' -e '/hs-boot$/ s/$/))/' libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp2 > libraries/deepseq/dist-install/build/.depend-v-p.haskell
+"inplace/bin/ghc-stage1.exe" -hisuf hi -osuf  o -hcsuf hc -static  -H32m -O    -this-package-key deeps_B1kWlp3pxi67AFTMHOGMnu -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_8yK4sGG5jjg0GLbd4IAH2k -package-key base_Fk2bxXXwDEyIsDbL6nDNHy -package-key ghcpr_BE58KUgBe9ELCsPXiJ1Q2r -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -split-objs  -c libraries/deepseq/./Control/DeepSeq.hs -o libraries/deepseq/dist-install/build/Control/DeepSeq.o 
+"rm" -f libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a.contents  
+/usr/bin/find libraries/deepseq/dist-install/build/Control/DeepSeq_o_split -name '*.o' -print >> libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a.contents
+echo        >> libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a.contents
+"/mingw64/bin/ar" q  libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a @libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a.contents
+"rm" -f libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu.a.contents  
+"C:/msys64/home/b-anmokh/ghc/inplace/mingw/bin/ld.exe"  -r -o libraries/deepseq/dist-install/build/HSdeeps_B1kWlp3pxi67AFTMHOGMnu.o  libraries/deepseq/dist-install/build/Control/DeepSeq.o      
+"inplace/bin/ghc-stage1.exe" -hisuf p_hi -osuf  p_o -hcsuf p_hc -static -prof  -H32m -O    -this-package-key deeps_B1kWlp3pxi67AFTMHOGMnu -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_8yK4sGG5jjg0GLbd4IAH2k -package-key base_Fk2bxXXwDEyIsDbL6nDNHy -package-key ghcpr_BE58KUgBe9ELCsPXiJ1Q2r -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -split-objs  -c libraries/deepseq/./Control/DeepSeq.hs -o libraries/deepseq/dist-install/build/Control/DeepSeq.p_o 
+"rm" -f libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a.contents  
+/usr/bin/find libraries/deepseq/dist-install/build/Control/DeepSeq_p_o_split -name '*.p_o' -print >> libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a.contents
+echo        >> libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a.contents
+"/mingw64/bin/ar" q  libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a @libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a.contents
+"rm" -f libraries/deepseq/dist-install/build/libHSdeeps_B1kWlp3pxi67AFTMHOGMnu_p.a.contents  
+make[1]: Leaving directory '/home/b-anmokh/ghc'
