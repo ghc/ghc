@@ -181,6 +181,14 @@ rnImportDecl this_mod
     let imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
+    -- Check for self-import, which confuses the typechecker (Trac #9032)
+    -- ghc --make rejects self-import cycles already, but batch-mode may not
+    -- at least not until TcIface.tcHiBootIface, which is too late to avoid
+    -- typechecker crashes.  ToDo: what about indirect self-import?
+    -- But 'import {-# SOURCE #-} M' is ok, even if a bit odd
+    when (not want_boot && imp_mod_name == moduleName this_mod)
+         (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
+
     -- Check for a missing import list (Opt_WarnMissingImportList also
     -- checks for T(..) items but that is done in checkDodgyImport below)
     case imp_details of
@@ -212,9 +220,9 @@ rnImportDecl this_mod
     warnIf (want_boot && any (not.mi_boot) ifaces && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
-        addErrAt loc (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
-                  $+$ ptext (sLit $ "please enable Safe Haskell through either "
-                                 ++ "Safe, Trustworthy or Unsafe"))
+        addErr (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
+                $+$ ptext (sLit $ "please enable Safe Haskell through either "
+                                   ++ "Safe, Trustworthy or Unsafe"))
 
     let
         qual_mod_name = as_mod `orElse` imp_mod_name
