@@ -1,0 +1,3 @@
+[submodule "mk-miner"]
+	path = mk-miner
+	url = https://github.com/snowleopard/mk-miner.git
