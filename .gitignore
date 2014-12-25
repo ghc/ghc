@@ -2,3 +2,4 @@
 *.hi
 _shake/
 _build/
+configure
