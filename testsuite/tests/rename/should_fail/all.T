@@ -129,6 +129,6 @@ test('T9077', normal, compile_fail, [''])
 test('T9815', normal, compile_fail, [''])
 
 test('T9032',
-     exit_code(2),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T9032'])
