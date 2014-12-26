@@ -104,7 +104,7 @@ option Root = do
     windows <- test WindowsHost
     if (windows)
     then do
-        Stdout out <- cmd ["cygpath", "-m", "/"]   
+        Stdout out <- quietly $ cmd ["cygpath", "-m", "/"]
         return $ dropWhileEnd isSpace out
     else
         return "/"
