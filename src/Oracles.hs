@@ -12,11 +12,10 @@ module Oracles (
     oracleRules
     ) where
 
-import Development.Shake.Config
 import Development.Shake.Rule
+import Development.Shake.Config
 import Development.Shake.Classes
 import Control.Monad hiding (when, unless)
-import qualified System.Directory as System
 import qualified Data.HashMap.Strict as M
 import qualified Prelude
 import Prelude hiding (not, (&&), (||))
@@ -129,7 +128,7 @@ argOption opt = do
     opt' <- option opt
     arg [opt']
 
-data Flag = LaxDeps | Stage1Only | DynamicGhcPrograms | GhcWithInterpreter | HsColourSrcs
+data Flag = LaxDeps | DynamicGhcPrograms | GhcWithInterpreter | HsColourSrcs
           | GccIsClang | GccLt46 | CrossCompiling | Validating | PlatformSupportsSharedLibs
           | WindowsHost
 
@@ -157,7 +156,6 @@ test WindowsHost = do
 test flag = do
     (key, defaultValue) <- return $ case flag of
         LaxDeps            -> ("lax-dependencies"    , False) -- TODO: move flags to a separate file
-        Stage1Only         -> ("stage-1-only"        , False) -- TODO: target only
         DynamicGhcPrograms -> ("dynamic-ghc-programs", False)
         GccIsClang         -> ("gcc-is-clang"        , False)
         GccLt46            -> ("gcc-lt-46"           , False)
