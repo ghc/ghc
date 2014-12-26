@@ -2,4 +2,4 @@
 *.hi
 _shake/
 _build/
-configure
+cfg/default.config
