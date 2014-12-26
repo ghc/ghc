@@ -1,5 +1,5 @@
 # Paths to builders:
-# ==================
+#===================
 
 system-ghc     = @WithGhc@
 system-ghc-pkg = @GhcPkgCmd@
@@ -32,7 +32,7 @@ lax-dependencies     = NO
 dynamic-ghc-programs = NO
 
 # Information about host and target systems:
-# ==========================================
+#===========================================
 
 target-os            = @TargetOS_CPP@
 target-arch          = @TargetArch_CPP@
@@ -69,8 +69,3 @@ iconv-lib-dirs     = @ICONV_LIB_DIRS@
 
 gmp-include-dirs   = @GMP_INCLUDE_DIRS@
 gmp-lib-dirs       = @GMP_LIB_DIRS@
-
-
-
-
-

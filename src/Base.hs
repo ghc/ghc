@@ -5,6 +5,7 @@ module Base (
     module Development.Shake.FilePath,
     module Control.Applicative,
     module Data.Monoid,
+    module Data.List,
     Stage (..),
     Args, arg, Condition,
     joinArgs, joinArgsWithSpaces,

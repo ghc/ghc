@@ -20,7 +20,9 @@ import qualified System.Directory as System
 import qualified Data.HashMap.Strict as M
 import qualified Prelude
 import Prelude hiding (not, (&&), (||))
+import Data.Char
 import Base
+import Config
 
 data Builder = Ar | Ld | Gcc | Alex | Happy | HsColour | GhcCabal | GhcPkg Stage | Ghc Stage
 
@@ -40,10 +42,18 @@ path builder = do
             Ghc Stage3    -> "ghc-stage3"
             GhcPkg Stage0 -> "system-ghc-pkg" -- GhcPkg Stage0 is the bootstrapping GhcPkg 
             GhcPkg _      -> "ghc-pkg"        -- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
-    askConfigWithDefault key $
+    cfgPath <- askConfigWithDefault key $
         error $ "\nCannot find path to '"
         ++ key
         ++ "' in configuration files."
+    let cfgPathExe = if cfgPath /= "" then cfgPath -<.> exe else ""
+    windows <- test WindowsHost
+    if (windows && "/" `isPrefixOf` cfgPathExe)
+    then do
+        root <- option Root
+        return $ root ++ cfgPathExe
+    else
+        return cfgPathExe
 
 argPath :: Builder -> Args
 argPath builder = do
@@ -53,12 +63,12 @@ argPath builder = do
 -- Explain!
 -- TODO: document change in behaviour (LaxDeps)
 needBuilder :: Builder -> Action ()
-needBuilder ghc @ (Ghc _) = do
+needBuilder ghc @ (Ghc stage) = do
     target  <- path ghc
     laxDeps <- test LaxDeps -- TODO: get rid of test?
     if laxDeps then orderOnly [target] else need [target]
 
-needBuilder builder = do
+needBuilder builder = do 
     target <- path builder
     need [target]
 
@@ -88,9 +98,18 @@ run builder args = do
 data Option = TargetOS | TargetArch | TargetPlatformFull
             | ConfCcArgs Stage | ConfGccLinkerArgs Stage | ConfLdLinkerArgs Stage | ConfCppArgs Stage
             | IconvIncludeDirs | IconvLibDirs | GmpIncludeDirs | GmpLibDirs
-            | HostOsCpp
+            | HostOsCpp | Root
 
 option :: Option -> Action String
+option Root = do
+    windows <- test WindowsHost
+    if (windows)
+    then do
+        Stdout out <- cmd ["cygpath", "-m", "/"]   
+        return $ dropWhileEnd isSpace out
+    else
+        return "/"
+
 option opt = askConfig $ case opt of 
     TargetOS                -> "target-os"
     TargetArch              -> "target-arch"
@@ -112,6 +131,7 @@ argOption opt = do
 
 data Flag = LaxDeps | Stage1Only | DynamicGhcPrograms | GhcWithInterpreter | HsColourSrcs
           | GccIsClang | GccLt46 | CrossCompiling | Validating | PlatformSupportsSharedLibs
+          | WindowsHost
 
 test :: Flag -> Action Bool
 test GhcWithInterpreter = do
@@ -129,6 +149,10 @@ test PlatformSupportsSharedLibs = do
 test HsColourSrcs = do
     hscolour <- path HsColour
     return $ hscolour /= ""
+
+test WindowsHost = do
+    hostOsCpp <- option HostOsCpp
+    return $ hostOsCpp `elem` ["mingw32", "cygwin32"]
 
 test flag = do
     (key, defaultValue) <- return $ case flag of
@@ -230,19 +254,19 @@ askConfig key = askConfigWithDefault key $ error $ "\nCannot find key '"
 oracleRules :: Rules ()
 oracleRules = do
     cfg <- newCache $ \() -> do
-        unless (doesFileExist "shake/default.config") $ do
+        unless (doesFileExist $ cfgPath </> "default.config.in") $ do
             error $ "\nDefault configuration file '"
-                ++ "shake/default.config.in"
+                ++ (cfgPath </> "default.config.in")
                 ++ "' is missing; unwilling to proceed."
             return ()
-        need ["shake/default.config"]
-        cfgDefault <- liftIO $ readConfigFile "shake/default.config"
-        existsUser <- doesFileExist "shake/user.config"
+        need [cfgPath </> "default.config"]
+        cfgDefault <- liftIO $ readConfigFile $ cfgPath </> "default.config"
+        existsUser <- doesFileExist $ cfgPath </> "user.config"
         cfgUser    <- if existsUser
-                      then liftIO $ readConfigFile "shake/user.config"
+                      then liftIO $ readConfigFile $ cfgPath </> "user.config"
                       else do
                           putLoud $ "\nUser defined configuration file '"
-                              ++ "shake/user.config"
+                              ++ (cfgPath </> "user.config")
                               ++ "' is missing; proceeding with default configuration.\n"
                           return M.empty
         return $ cfgUser `M.union` cfgDefault
