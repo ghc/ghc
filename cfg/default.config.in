@@ -1,0 +1,76 @@
+# Paths to builders:
+# ==================
+
+system-ghc     = @WithGhc@
+system-ghc-pkg = @GhcPkgCmd@
+
+ghc-cabal      = @hardtop@/inplace/bin/ghc-cabal
+
+ghc-stage1     = @hardtop@/inplace/bin/ghc-stage1
+ghc-stage2     = @hardtop@/inplace/bin/ghc-stage2
+ghc-stage3     = @hardtop@/inplace/bin/ghc-stage3
+
+ghc-pkg        = @hardtop@/inplace/bin/ghc-pkg
+
+gcc            = @WhatGccIsCalled@
+ld             = @LdCmd@
+ar             = @ArCmd@
+alex           = @AlexCmd@
+happy          = @HappyCmd@
+hscolour       = @HSCOLOUR@
+
+# Information about builders:
+#============================
+
+gcc-is-clang = @GccIsClang@
+gcc-lt-46    = @GccLT46@
+
+# Build options:
+#===============
+
+lax-dependencies     = NO
+dynamic-ghc-programs = NO
+
+# Information about host and target systems:
+# ==========================================
+
+target-os            = @TargetOS_CPP@
+target-arch          = @TargetArch_CPP@
+target-platform-full = @TargetPlatformFull@
+
+host-os-cpp          = @HostOS_CPP@
+
+cross-compiling      = @CrossCompiling@
+
+# Compilation and linking flags:
+#===============================
+
+conf-cc-args-stage-0         = @CONF_CC_OPTS_STAGE0@
+conf-cc-args-stage-1         = @CONF_CC_OPTS_STAGE1@
+conf-cc-args-stage-2         = @CONF_CC_OPTS_STAGE2@
+
+conf-cpp-args-stage-0        = @CONF_CPP_OPTS_STAGE0@
+conf-cpp-args-stage-1        = @CONF_CPP_OPTS_STAGE1@
+conf-cpp-args-stage-2        = @CONF_CPP_OPTS_STAGE2@
+
+conf-gcc-linker-args-stage-0 = @CONF_GCC_LINKER_OPTS_STAGE0@
+conf-gcc-linker-args-stage-1 = @CONF_GCC_LINKER_OPTS_STAGE1@
+conf-gcc-linker-args-stage-2 = @CONF_GCC_LINKER_OPTS_STAGE2@
+
+conf-ld-linker-args-stage-0  = @CONF_LD_LINKER_OPTS_STAGE0@
+conf-ld-linker-args-stage-1  = @CONF_LD_LINKER_OPTS_STAGE1@
+conf-ld-linker-args-stage-2  = @CONF_LD_LINKER_OPTS_STAGE2@
+
+# Include and library directories:
+#=================================
+
+iconv-include-dirs = @ICONV_INCLUDE_DIRS@
+iconv-lib-dirs     = @ICONV_LIB_DIRS@
+
+gmp-include-dirs   = @GMP_INCLUDE_DIRS@
+gmp-lib-dirs       = @GMP_LIB_DIRS@
+
+
+
+
+
