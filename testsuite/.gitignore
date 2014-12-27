@@ -574,8 +574,12 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/driver/out019/
 /tests/driver/recomp001/B.hs
 /tests/driver/recomp001/C
+/tests/driver/retc001/B.hs
+/tests/driver/retc001/C
 /tests/driver/recomp003/Data/
 /tests/driver/recomp003/err
+/tests/driver/retc003/Data/
+/tests/driver/retc003/err
 /tests/driver/recomp004/MainX
 /tests/driver/recomp004/MainX.hs
 /tests/driver/recomp004/c.c

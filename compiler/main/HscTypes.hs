@@ -2357,6 +2357,10 @@ data ModSummary
           -- ^ Timestamp of source file
         ms_obj_date     :: Maybe UTCTime,
           -- ^ Timestamp of object, if we have one
+        ms_iface_date   :: Maybe UTCTime,
+          -- ^ Timestamp of hi file, if we *only* are typechecking (it is
+          -- 'Nothing' otherwise.
+          -- See Note [Recompilation checking when typechecking only] and #9243
         ms_srcimps      :: [Located (ImportDecl RdrName)],
           -- ^ Source imports of the module
         ms_textual_imps :: [Located (ImportDecl RdrName)],

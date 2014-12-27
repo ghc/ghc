@@ -18,6 +18,5 @@ clean:
 recomp001: clean
 	cp B1.hs B.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make -v0 C.hs
-	sleep 1
 	cp B2.hs B.hs
 	-'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make -v0 C.hs
