@@ -171,7 +171,7 @@ compileOne' m_tc_result mHscMessage
    -- -fforce-recomp should also work with --make
    let force_recomp = gopt Opt_ForceRecomp dflags
        source_modified
-         | force_recomp || isNothing maybe_old_linkable = SourceModified
+         | force_recomp = SourceModified
          | otherwise = source_modified0
        object_filename = ml_obj_file location
 
