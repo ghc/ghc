@@ -138,11 +138,7 @@ ccall:          Caller allocates parameters, *and* deallocates them.
 
 stdcall:        Caller allocates parameters, callee deallocates.
                 Function name has @N after it, where N is number of arg bytes
-                e.g.  _Foo@8
-
-ToDo: The stdcall calling convention is x86 (win32) specific,
-so perhaps we should emit a warning if it's being used on other
-platforms.
+                e.g.  _Foo@8. This convention is x86 (win32) specific.
 
 See: http://www.programmersheaven.com/2/Calling-conventions
 -}
