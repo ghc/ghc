@@ -221,6 +221,7 @@ initSysTools mbMinusB
                                  Just v -> return v
                                  Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
                              Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+       crossCompiling <- getBooleanSetting "cross compiling"
        targetArch <- readSetting "target arch"
        targetOS <- readSetting "target os"
        targetWordSize <- readSetting "target word size"
@@ -309,7 +310,8 @@ initSysTools mbMinusB
                           platformUnregisterised = targetUnregisterised,
                           platformHasGnuNonexecStack = targetHasGnuNonexecStack,
                           platformHasIdentDirective = targetHasIdentDirective,
-                          platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
+                          platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols,
+                          platformIsCrossCompiling = crossCompiling
                       }
 
        return $ Settings {
