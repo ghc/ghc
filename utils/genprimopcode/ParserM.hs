@@ -16,7 +16,10 @@ module ParserM (
     -- Other
     happyError
  ) where
+
 import Control.Applicative
+import Prelude
+
 import Control.Monad (ap, liftM)
 import Data.Word (Word8)
 import Data.Char (ord)
