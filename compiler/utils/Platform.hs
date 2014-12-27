@@ -31,7 +31,8 @@ data Platform
               platformUnregisterised           :: Bool,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
-              platformHasSubsectionsViaSymbols :: Bool
+              platformHasSubsectionsViaSymbols :: Bool,
+              platformIsCrossCompiling         :: Bool
           }
         deriving (Read, Show, Eq)
 

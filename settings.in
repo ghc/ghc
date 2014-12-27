@@ -18,6 +18,7 @@
  ("windres command", "@SettingsWindresCommand@"),
  ("libtool command", "@SettingsLibtoolCommand@"),
  ("perl command", "@SettingsPerlCommand@"),
+ ("cross compiling", "@CrossCompiling@"),
  ("target os", "@HaskellTargetOs@"),
  ("target arch", "@HaskellTargetArch@"),
  ("target word size", "@WordSize@"),
