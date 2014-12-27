@@ -58,6 +58,10 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	cat libffi-tarballs/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 
+# update config.guess/config.sub
+	$(CP) "$(TOP)/config.guess" libffi/build/config.guess
+	$(CP) "$(TOP)/config.sub"   libffi/build/config.sub
+
 # We have to fake a non-working ln for configure, so that the fallback
 # option (cp -p) gets used instead.  Otherwise the libffi build system
 # will use cygwin symbolic links which cannot be read by mingw gcc.
