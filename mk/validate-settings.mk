@@ -187,4 +187,3 @@ GhcBootLibHcOpts += -fno-warn-deprecated-flags
 # for details
 #
 GhcLibHcOpts += -fno-warn-tabs
-utils/hsc2hs_dist-install_EXTRA_HC_OPTS += -fno-warn-tabs
