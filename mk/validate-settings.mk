@@ -93,39 +93,22 @@ utils/ghc-cabal_dist_EXTRA_HC_OPTS += -w
 libraries/Cabal/Cabal_dist-boot_EXTRA_HC_OPTS += -w
 libraries/Cabal/Cabal_dist-install_EXTRA_HC_OPTS += -w
 
-# Temporarily turn off incomplete-pattern warnings for containers
-libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
-
-# Temporarily turn off pointless-pragma warnings for containers
-libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-pointless-pragmas
-
 # Turn off import warnings for bad unused imports
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
-libraries/hoopl_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 utils/haddock_dist_EXTRA_HC_OPTS += -fno-warn-unused-imports
-libraries/stm_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
-libraries/parallel_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/vector_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # haddock's attoparsec uses deprecated `inlinePerformIO`
 utils/haddock_dist_EXTRA_HC_OPTS += -fno-warn-deprecations
 
-# bytestring has identities at the moment
-libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
-
-# bytestring uses bitSize at the moment
-libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
-
 # containers uses bitSize at the moment
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 
-# Temporarily turn off unused-do-bind warnings for the time package
-libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind 
-# Temporary: mkTyCon is deprecated
-libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 # On Windows, there are also some unused import warnings
+ifeq "$(HostOS_CPP)" "mingw32"
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
+endif
 
 # haskeline has warnings about deprecated use of block/unblock
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
@@ -135,21 +118,15 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
 libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 
-# temporarily turn off -Werror for mtl
-libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
-
 # temporarily turn off unused-imports warnings for pretty
 libraries/pretty_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # primitive has a warning about deprecated use of GHC.IOBase
-libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/primitive_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # temporarily turn off unused-imports warnings for terminfo
+libraries/terminfo_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/terminfo_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
-
-# temporarily turn off -Werror for transformers
-libraries/transformers_dist-boot_EXTRA_HC_OPTS += -Wwarn
-libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # vector has some unused match warnings
 libraries/vector_dist-install_EXTRA_HC_OPTS += -Wwarn
@@ -163,17 +140,16 @@ libraries/dph/dph-prim-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-par_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-lifted-common-install_EXTRA_HC_OPTS += -Wwarn
 
-# We need to turn of deprecated warnings for SafeHaskell transition
-libraries/array_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
+# transformers has unused function parameters warnings
+libraries/transformers_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-matches -fno-warn-unused-imports
+libraries/transformers_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-matches -fno-warn-unused-imports
 
 # Turn of trustworthy-safe warning
 libraries/base_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 libraries/ghc-prim_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
-libraries/unix_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 libraries/Win32_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 
 # Temporarely disable inline rule shadowing warning
-libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
 libraries/template-haskell_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
 
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
@@ -187,3 +163,4 @@ GhcBootLibHcOpts += -fno-warn-deprecated-flags
 # for details
 #
 GhcLibHcOpts += -fno-warn-tabs
+GhcBootLibHcOpts += -fno-warn-tabs
