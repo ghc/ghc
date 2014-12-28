@@ -15,7 +15,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Control.Monad.Zip where
+module Control.Monad.Zip (MonadZip(..)) where
 
 import Control.Monad (liftM)
 

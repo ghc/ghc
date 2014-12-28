@@ -20,7 +20,30 @@
 --
 -----------------------------------------------------------------------------
 
-module System.Posix.Internals where
+module System.Posix.Internals
+     (
+     CFLock, CFilePath, CGroup, CLconv, CPasswd, CSigaction, CSigset, CStat,
+     CTermios, CTm, CTms, CUtimbuf, CUtsname, FD,
+
+     c_access, c_chmod, c_close, c_creat, c_dup, c_dup2, c_fcntl_lock,
+     c_fcntl_read, c_fcntl_write, c_fork, c_fstat, c_ftruncate, c_getpid,
+     c_isatty, c_lflag, c_link, c_lseek, c_mkfifo, c_open, c_pipe, c_read,
+     c_s_isblk, c_s_ischr, c_s_isdir, c_s_isfifo, c_s_isreg, c_s_issock,
+     c_safe_open, c_safe_read, c_safe_write, c_sigaddset, c_sigemptyset,
+     c_sigprocmask, c_stat, c_tcgetattr, c_tcsetattr, c_umask, c_unlink,
+     c_utime, c_waitpid, c_write, const_echo, const_f_getfl, const_f_setfd,
+     const_f_setfl, const_fd_cloexec, const_icanon, const_sig_block,
+     const_sig_setmask, const_sigttou, const_tcsanow, const_vmin, const_vtime,
+     dEFAULT_BUFFER_SIZE, fdFileSize, fdGetMode, fdStat, fdType, fileType,
+     getEcho, get_saved_termios, ioe_unknownfiletype, lstat, newFilePath,
+     o_APPEND, o_BINARY, o_CREAT, o_EXCL, o_NOCTTY, o_NONBLOCK, o_RDONLY,
+     o_RDWR, o_TRUNC, o_WRONLY, peekFilePath, peekFilePathLen, poke_c_lflag,
+     ptr_c_cc, puts, sEEK_CUR, sEEK_END, sEEK_SET, s_isblk, s_ischr, s_isdir,
+     s_isfifo, s_isreg, s_issock, setCloseOnExec, setCooked, setEcho,
+     setNonBlockingFD, set_saved_termios, sizeof_sigset_t, sizeof_stat,
+     sizeof_termios, st_dev, st_ino, st_mode, st_mtime, st_size, statGetType,
+     tcSetAttr, withFilePath
+     ) where
 
 #include "HsBaseConfig.h"
 
@@ -42,7 +65,7 @@ import GHC.Real
 import GHC.IO
 import GHC.IO.IOMode
 import GHC.IO.Exception
-import GHC.IO.Device
+import GHC.IO.Device hiding (getEcho, setEcho)
 #ifndef mingw32_HOST_OS
 import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
