@@ -892,6 +892,7 @@ declPrefixes dflags = keywords ++ concat opt_keywords
 
     opt_keywords = [ ["foreign "  | xopt Opt_ForeignFunctionInterface dflags]
                    , ["deriving " | xopt Opt_StandaloneDeriving dflags]
+                   , ["pattern "  | xopt Opt_PatternSynonyms dflags]
                    ]
 
 -- | Entry point to execute some haskell code from user.
