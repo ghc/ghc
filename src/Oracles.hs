@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, DeriveGeneric, ConstraintKinds #-}
+{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ConstraintKinds #-}
 
 module Oracles (
     module Control.Monad,
@@ -8,7 +8,7 @@ module Oracles (
     Builder (..), Flag (..), Option (..),
     path, with, run, argPath,
     option, argOption,
-    test, when, unless, not, (&&), (||),
+    Condition, test, when, unless, not, (&&), (||),
     oracleRules
     ) where
 
@@ -50,7 +50,7 @@ path builder = do
     if (windows && "/" `isPrefixOf` cfgPathExe)
     then do
         root <- option Root
-        return $ root ++ cfgPathExe
+        return $ root ++ (drop 1 $ cfgPathExe)
     else
         return cfgPathExe
 
@@ -59,19 +59,22 @@ argPath builder = do
     path <- path builder
     arg [path]
 
--- Explain!
--- TODO: document change in behaviour (LaxDeps)
+-- When LaxDeps flag is set (by adding 'lax-dependencies = YES' to user.config),
+-- dependencies on the GHC executable are turned into order-only dependencies to
+-- avoid needless recompilation when making changes to GHC's sources. In certain
+-- situations this can lead to build failures, in which case you should reset
+-- the flag (at least temporarily).
 needBuilder :: Builder -> Action ()
 needBuilder ghc @ (Ghc stage) = do
     target  <- path ghc
-    laxDeps <- test LaxDeps -- TODO: get rid of test?
+    laxDeps <- test LaxDeps
     if laxDeps then orderOnly [target] else need [target]
 
 needBuilder builder = do 
     target <- path builder
     need [target]
 
--- 'with Gcc' generates --with-gcc=/usr/bin/gcc and needs it
+-- Action 'with Gcc' returns an argument '--with-gcc=/path/to/gcc' and needs the builder 
 with :: Builder -> Args
 with builder = do 
     let prefix = case builder of 
@@ -163,7 +166,7 @@ test flag = do
         Validating         -> ("validating"          , False)
     let defaultString = if defaultValue then "YES" else "NO"
     value <- askConfigWithDefault key $
-        do putLoud $ "\nFlag '"
+        do putLoud $ "\nFlag '" -- TODO: Give the warning *only once* per key
                 ++ key
                 ++ "' not set in configuration files. "
                 ++ "Proceeding with default value '"
@@ -171,6 +174,8 @@ test flag = do
                 ++ "'.\n"
            return defaultString
     return $ value == "YES"
+
+type Condition = Action Bool
 
 class ToCondition a where
     toCondition :: a -> Condition
