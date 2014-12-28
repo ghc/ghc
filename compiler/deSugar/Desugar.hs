@@ -24,7 +24,6 @@ import Coercion
 import InstEnv
 import Class
 import Avail
-import PatSyn
 import CoreSyn
 import CoreSubst
 import PprCore
@@ -184,7 +183,7 @@ deSugar hsc_env
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
-                mg_patsyns      = filter ((`elemNameSet` export_set) . patSynName) patsyns,
+                mg_patsyns      = patsyns,
                 mg_rules        = ds_rules_for_imps,
                 mg_binds        = ds_binds,
                 mg_foreign      = ds_fords,

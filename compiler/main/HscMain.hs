@@ -97,6 +97,7 @@ import CoreLint         ( lintInteractiveExpr )
 import DsMeta           ( templateHaskellNames )
 import VarEnv           ( emptyTidyEnv )
 import Panic
+import ConLike
 
 import GHC.Exts
 #endif
@@ -1505,6 +1506,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     liftIO $ linkDecls hsc_env src_span cbc
 
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
+        patsyns = mg_patsyns simpl_mg
 
         ext_ids = [ id | id <- bindersOfBinds core_binds
                        , isExternalName (idName id)
@@ -1515,11 +1517,11 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
             -- The DFunIds are in 'cls_insts' (see Note [ic_tythings] in HscTypes
             -- Implicit Ids are implicit in tcs
 
-        tythings =  map AnId ext_ids ++ map ATyCon tcs
+        tythings =  map AnId ext_ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) patsyns
 
     let icontext = hsc_IC hsc_env
         ictxt    = extendInteractiveContext icontext ext_ids tcs
-                                            cls_insts fam_insts defaults
+                                            cls_insts fam_insts defaults patsyns
     return (tythings, ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)

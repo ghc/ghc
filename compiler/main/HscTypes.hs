@@ -1403,8 +1403,9 @@ extendInteractiveContext :: InteractiveContext
                          -> [Id] -> [TyCon]
                          -> [ClsInst] -> [FamInst]
                          -> Maybe [Type]
+                         -> [PatSyn]
                          -> InteractiveContext
-extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults
+extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults new_patsyns
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
                             -- a new mod_index (Trac #9426)
@@ -1413,7 +1414,7 @@ extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults
           , ic_instances  = (new_cls_insts ++ old_cls_insts, new_fam_insts ++ old_fam_insts)
           , ic_default    = defaults }
   where
-    new_tythings = map AnId ids ++ map ATyCon tcs
+    new_tythings = map AnId ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) new_patsyns
     old_tythings = filterOut (shadowed_by ids) (ic_tythings ictxt)
 
     -- Discard old instances that have been fully overrridden
