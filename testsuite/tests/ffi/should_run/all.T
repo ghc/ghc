@@ -115,6 +115,7 @@ test('T2276', [ omit_ways(['ghci']),
                 extra_clean(['T2276_c.o']) ],
               compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ways(['ghci']),
+                     when(opsys('darwin'), skip), # stdcall not supported on OS X
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup'),
                      extra_clean(['T2276_ghci_c.o']) ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
