@@ -120,7 +120,8 @@ buildPackageData pkg @ (Package name path todo) (stage, dist, settings) =
           "haddock-prologue.txt",
           "inplace-pkg-config",
           "setup-config",
-          "build" </> "autogen" </> "cabal_macros.h"
+          "build" </> "autogen" </> "cabal_macros.h",
+          "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? What's up with Paths_cpsa.hs?
         ] &%> \_ -> do
             need [path </> name <.> "cabal"]
             when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
