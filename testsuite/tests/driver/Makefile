@@ -586,3 +586,9 @@ write_interface_make:
 	$(RM) -rf write_interface_make/A011.hi
 	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir write_interface_make -fno-code -fwrite-interface --make A011.hs
 	test -f write_interface_make/A011.hi
+
+.PHONY: T9938
+T9938:
+	$(RM) -rf T9938.o T9938.hi T9938
+	"$(TEST_HC)" -c T9938.hs
+	"$(TEST_HC)" T9938.o -o T9938
