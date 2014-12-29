@@ -86,7 +86,7 @@ data GCFlags = GCFlags
     , minAllocAreaSize      :: Nat
     , minOldGenSize         :: Nat
     , heapSizeSuggestion    :: Nat
-    , heapSizeSuggesionAuto :: Bool
+    , heapSizeSuggestionAuto :: Bool
     , oldGenFactor          :: Double
     , pcFreeHeap            :: Double
     , generations           :: Nat
