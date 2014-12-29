@@ -120,7 +120,7 @@ data PersistentLinkerState
 
         -- we need to remember the name of the last temporary DLL/.so
         -- so we can link it
-        last_temp_so :: !(Maybe FilePath) }
+        last_temp_so :: !(Maybe (FilePath, String)) }
 
 
 emptyPLS :: DynFlags -> PersistentLinkerState
@@ -818,7 +818,7 @@ dynLoadObjs :: DynFlags -> PersistentLinkerState -> [FilePath]
 dynLoadObjs _      pls []   = return pls
 dynLoadObjs dflags pls objs = do
     let platform = targetPlatform dflags
-    soFile <- newTempName dflags (soExt platform)
+    (soFile, libPath , libName) <- newTempLibName dflags (soExt platform)
     let -- When running TH for a non-dynamic way, we still need to make
         -- -l flags to link against the dynamic libraries, so we turn
         -- Opt_Static off
@@ -833,12 +833,11 @@ dynLoadObjs dflags pls objs = do
                       ldInputs =
                         case last_temp_so pls of
                           Nothing -> []
-                          Just so  ->
-                                 let (lp, l) = splitFileName so in
+                          Just (lp, l)  ->
                                  [ Option ("-L" ++ lp)
                                  , Option ("-Wl,-rpath")
                                  , Option ("-Wl," ++ lp)
-                                 , Option ("-l:" ++ l)
+                                 , Option ("-l" ++  l)
                                  ],
                       -- Even if we're e.g. profiling, we still want
                       -- the vanilla dynamic libraries, so we set the
@@ -851,7 +850,7 @@ dynLoadObjs dflags pls objs = do
     consIORef (filesToNotIntermediateClean dflags) soFile
     m <- loadDLL soFile
     case m of
-        Nothing -> return pls { last_temp_so = Just soFile }
+        Nothing -> return pls { last_temp_so = Just (libPath, libName) }
         Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
