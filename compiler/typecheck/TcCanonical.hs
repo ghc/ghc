@@ -242,67 +242,95 @@ emitSuperclasses _ = panic "emit_superclasses of non-class!"
 {-
 Note [Adding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Since dictionaries are canonicalized only once in their lifetime, the
-place to add their superclasses is canonicalisation (The alternative
-would be to do it during constraint solving, but we'd have to be
-extremely careful to not repeatedly introduced the same superclass in
-our worklist). Here is what we do:
+place to add their superclasses is canonicalisation.  See Note [Add
+superclasses only during canonicalisation].  Here is what we do:
 
-For Givens:
-       We add all their superclasses as Givens.
+  Deriveds: Do nothing.
 
-For Wanteds:
-       Generally speaking we want to be able to add superclasses of
-       wanteds for two reasons:
+  Givens:   Add all their superclasses as Givens.
 
-       (1) Oportunities for improvement. Example:
-                  class (a ~ b) => C a b
-           Wanted constraint is: C alpha beta
-           We'd like to simply have C alpha alpha. Similar
-           situations arise in relation to functional dependencies.
+  Wanteds:  Add all their superclasses as Derived.
+            Not as Wanted: we don't need a proof.
+            Nor as Given: that leads to superclass loops.
 
-       (2) To have minimal constraints to quantify over:
-           For instance, if our wanted constraint is (Eq a, Ord a)
-           we'd only like to quantify over Ord a.
+We also want to ensure minimal constraints to quantify over.  For
+instance, if our wanted constraint is (Eq a, Ord a) we'd only like to
+quantify over Ord a.  But we deal with that completely independently
+in TcSimplify. See Note [Minimize by SuperClasses] in TcSimplify.
 
-       To deal with (1) above we only add the superclasses of wanteds
-       which may lead to improvement, that is: equality superclasses or
-       superclasses with functional dependencies.
+Examples of how adding superclasses as Derived is useful
 
-       We deal with (2) completely independently in TcSimplify. See
-       Note [Minimize by SuperClasses] in TcSimplify.
+    --- Example 1
+        class C a b | a -> b
+    Suppose we want to solve
+         [G] C a b
+         [W] C a beta
+    Then adding [D] beta~b will let us solve it.
+
+    -- Example 2 (similar but using a type-equality superclass)
+        class (F a ~ b) => C a b
+    And try to sllve:
+         [G] C a b
+         [W] C a beta
+    Follow the superclass rules to add
+         [G] F a ~ b
+         [D] F a ~ beta
+    Now we we get [D] beta ~ b, and can solve that.
+
+Example of why adding superclass of a Wanted as a Given would
+be terrible, see Note [Do not add superclasses of solved dictionaries]
+in TcSMonad, which has this example:
+        class Ord a => C a where
+        instance Ord [a] => C [a] where ...
+Suppose we are trying to solve
+  [G] d1 : Ord a
+  [W] d2 : C [a]
+If we (bogusly) added the superclass of d2 as Gievn we'd have
+  [G] d1 : Ord a
+  [W] d2 : C [a]
+  [G] d3 : Ord [a]   -- Superclass of d2, bogus
+
+Then we'll use the instance decl to give
+  [G] d1 : Ord a     Solved: d2 : C [a] = $dfCList d4
+  [G] d3 : Ord [a]   -- Superclass of d2, bogus
+  [W] d4: Ord [a]
+
+ANd now we could bogusly solve d4 from d3.
 
 
-       Moreover, in all cases the extra improvement constraints are
-       Derived. Derived constraints have an identity (for now), but
-       we don't do anything with their evidence. For instance they
-       are never used to rewrite other constraints.
+Note [Add superclasses only during canonicalisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We add superclasses only during canonicalisation, on the passage
+from CNonCanonical to CDictCan.  A class constraint can be repeatedly
+rewritten, and there's no point in repeatedly adding its superclasses.
 
-       See also [New Wanted Superclass Work] in TcInteract.
-
-
-For Deriveds:
-       We do nothing.
-
-Here's an example that demonstrates why we chose to NOT add
-superclasses during simplification: [Comes from ticket #4497]
+Here's a serious, but now out-dated example, from Trac #4497:
 
    class Num (RealOf t) => Normed t
    type family RealOf x
 
 Assume the generated wanted constraint is:
-   RealOf e ~ e, Normed e
-If we were to be adding the superclasses during simplification we'd get:
-   Num uf, Normed e, RealOf e ~ e, RealOf e ~ uf
-==>
-   e ~ uf, Num uf, Normed e, RealOf e ~ e
-==> [Spontaneous solve]
-   Num uf, Normed uf, RealOf uf ~ uf
+   [W] RealOf e ~ e
+   [W] Normed e
 
-While looks exactly like our original constraint. If we add the superclass again we'd loop.
-By adding superclasses definitely only once, during canonicalisation, this situation can't
+If we were to be adding the superclasses during simplification we'd get:
+   [W] RealOf e ~ e
+   [W] Normed e
+   [D] RealOf e ~ fuv
+   [D] Num fuv
+==>
+   e := fuv, Num fuv, Normed fuv, RealOf fuv ~ fuv
+
+While looks exactly like our original constraint. If we add the
+superclass of (Normed fuv) again we'd loop.  By adding superclasses
+definitely only once, during canonicalisation, this situation can't
 happen.
--}
+
+Mind you, now that Wanteds cannot rewrite Derived, I think this particular
+situation can't happen.
+  -}
 
 newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]

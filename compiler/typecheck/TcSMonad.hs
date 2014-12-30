@@ -378,6 +378,165 @@ Type-family equations, of form (ev : F tys ~ ty), live in three places
     using w3 itself!
 
   * The inert_funeqs are un-solved but fully processed and in the InertCans.
+
+Note [Solved dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we apply a top-level instance declararation, we add the "solved"
+dictionary to the inert_solved_dicts.  In general, we use it to avoid
+creating a new EvVar when we have a new goal that we have solved in
+the past.
+
+But in particular, we can use it to create *recursive* dicationaries.
+The simplest, degnerate case is
+    instance C [a] => C [a] where ...
+If we have
+    [W] d1 :: C [x]
+then we can apply the instance to get
+    d1 = $dfCList d
+    [W] d2 :: C [x]
+Now 'd1' goes in inert_solved_dicts, and we can solve d2 directly from d1.
+    d1 = $dfCList d
+    d2 = d1
+
+See Note [Example of recursive dictionaries]
+Other notes about solved dictionaries
+
+* See also Note [Do not add superclasses of solved dictionaries]
+
+* The inert_solved_dicts field is not rewritten by equalities, so it may
+  get out of date.
+
+Note [Do not add superclasses of solved dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every member of inert_solved_dicts is the result of applying a dictionary
+function, NOT of applying superclass selection to anything.
+Consider
+
+        class Ord a => C a where
+        instance Ord [a] => C [a] where ...
+
+Suppose we are trying to solve
+  [G] d1 : Ord a
+  [W] d2 : C [a]
+
+Then we'll use the instance decl to give
+
+  [G] d1 : Ord a     Solved: d2 : C [a] = $dfCList d3
+  [W] d3 : Ord [a]
+
+We must not add d4 : Ord [a] to the 'solved' set (by taking the
+superclass of d2), otherwise we'll use it to solve d3, without ever
+using d1, which would be a catastrophe.
+
+Solution: when extending the solved dictionaries, do not add superclasses.
+That's why each element of the inert_solved_dicts is the result of applying
+a dictionary function.
+
+Note [Example of recursive dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--- Example 1
+
+    data D r = ZeroD | SuccD (r (D r));
+
+    instance (Eq (r (D r))) => Eq (D r) where
+        ZeroD     == ZeroD     = True
+        (SuccD a) == (SuccD b) = a == b
+        _         == _         = False;
+
+    equalDC :: D [] -> D [] -> Bool;
+    equalDC = (==);
+
+We need to prove (Eq (D [])). Here's how we go:
+
+   [W] d1 : Eq (D [])
+By instance decl of Eq (D r):
+   [W] d2 : Eq [D []]      where   d1 = dfEqD d2
+By instance decl of Eq [a]:
+   [W] d3 : Eq (D [])      where   d2 = dfEqList d3
+                                   d1 = dfEqD d2
+Now this wanted can interact with our "solved" d1 to get:
+    d3 = d1
+
+-- Example 2:
+This code arises in the context of "Scrap Your Boilerplate with Class"
+
+    class Sat a
+    class Data ctx a
+    instance  Sat (ctx Char)             => Data ctx Char       -- dfunData1
+    instance (Sat (ctx [a]), Data ctx a) => Data ctx [a]        -- dfunData2
+
+    class Data Maybe a => Foo a
+
+    instance Foo t => Sat (Maybe t)                             -- dfunSat
+
+    instance Data Maybe a => Foo a                              -- dfunFoo1
+    instance Foo a        => Foo [a]                            -- dfunFoo2
+    instance                 Foo [Char]                         -- dfunFoo3
+
+Consider generating the superclasses of the instance declaration
+         instance Foo a => Foo [a]
+
+So our problem is this
+    [G] d0 : Foo t
+    [W] d1 : Data Maybe [t]   -- Desired superclass
+
+We may add the given in the inert set, along with its superclasses
+  Inert:
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  WorkList
+    [W] d1 : Data Maybe [t]
+
+Solve d1 using instance dfunData2; d1 := dfunData2 d2 d3
+  Inert:
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+  WorkList:
+    [W] d2 : Sat (Maybe [t])
+    [W] d3 : Data Maybe t
+
+Now, we may simplify d2 using dfunSat; d2 := dfunSat d4
+  Inert:
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+        d2 : Sat (Maybe [t])
+  WorkList:
+    [W] d3 : Data Maybe t
+    [W] d4 : Foo [t]
+
+Now, we can just solve d3 from d01; d3 := d01
+  Inert
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+        d2 : Sat (Maybe [t])
+  WorkList
+    [W] d4 : Foo [t]
+
+Now, solve d4 using dfunFoo2;  d4 := dfunFoo2 d5
+  Inert
+    [G] d0  : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+        d2 : Sat (Maybe [t])
+        d4 : Foo [t]
+  WorkList:
+    [W] d5 : Foo t
+
+Now, d5 can be solved! d5 := d0
+
+Result
+   d1 := dfunData2 d2 d3
+   d2 := dfunSat d4
+   d3 := d01
+   d4 := dfunFoo2 d5
+   d5 := d0
 -}
 
 -- All Given (fully known) or Wanted or Derived
@@ -435,11 +594,8 @@ data InertSet
 
        , inert_solved_dicts   :: DictMap CtEvidence
               -- Of form ev :: C t1 .. tn
-              -- Always the result of using a top-level instance declaration
-              -- - Used to avoid creating a new EvVar when we have a new goal
-              --   that we have solved in the past
-              -- - Stored not necessarily as fully rewritten
-              --   (ToDo: rewrite lazily when we lookup)
+              -- See Note [Solved dictionaries]
+              -- and Note [Do not add superclasses of solved dictionaries]
        }
 
 instance Outputable InertCans where
@@ -514,6 +670,7 @@ insertInertItemTcS item
 
 addSolvedDict :: CtEvidence -> Class -> [Type] -> TcS ()
 -- Add a new item in the solved set of the monad
+-- See Note [Solved dictionaries]
 addSolvedDict item cls tys
   | isIPPred (ctEvPred item)    -- Never cache "solved" implicit parameters (not sure why!)
   = return ()

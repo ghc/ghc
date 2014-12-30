@@ -1105,6 +1105,9 @@ See Trac #3731, #4809, #5751, #5913, #6117, #6161, which all
 describe somewhat more complicated situations, but ones
 encountered in practice.
 
+See also tests tcrun020, tcrun021, tcrun033
+
+
 ----- THE PROBLEM --------
 The problem is that it is all too easy to create a class whose
 superclass is bottom when it should not be.
@@ -1189,8 +1192,6 @@ superclasses of (Foo a), which is smaller, namely Duper (Fam a).  But
 that is *not* smaller than the target so we can't take *its*
 superclasses.  As a result the program is rightly rejected, unless you
 add (Super (Fam a)) to the context of (i3).
-
-
 
 Note [Silent superclass arguments] (historical interest)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
