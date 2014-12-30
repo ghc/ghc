@@ -9,6 +9,7 @@ module Oracles (
     path, with, run, argPath,
     option, argOption,
     Condition, test, when, unless, not, (&&), (||),
+    packagaDataOption, PackageDataKey (..),
     oracleRules
     ) where
 
@@ -240,9 +241,10 @@ instance ToCondition a => AndOr Flag a where
 
 newtype ConfigKey = ConfigKey String deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
+
 askConfigWithDefault :: String -> Action String -> Action String
 askConfigWithDefault key defaultAction = do
-    maybeValue <- askOracle $ ConfigKey $ key 
+    maybeValue <- askOracle $ ConfigKey key 
     case maybeValue of
         Just value -> return value
         Nothing    -> do
@@ -253,6 +255,32 @@ askConfig :: String -> Action String
 askConfig key = askConfigWithDefault key $ error $ "\nCannot find key '"
                                          ++ key
                                          ++ "' in configuration files."
+
+newtype PackageDataPair = PackageDataPair (FilePath, String)
+                        deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+
+packagaDataOptionWithDefault :: FilePath -> String -> Action String -> Action String
+packagaDataOptionWithDefault file key defaultAction = do
+    maybeValue <- askOracle $ PackageDataPair (file, key) 
+    case maybeValue of
+        Just value -> return value
+        Nothing    -> do
+                        result <- defaultAction
+                        return result   
+
+data PackageDataKey = Modules | SrcDirs
+
+packagaDataOption :: FilePath -> PackageDataKey -> Action String
+packagaDataOption file key = do
+    let keyName = replaceChar '/' '_' $ takeDirectory file ++ case key of
+           Modules -> "_MODULES"
+           SrcDirs -> "_HS_SRC_DIRS"
+    packagaDataOptionWithDefault file keyName $ error $ "\nCannot find key '"
+                                         ++ keyName
+                                         ++ "' in "
+                                         ++ file
+                                         ++ "."
+
 
 oracleRules :: Rules ()
 oracleRules = do
@@ -273,5 +301,12 @@ oracleRules = do
                               ++ "' is missing; proceeding with default configuration.\n"
                           return M.empty
         return $ cfgUser `M.union` cfgDefault
-    addOracle $ \(ConfigKey x) -> M.lookup x <$> cfg ()
+
+    addOracle $ \(ConfigKey key) -> M.lookup key <$> cfg ()
+
+    pkgData <- newCache $ \file -> do
+        need [file]
+        liftIO $ readConfigFile file
+
+    addOracle $ \(PackageDataPair (file, key)) -> M.lookup key <$> pkgData file
     return ()
