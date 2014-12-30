@@ -246,14 +246,11 @@ askConfigWithDefault key defaultAction = do
     maybeValue <- askOracle $ ConfigKey key 
     case maybeValue of
         Just value -> return value
-        Nothing    -> do
-                        result <- defaultAction
-                        return result
+        Nothing    -> defaultAction
 
 askConfig :: String -> Action String
-askConfig key = askConfigWithDefault key $ error $ "\nCannot find key '"
-                                         ++ key
-                                         ++ "' in configuration files."
+askConfig key = askConfigWithDefault key $
+    error $ "\nCannot find key '" ++ key ++ "' in configuration files."
 
 newtype PackageDataPair = PackageDataPair (FilePath, String)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -263,9 +260,7 @@ packagaDataOptionWithDefault file key defaultAction = do
     maybeValue <- askOracle $ PackageDataPair (file, key) 
     case maybeValue of
         Just value -> return value
-        Nothing    -> do
-                        result <- defaultAction
-                        return result   -- TODO: simplify
+        Nothing    -> defaultAction
 
 data PackageDataKey = Modules | SrcDirs
 
@@ -274,12 +269,8 @@ packagaDataOption file key = do
     let keyName = replaceIf isSlash '_' $ takeDirectory file ++ case key of
            Modules -> "_MODULES"
            SrcDirs -> "_HS_SRC_DIRS"
-    packagaDataOptionWithDefault file keyName $ error $ "\nCannot find key '"
-                                         ++ keyName
-                                         ++ "' in "
-                                         ++ file
-                                         ++ "." -- TODO: Improve formatting
-
+    packagaDataOptionWithDefault file keyName $
+        error $ "\nCannot find key '" ++ keyName ++ "' in " ++ file ++ "."
 
 oracleRules :: Rules ()
 oracleRules = do
