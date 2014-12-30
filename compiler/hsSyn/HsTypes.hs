@@ -141,6 +141,10 @@ type LHsType name = Located (HsType name)
 type HsKind name = HsType name
 type LHsKind name = Located (HsKind name)
 
+--------------------------------------------------
+--             LHsTyVarBndrs
+--  The quantified binders in a HsForallTy
+
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
 
 data LHsTyVarBndrs name
@@ -164,6 +168,15 @@ emptyHsQTvs =  HsQTvs { hsq_kvs = [], hsq_tvs = [] }
 hsQTvBndrs :: LHsTyVarBndrs name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
 
+------------------------------------------------
+--            HsWithBndrs
+-- Used to quantify the binders of a type in cases
+-- when a HsForAll isn't appropriate:
+--    * Patterns in a type/data family instance (HsTyPats)
+--    * Type of a rule binder (RuleBndr)
+--    * Pattern type signatures (SigPatIn)
+-- In the last of these, wildcards can happen, so we must accommodate them
+
 data HsWithBndrs name thing
   = HsWB { hswb_cts :: thing             -- Main payload (type or list of types)
          , hswb_kvs :: PostRn name [Name] -- Kind vars
@@ -180,6 +193,7 @@ mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = PlaceHolder
                                      , hswb_wcs = PlaceHolder }
 
 
+--------------------------------------------------
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
 newtype HsIPName = HsIPName FastString-- ?x
@@ -196,6 +210,7 @@ instance OutputableBndr HsIPName where
     pprInfixOcc  n = ppr n
     pprPrefixOcc n = ppr n
 
+--------------------------------------------------
 data HsTyVarBndr name
   = UserTyVar        -- no explicit kinding
          name
@@ -218,6 +233,7 @@ isHsKindedTyVar (KindedTyVar {}) = True
 hsTvbAllKinded :: LHsTyVarBndrs name -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvBndrs
 
+--------------------------------------------------
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
 --            'ApiAnnotation.AnnTilde','ApiAnnotation.AnnRarrow',
 --            'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
