@@ -414,3 +414,8 @@ test('T9938',
      [ extra_clean(['T9938.hi', 'T9938.o', 'T9938']), expect_broken(9938)],
      run_command,
      ['$MAKE -s --no-print-directory T9938'])
+
+test('T9938B',
+     [ extra_clean(['T9938B.hi', 'T9938B.o', 'T9938B']) ],
+     run_command,
+     ['$MAKE -s --no-print-directory T9938B'])
