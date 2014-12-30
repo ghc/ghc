@@ -122,15 +122,13 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
           "inplace-pkg-config",
           "setup-config",
           "build" </> "autogen" </> "cabal_macros.h",
-          "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? What's up with Paths_cpsa.hs?
+          "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? Also check out Paths_cpsa.hs.
         ] &%> \_ -> do
             need [path </> name <.> "cabal"]
             when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
             run GhcCabal cabalArgs
             when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
-            let pkgDataFile = path </> dist </> "package-data.mk"                 
-            pkgData <- lines <$> liftIO (readFile pkgDataFile)
-            length pkgData `seq` writeFileLines pkgDataFile $ map (replaceIf isSlash '_') $ filter ('$' `notElem`) pkgData
+            postProcessPackageData $ path </> dist </> "package-data.mk"
               where
                 cabalArgs, ghcPkgArgs :: Args
                 cabalArgs = mconcat
