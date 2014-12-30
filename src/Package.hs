@@ -161,7 +161,6 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
                     , arg [path </> dist </> "inplace-pkg-config"]
                     ]
 
--- "inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
 
 -- $1_$2_$3_MOST_DIR_HC_OPTS = \
 --  $$($1_$2_$3_MOST_HC_OPTS) \
@@ -185,6 +184,8 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
 --         if test ! -d $$$$dir; then mkdir -p $$$$dir; fi \
 --     done
 -- endif
+
+-- "inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
 
 -- $1_$2_$3_MOST_HC_OPTS = \
 --  $$(WAY_$3_HC_OPTS) \
@@ -213,24 +214,39 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
 --  $$(SRC_HC_WARNING_OPTS) \
 --  $$(EXTRA_HC_OPTS)
 
--- TODO: double-check that ignoring $1_$2_HS_SRC_DIRS is safe
--- Options CONF_HC_OPTS and 
+-- TODO: double-check that ignoring SrcDirs ($1_$2_HS_SRC_DIRS) is safe
+-- TODO: add $1_HC_OPTS
+-- TODO: check that the package is not a program ($1_$2_PROG == "")
+-- TODO: handle empty $1_PACKAGE
+-- Option CONF_HC_OPTS is skipped
 buildPackageDeps :: Package -> TodoItem -> Rules ()
 buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist
     in
     (buildDir </> "build" </> name <.> "m") %> \out -> do
-        let pkgData = buildDir </> "package-data.mk"
-            autogen = dist </> "build" </> "autogen"
-        mods <- words <$> packagaDataOption pkgData Modules
+        let pkgData    = buildDir </> "package-data.mk"
+            autogen    = dist </> "build" </> "autogen"
+        mods    <- words <$> packagaDataOption pkgData Modules
+        srcDirs <- words <$> packagaDataOption pkgData SrcDirs
         src  <- getDirectoryFiles "" $ do
                     start <- map (replaceEq '.' '/') mods
                     end   <- [".hs", ".lhs"]
                     return $ path ++ "//" ++ start ++ end
+        packageKey <- packagaDataOption pkgData PackageKey
         run (Ghc stage) $ mconcat
                 [ arg ["-M"]
                 , wayHcOpts vanilla -- TODO: is this needed? shall we run GHC -M multiple times?
                 , splitArgs $ argOption SrcHcOpts
+                , when (stage == Stage0) $ arg ["-package-db libraries/bootstrapping.conf"]
+                , when (not SupportsPackageKey && stage == Stage0) $ arg ["-package-name"]
+                , when (    SupportsPackageKey || stage /= Stage0) $ arg ["-this-package-key"]
+                , arg [packageKey]
+                , arg ["-hide-all-packages"]
+                , arg $ map (\d -> "-i" ++ path ++ "/" ++ d) srcDirs
+                , arg $ do
+                    prefix <- ["-i", "-I"]
+                    suffix <- ["build", "build/autogen"]
+                    return $ prefix ++ path </> dist </> suffix
                 , arg ["-dep-makefile", out, "-dep-suffix", "", "-include-pkg-deps"]
                 , arg [unwords src]
                 ]

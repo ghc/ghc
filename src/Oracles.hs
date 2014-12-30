@@ -136,7 +136,7 @@ argOption opt = do
 
 data Flag = LaxDeps | DynamicGhcPrograms | GhcWithInterpreter | HsColourSrcs
           | GccIsClang | GccLt46 | CrossCompiling | Validating | PlatformSupportsSharedLibs
-          | WindowsHost
+          | WindowsHost | SupportsPackageKey
 
 test :: Flag -> Action Bool
 test GhcWithInterpreter = do
@@ -161,12 +161,13 @@ test WindowsHost = do
 
 test flag = do
     (key, defaultValue) <- return $ case flag of
-        LaxDeps            -> ("lax-dependencies"    , False) -- TODO: move flags to a separate file
-        DynamicGhcPrograms -> ("dynamic-ghc-programs", False)
-        GccIsClang         -> ("gcc-is-clang"        , False)
-        GccLt46            -> ("gcc-lt-46"           , False)
-        CrossCompiling     -> ("cross-compiling"     , False)
-        Validating         -> ("validating"          , False)
+        LaxDeps            -> ("lax-dependencies"     , False) -- TODO: move flags to a separate file
+        DynamicGhcPrograms -> ("dynamic-ghc-programs" , False)
+        GccIsClang         -> ("gcc-is-clang"         , False)
+        GccLt46            -> ("gcc-lt-46"            , False)
+        CrossCompiling     -> ("cross-compiling"      , False)
+        Validating         -> ("validating"           , False)
+        SupportsPackageKey -> ("supports-package-key" , False)
     let defaultString = if defaultValue then "YES" else "NO"
     value <- askConfigWithDefault key $
         do putLoud $ "\nFlag '" -- TODO: Give the warning *only once* per key
@@ -264,13 +265,14 @@ packagaDataOptionWithDefault file key defaultAction = do
         Just value -> return value
         Nothing    -> defaultAction
 
-data PackageDataKey = Modules | SrcDirs
+data PackageDataKey = Modules | SrcDirs | PackageKey
 
 packagaDataOption :: FilePath -> PackageDataKey -> Action String
 packagaDataOption file key = do
-    let keyName = replaceIf isSlash '_' $ takeDirectory file ++ case key of
-           Modules -> "_MODULES"
-           SrcDirs -> "_HS_SRC_DIRS"
+    let keyName = replaceIf isSlash '_' $ takeDirectory file ++ "_" ++ case key of
+           Modules    -> "MODULES"
+           SrcDirs    -> "HS_SRC_DIRS" -- TODO: add "." as a default?
+           PackageKey -> "PACKAGE_KEY"
     packagaDataOptionWithDefault file keyName $
         error $ "\nCannot find key '" ++ keyName ++ "' in " ++ file ++ "."
 
