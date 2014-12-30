@@ -8,7 +8,7 @@ module Base (
     module Data.List,
     Stage (..),
     Args, arg,
-    joinArgs, joinArgsWithSpaces,
+    joinArgs, joinArgsWithSpaces, splitArgs,
     filterOut
     ) where
 
@@ -39,6 +39,9 @@ joinArgsWithSpaces = intercalateArgs " "
 
 joinArgs :: Args -> Args
 joinArgs = intercalateArgs ""
+
+splitArgs :: Args -> Args
+splitArgs = fmap (concatMap words)
 
 filterOut :: Args -> [String] -> Args
 filterOut args list = filter (`notElem` list) <$> args
