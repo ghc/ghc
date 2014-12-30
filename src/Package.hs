@@ -4,6 +4,7 @@ module Package (
     ) where
 
 import Base
+import Util
 import Ways
 import Oracles
 
@@ -129,7 +130,7 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
             when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
             let pkgDataFile = path </> dist </> "package-data.mk"                 
             pkgData <- lines <$> liftIO (readFile pkgDataFile)
-            length pkgData `seq` writeFileLines pkgDataFile $ map (replaceChar '/' '_') $ filter ('$' `notElem`) pkgData
+            length pkgData `seq` writeFileLines pkgDataFile $ map (replaceIf isSlash '_') $ filter ('$' `notElem`) pkgData
               where
                 cabalArgs, ghcPkgArgs :: Args
                 cabalArgs = mconcat
@@ -225,7 +226,7 @@ buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
             autogen = dist </> "build" </> "autogen"
         mods <- words <$> packagaDataOption pkgData Modules
         src  <- getDirectoryFiles "" $ do
-                    start <- map (replaceChar '.' '/') mods
+                    start <- map (replaceEq '.' '/') mods
                     end   <- [".hs", ".lhs"]
                     return $ path ++ "//" ++ start ++ end
         run (Ghc stage) $ mconcat

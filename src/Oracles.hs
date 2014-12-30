@@ -20,8 +20,8 @@ import Control.Monad hiding (when, unless)
 import qualified Data.HashMap.Strict as M
 import qualified Prelude
 import Prelude hiding (not, (&&), (||))
-import Data.Char
 import Base
+import Util
 import Config
 
 data Builder = Ar | Ld | Gcc | Alex | Happy | HsColour | GhcCabal | GhcPkg Stage | Ghc Stage
@@ -241,7 +241,6 @@ instance ToCondition a => AndOr Flag a where
 
 newtype ConfigKey = ConfigKey String deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-
 askConfigWithDefault :: String -> Action String -> Action String
 askConfigWithDefault key defaultAction = do
     maybeValue <- askOracle $ ConfigKey key 
@@ -266,20 +265,20 @@ packagaDataOptionWithDefault file key defaultAction = do
         Just value -> return value
         Nothing    -> do
                         result <- defaultAction
-                        return result   
+                        return result   -- TODO: simplify
 
 data PackageDataKey = Modules | SrcDirs
 
 packagaDataOption :: FilePath -> PackageDataKey -> Action String
 packagaDataOption file key = do
-    let keyName = replaceChar '/' '_' $ takeDirectory file ++ case key of
+    let keyName = replaceIf isSlash '_' $ takeDirectory file ++ case key of
            Modules -> "_MODULES"
            SrcDirs -> "_HS_SRC_DIRS"
     packagaDataOptionWithDefault file keyName $ error $ "\nCannot find key '"
                                          ++ keyName
                                          ++ "' in "
                                          ++ file
-                                         ++ "."
+                                         ++ "." -- TODO: Improve formatting
 
 
 oracleRules :: Rules ()

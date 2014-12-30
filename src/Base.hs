@@ -9,8 +9,7 @@ module Base (
     Stage (..),
     Args, arg,
     joinArgs, joinArgsWithSpaces,
-    filterOut,
-    replaceChar
+    filterOut
     ) where
 
 import Development.Shake hiding ((*>))
@@ -43,8 +42,3 @@ joinArgs = intercalateArgs ""
 
 filterOut :: Args -> [String] -> Args
 filterOut args list = filter (`notElem` list) <$> args
-
-replaceChar :: Char -> Char -> String -> String
-replaceChar from to = (go from) . if from == '/' then go '\\' else id
-  where
-    go from' = map (\c -> if c == from' then to else c)
