@@ -163,6 +163,29 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
 
 -- "inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
 
+-- $1_$2_$3_MOST_DIR_HC_OPTS = \
+--  $$($1_$2_$3_MOST_HC_OPTS) \
+--  -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build
+
+-- # Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
+-- # indirectly) include the generated includes files.
+-- $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
+-- 
+-- $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
+--     $$(call removeFiles,$$@.tmp)
+-- ifneq "$$($1_$2_HS_SRCS)" ""
+--     "$$($1_$2_HC_MK_DEPEND)" -M \
+--         $$($1_$2_$$(firstword $$($1_$2_WAYS))_MOST_DIR_HC_OPTS) \
+--         $$($1_$2_MKDEPENDHS_FLAGS) \
+--         $$($1_$2_HS_SRCS)
+-- endif
+--     echo "$1_$2_depfile_haskell_EXISTS = YES" >> $$@.tmp
+-- ifneq "$$($1_$2_SLASH_MODS)" ""
+--     for dir in $$(sort $$(foreach mod,$$($1_$2_SLASH_MODS),$1/$2/build/$$(dir $$(mod)))); do \
+--         if test ! -d $$$$dir; then mkdir -p $$$$dir; fi \
+--     done
+-- endif
+
 -- $1_$2_$3_MOST_HC_OPTS = \
 --  $$(WAY_$3_HC_OPTS) \
 --  $$(CONF_HC_OPTS) \
@@ -190,31 +213,8 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
 --  $$(SRC_HC_WARNING_OPTS) \
 --  $$(EXTRA_HC_OPTS)
 
-
--- $1_$2_$3_MOST_DIR_HC_OPTS = \
---  $$($1_$2_$3_MOST_HC_OPTS) \
---  -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build
-
--- # Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
--- # indirectly) include the generated includes files.
--- $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
--- 
--- $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
---     $$(call removeFiles,$$@.tmp)
--- ifneq "$$($1_$2_HS_SRCS)" ""
---     "$$($1_$2_HC_MK_DEPEND)" -M \
---         $$($1_$2_$$(firstword $$($1_$2_WAYS))_MOST_DIR_HC_OPTS) \
---         $$($1_$2_MKDEPENDHS_FLAGS) \
---         $$($1_$2_HS_SRCS)
--- endif
---     echo "$1_$2_depfile_haskell_EXISTS = YES" >> $$@.tmp
--- ifneq "$$($1_$2_SLASH_MODS)" ""
---     for dir in $$(sort $$(foreach mod,$$($1_$2_SLASH_MODS),$1/$2/build/$$(dir $$(mod)))); do \
---         if test ! -d $$$$dir; then mkdir -p $$$$dir; fi \
---     done
--- endif
-
 -- TODO: double-check that ignoring $1_$2_HS_SRC_DIRS is safe
+-- Options CONF_HC_OPTS and 
 buildPackageDeps :: Package -> TodoItem -> Rules ()
 buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist
@@ -229,6 +229,8 @@ buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
                     return $ path ++ "//" ++ start ++ end
         run (Ghc stage) $ mconcat
                 [ arg ["-M"]
+                , wayHcOpts vanilla -- TODO: is this needed? shall we run GHC -M multiple times?
+                , splitArgs $ argOption SrcHcOpts
                 , arg ["-dep-makefile", out, "-dep-suffix", "", "-include-pkg-deps"]
                 , arg [unwords src]
                 ]

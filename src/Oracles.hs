@@ -101,6 +101,7 @@ run builder args = do
 data Option = TargetOS | TargetArch | TargetPlatformFull
             | ConfCcArgs Stage | ConfGccLinkerArgs Stage | ConfLdLinkerArgs Stage | ConfCppArgs Stage
             | IconvIncludeDirs | IconvLibDirs | GmpIncludeDirs | GmpLibDirs
+            | SrcHcOpts
             | HostOsCpp | Root
 
 option :: Option -> Action String
@@ -125,6 +126,7 @@ option opt = askConfig $ case opt of
     IconvLibDirs            -> "iconv-lib-dirs"
     GmpIncludeDirs          -> "gmp-include-dirs"
     GmpLibDirs              -> "gmp-lib-dirs"
+    SrcHcOpts               -> "src-hc-opts"
     HostOsCpp               -> "host-os-cpp"
 
 argOption :: Option -> Args
