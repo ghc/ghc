@@ -23,7 +23,7 @@ data WayUnit = Profiling | Logging | Parallel | GranSim | Threaded | Debug | Dyn
 data Way = Way
      {
          tag         :: String,    -- e.g., "thr_p"
-         description :: String,    -- e.g., "threaded profiled"
+         description :: String,    -- e.g., "threaded profiled"; TODO: get rid of this field?
          units       :: [WayUnit]  -- e.g., [Threaded, Profiling]
      }
      deriving Eq
@@ -72,17 +72,18 @@ defaultWays stage = do
 wayHcOpts :: Way -> Args
 wayHcOpts (Way _ _ units) =
     mconcat
-    [ when (Dynamic `notElem` units) $ arg [ "-static" ]
-    , when (Dynamic    `elem` units) $ arg [ "-fPIC", "-dynamic" ]
-    , when (Threaded   `elem` units) $ arg [ "-optc-DTHREADED_RTS" ]
-    , when (Debug      `elem` units) $ arg [ "-optc-DDEBUG"        ]
-    , when (Profiling  `elem` units) $ arg [ "-prof"               ]
-    , when (Logging    `elem` units) $ arg [ "-eventlog"           ]
-    , when (Parallel   `elem` units) $ arg [ "-parallel"           ]
-    , when (GranSim    `elem` units) $ arg [ "-gransim"            ]
-    , when (units == [Debug] || units == [Debug, Dynamic]) $ arg [ "-ticky", "-DTICKY_TICKY" ]
+    [ when (Dynamic `notElem` units) $ arg ["-static"]
+    , when (Dynamic    `elem` units) $ arg ["-fPIC", "-dynamic"]
+    , when (Threaded   `elem` units) $ arg ["-optc-DTHREADED_RTS"]
+    , when (Debug      `elem` units) $ arg ["-optc-DDEBUG"]
+    , when (Profiling  `elem` units) $ arg ["-prof"]
+    , when (Logging    `elem` units) $ arg ["-eventlog"]
+    , when (Parallel   `elem` units) $ arg ["-parallel"]
+    , when (GranSim    `elem` units) $ arg ["-gransim"]
+    , when (units == [Debug] || units == [Debug, Dynamic]) $ arg ["-ticky", "-DTICKY_TICKY"]
     ]
 
+-- TODO: cover other cases
 suffix :: FilePath -> Way -> FilePath
 suffix base (Way _ _ units) = 
     concat $
