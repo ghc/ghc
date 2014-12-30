@@ -19,8 +19,12 @@ replaceEq from = replaceIf (== from)
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
--- 2) Replace '/' and '\' with '_'
+-- 2) Replace '/' and '\' with '_' before '='
 postProcessPackageData :: FilePath -> Action ()
 postProcessPackageData file = do
     pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)
-    length pkgData `seq` writeFileLines file $ map (replaceIf isSlash '_') pkgData
+    length pkgData `seq` writeFileLines file $ map processLine pkgData
+      where
+        processLine line = replaceIf isSlash '_' prefix ++ suffix
+          where
+            (prefix, suffix) = break (== '=') line
