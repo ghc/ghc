@@ -4898,28 +4898,54 @@ The <option>-XFlexibleInstances</option> flag implies <option>-XTypeSynonymInsta
 </para></listitem>
 </itemizedlist>
 </para>
+<para>
+However, the instance declaration must still conformm to the rules for instance
+termination: see <xref linkend="instance-termination"/>.
+</para>
 </sect3>
 
 <sect3 id="instance-rules">
 <title>Relaxed rules for instance contexts</title>
 
-<para>In Haskell 98, the assertions in the context of the instance declaration
+<para>In Haskell 98, the class constraints in the context of the instance declaration
 must be of the form <literal>C a</literal> where <literal>a</literal>
 is a type variable that occurs in the head.
 </para>
 
 <para>
 The <option>-XFlexibleContexts</option> flag relaxes this rule, as well
-as the corresponding rule for type signatures (see <xref linkend="flexible-contexts"/>).
-With this flag the context of the instance declaration can each consist of arbitrary
-(well-kinded) assertions <literal>(C t1 ... tn)</literal> subject only to the
-following rules:
+as relaxing the corresponding rule for type signatures (see <xref linkend="flexible-contexts"/>).
+Specfically, <option>-XFlexibleContexts</option>, allows (well-kinded) class constraints
+of form <literal>(C t1 ... tn)</literal> in the context of an instance declaration.
+</para>
+<para>
+Notice that the flag does not affect equality constaints in an instance context;
+they are permitted by <option>-XTypeFamilies</option> or <option>-XGADTs</option>.
+</para>
+<para>
+However, the instance declaration must still conformm to the rules for instance
+termination: see <xref linkend="instance-termination"/>.
+</para>
+
+</sect3>
+
+<sect3 id="instance-termination">
+<title>Instance termination rules</title>
+
+<para>
+Regardless of <option>-XFlexibleInstances</option> and <option>-XFlexibleContexts</option>,
+instance declarations must conform to some rules that ensure that instance resolution
+will terminate.  The restrictions can be lifted with <option>-XUndecidableInstances</option> 
+(see <xref linkend="undecidable-instances"/>).
+</para>
+<para>
+The rules are these:
 <orderedlist>
 <listitem><para>
-The Paterson Conditions: for each assertion in the context
+The Paterson Conditions: for each class constraint <literal>(C t1 ... tn)</literal> in the context
 <orderedlist>
-<listitem><para>No type variable has more occurrences in the assertion than in the head</para></listitem>
-<listitem><para>The assertion has fewer constructors and variables (taken together
+<listitem><para>No type variable has more occurrences in the constraint than in the head</para></listitem>
+<listitem><para>The constraint has fewer constructors and variables (taken together
       and counting repetitions) than the head</para></listitem>
 </orderedlist>
 </para></listitem>
@@ -4931,14 +4957,12 @@ every type variable in
 S(<replaceable>tvs</replaceable><subscript>right</subscript>) must appear in
 S(<replaceable>tvs</replaceable><subscript>left</subscript>), where S is the
 substitution mapping each type variable in the class declaration to the
-corresponding type in the instance declaration.
+corresponding type in the instance head.
 </para></listitem>
 </orderedlist>
-These restrictions ensure that context reduction terminates: each reduction
+These restrictions ensure that instance resolution terminates: each reduction
 step makes the problem smaller by at least one
-constructor.  Both the Paterson Conditions and the Coverage Condition are lifted
-if you give the <option>-XUndecidableInstances</option>
-flag (<xref linkend="undecidable-instances"/>).
+constructor.
 You can find lots of background material about the reason for these
 restrictions in the paper <ulink
 url="http://research.microsoft.com/%7Esimonpj/papers/fd%2Dchr/">
@@ -5002,7 +5026,19 @@ something more specific does not:
 <title>Undecidable instances</title>
 
 <para>
-Sometimes even the rules of <xref linkend="instance-rules"/> are too onerous.
+Sometimes even the termination rules of <xref linkend="instance-termination"/> are too onerous.
+So GHC allows you to experiment with more liberal rules: if you use
+the experimental flag <option>-XUndecidableInstances</option>
+<indexterm><primary>-XUndecidableInstances</primary></indexterm>,
+both the Paterson Conditions and the Coverage Condition
+(described in <xref linkend="instance-termination"/>) are lifted.
+Termination is still ensured by having a
+fixed-depth recursion stack.  If you exceed the stack depth you get a
+sort of backtrace, and the opportunity to increase the stack depth
+with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
+</para>
+
+<para>
 For example, sometimes you might want to use the following to get the
 effect of a "class synonym":
 <programlisting>
@@ -5055,16 +5091,6 @@ and indeed the (somewhat strange) definition:
 </programlisting>
 makes instance inference go into a loop, because it requires the constraint
 <literal>(Mul a [b] b)</literal>.
-</para>
-<para>
-Nevertheless, GHC allows you to experiment with more liberal rules.  If you use
-the experimental flag <option>-XUndecidableInstances</option>
-<indexterm><primary>-XUndecidableInstances</primary></indexterm>,
-both the Paterson Conditions and the Coverage Condition
-(described in <xref linkend="instance-rules"/>) are lifted.  Termination is ensured by having a
-fixed-depth recursion stack.  If you exceed the stack depth you get a
-sort of backtrace, and the opportunity to increase the stack depth
-with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 </para>
 
 <para>
