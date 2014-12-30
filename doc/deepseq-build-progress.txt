@@ -3,7 +3,6 @@
 Skipping.
 
 
-
 "inplace/bin/ghc-cabal.exe"                        configure libraries/deepseq dist-install "" --with-ghc="C:/msys/home/chEEtah/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/usr/bin/ar"          --with-alex="/usr/local/bin/alex"          --with-happy="/usr/local/bin/happy"
 C:/msys/home/chEEtah/ghc/inplace/bin/ghc-cabal.exe configure libraries\deepseq dist-install    --with-ghc= C:/msys/home/chEEtah/ghc/inplace/bin/ghc-stage1.exe  --with-ghc-pkg= C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe   --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=-fno-stack-protector       --configure-option=LDFLAGS=      --configure-option=CPPFLAGS=      --gcc-options=-fno-stack-protector           --with-gcc= C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe  --with-ld= C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe  --configure-option=--with-cc= C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe  --with-ar=C:/msys/usr/bin/ar.exe --with-alex=C:/msys/usr/local/bin/alex.exe --with-happy=C:/msys/usr/local/bin/happy.exe
 
@@ -12,52 +11,18 @@ Configuring deepseq-1.4.0.0...
 "C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/deepseq/dist-install/inplace-pkg-config
  C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe  update --force  libraries\deepseq\dist-install\inplace-pkg-config
 
-
 Reading package info from "libraries/deepseq/dist-install/inplace-pkg-config" ... done.
-deepseq-1.4.0.0: Warning: haddock-interfaces: C:\msys\home\chEEtah\ghc\libraries\deepseq\dist-install\doc\html\deepseq\deepseq.haddock doesn't exist or isn't a file
-deepseq-1.4.0.0: cannot find any of ["Control\\DeepSeq.hi","Control\\DeepSeq.p_hi","Control\\DeepSeq.dyn_hi"] (ignoring)
-deepseq-1.4.0.0: cannot find any of ["libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a","libHSdeeps_FT5iVCELxOr62eHY0nbvnU.p_a","libHSdeeps_FT5iVCELxOr62eHY0nbvnU-ghc7.11.20141222.so","libHSdeeps_FT5iVCELxOr62eHY0nbvnU-ghc7.11.20141222.dylib","HSdeeps_FT5iVCELxOr62eHY0nbvnU-ghc7.11.20141222.dll"] on library path (ignoring)
-
-libraries/deepseq/ghc.mk:4: libraries/deepseq/dist-install/build/.depend-v-p.haskell: No such file or directory
-libraries/deepseq/ghc.mk:4: libraries/deepseq/dist-install/build/.depend-v-p.c_asm: No such file or directory
-
-
-Primop bits:
-
-C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe -E  -undef -traditional -P -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header  -Icompiler/stage2 -x c compiler/prelude/primops.txt.pp | grep -v '^#pragma GCC' > compiler/stage2/build/primops.txt
-"inplace/bin/genprimopcode.exe" --data-decl          < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-data-decl.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-tag         < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-tag.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-list        < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-list.hs-incl
-"inplace/bin/genprimopcode.exe" --has-side-effects   < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-has-side-effects.hs-incl
-"inplace/bin/genprimopcode.exe" --out-of-line        < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-out-of-line.hs-incl
-"inplace/bin/genprimopcode.exe" --commutable         < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-commutable.hs-incl
-"inplace/bin/genprimopcode.exe" --code-size          < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-code-size.hs-incl
-"inplace/bin/genprimopcode.exe" --can-fail           < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-can-fail.hs-incl
-"inplace/bin/genprimopcode.exe" --strictness         < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-strictness.hs-incl
-"inplace/bin/genprimopcode.exe" --fixity             < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-fixity.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-primop-info < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-primop-info.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-vector-uniques     < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-vector-uniques.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-vector-tys         < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-vector-tys.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-vector-tys-exports < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-vector-tys-exports.hs-incl
-"inplace/bin/genprimopcode.exe" --primop-vector-tycons      < compiler/stage2/build/primops.txt > compiler/stage2/build/primop-vector-tycons.hs-incl
-
-
-"inplace/bin/ghc-cabal.exe" check libraries/deepseq
-"inplace/bin/ghc-cabal.exe" configure libraries/deepseq dist-install "" --with-ghc="C:/msys/home/chEEtah/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/usr/bin/ar" --with-alex="/usr/local/bin/alex" --with-happy="/usr/local/bin/happy"
-Configuring deepseq-1.4.0.0...
-"C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/deepseq/dist-install/inplace-pkg-config
-Reading package info from "libraries/deepseq/dist-install/inplace-pkg-config" ... done.
-deepseq-1.4.0.0: Warning: haddock-interfaces: C:\msys\home\chEEtah\ghc\libraries\deepseq\dist-install\doc\html\deepseq\deepseq.haddock doesn't exist or isn't a file
-deepseq-1.4.0.0: cannot find any of ["Control\\DeepSeq.hi","Control\\DeepSeq.p_hi","Control\\DeepSeq.dyn_hi"] (ignoring)
-deepseq-1.4.0.0: cannot find any of ["libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a","libHSdeeps_FT5iVCELxOr62eHY0nbvnU.p_a","libHSdeeps_FT5iVCELxOr62eHY0nbvnU-ghc7.11.20141222.so","libHSdeeps_FT5iVCELxOr62eHY0nbvnU-ghc7.11.20141222.dylib","HSdeeps_FT5iVCELxOr62eHY0nbvnU-ghc7.11.20141222.dll"] on library path (ignoring)
 
 
 "rm" -f libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp
 "rm" -f libraries/deepseq/dist-install/build/.depend-v-p.c_asm.bit
+
 echo "libraries/deepseq_dist-install_depfile_c_asm_EXISTS = YES" >> libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp
 mv libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp libraries/deepseq/dist-install/build/.depend-v-p.c_asm
 "rm" -f libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp
+
 "inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
+
 echo "libraries/deepseq_dist-install_depfile_haskell_EXISTS = YES" >> libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp
 for dir in libraries/deepseq/dist-install/build/Control/; do if test ! -d $dir; then mkdir -p $dir; fi done
 grep -v ' : [a-zA-Z]:/' libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp > libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp2

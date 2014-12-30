@@ -114,7 +114,7 @@ configureArgs stage settings =
         ]
 
 buildPackageData :: Package -> TodoItem -> Rules ()
-buildPackageData pkg @ (Package name path todo) (stage, dist, settings) =
+buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
         ((path </> dist) </>) <$>
         [ "package-data.mk",
           "haddock-prologue.txt",
@@ -127,9 +127,12 @@ buildPackageData pkg @ (Package name path todo) (stage, dist, settings) =
             when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
             run GhcCabal cabalArgs
             when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
+            let pkgDataFile = path </> dist </> "package-data.mk"                 
+            pkgData <- lines <$> liftIO (readFile pkgDataFile)
+            length pkgData `seq` writeFileLines pkgDataFile $ map (replaceChar '/' '_') $ filter ('$' `notElem`) pkgData
               where
                 cabalArgs, ghcPkgArgs :: Args
-                cabalArgs = mconcat $
+                cabalArgs = mconcat
                     [ arg ["configure", path, dist]
                     -- this is a positional argument, hence:
                     -- * if it is empty, we need to emit one empty string argument
@@ -153,20 +156,97 @@ buildPackageData pkg @ (Package name path todo) (stage, dist, settings) =
                     , with Happy
                     ] -- TODO: reorder with's
 
-                ghcPkgArgs = mconcat $
+                ghcPkgArgs = mconcat
                     [ arg ["update", "--force"]
                     , when (stage == Stage0) $ arg ["--package-db=libraries/bootstrapping.conf"]
                     , arg [path </> dist </> "inplace-pkg-config"]
                     ]
 
+-- "inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
+
+-- $1_$2_$3_MOST_HC_OPTS = \
+--  $$(WAY_$3_HC_OPTS) \
+--  $$(CONF_HC_OPTS) \
+--  $$(SRC_HC_OPTS) \
+--  $$($1_HC_OPTS) \
+--  $$($1_$2_HC_PKGCONF) \
+--  $$(if $$($1_$2_PROG),, \
+--         $$(if $$($1_PACKAGE),$$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))) \
+--  $$(if $$($1_PACKAGE),-hide-all-packages) \
+--  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
+--  -i$1/$2/build -i$1/$2/build/autogen \
+--  -I$1/$2/build -I$1/$2/build/autogen \
+--  $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
+--  $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
+--  $$(foreach inc,$$($1_$2_INCLUDE),-\#include "$$(inc)") \
+--  $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
+--  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
+--  $$($1_$2_$4_DEP_OPTS) \
+--  $$($1_$2_HC_OPTS) \
+--  $$(CONF_HC_OPTS_STAGE$4) \
+--  $$($1_$2_MORE_HC_OPTS) \
+--  $$($1_$2_EXTRA_HC_OPTS) \
+--  $$($1_$2_$3_HC_OPTS) \
+--  $$($$(basename $$(subst ./,,$$<))_HC_OPTS) \
+--  $$(SRC_HC_WARNING_OPTS) \
+--  $$(EXTRA_HC_OPTS)
+
+
+-- $1_$2_$3_MOST_DIR_HC_OPTS = \
+--  $$($1_$2_$3_MOST_HC_OPTS) \
+--  -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build
+
+-- # Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
+-- # indirectly) include the generated includes files.
+-- $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
+-- 
+-- $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
+--     $$(call removeFiles,$$@.tmp)
+-- ifneq "$$($1_$2_HS_SRCS)" ""
+--     "$$($1_$2_HC_MK_DEPEND)" -M \
+--         $$($1_$2_$$(firstword $$($1_$2_WAYS))_MOST_DIR_HC_OPTS) \
+--         $$($1_$2_MKDEPENDHS_FLAGS) \
+--         $$($1_$2_HS_SRCS)
+-- endif
+--     echo "$1_$2_depfile_haskell_EXISTS = YES" >> $$@.tmp
+-- ifneq "$$($1_$2_SLASH_MODS)" ""
+--     for dir in $$(sort $$(foreach mod,$$($1_$2_SLASH_MODS),$1/$2/build/$$(dir $$(mod)))); do \
+--         if test ! -d $$$$dir; then mkdir -p $$$$dir; fi \
+--     done
+-- endif
+
+-- TODO: double-check that ignoring $1_$2_HS_SRC_DIRS is safe
+buildPackageDeps :: Package -> TodoItem -> Rules ()
+buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
+    let buildDir = path </> dist
+    in
+    (buildDir </> "build" </> name <.> "m") %> \out -> do
+        let pkgData = buildDir </> "package-data.mk"
+            autogen = dist </> "build" </> "autogen"
+        mods <- words <$> packagaDataOption pkgData Modules
+        src  <- getDirectoryFiles "" $ do
+                    start <- map (replaceChar '.' '/') mods
+                    end   <- [".hs", ".lhs"]
+                    return $ path ++ "//" ++ start ++ end
+        run (Ghc stage) $ mconcat
+                [ arg ["-M"]
+                , arg ["-dep-makefile", out, "-dep-suffix", "", "-include-pkg-deps"]
+                , arg [unwords src]
+                ]
+
+-- $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$($1_$2_WAYS),-dep-suffix "$$(-- patsubst %o,%,$$($$(way)_osuf))")
+-- $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
+
+
 buildPackage :: Package -> TodoItem -> Rules ()
 buildPackage pkg todoItem = do
     buildPackageData pkg todoItem
+    buildPackageDeps pkg todoItem
 
 packageRules :: Rules ()
 packageRules = do
 
-    want ["libraries/deepseq/dist-install/package-data.mk"]
+    want ["libraries/deepseq/dist-install/build/deepseq.m"]
     forM_ packages $ \pkg -> do
         forM_ (pkgTodo pkg) $ \todoItem -> do
             buildPackage pkg todoItem
