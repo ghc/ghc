@@ -12,6 +12,7 @@ module Ways (
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic,
 
+    wayHcOpts, 
     hisuf, osuf, hcsuf
     ) where
 
