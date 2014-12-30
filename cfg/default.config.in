@@ -30,6 +30,7 @@ gcc-lt-46    = @GccLT46@
 
 lax-dependencies     = NO
 dynamic-ghc-programs = NO
+supports-package-key = @SUPPORTS_PACKAGE_KEY@
 
 # Information about host and target systems:
 #===========================================
