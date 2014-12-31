@@ -13,7 +13,7 @@ replaceIf p to = map (\from -> if p from then to else from)
 replaceEq :: Eq a => a -> a -> [a] -> [a]
 replaceEq from = replaceIf (== from)
 
-replaceSeparators :: String -> String
+replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
