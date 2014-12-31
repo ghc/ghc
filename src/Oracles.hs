@@ -265,16 +265,22 @@ packagaDataOptionWithDefault file key defaultAction = do
         Just value -> return value
         Nothing    -> defaultAction
 
-data PackageDataKey = Modules | SrcDirs | PackageKey
+data PackageDataKey = Modules | SrcDirs | PackageKey | IncludeDirs | Deps | DepKeys
+                    deriving Show
 
 packagaDataOption :: FilePath -> PackageDataKey -> Action String
 packagaDataOption file key = do
-    let keyName = replaceIf isSlash '_' $ takeDirectory file ++ "_" ++ case key of
-           Modules    -> "MODULES"
-           SrcDirs    -> "HS_SRC_DIRS" -- TODO: add "." as a default?
-           PackageKey -> "PACKAGE_KEY"
-    packagaDataOptionWithDefault file keyName $
+    let (keyName, ifEmpty) = case key of
+           Modules     -> ("MODULES"     , "" )
+           SrcDirs     -> ("HS_SRC_DIRS" , ".")
+           PackageKey  -> ("PACKAGE_KEY" , "" )
+           IncludeDirs -> ("INCLUDE_DIRS", ".")
+           Deps        -> ("DEPS"        , "" )
+           DepKeys     -> ("DEP_KEYS"    , "" )
+        keyFullName = replaceSeparators '_' $ takeDirectory file ++ "_" ++ keyName
+    res <- packagaDataOptionWithDefault file keyFullName $
         error $ "\nCannot find key '" ++ keyName ++ "' in " ++ file ++ "."
+    return $ if res == "" then ifEmpty else res
 
 oracleRules :: Rules ()
 oracleRules = do

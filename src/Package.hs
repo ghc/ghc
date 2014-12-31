@@ -214,42 +214,52 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
 --  $$(SRC_HC_WARNING_OPTS) \
 --  $$(EXTRA_HC_OPTS)
 
--- TODO: double-check that ignoring SrcDirs ($1_$2_HS_SRC_DIRS) is safe
+-- TODO: make sure SrcDirs ($1_$2_HS_SRC_DIRS) is not empty ('.' by default)
 -- TODO: add $1_HC_OPTS
 -- TODO: check that the package is not a program ($1_$2_PROG == "")
--- TODO: handle empty $1_PACKAGE
+-- TODO: handle empty $1_PACKAGE (can it be empty?)
+-- TODO: $1_$2_INCLUDE appears to be not set. Safe to skip?
 -- Option CONF_HC_OPTS is skipped
 buildPackageDeps :: Package -> TodoItem -> Rules ()
 buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist
     in
     (buildDir </> "build" </> name <.> "m") %> \out -> do
-        let pkgData    = buildDir </> "package-data.mk"
-            autogen    = dist </> "build" </> "autogen"
-        mods    <- words <$> packagaDataOption pkgData Modules
-        srcDirs <- words <$> packagaDataOption pkgData SrcDirs
-        src  <- getDirectoryFiles "" $ do
-                    start <- map (replaceEq '.' '/') mods
-                    end   <- [".hs", ".lhs"]
-                    return $ path ++ "//" ++ start ++ end
+        let pkgData = buildDir </> "package-data.mk"
+        usePackageKey <- SupportsPackageKey || stage /= Stage0 -- TODO: check reasoning (distdir-way-opts)
+        [mods, srcDirs, includeDirs, deps, depKeys] <-
+            mapM ((fmap words) . (packagaDataOption pkgData))
+            [Modules, SrcDirs, IncludeDirs, Deps, DepKeys]
+        srcs <- getDirectoryFiles "" $ do
+            dir       <- srcDirs
+            modPath   <- map (replaceEq '.' pathSeparator) mods
+            extension <- ["hs", "lhs"]
+            return $ path </> dir </> modPath <.> extension
         packageKey <- packagaDataOption pkgData PackageKey
         run (Ghc stage) $ mconcat
-                [ arg ["-M"]
-                , wayHcOpts vanilla -- TODO: is this needed? shall we run GHC -M multiple times?
-                , splitArgs $ argOption SrcHcOpts
-                , when (stage == Stage0) $ arg ["-package-db libraries/bootstrapping.conf"]
-                , when (not SupportsPackageKey && stage == Stage0) $ arg ["-package-name"]
-                , when (    SupportsPackageKey || stage /= Stage0) $ arg ["-this-package-key"]
-                , arg [packageKey]
-                , arg ["-hide-all-packages"]
-                , arg $ map (\d -> "-i" ++ path ++ "/" ++ d) srcDirs
-                , arg $ do
-                    prefix <- ["-i", "-I"]
-                    suffix <- ["build", "build/autogen"]
-                    return $ prefix ++ path </> dist </> suffix
-                , arg ["-dep-makefile", out, "-dep-suffix", "", "-include-pkg-deps"]
-                , arg [unwords src]
-                ]
+            [ arg ["-M"]
+            , wayHcOpts vanilla -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
+            , splitArgs $ argOption SrcHcOpts
+            , when (stage == Stage0) $ arg ["-package-db libraries/bootstrapping.conf"]
+            , arg [if usePackageKey then "-this-package-key" else "-package-name"]
+            , arg [packageKey] -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
+            , arg ["-hide-all-packages"]
+            , arg ["-i"] -- resets the search path to nothing; TODO: check if really needed
+            , arg $ map (\d -> "-i" ++ path </> d) srcDirs
+            , arg $ do
+                prefix <- ["-i", "-I"] -- 'import' and '#include' search paths
+                suffix <- ["build", "build/autogen"]
+                return $ prefix ++ buildDir </> suffix
+            , arg $ map (\d -> "-I" ++ path </> d) $ filter isRelative includeDirs
+            , arg $ map (\d -> "-I" ++          d) $ filter isAbsolute includeDirs
+            , arg ["-optP-include"]
+            , arg ["-optP" ++ buildDir </> "build/autogen/cabal_macros.h"]
+            , if usePackageKey 
+              then arg $ concatMap (\d -> ["-package-key", d]) depKeys
+              else arg $ concatMap (\d -> ["-package"    , d]) deps
+            , arg ["-dep-makefile", out, "-dep-suffix", "", "-include-pkg-deps"]
+            , arg $ map normalise srcs
+            ]
 
 -- $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$($1_$2_WAYS),-dep-suffix "$$(-- patsubst %o,%,$$($$(way)_osuf))")
 -- $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
