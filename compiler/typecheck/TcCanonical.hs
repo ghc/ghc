@@ -186,12 +186,26 @@ canEvNC ev
 -}
 
 canTuple :: CtEvidence -> [PredType] -> TcS (StopOrContinue Ct)
-canTuple ev tys
-  = do { traceTcS "can_pred" (text "TuplePred!")
-       ; let xcomp = EvTupleMk
-             xdecomp x = zipWith (\_ i -> EvTupleSel x i) tys [0..]
-       ; xCtEvidence ev (XEvTerm tys xcomp xdecomp)
+canTuple ev preds
+  | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
+  = do { new_evars <- mapM (newWantedEvVar loc) preds
+       ; setEvBind evar (EvTupleMk (map (ctEvTerm . fst) new_evars))
+       ; emitWorkNC (freshGoals new_evars)
+         -- Note the "NC": these are fresh goals, not necessarily canonical
        ; stopWith ev "Decomposed tuple constraint" }
+
+  | CtGiven { ctev_evtm = tm, ctev_loc = loc } <- ev
+  = do { let mk_pr pred i = (pred, EvTupleSel tm i)
+       ; given_evs <- newGivenEvVars loc (zipWith mk_pr preds [0..])
+       ; emitWorkNC given_evs
+       ; stopWith ev "Decomposed tuple constraint" }
+
+  | CtDerived { ctev_loc = loc } <- ev
+  = do { mapM_ (emitNewDerived loc) preds
+       ; stopWith ev "Decomposed tuple constraint" }
+
+  | otherwise = panic "canTuple"
+
 
 {-
 ************************************************************************
@@ -339,13 +353,11 @@ newSCWorkFromFlavored flavor cls xis
   = return ()  -- Deriveds don't yield more superclasses because we will
                -- add them transitively in the case of wanteds.
 
-  | isGiven flavor
+  | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- flavor
   = do { let sc_theta = immSuperClasses cls xis
-             xev_decomp x = zipWith (\_ i -> EvSuperClass x i) sc_theta [0..]
-             xev = XEvTerm { ev_preds  =  sc_theta
-                           , ev_comp   = panic "Can't compose for given!"
-                           , ev_decomp = xev_decomp }
-       ; xCtEvidence flavor xev }
+             mk_pr sc_pred i = (sc_pred, EvSuperClass ev_tm i)
+       ; given_evs <- newGivenEvVars loc (zipWith mk_pr sc_theta [0..])
+       ; emitWorkNC given_evs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
   = return () -- Wanteds with no variables yield no deriveds.
@@ -683,8 +695,7 @@ try_decompose_nom_app ev ty1 ty2
    | otherwise  -- Neither is an AppTy
    = canEqNC ev NomEq ty1 ty2
    where
-     -- do_decompose is like xCtEvidence, but recurses
-     -- to try_decompose_nom_app to decompose a chain of AppTys
+     -- Recurses to try_decompose_nom_app to decompose a chain of AppTys
      do_decompose s1 t1 s2 t2
        | CtDerived { ctev_loc = loc } <- ev
        = do { emitNewDerived loc (mkTcEqPred t1 t2)
@@ -1359,31 +1370,6 @@ itself, and so on.  See Note [Occurs check expansion] in TcType
 -}
 
 {-
-Note [xCtEvidence]
-~~~~~~~~~~~~~~~~~~
-A call might look like this:
-
-    xCtEvidence ev evidence-transformer
-
-  ev is Given   => use ev_decomp to create new Givens for ev_preds,
-                   and return them
-
-  ev is Wanted  => create new wanteds for ev_preds,
-                   use ev_comp to bind ev,
-                   return fresh wanteds (ie ones not cached in inert_cans or solved)
-
-  ev is Derived => create new deriveds for ev_preds
-                      (unless cached in inert_cans or solved)
-
-Note: The [CtEvidence] returned is a subset of the subgoal-preds passed in
-      Ones that are already cached are not returned
-
-Example
-    ev : Tree a b ~ Tree c d
-    xCtEvidence ev [a~c, b~d] (XEvTerm { ev_comp = \[c1 c2]. <Tree> c1 c2
-                                       , ev_decomp = \c. [nth 1 c, nth 2 c] })
-              (\fresh-goals.  stuff)
-
 Note [Bind new Givens immediately]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For Givens we make new EvVars and bind them immediately. We don't worry
@@ -1398,26 +1384,6 @@ But that superclass selector can't (yet) appear in a coercion
 See Note [Coercion evidence terms] in TcEvidence.
 -}
 
-xCtEvidence :: CtEvidence            -- Original evidence
-            -> XEvTerm               -- Instructions about how to manipulate evidence
-            -> TcS ()
-
-xCtEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
-  = do { new_evars <- mapM (newWantedEvVar loc) ptys
-       ; setEvBind evar (comp_fn (map (ctEvTerm . fst) new_evars))
-       ; emitWorkNC (freshGoals new_evars) }
-         -- Note the "NC": these are fresh goals, not necessarily canonical
-
-xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
-  = ASSERT( equalLength ptys (decomp_fn tm) )
-    do { given_evs <- newGivenEvVars loc (ptys `zip` decomp_fn tm)
-       ; emitWorkNC given_evs }
-
-xCtEvidence (CtDerived { ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys })
-  = mapM_ (emitNewDerived loc) ptys
 
 -----------------------------
 data StopOrContinue a

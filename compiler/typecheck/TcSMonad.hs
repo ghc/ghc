@@ -23,7 +23,6 @@ module TcSMonad (
     wrapErrTcS, wrapWarnTcS,
 
     -- Evidence creation and transformation
-    XEvTerm(..),
     Freshness(..), freshGoals, isFresh,
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
@@ -1751,14 +1750,6 @@ instFlexiTcSHelperTcS n k = wrapTcS (instFlexiTcSHelper n k)
 
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-data XEvTerm
-  = XEvTerm { ev_preds  :: [PredType]           -- New predicate types
-            , ev_comp   :: [EvTerm] -> EvTerm   -- How to compose evidence
-            , ev_decomp :: EvTerm -> [EvTerm]   -- How to decompose evidence
-            -- In both ev_comp and ev_decomp, the [EvTerm] is 1-1 with ev_preds
-            -- and each EvTerm has type of the corresponding EvPred
-            }
 
 data Freshness = Fresh | Cached
 
