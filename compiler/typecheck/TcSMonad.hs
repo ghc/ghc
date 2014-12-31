@@ -828,7 +828,7 @@ getNoGivenEqs tclvl skol_tvs
     -- i.e. the current level
     ev_given_here ev
       =  isGiven ev
-      && tclvl == tcl_tclvl (ctl_env (ctEvLoc ev))
+      && tclvl == ctLocLevel (ctEvLoc ev)
 
     add_fsk :: Ct -> VarSet -> VarSet
     add_fsk ct fsks | CFunEqCan { cc_fsk = tv, cc_ev = ev } <- ct

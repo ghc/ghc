@@ -450,7 +450,11 @@ interactWithInertsStage wi
                 -- CHoleCan are put straight into inert_frozen, so never get here
                 -- CNonCanonical have been canonicalised
 
-data InteractResult = IRKeep | IRReplace | IRDelete
+data InteractResult
+   = IRKeep      -- Keep the existing inert constraint in the inert set
+   | IRReplace   -- Replace the existing inert constraint with the work item
+   | IRDelete    -- Delete the existing inert constraint from the inert set
+
 instance Outputable InteractResult where
   ppr IRKeep    = ptext (sLit "keep")
   ppr IRReplace = ptext (sLit "replace")
@@ -479,12 +483,57 @@ solveOneFromTheOther ev_i ev_w
   = do { setEvBind ev_id (ctEvTerm ev_w)
        ; return (IRReplace, True) }
 
-  | otherwise      -- If both are Given, we already have evidence; no need to duplicate
-                   -- But the work item *overrides* the inert item (hence IRReplace)
-                   -- See Note [Shadowing of Implicit Parameters]
-  = return (IRReplace, True)
+  | otherwise   -- Both are Given
+  = return (if use_replacement then IRReplace else IRKeep, True)
+
+  where
+    pred  = ctEvPred ev_i
+    loc_i = ctEvLoc ev_i
+    loc_w = ctEvLoc ev_w
+    lvl_i = ctLocLevel loc_i
+    lvl_w = ctLocLevel loc_w
+
+    use_replacement  -- See Note [Replacement vs keeping]
+      | isIPPred pred = lvl_w > lvl_i
+      | otherwise     = lvl_w < lvl_i
 
 {-
+Note [Replacement vs keeping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have two Given constraints both of type (C tys), say, which should
+we keep?
+
+  * For implicit parameters we want to keep the innermost (deepest)
+    one, so that it overrides the outer one.
+    See Note [Shadowing of Implicit Parameters]
+
+  * For everything else, we want to keep the outermost one.  Reason: that
+    makes it more likely that the inner one will turn out to be unused,
+    and can be reported as redundant.
+
+When there is a choice, use IRKeep rather than IRReplace, to avoid unnecesary
+munging of the inert set.
+
+Doing the depth-check for implicit parameters, rather than making the work item
+always overrride, is important.  Consider
+
+    data T a where { T1 :: (?x::Int) => T Int; T2 :: T a }
+
+    f :: (?x::a) => T a -> Int
+    f T1 = ?x
+    f T2 = 3
+
+We have a [G] (?x::a) in the inert set, and at the pattern match on T1 we add
+two new givens in the work-list:  [G] (?x::Int)
+                                  [G] (a ~ Int)
+Now consider these steps
+  - process a~Int, kicking out (?x::a)
+  - process (?x::Int), the inner given, adding to inert set
+  - process (?x::a), the outer given, overriding the inner given
+Wrong!  The depth-check ensures that the inner implicit parameter wins.
+(Actually I think that the order in which the work-list is processed means
+that this chain of events won't happen, but that's very fragile.)
+
 *********************************************************************************
 *                                                                               *
                    interactIrred

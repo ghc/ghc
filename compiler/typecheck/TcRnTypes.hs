@@ -67,7 +67,7 @@ module TcRnTypes(
         SubGoalCounter(..),
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalCounterValue, subGoalDepthExceeded,
-        CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin,
+        CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv, setCtLocSpan,
         CtOrigin(..), pprCtOrigin,
@@ -1834,6 +1834,9 @@ mkGivenLoc tclvl skol_info env
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env
+
+ctLocLevel :: CtLoc -> TcLevel
+ctLocLevel loc = tcl_tclvl (ctLocEnv loc)
 
 ctLocDepth :: CtLoc -> SubGoalDepth
 ctLocDepth = ctl_depth

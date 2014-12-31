@@ -414,7 +414,7 @@ data UserTypeCtxt
 ************************************************************************
 -}
 
-newtype TcLevel = TcLevel Int deriving( Eq )
+newtype TcLevel = TcLevel Int deriving( Eq, Ord )
   -- See Note [TcLevel and untouchable type variables] for what this Int is
 
 {-
