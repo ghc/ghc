@@ -1,15 +1,11 @@
 module Util (
     module Data.Char,
-    isSlash,
     replaceIf, replaceEq,
     postProcessPackageData
     ) where
 
 import Base
 import Data.Char
-
-isSlash :: Char -> Bool
-isSlash = (`elem` ['/', '\\']) 
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from) 
@@ -25,6 +21,6 @@ postProcessPackageData file = do
     pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)
     length pkgData `seq` writeFileLines file $ map processLine pkgData
       where
-        processLine line = replaceIf isSlash '_' prefix ++ suffix
+        processLine line = replaceIf isPathSeparator '_' prefix ++ suffix
           where
             (prefix, suffix) = break (== '=') line
