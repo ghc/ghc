@@ -1,5 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ConstraintKinds #-}
+{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.Base (
     ConfigKey (..),

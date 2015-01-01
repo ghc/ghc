@@ -1,5 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances, MultiParamTypeClasses #-}
 
 module Oracles.Flag (
     module Control.Monad,

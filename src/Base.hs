@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module Base (
     module Development.Shake,
     module Development.Shake.FilePath,

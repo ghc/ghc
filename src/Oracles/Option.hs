@@ -1,6 +1,3 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ConstraintKinds #-}
-
 module Oracles.Option (
     Option (..),
     option, argOption,

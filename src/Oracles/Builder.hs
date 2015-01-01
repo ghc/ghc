@@ -1,5 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, NoImplicitPrelude #-}
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ConstraintKinds #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Oracles.Builder (
     Builder (..),

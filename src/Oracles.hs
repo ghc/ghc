@@ -1,6 +1,3 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, NoImplicitPrelude #-}
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ConstraintKinds #-}
-
 module Oracles (
     module Oracles.Base,
     module Oracles.Flag,
