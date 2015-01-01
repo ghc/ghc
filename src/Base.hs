@@ -6,6 +6,7 @@ module Base (
     module Data.List,
     Stage (..),
     Args, arg,
+    Condition (..),
     joinArgs, joinArgsWithSpaces, splitArgs,
     filterOut
     ) where
@@ -19,6 +20,8 @@ import Data.List
 data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 
 type Args = Action [String]
+
+type Condition = Action Bool
 
 instance Monoid a => Monoid (Action a) where
     mempty = return mempty

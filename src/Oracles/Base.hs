@@ -2,14 +2,11 @@
 
 module Oracles.Base (
     ConfigKey (..),
-    askConfigWithDefault, askConfig,
-    Condition (..)
+    askConfigWithDefault, askConfig
     ) where
 
 import Base
 import Development.Shake.Classes
-
-type Condition = Action Bool
 
 newtype ConfigKey = ConfigKey String deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 

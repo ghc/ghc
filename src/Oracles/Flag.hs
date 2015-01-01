@@ -4,7 +4,7 @@ module Oracles.Flag (
     module Control.Monad,
     module Prelude,
     Flag (..), 
-    Condition, test, when, unless, not, (&&), (||)
+    test, when, unless, not, (&&), (||)
     ) where
 
 import Control.Monad hiding (when, unless)
