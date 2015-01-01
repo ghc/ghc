@@ -78,7 +78,7 @@ libraryArgs ways =
     in mconcat
         [ argEnable False "library-for-ghci" -- TODO: why always disable?
         , argEnable (vanilla `elem` ways) "library-vanilla"        
-        , when (GhcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways) $
+        , when (ghcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways) $
             argEnable True "library-for-ghci"        
         , argEnable (profiling `elem` ways) "library-profiling"
         , argEnable (dynamic   `elem` ways) "shared"
@@ -143,7 +143,7 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
                     , customConfArgs settings
                     , libraryArgs =<< ways settings                
 
-                    , when HsColourSrcs $ with HsColour
+                    , when hsColourSrcs $ with HsColour
                     , configureArgs stage settings
 
                     , when (stage == Stage0) $ bootPkgConstraints

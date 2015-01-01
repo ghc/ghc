@@ -65,7 +65,7 @@ allWays = [vanilla, profiling, logging, parallel, granSim,
 
 defaultWays :: Stage -> Action [Way]
 defaultWays stage = do
-    sharedLibs <- test PlatformSupportsSharedLibs
+    sharedLibs <- platformSupportsSharedLibs
     return $ [vanilla]
         ++ [profiling | stage /= Stage0] 
         ++ [dynamic   | sharedLibs     ]
