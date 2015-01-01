@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+
 module Base (
     module Development.Shake,
     module Development.Shake.FilePath,
@@ -27,8 +29,14 @@ instance Monoid a => Monoid (Action a) where
     mempty = return mempty
     mappend p q = mappend <$> p <*> q
 
-arg :: [String] -> Args
-arg = return
+class ShowAction a where
+    showAction :: a -> Action String
+
+instance ShowAction String where
+    showAction = return 
+
+arg :: ShowAction a => [a] -> Args
+arg = mapM showAction
 
 intercalateArgs :: String -> Args -> Args
 intercalateArgs s args = do
