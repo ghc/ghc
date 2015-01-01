@@ -12,9 +12,9 @@ module Base (
     filterOut
     ) where
 
-import Development.Shake hiding ((*>))
+import Development.Shake
 import Development.Shake.FilePath
-import Control.Applicative
+import Control.Applicative hiding ((*>))
 import Data.Monoid
 import Data.List
 
