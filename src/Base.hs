@@ -7,7 +7,7 @@ module Base (
     module Data.Monoid,
     module Data.List,
     Stage (..),
-    Args, arg,
+    Args, arg, args, ShowAction (..),
     Condition (..),
     joinArgs, joinArgsWithSpaces, splitArgs,
     filterOut
@@ -33,10 +33,24 @@ class ShowAction a where
     showAction :: a -> Action String
 
 instance ShowAction String where
-    showAction = return 
+    showAction = return
 
 arg :: ShowAction a => [a] -> Args
 arg = mapM showAction
+
+class Collect a where
+    collect :: Args -> a
+
+instance Collect Args where
+    collect = id
+
+instance (ShowAction a, Collect r) => Collect (a -> r) where
+    collect prev next = collect $ do
+        next' <- showAction next
+        prev <> return [next']
+
+args :: Collect a => a
+args = collect mempty
 
 intercalateArgs :: String -> Args -> Args
 intercalateArgs s args = do
