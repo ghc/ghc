@@ -98,6 +98,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_tvs, req_theta, ev_binds, req_dicts)
                           (ex_tvs, map mkTyVarTy ex_tvs, prov_theta, emptyTcEvBinds, prov_dicts)
+                          []
                           (zip args $ repeat idHsWrapper)
                           pat_ty }
 
@@ -194,6 +195,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_tvs, req_theta, req_ev_binds, req_dicts)
                           (ex_tvs, ex_tys, prov_theta, prov_ev_binds, prov_dicts)
+                          spec_eqs
                           wrapped_args
                           pat_ty }
   where
@@ -212,17 +214,20 @@ tc_patsyn_finish :: Located Name
                  -> LPat Id
                  -> ([TcTyVar], [PredType], TcEvBinds, [EvVar])
                  -> ([TcTyVar], [TcType], [PredType], TcEvBinds, [EvVar])
+                 -> [(TcTyVar, TcType)]
                  -> [(Var, HsWrapper)]
                  -> TcType
                  -> TcM (PatSyn, LHsBinds Id)
 tc_patsyn_finish lname dir is_infix lpat'
                  (univ_tvs, req_theta, req_ev_binds, req_dicts)
                  (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
+                 spec_eqs
                  wrapped_args
                  pat_ty
   = do { traceTc "tc_patsyn_finish" $
          ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
          ppr (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts) $$
+         ppr spec_eqs $$
          ppr wrapped_args $$
          ppr pat_ty
 
@@ -237,7 +242,7 @@ tc_patsyn_finish lname dir is_infix lpat'
        ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
-                        []
+                        spec_eqs
                         arg_tys
                         pat_ty
                         matcher_id builder_id
