@@ -4,7 +4,7 @@ FDsFromGivens.hs:21:15:
     arising from a functional dependency between constraints:
       ‘C Char [a]’ arising from a use of ‘f’ at FDsFromGivens.hs:21:15
       ‘C Char Char’
-        arising from a pattern with constructor
+        arising from a pattern with constructor:
                        KCC :: C Char Char => () -> KCC,
                      in an equation for ‘bar’
         at FDsFromGivens.hs:21:6-10

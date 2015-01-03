@@ -3,8 +3,7 @@ gadt7.hs:16:38:
     Couldn't match expected type ‘t’ with actual type ‘t1’
       ‘t1’ is untouchable
         inside the constraints (t2 ~ Int)
-        bound by a pattern with constructor
-                   K :: T Int,
+        bound by a pattern with constructor: K :: T Int,
                  in a case alternative
         at gadt7.hs:16:33
       ‘t1’ is a rigid type variable bound by

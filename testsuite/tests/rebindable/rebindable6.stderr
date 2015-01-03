@@ -1,7 +1,7 @@
 
 rebindable6.hs:106:17:
     No instance for (HasSeq (IO a -> t0 -> IO b))
-      (maybe you haven't applied enough arguments to a function?)
+      (maybe you haven't applied a function to enough arguments?)
       arising from a do statement
     The type variable ‘t0’ is ambiguous
     Relevant bindings include
@@ -25,7 +25,7 @@ rebindable6.hs:106:17:
 
 rebindable6.hs:107:17:
     No instance for (HasFail ([Prelude.Char] -> t1))
-      (maybe you haven't applied enough arguments to a function?)
+      (maybe you haven't applied a function to enough arguments?)
       arising from a do statement
     The type variable ‘t1’ is ambiguous
     Note: there is a potential instance available:
@@ -44,7 +44,7 @@ rebindable6.hs:107:17:
 
 rebindable6.hs:108:17:
     No instance for (HasReturn (b -> t1))
-      (maybe you haven't applied enough arguments to a function?)
+      (maybe you haven't applied a function to enough arguments?)
       arising from a use of ‘return’
     The type variable ‘t1’ is ambiguous
     Relevant bindings include

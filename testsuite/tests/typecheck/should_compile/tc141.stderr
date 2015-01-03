@@ -36,7 +36,7 @@ tc141.hs:15:18:
     Couldn't match expected type ‘a2’ with actual type ‘t’
       because type variable ‘a2’ would escape its scope
     This (rigid, skolem) type variable is bound by
-      the type signature for v :: a2
+      the type signature for: v :: a2
       at tc141.hs:14:19
     Relevant bindings include
       v :: a2 (bound at tc141.hs:15:14)

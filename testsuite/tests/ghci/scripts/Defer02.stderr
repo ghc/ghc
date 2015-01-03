@@ -20,15 +20,14 @@
 ../../typecheck/should_run/Defer01.hs:25:4: Warning:
     Couldn't match type ‘Int’ with ‘Bool’
     Inaccessible code in
-      a pattern with constructor
-        C2 :: Bool -> C Bool,
+      a pattern with constructor: C2 :: Bool -> C Bool,
       in an equation for ‘c’
     In the pattern: C2 x
     In an equation for ‘c’: c (C2 x) = True
 
 ../../typecheck/should_run/Defer01.hs:28:5: Warning:
     No instance for (Num (a -> a))
-      (maybe you haven't applied enough arguments to a function?)
+      (maybe you haven't applied a function to enough arguments?)
       arising from the literal ‘1’
     In the expression: 1
     In an equation for ‘d’: d = 1
@@ -45,7 +44,7 @@
 ../../typecheck/should_run/Defer01.hs:34:8: Warning:
     Couldn't match expected type ‘Char’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
-          the type signature for h :: a -> (Char, Char)
+          the type signature for: h :: a -> (Char, Char)
           at ../../typecheck/should_run/Defer01.hs:33:6
     Relevant bindings include
       x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
@@ -82,7 +81,7 @@
 ../../typecheck/should_run/Defer01.hs:45:6: Warning:
     Couldn't match type ‘Int’ with ‘Bool’
     Inaccessible code in
-      the type signature for k :: (Int ~ Bool) => Int -> Bool
+      the type signature for: k :: (Int ~ Bool) => Int -> Bool
     In the ambiguity check for the type signature for ‘k’:
       k :: (Int ~ Bool) => Int -> Bool
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
@@ -98,7 +97,7 @@
 ../../typecheck/should_run/Defer01.hs:45:6: Warning:
     Couldn't match type ‘Int’ with ‘Bool’
     Inaccessible code in
-      the type signature for k :: (Int ~ Bool) => Int -> Bool
+      the type signature for: k :: (Int ~ Bool) => Int -> Bool
 
 ../../typecheck/should_run/Defer01.hs:46:7: Warning:
     Couldn't match expected type ‘Bool’ with actual type ‘Int’
@@ -138,7 +137,7 @@
     In the first argument of ‘print’, namely ‘(c (C2 True))’
 *** Exception: ../../typecheck/should_run/Defer01.hs:28:5:
     No instance for (Num (a -> a))
-      (maybe you haven't applied enough arguments to a function?)
+      (maybe you haven't applied a function to enough arguments?)
       arising from the literal ‘1’
     In the expression: 1
     In an equation for ‘d’: d = 1
@@ -155,7 +154,7 @@
 *** Exception: ../../typecheck/should_run/Defer01.hs:34:8:
     Couldn't match expected type ‘Char’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
-          the type signature for h :: a -> (Char, Char)
+          the type signature for: h :: a -> (Char, Char)
           at ../../typecheck/should_run/Defer01.hs:33:6
     Relevant bindings include
       x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)

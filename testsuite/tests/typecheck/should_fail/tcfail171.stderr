@@ -3,6 +3,6 @@ tcfail171.hs:9:10:
     No instance for (PrintfType b) arising from a use of ‘printf’
     Possible fix:
       add (PrintfType b) to the context of
-        the type signature for phex :: a -> b
+        the type signature for: phex :: a -> b
     In the expression: printf "0x%x" x
     In an equation for ‘phex’: phex x = printf "0x%x" x

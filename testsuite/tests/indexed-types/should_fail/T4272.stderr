@@ -2,7 +2,7 @@
 T4272.hs:15:26:
     Couldn't match type ‘a’ with ‘TermFamily a a’
       ‘a’ is a rigid type variable bound by
-          the type signature for laws :: TermLike a => TermFamily a a -> b
+          the type signature for: laws :: TermLike a => TermFamily a a -> b
           at T4272.hs:14:16
     Expected type: TermFamily a (TermFamily a a)
       Actual type: TermFamily a a

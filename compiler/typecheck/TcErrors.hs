@@ -1252,7 +1252,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
       = ptext (sLit "No instance for")
         <+> pprParendType pred
         $$ if type_has_arrow pred
-            then nest 2 $ ptext (sLit "(maybe you haven't applied enough arguments to a function?)")
+            then nest 2 $ ptext (sLit "(maybe you haven't applied a function to enough arguments?)")
             else empty
 
       | otherwise
