@@ -33,10 +33,6 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
-                             "DeriveAnyClass",
-                             "PatternSynonyms",
-                             "PartialTypeSignatures",
-                             "NamedWildCards",
                              "StaticPointers"]
 
 expectedCabalOnlyExtensions :: [String]
