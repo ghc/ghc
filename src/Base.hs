@@ -23,6 +23,7 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 
 type Args = Action [String]
 
+
 type Condition = Action Bool
 
 instance Monoid a => Monoid (Action a) where
@@ -35,36 +36,42 @@ class ShowAction a where
 instance ShowAction String where
     showAction = return
 
+instance ShowAction (Action String) where
+    showAction = id
+
 arg :: ShowAction a => [a] -> Args
 arg = mapM showAction
 
+type ArgsCombine = Args -> Args -> Args
+
 class Collect a where
-    collect :: Args -> a
+    collect :: ArgsCombine -> Args -> a
 
 instance Collect Args where
-    collect = id
+    collect = const id
 
 instance (ShowAction a, Collect r) => Collect (a -> r) where
-    collect prev next = collect $ do
-        next' <- showAction next
-        prev <> return [next']
+    collect combine x = \y -> collect combine $ x `combine` arg [y]
+
+instance Collect r => Collect (Args -> r) where
+    collect combine x = \y -> collect combine $ x `combine` y
 
 args :: Collect a => a
-args = collect mempty
+args = collect (<>) mempty
+
+joinArgs :: Collect a => a
+joinArgs = collect (\x y -> intercalateArgs "" x <> y) mempty
+
+joinArgsWithSpaces :: Collect a => a
+joinArgsWithSpaces = collect (\x y -> intercalateArgs " " x <> y) mempty
 
 intercalateArgs :: String -> Args -> Args
-intercalateArgs s args = do
-    as <- args
-    return [intercalate s as]
-
-joinArgsWithSpaces :: Args -> Args
-joinArgsWithSpaces = intercalateArgs " "
-
-joinArgs :: Args -> Args
-joinArgs = intercalateArgs ""
+intercalateArgs s as = do
+    as' <- as
+    return [intercalate s as']
 
 splitArgs :: Args -> Args
 splitArgs = fmap (concatMap words)
 
 filterOut :: Args -> [String] -> Args
-filterOut args list = filter (`notElem` list) <$> args
+filterOut as list = filter (`notElem` list) <$> as
