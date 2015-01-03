@@ -15,7 +15,7 @@ module PatSyn (
         patSynName, patSynArity, patSynIsInfix,
         patSynArgs, patSynTyDetails, patSynType,
         patSynMatcher, patSynBuilder,
-        patSynExTyVars, patSynSig,
+        patSynExTyVars, patSynSig, patSynEqSpec,
         patSynInstArgTys, patSynInstResTy,
         tidyPatSynIds
     ) where
@@ -50,17 +50,19 @@ import Data.Function
 data PatSyn
   = MkPatSyn {
         psName        :: Name,
-        psUnique      :: Unique,      -- Cached from Name
+        psUnique      :: Unique,          -- Cached from Name
 
         psArgs        :: [Type],
-        psArity       :: Arity,       -- == length psArgs
-        psInfix       :: Bool,        -- True <=> declared infix
+        psArity       :: Arity,           -- == length psArgs
+        psInfix       :: Bool,            -- True <=> declared infix
 
-        psUnivTyVars  :: [TyVar],     -- Universially-quantified type variables
-        psReqTheta    :: ThetaType,   -- Required dictionaries
-        psExTyVars    :: [TyVar],     -- Existentially-quantified type vars
-        psProvTheta   :: ThetaType,   -- Provided dictionaries
-        psOrigResTy   :: Type,        -- Mentions only psUnivTyVars
+        psUnivTyVars  :: [TyVar],         -- Universially-quantified type variables
+        psReqTheta    :: ThetaType,       -- Required dictionaries
+        psExTyVars    :: [TyVar],         -- Existentially-quantified type vars
+        psProvTheta   :: ThetaType,       -- Provided dictionaries
+        psOrigResTy   :: Type,            -- Mentions only psUnivTyVars
+        psEqSpec      :: [(TyVar, Type)], -- Equalities derived from the result type,
+                                         -- _as written by the programmer_
 
         -- See Note [Matchers and builders for pattern synonyms]
         psMatcher     :: (Id, Bool),
@@ -241,6 +243,7 @@ mkPatSyn :: Name
                                  --   and required dicts
          -> ([TyVar], ThetaType) -- ^ Existentially-quantified type variables
                                  --   and provided dicts
+         -> [(TyVar, Type)]      -- ^ Equalities from hand-written type signature
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
@@ -249,12 +252,14 @@ mkPatSyn :: Name
 mkPatSyn name declared_infix
          (univ_tvs, req_theta)
          (ex_tvs, prov_theta)
+         eq_spec
          orig_args
          orig_res_ty
          matcher builder
     = MkPatSyn {psName = name, psUnique = getUnique name,
                 psUnivTyVars = univ_tvs, psExTyVars = ex_tvs,
                 psProvTheta = prov_theta, psReqTheta = req_theta,
+                psEqSpec = eq_spec,
                 psInfix = declared_infix,
                 psArgs = orig_args,
                 psArity = length orig_args,
@@ -301,6 +306,11 @@ patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psOrigResTy = res_ty })
   = (univ_tvs, ex_tvs, prov, req, arg_tys, res_ty)
+
+-- | Equalities derived from the type signature of the pattern synonym,
+-- as written by the programmer
+patSynEqSpec :: PatSyn -> [(TyVar,Type)]
+patSynEqSpec = psEqSpec
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher

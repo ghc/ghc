@@ -188,11 +188,13 @@ buildPatSyn :: Name -> Bool
             -> (Id,Bool) -> Maybe (Id, Bool)
             -> ([TyVar], ThetaType) -- ^ Univ and req
             -> ([TyVar], ThetaType) -- ^ Ex and prov
+            -> [(TyVar,Type)]       -- ^ Equality spec
             -> [Type]               -- ^ Argument types
             -> Type                 -- ^ Result type
             -> PatSyn
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
-            (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys pat_ty
+            (univ_tvs, req_theta) (ex_tvs, prov_theta)
+            eq_spec arg_tys pat_ty
   = ASSERT((and [ univ_tvs == univ_tvs'
                 , ex_tvs == ex_tvs'
                 , pat_ty `eqType` pat_ty'
@@ -202,7 +204,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
                 ]))
     mkPatSyn src_name declared_infix
              (univ_tvs, req_theta) (ex_tvs, prov_theta)
-             arg_tys pat_ty
+             eq_spec arg_tys pat_ty
              matcher builder
   where
     ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher_id

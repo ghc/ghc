@@ -1537,6 +1537,7 @@ patSynToIfaceDecl ps
                 , ifPatExTvs      = toIfaceTvBndrs ex_tvs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
+                , ifPatEqSpec     = tidyEqSpec env2 eq_spec
                 , ifPatArgs       = map (tidyToIfaceType env2) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 }
@@ -1544,6 +1545,7 @@ patSynToIfaceDecl ps
     (univ_tvs, ex_tvs, prov_theta, req_theta, args, rhs_ty) = patSynSig ps
     (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
     (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
+    eq_spec = patSynEqSpec ps
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 --------------------------
@@ -1679,7 +1681,7 @@ tyConToIfaceDecl env tycon
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
                     ifConExTvs   = toIfaceTvBndrs ex_tvs',
-                    ifConEqSpec  = map to_eq_spec eq_spec,
+                    ifConEqSpec  = tidyEqSpec con_env2 eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
                     ifConFields  = map getOccName
@@ -1699,7 +1701,6 @@ tyConToIfaceDecl env tycon
                      -- A bit grimy, perhaps, but it's simple!
 
           (con_env2, ex_tvs') = tidyTyVarBndrs con_env1 ex_tvs
-          to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
 toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
 toIfaceBang _    HsNoBang            = IfNoBang
@@ -1777,6 +1778,11 @@ tidyTyClTyVarBndr env@(_, subst) tv
 tidyTyVar :: TidyEnv -> TyVar -> TyVar
 tidyTyVar (_, subst) tv = lookupVarEnv subst tv `orElse` tv
    -- TcType.tidyTyVarOcc messes around with FlatSkols
+
+tidyEqSpec :: TidyEnv -> [(TyVar, Type)] -> IfaceEqSpec
+tidyEqSpec env = map tidy_eq
+  where
+    tidy_eq (tv, ty) = (toIfaceTyVar (tidyTyVar env tv), tidyToIfaceType env ty)
 
 getFS :: NamedThing a => a -> FastString
 getFS x = occNameFS (getOccName x)

@@ -114,7 +114,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
          ppr (ex_tvs, prov_theta) $$
          ppr (univ_tvs, req_theta) $$
          ppr arg_tys $$
-         ppr tau
+         ppr pat_ty
        ; tcCheckPatSynPat lpat
 
        ; req_dicts <- newEvVars req_theta
@@ -192,7 +192,13 @@ tc_patsyn_finish lname dir is_infix lpat'
                  (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
                  wrapped_args
                  pat_ty
-  = do { (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
+  = do { traceTc "tc_patsyn_finish" $
+         ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
+         ppr (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts) $$
+         ppr wrapped_args $$
+         ppr pat_ty
+
+       ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
                                          (univ_tvs, req_theta, req_ev_binds, req_dicts)
                                          (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
                                          wrapped_args
@@ -203,6 +209,7 @@ tc_patsyn_finish lname dir is_infix lpat'
        ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
+                        []
                         arg_tys
                         pat_ty
                         matcher_id builder_id

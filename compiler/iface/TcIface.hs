@@ -448,6 +448,7 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                               , ifPatExTvs = ex_tvs
                               , ifPatProvCtxt = prov_ctxt
                               , ifPatReqCtxt = req_ctxt
+                              , ifPatEqSpec = eq_spec
                               , ifPatArgs = args
                               , ifPatTy = pat_ty })
   = do { name <- lookupIfaceTop occ_name
@@ -459,11 +460,12 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
        { patsyn <- forkM (mk_doc name) $
              do { prov_theta <- tcIfaceCtxt prov_ctxt
                 ; req_theta  <- tcIfaceCtxt req_ctxt
-                ; pat_ty     <- tcIfaceType pat_ty
+                ; eq_spec    <- tcIfaceEqSpec eq_spec
                 ; arg_tys    <- mapM tcIfaceType args
+                ; pat_ty     <- tcIfaceType pat_ty
                 ; return $ buildPatSyn name is_infix matcher builder
                                        (univ_tvs, req_theta) (ex_tvs, prov_theta)
-                                       arg_tys pat_ty }
+                                       eq_spec arg_tys pat_ty }
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
      mk_doc n = ptext (sLit "Pattern synonym") <+> ppr n
