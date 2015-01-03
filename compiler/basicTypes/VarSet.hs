@@ -16,7 +16,8 @@ module VarSet (
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
-        minusVarSet, foldVarSet, filterVarSet, fixVarSet,
+        minusVarSet, foldVarSet, filterVarSet, 
+        transCloVarSet,
         lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet
     ) where
@@ -69,7 +70,6 @@ extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
 
 delVarSetByKey  :: VarSet -> Unique -> VarSet
 elemVarSetByKey :: Unique -> VarSet -> Bool
-fixVarSet       :: (VarSet -> VarSet) -> VarSet -> VarSet
 partitionVarSet :: (Var -> Bool) -> VarSet -> (VarSet, VarSet)
 
 emptyVarSet     = emptyUniqSet
@@ -110,11 +110,26 @@ intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 
--- Iterate f to a fixpoint
-fixVarSet f s | new_s `subVarSet` s = s
-              | otherwise           = fixVarSet f new_s
-              where
-                new_s = f s
+transCloVarSet :: (VarSet -> VarSet)
+                  -- Map some variables in the set to 
+                  -- *extra* variables that should be in it
+               -> VarSet -> VarSet
+-- (transCloVarSet f s) repeatedly applies f to the set s, adding any
+-- new variables to s that it finds thereby, until it reaches a fixed
+-- point.  The actual algorithm is a bit more efficient.
+transCloVarSet fn seeds
+  = go seeds seeds
+  where
+    go :: VarSet  -- Accumulating result
+       -> VarSet  -- Work-list; un-processed subset of accumulating result
+       -> VarSet
+    -- Specification: go acc vs = acc `union` transClo fn vs
+   
+    go acc candidates
+       | isEmptyVarSet new_vs = acc
+       | otherwise            = go (acc `unionVarSet` new_vs) new_vs
+       where
+         new_vs = fn candidates `minusVarSet` acc
 
 seqVarSet :: VarSet -> ()
 seqVarSet s = sizeVarSet s `seq` ()

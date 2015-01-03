@@ -468,17 +468,18 @@ quantifyPred qtvs pred
 growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
 -- See Note [Growing the tau-tvs using constraints]
 growThetaTyVars theta tvs
-  | null theta             = tvs
-  | isEmptyVarSet seed_tvs = tvs
-  | otherwise              = fixVarSet mk_next seed_tvs
+  | null theta = tvs
+  | otherwise  = transCloVarSet mk_next seed_tvs
   where
     seed_tvs = tvs `unionVarSet` tyVarsOfTypes ips
     (ips, non_ips) = partition isIPPred theta
                          -- See note [Inheriting implicit parameters]
-    mk_next tvs = foldr grow_one tvs non_ips
-    grow_one pred tvs
-       | pred_tvs `intersectsVarSet` tvs = tvs `unionVarSet` pred_tvs
-       | otherwise                       = tvs
+
+    mk_next :: VarSet -> VarSet -- Maps current set to newly-grown ones
+    mk_next so_far = foldr (grow_one so_far) emptyVarSet non_ips
+    grow_one so_far pred tvs
+       | pred_tvs `intersectsVarSet` so_far = tvs `unionVarSet` pred_tvs
+       | otherwise                          = tvs
        where
          pred_tvs = tyVarsOfType pred
 
@@ -990,14 +991,16 @@ approximateWC wc
       = filterBag is_floatable simples `unionBags`
         do_bag (float_implic new_trapping_tvs) implics
       where
-        new_trapping_tvs = fixVarSet grow trapping_tvs
         is_floatable ct = tyVarsOfCt ct `disjointVarSet` new_trapping_tvs
+        new_trapping_tvs = transCloVarSet grow trapping_tvs
 
-        grow tvs = foldrBag grow_one tvs simples
-        grow_one ct tvs | ct_tvs `intersectsVarSet` tvs = tvs `unionVarSet` ct_tvs
-                        | otherwise                     = tvs
-                        where
-                          ct_tvs = tyVarsOfCt ct
+        grow :: VarSet -> VarSet  -- Maps current trapped tyvars to newly-trapped ones
+        grow so_far = foldrBag (grow_one so_far) emptyVarSet simples
+        grow_one so_far ct tvs 
+          | ct_tvs `intersectsVarSet` so_far = tvs `unionVarSet` ct_tvs
+          | otherwise                        = tvs
+          where
+            ct_tvs = tyVarsOfCt ct
 
     float_implic :: TcTyVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
