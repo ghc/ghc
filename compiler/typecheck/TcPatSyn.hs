@@ -130,6 +130,34 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; checkTc (length arg_names == ty_arity)
                  (wrongNumberOfParmsErr ty_arity)
 
+         -- Recover implicit type equalities
+       ; (pat_ty, spec_tvs, spec_eqs) <- case tcSplitTyConApp_maybe pat_ty of
+               Nothing -> return (pat_ty, [], [])
+               Just (tyCon, conArgs) -> do
+                   { spec_eqs <- forM conArgs $ \conArg -> do
+                          { tv <- zonkQuantifiedTyVar =<< newMetaTyVar SigTv (typeKind conArg)
+                          ; return (tv, conArg) }
+                   ; let spec_tvs = map fst spec_eqs
+                         pat_ty' = mkTyConApp tyCon (map mkTyVarTy spec_tvs)
+                   ; return (pat_ty', spec_tvs, spec_eqs) }
+       ; traceTc "tcCheckPatSynDecl spec {" $
+         ppr pat_ty $$
+         ppr spec_tvs $$
+         ppr spec_eqs
+
+       ; let con_arg_tvs = tcTyVarsOfTypes (map snd spec_eqs)
+             spec_theta = [ mkEqPred (mkTyVarTy tv) conArg
+                          | (tv, conArg) <- spec_eqs ]
+       ; univ_tvs <- return $ filter (not . (`elemVarSet` con_arg_tvs)) univ_tvs ++ spec_tvs
+       ; ex_tvs <- return $ ex_tvs ++ varSetElems con_arg_tvs
+             -- ex_tys' = ex_tys ++ map mkTyVarTy (varSetElems con_arg_tvs)
+       ; prov_theta <- return $ prov_theta ++ spec_theta
+
+       ; traceTc "tcCheckPatSynDecl spec }" $
+         ppr univ_tvs $$
+         ppr ex_tvs $$
+         ppr prov_theta
+
          -- Typecheck the pattern against pat_ty, then unify the type of args
          -- against arg_tys, with ex_tvs changed to SigTyVars.
          -- We get out of this:
