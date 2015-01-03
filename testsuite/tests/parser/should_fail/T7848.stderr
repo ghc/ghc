@@ -24,7 +24,7 @@ T7848.hs:6:57:
 T7848.hs:10:9:
     Couldn't match type ‘a’ with ‘t -> t1 -> A -> A -> A -> A -> t2’
       ‘a’ is a rigid type variable bound by
-          the type signature for (&) :: a at T7848.hs:10:9
+          the type signature for: (&) :: a at T7848.hs:10:9
     Expected type: forall a. a
       Actual type: t -> t1 -> A -> A -> A -> A -> t2
     Relevant bindings include

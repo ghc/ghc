@@ -3,7 +3,7 @@ T5236.hs:13:9:
     Couldn't match type ‘B’ with ‘A’
     arising from a functional dependency between:
       constraint ‘Id A B’
-        arising from the type signature for loop :: Id A B => Bool
+        arising from the type signature for: loop :: Id A B => Bool
       instance ‘Id B B’ at T5236.hs:11:10-15
     In the ambiguity check for the type signature for ‘loop’:
       loop :: Id A B => Bool

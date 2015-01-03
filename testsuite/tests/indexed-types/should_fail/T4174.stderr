@@ -2,8 +2,8 @@
 T4174.hs:42:12:
     Couldn't match type ‘a’ with ‘SmStep’
       ‘a’ is a rigid type variable bound by
-          the type signature for
-            testcase :: Monad m => m (Field (Way (GHC6'8 minor) n t p) a b)
+          the type signature for:
+          testcase :: Monad m => m (Field (Way (GHC6'8 minor) n t p) a b)
           at T4174.hs:41:13
     Expected type: m (Field (Way (GHC6'8 minor) n t p) a b)
       Actual type: m (Field (WayOf m) SmStep RtsSpinLock)
@@ -16,8 +16,8 @@ T4174.hs:42:12:
 T4174.hs:42:12:
     Couldn't match type ‘b’ with ‘RtsSpinLock’
       ‘b’ is a rigid type variable bound by
-          the type signature for
-            testcase :: Monad m => m (Field (Way (GHC6'8 minor) n t p) a b)
+          the type signature for:
+          testcase :: Monad m => m (Field (Way (GHC6'8 minor) n t p) a b)
           at T4174.hs:41:13
     Expected type: m (Field (Way (GHC6'8 minor) n t p) a b)
       Actual type: m (Field (WayOf m) SmStep RtsSpinLock)

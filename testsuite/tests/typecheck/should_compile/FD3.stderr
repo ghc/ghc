@@ -2,7 +2,7 @@
 FD3.hs:15:15:
     Couldn't match type ‘a’ with ‘(String, a)’
       ‘a’ is a rigid type variable bound by
-          the type signature for translate :: (String, a) -> A a
+          the type signature for: translate :: (String, a) -> A a
           at FD3.hs:14:14
     arising from a functional dependency between:
       constraint ‘MkA (String, a) a’ arising from a use of ‘mkA’

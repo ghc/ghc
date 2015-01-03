@@ -3,7 +3,7 @@ PushedInAsGivens.hs:10:31:
     Couldn't match expected type ‘a1’ with actual type ‘a’
       because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
-      the type signature for foo :: (F Int ~ [a1]) => a1 -> Int
+      the type signature for: foo :: (F Int ~ [a1]) => a1 -> Int
       at PushedInAsGivens.hs:9:20-44
     Relevant bindings include
       x :: a1 (bound at PushedInAsGivens.hs:10:17)

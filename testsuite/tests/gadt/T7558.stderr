@@ -2,9 +2,9 @@
 T7558.hs:8:4:
     Couldn't match type ‘a’ with ‘Maybe a’
       ‘a’ is a rigid type variable bound by
-          the type signature for f :: T a a -> Bool at T7558.hs:7:6
+          the type signature for: f :: T a a -> Bool at T7558.hs:7:6
     Inaccessible code in
-      a pattern with constructor
+      a pattern with constructor:
         MkT :: forall a b. (a ~ Maybe b) => a -> Maybe b -> T a b,
       in an equation for ‘f’
     Relevant bindings include

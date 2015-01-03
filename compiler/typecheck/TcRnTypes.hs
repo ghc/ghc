@@ -1932,41 +1932,51 @@ instance Outputable SkolemInfo where
 
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
-pprSkolInfo (SigSkol (FunSigCtxt f) ty)
-                            = hang (ptext (sLit "the type signature for"))
-                                 2 (pprPrefixOcc f <+> dcolon <+> ppr ty)
-pprSkolInfo (SigSkol cx ty) = hang (pprUserTypeCtxt cx <> colon)
-                                 2 (ppr ty)
-pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter binding") <> plural ips <+> ptext (sLit "for")
-                              <+> pprWithCommas ppr ips
-pprSkolInfo (ClsSkol cls)   = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
-pprSkolInfo InstSkol        = ptext (sLit "the instance declaration")
-pprSkolInfo DataSkol        = ptext (sLit "the data type declaration")
-pprSkolInfo FamInstSkol     = ptext (sLit "the family instance declaration")
-pprSkolInfo BracketSkol     = ptext (sLit "a Template Haskell bracket")
-pprSkolInfo (RuleSkol name) = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
-pprSkolInfo ArrowSkol       = ptext (sLit "the arrow form")
-pprSkolInfo (PatSkol cl mc) = case cl of
-    RealDataCon dc -> sep [ ptext (sLit "a pattern with constructor")
-                          , nest 2 $ ppr dc <+> dcolon
-                            <+> pprType (dataConUserType dc) <> comma
-                            -- pprType prints forall's regardless of -fprint-explict-foralls
-                            -- which is what we want here, since we might be saying
-                            -- type variable 't' is bound by ...
-                          , ptext (sLit "in") <+> pprMatchContext mc ]
-    PatSynCon ps -> sep [ ptext (sLit "a pattern with pattern synonym")
-                        , nest 2 $ ppr ps <+> dcolon
-                          <+> pprType (patSynType ps) <> comma
-                        , ptext (sLit "in") <+> pprMatchContext mc ]
-pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
-                                  , vcat [ ppr name <+> dcolon <+> ppr ty
-                                         | (name,ty) <- ids ]]
+pprSkolInfo (SigSkol ctxt ty) = pprSigSkolInfo ctxt ty
+pprSkolInfo (IPSkol ips)      = ptext (sLit "the implicit-parameter binding") <> plural ips <+> ptext (sLit "for")
+                                <+> pprWithCommas ppr ips
+pprSkolInfo (ClsSkol cls)     = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo InstSkol          = ptext (sLit "the instance declaration")
+pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
+pprSkolInfo FamInstSkol       = ptext (sLit "a family instance declaration")
+pprSkolInfo BracketSkol       = ptext (sLit "a Template Haskell bracket")
+pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo ArrowSkol         = ptext (sLit "an arrow form")
+pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
+                                    , ptext (sLit "in") <+> pprMatchContext mc ]
+pprSkolInfo (InferSkol ids)   = sep [ ptext (sLit "the inferred type of")
+                                    , vcat [ ppr name <+> dcolon <+> ppr ty
+                                           | (name,ty) <- ids ]]
 pprSkolInfo (UnifyForAllSkol tvs ty) = ptext (sLit "the type") <+> ppr (mkForAllTys tvs ty)
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
 pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
+
+pprSigSkolInfo :: UserTypeCtxt -> Type -> SDoc
+pprSigSkolInfo ctxt ty
+  = case ctxt of
+       FunSigCtxt f _ -> pp_sig f
+       _              -> hang (pprUserTypeCtxt ctxt <> colon)
+                            2 (ppr ty)
+  where
+    pp_sig f = sep [ ptext (sLit "the type signature for:")
+                   , pprPrefixOcc f <+> dcolon <+> ppr ty ]
+
+pprPatSkolInfo :: ConLike -> SDoc
+pprPatSkolInfo (RealDataCon dc)
+  = sep [ ptext (sLit "a pattern with constructor:")
+        , nest 2 $ ppr dc <+> dcolon
+          <+> pprType (dataConUserType dc) <> comma ]
+          -- pprType prints forall's regardless of -fprint-explict-foralls
+          -- which is what we want here, since we might be saying
+          -- type variable 't' is bound by ...
+
+pprPatSkolInfo (PatSynCon ps)
+  = sep [ ptext (sLit "a pattern with pattern synonym:")
+        , nest 2 $ ppr ps <+> dcolon
+                   <+> pprType (patSynType ps) <> comma ]
 
 {-
 ************************************************************************

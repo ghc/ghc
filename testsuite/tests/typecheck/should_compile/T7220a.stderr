@@ -2,11 +2,11 @@
 T7220a.hs:17:6:
     Could not deduce (C a b)
     from the context (C a0 b, TF b ~ Y)
-      bound by the type signature for f :: (C a0 b, TF b ~ Y) => b
+      bound by the type signature for: f :: (C a0 b, TF b ~ Y) => b
       at T7220a.hs:17:6-44
     Possible fix:
       add (C a b) to the context of
-        the type signature for f :: (C a0 b, TF b ~ Y) => b
+        the type signature for: f :: (C a0 b, TF b ~ Y) => b
     In the ambiguity check for the type signature for ‘f’:
       f :: forall a. (forall b. (C a b, TF b ~ Y) => b) -> X
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes

@@ -23,11 +23,11 @@ T9834.hs:23:10: Warning:
 T9834.hs:23:10: Warning:
     Couldn't match type ‘a’ with ‘p a0’
       ‘a’ is a rigid type variable bound by
-          the type signature for
-            afix :: (forall (q :: * -> *).
-                     Applicative q =>
-                     Comp p q a -> Comp p q a)
-                    -> p a
+          the type signature for:
+          afix :: (forall (q :: * -> *).
+                   Applicative q =>
+                   Comp p q a -> Comp p q a)
+                  -> p a
           at T9834.hs:22:11
     Expected type: (forall (q :: * -> *).
                     Applicative q =>
@@ -49,11 +49,11 @@ T9834.hs:23:10: Warning:
 T9834.hs:23:10: Warning:
     Couldn't match type ‘a’ with ‘a1’
       ‘a’ is a rigid type variable bound by
-          the type signature for
-            afix :: (forall (q :: * -> *).
-                     Applicative q =>
-                     Comp p q a -> Comp p q a)
-                    -> p a
+          the type signature for:
+          afix :: (forall (q :: * -> *).
+                   Applicative q =>
+                   Comp p q a -> Comp p q a)
+                  -> p a
           at T9834.hs:22:11
       ‘a1’ is a rigid type variable bound by
            a type expected by the context:

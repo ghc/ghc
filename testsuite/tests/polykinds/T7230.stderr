@@ -2,18 +2,18 @@
 T7230.hs:48:32:
     Could not deduce ((x :<<= x1) ~ 'True)
     from the context (Increasing xs ~ 'True)
-      bound by the type signature for
-                 crash :: (Increasing xs ~ 'True) =>
-                          SList xs -> SBool (Increasing xs)
+      bound by the type signature for:
+               crash :: (Increasing xs ~ 'True) =>
+                        SList xs -> SBool (Increasing xs)
       at T7230.hs:47:10-68
     or from (xs ~ (x : xs1))
-      bound by a pattern with constructor
+      bound by a pattern with constructor:
                  SCons :: forall (k :: BOX) (x :: k) (xs :: [k]).
                           Sing x -> Sing xs -> Sing (x : xs),
                in an equation for ‘crash’
       at T7230.hs:48:8-27
     or from (xs1 ~ (x1 : xs2))
-      bound by a pattern with constructor
+      bound by a pattern with constructor:
                  SCons :: forall (k :: BOX) (x :: k) (xs :: [k]).
                           Sing x -> Sing xs -> Sing (x : xs),
                in an equation for ‘crash’

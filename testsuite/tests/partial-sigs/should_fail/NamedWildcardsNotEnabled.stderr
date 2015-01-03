@@ -2,7 +2,7 @@
 NamedWildcardsNotEnabled.hs:4:9:
     Couldn't match expected type ‘_b’ with actual type ‘Bool’
       ‘_b’ is a rigid type variable bound by
-           the type signature for foo :: _a -> _b
+           the type signature for: foo :: _a -> _b
            at NamedWildcardsNotEnabled.hs:3:8
     Relevant bindings include
       foo :: _a -> _b (bound at NamedWildcardsNotEnabled.hs:4:1)
@@ -12,7 +12,7 @@ NamedWildcardsNotEnabled.hs:4:9:
 NamedWildcardsNotEnabled.hs:4:13:
     Couldn't match expected type ‘Bool’ with actual type ‘_a’
       ‘_a’ is a rigid type variable bound by
-           the type signature for foo :: _a -> _b
+           the type signature for: foo :: _a -> _b
            at NamedWildcardsNotEnabled.hs:3:8
     Relevant bindings include
       x :: _a (bound at NamedWildcardsNotEnabled.hs:4:5)
