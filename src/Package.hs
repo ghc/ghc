@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
 module Package (
     packageRules
     ) where
@@ -50,7 +50,7 @@ libraryPackage name stage settings =
         )]
 
 commonCcArgs :: Args
-commonCcArgs = when Validating $ arg ["-Werror", "-Wall"]
+commonCcArgs = when Validating $ args "-Werror" "-Wall"
 
 commonLdArgs :: Args
 commonLdArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
@@ -60,21 +60,17 @@ commonCppArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
 
 commonCcWarninigArgs :: Args
 commonCcWarninigArgs = when Validating $ mconcat
-    [ when GccIsClang                      $ arg ["-Wno-unknown-pragmas"]
-    , when (not GccIsClang && not GccLt46) $ arg ["-Wno-error=inline"]
-    , when (    GccIsClang && not GccLt46) $ hostOsCppWarning
+    [ when GccIsClang                                     $ arg "-Wno-unknown-pragmas"
+    , when (not GccIsClang && not GccLt46)                $ arg "-Wno-error=inline"
+    , when (    GccIsClang && not GccLt46 && windowsHost) $ arg "-Werror=unused-but-set-variable" 
     ]
-      where
-        hostOsCppWarning = do
-            hostOsCpp <- option HostOsCpp
-            when (hostOsCpp /= "mingw32") $ arg ["-Werror=unused-but-set-variable" ]
 
 bootPkgConstraints :: Args
 bootPkgConstraints = mempty
 
 libraryArgs :: [Way] -> Args
 libraryArgs ways = 
-    let argEnable x suffix = arg [(if x then "--enable-" else "--disable-") ++ suffix]
+    let argEnable x suffix = arg $ (if x then "--enable-" else "--disable-") ++ suffix
     in mconcat
         [ argEnable False "library-for-ghci" -- TODO: why always disable?
         , argEnable (vanilla `elem` ways) "library-vanilla"        
@@ -86,32 +82,31 @@ libraryArgs ways =
 
 configureArgs :: Stage -> Settings -> Args
 configureArgs stage settings = 
-    let argConf key args = joinArgs $ arg ["--configure-option=", key, "="] <> joinArgsWithSpaces args
+    let argConf :: String -> Args -> Args
+        argConf key as = joinArgs "--configure-option=" key "=" as
 
         argConfWith key opt = do
-            value <- option opt
-            when (value /= "") $ argConf ("--with-" ++ key) $ arg [value]
+            [value] <- showAction opt
+            when (value /= "") $ argConf ("--with-" ++ key) $ arg value
 
-        cflags   = mconcat
-                   [ commonCcArgs `filterOut` ["-Werror"]
-                   , argOption $ ConfCcArgs stage
-                   , customCcArgs settings
-                   , commonCcWarninigArgs
-                   ]
-        ldflags  = mconcat [  commonLdArgs, argOption $ ConfGccLinkerArgs stage,  customLdArgs settings ]
-        cppflags = mconcat [ commonCppArgs, argOption $ ConfCppArgs       stage, customCppArgs settings ]
+        cflags   = joinArgsSpaced (commonCcArgs `filterOut` ["-Werror"])
+                                  (ConfCcArgs stage)
+                                  (customCcArgs settings)
+                                  (commonCcWarninigArgs)
+        ldflags  = joinArgsSpaced commonLdArgs  (ConfGccLinkerArgs stage) (customLdArgs  settings)
+        cppflags = joinArgsSpaced commonCppArgs (ConfCppArgs       stage) (customCppArgs settings)
                    
     in mconcat
         [ argConf "CFLAGS"   cflags
         , argConf "LDFLAGS"  ldflags
         , argConf "CPPFLAGS" cppflags
-        , joinArgs $ mconcat [arg ["--gcc-options="], cflags, arg [" "], ldflags]
+        , joinArgs "--gcc-options=" cflags " " ldflags
         , argConfWith "iconv-includes"  IconvIncludeDirs
         , argConfWith "iconv-libraries" IconvLibDirs
         , argConfWith "gmp-includes"    GmpIncludeDirs
         , argConfWith "gmp-libraries"   GmpLibDirs
-        , when CrossCompiling $ argConf "--host" $ argOption $ TargetPlatformFull -- TODO: why not host?
-        , argConf "--with-cc" $ argPath Gcc
+        , when CrossCompiling $ argConf "--host" $ arg TargetPlatformFull -- TODO: why not host?
+        , argConf "--with-cc" $ arg Gcc
         ]
 
 buildPackageData :: Package -> TodoItem -> Rules ()
@@ -132,11 +127,11 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
               where
                 cabalArgs, ghcPkgArgs :: Args
                 cabalArgs = mconcat
-                    [ arg ["configure", path, dist]
+                    [ args "configure" path dist
                     -- this is a positional argument, hence:
                     -- * if it is empty, we need to emit one empty string argument
                     -- * if there are many, we must collapse them into one string argument
-                    , joinArgsWithSpaces $ customDllArgs settings 
+                    , joinArgsSpaced $ customDllArgs settings
                     , with $ Ghc stage -- TODO: used to be stage01 (using max Stage1 GHC)
                     , with $ GhcPkg stage             
 
@@ -155,11 +150,9 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
                     , with Happy
                     ] -- TODO: reorder with's
 
-                ghcPkgArgs = mconcat
-                    [ arg ["update", "--force"]
-                    , when (stage == Stage0) $ arg ["--package-db=libraries/bootstrapping.conf"]
-                    , arg [path </> dist </> "inplace-pkg-config"]
-                    ]
+                ghcPkgArgs = args "update" "--force"
+                    (when (stage == Stage0) $ arg "--package-db=libraries/bootstrapping.conf")
+                    (path </> dist </> "inplace-pkg-config")
 
 
 -- $1_$2_$3_MOST_DIR_HC_OPTS = \
@@ -239,7 +232,7 @@ buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
         run (Ghc stage) $ mconcat
             [ arg ["-M"]
             , wayHcOpts vanilla -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
-            , splitArgs $ argOption SrcHcOpts
+            , splitArgs $ arg [SrcHcOpts]
             , when (stage == Stage0) $ arg ["-package-db libraries/bootstrapping.conf"]
             , arg [if usePackageKey then "-this-package-key" else "-package-name"]
             , arg [packageKey] -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))

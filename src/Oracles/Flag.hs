@@ -51,14 +51,14 @@ instance ToCondition Flag where
     toCondition = test
 
 when :: (ToCondition a, Monoid m) => a -> Action m -> Action m
-when x args = do
+when x act = do
     bool <- toCondition x
-    if bool then args else mempty
+    if bool then act else mempty
 
 unless :: (ToCondition a, Monoid m) => a -> Action m -> Action m
-unless x args = do
+unless x act = do
     bool <- toCondition x
-    if bool then mempty else args
+    if bool then mempty else act
 
 class Not a where
     type NotResult a

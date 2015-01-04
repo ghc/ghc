@@ -15,7 +15,7 @@ import Oracles.Option
 data Builder = Ar | Ld | Gcc | Alex | Happy | HsColour | GhcCabal | GhcPkg Stage | Ghc Stage
 
 instance ShowAction Builder where
-    showAction builder = do
+    showAction builder = showAction $ do
         let key = case builder of
                 Ar            -> "ar"
                 Ld            -> "ld"
@@ -50,12 +50,12 @@ instance ShowAction Builder where
 -- the flag (at least temporarily).
 needBuilder :: Builder -> Action ()
 needBuilder ghc @ (Ghc stage) = do
-    target  <- showAction ghc
-    laxDeps <- test LaxDeps
+    [target] <- showAction ghc
+    laxDeps  <- test LaxDeps
     if laxDeps then orderOnly [target] else need [target]
 
 needBuilder builder = do 
-    target <- showAction builder
+    [target] <- showAction builder
     need [target]
 
 -- Action 'with Gcc' returns an argument '--with-gcc=/path/to/gcc' and needs the builder 
@@ -70,18 +70,18 @@ with builder = do
             Happy    -> "--with-happy="
             GhcPkg _ -> "--with-ghc-pkg="
             HsColour -> "--with-hscolour="
-    suffix <- showAction builder
+    [suffix] <- showAction builder
     needBuilder builder
     return [prefix ++ suffix]
 
 run :: Builder -> Args -> Action ()
 run builder args = do
     needBuilder builder
-    exe   <- showAction builder
+    [exe] <- showAction builder
     args' <- args
-    cmd [exe :: FilePath] args'
+    cmd [exe] args'
 
 hsColourSrcs :: Condition
 hsColourSrcs = do
-    hscolour <- showAction HsColour
+    [hscolour] <- showAction HsColour
     return $ hscolour /= ""
