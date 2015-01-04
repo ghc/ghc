@@ -7,7 +7,7 @@ module Base (
     module Data.Monoid,
     module Data.List,
     Stage (..),
-    Args, arg, args, ShowAction (..), Collect (..),
+    Args, arg, args, ShowAction (..),
     Condition (..),
     joinArgs, joinArgsSpaced, splitArgs,
     filterOut

@@ -230,14 +230,14 @@ buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
             return $ path </> dir </> modPath <.> extension
         packageKey <- packagaDataOption pkgData PackageKey
         run (Ghc stage) $ mconcat
-            [ arg ["-M"]
+            [ arg "-M"
             , wayHcOpts vanilla -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
-            , splitArgs $ arg [SrcHcOpts]
-            , when (stage == Stage0) $ arg ["-package-db libraries/bootstrapping.conf"]
-            , arg [if usePackageKey then "-this-package-key" else "-package-name"]
-            , arg [packageKey] -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
-            , arg ["-hide-all-packages"]
-            , arg ["-i"] -- resets the search path to nothing; TODO: check if really needed
+            , splitArgs $ arg SrcHcOpts -- TODO: get rid of splitArgs
+            , when (stage == Stage0) $ arg "-package-db libraries/bootstrapping.conf"
+            , arg $ if usePackageKey then "-this-package-key" else "-package-name"
+            , arg packageKey -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
+            , arg "-hide-all-packages"
+            , arg "-i" -- resets the search path to nothing; TODO: check if really needed
             , arg $ map (\d -> "-i" ++ path </> d) srcDirs
             , arg $ do
                 prefix <- ["-i", "-I"] -- 'import' and '#include' search paths
@@ -245,8 +245,8 @@ buildPackageDeps pkg @ (Package name path _) (stage, dist, settings) =
                 return $ prefix ++ buildDir </> suffix
             , arg $ map (\d -> "-I" ++ path </> d) $ filter isRelative includeDirs
             , arg $ map (\d -> "-I" ++          d) $ filter isAbsolute includeDirs
-            , arg ["-optP-include"]
-            , arg ["-optP" ++ buildDir </> "build/autogen/cabal_macros.h"]
+            , arg "-optP-include"
+            , arg $ "-optP" ++ buildDir </> "build/autogen/cabal_macros.h"
             , if usePackageKey 
               then arg $ concatMap (\d -> ["-package-key", d]) depKeys
               else arg $ concatMap (\d -> ["-package"    , d]) deps
