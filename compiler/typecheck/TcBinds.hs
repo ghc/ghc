@@ -751,6 +751,29 @@ completeTheta inferred_theta
               , typeSigCtxt (idName poly_id) sig ]
 
 {-
+Note [Partial type signatures and generalisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have a partial type signature, like
+   f :: _ -> Int
+then we *always* use the InferGen plan, and hence tcPolyInfer.
+We do this even for a local binding with -XMonoLocalBinds.
+Reasons:
+  * The TcSigInfo for 'f' has a unification variable for the '_',
+    whose TcLevel is one level deeper than the current level.
+    (See pushTcLevelM in tcTySig.)  But NoGen doesn't increase
+    the TcLevel like InferGen, so we lose the level invariant.
+
+  * The signature might be   f :: forall a. _ -> a
+    so it really is polymorphic.  It's not clear what it would
+    mean to use NoGen on this, and indeed the ASSERT in tcLhs,
+    in the (Just sig) case, checks that if there is a signature
+    then we are using LetLclBndr, and hence a nested AbsBinds with
+    increased TcLevel
+
+It might be possible to fix these difficulties somehow, but there
+doesn't seem much point.  Indeed, adding a partial type signature is a
+way to get per-binding inferred generalisation.
+
 Note [Validity of inferred types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to check inferred type for validity, in case it uses language
@@ -1178,14 +1201,17 @@ tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = matches })
   | Just sig <- sig_fn name
   = ASSERT2( case no_gen of { LetLclBndr -> True; LetGblBndr {} -> False }
-           , ppr name )  -- { f :: ty; f x = e } is always done via CheckGen
-                         -- which gives rise to LetLclBndr.  It wouldn't make
-                         -- sense to have a *polymorphic* function Id at this point
+           , ppr name )
+       -- { f :: ty; f x = e } is always done via CheckGen (full signature)
+       --                                      or InferGen (partial signature)
+       --               see Note [Partial type signatures and generalisation]
+       -- Both InferGen and CheckGen gives rise to LetLclBndr
     do  { mono_name <- newLocalName name
         ; let mono_id = mkLocalId mono_name (sig_tau sig)
         ; addErrCtxt (typeSigCtxt name sig) $
           emitWildcardHoleConstraints (sig_nwcs sig)
         ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
+
   | otherwise
   = do  { mono_ty <- newFlexiTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name mono_ty
@@ -1437,12 +1463,15 @@ decideGeneralisationPlan
    :: DynFlags -> TcTypeEnv -> [Name]
    -> [LHsBind Name] -> TcSigFun -> GeneralisationPlan
 decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
-  | strict_pat_binds                                 = NoGen
-  | Just (lbind, sig) <- one_funbind_with_sig lbinds = CheckGen lbind sig
-  | mono_local_binds                                 = NoGen
-  | otherwise                                        = InferGen mono_restriction closed_flag
-
+  | strict_pat_binds                          = NoGen
+  | Just (lbind, sig) <- one_funbind_with_sig = if isPartialSig sig
+    -- See Note [Partial type signatures and generalisation]
+                                                then infer_plan
+                                                else CheckGen lbind sig
+  | mono_local_binds                          = NoGen
+  | otherwise                                 = infer_plan
   where
+    infer_plan = InferGen mono_restriction closed_flag
     bndr_set = mkNameSet bndr_names
     binds = map unLoc lbinds
 
@@ -1485,12 +1514,11 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
 
     -- With OutsideIn, all nested bindings are monomorphic
     -- except a single function binding with a signature
-    one_funbind_with_sig [lbind@(L _ (FunBind { fun_id = v }))]
-      = case sig_fn (unLoc v) of
-        Nothing -> Nothing
-        Just sig | isPartialSig sig -> Nothing
-        Just sig | otherwise        -> Just (lbind, sig)
-    one_funbind_with_sig _
+    one_funbind_with_sig
+      | [lbind@(L _ (FunBind { fun_id = v }))] <- lbinds
+      , Just sig <- sig_fn (unLoc v)
+      = Just (lbind, sig)
+      | otherwise
       = Nothing
 
     -- The Haskell 98 monomorphism resetriction
