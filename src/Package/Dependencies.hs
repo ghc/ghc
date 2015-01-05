@@ -1,7 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Package.Dependencies (
-    buildPackageDependencies
-    ) where
+module Package.Dependencies (buildPackageDependencies) where
 
 import Package.Base
 

@@ -4,8 +4,9 @@ import Package.Base
 import Package.Data
 import Package.Dependencies
 
--- These are the packages we build
 -- See Package.Base for definitions of basic types
+
+-- These are the packages we build:
 packages :: [Package]
 packages = [libraryPackage "deepseq" Stage1 defaultSettings]
 

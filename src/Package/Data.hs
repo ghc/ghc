@@ -1,7 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
-module Package.Data (
-    buildPackageData
-    ) where
+module Package.Data (buildPackageData) where
 
 import Package.Base
 
