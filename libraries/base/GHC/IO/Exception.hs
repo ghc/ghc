@@ -246,7 +246,7 @@ ioError         =  ioException
 -- | The Haskell 2010 type for exceptions in the 'IO' monad.
 -- Any I\/O operation may raise an 'IOError' instead of returning a result.
 -- For a more general type of exception, including also those that arise
--- in pure code, see "Control.Exception.Exception".
+-- in pure code, see 'Control.Exception.Exception'.
 --
 -- In Haskell 2010, this is an opaque type.
 type IOError = IOException
