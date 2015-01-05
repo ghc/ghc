@@ -553,6 +553,8 @@ list giving the break-off point:
 -}
 
 takeList :: [b] -> [a] -> [a]
+-- (takeList as bs) trims bs to the be same length
+-- as as, unless as is longer in which case it's a no-op
 takeList [] _ = []
 takeList (_:xs) ls =
    case ls of

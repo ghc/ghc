@@ -366,8 +366,12 @@ data MetaInfo
 -- in the places where we need to an expression has that type
 
 data UserTypeCtxt
-  = FunSigCtxt Name     -- Function type signature
-                        -- Also used for types in SPECIALISE pragmas
+  = FunSigCtxt Name Bool    -- Function type signature, when checking the type
+                            -- Also used for types in SPECIALISE pragmas
+                            -- Bool = True  <=> report redundant class constraints
+                            --        False <=> do not
+                            -- See Note [Tracking redundant constraints] in TcSimplify
+
   | InfSigCtxt Name     -- Inferred type for function
   | ExprSigCtxt         -- Expression type signature
   | ConArgCtxt Name     -- Data constructor argument
@@ -528,8 +532,8 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
                 FlatMetaTv  -> ptext (sLit "fuv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
+pprUserTypeCtxt (FunSigCtxt n _)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
-pprUserTypeCtxt (FunSigCtxt n)    = ptext (sLit "the type signature for") <+> quotes (ppr n)
 pprUserTypeCtxt (RuleSigCtxt n)   = ptext (sLit "a RULE for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
@@ -556,10 +560,10 @@ pprSigCtxt ctxt extra pp_ty
   = sep [ ptext (sLit "In") <+> extra <+> pprUserTypeCtxt ctxt <> colon
         , nest 2 (pp_sig ctxt) ]
   where
-    pp_sig (FunSigCtxt n)  = pp_n_colon n
-    pp_sig (ConArgCtxt n)  = pp_n_colon n
-    pp_sig (ForSigCtxt n)  = pp_n_colon n
-    pp_sig _               = pp_ty
+    pp_sig (FunSigCtxt n _) = pp_n_colon n
+    pp_sig (ConArgCtxt n)   = pp_n_colon n
+    pp_sig (ForSigCtxt n)   = pp_n_colon n
+    pp_sig _                = pp_ty
 
     pp_n_colon n = pprPrefixOcc n <+> dcolon <+> pp_ty
 

@@ -30,7 +30,6 @@ module TcMType (
   -- Creating new evidence variables
   newEvVar, newEvVars, newEq, newDict,
   newTcEvBinds, addTcEvBind,
-  newSimpleWanted, newSimpleWanteds,
 
   --------------------------------
   -- Instantiation
@@ -147,25 +146,6 @@ predTypeOccName ty = case classifyPredType ty of
     TuplePred _     -> mkVarOccFS (fsLit "tup")
     IrredPred _     -> mkVarOccFS (fsLit "irred")
 
-{-
-*********************************************************************************
-*                                                                               *
-*                   Wanted constraints
-*                                                                               *
-*********************************************************************************
--}
-
-newSimpleWanted :: CtOrigin -> PredType -> TcM Ct
-newSimpleWanted orig pty
-  = do loc <- getCtLoc orig
-       v <- newEvVar pty
-       return $ mkNonCanonical $
-            CtWanted { ctev_evar = v
-                     , ctev_pred = pty
-                     , ctev_loc = loc }
-
-newSimpleWanteds :: CtOrigin -> ThetaType -> TcM [Ct]
-newSimpleWanteds orig = mapM (newSimpleWanted orig)
 
 {-
 ************************************************************************
@@ -742,7 +722,7 @@ zonkTcPredType = zonkTcType
 ************************************************************************
 -}
 
-zonkImplication :: Implication -> TcM (Bag Implication)
+zonkImplication :: Implication -> TcM Implication
 zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_given  = given
                                , ic_wanted = wanted
@@ -752,13 +732,10 @@ zonkImplication implic@(Implic { ic_skols  = skols
        ; given'  <- mapM zonkEvVar given
        ; info'   <- zonkSkolemInfo info
        ; wanted' <- zonkWCRec wanted
-       ; if isEmptyWC wanted'
-         then return emptyBag
-         else return $ unitBag $
-              implic { ic_skols  = skols'
-                     , ic_given  = given'
-                     , ic_wanted = wanted'
-                     , ic_info   = info' } }
+       ; return (implic { ic_skols  = skols'
+                        , ic_given  = given'
+                        , ic_wanted = wanted'
+                        , ic_info   = info' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar
 zonkEvVar var = do { ty' <- zonkTcType (varType var)
@@ -771,7 +748,7 @@ zonkWC wc = zonkWCRec wc
 zonkWCRec :: WantedConstraints -> TcM WantedConstraints
 zonkWCRec (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
   = do { simple' <- zonkSimples simple
-       ; implic' <- flatMapBagM zonkImplication implic
+       ; implic' <- mapBagM zonkImplication implic
        ; insol'  <- zonkSimples insol
        ; return (WC { wc_simple = simple', wc_impl = implic', wc_insol = insol' }) }
 

@@ -67,9 +67,8 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
                  InfixPatSyn name1 name2 -> (map unLoc [name1, name2], True)
-       ; (((lpat', (args, pat_ty)), tclvl), wanted)
-            <- captureConstraints  $
-               captureTcLevel      $
+       ; ((lpat', (args, pat_ty)), tclvl, wanted)
+            <- pushLevelAndCaptureConstraints  $
                do { pat_ty <- newFlexiTyVarTy openTypeKind
                   ; tcPat PatSyn lpat pat_ty $
                do { args <- mapM tcLookupId arg_names
@@ -120,7 +119,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; req_dicts <- newEvVars req_theta
 
        -- TODO: find a better SkolInfo
-       ; let skol_info = SigSkol (FunSigCtxt name) (mkFunTys arg_tys pat_ty)
+       ; let skol_info = SigSkol (FunSigCtxt name True) (mkFunTys arg_tys pat_ty)
 
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
@@ -373,6 +372,7 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                             , sig_loc = noSrcSpan
                             , sig_extra_cts = Nothing
                             , sig_partial = False
+                            , sig_warn_redundant = False  -- See Note [Redundant constraints for builder]
                             , sig_nwcs = []
                             }
 
@@ -416,6 +416,14 @@ tcPatSynBuilderOcc orig ps
     builder = patSynBuilder ps
 
 {-
+Note [Redundant constraints for builder]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The builder can have redundant constraints, which are awkard to eliminate.
+Consider
+   pattern P = Just 34
+To match against this pattern we need (Eq a, Num a).  But to build
+(Just 34) we need only (Num a).
+
 ************************************************************************
 *                                                                      *
          Helper functions

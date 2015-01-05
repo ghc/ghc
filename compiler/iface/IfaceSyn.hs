@@ -114,7 +114,7 @@ data IfaceDecl
                                                    -- the tycon)
                    ifFamFlav :: IfaceFamTyConFlav }
 
-  | IfaceClass { ifCtxt    :: IfaceContext,             -- Context...
+  | IfaceClass { ifCtxt    :: IfaceContext,             -- Superclasses
                  ifName    :: IfaceTopBndr,             -- Name of the class TyCon
                  ifTyVars  :: [IfaceTvBndr],            -- Type variables
                  ifRoles   :: [Role],                   -- Roles

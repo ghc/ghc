@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- !!! instance decls with no binds
 --
 module ShouldFail where

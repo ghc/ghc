@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances, UndecidableInstances #-}
 -- UndecidableInstances because (L a b) is no smaller than (C a b)

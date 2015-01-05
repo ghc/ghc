@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- !!! class/instance mumble that failed Lint at one time
 --
 module ShouldCompile where

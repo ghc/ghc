@@ -1,5 +1,5 @@
 
-T4398.hs:5:11: Warning:
+T4398.hs:6:11: Warning:
     Forall'd constraint ‘Ord a’ is not bound in RULE lhs
       Orig bndrs: [a, $dOrd, x, y]
       Orig lhs: let {

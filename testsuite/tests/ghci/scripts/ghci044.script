@@ -1,3 +1,4 @@
+:set -fno-warn-redundant-constraints
 --Testing flexible and Overlapping instances
 class C a where { f :: a -> String; f _ = "Default" }
 instance C Int where { f _ = "Zeroth" }

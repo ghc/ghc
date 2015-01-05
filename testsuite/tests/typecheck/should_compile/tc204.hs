@@ -1,5 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -dcore-lint #-}
 {-# LANGUAGE ImplicitParams #-}
-{-# OPTIONS -dcore-lint #-}
 
 -- The dict-bindings attached to an IPBinds 
 -- need not be in recursive order.  This is

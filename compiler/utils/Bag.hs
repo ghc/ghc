@@ -15,7 +15,7 @@ module Bag (
         mapBag,
         elemBag, lengthBag,
         filterBag, partitionBag, partitionBagWith,
-        concatBag, foldBag, foldrBag, foldlBag,
+        concatBag, catBagMaybes, foldBag, foldrBag, foldlBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
         listToBag, bagToList,
         foldrBagM, foldlBagM, mapBagM, mapBagM_,
@@ -99,10 +99,15 @@ anyBag p (TwoBags b1 b2) = anyBag p b1 || anyBag p b2
 anyBag p (ListBag xs)    = any p xs
 
 concatBag :: Bag (Bag a) -> Bag a
-concatBag EmptyBag        = EmptyBag
-concatBag (UnitBag b)     = b
-concatBag (TwoBags b1 b2) = concatBag b1 `unionBags` concatBag b2
-concatBag (ListBag bs)    = unionManyBags bs
+concatBag bss = foldrBag add emptyBag bss
+  where
+    add bs rs = bs `unionBags` rs
+
+catBagMaybes :: Bag (Maybe a) -> Bag a
+catBagMaybes bs = foldrBag add emptyBag bs
+  where
+    add Nothing rs = rs
+    add (Just x) rs = x `consBag` rs
 
 partitionBag :: (a -> Bool) -> Bag a -> (Bag a {- Satisfy predictate -},
                                          Bag a {- Don't -})

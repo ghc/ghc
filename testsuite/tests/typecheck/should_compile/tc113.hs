@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- !!! Monomorphism restriction
 
 module ShouldCompile where

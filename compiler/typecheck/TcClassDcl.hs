@@ -9,7 +9,7 @@ Typechecking class declarations
 {-# LANGUAGE CPP #-}
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2,
-                    findMethodBind, instantiateMethod, tcInstanceMethodBody,
+                    findMethodBind, instantiateMethod, 
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
                     tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
@@ -20,7 +20,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 import HsSyn
 import TcEnv
 import TcPat( addInlinePrags )
-import TcEvidence( HsWrapper, idHsWrapper )
+import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
 import TcHsType
@@ -156,28 +156,35 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
         --      dm1 = \d -> case ds d of (a,b,c) -> a
         -- And since ds is big, it doesn't get inlined, so we don't get good
         -- default methods.  Better to make separate AbsBinds for each
-        ; let
-              (tyvars, _, _, op_items) = classBigSig clas
+        ; let (tyvars, _, _, op_items) = classBigSig clas
               prag_fn     = mkPragFun sigs default_binds
               sig_fn      = mkHsSigFun sigs
               clas_tyvars = snd (tcSuperSkolTyVars tyvars)
               pred        = mkClassPred clas (mkTyVarTys clas_tyvars)
         ; this_dict <- newEvVar pred
 
-        ; traceTc "TIM2" (ppr sigs)
-        ; let tc_dm = tcDefMeth clas clas_tyvars
-                                this_dict default_binds
-                                sig_fn prag_fn
+        ; let tc_item (sel_id, dm_info)
+                = case dm_info of
+                    DefMeth dm_name    -> tc_dm sel_id dm_name False
+                    GenDefMeth dm_name -> tc_dm sel_id dm_name True
+                       -- For GenDefMeth, warn if the user specifies a signature
+                       -- with redundant constraints; but not for DefMeth, where
+                       -- the default method may well be 'error' or something
+                    NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id))
+                                                     (prag_fn (idName sel_id))
+                                             ; return emptyBag }
+              tc_dm = tcDefMeth clas clas_tyvars this_dict
+                                default_binds sig_fn prag_fn
 
         ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
-                      mapM tc_dm op_items
+                      mapM tc_item op_items
 
         ; return (unionManyBags dm_binds) }
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
 tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
-          -> HsSigFun -> PragFun -> ClassOpItem
+          -> HsSigFun -> PragFun -> Id -> Name -> Bool
           -> TcM (LHsBinds TcId)
 -- Generate code for polymorphic default methods only (hence DefMeth)
 -- (Generic default methods have turned into instance decls by now.)
@@ -185,78 +192,62 @@ tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
 -- default method for every class op, regardless of whether or not
 -- the programmer supplied an explicit default decl for the class.
 -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
-tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
-  = case dm_info of
-      NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id)) prags
-                               ; return emptyBag }
-      DefMeth dm_name    -> tc_dm dm_name
-      GenDefMeth dm_name -> tc_dm dm_name
-  where
-    sel_name           = idName sel_id
-    prags              = prag_fn sel_name
-    (dm_bind,bndr_loc) = findMethodBind sel_name binds_in
-                         `orElse` pprPanic "tcDefMeth" (ppr sel_id)
+tcDefMeth clas tyvars this_dict binds_in
+          hs_sig_fn prag_fn sel_id dm_name warn_redundant
+  | Just (L bind_loc dm_bind, bndr_loc) <- findMethodBind sel_name binds_in
+    -- First look up the default method -- it should be there!
+  = do { global_dm_id  <- tcLookupId dm_name
+       ; global_dm_id  <- addInlinePrags global_dm_id prags
+       ; local_dm_name <- setSrcSpan bndr_loc (newLocalName sel_name)
+            -- Base the local_dm_name on the selector name, because
+            -- type errors from tcInstanceMethodBody come from here
 
-    -- Eg.   class C a where
-    --          op :: forall b. Eq b => a -> [b] -> a
-    --          gen_op :: a -> a
-    --          generic gen_op :: D a => a -> a
-    -- The "local_dm_ty" is precisely the type in the above
-    -- type signatures, ie with no "forall a. C a =>" prefix
+       ; spec_prags <- tcSpecPrags global_dm_id prags
+       ; warnTc (not (null spec_prags))
+                (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
+                 <+> quotes (ppr sel_name))
 
-    tc_dm dm_name
-      = do { dm_id <- tcLookupId dm_name
-           ; local_dm_name <- setSrcSpan bndr_loc (newLocalName sel_name)
-             -- Base the local_dm_name on the selector name, because
-             -- type errors from tcInstanceMethodBody come from here
+       ; let hs_ty       = lookupHsSig hs_sig_fn sel_name
+                           `orElse` pprPanic "tc_dm" (ppr sel_name)
+             -- We need the HsType so that we can bring the right
+             -- type variables into scope
+             --
+             -- Eg.   class C a where
+             --          op :: forall b. Eq b => a -> [b] -> a
+             --          gen_op :: a -> a
+             --          generic gen_op :: D a => a -> a
+             -- The "local_dm_ty" is precisely the type in the above
+             -- type signatures, ie with no "forall a. C a =>" prefix
 
-           ; dm_id_w_inline <- addInlinePrags dm_id prags
-           ; spec_prags     <- tcSpecPrags dm_id prags
+             local_dm_ty = instantiateMethod clas global_dm_id (mkTyVarTys tyvars)
 
-           ; let local_dm_ty = instantiateMethod clas dm_id (mkTyVarTys tyvars)
-                 hs_ty       = lookupHsSig hs_sig_fn sel_name
-                               `orElse` pprPanic "tc_dm" (ppr sel_name)
-
-           ; local_dm_sig <- instTcTySig hs_ty local_dm_ty Nothing [] local_dm_name
-           ; warnTc (not (null spec_prags))
-                    (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
-                     <+> quotes (ppr sel_name))
-
-           ; tc_bind <- tcInstanceMethodBody (ClsSkol clas) tyvars [this_dict]
-                                             dm_id_w_inline local_dm_sig idHsWrapper
-                                             IsDefaultMethod dm_bind
-
-           ; return (unitBag tc_bind) }
-
----------------
-tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
-                     -> Id -> TcSigInfo
-                     -> HsWrapper  -- See Note [Instance method signatures] in TcInstDcls
-                     -> TcSpecPrags -> LHsBind Name
-                     -> TcM (LHsBind Id)
-tcInstanceMethodBody skol_info tyvars dfun_ev_vars
-                     meth_id local_meth_sig wrapper
-                     specs (L loc bind)
-  = do  { let local_meth_id = case local_meth_sig of
-                  TcSigInfo{ sig_id = meth_id } -> meth_id
-                  _ -> pprPanic "tcInstanceMethodBody" (ppr local_meth_sig)
-              lm_bind = L loc (bind { fun_id = L loc (idName local_meth_id) })
+             lm_bind     = dm_bind { fun_id = L bind_loc local_dm_name }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
-        ; (ev_binds, (tc_bind, _, _))
-               <- checkConstraints skol_info tyvars dfun_ev_vars $
-                  tcPolyCheck NonRecursive no_prag_fn local_meth_sig lm_bind
 
-        ; let export = ABE { abe_wrap = wrapper, abe_poly = meth_id
-                           , abe_mono = local_meth_id, abe_prags = specs }
+       ; local_dm_sig <- instTcTySig hs_ty local_dm_ty Nothing [] local_dm_name
+       ; let local_dm_sig' = local_dm_sig { sig_warn_redundant = warn_redundant }
+        ; (ev_binds, (tc_bind, _, _))
+               <- checkConstraints (ClsSkol clas) tyvars [this_dict] $
+                  tcPolyCheck NonRecursive no_prag_fn local_dm_sig'
+                              (L bind_loc lm_bind)
+
+        ; let export = ABE { abe_poly  = global_dm_id
+                           , abe_mono  = sig_id local_dm_sig'
+                           , abe_wrap  = idHsWrapper
+                           , abe_prags = IsDefaultMethod }
               full_bind = AbsBinds { abs_tvs      = tyvars
-                                   , abs_ev_vars  = dfun_ev_vars
+                                   , abs_ev_vars  = [this_dict]
                                    , abs_exports  = [export]
-                                   , abs_ev_binds = ev_binds
+                                   , abs_ev_binds = [ev_binds]
                                    , abs_binds    = tc_bind }
 
-        ; return (L loc full_bind) }
+        ; return (unitBag (L bind_loc full_bind)) }
+
+  | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
+    sel_name = idName sel_id
+    prags    = prag_fn sel_name
     no_prag_fn  _ = []          -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
 

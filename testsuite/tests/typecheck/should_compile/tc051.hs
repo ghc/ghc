@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 module ShouldSucceed where
 
 class Eq' a where

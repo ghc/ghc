@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 -- This one tickled the kind-check in TcType.matchTys,

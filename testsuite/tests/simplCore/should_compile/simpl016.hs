@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- Test for trac ticket #1287; ghc 6.6 and 6.6.1 panicked on this
 
 module ShouldCompile where

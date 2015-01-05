@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ConstraintKinds, TemplateHaskell, PolyKinds, TypeFamilies, RankNTypes #-}
 
 module T7021a where

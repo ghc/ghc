@@ -27,7 +27,7 @@ module TcSMonad (
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
     setWantedTyBind, reportUnifications,
-    setEvBind,
+    setEvBind, setWantedEvBind, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
     newDerived, emitNewDerived,
 
@@ -1355,10 +1355,11 @@ checkForCyclicBinds ev_binds
     cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVertices edges]
 
     coercion_cycles = [c | c <- cycles, any is_co_bind c]
-    is_co_bind (EvBind b _) = isEqVar b
+    is_co_bind (EvBind { eb_lhs = b }) = isEqVar b
 
     edges :: [(EvBind, EvVar, [EvVar])]
-    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs)) | bind@(EvBind bndr rhs) <- bagToList ev_binds]
+    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs)) 
+            | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs }) <- bagToList ev_binds]
 #endif
 
 nestImplicTcS :: EvBindsVar -> TcLevel -> TcS a -> TcS a
@@ -1760,10 +1761,19 @@ isFresh Cached = False
 freshGoals :: [(CtEvidence, Freshness)] -> [CtEvidence]
 freshGoals mns = [ ctev | (ctev, Fresh) <- mns ]
 
-setEvBind :: EvVar -> EvTerm -> TcS ()
-setEvBind the_ev tm
+setEvBind :: EvBind -> TcS ()
+setEvBind ev_bind
   = do { tc_evbinds <- getTcEvBinds
-       ; wrapTcS $ TcM.addTcEvBind tc_evbinds the_ev tm }
+       ; wrapTcS $ TcM.addTcEvBind tc_evbinds ev_bind }
+
+setWantedEvBind :: EvVar -> EvTerm -> TcS ()
+setWantedEvBind ev_id tm = setEvBind (mkWantedEvBind ev_id tm)
+
+setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
+setEvBindIfWanted ev tm
+  = case ev of
+      CtWanted { ctev_evar = ev_id } -> setWantedEvBind ev_id tm
+      _                              -> return ()
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds
@@ -1780,7 +1790,7 @@ newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 newGivenEvVar loc (pred, rhs)
   = ASSERT2( not (isKindEquality pred), ppr pred $$ pprCtOrigin (ctLocOrigin loc) )
     do { new_ev <- newEvVar pred
-       ; setEvBind new_ev rhs
+       ; setEvBind (mkGivenEvBind new_ev rhs)
        ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev, ctev_loc = loc }) }
 
 newGivenEvVars :: CtLoc -> [(TcPredType, EvTerm)] -> TcS [CtEvidence]
@@ -1920,15 +1930,15 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; let wc = WC { wc_simple = singleCt new_ct
                                        , wc_impl   = emptyBag
                                        , wc_insol  = emptyCts }
-                               imp = Implic { ic_tclvl  = new_tclvl
-                                            , ic_skols  = skol_tvs
-                                            , ic_no_eqs = True
-                                            , ic_given  = []
-                                            , ic_wanted = wc
-                                            , ic_insol  = False
-                                            , ic_binds  = ev_binds_var
-                                            , ic_env    = env
-                                            , ic_info   = skol_info }
+                               imp = Implic { ic_tclvl    = new_tclvl
+                                            , ic_skols    = skol_tvs
+                                            , ic_no_eqs   = True
+                                            , ic_given    = []
+                                            , ic_wanted   = wc
+                                            , ic_status   = IC_Unsolved
+                                            , ic_binds    = ev_binds_var
+                                            , ic_env      = env
+                                            , ic_info     = skol_info }
                          ; updWorkListTcS (extendWorkListImplic imp)
                          ; return (TcLetCo ev_binds new_co) }
 

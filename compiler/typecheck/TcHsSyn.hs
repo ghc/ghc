@@ -462,7 +462,7 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
   = ASSERT( all isImmutableTyVar tyvars )
     do { (env0, new_tyvars) <- zonkTyBndrsX env tyvars
        ; (env1, new_evs) <- zonkEvBndrsX env0 evs
-       ; (env2, new_ev_binds) <- zonkTcEvBinds env1 ev_binds
+       ; (env2, new_ev_binds) <- zonkTcEvBinds_s env1 ev_binds
        ; (new_val_bind, new_exports) <- fixM $ \ ~(new_val_binds, _) ->
          do { let env3 = extendIdZonkEnv env2 (collectHsBindsBinders new_val_binds)
             ; new_val_binds <- zonkMonoBinds env3 noSigWarn val_binds
@@ -1254,11 +1254,17 @@ zonkEvTerm env (EvDelayedError ty msg)
   = do { ty' <- zonkTcTypeToType env ty
        ; return (EvDelayedError ty' msg) }
 
+zonkTcEvBinds_s :: ZonkEnv -> [TcEvBinds] -> TcM (ZonkEnv, [TcEvBinds])
+zonkTcEvBinds_s env bs = do { (env, bs') <- mapAccumLM zonk_tc_ev_binds env bs
+                            ; return (env, [EvBinds (unionManyBags bs')]) }
+
 zonkTcEvBinds :: ZonkEnv -> TcEvBinds -> TcM (ZonkEnv, TcEvBinds)
-zonkTcEvBinds env (TcEvBinds var) = do { (env', bs') <- zonkEvBindsVar env var
-                                       ; return (env', EvBinds bs') }
-zonkTcEvBinds env (EvBinds bs)    = do { (env', bs') <- zonkEvBinds env bs
-                                       ; return (env', EvBinds bs') }
+zonkTcEvBinds env bs = do { (env', bs') <- zonk_tc_ev_binds env bs
+                          ; return (env', EvBinds bs') }
+
+zonk_tc_ev_binds :: ZonkEnv -> TcEvBinds -> TcM (ZonkEnv, Bag EvBind)
+zonk_tc_ev_binds env (TcEvBinds var) = zonkEvBindsVar env var
+zonk_tc_ev_binds env (EvBinds bs)    = zonkEvBinds env bs
 
 zonkEvBindsVar :: ZonkEnv -> EvBindsVar -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBindsVar env (EvBindsVar ref _) = do { bs <- readMutVar ref
@@ -1274,22 +1280,21 @@ zonkEvBinds env binds
   where
     collect_ev_bndrs :: Bag EvBind -> [EvVar]
     collect_ev_bndrs = foldrBag add []
-    add (EvBind var _) vars = var : vars
+    add (EvBind { eb_lhs = var }) vars = var : vars
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
-zonkEvBind env (EvBind var term)
+zonkEvBind env (EvBind { eb_lhs = var, eb_rhs = term, eb_is_given = is_given })
   = do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
 
          -- Optimise the common case of Refl coercions
          -- See Note [Optimise coercion zonking]
          -- This has a very big effect on some programs (eg Trac #5030)
-       ; let ty' = idType var'
-
-       ; case getEqPredTys_maybe ty' of
+       ; term' <- case getEqPredTys_maybe (idType var') of
            Just (r, ty1, ty2) | ty1 `eqType` ty2
-                  -> return (EvBind var' (EvCoercion (mkTcReflCo r ty1)))
-           _other -> do { term' <- zonkEvTerm env term
-                        ; return (EvBind var' term') } }
+                  -> return (EvCoercion (mkTcReflCo r ty1))
+           _other -> zonkEvTerm env term
+
+      ; return (EvBind { eb_lhs = var', eb_rhs = term', eb_is_given = is_given }) }
 
 {-
 ************************************************************************

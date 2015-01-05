@@ -32,7 +32,6 @@ import InstEnv
 import FamInstEnv
 import PrelNames
 
-import Var
 import Id
 import VarSet
 import VarEnv
@@ -1094,13 +1093,12 @@ newTcEvBinds = do { ref <- newTcRef emptyEvBindMap
                   ; uniq <- newUnique
                   ; return (EvBindsVar ref uniq) }
 
-addTcEvBind :: EvBindsVar -> EvVar -> EvTerm -> TcM ()
+addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
-addTcEvBind (EvBindsVar ev_ref _) ev_id ev_tm
-  = do { traceTc "addTcEvBind" $ vcat [ text "ev_id =" <+> ppr ev_id
-                                      , text "ev_tm =" <+> ppr ev_tm ]
+addTcEvBind (EvBindsVar ev_ref _) ev_bind
+  = do { traceTc "addTcEvBind" $ ppr ev_bind
        ; bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (extendEvBinds bnds ev_id ev_tm) }
+       ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
 
 getTcEvBinds :: EvBindsVar -> TcM (Bag EvBind)
 getTcEvBinds (EvBindsVar ev_ref _)
@@ -1163,24 +1161,31 @@ captureConstraints thing_inside
          lie <- readTcRef lie_var ;
          return (res, lie) }
 
-captureTcLevel :: TcM a -> TcM (a, TcLevel)
-captureTcLevel thing_inside
+pushLevelAndCaptureConstraints :: TcM a -> TcM (a, TcLevel, WantedConstraints)
+pushLevelAndCaptureConstraints thing_inside
   = do { env <- getLclEnv
+       ; lie_var <- newTcRef emptyWC ;
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
-       ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
+       ; res <- setLclEnv (env { tcl_tclvl = tclvl'
+                               , tcl_lie   = lie_var })
                 thing_inside
-       ; return (res, tclvl') }
+       ; lie <- readTcRef lie_var
+       ; return (res, tclvl', lie) }
 
-pushTcLevelM :: TcM a -> TcM a
+pushTcLevelM_ :: TcM a -> TcM a
+pushTcLevelM_ = updLclEnv (\ env -> env { tcl_tclvl = pushTcLevel (tcl_tclvl env) })
+
+pushTcLevelM :: TcM a -> TcM (a, TcLevel)
 pushTcLevelM thing_inside
   = do { env <- getLclEnv
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
-       ; setLclEnv (env { tcl_tclvl = tclvl' })
-                   thing_inside }
+       ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
+                          thing_inside
+       ; return (res, tclvl') }
 
 getTcLevel :: TcM TcLevel
 getTcLevel = do { env <- getLclEnv
-                     ; return (tcl_tclvl env) }
+                ; return (tcl_tclvl env) }
 
 setTcLevel :: TcLevel -> TcM a -> TcM a
 setTcLevel tclvl thing_inside

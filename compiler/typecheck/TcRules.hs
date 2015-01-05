@@ -166,29 +166,29 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
            -- Simplify the RHS constraints
        ; lcl_env <- getLclEnv
        ; rhs_binds_var <- newTcEvBinds
-       ; emitImplication $ Implic { ic_tclvl  = topTcLevel
-                                  , ic_skols  = qtkvs
-                                  , ic_no_eqs = False
-                                  , ic_given  = lhs_evs
-                                  , ic_wanted = rhs_wanted
-                                  , ic_insol  = insolubleWC rhs_wanted
-                                  , ic_binds  = rhs_binds_var
-                                  , ic_info   = RuleSkol (unLoc name)
-                                  , ic_env    = lcl_env }
+       ; emitImplication $ Implic { ic_tclvl    = topTcLevel
+                                  , ic_skols    = qtkvs
+                                  , ic_no_eqs   = False
+                                  , ic_given    = lhs_evs
+                                  , ic_wanted   = rhs_wanted
+                                  , ic_status   = IC_Unsolved
+                                  , ic_binds    = rhs_binds_var
+                                  , ic_info     = RuleSkol (unLoc name)
+                                  , ic_env      = lcl_env }
 
            -- For the LHS constraints we must solve the remaining constraints
            -- (a) so that we report insoluble ones
            -- (b) so that we bind any soluble ones
        ; lhs_binds_var <- newTcEvBinds
-       ; emitImplication $ Implic { ic_tclvl  = topTcLevel
-                                  , ic_skols  = qtkvs
-                                  , ic_no_eqs = False
-                                  , ic_given  = lhs_evs
-                                  , ic_wanted = other_lhs_wanted
-                                  , ic_insol  = insolubleWC other_lhs_wanted
-                                  , ic_binds  = lhs_binds_var
-                                  , ic_info   = RuleSkol (unLoc name)
-                                  , ic_env    = lcl_env }
+       ; emitImplication $ Implic { ic_tclvl    = topTcLevel
+                                  , ic_skols    = qtkvs
+                                  , ic_no_eqs   = False
+                                  , ic_given    = lhs_evs
+                                  , ic_wanted   = other_lhs_wanted
+                                  , ic_status   = IC_Unsolved
+                                  , ic_binds    = lhs_binds_var
+                                  , ic_info     = RuleSkol (unLoc name)
+                                  , ic_env      = lcl_env }
 
        ; return (HsRule name act
                     (map (noLoc . RuleBndr . noLoc) (qtkvs ++ tpl_ids))

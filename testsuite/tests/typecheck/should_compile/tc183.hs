@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ExistentialQuantification, RankNTypes #-}
 
 -- An interesting interaction of universals and existentials, prompted by 

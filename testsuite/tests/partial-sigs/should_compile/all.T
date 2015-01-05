@@ -29,7 +29,7 @@ test('HigherRank2', normal, compile, ['-ddump-types -fno-warn-partial-type-signa
 test('LocalDefinitionBug', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Meltdown', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug
-test('MonoLocalBinds', expect_fail, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('MonoLocalBinds', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('NamedTyVar', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ParensAroundContext', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])

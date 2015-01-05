@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- This test comes from Sergei Mechveliani's DoCon system

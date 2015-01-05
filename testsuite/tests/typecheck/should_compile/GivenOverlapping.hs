@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FunctionalDependencies, FlexibleContexts #-}
 
 class C a where 

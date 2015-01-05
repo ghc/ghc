@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ConstraintKinds, RankNTypes #-}
 
 module T8807 where

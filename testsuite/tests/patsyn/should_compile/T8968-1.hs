@@ -6,3 +6,4 @@ data X :: (* -> *) -> * -> * where
 
 pattern C :: a -> X Maybe (Maybe a)
 pattern C x = Y (Just x)
+

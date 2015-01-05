@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -w #-}
 {-# LANGUAGE UndecidableInstances, EmptyDataDecls #-}
 {-# LANGUAGE RankNTypes, KindSignatures, MultiParamTypeClasses, FlexibleInstances #-}
 

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- !!! Mis-matched contexts in a mutually recursive group
 
 {-  # LANGUAGE NoRelaxedPolyRec #-}

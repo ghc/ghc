@@ -11,8 +11,9 @@ module TcEvidence (
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
-  EvBindMap(..), emptyEvBindMap, extendEvBinds, lookupEvBind, evBindMapBinds,
-  EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds,
+  EvBindMap(..), emptyEvBindMap, extendEvBinds, 
+                 lookupEvBind, evBindMapBinds, foldEvBindMap,
+  EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   EvTerm(..), mkEvCast, evVarsOfTerm,
   EvLit(..), evTermCoercion,
 
@@ -446,10 +447,10 @@ coVarsOfTcCo tc_co
 
     -- We expect only coercion bindings, so use evTermCoercion
     go_bind :: EvBind -> VarSet
-    go_bind (EvBind _ tm) = go (evTermCoercion tm)
+    go_bind (EvBind { eb_rhs =tm }) = go (evTermCoercion tm)
 
     get_bndrs :: Bag EvBind -> VarSet
-    get_bndrs = foldrBag (\ (EvBind b _) bs -> extendVarSet bs b) emptyVarSet
+    get_bndrs = foldrBag (\ (EvBind { eb_lhs = b }) bs -> extendVarSet bs b) emptyVarSet
 
 -- Pretty printing
 
@@ -665,20 +666,35 @@ newtype EvBindMap
 emptyEvBindMap :: EvBindMap
 emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyVarEnv }
 
-extendEvBinds :: EvBindMap -> EvVar -> EvTerm -> EvBindMap
-extendEvBinds bs v t
-  = EvBindMap { ev_bind_varenv = extendVarEnv (ev_bind_varenv bs) v (EvBind v t) }
+extendEvBinds :: EvBindMap -> EvBind -> EvBindMap
+extendEvBinds bs ev_bind
+  = EvBindMap { ev_bind_varenv = extendVarEnv (ev_bind_varenv bs)
+                                              (eb_lhs ev_bind)
+                                              ev_bind }
 
 lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
 lookupEvBind bs = lookupVarEnv (ev_bind_varenv bs)
 
 evBindMapBinds :: EvBindMap -> Bag EvBind
-evBindMapBinds bs
-  = foldVarEnv consBag emptyBag (ev_bind_varenv bs)
+evBindMapBinds = foldEvBindMap consBag emptyBag
+
+foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
+foldEvBindMap k z bs = foldVarEnv k z (ev_bind_varenv bs)
 
 -----------------
 -- All evidence is bound by EvBinds; no side effects
-data EvBind = EvBind EvVar EvTerm
+data EvBind
+  = EvBind { eb_lhs      :: EvVar
+           , eb_rhs      :: EvTerm
+           , eb_is_given :: Bool  -- True <=> given
+                 -- See Note [Tracking redundant constraints] in TcSimplify
+    }
+
+mkWantedEvBind :: EvVar -> EvTerm -> EvBind
+mkWantedEvBind ev tm = EvBind { eb_is_given = False, eb_lhs = ev, eb_rhs = tm }
+
+mkGivenEvBind :: EvVar -> EvTerm -> EvBind
+mkGivenEvBind ev tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = tm }
 
 data EvTerm
   = EvId EvId                    -- Any sort of evidence Id, including coercions
@@ -888,7 +904,11 @@ instance Outputable EvBindsVar where
   ppr (EvBindsVar _ u) = ptext (sLit "EvBindsVar") <> angleBrackets (ppr u)
 
 instance Outputable EvBind where
-  ppr (EvBind v e)   = sep [ ppr v, nest 2 $ equals <+> ppr e ]
+  ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })
+     = sep [ pp_gw <+> ppr v
+           , nest 2 $ equals <+> ppr e ]
+     where
+       pp_gw = brackets (if is_given then ptext (sLit "[G]") else ptext (sLit "[W]"))
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where

@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, KindSignatures #-}
+
 module TcShouldTerminate where
 
 import GHC.Prim (Constraint)

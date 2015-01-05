@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+
 module ShouldSucceed where
 
 data Z a b

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE DataKinds, FunctionalDependencies, FlexibleInstances,
               UndecidableInstances, PolyKinds, KindSignatures,
               ConstraintKinds, FlexibleContexts, GADTs #-}

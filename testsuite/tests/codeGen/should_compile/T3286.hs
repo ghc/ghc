@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module T3286 (train) where
 

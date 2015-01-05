@@ -1,4 +1,5 @@
-{-# OPTIONS -XArrows #-}
+{-# LANGUAGE Arrows #-}
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 
 -- Test for Trac #1662
 

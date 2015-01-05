@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE NoMonomorphismRestriction, RankNTypes #-}
 {-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances, FlexibleContexts, ScopedTypeVariables #-}

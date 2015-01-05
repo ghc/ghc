@@ -1,4 +1,5 @@
 --Testing GADTs, type families as well as a ton of crazy type stuff
+:set -fno-warn-redundant-constraints
 :set -XGADTs
 :set -XTypeFamilies
 :set -XFunctionalDependencies

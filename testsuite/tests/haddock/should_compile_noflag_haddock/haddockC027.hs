@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 module ShouldCompile where
 
 -- I bet this test is a mistake!  From the layout it 

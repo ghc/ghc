@@ -1156,8 +1156,8 @@ collectEvBinders (EvBinds bs)   = foldrBag add_ev_bndr [] bs
 collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
 
 add_ev_bndr :: EvBind -> [Id] -> [Id]
-add_ev_bndr (EvBind b _) bs | isId b    = b:bs
-                            | otherwise = bs
+add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs
+                                       | otherwise = bs
   -- A worry: what about coercion variable binders??
 
 collectLStmtsBinders :: [LStmt Id body] -> [Id]

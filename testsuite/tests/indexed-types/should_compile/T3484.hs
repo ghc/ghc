@@ -1,5 +1,6 @@
+{-# OPTIONS_GHC -Wall -fno-warn-redundant-constraints #-}
 {-# LANGUAGE GADTs, RankNTypes, TypeFamilies, FlexibleContexts, ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall #-}
+
 module Absurd where
 
 data Z = Z

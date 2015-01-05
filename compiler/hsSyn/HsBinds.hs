@@ -191,8 +191,13 @@ data HsBindLR idL idR
        -- to have the right type
         abs_exports :: [ABExport idL],
 
-        abs_ev_binds :: TcEvBinds,     -- ^ Evidence bindings
-        abs_binds    :: LHsBinds idL   -- ^ Typechecked user bindings
+        -- | Evidence bindings
+        -- Why a list? See TcInstDcls
+        -- Note [Typechecking plan for instance declarations]
+        abs_ev_binds :: [TcEvBinds],
+
+        -- | Typechecked user bindings
+        abs_binds    :: LHsBinds idL
     }
 
   | PatSynBind (PatSynBind idL idR)

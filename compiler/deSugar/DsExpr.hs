@@ -142,7 +142,7 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlBagM (\body lbind -> dsStrictBind (unLoc lbind) body)
                             body1 lbinds
-       ; ds_binds <- dsTcEvBinds ev_binds
+       ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn
