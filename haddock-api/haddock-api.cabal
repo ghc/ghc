@@ -45,7 +45,7 @@ library
     , array
     , xhtml >= 3000.2 && < 3000.3
     , Cabal >= 1.10
-    , ghc == 7.9.*
+    , ghc >= 7.10 && < 7.10.2
 
     , ghc-paths
     , haddock-library == 1.2.0.*
