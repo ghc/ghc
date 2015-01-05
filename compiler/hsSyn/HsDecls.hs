@@ -601,12 +601,10 @@ isDataFamilyDecl _other      = False
 
 -- Dealing with names
 
-tyFamInstDeclName :: OutputableBndr name
-                  => TyFamInstDecl name -> name
+tyFamInstDeclName :: TyFamInstDecl name -> name
 tyFamInstDeclName = unLoc . tyFamInstDeclLName
 
-tyFamInstDeclLName :: OutputableBndr name
-                   => TyFamInstDecl name -> Located name
+tyFamInstDeclLName :: TyFamInstDecl name -> Located name
 tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
                      (L _ (TyFamEqn { tfe_tycon = ln })) })
   = ln
@@ -618,7 +616,7 @@ tyClDeclLName decl = tcdLName decl
 tcdName :: TyClDecl name -> name
 tcdName = unLoc . tyClDeclLName
 
-tyClDeclTyVars :: OutputableBndr name => TyClDecl name -> LHsTyVarBndrs name
+tyClDeclTyVars :: TyClDecl name -> LHsTyVarBndrs name
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
 

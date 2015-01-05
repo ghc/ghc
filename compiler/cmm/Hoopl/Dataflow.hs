@@ -763,7 +763,7 @@ normalizeGraph g = (mapGraphBlocks dropFact g, facts g)
           exitFacts (JustO (DBlock f b)) = mapSingleton (entryLabel b) f
           bodyFacts :: LabelMap (DBlock f n C C) -> FactBase f
           bodyFacts body = mapFoldWithKey f noFacts body
-            where f :: forall t a x. (NonLocal t) => Label -> DBlock a t C x -> LabelMap a -> LabelMap a
+            where f :: forall t a x. Label -> DBlock a t C x -> LabelMap a -> LabelMap a
                   f lbl (DBlock f _) fb = mapInsert lbl f fb
 
 --- implementation of the constructors (boring)

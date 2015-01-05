@@ -20,7 +20,7 @@ import Data.Maybe
 
 -- | Pretty print a graph in a somewhat human readable format.
 dumpGraph
-        :: (Outputable k, Outputable cls, Outputable color)
+        :: (Outputable k, Outputable color)
         => Graph k cls color -> SDoc
 
 dumpGraph graph
@@ -28,7 +28,7 @@ dumpGraph graph
         $$ (vcat $ map dumpNode $ eltsUFM $ graphMap graph)
 
 dumpNode
-        :: (Outputable k, Outputable cls, Outputable color)
+        :: (Outputable k, Outputable color)
         => Node k cls color -> SDoc
 
 dumpNode node
@@ -74,8 +74,7 @@ dotGraph colorMap triv graph
                    , space ])
 
 
-dotNode :: ( Uniquable k
-           , Outputable k, Outputable cls, Outputable color)
+dotNode :: ( Outputable k, Outputable cls, Outputable color)
         => (color -> SDoc)
         -> Triv k cls color
         -> Node k cls color -> SDoc
@@ -132,7 +131,7 @@ dotNode colorMap triv node
 
 dotNodeEdges
         :: ( Uniquable k
-           , Outputable k, Outputable cls, Outputable color)
+           , Outputable k)
         => UniqSet k
         -> Node k cls color
         -> (UniqSet k, Maybe SDoc)

@@ -108,7 +108,7 @@ instance Monad m => Monad (EwM m) where
                                       unEwM (k r) l e' w')
     return v = EwM (\_ e w -> return (e, w, v))
 
-setArg :: Monad m => Located String -> EwM m () -> EwM m ()
+setArg :: Located String -> EwM m () -> EwM m ()
 setArg l (EwM f) = EwM (\_ es ws -> f l es ws)
 
 addErr :: Monad m => String -> EwM m ()

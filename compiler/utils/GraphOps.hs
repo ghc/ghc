@@ -76,7 +76,7 @@ addNode k node graph
 
 
 -- | Delete a node and all its edges from the graph.
-delNode :: (Uniquable k, Outputable k)
+delNode :: (Uniquable k)
         => k -> Graph k cls color -> Maybe (Graph k cls color)
 
 delNode k graph
@@ -119,16 +119,14 @@ modNode f k graph
 
 
 -- | Get the size of the graph, O(n)
-size    :: Uniquable k
-        => Graph k cls color -> Int
+size    :: Graph k cls color -> Int
 
 size graph
         = sizeUFM $ graphMap graph
 
 
 -- | Union two graphs together.
-union   :: Uniquable k
-        => Graph k cls color -> Graph k cls color -> Graph k cls color
+union   :: Graph k cls color -> Graph k cls color -> Graph k cls color
 
 union   graph1 graph2
         = Graph
@@ -333,7 +331,7 @@ coalesceGraph' aggressive triv graph kkPairsAcc
 --               Nothing if either of the nodes weren't in the graph
 
 coalesceNodes
-        :: (Uniquable k, Ord k, Eq cls, Outputable k)
+        :: (Uniquable k, Ord k, Eq cls)
         => Bool                 -- ^ If True, coalesce nodes even if this might make the graph
                                 --      less colorable (aggressive coalescing)
         -> Triv  k cls color
@@ -364,7 +362,7 @@ coalesceNodes aggressive triv graph (k1, k2)
         = (graph, Nothing)
 
 coalesceNodes_merge
-        :: (Uniquable k, Ord k, Eq cls, Outputable k)
+        :: (Uniquable k, Eq cls)
         => Bool
         -> Triv  k cls color
         -> Graph k cls color
@@ -410,7 +408,7 @@ coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
           in    coalesceNodes_check aggressive triv graph kMin kMax node
 
 coalesceNodes_check
-        :: (Uniquable k, Ord k, Eq cls, Outputable k)
+        :: Uniquable k
         => Bool
         -> Triv  k cls color
         -> Graph k cls color
@@ -483,7 +481,7 @@ freezeNode k
 --              right here, and add it to a worklist if known triv\/non-move nodes.
 --
 freezeOneInGraph
-        :: (Uniquable k, Outputable k)
+        :: (Uniquable k)
         => Graph k cls color
         -> ( Graph k cls color          -- the new graph
            , Bool )                     -- whether we found a node to freeze
@@ -512,7 +510,7 @@ freezeOneInGraph graph
 --      for debugging the iterative allocator.
 --
 freezeAllInGraph
-        :: (Uniquable k, Outputable k)
+        :: (Uniquable k)
         => Graph k cls color
         -> Graph k cls color
 
@@ -525,8 +523,7 @@ freezeAllInGraph graph
 -- | Find all the nodes in the graph that meet some criteria
 --
 scanGraph
-        :: Uniquable k
-        => (Node k cls color -> Bool)
+        :: (Node k cls color -> Bool)
         -> Graph k cls color
         -> [Node k cls color]
 
@@ -611,8 +608,7 @@ checkNode graph node
 -- | Slurp out a map of how many nodes had a certain number of conflict neighbours
 
 slurpNodeConflictCount
-        :: Uniquable k
-        => Graph k cls color
+        :: Graph k cls color
         -> UniqFM (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
 
 slurpNodeConflictCount graph

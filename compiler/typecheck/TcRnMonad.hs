@@ -893,10 +893,11 @@ failIfErrsM :: TcRn ()
 -- Useful to avoid error cascades
 failIfErrsM = ifErrsM failM (return ())
 
-checkTH :: Outputable a => a -> String -> TcRn ()
 #ifdef GHCI
+checkTH :: a -> String -> TcRn ()
 checkTH _ _ = return () -- OK
 #else
+checkTH :: Outputable a => a -> String -> TcRn ()
 checkTH e what = failTH e what  -- Raise an error in a stage-1 compiler
 #endif
 

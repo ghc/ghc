@@ -1064,14 +1064,14 @@ pprMatch ctxt (Match pats maybe_ty grhss)
                         Nothing -> empty
 
 
-pprGRHSs :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
+pprGRHSs :: (OutputableBndr idR, Outputable body)
          => HsMatchContext idL -> GRHSs idR body -> SDoc
 pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
  $$ ppUnless (isEmptyLocalBinds binds)
       (text "where" $$ nest 4 (pprBinds binds))
 
-pprGRHS :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
+pprGRHS :: (OutputableBndr idR, Outputable body)
         => HsMatchContext idL -> GRHS idR body -> SDoc
 pprGRHS ctxt (GRHS [] body)
  =  pp_rhs ctxt body
@@ -1355,8 +1355,8 @@ In any other context than 'MonadComp', the fields for most of these
 'SyntaxExpr's stay bottom.
 -}
 
-instance (OutputableBndr idL, OutputableBndr idR)
-    => Outputable (ParStmtBlock idL idR) where
+instance (OutputableBndr idL)
+      => Outputable (ParStmtBlock idL idR) where
   ppr (ParStmtBlock stmts _ _) = interpp'SP stmts
 
 instance (OutputableBndr idL, OutputableBndr idR, Outputable body)

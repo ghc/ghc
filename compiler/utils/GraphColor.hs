@@ -34,7 +34,7 @@ import Data.List
 --
 colorGraph
         :: ( Uniquable  k, Uniquable cls,  Uniquable  color
-           , Eq color, Eq cls, Ord k
+           , Eq cls, Ord k
            , Outputable k, Outputable cls, Outputable color)
         => Bool                         -- ^ whether to do iterative coalescing
         -> Int                          -- ^ how many times we've tried to color this graph so far.
@@ -250,7 +250,7 @@ colorScan_spill iterative triv spill graph
 
 assignColors
         :: ( Uniquable k, Uniquable cls, Uniquable color
-           , Eq color, Outputable cls)
+           , Outputable cls)
         => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> [k]                          -- ^ nodes to assign a color to.
@@ -288,7 +288,7 @@ assignColors colors graph ks
 --
 selectColor
         :: ( Uniquable k, Uniquable cls, Uniquable color
-           , Eq color, Outputable cls)
+           , Outputable cls)
         => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> k                            -- ^ key of the node to select a color for.

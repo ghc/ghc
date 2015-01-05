@@ -543,7 +543,7 @@ addAssoc a b m
 
 
 -- | Delete all associations to a node.
-delAssoc :: (Outputable a, Uniquable a)
+delAssoc :: (Uniquable a)
          => a -> Assoc a -> Assoc a
 
 delAssoc a m
@@ -566,7 +566,7 @@ delAssoc1 a b m
 
 
 -- | Check if these two things are associated.
-elemAssoc :: (Outputable a, Uniquable a)
+elemAssoc :: (Uniquable a)
           => a -> a -> Assoc a -> Bool
 
 elemAssoc a b m
@@ -574,7 +574,7 @@ elemAssoc a b m
 
 
 -- | Find the refl. trans. closure of the association from this point.
-closeAssoc :: (Outputable a, Uniquable a)
+closeAssoc :: (Uniquable a)
         => a -> Assoc a -> UniqSet a
 
 closeAssoc a assoc
@@ -604,10 +604,7 @@ closeAssoc a assoc
                         (unionUniqSets   toVisit neighbors)
 
 -- | Intersect two associations.
-intersectAssoc
-        :: Uniquable a
-        => Assoc a -> Assoc a -> Assoc a
-
+intersectAssoc :: Assoc a -> Assoc a -> Assoc a
 intersectAssoc a b
         = intersectUFM_C (intersectUniqSets) a b
 

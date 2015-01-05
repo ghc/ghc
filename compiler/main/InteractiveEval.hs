@@ -75,7 +75,6 @@ import BreakArray
 import RtClosureInspect
 import Outputable
 import FastString
-import MonadUtils
 
 import System.Mem.Weak
 import System.Directory
@@ -427,7 +426,7 @@ rethrow dflags io = Exception.catch io $ \se -> do
 -- resets everything when the computation has stopped running.  This
 -- is a not-very-good way to ensure that only the interactive
 -- evaluation should generate breakpoints.
-withBreakAction :: (ExceptionMonad m, MonadIO m) =>
+withBreakAction :: (ExceptionMonad m) =>
                    Bool -> DynFlags -> MVar () -> MVar Status -> m a -> m a
 withBreakAction step dflags breakMVar statusMVar act
  = gbracket (liftIO setBreakAction) (liftIO . resetBreakAction) (\_ -> act)

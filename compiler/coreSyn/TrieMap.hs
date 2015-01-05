@@ -154,12 +154,12 @@ mapMb :: TrieMap m => (a->b) -> MaybeMap m a -> MaybeMap m b
 mapMb f (MM { mm_nothing = mn, mm_just = mj })
   = MM { mm_nothing = fmap f mn, mm_just = mapTM f mj }
 
-lkMaybe :: TrieMap m => (forall b. k -> m b -> Maybe b)
+lkMaybe :: (forall b. k -> m b -> Maybe b)
         -> Maybe k -> MaybeMap m a -> Maybe a
 lkMaybe _  Nothing  = mm_nothing
 lkMaybe lk (Just x) = mm_just >.> lk x
 
-xtMaybe :: TrieMap m => (forall b. k -> XT b -> m b -> m b)
+xtMaybe :: (forall b. k -> XT b -> m b -> m b)
         -> Maybe k -> XT a -> MaybeMap m a -> MaybeMap m a
 xtMaybe _  Nothing  f m = m { mm_nothing  = f (mm_nothing m) }
 xtMaybe tr (Just x) f m = m { mm_just = mm_just m |> tr x f }
