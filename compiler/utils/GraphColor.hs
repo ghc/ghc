@@ -288,7 +288,7 @@ assignColors colors graph ks
 --
 selectColor
         :: ( Uniquable k, Uniquable cls, Uniquable color
-           , Eq color, Outputable cls)
+           , Outputable cls)
         => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> k                            -- ^ key of the node to select a color for.

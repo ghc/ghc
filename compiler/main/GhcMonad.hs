@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE CPP, RankNTypes #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -- -----------------------------------------------------------------------------
 --
@@ -156,7 +156,8 @@ reifyGhc act = Ghc $ act
 --
 -- Note that the wrapped monad must support IO and handling of exceptions.
 newtype GhcT m a = GhcT { unGhcT :: Session -> m a }
-liftGhcT :: Monad m => m a -> GhcT m a
+
+liftGhcT :: m a -> GhcT m a
 liftGhcT m = GhcT $ \_ -> m
 
 instance Functor m => Functor (GhcT m) where
@@ -183,10 +184,18 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
                            in
                               unGhcT (f g_restore) s
 
-instance (Functor m, ExceptionMonad m, MonadIO m) => HasDynFlags (GhcT m) where
+#if __GLASGOW_HASKELL__ < 710
+instance (ExceptionMonad m, Functor m) => HasDynFlags (GhcT m) where
+#else
+instance (ExceptionMonad m) => HasDynFlags (GhcT m) where
+#endif
   getDynFlags = getSessionDynFlags
 
-instance (Functor m, ExceptionMonad m, MonadIO m) => GhcMonad (GhcT m) where
+#if __GLASGOW_HASKELL__ < 710
+instance (ExceptionMonad m, Functor m) => GhcMonad (GhcT m) where
+#else
+instance (ExceptionMonad m) => GhcMonad (GhcT m) where
+#endif
   getSession = GhcT $ \(Session r) -> liftIO $ readIORef r
   setSession s' = GhcT $ \(Session r) -> liftIO $ writeIORef r s'
 

@@ -184,7 +184,7 @@ brListFoldlM_ :: forall a b m br. Monad m
               => (a -> b -> m a) -> a -> BranchList b br -> m ()
 brListFoldlM_ f z brs = do { _ <- go z brs
                            ; return () }
-  where go :: forall br'. Monad m => a -> BranchList b br' -> m a
+  where go :: forall br'. a -> BranchList b br' -> m a
         go acc (FirstBranch b)  = f acc b
         go acc (NextBranch h t) = do { fh <- f acc h
                                      ; go fh t }

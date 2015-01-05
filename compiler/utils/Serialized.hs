@@ -100,7 +100,7 @@ deserializeConstr bytes k = deserializeWord8 bytes $ \constr_ix bytes ->
 serializeFixedWidthNum :: forall a. (Num a, Integral a, Bits a) => a -> [Word8] -> [Word8]
 serializeFixedWidthNum what = go (bitSize what) what
 #else
-serializeFixedWidthNum :: forall a. (Num a, Integral a, FiniteBits a) => a -> [Word8] -> [Word8]
+serializeFixedWidthNum :: forall a. (Integral a, FiniteBits a) => a -> [Word8] -> [Word8]
 serializeFixedWidthNum what = go (finiteBitSize what) what
 #endif
   where
@@ -113,7 +113,7 @@ serializeFixedWidthNum what = go (finiteBitSize what) what
 deserializeFixedWidthNum :: forall a b. (Num a, Integral a, Bits a) => [Word8] -> (a -> [Word8] -> b) -> b
 deserializeFixedWidthNum bytes k = go (bitSize (undefined :: a)) bytes k
 #else
-deserializeFixedWidthNum :: forall a b. (Num a, Integral a, FiniteBits a) => [Word8] -> (a -> [Word8] -> b) -> b
+deserializeFixedWidthNum :: forall a b. (Integral a, FiniteBits a) => [Word8] -> (a -> [Word8] -> b) -> b
 deserializeFixedWidthNum bytes k = go (finiteBitSize (undefined :: a)) bytes k
 #endif
   where

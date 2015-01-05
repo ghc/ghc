@@ -199,7 +199,7 @@ linkDependencies hsc_env pls span needed_mods = do
 
 -- | Temporarily extend the linker state.
 
-withExtendedLinkEnv :: (MonadIO m, ExceptionMonad m) =>
+withExtendedLinkEnv :: (ExceptionMonad m) =>
                        [(Name,HValue)] -> m a -> m a
 withExtendedLinkEnv new_env action
     = gbracket (liftIO $ extendLinkEnv new_env)

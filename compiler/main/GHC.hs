@@ -345,7 +345,7 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: (ExceptionMonad m, MonadIO m)
+defaultErrorHandler :: (ExceptionMonad m)
                     => FatalMessager -> FlushOut -> m a -> m a
 defaultErrorHandler fm (FlushOut flushOut) inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
@@ -386,7 +386,7 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
 -- a GHC run.  This is separate from 'defaultErrorHandler', because you might
 -- want to override the error handling, but still get the ordinary cleanup
 -- behaviour.
-defaultCleanupHandler :: (ExceptionMonad m, MonadIO m) =>
+defaultCleanupHandler :: (ExceptionMonad m) =>
                          DynFlags -> m a -> m a
 defaultCleanupHandler dflags inner =
     -- make sure we clean up after ourselves
@@ -432,7 +432,11 @@ runGhc mb_top_dir ghc = do
 -- to this function will create a new session which should not be shared among
 -- several threads.
 
-runGhcT :: (ExceptionMonad m, Functor m, MonadIO m) =>
+#if __GLASGOW_HASKELL < 710
+runGhcT :: (ExceptionMonad m, Functor m) =>
+#else
+runGhcT :: (ExceptionMonad m) =>
+#endif
            Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
         -> GhcT m a        -- ^ The action to perform.
         -> m a

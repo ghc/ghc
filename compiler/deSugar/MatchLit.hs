@@ -394,7 +394,7 @@ hsLitKey _      (HsString _ s)     = MachStr    (fastStringToByteString s)
 hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 
 ---------------------------
-hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
+hsOverLitKey :: HsOverLit a -> Bool -> Literal
 -- Ditto for HsOverLit; the boolean indicates to negate
 hsOverLitKey (OverLit { ol_val = l }) neg = litValKey l neg
 

@@ -235,12 +235,14 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
     arch ->
         panic ("mkJumpToAddr not defined for " ++ show arch)
 
-byte0, byte1, byte2, byte3 :: (Integral w, Bits w) => w -> Word8
+byte0 :: (Integral w) => w -> Word8
 byte0 w = fromIntegral w
+
+byte1, byte2, byte3, byte4, byte5, byte6, byte7
+       :: (Integral w, Bits w) => w -> Word8
 byte1 w = fromIntegral (w `shiftR` 8)
 byte2 w = fromIntegral (w `shiftR` 16)
 byte3 w = fromIntegral (w `shiftR` 24)
-byte4, byte5, byte6, byte7 :: (Integral w, Bits w) => w -> Word8
 byte4 w = fromIntegral (w `shiftR` 32)
 byte5 w = fromIntegral (w `shiftR` 40)
 byte6 w = fromIntegral (w `shiftR` 48)

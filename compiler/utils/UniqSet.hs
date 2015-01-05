@@ -54,7 +54,7 @@ addOneToUniqSet_C :: Uniquable a => (a -> a -> a) -> UniqSet a -> a -> UniqSet a
 addListToUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
 
 delOneFromUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
-delOneFromUniqSet_Directly :: Uniquable a => UniqSet a -> Unique -> UniqSet a
+delOneFromUniqSet_Directly :: UniqSet a -> Unique -> UniqSet a
 delListFromUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
 
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a

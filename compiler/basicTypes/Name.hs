@@ -564,11 +564,12 @@ getSrcLoc           = nameSrcLoc           . getName
 getSrcSpan          = nameSrcSpan          . getName
 getOccString        = occNameString        . getOccName
 
-pprInfixName, pprPrefixName :: (Outputable a, NamedThing a) => a -> SDoc
+pprInfixName :: (Outputable a, NamedThing a) => a -> SDoc
 -- See Outputable.pprPrefixVar, pprInfixVar;
 -- add parens or back-quotes as appropriate
 pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
 
+pprPrefixName :: NamedThing a => a -> SDoc
 pprPrefixName thing
  |  name `hasKey` liftedTypeKindTyConKey
  = ppr name   -- See Note [Special treatment for kind *]
