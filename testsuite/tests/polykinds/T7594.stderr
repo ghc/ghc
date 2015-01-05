@@ -2,7 +2,7 @@
 T7594.hs:33:12:
     Couldn't match type ‘b’ with ‘IO ()’
       ‘b’ is untouchable
-        inside the constraints ((:&:) c0 Real a)
+        inside the constraints: (:&:) c0 Real a
         bound by a type expected by the context: (:&:) c0 Real a => a -> b
         at T7594.hs:33:8-19
       ‘b’ is a rigid type variable bound by

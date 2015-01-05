@@ -2,7 +2,7 @@
 T9109.hs:8:13:
     Couldn't match expected type ‘t’ with actual type ‘Bool’
       ‘t’ is untouchable
-        inside the constraints (t1 ~ Bool)
+        inside the constraints: t1 ~ Bool
         bound by a pattern with constructor: GBool :: G Bool,
                  in an equation for ‘foo’
         at T9109.hs:8:5-9

@@ -21,7 +21,7 @@ tcfail067.hs:15:11:
 
 tcfail067.hs:46:12:
     Could not deduce (Ord a) arising from a use of ‘SubRange’
-    from the context (Show a)
+    from the context: Show a
       bound by the type signature for:
                showRange :: Show a => SubRange a -> String
       at tcfail067.hs:45:14-43
@@ -35,7 +35,7 @@ tcfail067.hs:46:12:
 
 tcfail067.hs:61:12:
     Could not deduce (Ord a) arising from a use of ‘numSubRangeNegate’
-    from the context (Num a)
+    from the context: Num a
       bound by the instance declaration at tcfail067.hs:60:10-34
     Possible fix:
       add (Ord a) to the context of the instance declaration
@@ -45,7 +45,7 @@ tcfail067.hs:61:12:
 
 tcfail067.hs:65:19:
     Could not deduce (Ord a) arising from a use of ‘SubRange’
-    from the context (Num a)
+    from the context: Num a
       bound by the instance declaration at tcfail067.hs:60:10-34
     Possible fix:
       add (Ord a) to the context of the instance declaration
@@ -58,7 +58,7 @@ tcfail067.hs:65:19:
 
 tcfail067.hs:74:5:
     Could not deduce (Ord a) arising from a use of ‘SubRange’
-    from the context (Num a)
+    from the context: Num a
       bound by the type signature for:
                numSubRangeBinOp :: Num a =>
                                    (a -> a -> a) -> SubRange a -> SubRange a -> SubRange a

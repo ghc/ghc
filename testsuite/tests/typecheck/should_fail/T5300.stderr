@@ -1,7 +1,7 @@
 
 T5300.hs:11:7:
     Could not deduce (C1 a b c0)
-    from the context (Monad m, C1 a b c)
+    from the context: (Monad m, C1 a b c)
       bound by the type signature for:
                f1 :: (Monad m, C1 a b c) => a -> StateT (T b) m a
       at T5300.hs:11:7-50
@@ -16,7 +16,7 @@ T5300.hs:11:7:
 
 T5300.hs:14:7:
     Could not deduce (C2 a2 b2 c20)
-    from the context (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
+    from the context: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
       bound by the type signature for:
                f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
                      a1 -> StateT (T b2) m a2

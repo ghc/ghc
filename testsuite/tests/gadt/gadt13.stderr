@@ -3,7 +3,7 @@ gadt13.hs:15:13:
     Couldn't match expected type ‘t’
                 with actual type ‘String -> [Char]’
       ‘t’ is untouchable
-        inside the constraints (t1 ~ Int)
+        inside the constraints: t1 ~ Int
         bound by a pattern with constructor: I :: Int -> Term Int,
                  in an equation for ‘shw’
         at gadt13.hs:15:6-8

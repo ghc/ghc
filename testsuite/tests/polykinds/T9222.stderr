@@ -2,7 +2,7 @@
 T9222.hs:13:3:
     Couldn't match type ‘b0’ with ‘b’
       ‘b0’ is untouchable
-        inside the constraints (a ~ '(b0, c0))
+        inside the constraints: a ~ '(b0, c0)
         bound by the type of the constructor ‘Want’:
                    (a ~ '(b0, c0)) => Proxy b0
         at T9222.hs:13:3

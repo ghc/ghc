@@ -2,7 +2,7 @@
 T7438.hs:6:14:
     Couldn't match expected type ‘t1’ with actual type ‘t’
       ‘t’ is untouchable
-        inside the constraints (t2 ~ t3)
+        inside the constraints: t2 ~ t3
         bound by a pattern with constructor:
                    Nil :: forall (k :: BOX) (b :: k). Thrist b b,
                  in an equation for ‘go’

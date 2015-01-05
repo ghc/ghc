@@ -2,7 +2,7 @@
 FailDueToGivenOverlapping.hs:27:9:
     Overlapping instances for E [t0] arising from a use of ‘eop’
     Matching givens (or their superclasses):
-      (E [Int])
+      E [Int]
         bound by the type signature for: bar :: E [Int] => () -> ()
         at FailDueToGivenOverlapping.hs:26:8-26
     Matching instances:
