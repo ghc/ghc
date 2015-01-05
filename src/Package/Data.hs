@@ -56,6 +56,7 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
           "build" </> "autogen" </> "cabal_macros.h",
           "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? Also check out Paths_cpsa.hs.
         ] &%> \_ -> do
+            need ["shake/src/Package/Data.hs"] -- Track changes in this file
             need [path </> name <.> "cabal"]
             when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
             run GhcCabal cabalArgs

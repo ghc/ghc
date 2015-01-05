@@ -68,6 +68,7 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist
     in
     (buildDir </> "build" </> name <.> "m") %> \out -> do
+        need ["shake/src/Package/Dependencies.hs"] -- Track changes in this file
         let pkgData = buildDir </> "package-data.mk"
         usePackageKey <- SupportsPackageKey || stage /= Stage0 -- TODO: check reasoning (distdir-way-opts)
         [mods, srcDirs, includeDirs, deps, depKeys] <-
