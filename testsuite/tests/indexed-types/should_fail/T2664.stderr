@@ -1,7 +1,7 @@
 
 T2664.hs:31:52:
-    Could not deduce (a ~ b)
-    from the context ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
+    Could not deduce: a ~ b
+    from the context: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
       bound by the type signature for:
                newPChan :: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b)) =>
                            IO (PChan (a :*: b), PChan c)

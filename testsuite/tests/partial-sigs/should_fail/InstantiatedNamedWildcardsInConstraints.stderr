@@ -8,6 +8,6 @@ InstantiatedNamedWildcardsInConstraints.hs:4:14:
     In the type signature for ‘foo’: (Enum _a, _) => _a -> (String, b)
 
 InstantiatedNamedWildcardsInConstraints.hs:4:18:
-    Found hole ‘_’ with inferred constraints: (Show b)
+    Found hole ‘_’ with inferred constraints: Show b
     To use the inferred type, enable PartialTypeSignatures
     In the type signature for ‘foo’: (Enum _a, _) => _a -> (String, b)

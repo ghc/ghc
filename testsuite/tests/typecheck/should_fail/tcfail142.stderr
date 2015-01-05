@@ -1,7 +1,7 @@
 
 tcfail142.hs:18:8:
     Could not deduce (Bar a0 r)
-    from the context (Bar a r)
+    from the context: Bar a r
       bound by the type signature for: bar :: Bar a r => r -> ()
       at tcfail142.hs:18:8-25
     The type variable ‘a0’ is ambiguous

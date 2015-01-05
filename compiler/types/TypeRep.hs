@@ -525,7 +525,7 @@ pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
 ------------
 pprTheta :: ThetaType -> SDoc
--- pprTheta [pred] = pprPred pred        -- I'm in two minds about this
+pprTheta [pred] = ppr_type TopPrec pred        -- I'm in two minds about this
 pprTheta theta  = parens (sep (punctuate comma (map (ppr_type TopPrec) theta)))
 
 pprThetaArrowTy :: ThetaType -> SDoc

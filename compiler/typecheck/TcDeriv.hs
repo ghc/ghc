@@ -1396,7 +1396,7 @@ cond_functorOK allowFunctions (_, rep_tc, _)
 
   | not (null bad_stupid_theta)
   = NotValid (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
-              <+> ptext (sLit "must not have a class context") <+> pprTheta bad_stupid_theta)
+              <+> ptext (sLit "must not have a class context:") <+> pprTheta bad_stupid_theta)
 
   | otherwise
   = allValid (map check_con data_cons)

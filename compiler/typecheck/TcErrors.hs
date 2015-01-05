@@ -891,7 +891,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
              tclvl_extra
                 = nest 2 $
                   sep [ quotes (ppr tv1) <+> ptext (sLit "is untouchable")
-                      , nest 2 $ ptext (sLit "inside the constraints") <+> pprEvVarTheta given
+                      , nest 2 $ ptext (sLit "inside the constraints:") <+> pprEvVarTheta given
                       , nest 2 $ ptext (sLit "bound by") <+> ppr skol_info
                       , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
              tv_extra = extraTyVarInfo ctxt tv1 ty2
@@ -962,15 +962,15 @@ misMatchOrCND ctxt ct oriented ty1 ty2
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
-  = vcat [ addArising orig (ptext (sLit "Could not deduce") <+> pprTheta wanteds)
+  = vcat [ addArising orig (ptext (sLit "Could not deduce:") <+> pprTheta wanteds)
          , vcat (pp_givens givens)]
 
 pp_givens :: [UserGiven] -> [SDoc]
 pp_givens givens
    = case givens of
          []     -> []
-         (g:gs) ->      ppr_given (ptext (sLit "from the context")) g
-                 : map (ppr_given (ptext (sLit "or from"))) gs
+         (g:gs) ->      ppr_given (ptext (sLit "from the context:")) g
+                 : map (ppr_given (ptext (sLit "or from:"))) gs
     where
        ppr_given herald (gs, skol_info, _, loc)
            = hang (herald <+> pprEvVarTheta gs)
