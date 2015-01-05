@@ -20,6 +20,7 @@ import TcSMonad as TcS
 import TcInteract
 import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
+import Unify    ( tcMatchTy )
 import Type     ( classifyPredType, isIPClass, PredTree(..)
                 , getClassPredTys_maybe, EqRel(..) )
 import TyCon    ( isTypeFamilyTyCon )
@@ -101,7 +102,7 @@ simpl_top wanteds
       | isEmptyWC wc
       = return wc
       | otherwise  -- See Note [When to do type-class defaulting]
-      = do { something_happened <- applyDefaultingRules (approximateWC wc)
+      = do { something_happened <- applyDefaultingRules wc
                                    -- See Note [Top-level Defaulting Plan]
            ; if something_happened
              then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
@@ -996,7 +997,7 @@ approximateWC wc
 
         grow :: VarSet -> VarSet  -- Maps current trapped tyvars to newly-trapped ones
         grow so_far = foldrBag (grow_one so_far) emptyVarSet simples
-        grow_one so_far ct tvs 
+        grow_one so_far ct tvs
           | ct_tvs `intersectsVarSet` so_far = tvs `unionVarSet` ct_tvs
           | otherwise                        = tvs
           where
@@ -1337,13 +1338,13 @@ to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
 *********************************************************************************
 -}
 
-applyDefaultingRules :: Cts -> TcS Bool
+applyDefaultingRules :: WantedConstraints -> TcS Bool
   -- True <=> I did some defaulting, reflected in ty_binds
 
 -- Return some extra derived equalities, which express the
 -- type-class default choice.
 applyDefaultingRules wanteds
-  | isEmptyBag wanteds
+  | isEmptyWC wanteds
   = return False
   | otherwise
   = do { traceTcS "applyDefaultingRules { " $
@@ -1351,8 +1352,10 @@ applyDefaultingRules wanteds
 
        ; info@(default_tys, _) <- getDefaultInfo
        ; let groups = findDefaultableGroups info wanteds
+
        ; traceTcS "findDefaultableGroups" $ vcat [ text "groups=" <+> ppr groups
                                                  , text "info=" <+> ppr info ]
+
        ; something_happeneds <- mapM (disambigGroup default_tys) groups
 
        ; traceTcS "applyDefaultingRules }" (ppr something_happeneds)
@@ -1361,26 +1364,33 @@ applyDefaultingRules wanteds
 
 findDefaultableGroups
     :: ( [Type]
-       , (Bool,Bool) )  -- (Overloaded strings, extended default rules)
-    -> Cts              -- Unsolved (wanted or derived)
-    -> [[(Ct,Class,TcTyVar)]]
+       , (Bool,Bool) )     -- (Overloaded strings, extended default rules)
+    -> WantedConstraints   -- Unsolved (wanted or derived)
+    -> [(TyVar, [Ct])]
 findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
-  | null default_tys = []
-  | otherwise        = defaultable_groups
+  | null default_tys
+  = []
+  | otherwise
+  = [ (tv, map fstOf3 group)
+    | group@((_,_,tv):_) <- unary_groups
+    , defaultable_tyvar tv
+    , defaultable_classes (map sndOf3 group) ]
   where
-    defaultable_groups = filter is_defaultable_group groups
-    groups             = equivClasses cmp_tv unaries
-    unaries     :: [(Ct, Class, TcTyVar)]  -- (C tv) constraints
-    non_unaries :: [Ct]             -- and *other* constraints
+    simples                = approximateWC wanteds
+    (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
+    unary_groups           = equivClasses cmp_tv unaries
 
-    (unaries, non_unaries) = partitionWith find_unary (bagToList wanteds)
+    unary_groups :: [[(Ct, Class, TcTyVar)]]  -- (C tv) constraints
+    unaries      ::  [(Ct, Class, TcTyVar)]   -- (C tv) constraints
+    non_unaries  :: [Ct]                      -- and *other* constraints
+
         -- Finds unary type-class constraints
         -- But take account of polykinded classes like Typeable,
         -- which may look like (Typeable * (a:*))   (Trac #8931)
     find_unary cc
         | Just (cls,tys)   <- getClassPredTys_maybe (ctPred cc)
-        , Just (kinds, ty) <- snocView tys
-        , all isKind kinds
+        , Just (kinds, ty) <- snocView tys   -- Ignore kind arguments
+        , all isKind kinds                   -- for this purpose
         , Just tv <- tcGetTyVar_maybe ty
         , isMetaTyVar tv  -- We might have runtime-skolems in GHCi, and
                           -- we definitely don't want to try to assign to those!
@@ -1392,12 +1402,10 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
 
     cmp_tv (_,_,tv1) (_,_,tv2) = tv1 `compare` tv2
 
-    is_defaultable_group ds@((_,_,tv):_)
+    defaultable_tyvar tv
         = let b1 = isTyConableTyVar tv  -- Note [Avoiding spurious errors]
               b2 = not (tv `elemVarSet` bad_tvs)
-              b4 = defaultable_classes [cls | (_,cls,_) <- ds]
-          in (b1 && b2 && b4)
-    is_defaultable_group [] = panic "defaultable_group"
+          in b1 && b2
 
     defaultable_classes clss
         | extended_defaults = any isInteractiveClass clss
@@ -1416,22 +1424,19 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     -- Similarly is_std_class
 
 ------------------------------
-disambigGroup :: [Type]                  -- The default types
-              -> [(Ct, Class, TcTyVar)]  -- All classes of the form (C a)
-                                         --  sharing same type variable
+disambigGroup :: [Type]            -- The default types
+              -> (TcTyVar, [Ct])   -- All classes of the form (C a)
+                                   --  sharing same type variable
               -> TcS Bool   -- True <=> something happened, reflected in ty_binds
 
-disambigGroup []  _grp
+disambigGroup [] _
   = return False
-disambigGroup (default_ty:default_tys) group
-  = do { traceTcS "disambigGroup {" (ppr group $$ ppr default_ty)
+disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
+  = do { traceTcS "disambigGroup {" (vcat [ ppr default_ty, ppr the_tv, ppr wanteds ])
        ; fake_ev_binds_var <- TcS.newTcEvBinds
-       ; given_ev_var      <- TcS.newEvVar (mkTcEqPred (mkTyVarTy the_tv) default_ty)
        ; tclvl             <- TcS.getTcLevel
-       ; success <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) $
-                    do { solveSimpleGivens loc [given_ev_var]
-                       ; residual_wanted <- solveSimpleWanteds wanteds
-                       ; return (isEmptyWC residual_wanted) }
+       ; success <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl)
+                    try_group
 
        ; if success then
              -- Success: record the type variable binding, and return
@@ -1445,8 +1450,21 @@ disambigGroup (default_ty:default_tys) group
                            (ppr default_ty)
                 ; disambigGroup default_tys group } }
   where
-    wanteds          = listToBag (map fstOf3 group)
-    ((_,_,the_tv):_) = group
+    try_group
+      | Just subst <- mb_subst
+      = do { wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
+                                wanteds
+           ; residual_wanted <- solveSimpleWanteds $ listToBag $
+                                map mkNonCanonical wanted_evs
+           ; return (isEmptyWC residual_wanted) }
+      | otherwise
+      = return False
+
+    tmpl_tvs = extendVarSet (tyVarsOfType (tyVarKind the_tv)) the_tv
+    mb_subst = tcMatchTy tmpl_tvs (mkTyVarTy the_tv) default_ty
+      -- Make sure the kinds match too; hence this call to tcMatchTy
+      -- E.g. suppose the only constraint was (Typeable k (a::k))
+
     loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
                 , ctl_env = panic "disambigGroup:env"
                 , ctl_depth = initialSubGoalDepth }
