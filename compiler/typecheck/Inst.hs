@@ -11,6 +11,7 @@ The @Inst@ type: dictionaries or method instances
 module Inst (
        deeplySkolemise, deeplyInstantiate, 
        instCall, instDFunType, instStupidTheta,
+       newWanted, newWanteds,
        emitWanted, emitWanteds,
 
        newOverloadedLit, mkOverLit,
@@ -62,10 +63,21 @@ import Data.Maybe( isJust )
 {-
 ************************************************************************
 *                                                                      *
-                Emitting constraints
+                Creating and emittind constraints
 *                                                                      *
 ************************************************************************
 -}
+
+newWanted :: CtOrigin -> PredType -> TcM CtEvidence
+newWanted orig pty
+  = do loc <- getCtLoc orig
+       v <- newEvVar pty
+       return $ CtWanted { ctev_evar = v
+                         , ctev_pred = pty
+                         , ctev_loc = loc }
+
+newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
+newWanteds orig = mapM (newWanted orig)
 
 emitWanteds :: CtOrigin -> TcThetaType -> TcM [EvVar]
 emitWanteds origin theta = mapM (emitWanted origin) theta
@@ -75,7 +87,7 @@ emitWanted origin pred
   = do { loc <- getCtLoc origin
        ; ev  <- newEvVar pred
        ; emitSimple $ mkNonCanonical $
-             CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
+         CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
        ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -634,3 +646,5 @@ tyVarsOfImplic (Implic { ic_skols = skols
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
+
+

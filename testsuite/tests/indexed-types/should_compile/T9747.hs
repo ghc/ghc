@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ConstraintKinds, DataKinds, GADTs, TypeFamilies, TypeOperators #-}
+
 module T9747 where
 import Data.List (intercalate)
 import Data.Proxy

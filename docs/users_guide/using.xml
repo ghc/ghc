@@ -1408,6 +1408,38 @@ foreign import "&amp;f" f :: FunPtr t
           The warning will indicate the duplicated <literal>Eq a</literal> constraint.
           </para>
 
+          <para>This option is now deprecated in favour of <option>-fwarn-redundant-constraints</option>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-redundant-constraints</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-redundant-constraints</option></primary></indexterm>
+          <indexterm><primary>redundant constraints, warning</primary></indexterm>
+
+          <para>Have the compiler warn about redundant constraints in a type signature. For
+          example
+          <itemizedlist>
+          <listitem><para>
+          <programlisting>
+             f :: (Eq a, Ord a) => a -> a
+          </programlisting>
+          The warning will indicate the redundant <literal>Eq a</literal> constraint:
+          it is subsumed by the <literal>Ord a</literal> constraint.
+          </para></listitem>
+          <listitem><para>
+          <programlisting>
+             f :: Eq a => a -> a -> Bool
+             f x y = True
+          </programlisting>
+          The warning will indicate the redundant <literal>Eq a</literal> constraint:
+          : it is not used by the definition of <literal>f</literal>.)
+          </para></listitem>
+          </itemizedlist>
+          Similar warnings are given for a redundant constraint in an instance declaration.
+          </para>
+
           <para>This option is on by default.</para>
         </listitem>
       </varlistentry>

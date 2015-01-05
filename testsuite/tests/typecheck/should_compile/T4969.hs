@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -w #-}
+{-# OPTIONS_GHC -w -fno-warn-redundant-constraints #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleContexts, FlexibleInstances,
              OverlappingInstances, UndecidableInstances,

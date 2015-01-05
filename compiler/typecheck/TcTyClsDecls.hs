@@ -1690,15 +1690,15 @@ checkValidClass cls
 
         ; case dm of
             GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
-                                     ; checkValidType (FunSigCtxt op_name) (idType dm_id) }
+                                     ; checkValidType ctxt (idType dm_id) }
             _                  -> return ()
         }
         where
-          ctxt    = FunSigCtxt op_name
+          ctxt    = FunSigCtxt op_name True -- Report redundant class constraints
           op_name = idName sel_id
           op_ty   = idType sel_id
           (_,theta1,tau1) = tcSplitSigmaTy op_ty
-          (_,theta2,tau2)  = tcSplitSigmaTy tau1
+          (_,theta2,tau2) = tcSplitSigmaTy tau1
           (theta,tau) | constrained_class_methods = (theta1 ++ theta2, tau2)
                       | otherwise = (theta1, mkPhiTy (tail theta1) tau1)
                 -- Ugh!  The function might have a type like

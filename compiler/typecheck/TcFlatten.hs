@@ -1531,8 +1531,7 @@ unflatten tv_eqs funeqs
       = do { ty1 <- zonkTcTyVar tv
            ; ty2 <- zonkTcType rhs
            ; let is_refl = ty1 `tcEqType` ty2
-           ; if is_refl then do { when (isWanted ev) $
-                                  setEvBind (ctEvId ev)
+           ; if is_refl then do { setEvBindIfWanted ev
                                             (EvCoercion $
                                              mkTcReflCo (eqRelRole eq_rel) rhs)
                                 ; return rest }
@@ -1563,8 +1562,7 @@ tryFill dflags tv rhs ev
     do { rhs' <- zonkTcType rhs
        ; case occurCheckExpand dflags tv rhs' of
            OC_OK rhs''    -- Normal case: fill the tyvar
-             -> do { when (isWanted ev) $
-                     setEvBind (ctEvId ev)
+             -> do { setEvBindIfWanted ev
                                (EvCoercion (mkTcReflCo (ctEvRole ev) rhs''))
                    ; setWantedTyBind tv rhs''
                    ; return True }

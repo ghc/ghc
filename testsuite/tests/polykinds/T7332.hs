@@ -18,7 +18,7 @@ instance IsString (DC String) where
 
 
 class Monoid acc => Build acc r where
-    type BuildR r :: *		-- Result type
+    type BuildR r :: *          -- Result type
     build :: (acc -> BuildR r) -> acc -> r
 
 instance Monoid dc => Build dc (DC dx) where
@@ -31,8 +31,24 @@ instance (Build dc r, a ~ dc) => Build dc (a->r) where
 
 
 -- The type is inferred
-tspan :: (Monoid d, Build (DC d) r, BuildR r ~ DC d) => r
+-- tspan :: (Monoid d, Build (DC d) r, BuildR r ~ DC d) => r
+tspan :: (Build (DC d) r, BuildR r ~ DC d) => r
 tspan = build (id :: DC d -> DC d) mempty
+
+{- Wanted:
+       Build acc0 r0
+       Monid acc0
+       acc0 ~ DC d0
+       DC d0 ~ BuildR r0
+==>
+       Build (DC d0) r0
+       Monoid (DC d0)  -->  Monoid d0
+       DC d- ~ BuildR r0
+
+In fact Monoid (DC d0) is a superclass of (Build (DC do) r0)
+But during inference we do not take upserclasses of wanteds
+-}
+
 
 foo = tspan "aa"
 

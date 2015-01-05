@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -O #-}
+{-# OPTIONS_GHC -O -fno-warn-redundant-constraints #-}
 
 module Gadt17_help (
       TernOp (..), applyTernOp

@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+
 {-# LANGUAGE DatatypeContexts #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleInstances #-}

@@ -61,9 +61,9 @@ module TcRnTypes(
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
-        dropDerivedWC,
+        dropDerivedWC, insolubleImplic, trulyInsoluble,
 
-        Implication(..),
+        Implication(..), ImplicStatus(..), isInsolubleStatus,
         SubGoalCounter(..),
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalCounterValue, subGoalDepthExceeded,
@@ -1413,21 +1413,15 @@ data WantedConstraints
 emptyWC :: WantedConstraints
 emptyWC = WC { wc_simple = emptyBag, wc_impl = emptyBag, wc_insol = emptyBag }
 
-mkSimpleWC :: [Ct] -> WantedConstraints
+mkSimpleWC :: [CtEvidence] -> WantedConstraints
 mkSimpleWC cts
-  = WC { wc_simple = listToBag cts, wc_impl = emptyBag, wc_insol = emptyBag }
+  = WC { wc_simple = listToBag (map mkNonCanonical cts)
+       , wc_impl = emptyBag
+       , wc_insol = emptyBag }
 
 isEmptyWC :: WantedConstraints -> Bool
 isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_insol = n })
   = isEmptyBag f && isEmptyBag i && isEmptyBag n
-
-insolubleWC :: WantedConstraints -> Bool
--- True if there are any insoluble constraints in the wanted bag. Ignore
--- constraints arising from PartialTypeSignatures to solve as much of the
--- constraints as possible before reporting the holes.
-insolubleWC wc = not (isEmptyBag (filterBag (not . isTypeHoleCt)
-                                  (wc_insol wc)))
-               || anyBag ic_insol (wc_impl wc)
 
 andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
 andWC (WC { wc_simple = f1, wc_impl = i1, wc_insol = n1 })
@@ -1449,6 +1443,24 @@ addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
 addInsols :: WantedConstraints -> Bag Ct -> WantedConstraints
 addInsols wc cts
   = wc { wc_insol = wc_insol wc `unionBags` cts }
+
+isInsolubleStatus :: ImplicStatus -> Bool
+isInsolubleStatus IC_Insoluble = True
+isInsolubleStatus _            = False
+
+insolubleImplic :: Implication -> Bool
+insolubleImplic ic = isInsolubleStatus (ic_status ic)
+
+insolubleWC :: WantedConstraints -> Bool
+insolubleWC (WC { wc_impl = implics, wc_insol = insols })
+  =  anyBag trulyInsoluble  insols
+  || anyBag insolubleImplic implics
+
+trulyInsoluble :: Ct -> Bool
+-- The constraint is in the wc_insol set, but we do not
+-- treat type-holes, arising from PartialTypeSignatures,
+-- as "truly insoluble". Yuk.
+trulyInsoluble insol = not (isTypeHoleCt insol)
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
@@ -1488,32 +1500,63 @@ data Implication
                                  -- False <=> ic_givens might have equalities
 
       ic_env   :: TcLclEnv,      -- Gives the source location and error context
-                                 -- for the implicatdion, and hence for all the
+                                 -- for the implication, and hence for all the
                                  -- given evidence variables
 
       ic_wanted :: WantedConstraints,  -- The wanted
-      ic_insol  :: Bool,               -- True iff insolubleWC ic_wanted is true
 
-      ic_binds  :: EvBindsVar   -- Points to the place to fill in the
-                                -- abstraction and bindings
+      ic_binds  :: EvBindsVar,    -- Points to the place to fill in the
+                                  -- abstraction and bindings
+
+      ic_status   :: ImplicStatus
     }
+
+data ImplicStatus
+  = IC_Solved     -- All wanteds in the tree are solved, all the way down
+       { ics_need :: VarSet     -- Evidence variables needed by this implication
+       , ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
+         -- See Note [Tracking redundant constraints] in TcSimplify
+
+  | IC_Insoluble  -- At least one insoluble constraint in the tree
+
+  | IC_Unsolved   -- Neither of the above; might go either way
 
 instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
-              , ic_wanted = wanted, ic_insol = insol
+              , ic_wanted = wanted, ic_status = status
               , ic_binds = binds, ic_info = info })
    = hang (ptext (sLit "Implic") <+> lbrace)
         2 (sep [ ptext (sLit "TcLevel =") <+> ppr tclvl
                , ptext (sLit "Skolems =") <+> pprTvBndrs skols
                , ptext (sLit "No-eqs =") <+> ppr no_eqs
-               , ptext (sLit "Insol =") <+> ppr insol
+               , ptext (sLit "Status =") <+> ppr status
                , hang (ptext (sLit "Given ="))  2 (pprEvVars given)
                , hang (ptext (sLit "Wanted =")) 2 (ppr wanted)
                , ptext (sLit "Binds =") <+> ppr binds
                , pprSkolInfo info ] <+> rbrace)
 
+instance Outputable ImplicStatus where
+  ppr IC_Insoluble   = ptext (sLit "Insoluble")
+  ppr IC_Unsolved    = ptext (sLit "Unsolved")
+  ppr (IC_Solved { ics_need = vs, ics_dead = dead })
+    = ptext (sLit "Solved")
+      <+> (braces $ vcat [ ptext (sLit "Dead givens =") <+> ppr dead
+                         , ptext (sLit "Needed =") <+> ppr vs ])
+
 {-
+Note [Needed evidence variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Th ic_need_evs field holds the free vars of ic_binds, and all the
+ic_binds in nested implications.
+
+  * Main purpose: if one of the ic_givens is not mentioned in here, it
+    is redundant.
+
+  * solveImplication may drop an implication altogether if it has no
+    remaining 'wanteds'. But we still track the free vars of its
+    evidence binds, even though it has now disappeared.
+
 Note [Shadowing in a constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We assume NO SHADOWING in a constraint.  Specifically

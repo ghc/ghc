@@ -239,7 +239,7 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
 
               -- Make selectors for the superclasses
         ; sc_sel_names <- mapM  (newImplicitBinder tycon_name . mkSuperDictSelOcc)
-                                [1..length sc_theta]
+                                (takeList sc_theta [fIRST_TAG..])
         ; let sc_sel_ids = [ mkDictSelId sc_name rec_clas
                            | sc_name <- sc_sel_names]
               -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we

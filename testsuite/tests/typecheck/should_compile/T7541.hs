@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleContexts, Rank2Types #-}
 
 module Test where

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- !!! small class decl with local polymorphism;
 -- !!! "easy" to check default methods and such...
 -- !!! (this is the example given in TcClassDcl)

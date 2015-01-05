@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE RankNTypes, FlexibleContexts, ImplicitParams, TemplateHaskell #-}
 
 -- This test makes sure TH understands types where

@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, StandaloneDeriving, FlexibleInstances #-}
 
 -- Test Trac #2856

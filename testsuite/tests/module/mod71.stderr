@@ -9,3 +9,12 @@ mod71.hs:4:9:
     In the first argument of ‘x’, namely ‘_’
     In the expression: x _ 1
     In an equation for ‘f’: f x = x _ 1
+
+mod71.hs:4:11:
+    No instance for (Num a) arising from the literal ‘1’
+    Possible fix:
+      add (Num a) to the context of
+        the inferred type of f :: (t1 -> a -> t) -> t
+    In the second argument of ‘x’, namely ‘1’
+    In the expression: x _ 1
+    In an equation for ‘f’: f x = x _ 1

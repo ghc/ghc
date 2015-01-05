@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 {-  With "hugs -98 +o test.hs" gives me:

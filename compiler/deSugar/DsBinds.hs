@@ -13,7 +13,7 @@ lower levels it is preserved with @let@/@letrec@s).
 {-# LANGUAGE CPP #-}
 
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-                 dsHsWrapper, dsTcEvBinds, dsEvBinds
+                 dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
   ) where
 
 #include "HsVersions.h"
@@ -137,9 +137,9 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
   | ABE { abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
   = do  { dflags <- getDynFlags
-        ; bind_prs    <- ds_lhs_binds binds
-        ; let   core_bind = Rec (fromOL bind_prs)
-        ; ds_binds <- dsTcEvBinds ev_binds
+        ; bind_prs <- ds_lhs_binds binds
+        ; let core_bind = Rec (fromOL bind_prs)
+        ; ds_binds <- dsTcEvBinds_s ev_binds
         ; rhs <- dsHsWrapper wrap $  -- Usually the identity
                             mkLams tyvars $ mkLams dicts $
                             mkCoreLets ds_binds $
@@ -167,7 +167,7 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
               locals       = map abe_mono exports
               tup_expr     = mkBigCoreVarTup locals
               tup_ty       = exprType tup_expr
-        ; ds_binds <- dsTcEvBinds ev_binds
+        ; ds_binds <- dsTcEvBinds_s ev_binds
         ; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
                              mkCoreLets ds_binds $
                              Let core_bind $
@@ -832,6 +832,11 @@ dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
 
 --------------------------------------
+dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
+dsTcEvBinds_s []       = return []
+dsTcEvBinds_s (b:rest) = ASSERT( null rest )  -- Zonker ensures null
+                         dsTcEvBinds b
+
 dsTcEvBinds :: TcEvBinds -> DsM [CoreBind]
 dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"    -- Zonker has got rid of this
 dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
@@ -839,10 +844,11 @@ dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 dsEvBinds :: Bag EvBind -> DsM [CoreBind]
 dsEvBinds bs = mapM ds_scc (sccEvBinds bs)
   where
-    ds_scc (AcyclicSCC (EvBind v r)) = liftM (NonRec v) (dsEvTerm r)
-    ds_scc (CyclicSCC bs)            = liftM Rec (mapM ds_pair bs)
+    ds_scc (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = r }))
+                          = liftM (NonRec v) (dsEvTerm r)
+    ds_scc (CyclicSCC bs) = liftM Rec (mapM ds_pair bs)
 
-    ds_pair (EvBind v r) = liftM ((,) v) (dsEvTerm r)
+    ds_pair (EvBind { eb_lhs = v, eb_rhs = r }) = liftM ((,) v) (dsEvTerm r)
 
 sccEvBinds :: Bag EvBind -> [SCC EvBind]
 sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
@@ -851,7 +857,8 @@ sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
     edges = foldrBag ((:) . mk_node) [] bs
 
     mk_node :: EvBind -> (EvBind, EvVar, [EvVar])
-    mk_node b@(EvBind var term) = (b, var, varSetElems (evVarsOfTerm term))
+    mk_node b@(EvBind { eb_lhs = var, eb_rhs = term })
+       = (b, var, varSetElems (evVarsOfTerm term))
 
 
 ---------------------------------------
@@ -974,7 +981,7 @@ ds_tc_coercion subst tc_co
     ds_co_binds eb@(TcEvBinds {}) = pprPanic "ds_co_binds" (ppr eb)
 
     ds_scc :: CvSubst -> SCC EvBind -> CvSubst
-    ds_scc subst (AcyclicSCC (EvBind v ev_term))
+    ds_scc subst (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = ev_term }))
       = extendCvSubstAndInScope subst v (ds_co_term subst ev_term)
     ds_scc _ (CyclicSCC other) = pprPanic "ds_scc:cyclic" (ppr other $$ ppr tc_co)
 

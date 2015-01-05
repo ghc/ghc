@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- Check that "->" is an instance of Eval
 
 module ShouldSucceed where

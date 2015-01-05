@@ -467,6 +467,7 @@ data WarningFlag =
 -- See Note [Updating flag description in the User's Guide]
      Opt_WarnDuplicateExports
    | Opt_WarnDuplicateConstraints
+   | Opt_WarnRedundantConstraints
    | Opt_WarnHiShadows
    | Opt_WarnImplicitPrelude
    | Opt_WarnIncompletePatterns
@@ -2825,7 +2826,9 @@ fWarningFlags = [
   flagSpec "warn-dodgy-imports"               Opt_WarnDodgyImports,
   flagSpec "warn-empty-enumerations"          Opt_WarnEmptyEnumerations,
   flagSpec "warn-context-quantification"      Opt_WarnContextQuantification,
-  flagSpec "warn-duplicate-constraints"       Opt_WarnDuplicateConstraints,
+  flagSpec' "warn-duplicate-constraints"      Opt_WarnDuplicateConstraints
+    (\_ -> deprecate "it is subsumed by -fwarn-redundant-constraints"),
+  flagSpec "warn-redundant-constraints"       Opt_WarnRedundantConstraints,
   flagSpec "warn-duplicate-exports"           Opt_WarnDuplicateExports,
   flagSpec "warn-hi-shadowing"                Opt_WarnHiShadows,
   flagSpec "warn-implicit-prelude"            Opt_WarnImplicitPrelude,
@@ -3317,7 +3320,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnPointlessPragmas,
-        Opt_WarnDuplicateConstraints,
+        Opt_WarnRedundantConstraints,
         Opt_WarnDuplicateExports,
         Opt_WarnOverflowedLiterals,
         Opt_WarnEmptyEnumerations,

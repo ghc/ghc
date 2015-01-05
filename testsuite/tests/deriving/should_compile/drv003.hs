@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+
 -- !!! This is the example given in TcDeriv
 --
 module ShouldSucceed where

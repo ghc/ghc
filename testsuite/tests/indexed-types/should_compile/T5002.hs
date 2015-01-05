@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE TypeFamilies, FlexibleInstances, UndecidableInstances, FlexibleContexts #-}
 
 class A a

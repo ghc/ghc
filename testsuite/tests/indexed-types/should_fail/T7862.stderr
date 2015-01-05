@@ -1,5 +1,5 @@
 
-T7862.hs:22:10: Warning:
+T7862.hs:23:10: Warning:
     No explicit implementation for
       ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
                                                             or

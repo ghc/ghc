@@ -35,7 +35,7 @@ Rule fired: SPEC $c<$ @ 'Z
 Rule fired: SPEC $fFunctorShape @ 'Z
 Rule fired: Class op $p1Applicative
 Rule fired: SPEC $fFunctorShape @ 'Z
-Rule fired: SPEC $cp0Applicative @ 'Z
+Rule fired: SPEC $cp1Applicative @ 'Z
 Rule fired: SPEC $cpure @ 'Z
 Rule fired: SPEC $c<*> @ 'Z
 Rule fired: SPEC $c*> @ 'Z

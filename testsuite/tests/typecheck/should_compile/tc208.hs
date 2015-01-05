@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ImplicitParams, RankNTypes #-}
 
 -- This program failed to typecheck in an early version of

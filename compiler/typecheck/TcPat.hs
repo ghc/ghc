@@ -28,7 +28,6 @@ import Var
 import Name
 import NameSet
 import TcEnv
---import TcExpr
 import TcMType
 import TcValidity( arityErr )
 import TcType
@@ -120,10 +119,10 @@ data LetBndrSpec
   = LetLclBndr            -- The binder is just a local one;
                           -- an AbsBinds will provide the global version
 
-  | LetGblBndr TcPragFun  -- Genrealisation plan is NoGen, so there isn't going
+  | LetGblBndr TcPragFun  -- Generalisation plan is NoGen, so there isn't going
                           -- to be an AbsBinds; So we must bind the global version
                           -- of the binder right away.
-                          -- Oh, and dhhere is the inline-pragma information
+                          -- Oh, and here is the inline-pragma information
 
 makeLazy :: PatEnv -> PatEnv
 makeLazy penv = penv { pe_lazy = True }
@@ -162,8 +161,17 @@ data TcSigInfo
 
         sig_loc    :: SrcSpan,      -- The location of the signature
 
-        sig_partial :: Bool         -- True <=> a partial type signature
+        sig_partial :: Bool,        -- True <=> a partial type signature
                                     -- containing wildcards
+
+        sig_warn_redundant :: Bool  -- True <=> report redundant constraints
+                                    --          when typechecking the value binding
+                                    --          for this type signature
+           -- This is usually True, but False for
+           --   * Record selectors (not important here)
+           --   * Class and instance methods.  Here the code may legitimately
+           --     be more polymorphic than the signature generated from the
+           --     class declaration
     }
   | TcPatSynInfo TcPatSynInfo
 
@@ -290,8 +298,7 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
        ; return (mkTcNomReflCo pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
-  = do { bndr <- mkLocalBinder bndr_name pat_ty
-       ; return (mkTcNomReflCo pat_ty, bndr) }
+  = return (mkTcNomReflCo pat_ty, mkLocalId bndr_name pat_ty)
 
 ------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
@@ -302,10 +309,9 @@ newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
 --    use the original name directly
 newNoSigLetBndr LetLclBndr name ty
   =do  { mono_name <- newLocalName name
-       ; mkLocalBinder mono_name ty }
+       ; return (mkLocalId mono_name ty) }
 newNoSigLetBndr (LetGblBndr prags) name ty
-  = do { id <- mkLocalBinder name ty
-       ; addInlinePrags id (prags name) }
+  = addInlinePrags (mkLocalId name ty) (prags name)
 
 ----------
 addInlinePrags :: TcId -> [LSig Name] -> TcM TcId
@@ -330,11 +336,6 @@ warnPrags id bad_sigs herald
                   2 (ppr_sigs bad_sigs))
   where
     ppr_sigs sigs = vcat (map (ppr . getLoc) sigs)
-
------------------
-mkLocalBinder :: Name -> TcType -> TcM TcId
-mkLocalBinder name ty
-  = return (Id.mkLocalId name ty)
 
 {-
 Note [Typing patterns in pattern bindings]

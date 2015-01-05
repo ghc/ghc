@@ -34,8 +34,8 @@ instance Bind Maybe [] [] where
   Just x  >>= f = f x
   Nothing >>= f = []
 
-instance Functor a => Bind Identity a a 	where m >>= f = f (runIdentity m)
-instance Functor a => Bind a Identity a 	where m >>= f = fmap (runIdentity . f) m
+instance              Bind Identity a a   where m >>= f = f (runIdentity m)
+instance Functor a => Bind a Identity a   where m >>= f = fmap (runIdentity . f) m
 
 instance Prelude.Monad m => Bind m m m where (>>=) = (Prelude.>>=)
 

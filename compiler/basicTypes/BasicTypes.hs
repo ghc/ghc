@@ -125,10 +125,12 @@ type RepArity = Int
 -}
 
 -- | Type of the tags associated with each constructor possibility
+--   or superclass selector
 type ConTag = Int
 
 fIRST_TAG :: ConTag
 -- ^ Tags are allocated from here for real constructors
+--   or for superclass selectors
 fIRST_TAG =  1
 
 {-

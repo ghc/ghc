@@ -1,5 +1,5 @@
 
-<interactive>:38:1:
+<interactive>:39:1:
     Couldn't match type ‘HFalse’ with ‘HTrue’
     Expected type: HTrue
       Actual type: Or HFalse HFalse
@@ -7,7 +7,7 @@
     In the expression: f $ Baz 'a'
     In an equation for ‘it’: it = f $ Baz 'a'
 
-<interactive>:39:1:
+<interactive>:40:1:
     Couldn't match type ‘HFalse’ with ‘HTrue’
     Expected type: HTrue
       Actual type: Or HFalse HFalse

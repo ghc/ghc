@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+
 module Tc173a where
 
 class FormValue value where

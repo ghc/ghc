@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
 
 -- This used to fail because of the silent-superclass

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, TypeFamilies #-}  
 
 module T4497 where

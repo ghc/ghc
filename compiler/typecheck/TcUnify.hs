@@ -12,7 +12,7 @@ module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcGen,
   tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
-  checkConstraints, checkScConstraints,
+  checkConstraints,
 
   -- Various unifications
   unifyType, unifyTypeList, unifyTheta,
@@ -567,9 +567,7 @@ checkConstraints skol_info skol_tvs given thing_inside
   | otherwise
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { ((result, tclvl), wanted) <- captureConstraints  $
-                                      captureTcLevel $
-                                      thing_inside
+    do { (result, tclvl, wanted) <- pushLevelAndCaptureConstraints thing_inside
 
        ; if isEmptyWC wanted && null given
             -- Optimisation : if there are no wanteds, and no givens
@@ -586,41 +584,12 @@ checkConstraints skol_info skol_tvs given thing_inside
                                   , ic_no_eqs = False
                                   , ic_given = given
                                   , ic_wanted = wanted
-                                  , ic_insol  = insolubleWC wanted
+                                  , ic_status  = IC_Unsolved
                                   , ic_binds = ev_binds_var
                                   , ic_env = env
                                   , ic_info = skol_info }
 
        ; return (TcEvBinds ev_binds_var, result) } }
-
-checkScConstraints :: SkolemInfo
-                   -> [TcTyVar]           -- Skolems
-                   -> [EvVar]             -- Given
-                   -> (EvBindsVar -> TcM (Bool, result))
-                   -> TcM (TcEvBinds, result)
-
--- Like checkConstraints, but the thing_inside 
--- can generate its own evidence bindings
-checkScConstraints skol_info skol_tvs given thing_inside
-  = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
-    ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { ev_binds_var <- newTcEvBinds
-       ; (((ok, result), tclvl), wanted) <- captureConstraints  $
-                                            captureTcLevel $
-                                            thing_inside ev_binds_var
-
-       ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_tclvl  = tclvl
-                                  , ic_skols  = skol_tvs
-                                  , ic_no_eqs = False
-                                  , ic_given  = if ok then given else []
-                                  , ic_wanted = wanted
-                                  , ic_insol  = insolubleWC wanted
-                                  , ic_binds  = ev_binds_var
-                                  , ic_env    = env
-                                  , ic_info   = skol_info }
-
-       ; return (TcEvBinds ev_binds_var, result) }
 
 {-
 ************************************************************************

@@ -39,6 +39,7 @@ import Data.List( partition, foldl', deleteFirstsBy )
 import VarEnv
 
 import Control.Monad
+import Maybes( isJust )
 import Pair (Pair(..))
 import Unique( hasKey )
 import FastString ( sLit )
@@ -109,7 +110,6 @@ to float. This means that
 
 Note [Running plugins on unflattened wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 There is an annoying mismatch between solveSimpleGivens and
 solveSimpleWanteds, because the latter needs to fiddle with the inert
 set, unflatten and and zonk the wanteds.  It passes the zonked wanteds
@@ -151,6 +151,7 @@ solveSimpleWanteds = go emptyBag
            ; (wanteds', insols', rerun) <- runTcPluginsWanted zonked
               -- See Note [Running plugins on unflattened wanteds]
            ; let all_insols = insols0 `unionBags` insols `unionBags` insols'
+
            ; if rerun then do { updInertTcS prepareInertsForImplications
                               ; go all_insols wanteds' }
                       else return (WC { wc_simple = wanteds'
@@ -220,7 +221,7 @@ runTcPluginsWanted zonked_wanteds
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
-      CtWanted {ctev_evar = evar} -> setEvBind evar ev
+      CtWanted {ctev_evar = evar} -> setWantedEvBind evar ev
       _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 
 -- | A triple of (given, derived, wanted) constraints to pass to plugins
@@ -476,26 +477,37 @@ solveOneFromTheOther ev_i ev_w
   = return (IRDelete, False)
 
   | CtWanted { ctev_evar = ev_id } <- ev_w
-  = do { setEvBind ev_id (ctEvTerm ev_i)
+  = do { setWantedEvBind ev_id (ctEvTerm ev_i)
        ; return (IRKeep, True) }
 
   | CtWanted { ctev_evar = ev_id } <- ev_i
-  = do { setEvBind ev_id (ctEvTerm ev_w)
+  = do { setWantedEvBind ev_id (ctEvTerm ev_w)
        ; return (IRReplace, True) }
 
-  | otherwise   -- Both are Given
-  = return (if use_replacement then IRReplace else IRKeep, True)
+  -- So they are both Given
+  -- See Note [Replacement vs keeping]
+  | lvl_i == lvl_w
+  = do { binds <- getTcEvBindsMap
+       ; if has_binding binds ev_w && not (has_binding binds ev_i)
+         then return (IRReplace, True)
+         else return (IRKeep,    True) }
 
-  where
-    pred  = ctEvPred ev_i
-    loc_i = ctEvLoc ev_i
-    loc_w = ctEvLoc ev_w
-    lvl_i = ctLocLevel loc_i
-    lvl_w = ctLocLevel loc_w
+   | otherwise   -- Both are Given
+   = return (if use_replacement then IRReplace else IRKeep, True)
+   where
+     pred  = ctEvPred ev_i
+     loc_i = ctEvLoc ev_i
+     loc_w = ctEvLoc ev_w
+     lvl_i = ctLocLevel loc_i
+     lvl_w = ctLocLevel loc_w
 
-    use_replacement  -- See Note [Replacement vs keeping]
-      | isIPPred pred = lvl_w > lvl_i
-      | otherwise     = lvl_w < lvl_i
+     has_binding binds ev
+       | EvId v <- ctEvTerm ev = isJust (lookupEvBind binds v)
+       | otherwise             = True
+
+     use_replacement
+       | isIPPred pred = lvl_w > lvl_i
+       | otherwise     = lvl_w < lvl_i
 
 {-
 Note [Replacement vs keeping]
@@ -509,10 +521,23 @@ we keep?
 
   * For everything else, we want to keep the outermost one.  Reason: that
     makes it more likely that the inner one will turn out to be unused,
-    and can be reported as redundant.
+    and can be reported as redundant.  See Note [Tracking redundant constraints]
+    in TcSimplify.
 
-When there is a choice, use IRKeep rather than IRReplace, to avoid unnecesary
-munging of the inert set.
+    It transpires that using the outermost one is reponsible for an
+    8% performance improvement in nofib cryptarithm2, compared to
+    just rolling the dice.  I didn't investigate why.
+
+  * If there is no "outermost" one, we keep the one that has a non-trivial
+    evidence binding.  Note [Tracking redundant constraints] again.
+    Example:  f :: (Eq a, Ord a) => blah
+    then we may find [G] sc_sel (d1::Ord a) :: Eq a
+                     [G] d2 :: Eq a
+    We want to discard d2 in favour of the superclass selection from
+    the Ord dictionary.
+
+  * Finally, when there is still a choice, use IRKeep rather than
+    IRReplace, to avoid unnecesary munging of the inert set.
 
 Doing the depth-check for implicit parameters, rather than making the work item
 always overrride, is important.  Consider
@@ -872,8 +897,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                          , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ b
      -- Work item: a ~ b
-    do { when (isWanted ev) $
-         setEvBind (ctev_evar ev) (ctEvTerm ev_i)
+    do { setEvBindIfWanted ev (ctEvTerm ev_i)
        ; stopWith ev "Solved from inert" }
 
   | Just tv_rhs <- getTyVar_maybe rhs
@@ -883,8 +907,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                          , rhs_i `tcEqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
-    do { when (isWanted ev) $
-         setEvBind (ctev_evar ev)
+    do { setEvBindIfWanted ev
                    (EvCoercion (mkTcSymCo (ctEvCoercion ev_i)))
        ; stopWith ev "Solved from inert (r)" }
 
@@ -974,8 +997,7 @@ solveByUnification wd tv xi
                -- cf TcUnify.uUnboundKVar
 
        ; setWantedTyBind tv xi'
-       ; when (isWanted wd) $
-         setEvBind (ctEvId wd) (EvCoercion (mkTcNomReflCo xi')) }
+       ; setEvBindIfWanted wd (EvCoercion (mkTcNomReflCo xi')) }
 
 
 ppr_kicked :: Int -> SDoc
@@ -1227,7 +1249,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   = try_fundeps_and_return
 
   | Just ev <- lookupSolvedDict inerts loc cls xis   -- Cached
-  = do { setEvBind dict_id (ctEvTerm ev);
+  = do { setWantedEvBind dict_id (ctEvTerm ev);
        ; stopWith fl "Dict/Top (cached)" }
 
   | otherwise  -- Not cached
@@ -1247,12 +1269,12 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
         | null evs
         = do { traceTcS "doTopReact/found nullary instance for" $
                ppr dict_id
-             ; setEvBind dict_id ev_term
+             ; setWantedEvBind dict_id ev_term
              ; stopWith fl "Dict/Top (solved, no new work)" }
         | otherwise
         = do { traceTcS "doTopReact/found non-nullary instance for" $
                ppr dict_id
-             ; setEvBind dict_id ev_term
+             ; setWantedEvBind dict_id ev_term
              ; let mk_new_wanted ev
                        = mkNonCanonical (ev {ctev_loc = bumpCtLocDepth CountConstraints loc })
              ; updWorkListTcS (extendWorkListCts (map mk_new_wanted evs))
@@ -1378,7 +1400,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                -- old_ev :: F args ~ fsk := ax_co ; sym (G cos) ; new_ev
 
        ; new_ev <- newWantedEvVarNC loc (mkTcEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk))
-       ; setEvBind (ctEvId old_ev)
+       ; setWantedEvBind (ctEvId old_ev)
                    (EvCoercion (ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal fam_tc cos)
                                       `mkTcTransCo` ctEvCoercion new_ev))
 
@@ -1401,7 +1423,7 @@ dischargeFmv :: EvVar -> TcTyVar -> TcCoercion -> TcType -> TcS ()
 dischargeFmv evar fmv co xi
   = ASSERT2( not (fmv `elemVarSet` tyVarsOfType xi), ppr evar $$ ppr fmv $$ ppr xi )
     do { setWantedTyBind fmv xi
-       ; setEvBind evar (EvCoercion co)
+       ; setWantedEvBind evar (EvCoercion co)
        ; n_kicked <- kickOutRewritable Given NomEq fmv
        ; traceTcS "dischargeFuv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
 

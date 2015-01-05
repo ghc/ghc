@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 module T5342 (increaseAreas) where
 
 import Control.Monad

@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE CPP, TypeFamilies, FlexibleContexts #-}
+
 module Class ( cleverNamedResolve ) where
 
 data FL p = FL p

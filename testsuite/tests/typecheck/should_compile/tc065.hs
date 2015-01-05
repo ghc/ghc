@@ -68,7 +68,7 @@ type FlattenedDependencyInfo vertex name code
 mkVertices :: FlattenedDependencyInfo vertex name code -> [vertex]
 mkVertices info = [ vertex | (vertex,_,_,_) <- info]
 
-mkEdges :: (Eq vertex, Ord name) =>
+mkEdges :: (Ord name) =>
 	    [vertex]
 	 -> FlattenedDependencyInfo vertex name code
 	 -> [Edge vertex]
@@ -85,7 +85,7 @@ mkEdges vertices flat_info
    		name `Set.member` names_defined
       ]
 
-lookupVertex :: (Eq vertex, Ord name) =>
+lookupVertex :: (Eq vertex) =>
 	    	 FlattenedDependencyInfo vertex name code
 	      -> vertex
 	      -> code

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE Arrows, FunctionalDependencies, FlexibleContexts, 
              MultiParamTypeClasses, RecordWildCards  #-}
 

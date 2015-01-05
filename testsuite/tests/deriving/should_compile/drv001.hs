@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+
 -- !!! canonical weird example for "deriving"
 module ShouldSucceed where
 

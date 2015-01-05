@@ -134,15 +134,15 @@ data Operation cpu resultSize where
 
 type CDM cpu a = IO a
 
-($=) :: CPU cpu => Var cpu size -> Operation cpu size -> CDM cpu ()
+($=) :: Var cpu size -> Operation cpu size -> CDM cpu ()
 var $= op = undefined
 
-tempVar :: CPU cpu => CDM cpu (Var cpu size)
+tempVar :: CDM cpu (Var cpu size)
 tempVar = do
         cnt <- liftM fst undefined
         return $ Temp cnt
 
-op :: CPU cpu => Operation cpu size -> CDM cpu (Var cpu size)
+op :: Operation cpu size -> CDM cpu (Var cpu size)
 op operation = do
         v <- tempVar
         v $= operation

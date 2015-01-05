@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE RankNTypes, ConstraintKinds, KindSignatures, DataKinds, TypeFamilies #-}
 module T9569 where
 

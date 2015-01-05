@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FunctionalDependencies #-}  {-# LANGUAGE FlexibleInstances #-}
 
 module T7171a where

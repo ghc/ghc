@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 -- trac #1406: Constraint doesn't reduce in the presence of quantified
 --             type variables

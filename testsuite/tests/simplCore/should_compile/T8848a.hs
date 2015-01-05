@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 module T8848a where
 
 f :: Ord a => b -> a -> a
