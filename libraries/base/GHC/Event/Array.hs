@@ -132,7 +132,7 @@ unsafeWrite' (AC es _ cap) ix a = do
       withForeignPtr es $ \p ->
         pokeElemOff p ix a
 
-unsafeLoad :: Storable a => Array a -> (Ptr a -> Int -> IO Int) -> IO Int
+unsafeLoad :: Array a -> (Ptr a -> Int -> IO Int) -> IO Int
 unsafeLoad (Array ref) load = do
     AC es _ cap <- readIORef ref
     len' <- withForeignPtr es $ \p -> load p cap
@@ -170,7 +170,7 @@ snoc (Array ref) e = do
     unsafeWrite' ac' len e
     writeIORef ref (AC es len' cap)
 
-clear :: Storable a => Array a -> IO ()
+clear :: Array a -> IO ()
 clear (Array ref) = do
   atomicModifyIORef' ref $ \(AC es _ cap) ->
         (AC es 0 cap, ())

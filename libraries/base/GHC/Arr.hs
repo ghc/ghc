@@ -450,7 +450,7 @@ unsafeArray :: Ix i => (i,i) -> [(Int, e)] -> Array i e
 unsafeArray b ies = unsafeArray' b (rangeSize b) ies
 
 {-# INLINE unsafeArray' #-}
-unsafeArray' :: Ix i => (i,i) -> Int -> [(Int, e)] -> Array i e
+unsafeArray' :: (i,i) -> Int -> [(Int, e)] -> Array i e
 unsafeArray' (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
     case newArray# n# arrEleBottom s1# of
         (# s2#, marr# #) ->
@@ -465,7 +465,7 @@ fill marr# (I# i#, e) next
              s2# -> next s2#
 
 {-# INLINE done #-}
-done :: Ix i => i -> i -> Int -> MutableArray# s e -> STRep s (Array i e)
+done :: i -> i -> Int -> MutableArray# s e -> STRep s (Array i e)
 -- See NB on 'fill'
 -- Make sure it is strict in 'n'
 done l u n@(I# _) marr#
@@ -535,18 +535,18 @@ badSafeIndex i' n = error ("Error in array index; " ++ show i' ++
                         " not in range [0.." ++ show n ++ ")")
 
 {-# INLINE unsafeAt #-}
-unsafeAt :: Ix i => Array i e -> Int -> e
+unsafeAt :: Array i e -> Int -> e
 unsafeAt (Array _ _ _ arr#) (I# i#) =
     case indexArray# arr# i# of (# e #) -> e
 
 -- | The bounds with which an array was constructed.
 {-# INLINE bounds #-}
-bounds :: Ix i => Array i e -> (i,i)
+bounds :: Array i e -> (i,i)
 bounds (Array l u _ _) = (l,u)
 
 -- | The number of elements in the array.
 {-# INLINE numElements #-}
-numElements :: Ix i => Array i e -> Int
+numElements :: Array i e -> Int
 numElements (Array _ _ n _) = n
 
 -- | The list of indices of an array in ascending order.
@@ -556,13 +556,13 @@ indices (Array l u _ _) = range (l,u)
 
 -- | The list of elements of an array in index order.
 {-# INLINE elems #-}
-elems :: Ix i => Array i e -> [e]
+elems :: Array i e -> [e]
 elems arr@(Array _ _ n _) =
     [unsafeAt arr i | i <- [0 .. n - 1]]
 
 -- | A right fold over the elements
 {-# INLINABLE foldrElems #-}
-foldrElems :: Ix i => (a -> b -> b) -> b -> Array i a -> b
+foldrElems :: (a -> b -> b) -> b -> Array i a -> b
 foldrElems f b0 = \ arr@(Array _ _ n _) ->
   let
     go i | i == n    = b0
@@ -571,7 +571,7 @@ foldrElems f b0 = \ arr@(Array _ _ n _) ->
 
 -- | A left fold over the elements
 {-# INLINABLE foldlElems #-}
-foldlElems :: Ix i => (b -> a -> b) -> b -> Array i a -> b
+foldlElems :: (b -> a -> b) -> b -> Array i a -> b
 foldlElems f b0 = \ arr@(Array _ _ n _) ->
   let
     go i | i == (-1) = b0
@@ -580,7 +580,7 @@ foldlElems f b0 = \ arr@(Array _ _ n _) ->
 
 -- | A strict right fold over the elements
 {-# INLINABLE foldrElems' #-}
-foldrElems' :: Ix i => (a -> b -> b) -> b -> Array i a -> b
+foldrElems' :: (a -> b -> b) -> b -> Array i a -> b
 foldrElems' f b0 = \ arr@(Array _ _ n _) ->
   let
     go i a | i == (-1) = a
@@ -589,7 +589,7 @@ foldrElems' f b0 = \ arr@(Array _ _ n _) ->
 
 -- | A strict left fold over the elements
 {-# INLINABLE foldlElems' #-}
-foldlElems' :: Ix i => (b -> a -> b) -> b -> Array i a -> b
+foldlElems' :: (b -> a -> b) -> b -> Array i a -> b
 foldlElems' f b0 = \ arr@(Array _ _ n _) ->
   let
     go i a | i == n    = a
@@ -598,7 +598,7 @@ foldlElems' f b0 = \ arr@(Array _ _ n _) ->
 
 -- | A left fold over the elements with no starting value
 {-# INLINABLE foldl1Elems #-}
-foldl1Elems :: Ix i => (a -> a -> a) -> Array i a -> a
+foldl1Elems :: (a -> a -> a) -> Array i a -> a
 foldl1Elems f = \ arr@(Array _ _ n _) ->
   let
     go i | i == 0    = unsafeAt arr 0
@@ -608,7 +608,7 @@ foldl1Elems f = \ arr@(Array _ _ n _) ->
 
 -- | A right fold over the elements with no starting value
 {-# INLINABLE foldr1Elems #-}
-foldr1Elems :: Ix i => (a -> a -> a) -> Array i a -> a
+foldr1Elems :: (a -> a -> a) -> Array i a -> a
 foldr1Elems f = \ arr@(Array _ _ n _) ->
   let
     go i | i == n-1  = unsafeAt arr i
@@ -653,7 +653,7 @@ unsafeAccumArray :: Ix i => (e -> a -> e) -> e -> (i,i) -> [(Int, a)] -> Array i
 unsafeAccumArray f initial b ies = unsafeAccumArray' f initial b (rangeSize b) ies
 
 {-# INLINE unsafeAccumArray' #-}
-unsafeAccumArray' :: Ix i => (e -> a -> e) -> e -> (i,i) -> Int -> [(Int, a)] -> Array i e
+unsafeAccumArray' :: (e -> a -> e) -> e -> (i,i) -> Int -> [(Int, a)] -> Array i e
 unsafeAccumArray' f initial (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
     case newArray# n# initial s1#          of { (# s2#, marr# #) ->
     foldr (adjust f marr#) (done l u n marr#) ies s2# })
@@ -684,7 +684,7 @@ arr@(Array l u n _) // ies =
     unsafeReplace arr [(safeIndex (l,u) n i, e) | (i, e) <- ies]
 
 {-# INLINE unsafeReplace #-}
-unsafeReplace :: Ix i => Array i e -> [(Int, e)] -> Array i e
+unsafeReplace :: Array i e -> [(Int, e)] -> Array i e
 unsafeReplace arr ies = runST (do
     STArray l u n marr# <- thawSTArray arr
     ST (foldr (fill marr#) (done l u n marr#) ies))
@@ -701,13 +701,13 @@ accum f arr@(Array l u n _) ies =
     unsafeAccum f arr [(safeIndex (l,u) n i, e) | (i, e) <- ies]
 
 {-# INLINE unsafeAccum #-}
-unsafeAccum :: Ix i => (e -> a -> e) -> Array i e -> [(Int, a)] -> Array i e
+unsafeAccum :: (e -> a -> e) -> Array i e -> [(Int, a)] -> Array i e
 unsafeAccum f arr ies = runST (do
     STArray l u n marr# <- thawSTArray arr
     ST (foldr (adjust f marr#) (done l u n marr#) ies))
 
 {-# INLINE [1] amap #-}
-amap :: Ix i => (a -> b) -> Array i a -> Array i b
+amap :: (a -> b) -> Array i a -> Array i b
 amap f arr@(Array l u n@(I# n#) _) = runST (ST $ \s1# ->
     case newArray# n# arrEleBottom s1# of
         (# s2#, marr# #) ->
@@ -786,7 +786,7 @@ cmpIntArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
 ----------------------------------------------------------------------
 -- Array instances
 
-instance Ix i => Functor (Array i) where
+instance Functor (Array i) where
     fmap = amap
 
 instance (Ix i, Eq e) => Eq (Array i e) where
@@ -845,7 +845,7 @@ readSTArray marr@(STArray l u n _) i =
     unsafeReadSTArray marr (safeIndex (l,u) n i)
 
 {-# INLINE unsafeReadSTArray #-}
-unsafeReadSTArray :: Ix i => STArray s i e -> Int -> ST s e
+unsafeReadSTArray :: STArray s i e -> Int -> ST s e
 unsafeReadSTArray (STArray _ _ _ marr#) (I# i#)
     = ST $ \s1# -> readArray# marr# i# s1#
 
@@ -855,7 +855,7 @@ writeSTArray marr@(STArray l u n _) i e =
     unsafeWriteSTArray marr (safeIndex (l,u) n i) e
 
 {-# INLINE unsafeWriteSTArray #-}
-unsafeWriteSTArray :: Ix i => STArray s i e -> Int -> e -> ST s ()
+unsafeWriteSTArray :: STArray s i e -> Int -> e -> ST s ()
 unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
     case writeArray# marr# i# e s1# of
         s2# -> (# s2#, () #)
@@ -863,7 +863,7 @@ unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
 ----------------------------------------------------------------------
 -- Moving between mutable and immutable
 
-freezeSTArray :: Ix i => STArray s i e -> ST s (Array i e)
+freezeSTArray :: STArray s i e -> ST s (Array i e)
 freezeSTArray (STArray l u n@(I# n#) marr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr'# #) ->
     let copy i# s3# | isTrue# (i# ==# n#) = s3#
@@ -876,12 +876,12 @@ freezeSTArray (STArray l u n@(I# n#) marr#) = ST $ \s1# ->
     (# s4#, Array l u n arr# #) }}}
 
 {-# INLINE unsafeFreezeSTArray #-}
-unsafeFreezeSTArray :: Ix i => STArray s i e -> ST s (Array i e)
+unsafeFreezeSTArray :: STArray s i e -> ST s (Array i e)
 unsafeFreezeSTArray (STArray l u n marr#) = ST $ \s1# ->
     case unsafeFreezeArray# marr# s1#   of { (# s2#, arr# #) ->
     (# s2#, Array l u n arr# #) }
 
-thawSTArray :: Ix i => Array i e -> ST s (STArray s i e)
+thawSTArray :: Array i e -> ST s (STArray s i e)
 thawSTArray (Array l u n@(I# n#) arr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr# #) ->
     let copy i# s3# | isTrue# (i# ==# n#) = s3#
@@ -893,7 +893,7 @@ thawSTArray (Array l u n@(I# n#) arr#) = ST $ \s1# ->
     (# s3#, STArray l u n marr# #) }}
 
 {-# INLINE unsafeThawSTArray #-}
-unsafeThawSTArray :: Ix i => Array i e -> ST s (STArray s i e)
+unsafeThawSTArray :: Array i e -> ST s (STArray s i e)
 unsafeThawSTArray (Array l u n arr#) = ST $ \s1# ->
     case unsafeThawArray# arr# s1#      of { (# s2#, marr# #) ->
     (# s2#, STArray l u n marr# #) }

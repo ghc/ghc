@@ -56,7 +56,7 @@ import Data.Monoid
 import Data.Ord
 import Data.Proxy
 
-import GHC.Arr  ( Array(..), Ix(..), elems, numElements,
+import GHC.Arr  ( Array(..), elems, numElements,
                   foldlElems, foldrElems,
                   foldlElems', foldrElems',
                   foldl1Elems, foldr1Elems)
@@ -254,7 +254,7 @@ instance Foldable ((,) a) where
 
     foldr f z (_, y) = f y z
 
-instance Ix i => Foldable (Array i) where
+instance Foldable (Array i) where
     foldr = foldrElems
     foldl = foldlElems
     foldl' = foldlElems'

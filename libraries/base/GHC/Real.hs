@@ -103,12 +103,12 @@ notANumber = 0 :% 0
 -- | Extract the numerator of the ratio in reduced form:
 -- the numerator and denominator have no common factor and the denominator
 -- is positive.
-numerator       :: (Integral a) => Ratio a -> a
+numerator       :: Ratio a -> a
 
 -- | Extract the denominator of the ratio in reduced form:
 -- the numerator and denominator have no common factor and the denominator
 -- is positive.
-denominator     :: (Integral a) => Ratio a -> a
+denominator     :: Ratio a -> a
 
 
 -- | 'reduce' is a subsidiary function used only in this module.
@@ -410,7 +410,7 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
                           where (q,r) = quotRem x y
 
-instance  (Integral a, Show a)  => Show (Ratio a)  where
+instance  (Show a)  => Show (Ratio a)  where
     {-# SPECIALIZE instance Show Rational #-}
     showsPrec p (x:%y)  =  showParen (p > ratioPrec) $
                            showsPrec ratioPrec1 x .

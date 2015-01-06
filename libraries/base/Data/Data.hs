@@ -1064,7 +1064,7 @@ ratioConstr = mkConstr ratioDataType ":%" [] Infix
 ratioDataType :: DataType
 ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
 
-instance (Data a, Integral a) => Data (Ratio a) where
+instance Data a => Data (Ratio a) where
   gfoldl k z (a :% b) = z (:%) `k` a `k` b
   toConstr _ = ratioConstr
   gunfold k z c | constrIndex c == 1 = k (k (z (:%)))
@@ -1303,7 +1303,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
 
 ------------------------------------------------------------------------------
 
-instance (Data a, Typeable a) => Data (Ptr a) where
+instance Data a => Data (Ptr a) where
   toConstr _   = error "Data.Data.toConstr(Ptr)"
   gunfold _ _  = error "Data.Data.gunfold(Ptr)"
   dataTypeOf _ = mkNoRepType "GHC.Ptr.Ptr"
@@ -1311,7 +1311,7 @@ instance (Data a, Typeable a) => Data (Ptr a) where
 
 ------------------------------------------------------------------------------
 
-instance (Data a, Typeable a) => Data (ForeignPtr a) where
+instance Data a => Data (ForeignPtr a) where
   toConstr _   = error "Data.Data.toConstr(ForeignPtr)"
   gunfold _ _  = error "Data.Data.gunfold(ForeignPtr)"
   dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
@@ -1320,7 +1320,7 @@ instance (Data a, Typeable a) => Data (ForeignPtr a) where
 ------------------------------------------------------------------------------
 -- The Data instance for Array preserves data abstraction at the cost of
 -- inefficiency. We omit reflection services for the sake of data abstraction.
-instance (Typeable a, Data a, Data b, Ix a) => Data (Array a b)
+instance (Data a, Data b, Ix a) => Data (Array a b)
  where
   gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
   toConstr _   = error "Data.Data.toConstr(Array)"

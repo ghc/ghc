@@ -54,12 +54,12 @@ newIOArray :: Ix i => (i,i) -> e -> IO (IOArray i e)
 newIOArray lu initial  = stToIO $ do {marr <- newSTArray lu initial; return (IOArray marr)}
 
 -- | Read a value from an 'IOArray'
-unsafeReadIOArray  :: Ix i => IOArray i e -> Int -> IO e
+unsafeReadIOArray  :: IOArray i e -> Int -> IO e
 {-# INLINE unsafeReadIOArray #-}
 unsafeReadIOArray (IOArray marr) i = stToIO (unsafeReadSTArray marr i)
 
 -- | Write a new value into an 'IOArray'
-unsafeWriteIOArray :: Ix i => IOArray i e -> Int -> e -> IO ()
+unsafeWriteIOArray :: IOArray i e -> Int -> e -> IO ()
 {-# INLINE unsafeWriteIOArray #-}
 unsafeWriteIOArray (IOArray marr) i e = stToIO (unsafeWriteSTArray marr i e)
 

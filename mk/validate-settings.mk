@@ -104,6 +104,7 @@ utils/haddock_dist_EXTRA_HC_OPTS += -fno-warn-deprecations
 
 # containers uses bitSize at the moment
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
+libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-redundant-constraints
 
 # On Windows, there are also some unused import warnings
 ifeq "$(HostOS_CPP)" "mingw32"
@@ -113,6 +114,7 @@ endif
 # haskeline has warnings about deprecated use of block/unblock
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-redundant-constraints
 
 # binary upstream has some warnings, so don't use -Werror for it
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
@@ -143,6 +145,7 @@ libraries/dph/dph-lifted-common-install_EXTRA_HC_OPTS += -Wwarn
 # transformers has unused function parameters warnings
 libraries/transformers_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-matches -fno-warn-unused-imports
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-matches -fno-warn-unused-imports
+libraries/transformers_dist-install_EXTRA_HC_OPTS += -fno-warn-redundant-constraints
 
 # Turn of trustworthy-safe warning
 libraries/base_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
