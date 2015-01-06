@@ -111,8 +111,8 @@ disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 
 transCloVarSet :: (VarSet -> VarSet)
-                  -- Map some variables in the set to 
-                  -- *extra* variables that should be in it
+                  -- Map some variables in the set to
+                  -- extra variables that should be in it
                -> VarSet -> VarSet
 -- (transCloVarSet f s) repeatedly applies f to the set s, adding any
 -- new variables to s that it finds thereby, until it reaches a fixed

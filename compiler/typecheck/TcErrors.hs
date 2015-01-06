@@ -277,7 +277,7 @@ reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
             -- See Note [Do not report derived but soluble errors]
        ; mapBagM_ (reportImplic ctxt1) implics }
             -- NB ctxt1: don't suppress inner insolubles if there's only a
-            -- *wanted* insoluble here; but do suppress inner insolubles
+            -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
