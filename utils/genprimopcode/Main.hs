@@ -245,12 +245,14 @@ gen_hs_source (Info defaults entries) =
         ++ "{-# LANGUAGE MultiParamTypeClasses #-}\n"
         ++ "{-# LANGUAGE NoImplicitPrelude #-}\n"
         ++ "{-# LANGUAGE UnboxedTuples #-}\n"
+
         ++ "{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}\n"
                 -- We generate a binding for coerce, like
                 --   coerce :: Coercible a b => a -> b
                 --   coerce = let x = x in x
                 -- and we don't want a complaint that the constraint is redundant
                 -- Remember, this silly file is only for Haddock's consumption
+
         ++ "module GHC.Prim (\n"
         ++ unlines (map (("        " ++) . hdr) entries')
         ++ ") where\n"
@@ -259,7 +261,21 @@ gen_hs_source (Info defaults entries) =
         ++ unlines (map opt defaults)
     ++ "-}\n"
     ++ "import GHC.Types (Coercible)\n"
-        ++ unlines (concatMap ent entries') ++ "\n\n\n"
+
+    ++ "default ()"  -- If we don't say this then the default type include Integer
+                     -- so that runs off and loads modules that are not part of
+                     -- pacakge ghc-prim at all.  And that in turn somehow ends up
+                     -- with Declaration for $fEqMaybe:
+                     --       attempting to use module ‘GHC.Classes’
+                     --       (libraries/ghc-prim/./GHC/Classes.hs) which is not loaded
+                     -- coming from LoadIface.homeModError
+                     -- I'm not sure precisely why; but I *am* sure that we don't need
+                     -- any type-class defaulting; and it's clearly wrong to need
+                     -- the base package when haddocking ghc-prim
+
+       -- Now the main payload
+    ++ unlines (concatMap ent entries') ++ "\n\n\n"
+
      where entries' = concatMap desugarVectorSpec entries
 
            opt (OptionFalse n)    = n ++ " = False"
