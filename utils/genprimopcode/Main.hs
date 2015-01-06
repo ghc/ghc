@@ -245,6 +245,12 @@ gen_hs_source (Info defaults entries) =
         ++ "{-# LANGUAGE MultiParamTypeClasses #-}\n"
         ++ "{-# LANGUAGE NoImplicitPrelude #-}\n"
         ++ "{-# LANGUAGE UnboxedTuples #-}\n"
+        ++ "{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}\n"
+                -- We generate a binding for coerce, like
+                --   coerce :: Coercible a b => a -> b
+                --   coerce = let x = x in x
+                -- and we don't want a complaint that the constraint is redundant
+                -- Remember, this silly file is only for Haddock's consumption
         ++ "module GHC.Prim (\n"
         ++ unlines (map (("        " ++) . hdr) entries')
         ++ ") where\n"
