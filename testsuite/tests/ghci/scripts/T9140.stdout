@@ -9,6 +9,6 @@
       a = (# 1, 3 #)
       Probable fix: use a bang pattern
 
-Top level:
+<interactive>:1:1:
     GHCi can't bind a variable of unlifted type:
       a :: (# Integer, Integer #)

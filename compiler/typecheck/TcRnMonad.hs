@@ -74,12 +74,13 @@ initTc :: HscEnv
        -> HscSource
        -> Bool          -- True <=> retain renamed syntax trees
        -> Module
+       -> RealSrcSpan
        -> TcM r
        -> IO (Messages, Maybe r)
                 -- Nothing => error thrown by the thing inside
                 -- (error messages should have been printed already)
 
-initTc hsc_env hsc_src keep_rn_syntax mod do_this
+initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
@@ -167,7 +168,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
              } ;
              lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
-                tcl_loc        = mkGeneralSrcSpan (fsLit "Top level"),
+                tcl_loc        = loc,     -- Should be over-ridden very soon!
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -210,18 +211,19 @@ initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
 initTcInteractive hsc_env thing_inside
   = initTc hsc_env HsSrcFile False
            (icInteractiveModule (hsc_IC hsc_env))
+           (realSrcLocSpan interactive_src_loc)
            thing_inside
+  where
+    interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
 -- The thing_inside is just going to look up something
 -- in the environment, so we don't need much setup
 initTcForLookup hsc_env thing_inside
-    = do (msgs, m) <- initTc hsc_env HsSrcFile False
-                             (icInteractiveModule (hsc_IC hsc_env))  -- Irrelevant really
-                             thing_inside
-         case m of
+  = do { (msgs, m) <- initTcInteractive hsc_env thing_inside
+       ; case m of
              Nothing -> throwIO $ mkSrcErr $ snd msgs
-             Just x -> return x
+             Just x -> return x }
 
 {-
 ************************************************************************
@@ -637,11 +639,11 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (tcl_loc env) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env)) }
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan loc@(RealSrcSpan _) thing_inside
-    = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
+setSrcSpan (RealSrcSpan real_loc) thing_inside
+    = updLclEnv (\env -> env { tcl_loc = real_loc }) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
@@ -944,9 +946,9 @@ getCtLoc origin
 setCtLoc :: CtLoc -> TcM a -> TcM a
 -- Set the SrcSpan and error context from the CtLoc
 setCtLoc (CtLoc { ctl_env = lcl }) thing_inside
-  = updLclEnv (\env -> env { tcl_loc = tcl_loc lcl
+  = updLclEnv (\env -> env { tcl_loc   = tcl_loc lcl
                            , tcl_bndrs = tcl_bndrs lcl
-                           , tcl_ctxt = tcl_ctxt lcl })
+                           , tcl_ctxt  = tcl_ctxt lcl })
               thing_inside
 
 {-
@@ -1211,7 +1213,12 @@ emitWildcardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitWildcardHoleConstraints wcs
   = do { ctLoc <- getCtLoc HoleOrigin
        ; forM_ wcs $ \(name, tv) -> do {
-       ; let ctLoc' = setCtLocSpan ctLoc (nameSrcSpan name)
+       ; let real_span = case nameSrcSpan name of
+                           RealSrcSpan span  -> span
+                           UnhelpfulSpan str -> pprPanic "emitWildcardHoleConstraints"
+                                                      (ppr name <+> quotes (ftext str))
+               -- Wildcards are defined locally, and so have RealSrcSpans
+             ctLoc' = setCtLocSpan ctLoc real_span
              ty     = mkTyVarTy tv
              ev     = mkLocalId name ty
              can    = CHoleCan { cc_ev   = CtWanted ty ev ctLoc'

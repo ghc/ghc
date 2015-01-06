@@ -478,9 +478,9 @@ mkErrorMsg :: ReportErrCtxt -> Ct -> SDoc -> TcM ErrMsg
 mkErrorMsg ctxt ct msg
   = do { let tcl_env = ctLocEnv (ctLoc ct)
        ; err_info <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkLongErrAt (tcl_loc tcl_env) msg err_info }
+       ; mkLongErrAt (RealSrcSpan (tcl_loc tcl_env)) msg err_info }
 
-type UserGiven = ([EvVar], SkolemInfo, Bool, SrcSpan)
+type UserGiven = ([EvVar], SkolemInfo, Bool, RealSrcSpan)
 
 getUserGivens :: ReportErrCtxt -> [UserGiven]
 -- One item for each enclosing implication

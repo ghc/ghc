@@ -950,9 +950,9 @@ greToRdrNames GRE{ gre_name = name, gre_prov = prov }
 -- | Parses a string as an identifier, and returns the list of 'Name's that
 -- the identifier can refer to in the current interactive context.
 parseName :: GhcMonad m => String -> m [Name]
-parseName str = withSession $ \hsc_env -> do
-   (L _ rdr_name) <- liftIO $ hscParseIdentifier hsc_env str
-   liftIO $ hscTcRnLookupRdrName hsc_env rdr_name
+parseName str = withSession $ \hsc_env -> liftIO $
+   do { lrdr_name <- hscParseIdentifier hsc_env str
+      ; hscTcRnLookupRdrName hsc_env lrdr_name }
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression

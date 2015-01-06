@@ -123,22 +123,30 @@ tcRnModule :: HscEnv
 
 tcRnModule hsc_env hsc_src save_rn_syntax
    parsedModule@HsParsedModule {hpm_module=L loc this_module}
+ | RealSrcSpan real_loc <- loc
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
-      ; let { this_pkg = thisPackage (hsc_dflags hsc_env)
-            ; pair@(this_mod,_)
-                = case hsmodName this_module of
-                    Nothing -- 'module M where' is omitted
-                        ->  (mAIN, srcLocSpan (srcSpanStart loc))
-
-                    Just (L mod_loc mod)  -- The normal case
-                        -> (mkModule this_pkg mod, mod_loc) } ;
-
-      ; res <- initTc hsc_env hsc_src save_rn_syntax this_mod $
+      ; initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
                withTcPlugins hsc_env $
-        tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
-      ; return res
-      }
+               tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
+
+  | otherwise
+  = return ((emptyBag, unitBag err_msg), Nothing)
+
+  where
+    err_msg = mkPlainErrMsg (hsc_dflags hsc_env) loc $
+              text "Module does not have a RealSrcSpan:" <+> ppr this_mod
+
+    this_pkg = thisPackage (hsc_dflags hsc_env)
+
+    pair :: (Module, SrcSpan)
+    pair@(this_mod,_)
+      | Just (L mod_loc mod) <- hsmodName this_module
+      = (mkModule this_pkg mod, mod_loc)
+
+      | otherwise   -- 'module M where' is omitted
+      = (mAIN, srcLocSpan (srcSpanStart loc))
+
 
 -- To be called at the beginning of renaming hsig files.
 -- If we're processing a signature, load up the RdrEnv
@@ -1745,7 +1753,8 @@ tcRnExpr :: HscEnv
          -> IO (Messages, Maybe Type)
 -- Type checks the expression and returns its most general type
 tcRnExpr hsc_env rdr_expr
-  = runTcInteractive hsc_env $ do {
+  = runTcInteractive hsc_env $
+    do {
 
     (rn_expr, _fvs) <- rnLExpr rdr_expr ;
     failIfErrsM ;
@@ -1907,10 +1916,12 @@ getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (ptext (sLit "getModuleInterface")) mod
 
-tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Messages, Maybe [Name])
+tcRnLookupRdrName :: HscEnv -> Located RdrName
+                  -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
-tcRnLookupRdrName hsc_env rdr_name
+tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
+    setSrcSpan loc           $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.
