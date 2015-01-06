@@ -239,6 +239,6 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
 --------------------------------------------------------------------------------
 
 
-withTempDir :: (ExceptionMonad m, MonadIO m) => FilePath -> m a -> m a
+withTempDir :: (ExceptionMonad m) => FilePath -> m a -> m a
 withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
                             (liftIO $ removeDirectoryRecursive dir)
