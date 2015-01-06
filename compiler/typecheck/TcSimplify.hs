@@ -1104,6 +1104,16 @@ works:
   so that we can discard implication constraints that we don't need.
   So ics_dead consists only of the *reportable* redundant givens.
 
+----- Shortcomings
+
+Consider (see Trac #9939)
+    f2 :: (Eq a, Ord a) => a -> a -> Bool
+    -- Ord a redundant, but Eq a is reported
+    f2 x y = (x == y)
+
+We report (Eq a) as redundant, whereas actually (Ord a) is.  But it's
+really not easy to detect that!
+
 
 Note [Cutting off simpl_loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
