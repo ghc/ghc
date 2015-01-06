@@ -13,7 +13,7 @@ data Option = TargetOS | TargetArch | TargetPlatformFull
             | HostOsCpp
 
 instance ShowAction Option where
-    showAction opt = showAction $ askConfig $ case opt of 
+    showAction opt = showAction $ fmap words $ askConfig $ case opt of 
         TargetOS                -> "target-os"
         TargetArch              -> "target-arch"
         TargetPlatformFull      -> "target-platform-full"
