@@ -21,8 +21,8 @@ configureArgs stage settings =
         argConf key as = joinArgs "--configure-option=" key "=" as
 
         argConfWith key opt = do
-            [value] <- showAction opt
-            when (value /= "") $ argConf ("--with-" ++ key) $ arg value
+            opts <- showAction opt
+            when (opts /= []) $ argConf ("--with-" ++ key) $ arg opts
 
         cflags   = joinArgsSpaced (commonCcArgs `filterOut` ["-Werror"])
                                   (ConfCcArgs stage)

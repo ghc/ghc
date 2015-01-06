@@ -81,7 +81,7 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
         run (Ghc stage) $ mconcat
             [ arg "-M"
             , wayHcOpts vanilla -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
-            , splitArgs $ arg SrcHcOpts -- TODO: get rid of splitArgs
+            , arg SrcHcOpts -- TODO: get rid of splitArgs
             , when (stage == Stage0) $ arg "-package-db libraries/bootstrapping.conf"
             , arg $ if usePackageKey then "-this-package-key" else "-package-name"
             , arg packageKey -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
