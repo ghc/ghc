@@ -607,9 +607,10 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 739189056, 5),
+          [(wordsize(64), 687562440, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
+          # 2015-01-07    687562440   TrieMap leaf compression
            (wordsize(32), 353644844, 5)
           ]),
       ],

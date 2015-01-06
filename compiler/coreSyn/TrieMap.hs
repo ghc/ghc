@@ -622,6 +622,7 @@ mapR f = RM . mapTM f . unRM
 
 data TypeMap a
   = EmptyTM
+  | SingletonTM (CmEnv, Type) a
   | TM { tm_var   :: VarMap a
        , tm_app    :: TypeMap (TypeMap a)
        , tm_fun    :: TypeMap (TypeMap a)
@@ -630,6 +631,41 @@ data TypeMap a
        , tm_tylit  :: TyLitMap a
        }
 
+eqTypesModuloDeBruijn :: (CmEnv, [Type]) -> (CmEnv, [Type]) -> Bool
+eqTypesModuloDeBruijn (_, []) (_, []) = True
+eqTypesModuloDeBruijn (env, ty:tys) (env', ty':tys') =
+    eqTypeModuloDeBruijn (env, ty) (env', ty') &&
+    eqTypesModuloDeBruijn (env, tys) (env', tys')
+eqTypesModuloDeBruijn _ _ = False
+
+-- NB: need to coreView!
+eqTypeModuloDeBruijn :: (CmEnv, Type) -> (CmEnv, Type) -> Bool
+eqTypeModuloDeBruijn env_t@(env, t) env_t'@(env', t')
+    -- ToDo: I guess we can make this a little more efficient
+    | Just new_t  <- coreView t  = eqTypeModuloDeBruijn (env, new_t) env_t'
+    | Just new_t' <- coreView t' = eqTypeModuloDeBruijn env_t (env', new_t')
+eqTypeModuloDeBruijn (env, t) (env', t') =
+    case (t, t') of
+        (TyVarTy v, TyVarTy v')
+            -> case (lookupCME env v, lookupCME env' v') of
+                (Just bv, Just bv') -> bv == bv'
+                (Nothing, Nothing) -> v == v'
+                _ -> False
+        (AppTy t1 t2, AppTy t1' t2')
+            -> eqTypeModuloDeBruijn (env, t1) (env', t1') &&
+               eqTypeModuloDeBruijn (env, t2) (env', t2')
+        (FunTy t1 t2, FunTy t1' t2')
+            -> eqTypeModuloDeBruijn (env, t1) (env', t1') &&
+               eqTypeModuloDeBruijn (env, t2) (env', t2')
+        (TyConApp tc tys, TyConApp tc' tys')
+            -> tc == tc' && eqTypesModuloDeBruijn (env, tys) (env', tys')
+        (LitTy l, LitTy l')
+            -> l == l'
+        (ForAllTy tv ty, ForAllTy tv' ty')
+            -> eqTypeModuloDeBruijn (env, tyVarKind tv) (env', tyVarKind tv') &&
+               eqTypeModuloDeBruijn (extendCME env tv, ty)
+                                    (extendCME env' tv', ty')
+        _ -> False
 
 instance Outputable a => Outputable (TypeMap a) where
   ppr m = text "TypeMap elts" <+> ppr (foldTypeMap (:) [] m)
@@ -647,6 +683,10 @@ lookupTypeMap cm t = lkT emptyCME t cm
 -- This only considers saturated applications (i.e. TyConApp ones).
 lookupTypeMapTyCon :: TypeMap a -> TyCon -> [a]
 lookupTypeMapTyCon EmptyTM _ = []
+lookupTypeMapTyCon (SingletonTM (_, TyConApp tc' _) v) tc
+    | tc' == tc = [v]
+    | otherwise = []
+lookupTypeMapTyCon SingletonTM{} _ = []
 lookupTypeMapTyCon TM { tm_tc_app = cs } tc =
   case lookupUFM cs tc of
     Nothing -> []
@@ -673,6 +713,7 @@ instance TrieMap TypeMap where
 
 mapT :: (a->b) -> TypeMap a -> TypeMap b
 mapT _ EmptyTM = EmptyTM
+mapT f (SingletonTM env_ty v) = SingletonTM env_ty (f v)
 mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_fun = tfun
            , tm_tc_app = ttcapp, tm_forall = tforall, tm_tylit = tlit })
   = TM { tm_var    = mapTM f tvar
@@ -686,6 +727,10 @@ mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_fun = tfun
 lkT :: CmEnv -> Type -> TypeMap a -> Maybe a
 lkT env ty m
   | EmptyTM <- m = Nothing
+  | SingletonTM env_ty v <- m =
+        if eqTypeModuloDeBruijn env_ty (env, ty)
+            then Just v
+            else Nothing
   | otherwise    = go ty m
   where
     go ty | Just ty' <- coreView ty = go ty'
@@ -700,7 +745,18 @@ lkT env ty m
 -----------------
 xtT :: CmEnv -> Type -> XT a -> TypeMap a -> TypeMap a
 xtT env ty f m
-  | EmptyTM <- m            = xtT env ty  f wrapEmptyTypeMap
+  | EmptyTM <- m            = case f Nothing of
+                                Just v -> SingletonTM (env, ty) v
+                                Nothing -> EmptyTM
+  | SingletonTM env_ty@(env', ty') v' <- m
+    = if eqTypeModuloDeBruijn env_ty (env, ty)
+        then case f (Just v') of
+                Just v'' -> SingletonTM env_ty v''
+                Nothing -> EmptyTM
+        else case f Nothing of
+                Nothing -> SingletonTM env_ty v'
+                Just v  -> wrapEmptyTypeMap |> xtT env' ty' (const (Just v'))
+                                           >.> xtT env  ty  (const (Just v))
   | Just ty' <- coreView ty = xtT env ty' f m
 
 xtT env (TyVarTy v)       f  m = m { tm_var    = tm_var m |> xtVar env v f }
@@ -714,6 +770,7 @@ xtT _   (LitTy l)         f  m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 
 fdT :: (a -> b -> b) -> TypeMap a -> b -> b
 fdT _ EmptyTM = \z -> z
+fdT k (SingletonTM _ v) = \z -> k v z
 fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM k) (tm_app m)
         . foldTM (foldTM k) (tm_fun m)
