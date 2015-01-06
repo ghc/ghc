@@ -602,7 +602,7 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
-        tcl_loc        :: SrcSpan,         -- Source span
+        tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
         tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
 
@@ -1821,7 +1821,7 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
                    , ctl_env    :: TcLclEnv
                    , ctl_depth  :: !SubGoalDepth }
   -- The TcLclEnv includes particularly
-  --    source location:  tcl_loc   :: SrcSpan
+  --    source location:  tcl_loc   :: RealSrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
   --    level:            tcl_tclvl :: TcLevel
@@ -1844,10 +1844,10 @@ ctLocDepth = ctl_depth
 ctLocOrigin :: CtLoc -> CtOrigin
 ctLocOrigin = ctl_origin
 
-ctLocSpan :: CtLoc -> SrcSpan
+ctLocSpan :: CtLoc -> RealSrcSpan
 ctLocSpan (CtLoc { ctl_env = lcl}) = tcl_loc lcl
 
-setCtLocSpan :: CtLoc -> SrcSpan -> CtLoc
+setCtLocSpan :: CtLoc -> RealSrcSpan -> CtLoc
 setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (lcl { tcl_loc = loc })
 
 bumpCtLocDepth :: SubGoalCounter -> CtLoc -> CtLoc

@@ -1200,12 +1200,11 @@ The details are a bit tricky though:
    It stays as 'main' (or whatever -this-package-key says), and is the
    package to which :load'ed modules are added to.
 
- * So how do we arrange that declarations at the command prompt get
-   to be in the 'interactive' package?  Simply by setting the tcg_mod
+ * So how do we arrange that declarations at the command prompt get to
+   be in the 'interactive' package?  Simply by setting the tcg_mod
    field of the TcGblEnv to "interactive:Ghci1".  This is done by the
-   call to initTc in initTcInteractive, initTcForLookup, which in
-   turn get the module from it 'icInteractiveModule' field of the
-   interactive context.
+   call to initTc in initTcInteractive, which in turn get the module
+   from it 'icInteractiveModule' field of the interactive context.
 
    The 'thisPackage' field stays as 'main' (or whatever -this-package-key says.
 

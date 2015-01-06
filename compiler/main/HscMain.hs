@@ -271,10 +271,11 @@ ioMsgMaybe' ioA = do
 -- | Lookup things in the compiler's environment
 
 #ifdef GHCI
-hscTcRnLookupRdrName :: HscEnv -> RdrName -> IO [Name]
-hscTcRnLookupRdrName hsc_env0 rdr_name = runInteractiveHsc hsc_env0 $ do
-   hsc_env <- getHscEnv
-   ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name
+hscTcRnLookupRdrName :: HscEnv -> Located RdrName -> IO [Name]
+hscTcRnLookupRdrName hsc_env0 rdr_name 
+  = runInteractiveHsc hsc_env0 $ 
+    do { hsc_env <- getHscEnv
+       ; ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name }
 #endif
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
