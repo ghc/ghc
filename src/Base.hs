@@ -9,7 +9,7 @@ module Base (
     Stage (..),
     Args, arg, args, ShowAction (..),
     Condition (..),
-    joinArgs, joinArgsSpaced, splitArgs,
+    joinArgs, joinArgsSpaced,
     filterOut
     ) where
 
@@ -71,9 +71,6 @@ intercalateArgs :: String -> Args -> Args
 intercalateArgs s as = do
     as' <- as
     return [intercalate s as']
-
-splitArgs :: Args -> Args
-splitArgs = fmap (concatMap words)
 
 filterOut :: Args -> [String] -> Args
 filterOut as list = filter (`notElem` list) <$> as
