@@ -55,7 +55,6 @@ import Package.Base
 --  $$(SRC_HC_WARNING_OPTS) \
 --  $$(EXTRA_HC_OPTS)
 
--- TODO: make sure SrcDirs ($1_$2_HS_SRC_DIRS) is not empty ('.' by default)
 -- TODO: add $1_HC_OPTS
 -- TODO: check that the package is not a program ($1_$2_PROG == "")
 -- TODO: handle empty $1_PACKAGE (can it be empty?)
@@ -77,8 +76,9 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
             , wayHcOpts vanilla -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
             , arg SrcHcOpts
             , when (stage == Stage0) $ arg "-package-db libraries/bootstrapping.conf"
+            -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
             , arg $ if usePackageKey then "-this-package-key" else "-package-name"
-            , arg $ PackageKey pkgData -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
+            , arg $ PackageKey pkgData
             , arg "-hide-all-packages"
             , arg "-i" -- resets the search path to nothing; TODO: check if really needed
             , arg $ map (\d -> "-i" ++ path </> d) srcDirs
@@ -88,12 +88,16 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
                 return $ prefix ++ buildDir </> suffix
             , map (\d -> "-I" ++ path </> d) <$> filter isRelative <$> arg (IncludeDirs pkgData)
             , map (\d -> "-I" ++          d) <$> filter isAbsolute <$> arg (IncludeDirs pkgData)
-            , arg "-optP-include"
-            , arg $ "-optP" ++ buildDir </> "build/autogen/cabal_macros.h"
+            , args "-optP-include" ("-optP" ++ buildDir </> "build/autogen/cabal_macros.h")
             , if usePackageKey 
               then map ("-package-key " ++) <$> arg (DepKeys pkgData)
               else map ("-package "     ++) <$> arg (Deps    pkgData)
-            , args "-dep-makefile" out "-dep-suffix" "" "-include-pkg-deps"
+            , arg "-no-user-package-db"
+            , args "-odir"    (buildDir </> "build")
+            , args "-stubdir" (buildDir </> "build")
+            , joinArgsSpaced "-dep-makefile" out
+            , concatMap (\w -> ["-dep-suffix", suffix w]) <$> ways settings
+            , arg "-include-pkg-deps"
             , arg $ map normalise srcs
             ]
 
