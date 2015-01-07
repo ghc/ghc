@@ -411,7 +411,7 @@ test('write_interface_make', normal, run_command, ['$MAKE -s --no-print-director
 test('T9776', normal, compile_fail, ['-frule-check'])
 
 test('T9938',
-     [ extra_clean(['T9938.hi', 'T9938.o', 'T9938']) ],
+     [ extra_clean(['T9938.hi', 'T9938.o', 'T9938']), expect_broken(9938) ],
      run_command,
      ['$MAKE -s --no-print-directory T9938'])
 
