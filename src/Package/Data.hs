@@ -18,11 +18,7 @@ libraryArgs ways =
 configureArgs :: Stage -> Settings -> Args
 configureArgs stage settings = 
     let argConf :: String -> Args -> Args
-        argConf key as = joinArgs "--configure-option=" key "=" as
-
-        argConfWith key opt = do
-            opts <- showAction opt
-            when (opts /= []) $ argConf ("--with-" ++ key) $ arg opts
+        argConf key as = unless (null <$> as) $ joinArgs "--configure-option=" key "=" as
 
         cflags   = joinArgsSpaced (commonCcArgs `filterOut` ["-Werror"])
                                   (ConfCcArgs stage)
@@ -36,10 +32,10 @@ configureArgs stage settings =
         , argConf "LDFLAGS"  ldflags
         , argConf "CPPFLAGS" cppflags
         , joinArgs "--gcc-options=" cflags " " ldflags
-        , argConfWith "iconv-includes"  IconvIncludeDirs
-        , argConfWith "iconv-libraries" IconvLibDirs
-        , argConfWith "gmp-includes"    GmpIncludeDirs
-        , argConfWith "gmp-libraries"   GmpLibDirs
+        , argConf "--with-iconv-includes"  $ arg IconvIncludeDirs
+        , argConf "--with-iconv-libraries" $ arg IconvLibDirs
+        , argConf "--with-gmp-includes"    $ arg GmpIncludeDirs
+        , argConf "--with-gmp-libraries"   $ arg GmpLibDirs
         , when CrossCompiling $ argConf "--host" $ arg TargetPlatformFull -- TODO: why not host?
         , argConf "--with-cc" $ arg Gcc
         ]
@@ -66,13 +62,13 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
                     [ args "configure" path dist
                     -- this is a positional argument, hence:
                     -- * if it is empty, we need to emit one empty string argument
-                    -- * if there are many, we must collapse them into one string argument
-                    , joinArgsSpaced $ customDllArgs settings
+                    -- * if there are many, we must collapse them into one space-separated string
+                    , joinArgsSpaced "" (customDllArgs settings)
                     , with $ Ghc stage -- TODO: used to be stage01 (using max Stage1 GHC)
-                    , with $ GhcPkg stage             
+                    , with $ GhcPkg stage
 
                     , customConfArgs settings
-                    , libraryArgs =<< ways settings                
+                    , libraryArgs =<< ways settings
 
                     , when hsColourSrcs $ with HsColour
                     , configureArgs stage settings

@@ -65,7 +65,7 @@ commonCcWarninigArgs :: Args
 commonCcWarninigArgs = when Validating $
        when GccIsClang                                     (arg "-Wno-unknown-pragmas")
     <> when (not GccIsClang && not GccLt46)                (arg "-Wno-error=inline")
-    <> when (    GccIsClang && not GccLt46 && windowsHost) (arg "-Werror=unused-but-set-variable" )
+    <> when (    GccIsClang && not GccLt46 && windowsHost) (arg "-Werror=unused-but-set-variable")
 
 bootPkgConstraints :: Args
 bootPkgConstraints = mempty
