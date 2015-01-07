@@ -69,22 +69,16 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
         need ["shake/src/Package/Dependencies.hs"] -- Track changes in this file
         let pkgData = buildDir </> "package-data.mk"
         usePackageKey <- SupportsPackageKey || stage /= Stage0 -- TODO: check reasoning (distdir-way-opts)
-        [mods, srcDirs, includeDirs, deps, depKeys] <-
-            mapM ((fmap words) . (packagaDataOption pkgData))
-            [Modules, SrcDirs, IncludeDirs, Deps, DepKeys]
-        srcs <- getDirectoryFiles "" $ do
-            dir       <- srcDirs
-            modPath   <- map (replaceEq '.' pathSeparator) mods
-            extension <- ["hs", "lhs"]
-            return $ path </> dir </> modPath <.> extension
-        packageKey <- packagaDataOption pkgData PackageKey
+        mods    <- map (replaceEq '.' pathSeparator) <$> arg (Modules pkgData)
+        srcDirs <- arg $ SrcDirs pkgData
+        srcs    <- getDirectoryFiles "" $ [path </> dir </> mPath <.> ext | dir <- srcDirs, mPath <- mods, ext <- ["hs", "lhs"]]
         run (Ghc stage) $ mconcat
             [ arg "-M"
             , wayHcOpts vanilla -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
-            , arg SrcHcOpts -- TODO: get rid of splitArgs
+            , arg SrcHcOpts
             , when (stage == Stage0) $ arg "-package-db libraries/bootstrapping.conf"
             , arg $ if usePackageKey then "-this-package-key" else "-package-name"
-            , arg packageKey -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
+            , arg $ PackageKey pkgData -- TODO: check reasoning ($$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))
             , arg "-hide-all-packages"
             , arg "-i" -- resets the search path to nothing; TODO: check if really needed
             , arg $ map (\d -> "-i" ++ path </> d) srcDirs
@@ -92,13 +86,13 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
                 prefix <- ["-i", "-I"] -- 'import' and '#include' search paths
                 suffix <- ["build", "build/autogen"]
                 return $ prefix ++ buildDir </> suffix
-            , arg $ map (\d -> "-I" ++ path </> d) $ filter isRelative includeDirs
-            , arg $ map (\d -> "-I" ++          d) $ filter isAbsolute includeDirs
+            , map (\d -> "-I" ++ path </> d) <$> filter isRelative <$> arg (IncludeDirs pkgData)
+            , map (\d -> "-I" ++          d) <$> filter isAbsolute <$> arg (IncludeDirs pkgData)
             , arg "-optP-include"
             , arg $ "-optP" ++ buildDir </> "build/autogen/cabal_macros.h"
             , if usePackageKey 
-              then arg $ concatMap (\d -> ["-package-key", d]) depKeys
-              else arg $ concatMap (\d -> ["-package"    , d]) deps
+              then map ("-package-key " ++) <$> arg (DepKeys pkgData)
+              else map ("-package "     ++) <$> arg (Deps    pkgData)
             , args "-dep-makefile" out "-dep-suffix" "" "-include-pkg-deps"
             , arg $ map normalise srcs
             ]

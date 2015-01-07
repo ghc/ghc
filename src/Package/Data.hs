@@ -8,17 +8,16 @@ libraryArgs ways =
     let argEnable x suffix = arg $ (if x then "--enable-" else "--disable-") ++ suffix
     in mconcat
         [ argEnable False "library-for-ghci" -- TODO: why always disable?
-        , argEnable (vanilla `elem` ways) "library-vanilla"        
+        , argEnable (vanilla `elem` ways) "library-vanilla"
         , when (ghcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways) $
-            argEnable True "library-for-ghci"        
+            argEnable True "library-for-ghci"
         , argEnable (profiling `elem` ways) "library-profiling"
         , argEnable (dynamic   `elem` ways) "shared"
         ]
 
 configureArgs :: Stage -> Settings -> Args
 configureArgs stage settings = 
-    let argConf :: String -> Args -> Args
-        argConf key as = unless (null <$> as) $ joinArgs "--configure-option=" key "=" as
+    let argConf key as = unless (null <$> as) $ joinArgs "--configure-option=" key "=" (as :: Args)
 
         cflags   = joinArgsSpaced (commonCcArgs `filterOut` ["-Werror"])
                                   (ConfCcArgs stage)
