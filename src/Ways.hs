@@ -13,6 +13,7 @@ module Ways (
     loggingDynamic, threadedLoggingDynamic,
 
     wayHcOpts, 
+    suffix,
     hisuf, osuf, hcsuf
     ) where
 
@@ -84,15 +85,11 @@ wayHcOpts (Way _ _ units) =
     , when (units == [Debug] || units == [Debug, Dynamic]) $ arg ["-ticky", "-DTICKY_TICKY"]
     ]
 
--- TODO: cover other cases
-suffix :: FilePath -> Way -> FilePath
-suffix base (Way _ _ units) = 
-    concat $
-        ["p_"   | Profiling `elem` units] ++
-        ["dyn_" | Dynamic   `elem` units] ++
-        [base                           ]
+suffix :: Way -> String
+suffix way | way == vanilla = ""
+           | otherwise      = tag way ++ "_"
 
-hisuf, osuf, hcsuf :: Way -> FilePath
-hisuf = suffix "hi"
-osuf  = suffix "o"
-hcsuf = suffix "hc"
+hisuf, osuf, hcsuf :: Way -> String
+hisuf = (++ "hi") . suffix
+osuf  = (++ "o" ) . suffix
+hcsuf = (++ "hc") . suffix
