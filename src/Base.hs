@@ -70,7 +70,9 @@ joinArgsSpaced = collect (\x y -> intercalateArgs " " $ x <> y) mempty
 intercalateArgs :: String -> Args -> Args
 intercalateArgs s as = do
     as' <- as
-    return [intercalate s as']
+    case as' of
+        []        -> mempty
+        otherwise -> return [intercalate s as']
 
 filterOut :: Args -> [String] -> Args
 filterOut as list = filter (`notElem` list) <$> as
