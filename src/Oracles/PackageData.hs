@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.PackageData (
-    PackageDataPair (..),
+    PackageDataKey (..),
     PackageData (..)
     ) where
 
@@ -9,19 +9,11 @@ import Development.Shake.Classes
 import Base
 import Util
 
-newtype PackageDataPair = PackageDataPair (FilePath, String)
+newtype PackageDataKey = PackageDataKey (FilePath, String)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
-
-packagaDataWithDefault :: FilePath -> String -> Action String -> Action String
-packagaDataWithDefault file key defaultAction = do
-    maybeValue <- askOracle $ PackageDataPair (file, key) 
-    case maybeValue of
-        Just value -> return value
-        Nothing    -> defaultAction
 
 data PackageData = Modules FilePath | SrcDirs FilePath | PackageKey FilePath 
                  | IncludeDirs FilePath | Deps FilePath | DepKeys FilePath
-                 deriving Show
 
 instance ShowAction PackageData where
     showAction key = do
@@ -33,6 +25,8 @@ instance ShowAction PackageData where
                Deps        file -> ("DEPS"        , file, "" )
                DepKeys     file -> ("DEP_KEYS"    , file, "" )
             keyFullName = replaceSeparators '_' $ takeDirectory file ++ "_" ++ keyName
-        res <- packagaDataWithDefault file keyFullName $
-            error $ "\nCannot find key '" ++ keyName ++ "' in " ++ file ++ "."
-        return $ words $ if res == "" then ifEmpty else res
+        res <- askOracle $ PackageDataKey (file, keyFullName)
+        return $ words $ case res of
+            Nothing    -> error $ "\nCannot find key '" ++ keyName ++ "' in " ++ file ++ "."
+            Just ""    -> ifEmpty
+            Just value -> value

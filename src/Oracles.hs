@@ -43,5 +43,5 @@ oracleRules = do
         need [file]
         liftIO $ readConfigFile file
 
-    addOracle $ \(PackageDataPair (file, key)) -> M.lookup key <$> pkgData file
+    addOracle $ \(PackageDataKey (file, key)) -> M.lookup key <$> pkgData file
     return ()
