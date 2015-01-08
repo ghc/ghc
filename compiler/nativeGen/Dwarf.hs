@@ -33,7 +33,10 @@ dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]
 dwarfGen df modLoc us blocks = do
 
   -- Convert debug data structures to DWARF info records
-  let procs = debugSplitProcs blocks
+  -- We strip out block information, as it is not currently useful for
+  -- anything. In future we might want to only do this for -g1.
+  let procs = map stripBlocks $ debugSplitProcs blocks
+      stripBlocks dbg = dbg { dblBlocks = [] }
   compPath <- getCurrentDirectory
   let dwarfUnit = DwarfCompileUnit
         { dwChildren = map (procToDwarf df) procs
