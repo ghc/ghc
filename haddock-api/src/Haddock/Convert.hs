@@ -264,15 +264,15 @@ synifyDataCon use_gadt_syntax dc =
   linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
                 src_bang = case bang of
-                             HsUnpack {} -> HsUserBang (Just True) True
-                             HsStrict    -> HsUserBang (Just False) True
+                             HsUnpack {} -> HsSrcBang (Just True) True
+                             HsStrict    -> HsSrcBang (Just False) True
                              _           -> bang
             in case src_bang of
                  HsNoBang -> tySyn
                  _        -> noLoc $ HsBangTy bang tySyn
             -- HsNoBang never appears, it's implied instead.
           )
-          arg_tys (dataConStrictMarks dc)
+          arg_tys (dataConSrcBangs dc)
   field_tys = zipWith (\field synTy -> noLoc $ ConDeclField
                                                [synifyName field] synTy Nothing)
                 (dataConFieldLabels dc) linear_tys
