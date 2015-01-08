@@ -651,9 +651,9 @@ repBangTy ty= do
   rep2 strictTypeName [s, t]
   where
     (str, ty') = case ty of
-                   L _ (HsBangTy (HsUserBang (Just True) True) ty) -> (unpackedName,  ty)
-                   L _ (HsBangTy (HsUserBang _     True) ty)       -> (isStrictName,  ty)
-                   _                               -> (notStrictName, ty)
+                   L _ (HsBangTy (HsSrcBang (Just True) True) ty) -> (unpackedName,  ty)
+                   L _ (HsBangTy (HsSrcBang _     True) ty)       -> (isStrictName,  ty)
+                   _                                              -> (notStrictName, ty)
 
 -------------------------------------------------------
 --                      Deriving clause

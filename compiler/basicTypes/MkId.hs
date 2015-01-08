@@ -519,7 +519,7 @@ mkDataConRep dflags fam_envs wrap_name data_con
     wrap_ty      = dataConUserType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
     all_arg_tys  = ev_tys                         ++ orig_arg_tys
-    orig_bangs   = map mk_pred_strict_mark ev_tys ++ dataConStrictMarks data_con
+    orig_bangs   = map mk_pred_strict_mark ev_tys ++ dataConSrcBangs data_con
 
     wrap_arg_tys = theta ++ orig_arg_tys
     wrap_arity   = length wrap_arg_tys
@@ -580,19 +580,19 @@ newLocal ty = do { uniq <- getUniqueM
 dataConArgRep
    :: DynFlags
    -> FamInstEnvs
-   -> Type -> HsBang
-   -> ( HsBang   -- Like input but with HsUnpackFailed if necy
+   -> Type -> HsSrcBang
+   -> ( HsImplBang                 -- Implementation decision about unpack strategy
       , [(Type, StrictnessMark)]   -- Rep types
       , (Unboxer, Boxer) )
 
 dataConArgRep _ _ arg_ty HsNoBang
   = (HsNoBang, [(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
 
-dataConArgRep _ _ arg_ty (HsUserBang _ False)  -- No '!'
+dataConArgRep _ _ arg_ty (HsSrcBang _ False)  -- No '!'
   = (HsNoBang, [(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
 
 dataConArgRep dflags fam_envs arg_ty
-    (HsUserBang unpk_prag True)  -- {-# UNPACK #-} !
+    (HsSrcBang unpk_prag True)  -- {-# UNPACK #-} !
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
@@ -625,7 +625,7 @@ dataConArgRep _ _ _ (HsUnpack (Just co))
   , (rep_tys, wrappers) <- dataConArgUnpack co_rep_ty
   = (HsUnpack (Just co), rep_tys, wrapCo co co_rep_ty wrappers)
 
-strict_but_not_unpacked :: Type -> (HsBang, [(Type,StrictnessMark)], (Unboxer, Boxer))
+strict_but_not_unpacked :: Type -> (HsImplBang, [(Type,StrictnessMark)], (Unboxer, Boxer))
 strict_but_not_unpacked arg_ty
   = (HsStrict, [(arg_ty, MarkedStrict)], (seqUnboxer, unitBoxer))
 
@@ -716,15 +716,15 @@ isUnpackableType fam_envs ty
       = True
 
     ok_con_args tcs con
-       = all (ok_arg tcs) (dataConOrigArgTys con `zip` dataConStrictMarks con)
-         -- NB: dataConStrictMarks gives the *user* request;
-         -- We'd get a black hole if we used dataConRepBangs
+       = all (ok_arg tcs) (dataConOrigArgTys con `zip` dataConSrcBangs con)
+         -- NB: dataConSrcBangs gives the *user* request;
+         -- We'd get a black hole if we used dataConImplBangs
 
-    attempt_unpack (HsUnpack {})                 = True
-    attempt_unpack (HsUserBang (Just unpk) bang) = bang && unpk
-    attempt_unpack (HsUserBang Nothing bang)     = bang  -- Be conservative
-    attempt_unpack HsStrict                      = False
-    attempt_unpack HsNoBang                      = False
+    attempt_unpack (HsUnpack {})                = True
+    attempt_unpack (HsSrcBang (Just unpk) bang) = bang && unpk
+    attempt_unpack (HsSrcBang Nothing bang)     = bang  -- Be conservative
+    attempt_unpack HsStrict                     = False
+    attempt_unpack HsNoBang                     = False
 
 {-
 Note [Unpack one-wide fields]
@@ -789,7 +789,7 @@ heavy lifting.  This one line makes every GADT take a word less
 space for each equality predicate, so it's pretty important!
 -}
 
-mk_pred_strict_mark :: PredType -> HsBang
+mk_pred_strict_mark :: PredType -> HsSrcBang
 mk_pred_strict_mark pred
   | isEqPred pred = HsUnpack Nothing    -- Note [Unpack equality predicates]
   | otherwise     = HsNoBang

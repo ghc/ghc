@@ -172,7 +172,7 @@ module GHC (
         DataCon,
         dataConSig, dataConType, dataConTyCon, dataConFieldLabels,
         dataConIsInfix, isVanillaDataCon, dataConUserType,
-        dataConStrictMarks,  
+        dataConSrcBangs,
         StrictnessMark(..), isMarkedStrict,
 
         -- ** Classes

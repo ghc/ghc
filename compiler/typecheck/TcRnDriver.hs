@@ -1006,7 +1006,7 @@ checkBootTyCon tc1 tc2
                (text "The fixities of" <+> pname1 <+>
                 text "differ") `andThenCheck`
          check (eqListBy eqHsBang
-                         (dataConStrictMarks c1) (dataConStrictMarks c2))
+                         (dataConSrcBangs c1) (dataConSrcBangs c2))
                (text "The strictness annotations for" <+> pname1 <+>
                 text "differ") `andThenCheck`
          check (dataConFieldLabels c1 == dataConFieldLabels c2)

@@ -1227,7 +1227,7 @@ tcConIsInfix con details (ResTyGADT _)
 
 
 tcConArgs :: NewOrData -> HsConDeclDetails Name
-          -> TcM ([Name], [(TcType, HsBang)])
+          -> TcM ([Name], [(TcType, HsSrcBang)])
 tcConArgs new_or_data (PrefixCon btys)
   = do { btys' <- mapM (tcConArg new_or_data) btys
        ; return ([], btys') }
@@ -1245,7 +1245,7 @@ tcConArgs new_or_data (RecCon fields)
     exploded = concatMap explode combined
     (field_names,btys) = unzip exploded
 
-tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsBang)
+tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsSrcBang)
 tcConArg new_or_data bty
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsConArgType new_or_data bty
@@ -1572,7 +1572,7 @@ checkValidDataCon dflags existential_ok tc con
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
-        ; mapM_ check_bang (zip3 (dataConStrictMarks con) (dataConRepBangs con) [1..])
+        ; mapM_ check_bang (zip3 (dataConSrcBangs con) (dataConImplBangs con) [1..])
 
           -- Check that existentials are allowed if they are used
         ; checkTc (existential_ok || isVanillaDataCon con)
@@ -1589,7 +1589,7 @@ checkValidDataCon dflags existential_ok tc con
     }
   where
     ctxt = ConArgCtxt (dataConName con)
-    check_bang (HsUserBang (Just want_unpack) has_bang, rep_bang, n)
+    check_bang (HsSrcBang (Just want_unpack) has_bang, rep_bang, n)
       | want_unpack, not has_bang
       = addWarnTc (bad_bang n (ptext (sLit "UNPACK pragma lacks '!'")))
       | want_unpack
@@ -1623,7 +1623,7 @@ checkNewDataCon con
           ptext (sLit "A newtype constructor cannot have existential type variables")
                 -- No existentials
 
-        ; checkTc (not (any isBanged (dataConStrictMarks con)))
+        ; checkTc (not (any isBanged (dataConSrcBangs con)))
                   (newtypeStrictError con)
                 -- No strictness
     }
