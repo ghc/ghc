@@ -8,9 +8,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module TrieMap(
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
    TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap,
+   lookupTypesMap, deleteTypesMap, extendTypesMap,
    CoercionMap,
    MaybeMap,
    ListMap,
@@ -272,35 +274,41 @@ TrieMap structure!
 
 data GenMap m a
    = EmptyMap
-   | SingletonMap (CmEnv, Key m) a
+   | SingletonMap (Key m) a
    | MultiMap (m a)
 
-class CmEnvEq a where
-    equalDeBruijn :: (CmEnv, a) -> (CmEnv, a) -> Bool
+instance (Outputable a, Outputable (m a)) => Outputable (GenMap m a) where
+  ppr EmptyMap = text "Empty map"
+  ppr (SingletonMap _ v) = text "Singleton map" <+> ppr v
+  ppr (MultiMap m) = ppr m
 
-lkG :: CmEnvEq (Key m)
-    => (CmEnv -> Key m ->        m a -> Maybe a)
-    ->  CmEnv -> Key m -> GenMap m a -> Maybe a
-lkG _ _ _ EmptyMap = Nothing
-lkG _ env k (SingletonMap env_k' v')
-    | equalDeBruijn (env, k) env_k' = Just v'
-    | otherwise                     = Nothing
-lkG lk env k (MultiMap m) = lk env k m
+-- TODO undecidable instance
+instance (Eq (Key m), TrieMap m) => TrieMap (GenMap m) where
+   type Key (GenMap m) = Key m
+   emptyTM  = EmptyMap
+   lookupTM = lkG
+   alterTM  = xtG
+   foldTM   = fdG
+   mapTM    = mapG
 
-xtG :: (CmEnvEq (Key m), TrieMap m)
-    => (CmEnv -> Key m -> XT a ->        m a ->        m a)
-    ->  CmEnv -> Key m -> XT a -> GenMap m a -> GenMap m a
-xtG _  env k f EmptyMap
+lkG :: (Eq (Key m), TrieMap m) => Key m -> GenMap m a -> Maybe a
+lkG _ EmptyMap                         = Nothing
+lkG k (SingletonMap k' v') | k == k'   = Just v'
+                           | otherwise = Nothing
+lkG k (MultiMap m)                     = lookupTM k m
+
+xtG :: (Eq (Key m), TrieMap m) => Key m -> XT a -> GenMap m a -> GenMap m a
+xtG k f EmptyMap
     = case f Nothing of
-        Just v  -> SingletonMap (env, k) v
+        Just v  -> SingletonMap k v
         Nothing -> EmptyMap
-xtG xt env k f m@(SingletonMap env_k'@(env', k') v')
-    | equalDeBruijn env_k' (env, k)
+xtG k f m@(SingletonMap k' v')
+    | k' == k
     -- The new key matches the (single) key already in the tree.  Hence,
     -- apply @f@ to @Just v'@ and build a singleton or empty map depending
     -- on the 'Just'/'Nothing' response respectively.
     = case f (Just v') of
-        Just v'' -> SingletonMap env_k' v''
+        Just v'' -> SingletonMap k' v''
         Nothing  -> EmptyMap
     | otherwise
     -- We've hit a singleton tree for a different key than the one we are
@@ -310,24 +318,20 @@ xtG xt env k f m@(SingletonMap env_k'@(env', k') v')
     -- map of type @m a@.
     = case f Nothing of
         Nothing  -> m
-        Just v   -> emptyTM |> xt env' k' (const (Just v'))
-                           >.> xt env  k  (const (Just v))
+        Just v   -> emptyTM |> alterTM k' (const (Just v'))
+                           >.> alterTM k  (const (Just v))
                            >.> MultiMap
-xtG xt env k f (MultiMap m) = MultiMap (xt env k f m)
+xtG k f (MultiMap m) = MultiMap (alterTM k f m)
 
--- Note: These two could have been done with a TrieMap m => constraint as well.
+mapG :: TrieMap m => (a -> b) -> GenMap m a -> GenMap m b
+mapG _ EmptyMap = EmptyMap
+mapG f (SingletonMap k v) = SingletonMap k (f v)
+mapG f (MultiMap m) = MultiMap (mapTM f m)
 
-mapG :: ((a -> b) ->        m a ->        m b)
-     ->  (a -> b) -> GenMap m a -> GenMap m b
-mapG _  _ EmptyMap = EmptyMap
-mapG _  f (SingletonMap k v) = SingletonMap k (f v)
-mapG mp f (MultiMap m) = MultiMap (mp f m)
-
-fdG :: ((a -> b -> b) ->        m a -> b -> b)
-    ->  (a -> b -> b) -> GenMap m a -> b -> b
-fdG _  _ EmptyMap = \z -> z
-fdG _  k (SingletonMap _ v) = \z -> k v z
-fdG fd k (MultiMap m) = fd k m
+fdG :: TrieMap m => (a -> b -> b) -> GenMap m a -> b -> b
+fdG _ EmptyMap = \z -> z
+fdG k (SingletonMap _ v) = \z -> k v z
+fdG k (MultiMap m) = foldTM k m
 
 {-
 ************************************************************************
@@ -721,7 +725,7 @@ mapR f = RM . mapTM f . unRM
 
 type TypeMap = GenMap TypeMapX
 data TypeMapX a
-  = TM { tm_var   :: VarMap a
+  = TM { tm_var    :: VarMap a
        , tm_app    :: TypeMap (TypeMap a)
        , tm_fun    :: TypeMap (TypeMap a)
        , tm_tc_app :: NameEnv (ListMap TypeMap a)
@@ -729,43 +733,41 @@ data TypeMapX a
        , tm_tylit  :: TyLitMap a
        }
 
-eqTypesModuloDeBruijn :: (CmEnv, [Type]) -> (CmEnv, [Type]) -> Bool
-eqTypesModuloDeBruijn (_, []) (_, []) = True
-eqTypesModuloDeBruijn (env, ty:tys) (env', ty':tys') =
-    eqTypeModuloDeBruijn (env, ty) (env', ty') &&
-    eqTypesModuloDeBruijn (env, tys) (env', tys')
-eqTypesModuloDeBruijn _ _ = False
+instance TrieMap TypeMapX where
+   type Key TypeMapX = DeBruijn Type
+   emptyTM  = TM { tm_var  = emptyTM
+                 , tm_app  = EmptyMap
+                 , tm_fun  = EmptyMap
+                 , tm_tc_app = emptyNameEnv
+                 , tm_forall = EmptyMap
+                 , tm_tylit  = emptyTyLitMap }
+   lookupTM = lkTX
+   alterTM  = xtTX
+   foldTM   = fdTX
+   mapTM    = mapTX
 
-instance CmEnvEq Type where
-    equalDeBruijn = eqTypeModuloDeBruijn
-
--- NB: need to coreView!
-eqTypeModuloDeBruijn :: (CmEnv, Type) -> (CmEnv, Type) -> Bool
-eqTypeModuloDeBruijn env_t@(env, t) env_t'@(env', t')
-    -- ToDo: I guess we can make this a little more efficient
-    | Just new_t  <- coreView t  = eqTypeModuloDeBruijn (env, new_t) env_t'
-    | Just new_t' <- coreView t' = eqTypeModuloDeBruijn env_t (env', new_t')
-eqTypeModuloDeBruijn (env, t) (env', t') =
-    case (t, t') of
+instance Eq (DeBruijn Type) where
+  env_t@(D env t) == env_t'@(D env' t')
+    | Just new_t  <- coreView t  = D env new_t == env_t'
+    | Just new_t' <- coreView t' = env_t       == D env' new_t'
+    | otherwise                  =
+      case (t, t') of
         (TyVarTy v, TyVarTy v')
             -> case (lookupCME env v, lookupCME env' v') of
                 (Just bv, Just bv') -> bv == bv'
-                (Nothing, Nothing) -> v == v'
+                (Nothing, Nothing)  -> v == v'
                 _ -> False
         (AppTy t1 t2, AppTy t1' t2')
-            -> eqTypeModuloDeBruijn (env, t1) (env', t1') &&
-               eqTypeModuloDeBruijn (env, t2) (env', t2')
+            -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (FunTy t1 t2, FunTy t1' t2')
-            -> eqTypeModuloDeBruijn (env, t1) (env', t1') &&
-               eqTypeModuloDeBruijn (env, t2) (env', t2')
+            -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
-            -> tc == tc' && eqTypesModuloDeBruijn (env, tys) (env', tys')
+            -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
             -> l == l'
         (ForAllTy tv ty, ForAllTy tv' ty')
-            -> eqTypeModuloDeBruijn (env, tyVarKind tv) (env', tyVarKind tv') &&
-               eqTypeModuloDeBruijn (extendCME env tv, ty)
-                                    (extendCME env' tv', ty')
+            -> D env (tyVarKind tv)    == D env' (tyVarKind tv') &&
+               D (extendCME env tv) ty == D (extendCME env' tv') ty'
         _ -> False
 
 instance Outputable a => Outputable (TypeMap a) where
@@ -780,11 +782,20 @@ emptyTypeMap = EmptyMap
 lookupTypeMap :: TypeMap a -> Type -> Maybe a
 lookupTypeMap cm t = lkT emptyCME t cm
 
+lookupTypesMap :: ListMap TypeMap a -> [Type] -> Maybe a
+lookupTypesMap m ts = lookupTM (map (D emptyCME) ts) m
+
+deleteTypesMap :: ListMap TypeMap a -> [Type] -> ListMap TypeMap a
+deleteTypesMap m ts = deleteTM (map (D emptyCME) ts) m
+
+extendTypesMap :: ListMap TypeMap a -> [Type] -> a -> ListMap TypeMap a
+extendTypesMap m ts v = insertTM (map (D emptyCME) ts) v m
+
 -- Returns the type map entries that have keys starting with the given tycon.
 -- This only considers saturated applications (i.e. TyConApp ones).
 lookupTypeMapTyCon :: TypeMap a -> TyCon -> [a]
 lookupTypeMapTyCon EmptyMap _ = []
-lookupTypeMapTyCon (SingletonMap (_, TyConApp tc' _) v) tc
+lookupTypeMapTyCon (SingletonMap (D _ (TyConApp tc' _)) v) tc
     | tc' == tc = [v]
     | otherwise = []
 lookupTypeMapTyCon SingletonMap{} _ = []
@@ -795,36 +806,6 @@ lookupTypeMapTyCon (MultiMap TM { tm_tc_app = cs }) tc =
 
 extendTypeMap :: TypeMap a -> Type -> a -> TypeMap a
 extendTypeMap m t v = xtT emptyCME t (\_ -> Just v) m
-
-wrapEmptyTypeMap :: TypeMapX a
-wrapEmptyTypeMap = TM { tm_var  = emptyTM
-                      , tm_app  = EmptyMap
-                      , tm_fun  = EmptyMap
-                      , tm_tc_app = emptyNameEnv
-                      , tm_forall = EmptyMap
-                      , tm_tylit  = emptyTyLitMap }
-
-instance TrieMap TypeMap where
-   type Key TypeMap = Type
-   emptyTM  = EmptyMap
-   lookupTM = lkT emptyCME
-   alterTM  = xtT emptyCME
-   foldTM   = fdT
-   mapTM    = mapT
-
--- I guess you shouldn't ever really use this instance, but it's a bit
--- convenient for getting 'emptyTM' and 'Key', e.g. look at the types
--- for 'fdG' and 'xtG'.
-instance TrieMap TypeMapX where
-   type Key TypeMapX = Type
-   emptyTM  = wrapEmptyTypeMap
-   lookupTM = lkTX emptyCME
-   alterTM  = xtTX emptyCME
-   foldTM   = fdTX
-   mapTM    = mapTX
-
-mapT :: (a->b) -> TypeMap a -> TypeMap b
-mapT = mapG mapTX
 
 mapTX :: (a->b) -> TypeMapX a -> TypeMapX b
 mapTX f (TM { tm_var  = tvar, tm_app = tapp, tm_fun = tfun
@@ -838,10 +819,10 @@ mapTX f (TM { tm_var  = tvar, tm_app = tapp, tm_fun = tfun
 
 -----------------
 lkT :: CmEnv -> Type -> TypeMap a -> Maybe a
-lkT = lkG lkTX
+lkT env t = lkG (D env t)
 
-lkTX :: CmEnv -> Type -> TypeMapX a -> Maybe a
-lkTX env ty m = go ty m
+lkTX :: DeBruijn Type -> TypeMapX a -> Maybe a
+lkTX (D env ty) m = go ty m
   where
     go ty | Just ty' <- coreView ty = go ty'
     go (TyVarTy v)       = tm_var    >.> lkVar env v
@@ -854,26 +835,26 @@ lkTX env ty m = go ty m
 
 -----------------
 xtT :: CmEnv -> Type -> XT a -> TypeMap a -> TypeMap a
-xtT = xtG xtTX
+xtT env t = xtG (D env t)
 
-xtTX :: CmEnv -> Type -> XT a -> TypeMapX a -> TypeMapX a
-xtTX env ty f m
-  | Just ty' <- coreView ty = xtTX env ty' f m
+xtTX :: DeBruijn Type -> XT a -> TypeMapX a -> TypeMapX a
+xtTX (D env ty) f m
+  | Just ty' <- coreView ty = xtTX (D env ty') f m
 
-xtTX env (TyVarTy v)       f  m = m { tm_var    = tm_var m |> xtVar env v f }
-xtTX env (AppTy t1 t2)     f  m = m { tm_app    = tm_app m |> xtT env t1
+xtTX (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
+xtTX (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtT env t1
                                                  |>> xtT env t2 f }
-xtTX env (FunTy t1 t2)     f  m = m { tm_fun    = tm_fun m |> xtT env t1
+xtTX (D env (FunTy t1 t2))     f m = m { tm_fun    = tm_fun m |> xtT env t1
                                                  |>> xtT env t2 f }
-xtTX env (ForAllTy tv ty)  f  m = m { tm_forall = tm_forall m
+xtTX (D env (ForAllTy tv ty))  f m = m { tm_forall = tm_forall m
                                                  |> xtT (extendCME env tv) ty
                                                  |>> xtBndr env tv f }
-xtTX env (TyConApp tc tys) f  m = m { tm_tc_app = tm_tc_app m |> xtNamed tc
+xtTX (D env (TyConApp tc tys)) f m = m { tm_tc_app = tm_tc_app m |> xtNamed tc
                                                  |>> xtList (xtT env) tys f }
-xtTX _   (LitTy l)         f  m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
+xtTX (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 
 fdT :: (a -> b -> b) -> TypeMap a -> b -> b
-fdT = fdG fdTX
+fdT = fdG
 
 fdTX :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdTX k m = foldTM k (tm_var m)
@@ -947,6 +928,20 @@ extendCMEs env vs = foldl extendCME env vs
 
 lookupCME :: CmEnv -> Var -> Maybe BoundVar
 lookupCME (CME { cme_env = env }) v = lookupVarEnv env v
+
+-- | @DeBruijn a@ represents @a@ modulo alpha-renaming.  This is achieved
+-- by equipping the value with a 'CmEnv', which tracks an on-the-fly deBruijn
+-- numbering.  This allows us to define an 'Eq' instance for @DeBruijn a@, even
+-- if this was not (easily) possible for @a@.  Note: we purposely don't
+-- export the constructor.  Make a helper function if you find yourself
+-- needing it.
+data DeBruijn a = D CmEnv a
+
+instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
+    D _   []     == D _    []       = True
+    D env (x:xs) == D env' (x':xs') = D env x  == D env' x' &&
+                                      D env xs == D env' xs'
+    _            == _               = False
 
 --------- Variable binders -------------
 

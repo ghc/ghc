@@ -1035,15 +1035,15 @@ emptyTcAppMap = emptyUFM
 
 findTcApp :: TcAppMap a -> Unique -> [Type] -> Maybe a
 findTcApp m u tys = do { tys_map <- lookupUFM m u
-                       ; lookupTM tys tys_map }
+                       ; lookupTypesMap tys_map tys }
 
 delTcApp :: TcAppMap a -> Unique -> [Type] -> TcAppMap a
-delTcApp m cls tys = adjustUFM (deleteTM tys) m cls
+delTcApp m cls tys = adjustUFM (flip deleteTypesMap tys) m cls
 
 insertTcApp :: TcAppMap a -> Unique -> [Type] -> a -> TcAppMap a
 insertTcApp m cls tys ct = alterUFM alter_tm m cls
   where
-    alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
+    alter_tm mb_tm = Just (extendTypesMap (mb_tm `orElse` emptyTM) tys ct)
 
 -- mapTcApp :: (a->b) -> TcAppMap a -> TcAppMap b
 -- mapTcApp f = mapUFM (mapTM f)
@@ -1054,7 +1054,7 @@ filterTcAppMap f m
   where
     do_tm tm = foldTM insert_mb tm emptyTM
     insert_mb ct tm
-       | f ct      = insertTM tys ct tm
+       | f ct      = extendTypesMap tm tys ct
        | otherwise = tm
        where
          tys = case ct of
@@ -1095,7 +1095,8 @@ addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
   = addToUFM m cls (foldrBag add emptyTM items)
   where
-    add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
+    add ct@(CDictCan { cc_tyargs = tys }) tm
+             = extendTypesMap tm tys ct
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
 
 filterDicts :: (Ct -> Bool) -> DictMap Ct -> DictMap Ct
