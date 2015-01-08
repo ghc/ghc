@@ -28,7 +28,7 @@ module HsTypes (
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
 
-        LBangType, BangType, HsBang(..),
+        LBangType, BangType, HsBang(..), HsSrcBang, HsImplBang,
         getBangType, getBangStrictness,
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
@@ -55,7 +55,7 @@ import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
 import Name( Name )
 import RdrName( RdrName )
-import DataCon( HsBang(..) )
+import DataCon( HsBang(..), HsSrcBang, HsImplBang )
 import TysPrim( funTyConName )
 import Type
 import HsDoc
@@ -106,7 +106,7 @@ getBangType :: LHsType a -> LHsType a
 getBangType (L _ (HsBangTy _ ty)) = ty
 getBangType ty                    = ty
 
-getBangStrictness :: LHsType a -> HsBang
+getBangStrictness :: LHsType a -> HsSrcBang
 getBangStrictness (L _ (HsBangTy s _)) = s
 getBangStrictness _                    = HsNoBang
 
@@ -276,8 +276,8 @@ data HsType name
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
-  | HsBangTy    HsBang (LHsType name)   -- Bang-style type annotations
-  | HsRecTy     [LConDeclField name]    -- Only in data type declarations
+  | HsBangTy    HsSrcBang (LHsType name)   -- Bang-style type annotations
+  | HsRecTy     [LConDeclField name]       -- Only in data type declarations
 
   | HsCoreTy Type       -- An escape hatch for tunnelling a *closed*
                         -- Core Type through HsSyn.

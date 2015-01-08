@@ -128,7 +128,7 @@ mkNewTyConRhs tycon_name tycon con
 ------------------------------------------------------
 buildDataCon :: FamInstEnvs
             -> Name -> Bool
-            -> [HsBang]
+            -> [HsSrcBang]
             -> [Name]                   -- Field labels
             -> [TyVar] -> [TyVar]       -- Univ and ext
             -> [(TyVar,Type)]           -- Equality spec

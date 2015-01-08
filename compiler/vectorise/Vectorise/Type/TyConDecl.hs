@@ -177,7 +177,7 @@ vectDataCon dc
        ; liftDs $ buildDataCon fam_envs
                     name'
                     (dataConIsInfix dc)            -- infix if the original is
-                    (dataConStrictMarks dc)        -- strictness as original constructor
+                    (dataConSrcBangs dc)           -- strictness as original constructor
                     []                             -- no labelled fields for now
                     univ_tvs                       -- universally quantified vars
                     []                             -- no existential tvs for now

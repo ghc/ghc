@@ -1311,7 +1311,7 @@ reifyDataCon tys dc
              (subst', ex_tvs') = mapAccumL substTyVarBndr subst (dropList tys tvs)
              theta'   = substTheta subst' theta
              arg_tys' = substTys subst' arg_tys
-             stricts  = map reifyStrict (dataConStrictMarks dc)
+             stricts  = map reifyStrict (dataConSrcBangs dc)
              fields   = dataConFieldLabels dc
              name     = reifyName dc
 
@@ -1664,13 +1664,13 @@ reifyFixity name
       conv_dir BasicTypes.InfixL = TH.InfixL
       conv_dir BasicTypes.InfixN = TH.InfixN
 
-reifyStrict :: DataCon.HsBang -> TH.Strict
-reifyStrict HsNoBang                      = TH.NotStrict
-reifyStrict (HsUserBang _ False)          = TH.NotStrict
-reifyStrict (HsUserBang (Just True) True) = TH.Unpacked
-reifyStrict (HsUserBang _     True)       = TH.IsStrict
-reifyStrict HsStrict                      = TH.IsStrict
-reifyStrict (HsUnpack {})                 = TH.Unpacked
+reifyStrict :: DataCon.HsSrcBang -> TH.Strict
+reifyStrict HsNoBang                     = TH.NotStrict
+reifyStrict (HsSrcBang _ False)          = TH.NotStrict
+reifyStrict (HsSrcBang (Just True) True) = TH.Unpacked
+reifyStrict (HsSrcBang _     True)       = TH.IsStrict
+reifyStrict HsStrict                     = TH.IsStrict
+reifyStrict (HsUnpack {})                = TH.Unpacked
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

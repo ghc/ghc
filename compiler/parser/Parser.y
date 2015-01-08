@@ -1362,11 +1362,11 @@ sigtypes1 :: { (OrdList (LHsType RdrName)) }      -- Always HsForAllTys
 -- Types
 
 strict_mark :: { Located ([AddAnn],HsBang) }
-        : '!'                        { sL1 $1    ([],            HsUserBang Nothing      True) }
-        | '{-# UNPACK' '#-}'         { sLL $1 $> ([mo $1,mc $2], HsUserBang (Just True)  False) }
-        | '{-# NOUNPACK' '#-}'       { sLL $1 $> ([mo $1,mc $2], HsUserBang (Just False) False) }
-        | '{-# UNPACK' '#-}' '!'     { sLL $1 $> ([mo $1,mc $2], HsUserBang (Just True)  True) }
-        | '{-# NOUNPACK' '#-}' '!'   { sLL $1 $> ([mo $1,mc $2], HsUserBang (Just False) True) }
+        : '!'                        { sL1 $1    ([],            HsSrcBang Nothing      True) }
+        | '{-# UNPACK' '#-}'         { sLL $1 $> ([mo $1,mc $2], HsSrcBang (Just True)  False) }
+        | '{-# NOUNPACK' '#-}'       { sLL $1 $> ([mo $1,mc $2], HsSrcBang (Just False) False) }
+        | '{-# UNPACK' '#-}' '!'     { sLL $1 $> ([mo $1,mc $2], HsSrcBang (Just True)  True) }
+        | '{-# NOUNPACK' '#-}' '!'   { sLL $1 $> ([mo $1,mc $2], HsSrcBang (Just False) True) }
         -- Although UNPACK with no '!' is illegal, we get a
         -- better error message if we parse it here
 
