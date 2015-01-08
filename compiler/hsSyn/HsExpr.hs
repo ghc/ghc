@@ -665,7 +665,7 @@ ppr_expr (HsStatic e)
 
 ppr_expr (HsTick tickish exp)
   = pprTicks (ppr exp) $
-    ppr tickish <+> ppr exp
+    ppr tickish <+> ppr_lexpr exp
 ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
   = pprTicks (ppr exp) $
     hcat [ptext (sLit "bintick<"),

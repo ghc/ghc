@@ -21,6 +21,7 @@ module Dwarf.Types
 import Debug
 import CLabel
 import CmmExpr         ( GlobalReg(..) )
+import Encoding
 import FastString
 import Outputable
 import Platform
@@ -79,6 +80,7 @@ pprAbbrevDecls haveDebugLine =
        , (dW_AT_producer, dW_FORM_string)
        , (dW_AT_language, dW_FORM_data4)
        , (dW_AT_comp_dir, dW_FORM_string)
+       , (dW_AT_use_UTF8, dW_FORM_flag)
        ] ++
        (if haveDebugLine
         then [ (dW_AT_stmt_list, dW_FORM_data4) ]
@@ -115,6 +117,7 @@ pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lineLbl) =
   $$ pprString producer
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
+  $$ pprFlag True -- use UTF8
   $$ if haveSrc
      then pprData4' (sectionOffset lineLbl dwarfLineLabel)
      else empty
@@ -406,19 +409,25 @@ pprString' str = ptext (sLit "\t.asciz \"") <> str <> char '"'
 
 -- | Generate a string constant. We take care to escape the string.
 pprString :: String -> SDoc
-pprString = pprString' . hcat . map escape
-  where escape '\\' = ptext (sLit "\\\\")
-        escape '\"' = ptext (sLit "\\\"")
-        escape '\n' = ptext (sLit "\\n")
-        escape c    | isAscii c && isPrint c && c /= '?'
-                      -- escaping '?' prevents trigraph warnings
-                    = char c
-                    | otherwise
-                    = let ch = ord c
-                      in char '\\' <>
-                         char (intToDigit (ch `div` 64)) <>
-                         char (intToDigit ((ch `div` 8) `mod` 8)) <>
-                         char (intToDigit (ch `mod` 8))
+pprString str
+  = pprString' $ hcat $ map escapeChar $
+    if utf8EncodedLength str == length str
+    then str
+    else map (chr . fromIntegral) $ bytesFS $ mkFastString str
+
+-- | Escape a single non-unicode character
+escapeChar :: Char -> SDoc
+escapeChar '\\' = ptext (sLit "\\\\")
+escapeChar '\"' = ptext (sLit "\\\"")
+escapeChar '\n' = ptext (sLit "\\n")
+escapeChar c
+  | isAscii c && isPrint c && c /= '?' -- prevents trigraph warnings
+  = char c
+  | otherwise
+  = char '\\' <> char (intToDigit (ch `div` 64)) <>
+                 char (intToDigit ((ch `div` 8) `mod` 8)) <>
+                 char (intToDigit (ch `mod` 8))
+  where ch = ord c
 
 -- | Generate an offset into another section. This is tricky because
 -- this is handled differently depending on platform: Mac Os expects

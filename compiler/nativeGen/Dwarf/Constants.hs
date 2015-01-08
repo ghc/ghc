@@ -41,7 +41,7 @@ dW_TAG_arg_variable    = 257
 -- | Dwarf attributes
 dW_AT_name, dW_AT_stmt_list, dW_AT_low_pc, dW_AT_high_pc, dW_AT_language,
   dW_AT_comp_dir, dW_AT_producer, dW_AT_external, dW_AT_frame_base,
-  dW_AT_MIPS_linkage_name :: Word
+  dW_AT_use_UTF8, dW_AT_MIPS_linkage_name :: Word
 dW_AT_name              = 0x03
 dW_AT_stmt_list         = 0x10
 dW_AT_low_pc            = 0x11
@@ -51,6 +51,7 @@ dW_AT_comp_dir          = 0x1b
 dW_AT_producer          = 0x25
 dW_AT_external          = 0x3f
 dW_AT_frame_base        = 0x40
+dW_AT_use_UTF8          = 0x53
 dW_AT_MIPS_linkage_name = 0x2007
 
 -- | Abbrev declaration
