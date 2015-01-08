@@ -514,7 +514,7 @@ test('T6048',
             # 2014-09-03: 56315812 (x86 Windows, w/w for INLINEAVBLE)
             # 2014-12-01: 49987836 (x86 Windows)
 
-           (wordsize(64), 88186056, 12)])
+           (wordsize(64),  95946688, 12)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014  95960720 amd64/Linux Call Arity improvements
@@ -523,6 +523,7 @@ test('T6048',
              # 14/07/2014 125431448 amd64/Linux unknown reason. Even worse in GHC-7.8.3. *shurg*
              # 29/08/2014 108354472 amd64/Linux w/w for INLINABLE things
              # 14/09/2014  88186056 amd64/Linux BPP part1 change (more NoImplicitPreludes in base)
+             # 08/01/2014  95946688 amd64/Linux Mostly 4c834fd. Occasional spikes to 103822120!
       ],
       compile,[''])
 
