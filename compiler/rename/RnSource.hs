@@ -90,7 +90,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
    --     FastStrings to FixItems.
-   --     Also checks for duplcates.
+   --     Also checks for duplicates.
    local_fix_env <- makeMiniFixityEnv fix_decls ;
 
    -- (B) Bring top level binders (and their fixities) into scope,
