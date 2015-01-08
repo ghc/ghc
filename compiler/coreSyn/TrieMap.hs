@@ -370,9 +370,9 @@ for the two possibilities.  Only cm_ecase looks at the type.
 See also Note [Empty case alternatives] in CoreSyn.
 -}
 
-data CoreMap a
-  = EmptyCM
-  | CM { cm_var   :: VarMap a
+type CoreMap = GenMap CoreMapX
+data CoreMapX a
+  = CM { cm_var   :: VarMap a
        , cm_lit   :: LiteralMap a
        , cm_co    :: CoercionMap a
        , cm_type  :: TypeMap a
@@ -386,8 +386,47 @@ data CoreMap a
        , cm_ecase :: CoreMap (TypeMap a)    -- Note [Empty case alternatives]
      }
 
+instance Eq (DeBruijn CoreExpr) where
+  D env1 e1 == D env2 e2 = go e1 e2 where
+    go (Var v1) (Var v2) = case (lookupCME env1 v1, lookupCME env2 v2) of
+                            (Just b1, Just b2) -> b1 == b2
+                            (Nothing, Nothing) -> v1 == v2
+                            _ -> False
+    go (Lit lit1)    (Lit lit2)      = lit1 == lit2
+    go (Type t1)    (Type t2)        = D env1 t1 == D env2 t2
+    go (Coercion co1) (Coercion co2) = D env1 co1 == D env2 co2
+    go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
+    go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
+    -- This seems a bit dodgy, see 'eqTickish'
+    go (Tick n1 e1)  (Tick n2 e2)  = n1 == n2 && go e1 e2
 
-wrapEmptyCM :: CoreMap a
+    go (Lam b1 e1)  (Lam b2 e2)
+      =  D env1 (varType b1) == D env2 (varType b2)
+      && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
+
+    go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
+      =  go r1 r2
+      && D (extendCME env1 v1) e1 == D (extendCME env2 v2) e2
+
+    go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
+      = length ps1 == length ps2
+      && D env1' rs1 == D env2' rs2
+      && D env1' e1  == D env2' e2
+      where
+        (bs1,rs1) = unzip ps1
+        (bs2,rs2) = unzip ps2
+        env1' = extendCMEs env1 bs1
+        env2' = extendCMEs env2 bs2
+
+    go (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
+      | null a1   -- See Note [Empty case alternatives]
+      = null a2 && go e1 e2 && D env1 t1 == D env2 t2
+      | otherwise
+      =  go e1 e2 && D (extendCME env1 b1) a1 == D (extendCME env2 b2) a2
+
+    go _ _ = False
+
+wrapEmptyCM :: CoreMapX a
 wrapEmptyCM = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
                  , cm_co = emptyTM, cm_type = emptyTM
                  , cm_cast = emptyTM, cm_app = emptyTM
@@ -395,18 +434,17 @@ wrapEmptyCM = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
                  , cm_letr = emptyTM, cm_case = emptyTM
                  , cm_ecase = emptyTM, cm_tick = emptyTM }
 
-instance TrieMap CoreMap where
-   type Key CoreMap = CoreExpr
-   emptyTM  = EmptyCM
-   lookupTM = lkE emptyCME
-   alterTM  = xtE emptyCME
-   foldTM   = fdE
-   mapTM    = mapE
+instance TrieMap CoreMapX where
+   type Key CoreMapX = DeBruijn CoreExpr
+   emptyTM  = wrapEmptyCM
+   lookupTM = lkEX
+   alterTM  = xtEX
+   foldTM   = fdEX
+   mapTM    = mapEX
 
 --------------------------
-mapE :: (a->b) -> CoreMap a -> CoreMap b
-mapE _ EmptyCM = EmptyCM
-mapE f (CM { cm_var = cvar, cm_lit = clit
+mapEX :: (a->b) -> CoreMapX a -> CoreMapX b
+mapEX f (CM { cm_var = cvar, cm_lit = clit
            , cm_co = cco, cm_type = ctype
            , cm_cast = ccast , cm_app = capp
            , cm_lam = clam, cm_letn = cletn
@@ -427,18 +465,17 @@ extendCoreMap :: CoreMap a -> CoreExpr -> a -> CoreMap a
 extendCoreMap m e v = xtE emptyCME e (\_ -> Just v) m
 
 foldCoreMap :: (a -> b -> b) -> b -> CoreMap a -> b
-foldCoreMap k z m = fdE k m z
+foldCoreMap k z m = fdG k m z
 
 emptyCoreMap :: CoreMap a
-emptyCoreMap = EmptyCM
+emptyCoreMap = EmptyMap
 
 instance Outputable a => Outputable (CoreMap a) where
   ppr m = text "CoreMap elts" <+> ppr (foldCoreMap (:) [] m)
 
 -------------------------
-fdE :: (a -> b -> b) -> CoreMap a -> b -> b
-fdE _ EmptyCM = \z -> z
-fdE k m
+fdEX :: (a -> b -> b) -> CoreMapX a -> b -> b
+fdEX k m
   = foldTM k (cm_var m)
   . foldTM k (cm_lit m)
   . foldTM k (cm_co m)
@@ -453,10 +490,11 @@ fdE k m
   . foldTM (foldTM k) (cm_ecase m)
 
 lkE :: CmEnv -> CoreExpr -> CoreMap a -> Maybe a
+lkE env expr = lkG (D env expr)
+
 -- lkE: lookup in trie for expressions
-lkE env expr cm
-  | EmptyCM <- cm = Nothing
-  | otherwise     = go expr cm
+lkEX :: DeBruijn CoreExpr -> CoreMapX a -> Maybe a
+lkEX (D env expr) cm = go expr cm
   where
     go (Var v)              = cm_var  >.> lkVar env v
     go (Lit l)              = cm_lit  >.> lkLit l
@@ -479,32 +517,40 @@ lkE env expr cm
                               >=> lkList (lkA (extendCME env b)) as
 
 xtE :: CmEnv -> CoreExpr -> XT a -> CoreMap a -> CoreMap a
-xtE env e              f EmptyCM = xtE env e f wrapEmptyCM
-xtE env (Var v)              f m = m { cm_var  = cm_var m  |> xtVar env v f }
-xtE env (Type t)             f m = m { cm_type = cm_type m |> xtT env t f }
-xtE env (Coercion c)         f m = m { cm_co   = cm_co m   |> xtC env c f }
-xtE _   (Lit l)              f m = m { cm_lit  = cm_lit m  |> xtLit l f }
-xtE env (Cast e c)           f m = m { cm_cast = cm_cast m |> xtE env e |>>
-                                                 xtC env c f }
-xtE env (Tick t e)           f m = m { cm_tick = cm_tick m |> xtE env e |>> xtTickish t f }
-xtE env (App e1 e2)          f m = m { cm_app = cm_app m |> xtE env e2 |>> xtE env e1 f }
-xtE env (Lam v e)            f m = m { cm_lam = cm_lam m |> xtE (extendCME env v) e
+xtE env expr = xtG (D env expr)
+
+xtEX :: DeBruijn CoreExpr -> XT a -> CoreMapX a -> CoreMapX a
+xtEX (D env (Var v))              f m = m { cm_var  = cm_var m
+                                                 |> xtVar env v f }
+xtEX (D env (Type t))             f m = m { cm_type = cm_type m |> xtT env t f }
+xtEX (D env (Coercion c))         f m = m { cm_co   = cm_co m   |> xtC env c f }
+xtEX (D _   (Lit l))              f m = m { cm_lit  = cm_lit m  |> xtLit l f }
+xtEX (D env (Cast e c))           f m = m { cm_cast = cm_cast m |> xtE env e
+                                                 |>> xtC env c f }
+xtEX (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtE env e
+                                                 |>> xtTickish t f }
+xtEX (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtE env e2
+                                                 |>> xtE env e1 f }
+xtEX (D env (Lam v e))            f m = m { cm_lam = cm_lam m
+                                                 |> xtE (extendCME env v) e
                                                  |>> xtBndr env v f }
-xtE env (Let (NonRec b r) e) f m = m { cm_letn = cm_letn m
+xtEX (D env (Let (NonRec b r) e)) f m = m { cm_letn = cm_letn m
                                                  |> xtE (extendCME env b) e
                                                  |>> xtE env r |>> xtBndr env b f }
-xtE env (Let (Rec prs) e)    f m = m { cm_letr = let (bndrs,rhss) = unzip prs
+xtEX (D env (Let (Rec prs) e))    f m = m { cm_letr =
+                                                 let (bndrs,rhss) = unzip prs
                                                      env1 = extendCMEs env bndrs
                                                  in cm_letr m
                                                     |>  xtList (xtE env1) rhss
                                                     |>> xtE env1 e
                                                     |>> xtList (xtBndr env1) bndrs f }
-xtE env (Case e b ty as)     f m
+xtEX (D env (Case e b ty as))     f m
                      | null as   = m { cm_ecase = cm_ecase m |> xtE env e |>> xtT env ty f }
                      | otherwise = m { cm_case = cm_case m |> xtE env e
                                                  |>> let env1 = extendCME env b
                                                      in xtList (xtA env1) as f }
 
+-- TODO: this seems a bit dodgy, see 'eqTickish'
 type TickishMap a = Map.Map (Tickish Id) a
 lkTickish :: Tickish Id -> TickishMap a -> Maybe a
 lkTickish = lookupTM
@@ -527,6 +573,17 @@ instance TrieMap AltMap where
    alterTM  = xtA emptyCME
    foldTM   = fdA
    mapTM    = mapA
+
+instance Eq (DeBruijn CoreAlt) where
+  D env1 a1 == D env2 a2 = go a1 a2 where
+    go (DEFAULT, _, rhs1) (DEFAULT, _, rhs2)
+        = D env1 rhs1 == D env2 rhs2
+    go (LitAlt lit1, _, rhs1) (LitAlt lit2, _, rhs2)
+        = lit1 == lit2 && D env1 rhs1 == D env2 rhs2
+    go (DataAlt dc1, bs1, rhs1) (DataAlt dc2, bs2, rhs2)
+        = dc1 == dc2 &&
+          D (extendCMEs env1 bs1) rhs1 == D (extendCMEs env2 bs2) rhs2
+    go _ _ = False
 
 mapA :: (a->b) -> AltMap a -> AltMap b
 mapA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
@@ -558,9 +615,9 @@ fdA k m = foldTM k (am_deflt m)
 ************************************************************************
 -}
 
-data CoercionMap a
-  = EmptyKM
-  | KM { km_refl   :: RoleMap (TypeMap a)
+type CoercionMap = GenMap CoercionMapX
+data CoercionMapX a
+  = KM { km_refl   :: RoleMap (TypeMap a)
        , km_tc_app :: RoleMap (NameEnv (ListMap CoercionMap a))
        , km_app    :: CoercionMap (CoercionMap a)
        , km_forall :: CoercionMap (TypeMap a)
@@ -578,7 +635,47 @@ data CoercionMap a
                                   (ListMap TypeMap (ListMap CoercionMap a))
        }
 
-wrapEmptyKM :: CoercionMap a
+instance Eq (DeBruijn Coercion) where
+    D env1 co1 == D env2 co2 = go co1 co2 where
+        go (Refl eq1 ty1) (Refl eq2 ty2)
+            = eq1 == eq2 && D env1 ty1 == D env2 ty2
+        go (TyConAppCo eq1 tc1 cos1) (TyConAppCo eq2 tc2 cos2)
+            = eq1 == eq2 && tc1 == tc2 && D env1 cos1 == D env2 cos2
+        go (AppCo co11 co12) (AppCo co21 co22)
+            = D env1 co11 == D env2 co21 &&
+              D env1 co12 == D env2 co22
+        go (ForAllCo v1 co1) (ForAllCo v2 co2)
+            = D env1 (tyVarKind v1)     == D env2 (tyVarKind v2) &&
+              D (extendCME env1 v1) co1 == D (extendCME env2 v2) co2
+        go (CoVarCo cv1) (CoVarCo cv2)
+            = case (lookupCME env1 cv1, lookupCME env2 cv2) of
+                (Just bv1, Just bv2) -> bv1 == bv2
+                (Nothing, Nothing)   -> cv1 == cv2
+                _ -> False
+        go (AxiomInstCo con1 ind1 cos1) (AxiomInstCo con2 ind2 cos2)
+            = con1 == con2 && ind1 == ind2 && D env1 cos1 == D env2 cos2
+        go (UnivCo _ r1 ty11 ty12) (UnivCo _ r2 ty21 ty22)
+            = r1 == r2 && D env1 ty11 == D env2 ty21 &&
+                          D env1 ty12 == D env2 ty22
+        go (SymCo co1) (SymCo co2)
+            = D env1 co1 == D env2 co2
+        go (TransCo co11 co12) (TransCo co21 co22)
+            = D env1 co11 == D env2 co21 &&
+              D env1 co12 == D env2 co22
+        go (NthCo d1 co1) (NthCo d2 co2)
+            = d1 == d2 && D env1 co1 == D env2 co2
+        go (LRCo d1 co1) (LRCo d2 co2)
+            = d1 == d2 && D env1 co1 == D env2 co2
+        go (InstCo co1 ty1) (InstCo co2 ty2)
+            = D env1 co1 == D env2 co2 && D env1 ty1 == D env2 ty2
+        go (SubCo co1) (SubCo co2)
+            = D env1 co1 == D env2 co2
+        go (AxiomRuleCo a1 ts1 cs1) (AxiomRuleCo a2 ts2 cs2)
+            = a1 == a2 && D env1 ts1 == D env2 ts2 && D env1 cs1 == D env2 cs2
+        go _ _ = False
+
+
+wrapEmptyKM :: CoercionMapX a
 wrapEmptyKM = KM { km_refl = emptyTM, km_tc_app = emptyTM
                  , km_app = emptyTM, km_forall = emptyTM
                  , km_var = emptyTM, km_axiom = emptyNameEnv
@@ -587,17 +684,16 @@ wrapEmptyKM = KM { km_refl = emptyTM, km_tc_app = emptyTM
                  , km_inst = emptyTM, km_sub = emptyTM
                  , km_axiom_rule = emptyTM }
 
-instance TrieMap CoercionMap where
-   type Key CoercionMap = Coercion
-   emptyTM  = EmptyKM
-   lookupTM = lkC emptyCME
-   alterTM  = xtC emptyCME
-   foldTM   = fdC
-   mapTM    = mapC
+instance TrieMap CoercionMapX where
+   type Key CoercionMapX = DeBruijn Coercion
+   emptyTM  = wrapEmptyKM
+   lookupTM = lkCX
+   alterTM  = xtCX
+   foldTM   = fdCX
+   mapTM    = mapCX
 
-mapC :: (a->b) -> CoercionMap a -> CoercionMap b
-mapC _ EmptyKM = EmptyKM
-mapC f (KM { km_refl = krefl, km_tc_app = ktc
+mapCX :: (a->b) -> CoercionMapX a -> CoercionMapX b
+mapCX f (KM { km_refl = krefl, km_tc_app = ktc
            , km_app = kapp, km_forall = kforall
            , km_var = kvar, km_axiom = kax
            , km_univ   = kuniv  , km_sym = ksym, km_trans = ktrans
@@ -622,9 +718,10 @@ mapC f (KM { km_refl = krefl, km_tc_app = ktc
        }
 
 lkC :: CmEnv -> Coercion -> CoercionMap a -> Maybe a
-lkC env co m
-  | EmptyKM <- m = Nothing
-  | otherwise    = go co m
+lkC env co = lkG (D env co)
+
+lkCX :: DeBruijn Coercion -> CoercionMapX a -> Maybe a
+lkCX (D env co) m = go co m
   where
     go (Refl r ty)             = km_refl   >.> lookupTM r >=> lkT env ty
     go (TyConAppCo r tc cs)    = km_tc_app >.> lookupTM r >=> lkNamed tc >=> lkList (lkC env) cs
@@ -649,31 +746,38 @@ lkC env co m
 
 
 xtC :: CmEnv -> Coercion -> XT a -> CoercionMap a -> CoercionMap a
-xtC env co f EmptyKM = xtC env co f wrapEmptyKM
-xtC env (Refl r ty)             f m = m { km_refl   = km_refl m   |> xtR r |>> xtT env ty f }
-xtC env (TyConAppCo r tc cs)    f m = m { km_tc_app = km_tc_app m |> xtR r |>> xtNamed tc |>> xtList (xtC env) cs f }
-xtC env (AxiomInstCo ax ind cs) f m = m { km_axiom  = km_axiom m  |> xtNamed ax |>> xtInt ind |>> xtList (xtC env) cs f }
-xtC env (AppCo c1 c2)           f m = m { km_app    = km_app m    |> xtC env c1 |>> xtC env c2 f }
-xtC env (TransCo c1 c2)         f m = m { km_trans  = km_trans m  |> xtC env c1 |>> xtC env c2 f }
--- the provenance is not used in the map
-xtC env (UnivCo _ r t1 t2)        f m = m { km_univ   = km_univ   m |> xtR r |>> xtT env t1 |>> xtT env t2 f }
-xtC env (InstCo c t)            f m = m { km_inst   = km_inst m   |> xtC env c  |>> xtT env t  f }
-xtC env (ForAllCo v c)          f m = m { km_forall = km_forall m |> xtC (extendCME env v) c
-                                                      |>> xtBndr env v f }
-xtC env (CoVarCo v)             f m = m { km_var    = km_var m |> xtVar env  v f }
-xtC env (SymCo c)               f m = m { km_sym    = km_sym m |> xtC env    c f }
-xtC env (NthCo n c)             f m = m { km_nth    = km_nth m |> xtInt n |>> xtC env c f }
-xtC env (LRCo CLeft  c)         f m = m { km_left   = km_left  m |> xtC env c f }
-xtC env (LRCo CRight c)         f m = m { km_right  = km_right m |> xtC env c f }
-xtC env (SubCo c)               f m = m { km_sub    = km_sub m |> xtC env c f }
-xtC env (AxiomRuleCo co ts cs)  f m = m { km_axiom_rule = km_axiom_rule m
-                                                        |>  alterTM (coaxrName co)
-                                                        |>> xtList (xtT env) ts
-                                                        |>> xtList (xtC env) cs f}
+xtC env co = xtG (D env co)
 
-fdC :: (a -> b -> b) -> CoercionMap a -> b -> b
-fdC _ EmptyKM = \z -> z
-fdC k m = foldTM (foldTM k) (km_refl m)
+xtCX :: DeBruijn Coercion -> XT a -> CoercionMapX a -> CoercionMapX a
+xtCX (D env c) f m = case c of
+ Refl r ty          -> m { km_refl   = km_refl m   |> xtR r |>> xtT env ty f }
+ TyConAppCo r tc cs -> m { km_tc_app = km_tc_app m |> xtR r |>> xtNamed tc
+                                                  |>> xtList (xtC env) cs f }
+ AxiomInstCo ax ind cs -> m { km_axiom  = km_axiom m |> xtNamed ax |>> xtInt ind
+                                                  |>> xtList (xtC env) cs f }
+ AppCo c1 c2        -> m { km_app    = km_app m    |> xtC env c1
+                                                  |>> xtC env c2 f }
+ TransCo c1 c2      -> m { km_trans  = km_trans m  |> xtC env c1
+                                                  |>> xtC env c2 f }
+ -- the provenance is not used in the map
+ UnivCo _ r t1 t2   -> m { km_univ   = km_univ m   |> xtR r |>> xtT env t1
+                                                            |>> xtT env t2 f }
+ InstCo c t         -> m { km_inst   = km_inst m   |> xtC env c |>> xtT env t f}
+ ForAllCo v c       -> m { km_forall = km_forall m |> xtC (extendCME env v) c
+                                                  |>> xtBndr env v f }
+ CoVarCo v          -> m { km_var    = km_var m    |> xtVar env  v f }
+ SymCo c            -> m { km_sym    = km_sym m    |> xtC env    c f }
+ NthCo n c          -> m { km_nth    = km_nth m    |> xtInt n |>> xtC env c f }
+ LRCo CLeft  c      -> m { km_left   = km_left m   |> xtC env c f }
+ LRCo CRight c      -> m { km_right  = km_right m  |> xtC env c f }
+ SubCo c            -> m { km_sub    = km_sub m    |> xtC env c f }
+ AxiomRuleCo co ts cs -> m { km_axiom_rule = km_axiom_rule m
+                                                   |>  alterTM (coaxrName co)
+                                                   |>> xtList (xtT env) ts
+                                                   |>> xtList (xtC env) cs f}
+
+fdCX :: (a -> b -> b) -> CoercionMapX a -> b -> b
+fdCX k m = foldTM (foldTM k) (km_refl m)
         . foldTM (foldTM (foldTM k)) (km_tc_app m)
         . foldTM (foldTM k) (km_app m)
         . foldTM (foldTM k) (km_forall m)
