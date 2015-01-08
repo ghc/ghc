@@ -1418,10 +1418,11 @@ foreign import "&amp;f" f :: FunPtr t
           <indexterm><primary><option>-fwarn-redundant-constraints</option></primary></indexterm>
           <indexterm><primary>redundant constraints, warning</primary></indexterm>
 
-          <para>Have the compiler warn about redundant constraints in a type signature. For
-          example
+          <para>Have the compiler warn about redundant constraints in a type signature. 
+          In particular:
           <itemizedlist>
           <listitem><para>
+          A redundant constraint within the type signature itself:
           <programlisting>
              f :: (Eq a, Ord a) => a -> a
           </programlisting>
@@ -1429,6 +1430,7 @@ foreign import "&amp;f" f :: FunPtr t
           it is subsumed by the <literal>Ord a</literal> constraint.
           </para></listitem>
           <listitem><para>
+          A constraint in the type signature is not used in the code it covers:
           <programlisting>
              f :: Eq a => a -> a -> Bool
              f x y = True
@@ -1439,8 +1441,21 @@ foreign import "&amp;f" f :: FunPtr t
           </itemizedlist>
           Similar warnings are given for a redundant constraint in an instance declaration.
           </para>
-
-          <para>This option is on by default.</para>
+          <para>This option is on by default.  As usual you can suppress it on a per-module basis
+          with <option>-fno-warn-redundant-constraints</option>.  Occasionally you may specifically
+          want a function to have a more constrained signature than necessary, perhaps to
+          leave yourself wiggle-rooom for changing the implementation without changing the
+          API.  In that case, you can suppress the warning on a per-function basis, using a
+          call in a dead binding.  For example:
+          <programlisting>
+             f :: Eq a => a -> a -> Bool
+             f x y = True
+                where
+                  _ = x == x  -- Suppress the redundant-constraint warning for (Eq a)
+          </programlisting>
+          Here the call to <literal>(==)</literal> makes GHC think that the <literal>(Eq a)</literal>
+          constraint is needed, so no warning is issued.
+          </para>
         </listitem>
       </varlistentry>
 
