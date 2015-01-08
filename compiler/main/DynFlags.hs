@@ -770,7 +770,7 @@ data DynFlags = DynFlags {
 
   -- Package state
   -- NB. do not modify this field, it is calculated by
-  -- Packages.initPackages and Packages.updatePackages.
+  -- Packages.initPackages
   pkgDatabase           :: Maybe [PackageConfig],
   pkgState              :: PackageState,
 
