@@ -185,6 +185,7 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
                               unGhcT (f g_restore) s
 
 #if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
 instance (ExceptionMonad m, Functor m) => HasDynFlags (GhcT m) where
 #else
 instance (ExceptionMonad m) => HasDynFlags (GhcT m) where
@@ -192,6 +193,7 @@ instance (ExceptionMonad m) => HasDynFlags (GhcT m) where
   getDynFlags = getSessionDynFlags
 
 #if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
 instance (ExceptionMonad m, Functor m) => GhcMonad (GhcT m) where
 #else
 instance (ExceptionMonad m) => GhcMonad (GhcT m) where

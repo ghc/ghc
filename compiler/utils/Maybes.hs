@@ -68,6 +68,7 @@ instance Functor m => Functor (MaybeT m) where
   fmap f x = MaybeT $ fmap (fmap f) $ runMaybeT x
 
 #if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
 instance (Monad m, Functor m) => Applicative (MaybeT m) where
 #else
 instance (Monad m) => Applicative (MaybeT m) where

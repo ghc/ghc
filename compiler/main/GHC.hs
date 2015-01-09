@@ -433,6 +433,7 @@ runGhc mb_top_dir ghc = do
 -- several threads.
 
 #if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
 runGhcT :: (ExceptionMonad m, Functor m) =>
 #else
 runGhcT :: (ExceptionMonad m) =>
