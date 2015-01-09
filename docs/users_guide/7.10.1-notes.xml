@@ -117,6 +117,23 @@
            </listitem>
            <listitem>
                 <para>
+                    The new <option>-fdefer-typed-holes</option> flag turns
+                    typed hole errors into typed hole warnings that produce
+                    runtime errors when evaluated.
+
+                    The <option>-fno-warn-typed-holes</option> flag was
+                    repurposed to silence the warnings produced when
+                    <option>-fdefer-typed-holes</option> is used. As a result,
+                    it is no longer possible to disable typed holes like it was
+                    in GHC 7.8. This only turned a self-explanatory error into
+                    a cryptic parse error and was thus not very useful.
+
+                    For more details, consult <xref linkend="typed-holes"/> and
+                    <xref linkend="defer-type-errors"/>.
+                </para>
+           </listitem>
+           <listitem>
+                <para>
                     A new warning flag, <option>-fwarn-trustworthy-safe</option>
                     has been added and is turned on with
                     <option>-Wall</option>. It warns when a module that is
