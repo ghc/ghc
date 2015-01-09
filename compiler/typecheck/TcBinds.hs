@@ -751,7 +751,7 @@ completeTheta inferred_theta
        ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
        ; msg <- mkLongErrAt loc (mk_msg inferred_diff partial_sigs) empty
        ; case partial_sigs of
-           True | warn_partial_sigs -> reportWarning $ makeIntoWarning msg
+           True | warn_partial_sigs -> reportWarning msg
                 | otherwise         -> return ()
            False                    -> reportError msg
        ; return final_theta }

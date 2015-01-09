@@ -32,7 +32,7 @@ import VarSet
 import VarEnv
 import NameEnv
 import Bag
-import ErrUtils         ( ErrMsg, makeIntoWarning, pprLocErrMsg )
+import ErrUtils         ( ErrMsg, pprLocErrMsg )
 import BasicTypes
 import Util
 import FastString
@@ -418,7 +418,7 @@ maybeReportHoleError ctxt ct err
     -- only if -fwarn_partial_type_signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning (makeIntoWarning err)
+       HoleWarn  -> reportWarning err
        HoleDefer -> return ()
 
   -- Otherwise this is a typed hole in an expression
@@ -426,7 +426,7 @@ maybeReportHoleError ctxt ct err
   = -- If deferring, report a warning only if -fwarn-typed-holds is on
     case cec_expr_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning (makeIntoWarning err)
+       HoleWarn  -> reportWarning err
        HoleDefer -> return ()
 
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
@@ -434,7 +434,7 @@ maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 maybeReportError ctxt err
   -- See Note [Always warn with -fdefer-type-errors]
   | cec_defer_type_errors ctxt
-  = reportWarning (makeIntoWarning err)
+  = reportWarning err
   | cec_suppress ctxt
   = return ()
   | otherwise

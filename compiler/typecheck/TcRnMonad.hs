@@ -753,11 +753,16 @@ reportError err
          writeTcRef errs_var (warns, errs `snocBag` err) }
 
 reportWarning :: ErrMsg -> TcRn ()
-reportWarning warn
-  = do { traceTc "Adding warning:" (pprLocErrMsg warn) ;
-         errs_var <- getErrsVar ;
-         (warns, errs) <- readTcRef errs_var ;
-         writeTcRef errs_var (warns `snocBag` warn, errs) }
+reportWarning err
+  = do { let warn = makeIntoWarning err
+                    -- 'err' was build by mkLongErrMsg or something like that,
+                    -- so it's of error severity.  For a warning we downgrade
+                    -- its severity to SevWarning
+
+       ; traceTc "Adding warning:" (pprLocErrMsg warn)
+       ; errs_var <- getErrsVar
+       ; (warns, errs) <- readTcRef errs_var
+       ; writeTcRef errs_var (warns `snocBag` warn, errs) }
 
 try_m :: TcRn r -> TcRn (Either IOEnvFailure r)
 -- Does try_m, with a debug-trace on failure
