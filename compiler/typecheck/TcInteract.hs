@@ -1341,7 +1341,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
               -- flattening, occurs-check, and ufsk := ufsk issues
           ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
               --    ax_co :: fam_tc args ~ rhs_ty
-              --       ev :: alpha ~ rhs_ty
+              --   new_ev :: alpha ~ rhs_ty
               --     ufsk := alpha
               -- final_co :: fam_tc args ~ alpha
           ; dischargeFmv (ctEvId old_ev) fsk final_co alpha_ty
@@ -1370,8 +1370,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
   | isGiven old_ev
   = ASSERT( ctEvEqRel old_ev == NomEq )
     runFlatten $
-    do { let fmode = mkFlattenEnv FM_FlattenAll old_ev
-       ; (xis, cos) <- flatten_many fmode (repeat Nominal) tc_args
+    do { (xis, cos) <- flattenManyNom old_ev tc_args
                -- ax_co :: F args ~ G tc_args
                -- cos   :: xis ~ tc_args
                -- old_ev :: F args ~ fsk
@@ -1390,16 +1389,15 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
   | otherwise
   = ASSERT( not (isDerived old_ev) )   -- Caller ensures this
     ASSERT( ctEvEqRel old_ev == NomEq )
-    runFlatten $
-    do { let fmode = mkFlattenEnv FM_FlattenAll old_ev
-       ; (xis, cos) <- flatten_many fmode (repeat Nominal) tc_args
+    do { (xis, cos) <- flattenManyNom old_ev tc_args
                -- ax_co :: F args ~ G tc_args
                -- cos   :: xis ~ tc_args
                -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
                -- new_ev :: G xis ~ fsk
                -- old_ev :: F args ~ fsk := ax_co ; sym (G cos) ; new_ev
 
-       ; new_ev <- newWantedEvVarNC loc (mkTcEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk))
+       ; new_ev <- newWantedEvVarNC deeper_loc 
+                                    (mkTcEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk))
        ; setWantedEvBind (ctEvId old_ev)
                    (EvCoercion (ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal fam_tc cos)
                                       `mkTcTransCo` ctEvCoercion new_ev))

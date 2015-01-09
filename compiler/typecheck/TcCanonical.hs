@@ -231,7 +231,7 @@ canClassNC ev cls tys
 canClass ev cls tys
   =   -- all classes do *nominal* matching
     ASSERT2( ctEvRole ev == Nominal, ppr ev $$ ppr cls $$ ppr tys )
-    do { (xis, cos) <- flattenMany FM_FlattenAll ev (repeat Nominal) tys
+    do { (xis, cos) <- flattenManyNom ev tys
        ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
              mk_ct new_ev = CDictCan { cc_ev = new_ev
@@ -931,7 +931,7 @@ canCFunEqCan :: CtEvidence
 -- and the RHS is a fsk, which we must *not* substitute.
 -- So just substitute in the LHS
 canCFunEqCan ev fn tys fsk
-  = do { (tys', cos) <- flattenMany FM_FlattenAll ev (repeat Nominal) tys
+  = do { (tys', cos) <- flattenManyNom ev tys
                         -- cos :: tys' ~ tys
        ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
                         -- :: F tys' ~ F tys
@@ -952,8 +952,7 @@ canEqTyVar :: CtEvidence -> EqRel -> SwapFlag
 -- A TyVar on LHS, but so far un-zonked
 canEqTyVar ev eq_rel swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
   = do { traceTcS "canEqTyVar" (ppr tv1 $$ ppr ty2 $$ ppr swapped)
-       ; let fmode = mkFlattenEnv FM_FlattenAll ev  -- the FM_ param is ignored
-       ; mb_yes <- flattenTyVarOuter fmode tv1
+       ; mb_yes <- flattenTyVar ev tv1
        ; case mb_yes of
          { Right (ty1, co1) -> -- co1 :: ty1 ~ tv1
              do { traceTcS "canEqTyVar2"

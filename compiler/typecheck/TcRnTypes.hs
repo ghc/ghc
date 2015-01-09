@@ -1811,9 +1811,9 @@ subGoalCounterValue CountTyFunApps   (SubGoalDepth _ f) = f
 
 subGoalDepthExceeded :: SubGoalDepth -> SubGoalDepth -> Maybe SubGoalCounter
 subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
-        | c > mc    = Just CountConstraints
-        | f > mf    = Just CountTyFunApps
-        | otherwise = Nothing
+  | c > mc    = Just CountConstraints
+  | f > mf    = Just CountTyFunApps
+  | otherwise = Nothing
 
 -- | Checks whether the evidence can be used to solve a goal with the given minimum depth
 -- See Note [Preventing recursive dictionaries]

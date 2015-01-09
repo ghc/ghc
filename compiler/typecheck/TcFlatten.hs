@@ -2,9 +2,10 @@
 
 module TcFlatten(
    FlattenEnv(..), FlattenMode(..), mkFlattenEnv,
-   flatten, flattenMany, flatten_many,
-   flattenFamApp, flattenTyVarOuter,
+   flatten, flattenManyNom, flattenFamApp, flattenTyVar,
+
    unflatten,
+
    eqCanRewrite, eqCanRewriteFR, canRewriteOrSame,
    CtFlavourRole, ctEvFlavourRole, ctFlavourRole
  ) where
@@ -23,7 +24,6 @@ import Var
 import VarEnv
 import NameEnv
 import Outputable
-import VarSet
 import TcSMonad as TcS
 import DynFlags( DynFlags )
 
@@ -523,56 +523,10 @@ wanteds, we will
 
 ************************************************************************
 *                                                                      *
-*           The main flattening functions
+*                     FlattenEnv
+*             The flattening environment 
 *                                                                      *
 ************************************************************************
-
-Note [Flattening]
-~~~~~~~~~~~~~~~~~~~~
-  flatten ty  ==>   (xi, cc)
-    where
-      xi has no type functions, unless they appear under ForAlls
-
-      cc = Auxiliary given (equality) constraints constraining
-           the fresh type variables in xi.  Evidence for these
-           is always the identity coercion, because internally the
-           fresh flattening skolem variables are actually identified
-           with the types they have been generated to stand in for.
-
-Note that it is flatten's job to flatten *every type function it sees*.
-flatten is only called on *arguments* to type functions, by canEqGiven.
-
-Recall that in comments we use alpha[flat = ty] to represent a
-flattening skolem variable alpha which has been generated to stand in
-for ty.
-
------ Example of flattening a constraint: ------
-  flatten (List (F (G Int)))  ==>  (xi, cc)
-    where
-      xi  = List alpha
-      cc  = { G Int ~ beta[flat = G Int],
-              F beta ~ alpha[flat = F beta] }
-Here
-  * alpha and beta are 'flattening skolem variables'.
-  * All the constraints in cc are 'given', and all their coercion terms
-    are the identity.
-
-NB: Flattening Skolems only occur in canonical constraints, which
-are never zonked, so we don't need to worry about zonking doing
-accidental unflattening.
-
-Note that we prefer to leave type synonyms unexpanded when possible,
-so when the flattener encounters one, it first asks whether its
-transitive expansion contains any type function applications.  If so,
-it expands the synonym and proceeds; if not, it simply returns the
-unexpanded synonym.
-
-Note [Flattener EqRels]
-~~~~~~~~~~~~~~~~~~~~~~~
-When flattening, we need to know which equality relation -- nominal
-or representation -- we should be respecting. The only difference is
-that we rewrite variables by representational equalities when fe_eq_rel
-is ReprEq.
 
 -}
 
@@ -585,14 +539,14 @@ data FlattenEnv
 data FlattenMode  -- Postcondition for all three: inert wrt the type substitution
   = FM_FlattenAll          -- Postcondition: function-free
 
-  | FM_Avoid TcTyVar Bool  -- See Note [Lazy flattening]
-                           -- Postcondition:
-                           --  * tyvar is only mentioned in result under a rigid path
-                           --    e.g.   [a] is ok, but F a won't happen
-                           --  * If flat_top is True, top level is not a function application
-                           --   (but under type constructors is ok e.g. [F a])
-
   | FM_SubstOnly           -- See Note [Flattening under a forall]
+
+--  | FM_Avoid TcTyVar Bool  -- See Note [Lazy flattening]
+--                           -- Postcondition:
+--                           --  * tyvar is only mentioned in result under a rigid path
+--                           --    e.g.   [a] is ok, but F a won't happen
+--                           --  * If flat_top is True, top level is not a function application
+--                           --   (but under type constructors is ok e.g. [F a])
 
 mkFlattenEnv :: FlattenMode -> CtEvidence -> FlattenEnv
 mkFlattenEnv fm ctev = FE { fe_mode    = fm
@@ -603,7 +557,33 @@ mkFlattenEnv fm ctev = FE { fe_mode    = fm
 feRole :: FlattenEnv -> Role
 feRole = eqRelRole . fe_eq_rel
 
+-- | Change the 'EqRel' in a 'FlattenEnv'. Avoids allocating a
+-- new 'FlattenEnv' where possible.
+setFEEqRel :: FlattenEnv -> EqRel -> FlattenEnv
+setFEEqRel fmode@(FE { fe_eq_rel = old_eq_rel }) new_eq_rel
+  | old_eq_rel == new_eq_rel = fmode
+  | otherwise                = fmode { fe_eq_rel = new_eq_rel }
+
+-- | Change the 'FlattenMode' in a 'FlattenEnv'. Avoids allocating
+-- a new 'FlattenEnv' where possible.
+setFEMode :: FlattenEnv -> FlattenMode -> FlattenEnv
+setFEMode fmode@(FE { fe_mode = old_mode }) new_mode
+  | old_mode `eq` new_mode = fmode
+  | otherwise              = fmode { fe_mode = new_mode }
+  where
+    FM_FlattenAll   `eq` FM_FlattenAll   = True
+    FM_SubstOnly    `eq` FM_SubstOnly    = True
+--  FM_Avoid tv1 b1 `eq` FM_Avoid tv2 b2 = tv1 == tv2 && b1 == b2
+    _               `eq` _               = False
+
 {-
+Note [Flattener EqRels]
+~~~~~~~~~~~~~~~~~~~~~~~
+When flattening, we need to know which equality relation -- nominal
+or representation -- we should be respecting. The only difference is
+that we rewrite variables by representational equalities when fe_eq_rel
+is ReprEq.
+
 Note [Lazy flattening]
 ~~~~~~~~~~~~~~~~~~~~~~
 The idea of FM_Avoid mode is to flatten less aggressively.  If we have
@@ -644,6 +624,96 @@ soon throw out the phantoms when decomposing a TyConApp. (Or, the
 canonicaliser will emit an insoluble, in which case the unflattened version
 yields a better error message anyway.)
 
+-}
+
+{- *********************************************************************
+*                                                                      *
+*      Externally callable flattening functions                        *
+*                                                                      *
+*  They are all wrapped in runFlatten, so their                        *
+*  flattening work gets put into the work list                         *
+*                                                                      *
+********************************************************************* -}
+
+flatten :: FlattenMode -> CtEvidence -> TcType -> TcS (Xi, TcCoercion)
+flatten mode ev ty
+  = runFlatten (flatten_one fmode ty)
+  where
+    fmode = mkFlattenEnv mode ev
+
+flattenManyNom :: CtEvidence -> [TcType] -> TcS ([Xi], [TcCoercion])
+-- Externally-callable, hence runFlatten
+-- Flatten a bunch of types all at once; in fact they are
+-- always the arguments of a saturated type-family, so
+--      ctEvFlavour ev = Nominal
+-- and we want to flatten all at nominal role
+flattenManyNom ev tys
+  = runFlatten (flatten_many_nom fmode tys)
+  where
+    fmode = mkFlattenEnv FM_FlattenAll ev
+
+flattenFamApp :: FlattenMode -> CtEvidence
+              -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
+-- Externally callable, hence runFlatten
+flattenFamApp mode ev tc tys
+  = runFlatten (flatten_fam_app fmode tc tys)
+  where
+    fmode = mkFlattenEnv mode ev
+
+flattenTyVar :: CtEvidence -> TcTyVar
+             -> TcS (Either TyVar (TcType, TcCoercion))
+flattenTyVar ev tv
+  = runFlatten (flatten_tyvar fmode tv)
+  where
+    fmode = mkFlattenEnv FM_FlattenAll ev
+
+
+{- *********************************************************************
+*                                                                      *
+*           The main flattening functions
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Flattening]
+~~~~~~~~~~~~~~~~~~~~
+  flatten ty  ==>   (xi, cc)
+    where
+      xi has no type functions, unless they appear under ForAlls
+
+      cc = Auxiliary given (equality) constraints constraining
+           the fresh type variables in xi.  Evidence for these
+           is always the identity coercion, because internally the
+           fresh flattening skolem variables are actually identified
+           with the types they have been generated to stand in for.
+
+Note that it is flatten's job to flatten *every type function it sees*.
+flatten is only called on *arguments* to type functions, by canEqGiven.
+
+Recall that in comments we use alpha[flat = ty] to represent a
+flattening skolem variable alpha which has been generated to stand in
+for ty.
+
+----- Example of flattening a constraint: ------
+  flatten (List (F (G Int)))  ==>  (xi, cc)
+    where
+      xi  = List alpha
+      cc  = { G Int ~ beta[flat = G Int],
+              F beta ~ alpha[flat = F beta] }
+Here
+  * alpha and beta are 'flattening skolem variables'.
+  * All the constraints in cc are 'given', and all their coercion terms
+    are the identity.
+
+NB: Flattening Skolems only occur in canonical constraints, which
+are never zonked, so we don't need to worry about zonking doing
+accidental unflattening.
+
+Note that we prefer to leave type synonyms unexpanded when possible,
+so when the flattener encounters one, it first asks whether its
+transitive expansion contains any type function applications.  If so,
+it expands the synonym and proceeds; if not, it simply returns the
+unexpanded synonym.
+
 Note [flatten_many performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In programs with lots of type-level evaluation, flatten_many becomes
@@ -674,33 +744,8 @@ and T5321Fun.
 If we need to make this yet more performant, a possible way forward is to
 duplicate the flattener code for the nominal case, and make that case
 faster. This doesn't seem quite worth it, yet.
-
 -}
 
-------------------
-flatten :: FlattenMode -> CtEvidence -> TcType -> TcS (Xi, TcCoercion)
-flatten mode ev ty
-  = runFlatten (flatten_one fmode ty)
-  where
-    fmode = mkFlattenEnv mode ev
-
-flattenMany :: FlattenMode -> CtEvidence -> [Role]
-            -> [TcType] -> TcS ([Xi], [TcCoercion])
--- Flatten a bunch of types all at once. Roles on the coercions returned
--- always match the corresponding roles passed in.
-flattenMany mode ev roles tys
-  = runFlatten (flatten_many fmode roles tys)
-  where
-    fmode = mkFlattenEnv mode ev
-
-flattenFamApp :: FlattenMode -> CtEvidence
-              -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
-flattenFamApp mode ev tc tys
-  = runFlatten (flatten_fam_app fmode tc tys)
-  where
-    fmode = mkFlattenEnv mode ev
-
-------------------
 flatten_many :: FlattenEnv -> [Role] -> [Type] -> TcS ([Xi], [TcCoercion])
 -- Coercions :: Xi ~ Type, at roles given
 -- Returns True iff (no flattening happened)
@@ -738,7 +783,18 @@ flatten_one :: FlattenEnv -> TcType -> TcS (Xi, TcCoercion)
 flatten_one fmode xi@(LitTy {}) = return (xi, mkTcReflCo (feRole fmode) xi)
 
 flatten_one fmode (TyVarTy tv)
-  = flattenTyVar fmode tv
+  = do { mb_yes <- flatten_tyvar fmode tv
+       ; case mb_yes of
+           Left tv' -> -- Done
+                       do { traceTcS "flattenTyVar1" (ppr tv $$ ppr (tyVarKind tv'))
+                          ; return (ty', mkTcReflCo (feRole fmode) ty') }
+                    where
+                       ty' = mkTyVarTy tv'
+
+           Right (ty1, co1)  -- Recurse
+                    -> do { (ty2, co2) <- flatten_one fmode ty1
+                          ; traceTcS "flattenTyVar2" (ppr tv $$ ppr ty2)
+                          ; return (ty2, co2 `mkTcTransCo` co1) } }
 
 flatten_one fmode (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten_one fmode ty1
@@ -888,12 +944,12 @@ flatten_exact_fam_app fmode tc tys
                           ; return ( mkTyConApp tc xis
                                    , mkTcTyConAppCo (feRole fmode) tc cos ) }
 
-       FM_Avoid tv flat_top ->
-         do { (xis, cos) <- flatten_many fmode roles tys
-            ; if flat_top || tv `elemVarSet` tyVarsOfTypes xis
-              then flatten_exact_fam_app_fully fmode tc tys
-              else return ( mkTyConApp tc xis
-                          , mkTcTyConAppCo (feRole fmode) tc cos ) }
+--       FM_Avoid tv flat_top ->
+--         do { (xis, cos) <- flatten_many fmode roles tys
+--            ; if flat_top || tv `elemVarSet` tyVarsOfTypes xis
+--              then flatten_exact_fam_app_fully fmode tc tys
+--              else return ( mkTyConApp tc xis
+--                          , mkTcTyConAppCo (feRole fmode) tc cos ) }
   where
     -- These are always going to be Nominal for now,
     -- but not if #8177 is implemented
@@ -902,10 +958,12 @@ flatten_exact_fam_app fmode tc tys
 flatten_exact_fam_app_fully fmode tc tys
   -- See Note [Reduce type family applications eagerly]
   = try_to_reduce tc tys False id $
-    do { (xis, cos) <- flatten_many_nom (setFEEqRel (setFEMode fmode FM_FlattenAll) NomEq) tys
+    do { -- First, flatten the arguments
+         (xis, cos) <- flatten_many_nom (setFEEqRel fmode NomEq) tys
        ; let ret_co = mkTcTyConAppCo (feRole fmode) tc cos
               -- ret_co :: F xis ~ F tys
 
+        -- Now, look in the cache
        ; mb_ct <- lookupFlatCache tc xis
        ; case mb_ct of
            Just (co, rhs_ty, flav)  -- co :: F xis ~ fsk
@@ -1232,39 +1290,16 @@ subsitution means that the proof in Note [The inert equalities] may need
 to be revisited, but we don't think that the end conclusion is wrong.
 -}
 
-flattenTyVar :: FlattenEnv -> TcTyVar -> TcS (Xi, TcCoercion)
+flatten_tyvar :: FlattenEnv -> TcTyVar
+              -> TcS (Either TyVar (TcType, TcCoercion))
 -- "Flattening" a type variable means to apply the substitution to it
--- The substitution is actually the union of
---     * the unifications that have taken place (either before the
---       solver started, or in TcInteract.solveByUnification)
---     * the CTyEqCans held in the inert set
---
--- Postcondition: co : xi ~ tv
-flattenTyVar fmode tv
-  = do { mb_yes <- flattenTyVarOuter fmode tv
-       ; case mb_yes of
-           Left tv' -> -- Done
-                       do { traceTcS "flattenTyVar1" (ppr tv $$ ppr (tyVarKind tv'))
-                          ; return (ty', mkTcReflCo (feRole fmode) ty') }
-                    where
-                       ty' = mkTyVarTy tv'
-
-           Right (ty1, co1)  -- Recurse
-                    -> do { (ty2, co2) <- flatten_one fmode ty1
-                          ; traceTcS "flattenTyVar3" (ppr tv $$ ppr ty2)
-                          ; return (ty2, co2 `mkTcTransCo` co1) }
-       }
-
-flattenTyVarOuter :: FlattenEnv -> TcTyVar
-                  -> TcS (Either TyVar (TcType, TcCoercion))
--- Look up the tyvar in
---   a) the internal MetaTyVar box
---   b) the tyvar binds
---   c) the inerts
+-- Specifically, look up the tyvar in
+--   * the internal MetaTyVar box
+--   * the inerts
 -- Return (Left tv')      if it is not found, tv' has a properly zonked kind
 --        (Right (ty, co) if found, with co :: ty ~ tv;
 
-flattenTyVarOuter fmode tv
+flatten_tyvar fmode tv
   | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
   = Left `liftM` flattenTyVarFinal fmode tv
           -- So ty contains refernces to the non-TcTyVar a
@@ -1589,21 +1624,3 @@ unsolved constraints.  The flat form will be
 Flatten using the fun-eqs first.
 -}
 
--- | Change the 'EqRel' in a 'FlattenEnv'. Avoids allocating a
--- new 'FlattenEnv' where possible.
-setFEEqRel :: FlattenEnv -> EqRel -> FlattenEnv
-setFEEqRel fmode@(FE { fe_eq_rel = old_eq_rel }) new_eq_rel
-  | old_eq_rel == new_eq_rel = fmode
-  | otherwise                = fmode { fe_eq_rel = new_eq_rel }
-
--- | Change the 'FlattenMode' in a 'FlattenEnv'. Avoids allocating
--- a new 'FlattenEnv' where possible.
-setFEMode :: FlattenEnv -> FlattenMode -> FlattenEnv
-setFEMode fmode@(FE { fe_mode = old_mode }) new_mode
-  | old_mode `eq` new_mode = fmode
-  | otherwise            = fmode { fe_mode = new_mode }
-  where
-    FM_FlattenAll   `eq` FM_FlattenAll   = True
-    FM_SubstOnly    `eq` FM_SubstOnly    = True
-    FM_Avoid tv1 b1 `eq` FM_Avoid tv2 b2 = tv1 == tv2 && b1 == b2
-    _               `eq` _               = False
