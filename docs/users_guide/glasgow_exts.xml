@@ -1088,7 +1088,8 @@ would bring into scope the data constructor <literal>Just</literal> from the
   <replaceable>CReq</replaceable> are type contexts, and
   <replaceable>t1</replaceable>, <replaceable>t2</replaceable>, ...,
   <replaceable>tN</replaceable> and <replaceable>t</replaceable> are
-  types.
+  types. If <replaceable>CReq</replaceable> is empty
+  (<literal>()</literal>) it can be omitted.
 </para>
 
 <para>
@@ -1118,7 +1119,7 @@ the inferred pattern type of <literal>ExNumPat</literal> is
 </para>
 
 <programlisting>
-pattern (Show b) => ExNumPat b :: (Num a, Eq a) => T a
+pattern ExNumPat :: (Show b) => (Num a, Eq a) => b -> T a
 </programlisting>
 
 <para>
