@@ -12,8 +12,8 @@ data Option = TargetOS | TargetArch | TargetPlatformFull
             | SrcHcOpts
             | HostOsCpp
 
-instance ShowAction Option where
-    showAction opt = showAction $ fmap words $ askConfig $ case opt of 
+instance ShowArgs Option where
+    showArgs opt = showArgs $ fmap words $ askConfig $ case opt of 
         TargetOS                -> "target-os"
         TargetArch              -> "target-arch"
         TargetPlatformFull      -> "target-platform-full"
@@ -30,8 +30,8 @@ instance ShowAction Option where
 
 ghcWithInterpreter :: Condition
 ghcWithInterpreter = do
-    [os]   <- showAction TargetOS
-    [arch] <- showAction TargetArch
+    [os]   <- showArgs TargetOS
+    [arch] <- showArgs TargetArch
     return $
         os `elem` ["mingw32", "cygwin32", "linux", "solaris2", "freebsd", "dragonfly", "netbsd", "openbsd", "darwin", "kfreebsdgnu"]
         &&
@@ -39,10 +39,10 @@ ghcWithInterpreter = do
 
 platformSupportsSharedLibs :: Condition
 platformSupportsSharedLibs = do
-    [platform] <- showAction TargetPlatformFull
+    [platform] <- showArgs TargetPlatformFull
     return $ platform `notElem` [ "powerpc-unknown-linux", "x86_64-unknown-mingw32", "i386-unknown-mingw32" ] -- TODO: i386-unknown-solaris2?
 
 windowsHost :: Condition
 windowsHost = do
-    [hostOsCpp] <- showAction HostOsCpp
+    [hostOsCpp] <- showArgs HostOsCpp
     return $ hostOsCpp `elem` ["mingw32", "cygwin32"]

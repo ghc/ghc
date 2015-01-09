@@ -15,8 +15,8 @@ newtype PackageDataKey = PackageDataKey (FilePath, String)
 data PackageData = Modules FilePath | SrcDirs FilePath | PackageKey FilePath 
                  | IncludeDirs FilePath | Deps FilePath | DepKeys FilePath
 
-instance ShowAction PackageData where
-    showAction key = do
+instance ShowArgs PackageData where
+    showArgs key = do
         let (keyName, file, ifEmpty) = case key of
                Modules     file -> ("MODULES"     , file, "" )
                SrcDirs     file -> ("HS_SRC_DIRS" , file, ".")
