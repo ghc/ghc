@@ -906,16 +906,17 @@ setImplicationStatus :: Implication -> TcS (Maybe Implication)
 -- Return Nothing if we can discard the implication altogether
 setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
                                     , ic_info = info
-                                    , ic_wanted = wc, ic_given = givens })
+                                    , ic_wanted = wc
+                                    , ic_given = givens })
  | some_insoluble
  = return $ Just $
    implic { ic_status = IC_Insoluble
-          , ic_wanted = trimmed_wc }
+          , ic_wanted = wc { wc_simple = pruned_simples } }
 
  | some_unsolved
  = return $ Just $
    implic { ic_status = IC_Unsolved
-          , ic_wanted = trimmed_wc }
+          , ic_wanted = wc { wc_simple = pruned_simples } }
 
  | otherwise  -- Everything is solved; look at the implications
               -- See Note [Tracking redundant constraints]
@@ -928,27 +929,33 @@ setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
 
             final_needs = all_needs `delVarSetList` givens
 
-            discard_implic  -- Can we discard the entire implication?
+            discard_entire_implication  -- Can we discard the entire implication?
               =  null dead_givens           -- No warning from this implication
-              && isEmptyBag keep_implics    -- No live children
+              && isEmptyBag pruned_implics  -- No live children
               && isEmptyVarSet final_needs  -- No needed vars to pass up to parent
 
-            final_implic = implic { ic_status = IC_Solved { ics_need = final_needs
-                                                          , ics_dead = dead_givens }
-                                  , ic_wanted = trimmed_wc }
+            final_status = IC_Solved { ics_need = final_needs
+                                     , ics_dead = dead_givens }
+            final_implic = implic { ic_status = final_status
+                                  , ic_wanted = wc { wc_simple = pruned_simples
+                                                   , wc_impl   = pruned_implics } }
+               -- We can only prune the child implications (pruned_implics)
+               -- in the IC_Solved status case, because only then we can
+               -- accumulate their needed evidence variales into the
+               -- IC_Solved final_status field of the parent implication.
 
-      ; return $ if discard_implic then Nothing else Just final_implic }
+      ; return $ if discard_entire_implication
+                 then Nothing
+                 else Just final_implic }
  where
    WC { wc_simple = simples, wc_impl = implics, wc_insol = insols } = wc
-   trimmed_wc = wc { wc_simple = drop_der_simples
-                   , wc_impl   = keep_implics }
 
    some_insoluble = insolubleWC wc
    some_unsolved = not (isEmptyBag simples && isEmptyBag insols)
                  || isNothing mb_implic_needs
 
-   drop_der_simples = filterBag isWantedCt simples
-   keep_implics     = filterBag need_to_keep_implic implics
+   pruned_simples = filterBag isWantedCt simples  -- Drop Derived constraints
+   pruned_implics = filterBag need_to_keep_implic implics
 
    mb_implic_needs :: Maybe VarSet
         -- Just vs => all implics are IC_Solved, with 'vs' needed
