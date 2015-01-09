@@ -53,7 +53,7 @@ libraryPackage name stage settings =
         )]
 
 commonCcArgs :: Args
-commonCcArgs = when Validating $ args "-Werror" "-Wall"
+commonCcArgs = when Validating $ arg ["-Werror", "-Wall"]
 
 commonLdArgs :: Args
 commonLdArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?

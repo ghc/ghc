@@ -1,43 +1,37 @@
 {-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
 module Package.Data (buildPackageData) where
-
 import Package.Base
 
 libraryArgs :: [Way] -> Args
-libraryArgs ways = 
-    let argEnable x suffix = arg $ (if x then "--enable-" else "--disable-") ++ suffix
-    in mconcat
-        [ argEnable False "library-for-ghci" -- TODO: why always disable?
-        , argEnable (vanilla `elem` ways) "library-vanilla"
-        , when (ghcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways) $
-            argEnable True "library-for-ghci"
-        , argEnable (profiling `elem` ways) "library-profiling"
-        , argEnable (dynamic   `elem` ways) "shared"
-        ]
+libraryArgs ways =
+       argEnable False "library-for-ghci" -- TODO: why always disable?
+    <> argEnable (vanilla `elem` ways) "library-vanilla"
+    <> when (ghcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways) (argEnable True "library-for-ghci")
+    <> argEnable (profiling `elem` ways) "library-profiling"
+    <> argEnable (dynamic   `elem` ways) "shared"
+  where
+    argEnable x suffix = arg $ (if x then "--enable-" else "--disable-") ++ suffix
 
 configureArgs :: Stage -> Settings -> Args
 configureArgs stage settings = 
-    let argConf key as = unless (null <$> as) $ joinArgs "--configure-option=" key "=" (as :: Args)
+    let argConf key as = do
+            s <- unwords <$> arg as
+            unless (null s) $ arg $ "--configure-option=" ++ key ++ "=" ++ s
 
-        cflags   = joinArgsSpaced (commonCcArgs `filterOut` ["-Werror"])
-                                  (ConfCcArgs stage)
-                                  (customCcArgs settings)
-                                  (commonCcWarninigArgs)
-        ldflags  = joinArgsSpaced commonLdArgs  (ConfGccLinkerArgs stage) (customLdArgs  settings)
-        cppflags = joinArgsSpaced commonCppArgs (ConfCppArgs       stage) (customCppArgs settings)
-                   
-    in mconcat
-        [ argConf "CFLAGS"   cflags
-        , argConf "LDFLAGS"  ldflags
-        , argConf "CPPFLAGS" cppflags
-        , joinArgs "--gcc-options=" cflags " " ldflags
-        , argConf "--with-iconv-includes"  $ arg IconvIncludeDirs
-        , argConf "--with-iconv-libraries" $ arg IconvLibDirs
-        , argConf "--with-gmp-includes"    $ arg GmpIncludeDirs
-        , argConf "--with-gmp-libraries"   $ arg GmpLibDirs
-        , when CrossCompiling $ argConf "--host" $ arg TargetPlatformFull -- TODO: why not host?
-        , argConf "--with-cc" $ arg Gcc
-        ]
+        cflags   = commonCcArgs `filterOut` "-Werror" <+> ConfCcArgs stage <+> customCcArgs settings <+> commonCcWarninigArgs
+        ldflags  = commonLdArgs  <+> ConfGccLinkerArgs stage <+> customLdArgs  settings
+        cppflags = commonCppArgs <+> ConfCppArgs       stage <+> customCppArgs settings
+
+    in argConf "CFLAGS"   cflags
+    <> argConf "LDFLAGS"  ldflags
+    <> argConf "CPPFLAGS" cppflags
+    <> arg (concat <$> "--gcc-options=" <+> cflags <+> " " <+> ldflags)
+    <> argConf "--with-iconv-includes"  IconvIncludeDirs
+    <> argConf "--with-iconv-libraries" IconvLibDirs
+    <> argConf "--with-gmp-includes"    GmpIncludeDirs
+    <> argConf "--with-gmp-libraries"   GmpLibDirs
+    <> when CrossCompiling (argConf "--host" TargetPlatformFull) -- TODO: why not host?
+    <> argConf "--with-cc" Gcc
 
 buildPackageData :: Package -> TodoItem -> Rules ()
 buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
@@ -57,30 +51,28 @@ buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
             postProcessPackageData $ path </> dist </> "package-data.mk"
               where
                 cabalArgs, ghcPkgArgs :: Args
-                cabalArgs = mconcat
-                    [ args "configure" path dist
+                cabalArgs = arg ["configure", path, dist]
                     -- this is a positional argument, hence:
                     -- * if it is empty, we need to emit one empty string argument
                     -- * if there are many, we must collapse them into one space-separated string
-                    , joinArgsSpaced "" (customDllArgs settings)
-                    , with $ Ghc stage -- TODO: used to be stage01 (using max Stage1 GHC)
-                    , with $ GhcPkg stage
+                    <> arg (unwords <$> customDllArgs settings)
+                    <> with (Ghc stage) -- TODO: used to be stage01 (using max Stage1 GHC)
+                    <> with (GhcPkg stage)
 
-                    , customConfArgs settings
-                    , libraryArgs =<< ways settings
+                    <> customConfArgs settings
+                    <> (libraryArgs =<< ways settings)
 
-                    , when hsColourSrcs $ with HsColour
-                    , configureArgs stage settings
+                    <> when hsColourSrcs (with HsColour)
+                    <> configureArgs stage settings
 
-                    , when (stage == Stage0) $ bootPkgConstraints
-                    , with Gcc
-                    , when (stage /= Stage0) $ with Ld
+                    <> when (stage == Stage0) bootPkgConstraints
+                    <> with Gcc
+                    <> when (stage /= Stage0) (with Ld)
                     
-                    , with Ar
-                    , with Alex
-                    , with Happy
-                    ] -- TODO: reorder with's
+                    <> with Ar
+                    <> with Alex
+                    <> with Happy -- TODO: reorder with's
 
-                ghcPkgArgs = args "update" "--force"
-                    (when (stage == Stage0) $ arg "--package-db=libraries/bootstrapping.conf")
-                    (path </> dist </> "inplace-pkg-config")
+                ghcPkgArgs = arg ["update", "--force"]
+                    <> when (stage == Stage0) (arg "--package-db=libraries/bootstrapping.conf")
+                    <> arg (path </> dist </> "inplace-pkg-config")

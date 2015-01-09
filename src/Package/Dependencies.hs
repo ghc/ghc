@@ -88,14 +88,14 @@ buildPackageDependencies pkg @ (Package name path _) (stage, dist, settings) =
                 return $ prefix ++ buildDir </> suffix
             , map (\d -> "-I" ++ path </> d) <$> filter isRelative <$> arg (IncludeDirs pkgData)
             , map (\d -> "-I" ++          d) <$> filter isAbsolute <$> arg (IncludeDirs pkgData)
-            , args "-optP-include" ("-optP" ++ buildDir </> "build/autogen/cabal_macros.h")
+            , arg ["-optP-include", "-optP" ++ buildDir </> "build/autogen/cabal_macros.h"]
             , if usePackageKey 
               then map ("-package-key " ++) <$> arg (DepKeys pkgData)
               else map ("-package "     ++) <$> arg (Deps    pkgData)
             , arg "-no-user-package-db"
-            , args "-odir"    (buildDir </> "build")
-            , args "-stubdir" (buildDir </> "build")
-            , joinArgsSpaced "-dep-makefile" out
+            , arg ["-odir"   , buildDir </> "build"]
+            , arg ["-stubdir", buildDir </> "build"]
+            , arg $ "-dep-makefile " ++ out
             , concatMap (\w -> ["-dep-suffix", suffix w]) <$> ways settings
             , arg "-include-pkg-deps"
             , arg $ map normalise srcs
