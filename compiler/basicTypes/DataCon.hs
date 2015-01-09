@@ -830,9 +830,10 @@ dataConRepStrictness dc = case dcRep dc of
 dataConImplBangs :: DataCon -> [HsImplBang]
 -- The implementation decisions about the strictness/unpack of each
 -- source program argument to the data constructor
-dataConImplBangs dc = case dcRep dc of
-                       NoDataConRep              -> dcSrcBangs dc
-                       DCR { dcr_bangs = bangs } -> bangs
+dataConImplBangs dc
+  = case dcRep dc of
+      NoDataConRep              -> replicate (dcSourceArity dc) HsNoBang
+      DCR { dcr_bangs = bangs } -> bangs
 
 dataConBoxer :: DataCon -> Maybe DataConBoxer
 dataConBoxer (MkData { dcRep = DCR { dcr_boxer = boxer } }) = Just boxer
