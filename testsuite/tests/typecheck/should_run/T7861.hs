@@ -10,4 +10,12 @@ doA = undefined
 f :: A a -> a
 f = doA
 
-main = do { print "Hello"; f `seq` print "Bad" }
+main = do { print "Hello 1"
+
+          ; f `seq` print "Hello 2"
+              -- The casts are pushed inside the lambda
+              -- for f, so this seq succeds fine
+
+          ; f (error "urk") `seq` print "Bad"
+              -- But when we *call* f we get a type error
+        }
