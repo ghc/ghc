@@ -7,9 +7,9 @@ module Base (
     module Data.Monoid,
     module Data.List,
     Stage (..),
-    Args, arg, args, ShowAction (..),
+    Args, arg, ShowArgs (..),
     Condition (..),
-    joinArgs, joinArgsSpaced,
+    (<+>),
     filterOut
     ) where
 
@@ -29,50 +29,29 @@ instance Monoid a => Monoid (Action a) where
     mempty = return mempty
     mappend p q = mappend <$> p <*> q
 
-class ShowAction a where
-    showAction     :: a -> Args
-    showListAction :: [a] -> Args -- the Creators' trick for overlapping String instances
-    showListAction = mconcat . map showAction
+class ShowArgs a where
+    showArgs     :: a -> Args
+    showListArgs :: [a] -> Args -- the Creators' trick for overlapping String instances
+    showListArgs = mconcat . map showArgs
 
-instance ShowAction Char where
-    showAction c     = return [[c]]
-    showListAction s = return [s]
+instance ShowArgs Char where
+    showArgs c     = return [[c]]
+    showListArgs s = return [s]
 
-instance ShowAction a => ShowAction [a] where
-    showAction = showListAction
+instance ShowArgs a => ShowArgs [a] where
+    showArgs = showListArgs
 
-instance ShowAction a => ShowAction (Action a) where
-    showAction = (showAction =<<)
+instance ShowArgs a => ShowArgs (Action a) where
+    showArgs = (showArgs =<<)
 
-arg :: ShowAction a => a -> Args
-arg = showAction
+arg :: ShowArgs a => a -> Args
+arg = showArgs
 
-type ArgsCombine = Args -> Args -> Args
+-- Combine two heterogeneous ShowArgs values.
+(<+>) :: (ShowArgs a, ShowArgs b) => a -> b -> Args
+a <+> b = (<>) <$> showArgs a <*> showArgs b
 
-class Collect a where
-    collect :: ArgsCombine -> Args -> a
-
-instance Collect Args where
-    collect = const id
-
-instance (ShowAction a, Collect r) => Collect (a -> r) where
-    collect combine x = \y -> collect combine $ x `combine` arg y
-
-args :: Collect a => a
-args = collect (<>) mempty
-
-joinArgs :: Collect a => a
-joinArgs = collect (\x y -> intercalateArgs "" $ x <> y) mempty
-
-joinArgsSpaced :: Collect a => a
-joinArgsSpaced = collect (\x y -> intercalateArgs " " $ x <> y) mempty
-
-intercalateArgs :: String -> Args -> Args
-intercalateArgs s as = do
-    as' <- as
-    case as' of
-        []        -> mempty
-        otherwise -> return [intercalate s as']
-
-filterOut :: Args -> [String] -> Args
-filterOut as list = filter (`notElem` list) <$> as
+filterOut :: ShowArgs a => Args -> a -> Args
+filterOut as exclude = do
+    exclude' <- showArgs exclude
+    filter (`notElem` exclude') <$> as
