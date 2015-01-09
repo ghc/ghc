@@ -1025,8 +1025,7 @@ bidirectional. The syntax for unidirectional pattern synonyms is:
 <para>
   Pattern synonym declarations can only occur in the top level of a
   module. In particular, they are not allowed as local
-  definitions. Currently, they also don't work in GHCi, but that is a
-  technical restriction that will be lifted in later versions.
+  definitions.
 </para>
 <para>
   The variables in the left-hand side of the definition are bound by
