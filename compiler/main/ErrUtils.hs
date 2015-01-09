@@ -13,8 +13,8 @@ module ErrUtils (
         ErrMsg, WarnMsg, Severity(..),
         Messages, ErrorMessages, WarningMessages,
         errMsgSpan, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
-        mkLocMessage, pprMessageBag, pprErrMsgBag, pprErrMsgBagWithLoc,
-        pprLocErrMsg, makeIntoWarning, isWarning,
+        mkLocMessage, pprMessageBag, pprErrMsgBagWithLoc,
+        pprLocErrMsg, makeIntoWarning,
 
         errorsFound, emptyMessages, isEmptyMessages,
         mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
@@ -91,12 +91,12 @@ type WarningMessages = Bag WarnMsg
 type ErrorMessages   = Bag ErrMsg
 
 data ErrMsg = ErrMsg {
-        errMsgSpan      :: SrcSpan,
-        errMsgContext   :: PrintUnqualified,
-        errMsgShortDoc  :: MsgDoc,   -- errMsgShort* should always
-        errMsgShortString :: String, -- contain the same text
-        errMsgExtraInfo :: MsgDoc,
-        errMsgSeverity  :: Severity
+        errMsgSpan        :: SrcSpan,
+        errMsgContext     :: PrintUnqualified,
+        errMsgShortDoc    :: MsgDoc,   -- errMsgShort* should always
+        errMsgShortString :: String,   -- contain the same text
+        errMsgExtraInfo   :: MsgDoc,
+        errMsgSeverity    :: Severity
         }
         -- The SrcSpan is used for sorting errors into line-number order
 
@@ -110,6 +110,10 @@ data Severity
   | SevWarning
   | SevError
   | SevFatal
+
+isWarning :: Severity -> Bool
+isWarning SevWarning = True
+isWarning _          = False
 
 instance Show ErrMsg where
     show em = errMsgShortString em
@@ -128,19 +132,14 @@ mkLocMessage severity locn msg
                   else ppr (srcSpanStart locn)
       in hang (locn' <> colon <+> sev_info) 4 msg
   where
-    sev_info = case severity of
-                 SevWarning -> ptext (sLit "Warning:")
-                 _other     -> empty
+    sev_info = ppWhen (isWarning severity)
+                      (ptext (sLit "Warning:"))
       -- For warnings, print    Foo.hs:34: Warning:
       --                           <the warning message>
 
 makeIntoWarning :: ErrMsg -> ErrMsg
 makeIntoWarning err = err { errMsgSeverity = SevWarning }
 
-isWarning :: ErrMsg -> Bool
-isWarning err
-  | SevWarning <- errMsgSeverity err = True
-  | otherwise                        = False
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
 
@@ -181,16 +180,13 @@ errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
-  = printMsgBag dflags bag_of_errors
-
-pprErrMsgBag :: Bag ErrMsg -> [SDoc]
-pprErrMsgBag bag
-  = [ sdocWithDynFlags $ \dflags ->
-      let style = mkErrStyle dflags unqual
-      in withPprStyle style (d $$ e)
-    | ErrMsg { errMsgShortDoc  = d,
-               errMsgExtraInfo = e,
-               errMsgContext   = unqual } <- sortMsgBag bag ]
+  = sequence_ [ let style = mkErrStyle dflags unqual
+                in log_action dflags dflags sev s style (d $$ e)
+              | ErrMsg { errMsgSpan      = s,
+                         errMsgShortDoc  = d,
+                         errMsgSeverity  = sev,
+                         errMsgExtraInfo = e,
+                         errMsgContext   = unqual } <- sortMsgBag bag_of_errors ]
 
 pprErrMsgBagWithLoc :: Bag ErrMsg -> [SDoc]
 pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag bag ]
@@ -202,17 +198,8 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
   = sdocWithDynFlags $ \dflags ->
-    withPprStyle (mkErrStyle dflags unqual) (mkLocMessage sev s (d $$ e))
-
-printMsgBag :: DynFlags -> Bag ErrMsg -> IO ()
-printMsgBag dflags bag
-  = sequence_ [ let style = mkErrStyle dflags unqual
-                in log_action dflags dflags sev s style (d $$ e)
-              | ErrMsg { errMsgSpan      = s,
-                         errMsgShortDoc  = d,
-                         errMsgSeverity  = sev,
-                         errMsgExtraInfo = e,
-                         errMsgContext   = unqual } <- sortMsgBag bag ]
+    withPprStyle (mkErrStyle dflags unqual) $
+    mkLocMessage sev s (d $$ e)
 
 sortMsgBag :: Bag ErrMsg -> [ErrMsg]
 sortMsgBag bag = sortBy (comparing errMsgSpan) $ bagToList bag
