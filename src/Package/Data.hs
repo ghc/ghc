@@ -35,44 +35,39 @@ configureArgs stage settings =
 
 buildPackageData :: Package -> TodoItem -> Rules ()
 buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
-        ((path </> dist) </>) <$>
-        [ "package-data.mk",
-          "haddock-prologue.txt",
-          "inplace-pkg-config",
-          "setup-config",
-          "build" </> "autogen" </> "cabal_macros.h",
-          "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? Also check out Paths_cpsa.hs.
-        ] &%> \_ -> do
-            need ["shake/src/Package/Data.hs"] -- Track changes in this file
-            need [path </> name <.> "cabal"]
-            when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
-            run GhcCabal cabalArgs
-            when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
-            postProcessPackageData $ path </> dist </> "package-data.mk"
-              where
-                cabalArgs, ghcPkgArgs :: Args
-                cabalArgs = arg ["configure", path, dist]
-                    -- this is a positional argument, hence:
-                    -- * if it is empty, we need to emit one empty string argument
-                    -- * if there are many, we must collapse them into one space-separated string
-                    <> arg (unwords <$> customDllArgs settings)
-                    <> with (Ghc stage) -- TODO: used to be stage01 (using max Stage1 GHC)
-                    <> with (GhcPkg stage)
-
-                    <> customConfArgs settings
-                    <> (libraryArgs =<< ways settings)
-
-                    <> when hsColourSrcs (with HsColour)
-                    <> configureArgs stage settings
-
-                    <> when (stage == Stage0) bootPkgConstraints
-                    <> with Gcc
-                    <> when (stage /= Stage0) (with Ld)
-                    
-                    <> with Ar
-                    <> with Alex
-                    <> with Happy -- TODO: reorder with's
-
-                ghcPkgArgs = arg ["update", "--force"]
-                    <> when (stage == Stage0) (arg "--package-db=libraries/bootstrapping.conf")
-                    <> arg (path </> dist </> "inplace-pkg-config")
+    let buildDir = path </> dist
+        cabalArgs = arg ["configure", path, dist]
+            -- this is a positional argument, hence:
+            -- * if it is empty, we need to emit one empty string argument
+            -- * if there are many, we must collapse them into one space-separated string
+            <> arg (unwords <$> customDllArgs settings)
+            <> with (Ghc stage) -- TODO: used to be stage01 (using max stage1 GHC)
+            <> with (GhcPkg stage)
+            <> customConfArgs settings
+            <> (libraryArgs =<< ways settings)
+            <> when hsColourSrcs (with HsColour)
+            <> configureArgs stage settings
+            <> when (stage == Stage0) bootPkgConstraints
+            <> with Gcc
+            <> when (stage /= Stage0) (with Ld)            
+            <> with Ar
+            <> with Alex
+            <> with Happy -- TODO: reorder with's
+        ghcPkgArgs = arg ["update", "--force"]
+            <> when (stage == Stage0) (arg "--package-db=libraries/bootstrapping.conf")
+            <> arg (buildDir </> "inplace-pkg-config")
+    in
+    (buildDir </>) <$>
+    [ "package-data.mk"
+    , "haddock-prologue.txt"
+    , "inplace-pkg-config"
+    , "setup-config"
+    , "build" </> "autogen" </> "cabal_macros.h"
+    , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? Also check out Paths_cpsa.hs.
+    ] &%> \_ -> do
+        need ["shake/src/Package/Data.hs"] -- Track changes in this file
+        need [path </> name <.> "cabal"]
+        when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
+        run GhcCabal cabalArgs
+        when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
+        postProcessPackageData $ buildDir </> "package-data.mk"
