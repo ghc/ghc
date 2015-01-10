@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
 module Package.Data (buildPackageData) where
+
 import Package.Base
 
 libraryArgs :: [Way] -> Args
@@ -18,7 +19,10 @@ configureArgs stage settings =
             s <- unwords <$> arg as
             unless (null s) $ arg $ "--configure-option=" ++ key ++ "=" ++ s
 
-        cflags   = commonCcArgs `filterOut` "-Werror" <+> ConfCcArgs stage <+> customCcArgs settings <+> commonCcWarninigArgs
+        cflags   =  commonCcArgs `filterOut` "-Werror"
+                <+> ConfCcArgs stage
+                <+> customCcArgs settings
+                <+> commonCcWarninigArgs
         ldflags  = commonLdArgs  <+> ConfGccLinkerArgs stage <+> customLdArgs  settings
         cppflags = commonCppArgs <+> ConfCppArgs       stage <+> customCppArgs settings
 

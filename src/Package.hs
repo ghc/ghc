@@ -18,7 +18,8 @@ buildPackage pkg todoItem = do
 
 packageRules :: Rules ()
 packageRules = do
-    want ["libraries/deepseq/dist-install/build/deepseq.m"] -- TODO: control targets from commang line arguments
+    -- TODO: control targets from commang line arguments
+    want ["libraries/deepseq/dist-install/build/deepseq.m"]
     forM_ packages $ \pkg -> do
         forM_ (pkgTodo pkg) $ \todoItem -> do
             buildPackage pkg todoItem
