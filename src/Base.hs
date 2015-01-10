@@ -10,7 +10,8 @@ module Base (
     Args, arg, ShowArgs (..),
     Condition (..),
     (<+>),
-    filterOut
+    filterOut,
+    prefixArgs
     ) where
 
 import Development.Shake
@@ -47,13 +48,20 @@ instance ShowArgs a => ShowArgs (Action a) where
 arg :: ShowArgs a => a -> Args
 arg = showArgs
 
--- Combine two heterogeneous ShowArgs values.
+-- Combine two heterogeneous ShowArgs values
 (<+>) :: (ShowArgs a, ShowArgs b) => a -> b -> Args
 a <+> b = (<>) <$> showArgs a <*> showArgs b
 
 infixr 6 <+>
 
+-- Filter out given arg(s) from a collection
 filterOut :: ShowArgs a => Args -> a -> Args
 filterOut as exclude = do
     exclude' <- showArgs exclude
     filter (`notElem` exclude') <$> as
+
+-- Prefix each arg in a collection with a given prefix
+prefixArgs :: (ShowArgs a, ShowArgs b) => a -> b -> Args
+prefixArgs prefix as = do
+    prefix' <- showArgs prefix
+    concatMap (\a -> prefix' ++ [a]) <$> showArgs as
