@@ -51,6 +51,8 @@ arg = showArgs
 (<+>) :: (ShowArgs a, ShowArgs b) => a -> b -> Args
 a <+> b = (<>) <$> showArgs a <*> showArgs b
 
+infixr 6 <+>
+
 filterOut :: ShowArgs a => Args -> a -> Args
 filterOut as exclude = do
     exclude' <- showArgs exclude
