@@ -30,9 +30,6 @@ data Way = Way
      }
      deriving Eq
 
-instance Show Way where
-    show = tag 
-
 vanilla   = Way "v"  []
 profiling = Way "p"  [Profiling]
 logging   = Way "l"  [Logging]
@@ -40,7 +37,6 @@ parallel  = Way "mp" [Parallel]
 granSim   = Way "gm" [GranSim]
 
 -- RTS only ways
-
 threaded                 = Way "thr"           [Threaded]
 threadedProfiling        = Way "thr_p"         [Threaded, Profiling]
 threadedLogging          = Way "thr_l"         [Threaded, Logging]
@@ -71,22 +67,20 @@ defaultWays :: Stage -> Action [Way]
 defaultWays stage = do
     sharedLibs <- platformSupportsSharedLibs
     return $ [vanilla]
-        ++ [profiling | stage /= Stage0] 
-        ++ [dynamic   | sharedLibs     ]
+          ++ [profiling | stage /= Stage0] 
+          ++ [dynamic   | sharedLibs     ]
 
 wayHcArgs :: Way -> Args
 wayHcArgs (Way _ units) =
-    mconcat
-    [ when (Dynamic `notElem` units) $ arg ["-static"]
-    , when (Dynamic    `elem` units) $ arg ["-fPIC", "-dynamic"]
-    , when (Threaded   `elem` units) $ arg ["-optc-DTHREADED_RTS"]
-    , when (Debug      `elem` units) $ arg ["-optc-DDEBUG"]
-    , when (Profiling  `elem` units) $ arg ["-prof"]
-    , when (Logging    `elem` units) $ arg ["-eventlog"]
-    , when (Parallel   `elem` units) $ arg ["-parallel"]
-    , when (GranSim    `elem` units) $ arg ["-gransim"]
-    , when (units == [Debug] || units == [Debug, Dynamic]) $ arg ["-ticky", "-DTICKY_TICKY"]
-    ]
+       when (Dynamic `notElem` units) (arg "-static")
+    <> when (Dynamic    `elem` units) (arg ["-fPIC", "-dynamic"])
+    <> when (Threaded   `elem` units) (arg "-optc-DTHREADED_RTS")
+    <> when (Debug      `elem` units) (arg "-optc-DDEBUG")
+    <> when (Profiling  `elem` units) (arg "-prof")
+    <> when (Logging    `elem` units) (arg "-eventlog")
+    <> when (Parallel   `elem` units) (arg "-parallel")
+    <> when (GranSim    `elem` units) (arg "-gransim")
+    <> when (units == [Debug] || units == [Debug, Dynamic]) (arg ["-ticky", "-DTICKY_TICKY"])
 
 suffix :: Way -> String
 suffix way | way == vanilla = ""
