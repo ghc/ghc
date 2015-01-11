@@ -4,7 +4,7 @@ module Oracles.Flag (
     module Control.Monad,
     module Prelude,
     Flag (..), 
-    test, when, unless, not, (&&), (||)
+    test, when, unless, not, (&&), (||), (<?>)
     ) where
 
 import Control.Monad hiding (when, unless)
@@ -59,6 +59,10 @@ unless :: (ToCondition a, Monoid m) => a -> Action m -> Action m
 unless x act = do
     bool <- toCondition x
     if bool then mempty else act
+
+-- Infix version of when
+(<?>) :: (ToCondition a, Monoid m) => a -> Action m -> Action m
+(<?>) = when
 
 class Not a where
     type NotResult a
