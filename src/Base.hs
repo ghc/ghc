@@ -24,6 +24,9 @@ import Data.List
 
 data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 
+instance Show Stage where
+    show = show . fromEnum
+
 type Args = Action [String]
 
 type Condition = Action Bool
