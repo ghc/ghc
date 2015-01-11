@@ -38,7 +38,7 @@ configureArgs stage settings =
     <> argConf "--with-cc" Gcc
 
 buildPackageData :: Package -> TodoItem -> Rules ()
-buildPackageData pkg @ (Package name path _) (stage, dist, settings) =
+buildPackageData (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist
         cabalArgs = arg ["configure", path, dist]
             -- this is a positional argument, hence:
