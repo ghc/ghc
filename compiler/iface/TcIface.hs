@@ -532,7 +532,10 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 
         ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
                        name is_infix
-                       stricts lbl_names
+                       stricts     -- Pass the HsImplBangs (i.e. final decisions
+                                   -- to buildDataCon; it'll use these to guide 
+                                   -- the construction of a worker
+                       lbl_names
                        tc_tyvars ex_tyvars
                        eq_spec theta
                        arg_tys orig_res_ty tycon
@@ -540,6 +543,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
         ; return con }
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 
+    tc_strict :: IfaceBang -> IfL HsImplBang
     tc_strict IfNoBang = return HsNoBang
     tc_strict IfStrict = return HsStrict
     tc_strict IfUnpack = return (HsUnpack Nothing)

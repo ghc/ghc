@@ -205,7 +205,8 @@ data IfaceConDecl
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
 
-data IfaceBang
+data IfaceBang  -- This corresponds to an HsImplBang; that is, the final
+                -- implementation decision about the data constructor arg
   = IfNoBang | IfStrict | IfUnpack | IfUnpackCo IfaceCoercion
 
 data IfaceClsInst

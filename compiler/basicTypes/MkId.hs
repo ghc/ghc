@@ -580,7 +580,14 @@ newLocal ty = do { uniq <- getUniqueM
 dataConArgRep
    :: DynFlags
    -> FamInstEnvs
-   -> Type -> HsSrcBang
+   -> Type 
+   -> HsSrcBang     -- For DataCons defined in this module, this is the
+                    --    bang/unpack annotation that the programmer wrote
+                    -- For DataCons imported from an interface file, this
+                    --    is the HsImplBang implementation decision taken
+                    --    by the compiler in the defining module; just follow
+                    --    it slavishly, so that we make the same decision as
+                    --    in the defining module
    -> ( HsImplBang                 -- Implementation decision about unpack strategy
       , [(Type, StrictnessMark)]   -- Rep types
       , (Unboxer, Boxer) )
