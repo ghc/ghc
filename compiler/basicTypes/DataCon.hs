@@ -343,9 +343,14 @@ data DataCon
                 -- The OrigResTy is T [a], but the dcRepTyCon might be :T123
 
         -- Now the strictness annotations and field labels of the constructor
-        -- See Note [Bangs on data constructor arguments]
-        dcSrcBangs :: [HsSrcBang],
-                -- Strictness annotations as written by the programmer.
+        dcSrcBangs :: [HsBang],
+                -- See Note [Bangs on data constructor arguments]
+                -- For DataCons defined in this module: 
+                --    the [HsSrcBang] as written by the programmer.
+                -- For DataCons imported from an interface file:
+                --    the [HsImplBang] determined when compiling the
+                --    defining module
+                -- 
                 -- Matches 1-1 with dcOrigArgTys
                 -- Hence length = dataConSourceArity dataCon
 
@@ -466,7 +471,6 @@ data HsBang
 
 -- Two type-insecure, but useful, synonyms
 type HsSrcBang = HsBang   -- What the user wrote; hence always HsNoBang or HsSrcBang
-                          -- But see Note [HsSrcBang exceptions]
 
 type HsImplBang = HsBang   -- A HsBang implementation decision,
                            -- as determined by the compiler
@@ -477,16 +481,40 @@ type HsImplBang = HsBang   -- A HsBang implementation decision,
 -- of the DataCon *worker* fields
 data StrictnessMark = MarkedStrict | NotMarkedStrict
 
-{- Note [HsSrcBang exceptions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Exceptions to rule that HsSrcBang is always HsSrcBang or HsNoBang:
+{- Note [Bangs on data constructor arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T = MkT !Int {-# UNPACK #-} !Int Bool
 
-* When we build a DataCon from an interface file we don't
-  know what the user wrote, so we use HsUnpack/HsStrict
+When compiling the module, GHC will decide how to represent
+MkT, depending on the optimisation level, and settings of
+flags like -funbox-small-strict-fields.  
 
-* In MkId.mkDataConRep we want to say "always unpack an equality
-  predicate for equality arguments so we use HsUnpack
-  see MkId.mk_pred_strict_mark
+Terminology:
+  * HsSrcBang:  What the user wrote
+                Constructors: HsNoBang, HsUserBang
+
+  * HsImplBang: What GHC decided
+                Constructors: HsNoBang, HsStrict, HsUnpack
+
+* If T was defined in this module, MkT's dcSrcBangs field 
+  records the [HsSrcBang] of what the user wrote; in the example
+    [ HsSrcBang Nothing True
+    , HsSrcBang (Just True) True
+    , HsNoBang]
+
+* However, if T was defined in an imported module, MkT's dcSrcBangs
+  field gives the [HsImplBang] recording the decisions of the 
+  defining module.  The importing module must follow those decisions,
+  regardless of the flag settings in the importing module.
+
+* The dcr_bangs field of the dcRep field records the [HsImplBang]
+  If T was defined in this module, Without -O the dcr_bangs might be
+    [HsStrict, HsStrict, HsNoBang]
+  With -O it might be
+    [HsStrict, HsUnpack, HsNoBang]
+  With -funbox-small-strict-fields it might be
+    [HsUnpack, HsUnpack, HsNoBang]
 
 Note [Data con representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -506,25 +534,6 @@ but the rep type is
         Trep :: Int# -> a -> T a
 Actually, the unboxed part isn't implemented yet!
 
-Note [Bangs on data constructor arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  data T = MkT !Int {-# UNPACK #-} !Int Bool
-Its dcSrcBangs field records the *users* specifications, in this case
-    [ HsSrcBang Nothing True
-    , HsSrcBang (Just True) True
-    , HsNoBang]
-
-The dcr_bangs field of the dcRep field records the *actual, decided*
-representation of the data constructor.  Without -O this might be
-    [HsStrict, HsStrict, HsNoBang]
-With -O it might be
-    [HsStrict, HsUnpack, HsNoBang]
-With -funbox-small-strict-fields it might be
-    [HsUnpack, HsUnpack, HsNoBang]
-
-For imported data types, the dcSrcBangs field is just the same as the
-dcr_bangs field; we don't know what the user originally said.
 
 
 ************************************************************************
@@ -610,7 +619,8 @@ isMarkedStrict _               = True   -- All others are strict
 -- | Build a new data constructor
 mkDataCon :: Name
           -> Bool               -- ^ Is the constructor declared infix?
-          -> [HsSrcBang]        -- ^ User-supplied strictness/unpack annotations
+          -> [HsBang]           -- ^ Strictness/unpack annotations, from user, of
+                                --   (for imported DataCons) from the interface file 
           -> [FieldLabel]       -- ^ Field labels for the constructor, if it is a record,
                                 --   otherwise empty
           -> [TyVar]            -- ^ Universally quantified type variables
