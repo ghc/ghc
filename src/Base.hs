@@ -4,6 +4,7 @@ module Base (
     module Development.Shake,
     module Development.Shake.FilePath,
     module Control.Applicative,
+    module Data.Function,
     module Data.Monoid,
     module Data.List,
     Stage (..),
@@ -17,6 +18,7 @@ module Base (
 import Development.Shake
 import Development.Shake.FilePath
 import Control.Applicative hiding ((*>))
+import Data.Function
 import Data.Monoid
 import Data.List
 
