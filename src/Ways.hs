@@ -12,9 +12,10 @@ module Ways (
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic,
 
-    wayHcOpts, 
+    wayHcArgs, 
     suffix,
-    hisuf, osuf, hcsuf
+    hisuf, osuf, hcsuf,
+    detectWay
     ) where
 
 import Base
@@ -25,34 +26,36 @@ data WayUnit = Profiling | Logging | Parallel | GranSim | Threaded | Debug | Dyn
 data Way = Way
      {
          tag         :: String,    -- e.g., "thr_p"
-         description :: String,    -- e.g., "threaded profiled"; TODO: get rid of this field?
          units       :: [WayUnit]  -- e.g., [Threaded, Profiling]
      }
      deriving Eq
 
-vanilla   = Way "v"  "vanilla"       []
-profiling = Way "p"  "profiling"     [Profiling]
-logging   = Way "l"  "event logging" [Logging]
-parallel  = Way "mp" "parallel"      [Parallel]
-granSim   = Way "gm" "GranSim"       [GranSim]
+instance Show Way where
+    show = tag 
+
+vanilla   = Way "v"  []
+profiling = Way "p"  [Profiling]
+logging   = Way "l"  [Logging]
+parallel  = Way "mp" [Parallel]
+granSim   = Way "gm" [GranSim]
 
 -- RTS only ways
 
-threaded                 = Way "thr"           "threaded"                       [Threaded]
-threadedProfiling        = Way "thr_p"         "threaded profiling"             [Threaded, Profiling]
-threadedLogging          = Way "thr_l"         "threaded event logging"         [Threaded, Logging]
-debug                    = Way "debug"         "debug"                          [Debug]
-debugProfiling           = Way "debug_p"       "debug profiling"                [Debug, Profiling]
-threadedDebug            = Way "thr_debug"     "threaded debug"                 [Threaded, Debug]
-threadedDebugProfiling   = Way "thr_debug_p"   "threaded debug profiling"       [Threaded, Debug, Profiling]
-dynamic                  = Way "dyn"           "dyn"                            [Dynamic]
-profilingDynamic         = Way "p_dyn"         "p_dyn"                          [Profiling, Dynamic]
-threadedProfilingDynamic = Way "thr_p_dyn"     "thr_p_dyn"                      [Threaded, Profiling, Dynamic]
-threadedDynamic          = Way "thr_dyn"       "thr_dyn"                        [Threaded, Dynamic]
-threadedDebugDynamic     = Way "thr_debug_dyn" "thr_debug_dyn"                  [Threaded, Debug, Dynamic]
-debugDynamic             = Way "debug_dyn"     "debug_dyn"                      [Debug, Dynamic]
-loggingDynamic           = Way "l_dyn"         "event logging dynamic"          [Logging, Dynamic]
-threadedLoggingDynamic   = Way "thr_l_dyn"     "threaded event logging dynamic" [Threaded, Logging, Dynamic]
+threaded                 = Way "thr"           [Threaded]
+threadedProfiling        = Way "thr_p"         [Threaded, Profiling]
+threadedLogging          = Way "thr_l"         [Threaded, Logging]
+debug                    = Way "debug"         [Debug]
+debugProfiling           = Way "debug_p"       [Debug, Profiling]
+threadedDebug            = Way "thr_debug"     [Threaded, Debug]
+threadedDebugProfiling   = Way "thr_debug_p"   [Threaded, Debug, Profiling]
+dynamic                  = Way "dyn"           [Dynamic]
+profilingDynamic         = Way "p_dyn"         [Profiling, Dynamic]
+threadedProfilingDynamic = Way "thr_p_dyn"     [Threaded, Profiling, Dynamic]
+threadedDynamic          = Way "thr_dyn"       [Threaded, Dynamic]
+threadedDebugDynamic     = Way "thr_debug_dyn" [Threaded, Debug, Dynamic]
+debugDynamic             = Way "debug_dyn"     [Debug, Dynamic]
+loggingDynamic           = Way "l_dyn"         [Logging, Dynamic]
+threadedLoggingDynamic   = Way "thr_l_dyn"     [Threaded, Logging, Dynamic]
 
 allWays = [vanilla, profiling, logging, parallel, granSim, 
     threaded, threadedProfiling, threadedLogging, 
@@ -71,8 +74,8 @@ defaultWays stage = do
         ++ [profiling | stage /= Stage0] 
         ++ [dynamic   | sharedLibs     ]
 
-wayHcOpts :: Way -> Args
-wayHcOpts (Way _ _ units) =
+wayHcArgs :: Way -> Args
+wayHcArgs (Way _ units) =
     mconcat
     [ when (Dynamic `notElem` units) $ arg ["-static"]
     , when (Dynamic    `elem` units) $ arg ["-fPIC", "-dynamic"]
@@ -93,3 +96,11 @@ hisuf, osuf, hcsuf :: Way -> String
 hisuf = (++ "hi") . suffix
 osuf  = (++ "o" ) . suffix
 hcsuf = (++ "hc") . suffix
+
+-- Detect way from a given extension. Fail if the result is not unique.
+detectWay :: FilePath -> Way
+detectWay extension = case solutions of
+    [way]     -> way
+    otherwise -> error $ "Cannot detect way from extension '" ++ extension ++ "'."
+  where
+    solutions = [w | f <- [hisuf, osuf, hcsuf], w <- allWays, f w == extension]
