@@ -1,7 +1,6 @@
 module Util (
     module Data.Char,
-    replaceIf, replaceEq, replaceSeparators,
-    postProcessPackageData
+    replaceIf, replaceEq, replaceSeparators
     ) where
 
 import Base
@@ -16,14 +15,3 @@ replaceEq from = replaceIf (== from)
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
 
--- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
--- 1) Drop lines containing '$'
--- 2) Replace '/' and '\' with '_' before '='
-postProcessPackageData :: FilePath -> Action ()
-postProcessPackageData file = do
-    pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)
-    length pkgData `seq` writeFileLines file $ map processLine pkgData
-      where
-        processLine line = replaceSeparators '_' prefix ++ suffix
-          where
-            (prefix, suffix) = break (== '=') line

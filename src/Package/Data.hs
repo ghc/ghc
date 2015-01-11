@@ -43,6 +43,18 @@ configureArgs stage settings =
     <> when CrossCompiling (argConf "--host" TargetPlatformFull)
     <> argConf "--with-cc" Gcc
 
+-- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
+-- 1) Drop lines containing '$'
+-- 2) Replace '/' and '\' with '_' before '='
+postProcessPackageData :: FilePath -> Action ()
+postProcessPackageData file = do
+    pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)
+    length pkgData `seq` writeFileLines file $ map processLine pkgData
+      where
+        processLine line = replaceSeparators '_' prefix ++ suffix
+          where
+            (prefix, suffix) = break (== '=') line
+
 buildPackageData :: Package -> TodoItem -> Rules ()
 buildPackageData (Package name path _) (stage, dist, settings) =
     let pathDist  = path </> dist
