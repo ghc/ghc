@@ -21,7 +21,14 @@ module Ways (
 import Base
 import Oracles
 
-data WayUnit = Profiling | Logging | Parallel | GranSim | Threaded | Debug | Dynamic deriving Eq
+data WayUnit = Profiling
+             | Logging
+             | Parallel
+             | GranSim
+             | Threaded
+             | Debug
+             | Dynamic
+             deriving Eq
 
 data Way = Way
      {
@@ -36,7 +43,7 @@ logging   = Way "l"  [Logging]
 parallel  = Way "mp" [Parallel]
 granSim   = Way "gm" [GranSim]
 
--- RTS only ways
+-- RTS only ways. TODO: do we need to define these here?
 threaded                 = Way "thr"           [Threaded]
 threadedProfiling        = Way "thr_p"         [Threaded, Profiling]
 threadedLogging          = Way "thr_l"         [Threaded, Logging]
@@ -60,9 +67,6 @@ allWays = [vanilla, profiling, logging, parallel, granSim,
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic]
 
--- TODO: what are ways 't' and 's'?
--- ALL_WAYS=v p t l s mp mg debug dyn thr thr_l p_dyn debug_dyn thr_dyn thr_p_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p l_dyn thr_l_dyn
-
 defaultWays :: Stage -> Action [Way]
 defaultWays stage = do
     sharedLibs <- platformSupportsSharedLibs
@@ -70,17 +74,19 @@ defaultWays stage = do
           ++ [profiling | stage /= Stage0] 
           ++ [dynamic   | sharedLibs     ]
 
+-- TODO: do '-ticky' in all debug ways?
 wayHcArgs :: Way -> Args
 wayHcArgs (Way _ units) =
-       when (Dynamic `notElem` units) (arg "-static")
-    <> when (Dynamic    `elem` units) (arg ["-fPIC", "-dynamic"])
-    <> when (Threaded   `elem` units) (arg "-optc-DTHREADED_RTS")
-    <> when (Debug      `elem` units) (arg "-optc-DDEBUG")
-    <> when (Profiling  `elem` units) (arg "-prof")
-    <> when (Logging    `elem` units) (arg "-eventlog")
-    <> when (Parallel   `elem` units) (arg "-parallel")
-    <> when (GranSim    `elem` units) (arg "-gransim")
-    <> when (units == [Debug] || units == [Debug, Dynamic]) (arg ["-ticky", "-DTICKY_TICKY"])
+       (Dynamic `notElem` units) <?> arg "-static"
+    <> (Dynamic    `elem` units) <?> arg ["-fPIC", "-dynamic"]
+    <> (Threaded   `elem` units) <?> arg "-optc-DTHREADED_RTS"
+    <> (Debug      `elem` units) <?> arg "-optc-DDEBUG"
+    <> (Profiling  `elem` units) <?> arg "-prof"
+    <> (Logging    `elem` units) <?> arg "-eventlog"
+    <> (Parallel   `elem` units) <?> arg "-parallel"
+    <> (GranSim    `elem` units) <?> arg "-gransim"
+    <> (units == [Debug] || units == [Debug, Dynamic]) <?>
+       arg ["-ticky", "-DTICKY_TICKY"]
 
 suffix :: Way -> String
 suffix way | way == vanilla = ""
@@ -94,7 +100,7 @@ hcsuf = (++ "hc") . suffix
 -- Detect way from a given extension. Fail if the result is not unique.
 detectWay :: FilePath -> Way
 detectWay extension = case solutions of
-    [way]     -> way
-    otherwise -> error $ "Cannot detect way from extension '" ++ extension ++ "'."
+    [way] -> way
+    _     -> error $ "Cannot detect way from extension '" ++ extension ++ "'."
   where
     solutions = [w | f <- [hisuf, osuf, hcsuf], w <- allWays, f w == extension]
