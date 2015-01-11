@@ -7,7 +7,8 @@ module Package.Base (
     Package (..), Settings (..), TodoItem (..),
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
-    bootPkgConstraints, ghcOpts
+    bootPkgConstraints,
+    packageArgs, includeArgs, srcArgs
     ) where
 
 import Base
@@ -76,10 +77,28 @@ bootPkgConstraints = mempty
 --        $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
 --            --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
 
--- TODO: move?
-ghcOpts :: Package -> Stage -> Way -> Action [String]
-ghcOpts pkg stage way = do
-    return $ ["-hisuf " ++ hisuf way]
-        ++   ["-osuf "  ++ osuf  way]
-        ++   ["-hcsuf " ++ hcsuf way]
+packageArgs :: Stage -> FilePath -> Args
+packageArgs stage pkgData = do
+    usePackageKey <- SupportsPackageKey || stage /= Stage0
+    arg ["-hide-all-packages", "-no-user-package-db", "-include-pkg-deps"]
+        <> when (stage == Stage0) (arg "-package-db libraries/bootstrapping.conf")
+        <> keyArgs usePackageKey
+  where
+    keyArgs True  = prefixArgs "-this-package-key" (PackageKey pkgData) <>
+                    prefixArgs "-package-key"      (DepKeys    pkgData)
+    keyArgs False = prefixArgs "-package-name"     (PackageKey pkgData) <>
+                    prefixArgs "-package"          (Deps       pkgData)
 
+includeArgs :: ShowArgs a => String -> FilePath -> a -> Args
+includeArgs prefix path as = map includePath <$> arg as
+  where
+    includePath dir | isRelative dir = prefix ++ path </> dir
+                    | isAbsolute dir = prefix         </> dir
+
+srcArgs :: FilePath -> FilePath -> Args
+srcArgs path pkgData = do
+    mods <- map (replaceEq '.' pathSeparator) <$> arg (Modules pkgData)
+    dirs <- arg (SrcDirs pkgData)
+    srcs <- getDirectoryFiles ""
+        [path </> dir </> mPath <.> ext | dir <- dirs, mPath <- mods, ext <- ["hs", "lhs"]]
+    arg (map normaliseEx srcs)
