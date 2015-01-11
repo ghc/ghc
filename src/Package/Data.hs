@@ -7,11 +7,12 @@ libraryArgs :: [Way] -> Args
 libraryArgs ways =
        argEnable False "library-for-ghci" -- TODO: why always disable?
     <> argEnable (vanilla `elem` ways) "library-vanilla"
-    <> when (ghcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways) (argEnable True "library-for-ghci")
+    <> (ghcWithInterpreter && not DynamicGhcPrograms && vanilla `elem` ways)
+       <?> argEnable True "library-for-ghci"
     <> argEnable (profiling `elem` ways) "library-profiling"
     <> argEnable (dynamic   `elem` ways) "shared"
   where
-    argEnable x suffix = arg $ (if x then "--enable-" else "--disable-") ++ suffix
+    argEnable x key = arg $ (if x then "--enable-" else "--disable-") ++ key
 
 configureArgs :: Stage -> Settings -> Args
 configureArgs stage settings = 
@@ -23,8 +24,12 @@ configureArgs stage settings =
                 <+> ConfCcArgs stage
                 <+> customCcArgs settings
                 <+> commonCcWarninigArgs
-        ldflags  = commonLdArgs  <+> ConfGccLinkerArgs stage <+> customLdArgs  settings
-        cppflags = commonCppArgs <+> ConfCppArgs       stage <+> customCppArgs settings
+        ldflags  =  commonLdArgs
+                <+> ConfGccLinkerArgs stage
+                <+> customLdArgs settings
+        cppflags =  commonCppArgs
+                <+> ConfCppArgs stage
+                <+> customCppArgs settings
 
     in argConf "CFLAGS"   cflags
     <> argConf "LDFLAGS"  ldflags
@@ -34,18 +39,20 @@ configureArgs stage settings =
     <> argConf "--with-iconv-libraries" IconvLibDirs
     <> argConf "--with-gmp-includes"    GmpIncludeDirs
     <> argConf "--with-gmp-libraries"   GmpLibDirs
-    <> when CrossCompiling (argConf "--host" TargetPlatformFull) -- TODO: why not host?
+    -- TODO: why TargetPlatformFull and not host?
+    <> when CrossCompiling (argConf "--host" TargetPlatformFull)
     <> argConf "--with-cc" Gcc
 
 buildPackageData :: Package -> TodoItem -> Rules ()
 buildPackageData (Package name path _) (stage, dist, settings) =
-    let buildDir = path </> dist
+    let pathDist  = path </> dist
+        configure = path </> "configure"
         cabalArgs = arg ["configure", path, dist]
             -- this is a positional argument, hence:
             -- * if it is empty, we need to emit one empty string argument
-            -- * if there are many, we must collapse them into one space-separated string
+            -- * otherwise, we must collapse it into one space-separated string
             <> arg (unwords <$> customDllArgs settings)
-            <> with (Ghc stage) -- TODO: used to be stage01 (using max stage1 GHC)
+            <> with (Ghc stage) -- TODO: used limited to max stage1 GHC
             <> with (GhcPkg stage)
             <> customConfArgs settings
             <> (libraryArgs =<< ways settings)
@@ -58,20 +65,22 @@ buildPackageData (Package name path _) (stage, dist, settings) =
             <> with Alex
             <> with Happy -- TODO: reorder with's
         ghcPkgArgs = arg ["update", "--force"]
-            <> when (stage == Stage0) (arg "--package-db=libraries/bootstrapping.conf")
-            <> arg (buildDir </> "inplace-pkg-config")
+            <> (stage == Stage0) <?>
+               arg "--package-db=libraries/bootstrapping.conf"
+            <> arg (pathDist </> "inplace-pkg-config")
     in
-    (buildDir </>) <$>
+    (pathDist </>) <$>
     [ "package-data.mk"
     , "haddock-prologue.txt"
     , "inplace-pkg-config"
     , "setup-config"
     , "build" </> "autogen" </> "cabal_macros.h"
-    , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs" -- TODO: Is this needed? Also check out Paths_cpsa.hs.
+    -- TODO: Is this needed? Also check out Paths_cpsa.hs.
+    , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
-        need ["shake/src/Package/Data.hs"] -- Track changes in this file
+        need ["shake/src/Package/Data.hs"]
         need [path </> name <.> "cabal"]
-        when (doesFileExist $ path </> "configure.ac") $ need [path </> "configure"]
+        when (doesFileExist $ configure <.> "ac") $ need [configure]
         run GhcCabal cabalArgs
         when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
-        postProcessPackageData $ buildDir </> "package-data.mk"
+        postProcessPackageData $ pathDist </> "package-data.mk"
