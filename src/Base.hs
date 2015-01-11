@@ -12,12 +12,12 @@ module Base (
     Condition (..),
     (<+>),
     filterOut,
-    prefixArgs
+    productArgs, concatArgs
     ) where
 
-import Development.Shake
+import Development.Shake hiding ((*>))
 import Development.Shake.FilePath
-import Control.Applicative hiding ((*>))
+import Control.Applicative
 import Data.Function
 import Data.Monoid
 import Data.List
@@ -32,9 +32,10 @@ instance Monoid a => Monoid (Action a) where
     mempty = return mempty
     mappend p q = mappend <$> p <*> q
 
+-- Using the Creators' trick for overlapping String instances
 class ShowArgs a where
     showArgs     :: a -> Args
-    showListArgs :: [a] -> Args -- the Creators' trick for overlapping String instances
+    showListArgs :: [a] -> Args
     showListArgs = mconcat . map showArgs
 
 instance ShowArgs Char where
@@ -62,8 +63,18 @@ filterOut as exclude = do
     exclude' <- showArgs exclude
     filter (`notElem` exclude') <$> as
 
--- Prefix each arg in a collection with a given prefix
-prefixArgs :: (ShowArgs a, ShowArgs b) => a -> b -> Args
-prefixArgs prefix as = do
-    prefix' <- showArgs prefix
-    concatMap (\a -> prefix' ++ [a]) <$> showArgs as
+-- Generate a cross product collection of two argument collections
+-- Example: productArgs ["-a", "-b"] "c" = arg ["-a", "c", "-b", "c"]
+productArgs :: (ShowArgs a, ShowArgs b) => a -> b -> Args
+productArgs as bs = do
+    as' <- showArgs as
+    bs' <- showArgs bs
+    return $ concat $ sequence [as', bs']
+
+-- Similar to productArgs but concat resulting arguments pairwise
+-- Example: concatArgs ["-a", "-b"] "c" = arg ["-ac", "-bc"]
+concatArgs :: (ShowArgs a, ShowArgs b) => a -> b -> Args
+concatArgs as bs = do
+    as' <- showArgs as
+    bs' <- showArgs bs
+    return $ map concat $ sequence [as', bs']
