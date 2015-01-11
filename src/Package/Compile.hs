@@ -21,23 +21,15 @@ buildPackageCompile (Package name path _) (stage, dist, settings) =
         need [depFile]
         depContents <- parseMakefile <$> (liftIO $ readFile depFile)
         let deps = concat $ snd $ unzip $ filter ((== out) . fst) depContents
-            srcs = filter ("//*hs" ?==) deps
+            srcs = filter ("//*hs" ?==) deps -- TODO: handle *.c sources
         need deps
         run (Ghc stage) $ suffixArgs way
             <> wayHcArgs way
             <> arg SrcHcOpts
             <> packageArgs stage pkgData
-            <> arg "-i"
-            <> includeArgs "-i" path     (SrcDirs pkgData)
-            <> includeArgs "-i" buildDir ["build", "build/autogen"]
-            <> includeArgs "-I" buildDir ["build", "build/autogen"]
-            <> includeArgs "-I" path     (IncludeDirs pkgData)
-            <> arg "-optP-include" -- TODO: Shall we also add -cpp?
-            <> arg ("-optP" ++ buildDir </> "build/autogen/cabal_macros.h")
+            <> includeArgs path dist
             <> arg ["-Wall", "-XHaskell2010", "-O2"] -- TODO: now we have both -O and -O2
-            <> arg ["-odir"        , buildDir </> "build"]
-            <> arg ["-hidir"       , buildDir </> "build"]
-            <> arg ["-stubdir"     , buildDir </> "build"]
+            <> outputArgs ["-odir", "-hidir", "-stubdir"] (buildDir </> "build")
             <> arg "-split-objs"
             <> arg ("-c":srcs)
             <> arg ["-o", out]

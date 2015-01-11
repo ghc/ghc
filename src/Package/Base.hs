@@ -8,6 +8,7 @@ module Package.Base (
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     bootPkgConstraints,
+    pathArgs, outputArgs, 
     packageArgs, includeArgs, srcArgs
     ) where
 
@@ -77,6 +78,15 @@ bootPkgConstraints = mempty
 --        $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
 --            --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
 
+pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
+pathArgs prefix path as = map includePath <$> arg as
+  where
+    includePath dir | isRelative dir = prefix ++ normaliseEx (path </> dir)
+                    | isAbsolute dir = prefix </> normaliseEx dir
+
+outputArgs :: [String] -> FilePath -> Args
+outputArgs keys dir = arg $ concatMap (\k -> [k, normaliseEx dir]) keys
+
 packageArgs :: Stage -> FilePath -> Args
 packageArgs stage pkgData = do
     usePackageKey <- SupportsPackageKey || stage /= Stage0
@@ -89,11 +99,17 @@ packageArgs stage pkgData = do
     keyArgs False = prefixArgs "-package-name"     (PackageKey pkgData) <>
                     prefixArgs "-package"          (Deps       pkgData)
 
-includeArgs :: ShowArgs a => String -> FilePath -> a -> Args
-includeArgs prefix path as = map includePath <$> arg as
-  where
-    includePath dir | isRelative dir = prefix ++ path </> dir
-                    | isAbsolute dir = prefix         </> dir
+includeArgs :: FilePath -> FilePath -> Args
+includeArgs path dist = 
+    let buildDir = path </> dist
+        pkgData  = buildDir </> "package-data.mk"
+    in arg "-i"
+    <> pathArgs "-i" path     (SrcDirs pkgData)
+    <> pathArgs "-i" buildDir ["build", "build/autogen"]
+    <> pathArgs "-I" buildDir ["build", "build/autogen"]
+    <> pathArgs "-I" path     (IncludeDirs pkgData)
+    <> arg "-optP-include" -- TODO: Shall we also add -cpp?
+    <> pathArgs "-optP" buildDir "build/autogen/cabal_macros.h"
 
 srcArgs :: FilePath -> FilePath -> Args
 srcArgs path pkgData = do
