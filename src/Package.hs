@@ -11,12 +11,11 @@ import Package.Dependencies
 packages :: [Package]
 packages = [libraryPackage "deepseq" Stage1 defaultSettings]
 
--- Rule buildXY is defined in module X.Y
+-- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()
-buildPackage pkg todoItem = do
-    buildPackageData         pkg todoItem
-    buildPackageDependencies pkg todoItem
-    buildPackageCompile      pkg todoItem
+buildPackage = buildPackageData
+            <> buildPackageDependencies
+            <> buildPackageCompile
 
 packageRules :: Rules ()
 packageRules = do
