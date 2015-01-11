@@ -1,9 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Oracles.Option (
     Option (..),
     ghcWithInterpreter, platformSupportsSharedLibs, windowsHost
     ) where
 
 import Base
+import Oracles.Flag
 import Oracles.Base
 
 data Option = TargetOS
@@ -47,14 +49,15 @@ ghcWithInterpreter = do
         &&
         arch `elem` ["i386", "x86_64", "powerpc", "sparc", "sparc64", "arm"]
 
--- TODO: i386-unknown-solaris2 should be in the list if 
--- @SOLARIS_BROKEN_SHLD@ == YES
 platformSupportsSharedLibs :: Condition
 platformSupportsSharedLibs = do
     [platform] <- showArgs TargetPlatformFull
-    return $ platform `notElem` [ "powerpc-unknown-linux"
-                                , "x86_64-unknown-mingw32"
-                                , "i386-unknown-mingw32" ]
+    solarisBrokenShld <- test SolarisBrokenShld
+    return $ notElem platform $
+        [ "powerpc-unknown-linux"
+        , "x86_64-unknown-mingw32"
+        , "i386-unknown-mingw32"] ++
+        [ "i386-unknown-solaris2" | solarisBrokenShld ]
 
 windowsHost :: Condition
 windowsHost = do
