@@ -17,31 +17,41 @@ import Oracles.Option
 import Oracles.Builder
 import Oracles.PackageData
 
-oracleRules :: Rules ()
-oracleRules = do
+defaultConfig, userConfig :: FilePath
+defaultConfig = cfgPath </> "default.config"
+userConfig    = cfgPath </> "user.config"
+
+-- Oracle for configuration files.
+configOracle :: Rules ()
+configOracle = do
     cfg <- newCache $ \() -> do
-        unless (doesFileExist $ cfgPath </> "default.config.in") $ do
+        unless (doesFileExist $ defaultConfig <.> "in") $ do
             error $ "\nDefault configuration file '"
-                ++ (cfgPath </> "default.config.in")
+                ++ (defaultConfig <.> "in")
                 ++ "' is missing; unwilling to proceed."
             return ()
-        need [cfgPath </> "default.config"]
-        cfgDefault <- liftIO $ readConfigFile $ cfgPath </> "default.config"
-        existsUser <- doesFileExist $ cfgPath </> "user.config"
+        need [defaultConfig]
+        cfgDefault <- liftIO $ readConfigFile defaultConfig
+        existsUser <- doesFileExist userConfig
         cfgUser    <- if existsUser
-                      then liftIO $ readConfigFile $ cfgPath </> "user.config"
+                      then liftIO $ readConfigFile userConfig
                       else do
                           putLoud $ "\nUser defined configuration file '"
-                              ++ (cfgPath </> "user.config")
-                              ++ "' is missing; proceeding with default configuration.\n"
+                              ++ userConfig ++ "' is missing; "
+                              ++ "proceeding with default configuration.\n"
                           return M.empty
         return $ cfgUser `M.union` cfgDefault
-
     addOracle $ \(ConfigKey key) -> M.lookup key <$> cfg ()
+    return ()
 
+-- Oracle for 'package-data.mk' files.
+packageDataOracle :: Rules ()
+packageDataOracle = do
     pkgData <- newCache $ \file -> do
         need [file]
         liftIO $ readConfigFile file
-
     addOracle $ \(PackageDataKey (file, key)) -> M.lookup key <$> pkgData file
     return ()
+
+oracleRules :: Rules ()
+oracleRules = configOracle <> packageDataOracle
