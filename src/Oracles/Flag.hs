@@ -13,23 +13,30 @@ import Prelude hiding (not, (&&), (||))
 import Base
 import Oracles.Base
 
-data Flag = LaxDeps | DynamicGhcPrograms
-          | GccIsClang | GccLt46 | CrossCompiling | Validating
+data Flag = LaxDeps
+          | DynamicGhcPrograms
+          | GccIsClang
+          | GccLt46
+          | CrossCompiling
+          | Validating
           | SupportsPackageKey
+          | SolarisBrokenShld
 
+-- TODO: Give the warning *only once* per key
 test :: Flag -> Action Bool
 test flag = do
     (key, defaultValue) <- return $ case flag of
-        LaxDeps            -> ("lax-dependencies"     , False) -- TODO: move flags to a separate file
+        LaxDeps            -> ("lax-dependencies"     , False)
         DynamicGhcPrograms -> ("dynamic-ghc-programs" , False)
         GccIsClang         -> ("gcc-is-clang"         , False)
         GccLt46            -> ("gcc-lt-46"            , False)
         CrossCompiling     -> ("cross-compiling"      , False)
         Validating         -> ("validating"           , False)
         SupportsPackageKey -> ("supports-package-key" , False)
+        SolarisBrokenShld  -> ("solaris-broken-shld"  , False)
     let defaultString = if defaultValue then "YES" else "NO"
     value <- askConfigWithDefault key $
-        do putLoud $ "\nFlag '" -- TODO: Give the warning *only once* per key
+        do putLoud $ "\nFlag '"
                 ++ key
                 ++ "' not set in configuration files. "
                 ++ "Proceeding with default value '"
@@ -103,4 +110,4 @@ instance ToCondition a => AndOr Flag a where
     x && y = toCondition x && y
     x || y = toCondition x || y
 
-
+-- TODO: need one more instance?
