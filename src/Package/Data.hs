@@ -68,7 +68,7 @@ buildPackageData (Package name path _) (stage, dist, settings) =
             <> with (GhcPkg stage)
             <> customConfArgs settings
             <> (libraryArgs =<< ways settings)
-            <> when (exists HsColour) (with HsColour)
+            <> when (specified HsColour) (with HsColour)
             <> configureArgs stage settings
             <> when (stage == Stage0) bootPkgConstraints
             <> with Gcc

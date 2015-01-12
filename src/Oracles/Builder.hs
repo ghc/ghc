@@ -2,7 +2,7 @@
 
 module Oracles.Builder (
     Builder (..),
-    with, run, exists
+    with, run, specified
     ) where
 
 import Data.Char
@@ -46,6 +46,7 @@ instance ShowArgs Builder where
                   ++ "' in configuration files."
         let cfgPathExe = if cfgPath /= "" then cfgPath -<.> exe else ""
         windows <- windowsHost
+        -- Note, below is different from FilePath.isAbsolute:
         if (windows && "/" `isPrefixOf` cfgPathExe)
         then do
             Stdout out <- quietly $ cmd ["cygpath", "-m", "/"]
@@ -58,9 +59,12 @@ instance ShowArgs Builder where
 -- to avoid needless recompilation when making changes to GHC's sources. In
 -- certain situations this can lead to build failures, in which case you
 -- should reset the flag (at least temporarily).
+
+-- Make sure the builder exists on the given path and rebuild it if out of date
+-- Raise an error if the builder is not uniquely specified in config files
 needBuilder :: Builder -> Action ()
 needBuilder ghc @ (Ghc stage) = do
-    [exe]   <- showArgs ghc -- Raise an error if builder is not unique
+    [exe]   <- showArgs ghc
     laxDeps <- test LaxDeps
     if laxDeps then orderOnly [exe] else need [exe]
 
@@ -69,7 +73,7 @@ needBuilder builder = do
     need [exe]
 
 -- Action 'with Gcc' returns '--with-gcc=/path/to/gcc' and needs Gcc
--- Raises an error if the builder is not uniquely defined in config files
+-- Raises an error if the builder is not uniquely specified in config files
 with :: Builder -> Args
 with builder = do 
     let key = case builder of 
@@ -85,16 +89,17 @@ with builder = do
     needBuilder builder
     arg $ key ++ normaliseEx exe
 
--- Raises an error if the builder is not uniquely defined in config files
+-- Run the builder with a given collection of arguments
+-- Raises an error if the builder is not uniquely specified in config files
 run :: Builder -> Args -> Action ()
 run builder args = do
     needBuilder builder
     [exe] <- showArgs builder
     cmd [exe] =<< args
 
--- Check if the builder is uniquely defined in config files
-exists :: Builder -> Condition
-exists builder = do
+-- Check if the builder is uniquely specified in config files
+specified :: Builder -> Condition
+specified builder = do
     exes <- showArgs builder
     return $ case exes of
         [_] -> True
