@@ -11,8 +11,10 @@ import TcType   ( TcRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
 
 #ifdef GHCI
-import Id       ( Id )
+import Id         ( Id )
 import qualified Language.Haskell.TH as TH
+import Outputable (SDoc)
+import SrcLoc     (SrcSpan)
 #endif
 
 tcSpliceExpr :: HsSplice Name
@@ -43,4 +45,14 @@ runMetaD :: LHsExpr Id -> TcM [LHsDecl RdrName]
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQuasi :: TH.Q a -> TcM a
+
+data SpliceInfo
+  = SpliceInfo
+    { spliceIsDeclaration :: Bool
+    , spliceDescription   :: String
+    , spliceLocation      :: Maybe SrcSpan
+    , spliceSource        :: Maybe SDoc
+    , spliceGenerated     :: SDoc
+    }
+traceSplice :: SpliceInfo -> TcM ()
 #endif
