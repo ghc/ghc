@@ -8,7 +8,8 @@ module Oracles.Base (
 import Base
 import Development.Shake.Classes
 
-newtype ConfigKey = ConfigKey String deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+newtype ConfigKey = ConfigKey String
+    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 askConfigWithDefault :: String -> Action String -> Action String
 askConfigWithDefault key defaultAction = do

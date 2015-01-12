@@ -81,11 +81,11 @@ instance Not Bool where
 
 instance Not Condition where
     type NotResult Condition = Condition
-    not x = not <$> (toCondition x)
+    not = fmap not
 
 instance Not Flag where
     type NotResult Flag = Condition
-    not x = not (toCondition x)
+    not = not . toCondition
 
 class AndOr a b where
     type AndOrResult a b
@@ -102,12 +102,12 @@ instance AndOr Bool Bool where
 
 instance ToCondition a => AndOr Condition a where
     type AndOrResult Condition a = Condition
-    x && y = (Prelude.&&) <$> toCondition x <*> toCondition y
-    x || y = (Prelude.||) <$> toCondition x <*> toCondition y
+    x && y = (&&) <$> x <*> toCondition y
+    x || y = (||) <$> x <*> toCondition y
 
 instance ToCondition a => AndOr Flag a where
     type AndOrResult Flag a = Condition
     x && y = toCondition x && y
     x || y = toCondition x || y
 
--- TODO: need one more instance?
+-- TODO: need more instances to handle Bool as first argument of (&&), (||)
