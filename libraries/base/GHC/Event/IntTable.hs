@@ -82,6 +82,9 @@ grow oldit ref size = do
   withForeignPtr (tabSize newit) $ \ptr -> poke ptr size
   writeIORef ref newit
 
+-- | @insertWith f k v table@ inserts @k@ into @table@ with value @v@.
+-- If @k@ already appears in @table@ with value @v0@, the value is updated
+-- to @f v0 v@ and @Just v0@ is returned.
 insertWith :: (a -> a -> a) -> Int -> a -> IntTable a -> IO (Maybe a)
 insertWith f k v inttable@(IntTable ref) = do
   it@IT{..} <- readIORef ref
@@ -114,6 +117,7 @@ reset k Nothing  tbl = delete k tbl >> return ()
 indexOf :: Int -> IT a -> Int
 indexOf k IT{..} = k .&. (Arr.size tabArr - 1)
 
+-- | Remove the given key from the table and return its associated value.
 delete :: Int -> IntTable a -> IO (Maybe a)
 delete k t = updateWith (const Nothing) k t
 
