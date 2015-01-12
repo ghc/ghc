@@ -26,6 +26,20 @@
 --
 -- where the constants are fingerprints produced from the static forms.
 --
+-- There is also a finalization function for the time when the module is
+-- unloaded.
+--
+-- > static void hs_hpc_fini_Main(void) __attribute__((destructor));
+-- > static void hs_hpc_fini_Main(void) {
+-- >
+-- >   static StgWord64 k0[2] = {16252233372134256ULL,7370534374096082ULL};
+-- >   hs_spt_remove(k0);
+-- >
+-- >   static StgWord64 k1[2] = {12545634534567898ULL,5409674567544151ULL};
+-- >   hs_spt_remove(k1);
+-- >
+-- > }
+--
 module StaticPtrTable (sptInitCode) where
 
 import CoreSyn
@@ -61,6 +75,15 @@ sptInitCode this_mod entries = vcat
              )
         <> semi
         |  (i, (fp, (n, _))) <- zip [0..] entries
+        ]
+    , text "static void hs_spt_fini_" <> ppr this_mod
+           <> text "(void) __attribute__((destructor));"
+    , text "static void hs_spt_fini_" <> ppr this_mod <> text "(void)"
+    , braces $ vcat $
+        [  text "StgWord64 k" <> int i <> text "[2] = "
+           <> pprFingerprint fp <> semi
+        $$ text "hs_spt_remove" <> parens (char 'k' <> int i) <> semi
+        | (i, (fp, _)) <- zip [0..] entries
         ]
     ]
 

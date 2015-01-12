@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE StaticPointers     #-}
 
 -- | A test to use symbols produced by the static form.
@@ -9,15 +10,15 @@ import GHC.StaticPtr
 
 main :: IO ()
 main = do
-  print $ lookupKey (static (id . id)) (1 :: Int)
-  print $ lookupKey (static method :: StaticPtr (Char -> Int)) 'a'
+  lookupKey (static (id . id)) >>= \f -> print $ f (1 :: Int)
+  lookupKey (static method :: StaticPtr (Char -> Int)) >>= \f -> print $ f 'a'
   print $ deRefStaticPtr (static g)
   print $ deRefStaticPtr p0 'a'
   print $ deRefStaticPtr (static t_field) $ T 'b'
 
-lookupKey :: StaticPtr a -> a
-lookupKey p = case unsafeLookupStaticPtr (staticKey p) of
-  Just p -> deRefStaticPtr p
+lookupKey :: StaticPtr a -> IO a
+lookupKey p = unsafeLookupStaticPtr (staticKey p) >>= \case
+  Just p -> return $ deRefStaticPtr p
   Nothing -> error $ "couldn't find " ++ show (staticPtrInfo p)
 
 g :: String
