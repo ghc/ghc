@@ -619,8 +619,8 @@ isMarkedStrict _               = True   -- All others are strict
 -- | Build a new data constructor
 mkDataCon :: Name
           -> Bool               -- ^ Is the constructor declared infix?
-          -> [HsBang]           -- ^ Strictness/unpack annotations, from user, of
-                                --   (for imported DataCons) from the interface file 
+          -> [HsBang]           -- ^ Strictness/unpack annotations, from user;
+                                --   or, for imported DataCons, from the interface file 
           -> [FieldLabel]       -- ^ Field labels for the constructor, if it is a record,
                                 --   otherwise empty
           -> [TyVar]            -- ^ Universally quantified type variables
