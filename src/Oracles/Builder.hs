@@ -2,8 +2,7 @@
 
 module Oracles.Builder (
     Builder (..),
-    with, run,
-    hsColourSrcs
+    with, run, exists
     ) where
 
 import Data.Char
@@ -12,10 +11,22 @@ import Oracles.Base
 import Oracles.Flag
 import Oracles.Option
 
-data Builder = Ar | Ld | Gcc | Alex | Happy | HsColour | GhcCabal | GhcPkg Stage | Ghc Stage
+-- Ghc Stage0 is the bootstrapping compiler
+-- Ghc StageN, N > 0, is the one built on stage (N - 1)
+-- GhcPkg Stage0 is the bootstrapping GhcPkg 
+-- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
+data Builder = Ar
+             | Ld
+             | Gcc
+             | Alex
+             | Happy
+             | HsColour
+             | GhcCabal
+             | Ghc Stage
+             | GhcPkg Stage
 
 instance ShowArgs Builder where
-    showArgs builder = showArgs $ do
+    showArgs builder = showArgs $ fmap words $ do
         let key = case builder of
                 Ar            -> "ar"
                 Ld            -> "ld"
@@ -24,16 +35,15 @@ instance ShowArgs Builder where
                 Happy         -> "happy"
                 HsColour      -> "hscolour"
                 GhcCabal      -> "ghc-cabal"
-                Ghc Stage0    -> "system-ghc"     -- Ghc Stage0 is the bootstrapping compiler 
-                Ghc Stage1    -> "ghc-stage1"     -- Ghc StageN, N > 0, is the one built on stage (N - 1)
+                Ghc Stage0    -> "system-ghc"
+                Ghc Stage1    -> "ghc-stage1"
                 Ghc Stage2    -> "ghc-stage2"
                 Ghc Stage3    -> "ghc-stage3"
-                GhcPkg Stage0 -> "system-ghc-pkg" -- GhcPkg Stage0 is the bootstrapping GhcPkg 
-                GhcPkg _      -> "ghc-pkg"        -- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
+                GhcPkg Stage0 -> "system-ghc-pkg"
+                GhcPkg _      -> "ghc-pkg"
         cfgPath <- askConfigWithDefault key $
-            error $ "\nCannot find path to '"
-            ++ key
-            ++ "' in configuration files."
+            error $ "\nCannot find path to '" ++ key
+                  ++ "' in configuration files."
         let cfgPathExe = if cfgPath /= "" then cfgPath -<.> exe else ""
         windows <- windowsHost
         if (windows && "/" `isPrefixOf` cfgPathExe)
@@ -43,25 +53,26 @@ instance ShowArgs Builder where
         else
             return cfgPathExe
 
--- When LaxDeps flag is set (by adding 'lax-dependencies = YES' to user.config),
--- dependencies on the GHC executable are turned into order-only dependencies to
--- avoid needless recompilation when making changes to GHC's sources. In certain
--- situations this can lead to build failures, in which case you should reset
--- the flag (at least temporarily).
+-- When LaxDeps flag is set ('lax-dependencies = YES' in user.config),
+-- dependencies on the GHC executable are turned into order-only dependencies
+-- to avoid needless recompilation when making changes to GHC's sources. In
+-- certain situations this can lead to build failures, in which case you
+-- should reset the flag (at least temporarily).
 needBuilder :: Builder -> Action ()
 needBuilder ghc @ (Ghc stage) = do
-    [target] <- showArgs ghc
-    laxDeps  <- test LaxDeps
-    if laxDeps then orderOnly [target] else need [target]
+    [exe]   <- showArgs ghc -- Raise an error if builder is not unique
+    laxDeps <- test LaxDeps
+    if laxDeps then orderOnly [exe] else need [exe]
 
 needBuilder builder = do 
-    [target] <- showArgs builder
-    need [target]
+    [exe] <- showArgs builder
+    need [exe]
 
--- Action 'with Gcc' returns an argument '--with-gcc=/path/to/gcc' and needs the builder 
+-- Action 'with Gcc' returns '--with-gcc=/path/to/gcc' and needs Gcc
+-- Raises an error if the builder is not uniquely defined in config files
 with :: Builder -> Args
 with builder = do 
-    let prefix = case builder of 
+    let key = case builder of 
             Ar       -> "--with-ar="
             Ld       -> "--with-ld="
             Gcc      -> "--with-gcc="
@@ -70,18 +81,21 @@ with builder = do
             Happy    -> "--with-happy="
             GhcPkg _ -> "--with-ghc-pkg="
             HsColour -> "--with-hscolour="
-    [suffix] <- showArgs builder
+    [exe] <- showArgs builder
     needBuilder builder
-    return [prefix ++ suffix]
+    arg $ key ++ normaliseEx exe
 
+-- Raises an error if the builder is not uniquely defined in config files
 run :: Builder -> Args -> Action ()
 run builder args = do
     needBuilder builder
     [exe] <- showArgs builder
-    args' <- args
-    cmd [exe] args'
+    cmd [exe] =<< args
 
-hsColourSrcs :: Condition
-hsColourSrcs = do
-    [hscolour] <- showArgs HsColour
-    return $ hscolour /= ""
+-- Check if the builder is uniquely defined in config files
+exists :: Builder -> Condition
+exists builder = do
+    exes <- showArgs builder
+    return $ case exes of
+        [_] -> True
+        _   -> False

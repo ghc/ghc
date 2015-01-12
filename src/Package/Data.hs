@@ -68,11 +68,11 @@ buildPackageData (Package name path _) (stage, dist, settings) =
             <> with (GhcPkg stage)
             <> customConfArgs settings
             <> (libraryArgs =<< ways settings)
-            <> when hsColourSrcs (with HsColour)
+            <> when (exists HsColour) (with HsColour)
             <> configureArgs stage settings
             <> when (stage == Stage0) bootPkgConstraints
             <> with Gcc
-            <> when (stage /= Stage0) (with Ld)            
+            <> when (stage /= Stage0) (with Ld)
             <> with Ar
             <> with Alex
             <> with Happy -- TODO: reorder with's
