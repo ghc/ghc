@@ -1,0 +1,4 @@
+
+WildcardInInstanceSig.hs:4:35:
+    Wildcard not allowed
+    in instance signature: ‘negate :: _’

@@ -798,6 +798,10 @@ inst_decl :: { LInstDecl RdrName }
                                      , cid_datafam_insts = adts }
              ; let err = text "In instance head:" <+> ppr $3
              ; checkNoPartialType err $3
+             ; sequence_ [ checkNoPartialType err ty
+                         | sig@(L _ (TypeSig _ ty _ )) <- sigs
+                         , let err = text "in instance signature" <> colon
+                                     <+> quotes (ppr sig) ]
              ; ams (L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid }))
                    (mj AnnInstance $1 : (fst $ unLoc $4)) } }
 
@@ -972,8 +976,12 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl RdrName }
   : 'deriving' 'instance' overlap_pragma inst_type
-                         {% ams (sLL $1 $> (DerivDecl $4 $3))
-                                [mj AnnDeriving $1,mj AnnInstance $2] }
+                         {% do {
+                                 let err = text "in the stand-alone deriving instance"
+                                            <> colon <+> quotes (ppr $4)
+                               ; checkNoPartialType err $4
+                               ; ams (sLL $1 $> (DerivDecl $4 $3))
+                                     [mj AnnDeriving $1,mj AnnInstance $2] }}
 
 -----------------------------------------------------------------------------
 -- Role annotations
@@ -1070,6 +1078,9 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
                     {% do { (TypeSig l ty _) <- checkValSig $2 $4
+                          ; let err = text "in default signature" <> colon <+>
+                                      quotes (ppr ty)
+                          ; checkNoPartialType err ty
                           ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 

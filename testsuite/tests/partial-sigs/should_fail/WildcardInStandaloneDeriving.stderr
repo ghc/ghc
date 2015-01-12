@@ -1,0 +1,4 @@
+
+WildcardInStandaloneDeriving.hs:4:19:
+    Wildcard not allowed
+    in the stand-alone deriving instance: ‘_’
