@@ -2072,7 +2072,7 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
-    if test "$$1" == ""; then
+    if test "$$1" = ""; then
         save_IFS=$IFS
         IFS=":;"
         for p in ${PATH}; do
