@@ -26,7 +26,7 @@ main = do
   print z
   performGC
   threadDelay 1000000
-  let Just p = unsafeLookupStaticPtr nats_key
+  Just p <- unsafeLookupStaticPtr nats_key
   print (deRefStaticPtr (unsafeCoerce p) !! 800 :: Integer)
   -- Uncommenting the next line keeps 'nats' alive and would prevent a segfault
   -- if 'nats' were garbage collected.
