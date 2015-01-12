@@ -15,11 +15,10 @@ module Maybes (
         whenIsJust,
         expectJust,
 
-        MaybeT(..)
+        MaybeT(..), liftMaybeT
     ) where
-#if __GLASGOW_HASKELL__ < 709
+
 import Control.Applicative
-#endif
 import Control.Monad
 import Data.Maybe
 
@@ -80,6 +79,25 @@ instance Monad m => Monad (MaybeT m) where
   return = MaybeT . return . Just
   x >>= f = MaybeT $ runMaybeT x >>= maybe (return Nothing) (runMaybeT . f)
   fail _ = MaybeT $ return Nothing
+
+#if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
+instance (Monad m, Functor m) => Alternative (MaybeT m) where
+#else
+instance (Monad m) => Alternative (MaybeT m) where
+#endif
+  empty = mzero
+  (<|>) = mplus
+
+instance Monad m => MonadPlus (MaybeT m) where
+  mzero       = MaybeT $ return Nothing
+  p `mplus` q = MaybeT $ do ma <- runMaybeT p
+                            case ma of
+                              Just a  -> return (Just a)
+                              Nothing -> runMaybeT q
+
+liftMaybeT :: Monad m => m a -> MaybeT m a
+liftMaybeT act = MaybeT $ Just `liftM` act
 
 {-
 ************************************************************************

@@ -67,6 +67,7 @@ module DynFlags (
         Settings(..),
         targetPlatform, programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
+        versionedAppDir,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_sysman, pgm_windres, pgm_libtool, pgm_lo, pgm_lc,
@@ -91,6 +92,7 @@ module DynFlags (
         updOptLevel,
         setTmpDir,
         setPackageKey,
+        interpretPackageEnv,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -162,7 +164,7 @@ import CmdLineParser
 import Constants
 import Panic
 import Util
-import Maybes           ( orElse )
+import Maybes
 import MonadUtils
 import qualified Pretty
 import SrcLoc
@@ -177,6 +179,7 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
 import Control.Monad
+import Control.Exception (throwIO)
 
 import Data.Bits
 import Data.Char
@@ -184,11 +187,12 @@ import Data.Int
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
 import System.FilePath
+import System.Directory
+import System.Environment (getEnv)
 import System.IO
 import System.IO.Error
 import Text.ParserCombinators.ReadP hiding (char)
@@ -768,6 +772,8 @@ data DynFlags = DynFlags {
 
   packageFlags          :: [PackageFlag],
         -- ^ The @-package@ and @-hide-package@ flags from the command-line
+  packageEnv            :: Maybe FilePath,
+        -- ^ Filepath to the package environment file (if overriding default)
 
   -- Package state
   -- NB. do not modify this field, it is calculated by
@@ -1012,6 +1018,14 @@ opt_lo                :: DynFlags -> [String]
 opt_lo dflags = sOpt_lo (settings dflags)
 opt_lc                :: DynFlags -> [String]
 opt_lc dflags = sOpt_lc (settings dflags)
+
+-- | The directory for this version of ghc in the user's app directory
+-- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
+--
+versionedAppDir :: IO FilePath
+versionedAppDir = do
+  appdir <- getAppUserDataDirectory "ghc"
+  return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
 
 -- | The target code type of the compilation (if any).
 --
@@ -1470,6 +1484,7 @@ defaultDynFlags mySettings =
 
         extraPkgConfs           = id,
         packageFlags            = [],
+        packageEnv              = Nothing,
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
         ways                    = defaultWays mySettings,
@@ -2723,6 +2738,7 @@ package_flags = [
   , defFlag "package-key"           (HasArg exposePackageKey)
   , defFlag "hide-package"          (HasArg hidePackage)
   , defFlag "hide-all-packages"     (NoArg (setGeneralFlag Opt_HideAllPackages))
+  , defFlag "package-env"           (HasArg setPackageEnv)
   , defFlag "ignore-package"        (HasArg ignorePackage)
   , defFlag "syslib"
       (HasArg (\s -> do exposePackage s
@@ -2732,6 +2748,8 @@ package_flags = [
   , defFlag "trust"                 (HasArg trustPackage)
   , defFlag "distrust"              (HasArg distrustPackage)
   ]
+  where
+    setPackageEnv env = upd $ \s -> s { packageEnv = Just env }
 
 -- | Make a list of flags for shell completion.
 -- Filter all available flags into two groups, for interactive GHC vs all other.
@@ -3699,6 +3717,102 @@ exposePackage' p dflags
 
 setPackageKey :: String -> DynFlags -> DynFlags
 setPackageKey p s =  s{ thisPackage = stringToPackageKey p }
+
+-- -----------------------------------------------------------------------------
+-- | Find the package environment (if one exists)
+--
+-- We interpret the package environment as a set of package flags; to be
+-- specific, if we find a package environment
+--
+-- > id1
+-- > id2
+-- > ..
+-- > idn
+--
+-- we interpret this as
+--
+-- > [ -hide-all-packages
+-- > , -package-id id1
+-- > , -package-id id2
+-- > , ..
+-- > , -package-id idn
+-- > ]
+interpretPackageEnv :: DynFlags -> IO DynFlags
+interpretPackageEnv dflags = do
+    mPkgEnv <- runMaybeT $ msum $ [
+                   getCmdLineArg >>= \env -> msum [
+                       loadEnvFile  env
+                     , loadEnvName  env
+                     , cmdLineError env
+                     ]
+                 , getEnvVar >>= \env -> msum [
+                       loadEnvFile env
+                     , loadEnvName env
+                     , envError    env
+                     ]
+                 , loadEnvFile localEnvFile
+                 , loadEnvName defaultEnvName
+                 ]
+    case mPkgEnv of
+      Nothing ->
+        -- No environment found. Leave DynFlags unchanged.
+        return dflags
+      Just ids -> do
+        let setFlags :: DynP ()
+            setFlags = do
+              setGeneralFlag Opt_HideAllPackages
+              mapM_ exposePackageId (lines ids)
+
+            (_, dflags') = runCmdLine (runEwM setFlags) dflags
+
+        return dflags'
+  where
+    -- Loading environments (by name or by location)
+
+    namedEnvPath :: String -> MaybeT IO FilePath
+    namedEnvPath name = do
+     appdir <- liftMaybeT $ versionedAppDir
+     return $ appdir </> "environments" </> name
+
+    loadEnvName :: String -> MaybeT IO String
+    loadEnvName name = loadEnvFile =<< namedEnvPath name
+
+    loadEnvFile :: String -> MaybeT IO String
+    loadEnvFile path = do
+      guard =<< liftMaybeT (doesFileExist path)
+      liftMaybeT $ readFile path
+
+    -- Various ways to define which environment to use
+
+    getCmdLineArg :: MaybeT IO String
+    getCmdLineArg = MaybeT $ return $ packageEnv dflags
+
+    getEnvVar :: MaybeT IO String
+    getEnvVar = do
+      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
+      case mvar of
+        Right var -> return var
+        Left err  -> if isDoesNotExistError err then mzero
+                                                else liftMaybeT $ throwIO err
+
+    defaultEnvName :: String
+    defaultEnvName = "default"
+
+    localEnvFile :: FilePath
+    localEnvFile = "./.ghc.environment"
+
+    -- Error reporting
+
+    cmdLineError :: String -> MaybeT IO a
+    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+      "Package environment " ++ show env ++ " not found"
+
+    envError :: String -> MaybeT IO a
+    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+         "Package environment "
+      ++ show env
+      ++ " (specified in GHC_ENVIRIONMENT) not found"
+
 
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).

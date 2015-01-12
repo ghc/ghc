@@ -354,10 +354,10 @@ getPackageConfRefs dflags = do
 
 resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
 resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
-resolvePackageConfig dflags UserPkgConf = handleIO (\_ -> return Nothing) $ do
-  appdir <- getAppUserDataDirectory (programName dflags)
-  let dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':projectVersion dflags)
-      pkgconf = dir </> "package.conf.d"
+resolvePackageConfig _ UserPkgConf = handleIO (\_ -> return Nothing) $ do
+  dir <- versionedAppDir
+  let pkgconf = dir </> "package.conf.d"
+
   exist <- doesDirectoryExist pkgconf
   return $ if exist then Just pkgconf else Nothing
 resolvePackageConfig _ (PkgConfFile name) = return $ Just name
@@ -814,7 +814,8 @@ mkPackageState
            PackageKey) -- this package, might be modified if the current
                       -- package is a wired-in package.
 
-mkPackageState dflags pkgs0 preload0 this_package = do
+mkPackageState dflags0 pkgs0 preload0 this_package = do
+  dflags <- interpretPackageEnv dflags0
 
 {-
    Plan.

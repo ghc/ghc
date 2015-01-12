@@ -18,7 +18,7 @@ module CmdLineParser
       Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
       errorsToGhcException,
 
-      EwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
+      EwM(..), runEwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
     ) where
 
 #include "HsVersions.h"
@@ -108,6 +108,9 @@ instance Monad m => Monad (EwM m) where
                                       unEwM (k r) l e' w')
     return v = EwM (\_ e w -> return (e, w, v))
 
+runEwM :: EwM m a -> m (Errs, Warns, a)
+runEwM action = unEwM action (panic "processArgs: no arg yet") emptyBag emptyBag
+
 setArg :: Located String -> EwM m () -> EwM m ()
 setArg l (EwM f) = EwM (\_ es ws -> f l es ws)
 
@@ -170,8 +173,7 @@ processArgs :: Monad m
                    [Located String],  -- errors
                    [Located String] ) -- warnings
 processArgs spec args = do
-    (errs, warns, spare) <- unEwM action (panic "processArgs: no arg yet")
-                                  emptyBag emptyBag
+    (errs, warns, spare) <- runEwM action
     return (spare, bagToList errs, bagToList warns)
   where
     action = process args []

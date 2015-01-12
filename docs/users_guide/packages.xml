@@ -1812,6 +1812,92 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
 -->
 
     </sect2>
+    <sect2 id="package-environments">
+    <indexterm><primary>package environments</primary></indexterm>
+    <title>
+      Package environments
+    </title>
+    <para>
+      A <emphasis>package environment</emphasis> is a file that tells
+      <literal>ghc</literal> precisely which packages should be visible. It
+      contains package IDs, one per line:
+    </para>
+<screen>
+package_id_1
+package_id_2
+...
+package_id_n
+</screen>
+    <para>
+      If a package environment is found, it is equivalent to passing these
+      command line arguments to <literal>ghc</literal>:
+    </para>
+<screen>
+-hide-all-packages
+-package-id package_id_1
+-package-id package_id_2
+...
+-package-id package_id_n
+</screen>
+    <para>
+      In order, <literal>ghc</literal> will look for the package environment
+      in the following locations:
+    </para>
+    <itemizedlist>
+      <listitem>
+        <para>
+          File
+            <replaceable>file</replaceable>
+          if you pass the option
+            <option>-package-env <replaceable>file</replaceable></option>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          File
+            <filename>$HOME/.ghc/<replaceable>arch</replaceable>-<replaceable>os</replaceable>-<replaceable>version</replaceable>/environments/<replaceable>name</replaceable></filename>
+          if you pass the option
+            <option>-package-env <replaceable>name</replaceable></option>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          File
+            <replaceable>file</replaceable>
+          if the environment variable <literal>GHC_ENVIRONMENT</literal>
+          is set to <replaceable>file</replaceable>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          File
+            <filename>$HOME/.ghc/<replaceable>arch</replaceable>-<replaceable>os</replaceable>-<replaceable>version</replaceable>/environments/<replaceable>name</replaceable></filename>
+          if the environment variable <literal>GHC_ENVIRONMENT</literal>
+          is set to <replaceable>name</replaceable>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          File <filename>./.ghc.environment</filename> if it exists.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          File
+            <filename>$HOME/.ghc/<replaceable>arch</replaceable>-<replaceable>os</replaceable>-<replaceable>version</replaceable>/environments/default</filename>
+          if it exists.
+        </para>
+      </listitem>
+    </itemizedlist>
+    <para>
+      Package environments can be modified by further command line arguments;
+      for example, if you specify
+        <option>-package <replaceable>foo</replaceable></option>
+      on the command line, then package <replaceable>foo</replaceable> will be
+      visible even if it's not listed in the currently active package
+      environment.
+    </para>
+    </sect2>
   </sect1>
 
 <!-- Emacs stuff:
