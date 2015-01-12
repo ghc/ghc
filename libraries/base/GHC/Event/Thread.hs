@@ -115,7 +115,7 @@ threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
   m <- newEmptyMVar
   mgr <- getSystemEventManager_
-  reg <- registerFd mgr (\_ e -> putMVar m e) fd evt
+  reg <- registerFd mgr (\_ e -> putMVar m e) fd evt M.OneShot
   evt' <- takeMVar m `onException` unregisterFd_ mgr reg
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
@@ -129,7 +129,7 @@ threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do
   m <- newTVarIO Nothing
   mgr <- getSystemEventManager_
-  reg <- registerFd mgr (\_ e -> atomically (writeTVar m (Just e))) fd evt
+  reg <- registerFd mgr (\_ e -> atomically (writeTVar m (Just e))) fd evt M.OneShot
   let waitAction =
         do mevt <- readTVar m
            case mevt of
@@ -264,7 +264,7 @@ startIOManagerThread :: IOArray Int (Maybe (ThreadId, EventManager))
                         -> IO ()
 startIOManagerThread eventManagerArray i = do
   let create = do
-        !mgr <- new True
+        !mgr <- new
         !t <- forkOn i $ do
                 c_setIOManagerControlFd
                   (fromIntegral i)
