@@ -14,8 +14,8 @@
 ifeq "$(TargetOS_CPP)" "mingw32"
 prependLibraryPath = $(error Do not know how to prependLibraryPath on Windows)
 else ifeq "$(TargetOS_CPP)" "darwin"
-prependLibraryPath = export DYLD_LIBRARY_PATH="$1:$$DYLD_LIBRARY_PATH"
+prependLibraryPath = export DYLD_LIBRARY_PATH="$1$${DYLD_LIBRARY_PATH:+:$$DYLD_LIBRARY_PATH}"
 else
-prependLibraryPath = export LD_LIBRARY_PATH="$1:$$LD_LIBRARY_PATH"
+prependLibraryPath = export LD_LIBRARY_PATH="$1$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"
 endif
 
