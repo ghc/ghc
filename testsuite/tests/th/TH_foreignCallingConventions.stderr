@@ -8,7 +8,7 @@ foreign import stdcall safe "bay" bay :: (GHC.Types.Int ->
                                          GHC.Types.IO GHC.Types.Int
 foreign import javascript unsafe "bax" bax :: GHC.Ptr.Ptr GHC.Types.Int ->
                                               GHC.Types.IO GHC.Base.String
-TH_foreignCallingConventions.hs:1:1: Splicing declarations
+TH_foreignCallingConventions.hs:(13,4)-(23,25): Splicing declarations
     do { let fi cconv safety lbl name ty
                = ForeignD (ImportF cconv safety lbl name ty);
          dec1 <- fi CCall Interruptible "&" (mkName "foo")
@@ -25,6 +25,5 @@ TH_foreignCallingConventions.hs:1:1: Splicing declarations
            >> hFlush stdout;
          return [dec1, dec2] }
   ======>
-    TH_foreignCallingConventions.hs:(13,4)-(23,25)
     foreign import ccall interruptible "static &foo" foo :: Ptr ()
     foreign import prim safe "static bar" bar :: Int# -> Int#

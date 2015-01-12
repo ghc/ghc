@@ -37,3 +37,9 @@ TH_Depends:
 
 T8333:
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --interactive -v0 T8333.hs < /dev/null
+
+# This was an easy way to re-use the stdout testing
+# to check the contents of a generated file.
+T8624:
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T8624.hs && cat T8624.th.hs
+	 $(RM) T8624.th.hs

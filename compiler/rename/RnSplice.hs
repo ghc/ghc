@@ -16,6 +16,7 @@ import TcRnMonad
 import Kind
 
 #ifdef GHCI
+import ErrUtils         ( dumpIfSet_dyn_printer )
 import Control.Monad    ( unless, when )
 import DynFlags
 import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName )
@@ -274,8 +275,11 @@ rnTopSpliceDecls (HsSplice _ expr'')
 
                 -- Run the expression
          ; decls <- runMetaD zonked_q_expr
-         ; showSplice "declarations" expr'
-                 (ppr (getLoc expr) $$ (vcat (map ppr decls)))
+         ; traceSplice $ SpliceInfo True
+                                    "declarations"
+                                    (Just (getLoc expr))
+                                    (Just $ ppr expr')
+                                    (vcat (map ppr decls))
 
          ; return (decls,fvs) }
 
@@ -404,12 +408,55 @@ showSplice :: String -> LHsExpr Name -> SDoc -> TcM ()
 --        (b) data constructors after type checking have been
 --            changed to their *wrappers*, and that makes them
 --            print always fully qualified
-showSplice what before after
-  = do { loc <- getSrcSpanM
-       ; traceSplice (vcat [ppr loc <> colon <+> text "Splicing" <+> text what,
-                            nest 2 (sep [nest 2 (ppr before),
-                                         text "======>",
-                                         nest 2 after])]) }
+showSplice what before after =
+    traceSplice $ SpliceInfo False what Nothing (Just $ ppr before) after
+
+-- | The splice data to be logged
+--
+-- duplicates code in TcSplice.lhs
+data SpliceInfo
+  = SpliceInfo
+    { spliceIsDeclaration :: Bool
+    , spliceDescription   :: String
+    , spliceLocation      :: Maybe SrcSpan
+    , spliceSource        :: Maybe SDoc
+    , spliceGenerated     :: SDoc
+    }
+
+-- | outputs splice information for 2 flags which have different output formats:
+-- `-ddump-splices` and `-dth-dec-file`
+--
+-- This duplicates code in TcSplice.lhs
+traceSplice :: SpliceInfo -> TcM ()
+traceSplice sd = do
+    loc <- case sd of
+        SpliceInfo { spliceLocation = Nothing }  -> getSrcSpanM
+        SpliceInfo { spliceLocation = Just loc } -> return loc
+    traceOptTcRn Opt_D_dump_splices (spliceDebugDoc loc sd)
+    when (spliceIsDeclaration sd) $ do
+        dflags <- getDynFlags
+        liftIO $ dumpIfSet_dyn_printer alwaysQualify dflags Opt_D_th_dec_file
+                                       (spliceCodeDoc loc sd)
+  where
+    -- `-ddump-splices`
+    spliceDebugDoc :: SrcSpan -> SpliceInfo -> SDoc
+    spliceDebugDoc loc sd
+      = let code = case spliceSource sd of
+                Nothing -> ending
+                Just b  -> nest 2 b : ending
+            ending = [ text "======>", nest 2 (spliceGenerated sd) ]
+        in  (vcat [   ppr loc <> colon
+                  <+> text "Splicing" <+> text (spliceDescription sd)
+                  , nest 2 (sep code)
+                  ])
+
+    -- `-dth-dec-file`
+    spliceCodeDoc :: SrcSpan -> SpliceInfo -> SDoc
+    spliceCodeDoc loc sd
+      = (vcat [    text "--" <+> ppr loc <> colon
+               <+> text "Splicing" <+> text (spliceDescription sd)
+              , sep [spliceGenerated sd]
+              ])
 
 illegalBracket :: SDoc
 illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (without intervening splices)")

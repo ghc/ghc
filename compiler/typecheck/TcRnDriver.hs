@@ -24,7 +24,7 @@ module TcRnDriver (
     ) where
 
 #ifdef GHCI
-import {-# SOURCE #-} TcSplice ( runQuasi )
+import {-# SOURCE #-} TcSplice ( runQuasi, traceSplice, SpliceInfo(..) )
 import RnSplice ( rnTopSpliceDecls )
 #endif
 
@@ -567,9 +567,12 @@ tc_rn_src_decls boot_details ds
                       rnTopSrcDecls extra_deps th_group
 
                     -- Dump generated top-level declarations
-                    ; loc <- getSrcSpanM
-                    ; traceSplice (vcat [ppr loc <> colon <+> text "Splicing top-level declarations added with addTopDecls ",
-                                   nest 2 (nest 2 (ppr th_rn_decls))])
+                    ; let msg = "top-level declarations added with addTopDecls"
+                    ; traceSplice $ SpliceInfo True
+                                               msg
+                                               Nothing
+                                               Nothing
+                                               (ppr th_rn_decls)
 
                     ; return (tcg_env, appendGroups rn_decls th_rn_decls)
                     }

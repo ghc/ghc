@@ -287,6 +287,7 @@ data DumpFlag
    | Opt_D_dump_if_trace
    | Opt_D_dump_vt_trace
    | Opt_D_dump_splices
+   | Opt_D_th_dec_file
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
    | Opt_D_dump_ticked
@@ -1685,6 +1686,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_verbose_core2core           = False
           enableIfVerbose Opt_D_verbose_stg2stg             = False
           enableIfVerbose Opt_D_dump_splices                = False
+          enableIfVerbose Opt_D_th_dec_file                 = False
           enableIfVerbose Opt_D_dump_rule_firings           = False
           enableIfVerbose Opt_D_dump_rule_rewrites          = False
           enableIfVerbose Opt_D_dump_simpl_trace            = False
@@ -2477,6 +2479,8 @@ dynamic_flags = [
                                             setDumpFlag' Opt_D_dump_cs_trace))
   , defGhcFlag "ddump-vt-trace"          (setDumpFlag Opt_D_dump_vt_trace)
   , defGhcFlag "ddump-splices"           (setDumpFlag Opt_D_dump_splices)
+  , defGhcFlag "dth-dec-file"            (setDumpFlag Opt_D_th_dec_file)
+
   , defGhcFlag "ddump-rn-stats"          (setDumpFlag Opt_D_dump_rn_stats)
   , defGhcFlag "ddump-opt-cmm"           (setDumpFlag Opt_D_dump_opt_cmm)
   , defGhcFlag "ddump-simpl-stats"       (setDumpFlag Opt_D_dump_simpl_stats)

@@ -9331,9 +9331,6 @@ Typed expression splices and quotations are supported.)
    </para></listitem>
 
     <listitem><para>
-	    The flag <literal>-ddump-splices</literal> shows the expansion of all top-level splices as they happen.
-   </para></listitem>
-    <listitem><para>
 	    If you are building GHC from source, you need at least a stage-2 bootstrap compiler to
 	      run Template Haskell.  A stage-1 compiler will reject the TH constructs.  Reason: TH
 	      compiles and runs a program, and then looks at the result.  So it's important that
@@ -9346,6 +9343,45 @@ Typed expression splices and quotations are supported.)
 	or file-at-a-time).  There used to be a restriction to the former two, but that restriction
 	has been lifted.
 </para>
+</sect2>
+
+<sect2 id="th-view-gen-code"> <title> Viewing Template Haskell generated code </title>
+  <para>
+    The flag <literal>-ddump-splices</literal> shows the expansion of all top-level declaration splices, both typed and untyped, as they happen.
+    As with all dump flags, the default is for this output to be sent to stdout.
+    For a non-trivial program, you may be interested in combining this with the <literal>-ddump-to-file flag</literal> (see <xref linkend="dumping-output"/>.
+    For each file using Template Haskell, this will show the output in a <literal>.dump-splices</literal> file.
+  </para>
+
+  <para>
+    The flag <literal>-dth-dec-file</literal> shows the expansions of all top-level TH declaration splices, both typed and untyped, in the file <literal>M.th.hs</literal> where M is the name of the module being compiled.
+    Note that other types of splices (expressions, types, and patterns) are not shown.
+    Application developers can check this into their repository so that they can grep for identifiers that were defined in Template Haskell.
+    This is similar to using <option>-ddump-to-file</option> with <option>-ddump-splices</option> but it always generates a file instead of being coupled to <option>-ddump-to-file</option>. The format is also different: it does not show code from the original file, instead it only shows generated code and has a comment for the splice location of the original file.
+  </para>
+
+  <para>
+    Below is a sample output of <literal>-ddump-splices</literal>
+  </para>
+
+<programlisting>
+TH_pragma.hs:(6,4)-(8,26): Splicing declarations
+  [d| foo :: Int -> Int
+      foo x = x + 1 |]
+======>
+  foo :: Int -> Int
+  foo x = (x + 1)
+</programlisting>
+
+  <para>
+  Below is the output of the same sample using <literal>-dth-dec-file</literal>
+  </para>
+
+<programlisting>
+-- TH_pragma.hs:(6,4)-(8,26): Splicing declarations
+foo :: Int -> Int
+foo x = (x + 1)
+</programlisting>
 </sect2>
 
 <sect2 id="th-example">  <title> A Template Haskell Worked Example </title>

@@ -301,7 +301,7 @@ dumpSDoc dflags print_unqual flag hdr doc
 chooseDumpFile :: DynFlags -> DumpFlag -> Maybe String
 chooseDumpFile dflags flag
 
-        | gopt Opt_DumpToFile dflags
+        | gopt Opt_DumpToFile dflags || flag == Opt_D_th_dec_file
         , Just prefix <- getPrefix
         = Just $ setDir (prefix ++ (beautifyDumpName flag))
 
@@ -325,6 +325,7 @@ chooseDumpFile dflags flag
 
 -- | Build a nice file name from name of a GeneralFlag constructor
 beautifyDumpName :: DumpFlag -> String
+beautifyDumpName Opt_D_th_dec_file = "th.hs"
 beautifyDumpName flag
  = let str = show flag
        suff = case stripPrefix "Opt_D_" str of

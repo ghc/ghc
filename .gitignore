@@ -154,3 +154,11 @@ _darcs/
 .tm_properties
 VERSION
 GIT_COMMIT_ID
+
+# -------------------------------------------------------------------------------------
+# when using a docker image, one can mount the source code directory as the home folder
+# -------------------------------------------------------------------------------------
+.arcrc
+.ghc
+.bash_history
+.gitconfig

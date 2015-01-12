@@ -3101,6 +3101,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-dth-dec-file</option></entry>
+            <entry>Show evaluated TH declarations in a .th.hs file</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-ddump-types</option></entry>
             <entry>Dump type signatures</entry>
             <entry>dynamic</entry>

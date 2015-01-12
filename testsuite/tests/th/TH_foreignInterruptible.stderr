@@ -1,4 +1,4 @@
-TH_foreignInterruptible.hs:1:1: Splicing declarations
+TH_foreignInterruptible.hs:8:3-100: Splicing declarations
     return
       [ForeignD
          (ImportF
@@ -8,6 +8,5 @@ TH_foreignInterruptible.hs:1:1: Splicing declarations
             (mkName "foo")
             (AppT (ConT ''Ptr) (ConT ''())))]
   ======>
-    TH_foreignInterruptible.hs:8:3-100
     foreign import ccall interruptible "static &foo" foo
       :: Ptr GHC.Tuple.()

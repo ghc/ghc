@@ -502,15 +502,12 @@ traceTc herald doc = traceTcN 1 (hang (text herald) 2 doc)
 -- | Typechecker trace
 traceTcN :: Int -> SDoc -> TcRn ()
 traceTcN level doc
-    = do { dflags <- getDynFlags
-         ; when (level <= traceLevel dflags) $
-           traceOptTcRn Opt_D_dump_tc_trace doc }
+    = do dflags <- getDynFlags
+         when (level <= traceLevel dflags && not opt_NoDebugOutput) $
+             traceOptTcRn Opt_D_dump_tc_trace doc
 
 traceRn :: SDoc -> TcRn ()
-traceRn doc = traceOptTcRn Opt_D_dump_rn_trace doc
-
-traceSplice :: SDoc -> TcRn ()
-traceSplice doc = traceOptTcRn Opt_D_dump_splices doc
+traceRn = traceOptTcRn Opt_D_dump_rn_trace -- Renamer Trace
 
 -- | Output a doc if the given 'DumpFlag' is set.
 --
