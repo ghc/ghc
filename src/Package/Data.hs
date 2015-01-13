@@ -88,7 +88,7 @@ buildPackageData (Package name path _) (stage, dist, settings) =
     , "setup-config"
     , "build" </> "autogen" </> "cabal_macros.h"
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
-    , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
+    -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
         need ["shake/src/Package/Data.hs"]
         need [path </> name <.> "cabal"]
