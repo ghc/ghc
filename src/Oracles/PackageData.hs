@@ -19,6 +19,7 @@ data PackageData = Modules     FilePath
                  | Deps        FilePath
                  | DepKeys     FilePath
                  | Synopsis    FilePath
+                 | CppOpts     FilePath
 
 instance ShowArgs PackageData where
     showArgs packageData = do
@@ -30,6 +31,7 @@ instance ShowArgs PackageData where
                Deps        file -> ("DEPS"        , file, "" )
                DepKeys     file -> ("DEP_KEYS"    , file, "" )
                Synopsis    file -> ("SYNOPSIS"    , file, "" )
+               CppOpts     file -> ("CPP_OPTS"    , file, "" )
             fullKey = replaceSeparators '_' $ takeDirectory file ++ "_" ++ key
         res <- askOracle $ PackageDataKey (file, fullKey)
         return $ words $ case res of
