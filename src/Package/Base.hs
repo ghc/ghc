@@ -84,7 +84,8 @@ bootPkgConstraints = mempty
 --     sed "s/[^0-9.]//g")"))
 
 pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
-pathArgs key path as = map (\a -> key ++ normaliseEx (path </> a)) <$> arg as
+pathArgs key path as =
+    map (\a -> key ++ toStandard (normaliseEx $ path </> a)) <$> arg as
 
 packageArgs :: Stage -> FilePath -> Args
 packageArgs stage pkgData = do
@@ -100,14 +101,14 @@ packageArgs stage pkgData = do
 
 includeArgs :: FilePath -> FilePath -> Args
 includeArgs path dist = 
-    let pkgData  = path </> dist </> "package-data.mk"
-        buildDir = path </> dist </> "build"
+    let pkgData  = toStandard $ path </> dist </> "package-data.mk"
+        buildDir = toStandard $ path </> dist </> "build"
     in arg "-i"
     <> pathArgs "-i" path     (SrcDirs pkgData)
-    <> concatArgs ["-i", "-I"] [buildDir, buildDir </> "autogen"]
+    <> concatArgs ["-i", "-I"] [buildDir, toStandard $ buildDir </> "autogen"]
     <> pathArgs "-I" path     (IncludeDirs pkgData)
     <> arg "-optP-include" -- TODO: Shall we also add -cpp?
-    <> concatArgs "-optP" (buildDir </> "autogen/cabal_macros.h")
+    <> concatArgs "-optP" (toStandard $ buildDir </> "autogen/cabal_macros.h")
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do

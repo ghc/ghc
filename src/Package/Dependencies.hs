@@ -5,16 +5,16 @@ import Package.Base
 
 buildPackageDependencies :: Package -> TodoItem -> Rules ()
 buildPackageDependencies (Package name path _) (stage, dist, settings) =
-    let buildDir = path </> dist </> "build"
-        pkgData  = path </> dist </> "package-data.mk"
+    let buildDir = toStandard $ path </> dist </> "build"
+        pkgData  = toStandard $ path </> dist </> "package-data.mk"
     in
     (buildDir </> name <.> "m") %> \out -> do
         need ["shake/src/Package/Dependencies.hs"]
         terseRun (Ghc stage) $ arg "-M"
             <> packageArgs stage pkgData
             <> includeArgs path dist
-            <> productArgs ["-odir", "-stubdir"] buildDir
-            <> arg ["-dep-makefile", out <.> "new"]
+            <> productArgs ["-odir", "-stubdir", "-hidir"] buildDir
+            <> arg ["-dep-makefile", toStandard $ out <.> "new"]
             <> productArgs "-dep-suffix" (map wayPrefix <$> ways settings)
             <> arg (pkgHsSources path dist)
             -- TODO: Check that skipping all _HC_OPTS is safe.
