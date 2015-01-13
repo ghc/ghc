@@ -25,18 +25,20 @@ buildPackage = buildPackageData
 packageRules :: Rules ()
 packageRules = do
     -- TODO: control targets from commang line arguments
-    want [ "libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a"
-         , "libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.p_a"
-         , "libraries/deepseq/dist-install/build/HSdeeps_FT5iVCELxOr62eHY0nbvnU.o"
-         , "libraries/array/dist-install/build/libHSarray_3w0nMK0JfaFJPpLFn2yWAJ.a"
-         , "libraries/array/dist-install/build/libHSarray_3w0nMK0JfaFJPpLFn2yWAJ.p_a"
-         , "libraries/array/dist-install/build/HSarray_3w0nMK0JfaFJPpLFn2yWAJ.o"
-         , "libraries/bin-package-db/dist-install/build/libHSbinpa_9qPPbdABQ6HK3eua2jBtib.a"
-         , "libraries/bin-package-db/dist-install/build/libHSbinpa_9qPPbdABQ6HK3eua2jBtib.p_a"
-         , "libraries/bin-package-db/dist-install/build/HSbinpa_9qPPbdABQ6HK3eua2jBtib.o"
-         , "libraries/binary/dist-install/build/HSbinar_8WpSY1EWq5j1AwY619xVVw.o"
-         , "libraries/binary/dist-install/build/libHSbinar_8WpSY1EWq5j1AwY619xVVw.a"
-         , "libraries/binary/dist-install/build/libHSbinar_8WpSY1EWq5j1AwY619xVVw.p_a" ]
-    forM_ packages $ \pkg -> do
-        forM_ (pkgTodo pkg) $ \todoItem -> do
+    forM_ packages $ \pkg @ (Package name path todo) -> do
+        forM_ todo $ \todoItem @ (stage, dist, settings) -> do
+
+            -- Want top .o and .a files for the pkg/todo combo:
+            action $ do
+                let buildDir = path </> dist </> "build"
+                    pkgData  = path </> dist </> "package-data.mk"
+                [key] <- arg (PackageKey pkgData)
+                let oFile = buildDir </> "Hs" ++ key <.> "o"
+                ways'  <- ways settings
+                aFiles <- forM ways' $ \way -> do
+                    extension <- libsuf way
+                    return $ buildDir </> "libHs" ++ key <.> extension
+                need $ [oFile] ++ aFiles
+
+            -- Build rules for the package
             buildPackage pkg todoItem
