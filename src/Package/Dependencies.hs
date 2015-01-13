@@ -14,10 +14,13 @@ buildPackageDependencies (Package name path _) (stage, dist, settings) =
             <> packageArgs stage pkgData
             <> includeArgs path dist
             <> productArgs ["-odir", "-stubdir"] buildDir
-            <> arg ["-dep-makefile", out]
+            <> arg ["-dep-makefile", out <.> "new"]
             <> productArgs "-dep-suffix" (map wayPrefix <$> ways settings)
             <> arg (pkgHsSources path dist)
             -- TODO: Check that skipping all _HC_OPTS is safe.
             -- <> arg SrcHcOpts
             -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
             -- <> wayHcOpts vanilla
+        -- Avoid rebuilding dependecies of out if it hasn't changed:
+        copyFileChanged (out <.> "new") out
+        removeFilesAfter "." [out <.> "new"]
