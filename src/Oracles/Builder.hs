@@ -2,7 +2,8 @@
 
 module Oracles.Builder (
     Builder (..),
-    with, run, specified
+    with, run, terseRun, specified,
+    arArgs
     ) where
 
 import Data.Char
@@ -24,6 +25,7 @@ data Builder = Ar
              | GhcCabal
              | Ghc Stage
              | GhcPkg Stage
+             deriving Show
 
 instance ShowArgs Builder where
     showArgs builder = showArgs $ fmap words $ do
@@ -97,6 +99,33 @@ run builder args = do
     [exe] <- showArgs builder
     cmd [exe] =<< args
 
+-- Run the builder with a given collection of arguments printing out a
+-- terse commentary with only 'interesting' info for the builder.
+-- Raises an error if the builder is not uniquely specified in config files
+terseRun :: Builder -> Args -> Action ()
+terseRun builder args = do
+    needBuilder builder
+    [exe] <- showArgs builder
+    args' <- args
+    putNormal $ "--------\nRunning " ++ show builder ++ " with arguments:"
+    mapM_ (putNormal . ("    " ++)) $ interestingInfo builder args'
+    putNormal "--------"
+    quietly $ cmd [exe] args'
+
+interestingInfo :: Builder -> [String] -> [String]
+interestingInfo builder ss = case builder of
+    Ar       -> prefixAndSuffix 3 1 ss
+    Ghc _    -> if head ss == "-M"
+                then prefixAndSuffix 1 1 ss
+                else prefixAndSuffix 0 4 ss
+    GhcPkg _ -> prefixAndSuffix 2 0 ss
+    GhcCabal -> prefixAndSuffix 3 0 ss
+  where
+    prefixAndSuffix n m ss =
+        if length ss <= n + m
+        then ss
+        else take n ss ++ ["..."] ++ drop (length ss - m) ss
+
 -- Check if the builder is uniquely specified in config files
 specified :: Builder -> Condition
 specified builder = do
@@ -104,3 +133,7 @@ specified builder = do
     return $ case exes of
         [_] -> True
         _   -> False
+
+-- TODO: generalise for other builders
+arArgs :: Args
+arArgs = arg "q"
