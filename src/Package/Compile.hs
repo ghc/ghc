@@ -48,6 +48,7 @@ oRule (Package name path _) (stage, dist, settings) =
             <> arg SrcHcOpts
             <> packageArgs stage pkgData
             <> includeArgs path dist
+            <> concatArgs ["-optP"] (CppOpts pkgData) 
             -- TODO: now we have both -O and -O2
             <> arg ["-Wall", "-XHaskell2010", "-O2"]
             <> productArgs ["-odir", "-hidir", "-stubdir"] buildDir
@@ -55,7 +56,7 @@ oRule (Package name path _) (stage, dist, settings) =
             <> arg ("-c":srcs)
             <> arg ["-o", toStandard out]
 
--- TODO: This rule looks a bit of a hack... combine it with the above?
+-- TODO: This rule looks hacky... combine it with the above?
 hiRule :: Package -> TodoItem -> Rules ()
 hiRule (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist </> "build"

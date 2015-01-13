@@ -122,9 +122,10 @@ pkgDepObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepObjects path dist way = do
     let pkgData  = path </> dist </> "package-data.mk"
         buildDir = path </> dist </> "build"
-        hs2obj   = (buildDir ++) . drop (length path) . (-<.> osuf way)
-    srcs <- pkgHsSources path dist
-    return $ map (toStandard . hs2obj) srcs
+    dirs <- map (normaliseEx . (path </>)) <$> arg (SrcDirs pkgData)
+    fmap concat $ forM dirs $ \d -> 
+        map (toStandard . (buildDir ++) . (-<.> osuf way) . drop (length d))
+        <$> (findModuleFiles pkgData [d] [".hs", ".lhs"])
 
 -- Find objects that go to library
 pkgLibObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]

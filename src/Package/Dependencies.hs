@@ -13,6 +13,7 @@ buildPackageDependencies (Package name path _) (stage, dist, settings) =
         terseRun (Ghc stage) $ arg "-M"
             <> packageArgs stage pkgData
             <> includeArgs path dist
+            <> concatArgs ["-optP"] (CppOpts pkgData) 
             <> productArgs ["-odir", "-stubdir", "-hidir"] buildDir
             <> arg ["-dep-makefile", toStandard $ out <.> "new"]
             <> productArgs "-dep-suffix" (map wayPrefix <$> ways settings)
