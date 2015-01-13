@@ -10,7 +10,8 @@ import Package.Dependencies
 
 -- These are the packages we build:
 packages :: [Package]
-packages = [libraryPackage "deepseq" Stage1 defaultSettings]
+packages = [libraryPackage "array"   Stage1 defaultSettings,
+            libraryPackage "deepseq" Stage1 defaultSettings]
 
 -- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()
@@ -24,7 +25,10 @@ packageRules = do
     -- TODO: control targets from commang line arguments
     want [ "libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a"
          , "libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.p_a"
-         , "libraries/deepseq/dist-install/build/HSdeeps_FT5iVCELxOr62eHY0nbvnU.o" ]
+         , "libraries/deepseq/dist-install/build/HSdeeps_FT5iVCELxOr62eHY0nbvnU.o"
+         , "libraries/array/dist-install/build/libHSarray_3w0nMK0JfaFJPpLFn2yWAJ.a"
+         , "libraries/array/dist-install/build/libHSarray_3w0nMK0JfaFJPpLFn2yWAJ.p_a"
+         , "libraries/array/dist-install/build/HSarray_3w0nMK0JfaFJPpLFn2yWAJ.o" ]
     forM_ packages $ \pkg -> do
         forM_ (pkgTodo pkg) $ \todoItem -> do
             buildPackage pkg todoItem
