@@ -13,7 +13,7 @@ module Ways (
     loggingDynamic, threadedLoggingDynamic,
 
     wayHcArgs, 
-    suffix,
+    wayPrefix,
     hisuf, osuf, hcsuf,
     detectWay
     ) where
@@ -43,7 +43,8 @@ logging   = Way "l"  [Logging]
 parallel  = Way "mp" [Parallel]
 granSim   = Way "gm" [GranSim]
 
--- RTS only ways. TODO: do we need to define these here?
+-- RTS only ways
+-- TODO: do we need to define *only* these? Shall we generalise/simplify?
 threaded                 = Way "thr"           [Threaded]
 threadedProfiling        = Way "thr_p"         [Threaded, Profiling]
 threadedLogging          = Way "thr_l"         [Threaded, Logging]
@@ -88,19 +89,52 @@ wayHcArgs (Way _ units) =
     <> (units == [Debug] || units == [Debug, Dynamic]) <?>
        arg ["-ticky", "-DTICKY_TICKY"]
 
-suffix :: Way -> String
-suffix way | way == vanilla = ""
-           | otherwise      = tag way ++ "_"
+wayPrefix :: Way -> String
+wayPrefix way | way == vanilla = ""
+              | otherwise      = tag way ++ "_"
 
-hisuf, osuf, hcsuf :: Way -> String
-hisuf = (++ "hi") . suffix
-osuf  = (++ "o" ) . suffix
-hcsuf = (++ "hc") . suffix
+hisuf, osuf, hcsuf, obootsuf, ssuf :: Way -> String
+osuf     = (++ "o"     ) . wayPrefix
+ssuf     = (++ "s"     ) . wayPrefix
+hisuf    = (++ "hi"    ) . wayPrefix
+hcsuf    = (++ "hc"    ) . wayPrefix
+obootsuf = (++ "o-boot") . wayPrefix
+
+-- Note: in the previous build system libsuf was mysteriously different
+-- from other suffixes. For example, in the profiling way it used to be
+-- "_p.a" instead of ".p_a" which is how other suffixes work. I decided
+-- to make all suffixes consistent: ".way_extension".
+libsuf :: Way -> Action String
+libsuf way = do
+    let staticSuffix = wayPrefix $ dropDynamic way
+    if Dynamic `notElem` units way
+    then return $ staticSuffix ++ "a"
+    else do
+        [extension] <- showArgs DynamicExtension
+        [version]   <- showArgs ProjectVersion
+        return $ staticSuffix ++ "-ghc" ++ version ++ extension
+
+-- TODO: This may be slow -- optimise if overhead is significant.
+dropDynamic :: Way -> Way
+dropDynamic way
+    | way == dynamic                  = vanilla
+    | way == profilingDynamic         = profiling
+    | way == threadedProfilingDynamic = threadedProfiling
+    | way == threadedDynamic          = threaded
+    | way == threadedDebugDynamic     = threadedDebug
+    | way == debugDynamic             = debug
+    | way == loggingDynamic           = logging
+    | way == threadedLoggingDynamic   = threadedLogging
+    | otherwise = error $ "Cannot drop Dynamic from way " ++ tag way ++ "."
 
 -- Detect way from a given extension. Fail if the result is not unique.
+-- TODO: This may be slow -- optimise if overhead is significant.
 detectWay :: FilePath -> Way
-detectWay extension = case solutions of
-    [way] -> way
-    _     -> error $ "Cannot detect way from extension '" ++ extension ++ "'."
-  where
-    solutions = [w | f <- [hisuf, osuf, hcsuf], w <- allWays, f w == extension]
+detectWay extension =
+    let prefix = reverse $ dropWhile (/= '_') $ reverse extension
+        result = filter ((== prefix) . wayPrefix) allWays
+    in
+    case result of
+        [way] -> way
+        _     -> error $ "Cannot detect way from extension '"
+                       ++ extension ++ "'."
