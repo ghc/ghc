@@ -53,4 +53,4 @@ buildPackageCompile (Package name path _) (stage, dist, settings) =
             <> productArgs ["-odir", "-hidir", "-stubdir"] buildDir
             <> when (splitObjects stage) (arg "-split-objs")
             <> arg ("-c":srcs)
-            <> arg ["-o", out]
+            <> arg ["-o", toStandard out]

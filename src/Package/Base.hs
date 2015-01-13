@@ -49,7 +49,7 @@ libraryPackage :: String -> Stage -> (Stage -> Settings) -> Package
 libraryPackage name stage settings =
     Package
         name
-        ("libraries" </> name)
+        (toStandard $ "libraries" </> name)
         [(
             stage,
             if stage == Stage0 then "dist-boot" else "dist-install",
@@ -123,7 +123,7 @@ pkgDepObjects path dist way = do
         buildDir = path </> dist </> "build"
         hs2obj   = (buildDir ++) . drop (length path) . (-<.> osuf way)
     srcs <- pkgHsSources path dist
-    return $ map hs2obj srcs
+    return $ map (toStandard . hs2obj) srcs
 
 -- Find objects that go to library
 pkgLibObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]
@@ -145,4 +145,4 @@ findModuleFiles pkgData directories suffixes = do
         modPath <- map (replaceEq '.' pathSeparator) mods
         suffix  <- suffixes
         return $ dir </> modPath ++ suffix
-    return $ map normaliseEx files
+    return $ map (toStandard . normaliseEx) files

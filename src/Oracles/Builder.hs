@@ -27,7 +27,7 @@ data Builder = Ar
              deriving Show
 
 instance ShowArgs Builder where
-    showArgs builder = showArgs $ fmap words $ do
+    showArgs builder = showArgs $ fmap (map toStandard . words) $ do
         let key = case builder of
                 Ar            -> "ar"
                 Ld            -> "ld"

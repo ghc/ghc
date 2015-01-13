@@ -79,7 +79,7 @@ buildPackageData (Package name path _) (stage, dist, settings) =
         ghcPkgArgs = arg ["update", "--force"]
             <> (stage == Stage0) <?>
                arg "--package-db=libraries/bootstrapping.conf"
-            <> arg (pathDist </> "inplace-pkg-config")
+            <> arg (toStandard $ pathDist </> "inplace-pkg-config")
     in
     (pathDist </>) <$>
     [ "package-data.mk"

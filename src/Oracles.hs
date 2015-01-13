@@ -49,7 +49,7 @@ packageDataOracle :: Rules ()
 packageDataOracle = do
     pkgData <- newCache $ \file -> do
         need [file]
-        putNormal $ "Parsing " ++ file ++ "..."
+        putNormal $ "Parsing " ++ toStandard file ++ "..."
         liftIO $ readConfigFile file
     addOracle $ \(PackageDataKey (file, key)) -> M.lookup key <$> pkgData file
     return ()

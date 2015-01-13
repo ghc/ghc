@@ -15,12 +15,7 @@ arRule (Package _ path _) (stage, dist, _) =
         need depObjs
         libObjs <- pkgLibObjects path dist stage way
         liftIO $ removeFiles "." [out]
-        terseRun Ar $ "q" <+> out <+> libObjs
-
-{- "C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe"  -r -o 
-libraries/deepseq/dist-install/build/HSdeeps_FT5iVCELxOr62eHY0nbvnU.o  
-libraries/deepseq/dist-install/build/Control/DeepSeq.o
--}
+        terseRun Ar $ "q" <+> toStandard out <+> libObjs
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule (Package name path _) (stage, dist, _) =
@@ -32,7 +27,7 @@ ldRule (Package name path _) (stage, dist, _) =
         depObjs <- pkgDepObjects path dist vanilla
         need depObjs
         terseRun Ld $ arg (ConfLdLinkerArgs stage)
-            <> arg ["-r", "-o", out]
+            <> arg ["-r", "-o", toStandard out]
             <> arg depObjs
         synopsis <- unwords <$> arg (Synopsis pkgData)
         putNormal $ "Successfully built package " ++ name ++ "." 

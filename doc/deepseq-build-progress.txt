@@ -70,9 +70,15 @@ echo        >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0
 # Skipping:
 /usr/bin/find libraries/deepseq/dist-install/build/Control/DeepSeq_p_o_split -name '*.p_o' -print >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
 echo        >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
+
+# Done:
 "/usr/bin/ar" q  libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a @libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
 /usr/bin/ar: creating libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a
+
+# Skipping:
 "rm" -f libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
+
+
 "inplace/bin/mkdirhier" libraries/deepseq/dist-install/doc/html/deepseq//.
 "C:/msys/home/chEEtah/ghc/inplace/bin/haddock" --odir="libraries/deepseq/dist-install/doc/html/deepseq" --no-tmp-comp-dir --dump-interface=libraries/deepseq/dist-install/doc/html/deepseq/deepseq.haddock --html --hoogle --title="deepseq-1.4.0.0: Deep evaluation of data structures" --prologue="libraries/deepseq/dist-install/haddock-prologue.txt"  --read-interface=../array-0.5.0.1,../array-0.5.0.1/src/%{MODULE/./-}.html\#%{NAME},libraries/array/dist-install/doc/html/array/array.haddock --read-interface=../base-4.8.0.0,../base-4.8.0.0/src/%{MODULE/./-}.html\#%{NAME},libraries/base/dist-install/doc/html/base/base.haddock --read-interface=../ghc-prim-0.3.1.0,../ghc-prim-0.3.1.0/src/%{MODULE/./-}.html\#%{NAME},libraries/ghc-prim/dist-install/doc/html/ghc-prim/ghc-prim.haddock --optghc=-hisuf --optghc=hi --optghc=-osuf --optghc=o --optghc=-hcsuf --optghc=hc --optghc=-static --optghc=-H32m --optghc=-O --optghc=-this-package-key --optghc=deeps_FT5iVCELxOr62eHY0nbvnU --optghc=-hide-all-packages --optghc=-i --optghc=-ilibraries/deepseq/. --optghc=-ilibraries/deepseq/dist-install/build --optghc=-ilibraries/deepseq/dist-install/build/autogen --optghc=-Ilibraries/deepseq/dist-install/build --optghc=-Ilibraries/deepseq/dist-install/build/autogen --optghc=-Ilibraries/deepseq/. --optghc=-optP-include --optghc=-optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h --optghc=-package-key --optghc=array_3w0nMK0JfaFJPpLFn2yWAJ --optghc=-package-key --optghc=base_469rOtLAqwTGFEOGWxSUiQ --optghc=-package-key --optghc=ghcpr_FgrV6cgh2JHBlbcx1OSlwt --optghc=-Wall --optghc=-XHaskell2010 --optghc=-O2 --optghc=-no-user-package-db --optghc=-rtsopts --optghc=-odir --optghc=libraries/deepseq/dist-install/build --optghc=-hidir --optghc=libraries/deepseq/dist-install/build --optghc=-stubdir --optghc=libraries/deepseq/dist-install/build --optghc=-split-objs    libraries/deepseq/./Control/DeepSeq.hs  +RTS -tlibraries/deepseq/dist-install/doc/html/deepseq/deepseq.haddock.t --machine-readable
 Haddock coverage:
