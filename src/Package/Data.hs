@@ -93,6 +93,6 @@ buildPackageData (Package name path _) (stage, dist, settings) =
         need ["shake/src/Package/Data.hs"]
         need [path </> name <.> "cabal"]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        run GhcCabal cabalArgs
-        when (registerPackage settings) $ run (GhcPkg stage) ghcPkgArgs
+        terseRun GhcCabal cabalArgs
+        when (registerPackage settings) $ terseRun (GhcPkg stage) ghcPkgArgs
         postProcessPackageData $ pathDist </> "package-data.mk"

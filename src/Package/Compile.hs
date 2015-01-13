@@ -43,7 +43,7 @@ buildPackageCompile (Package name path _) (stage, dist, settings) =
         let deps = concat $ snd $ unzip $ filter ((== out) . fst) depContents
             srcs = filter ("//*hs" ?==) deps -- TODO: handle *.c sources
         need deps
-        run (Ghc stage) $ suffixArgs way
+        terseRun (Ghc stage) $ suffixArgs way
             <> wayHcArgs way
             <> arg SrcHcOpts
             <> packageArgs stage pkgData
@@ -51,6 +51,6 @@ buildPackageCompile (Package name path _) (stage, dist, settings) =
             -- TODO: now we have both -O and -O2
             <> arg ["-Wall", "-XHaskell2010", "-O2"]
             <> productArgs ["-odir", "-hidir", "-stubdir"] buildDir
-            <> arg "-split-objs"
+            <> when (splitObjects stage) (arg "-split-objs")
             <> arg ("-c":srcs)
             <> arg ["-o", out]
