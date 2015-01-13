@@ -32,6 +32,8 @@ lax-dependencies     = NO
 dynamic-ghc-programs = NO
 supports-package-key = @SUPPORTS_PACKAGE_KEY@
 solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
+split-objects-broken = @SplitObjsBroken@
+ghc-unregisterised   = @Unregisterised@
 
 # Information about host and target systems:
 #===========================================
@@ -43,6 +45,10 @@ target-platform-full = @TargetPlatformFull@
 host-os-cpp          = @HostOS_CPP@
 
 cross-compiling      = @CrossCompiling@
+
+dynamic-extension    = @soext_target@
+
+project-version      = @ProjectVersion@
 
 # Compilation and linking flags:
 #===============================

@@ -21,6 +21,8 @@ data Flag = LaxDeps
           | Validating
           | SupportsPackageKey
           | SolarisBrokenShld
+          | SplitObjectsBroken
+          | GhcUnregisterised
 
 -- TODO: Give the warning *only once* per key
 test :: Flag -> Action Bool
@@ -34,6 +36,8 @@ test flag = do
         Validating         -> ("validating"           , False)
         SupportsPackageKey -> ("supports-package-key" , False)
         SolarisBrokenShld  -> ("solaris-broken-shld"  , False)
+        SplitObjectsBroken -> ("split-objects-broken" , False)
+        GhcUnregisterised  -> ("ghc-unregisterised"   , False)
     let defaultString = if defaultValue then "YES" else "NO"
     value <- askConfigWithDefault key $
         do putLoud $ "\nFlag '"
