@@ -8,7 +8,8 @@ module Package.Base (
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     bootPkgConstraints,
-    pathArgs, packageArgs, includeArgs, srcArgs
+    pathArgs, packageArgs, includeArgs, pkgHsSources, 
+    pkgDepObjects, pkgLibObjects
     ) where
 
 import Base
@@ -108,13 +109,40 @@ includeArgs path dist =
     <> arg "-optP-include" -- TODO: Shall we also add -cpp?
     <> concatArgs "-optP" (buildDir </> "autogen/cabal_macros.h")
 
-srcArgs :: FilePath -> FilePath -> Args
-srcArgs path pkgData = do
-    mods <- arg (Modules pkgData)
-    dirs <- arg (SrcDirs pkgData)
-    srcs <- getDirectoryFiles "" $ do
-        dir       <- dirs
-        modPath   <- map (replaceEq '.' pathSeparator) mods
-        extension <- ["hs", "lhs"]
-        return $ path </> dir </> modPath <.> extension
-    arg (map normaliseEx srcs)
+pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
+pkgHsSources path dist = do
+    let pkgData = path </> dist </> "package-data.mk"
+    dirs <- map (path </>) <$> arg (SrcDirs pkgData)
+    findModuleFiles pkgData dirs [".hs", ".lhs"]
+
+-- Find objects we depend on (we don't want to depend on split objects)
+-- TODO: look for non-hs objects too 
+pkgDepObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
+pkgDepObjects path dist way = do
+    let pkgData  = path </> dist </> "package-data.mk"
+        buildDir = path </> dist </> "build"
+        hs2obj   = (buildDir ++) . drop (length path) . (-<.> osuf way)
+    srcs <- pkgHsSources path dist
+    return $ map hs2obj srcs
+
+-- Find objects that go to library
+pkgLibObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]
+pkgLibObjects path dist stage way = do
+    let pkgData  = path </> dist </> "package-data.mk"
+        buildDir = path </> dist </> "build"
+    split <- splitObjects stage
+    if split
+    then do
+         let suffixes = ["_" ++ osuf way ++ "_split//*"]
+         findModuleFiles pkgData [buildDir] suffixes
+    else pkgDepObjects path dist way
+
+findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
+findModuleFiles pkgData directories suffixes = do
+    mods  <- arg (Modules pkgData)
+    files <- getDirectoryFiles "" $ do
+        dir     <- directories
+        modPath <- map (replaceEq '.' pathSeparator) mods
+        suffix  <- suffixes
+        return $ dir </> modPath ++ suffix
+    return $ map normaliseEx files
