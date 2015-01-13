@@ -1,48 +1,62 @@
+# Skipping:
 "inplace/bin/ghc-cabal.exe" check libraries/deepseq
 
-Skipping.
-
-
+# Done:
 "inplace/bin/ghc-cabal.exe"                        configure libraries/deepseq dist-install "" --with-ghc="C:/msys/home/chEEtah/ghc/inplace/bin/ghc-stage1.exe" --with-ghc-pkg="C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe"  --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=" -fno-stack-protector   " --configure-option=LDFLAGS="   " --configure-option=CPPFLAGS="   " --gcc-options=" -fno-stack-protector       " --with-gcc="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe" --with-ld="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe" --configure-option=--with-cc="C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe" --with-ar="/usr/bin/ar"          --with-alex="/usr/local/bin/alex"          --with-happy="/usr/local/bin/happy"
-C:/msys/home/chEEtah/ghc/inplace/bin/ghc-cabal.exe configure libraries\deepseq dist-install    --with-ghc= C:/msys/home/chEEtah/ghc/inplace/bin/ghc-stage1.exe  --with-ghc-pkg= C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe   --disable-library-for-ghci --enable-library-vanilla --enable-library-for-ghci --enable-library-profiling --disable-shared --configure-option=CFLAGS=-fno-stack-protector       --configure-option=LDFLAGS=      --configure-option=CPPFLAGS=      --gcc-options=-fno-stack-protector           --with-gcc= C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe  --with-ld= C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe  --configure-option=--with-cc= C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe  --with-ar=C:/msys/usr/bin/ar.exe --with-alex=C:/msys/usr/local/bin/alex.exe --with-happy=C:/msys/usr/local/bin/happy.exe
-
 Configuring deepseq-1.4.0.0...
 
+# Done:
 "C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe" update --force  libraries/deepseq/dist-install/inplace-pkg-config
- C:/msys/home/chEEtah/ghc/inplace/bin/ghc-pkg.exe  update --force  libraries\deepseq\dist-install\inplace-pkg-config
-
 Reading package info from "libraries/deepseq/dist-install/inplace-pkg-config" ... done.
 
-
+# Skipping:
 "rm" -f libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp
+
+# Skipping:
 "rm" -f libraries/deepseq/dist-install/build/.depend-v-p.c_asm.bit
 
+# Skipping:
 echo "libraries/deepseq_dist-install_depfile_c_asm_EXISTS = YES" >> libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp
+
+# Skipping:
 mv libraries/deepseq/dist-install/build/.depend-v-p.c_asm.tmp libraries/deepseq/dist-install/build/.depend-v-p.c_asm
+
+# Skipping:
 "rm" -f libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp
 
+# Done:
 "inplace/bin/ghc-stage1.exe" -M -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -dep-makefile libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp -dep-suffix "" -dep-suffix "p_" -include-pkg-deps  libraries/deepseq/./Control/DeepSeq.hs
 
+# Skipping:
 echo "libraries/deepseq_dist-install_depfile_haskell_EXISTS = YES" >> libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp
+
+# Skipping:
 for dir in libraries/deepseq/dist-install/build/Control/; do if test ! -d $dir; then mkdir -p $dir; fi done
+
+# Skipping:
 grep -v ' : [a-zA-Z]:/' libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp > libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp2
+
+# Skipping:
 sed -e '/hs$/ p' -e '/hs$/ s/o /hi /g' -e '/hs$/ s/:/ : %hi: %o /' -e '/hs$/ s/^/$(eval $(call hi-rule,/' -e '/hs$/ s/$/))/' -e '/hs-boot$/ p' -e '/hs-boot$/ s/o-boot /hi-boot /g' -e '/hs-boot$/ s/:/ : %hi-boot: %o-boot /' -e '/hs-boot$/ s/^/$(eval $(call hi-rule,/' -e '/hs-boot$/ s/$/))/' libraries/deepseq/dist-install/build/.depend-v-p.haskell.tmp2 > libraries/deepseq/dist-install/build/.depend-v-p.haskell
 
-
-
+# Done:
 "inplace/bin/ghc-stage1.exe" -hisuf hi -osuf  o -hcsuf hc -static  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -split-objs  -c libraries/deepseq/./Control/DeepSeq.hs -o libraries/deepseq/dist-install/build/Control/DeepSeq.o
 
-
-
+# Skipping:
 "rm" -f libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
+
+# Skipping:
 /usr/bin/find libraries/deepseq/dist-install/build/Control/DeepSeq_o_split -name '*.o' -print >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
+
+# Skipping:
 echo        >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
+
+# Done:
 "/usr/bin/ar" q  libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a @libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
 /usr/bin/ar: creating libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a
 "rm" -f libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
 
-
-
+# Done:
 "inplace/bin/ghc-stage1.exe" -hisuf p_hi -osuf  p_o -hcsuf p_hc -static -prof  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -split-objs  -c libraries/deepseq/./Control/DeepSeq.hs -o libraries/deepseq/dist-install/build/Control/DeepSeq.p_o
 
 
