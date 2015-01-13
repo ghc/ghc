@@ -7,7 +7,6 @@ import Data.List.Split
 arRule :: Package -> TodoItem -> Rules ()
 arRule (Package _ path _) (stage, dist, _) =
     let buildDir = path </> dist </> "build"
-        pkgData  = path </> dist </> "package-data.mk"
     in
     (buildDir <//> "*a") %> \out -> do
         let way = detectWay $ tail $ takeExtension out
@@ -16,6 +15,8 @@ arRule (Package _ path _) (stage, dist, _) =
         need depObjs
         libObjs <- pkgLibObjects path dist stage way
         liftIO $ removeFiles "." [out]
+        -- Splitting argument list into chunks as otherwise Ar chokes up
+        -- TODO: use simpler list notation for passing arguments
         forM_ (chunksOf 100 libObjs) $ \os -> do
             terseRun Ar $ "q" <+> toStandard out <+> os
 

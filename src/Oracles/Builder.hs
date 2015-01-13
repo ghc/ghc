@@ -11,6 +11,9 @@ import Oracles.Base
 import Oracles.Flag
 import Oracles.Option
 
+-- A Builder is an external command invoked in separate process
+-- by calling Shake.cmd
+--
 -- Ghc Stage0 is the bootstrapping compiler
 -- Ghc StageN, N > 0, is the one built on stage (N - 1)
 -- GhcPkg Stage0 is the bootstrapping GhcPkg 
@@ -96,7 +99,8 @@ run :: Builder -> Args -> Action ()
 run builder args = do
     needBuilder builder
     [exe] <- showArgs builder
-    cmd [exe] =<< args
+    args' <- args
+    cmd [exe] args'
 
 -- Run the builder with a given collection of arguments printing out a
 -- terse commentary with only 'interesting' info for the builder.
@@ -106,9 +110,9 @@ terseRun builder args = do
     needBuilder builder
     [exe] <- showArgs builder
     args' <- args
-    putNormal $ "--------\nRunning " ++ show builder ++ " with arguments:"
-    mapM_ (putNormal . ("    " ++)) $ interestingInfo builder args'
-    putNormal "--------"
+    putNormal $ "|--------\n| Running " ++ show builder ++ " with arguments:"
+    mapM_ (putNormal . ("|   " ++)) $ interestingInfo builder args'
+    putNormal "|--------"
     quietly $ cmd [exe] args'
 
 interestingInfo :: Builder -> [String] -> [String]

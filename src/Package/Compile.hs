@@ -32,7 +32,7 @@ suffixArgs way = arg ["-hisuf", hisuf way]
 oRule :: Package -> TodoItem -> Rules ()
 oRule (Package name path _) (stage, dist, settings) =
     let buildDir = toStandard $ path </> dist </> "build"
-        pkgData  = toStandard $ path </> dist </> "package-data.mk"
+        pkgData  = path </> dist </> "package-data.mk"
         depFile  = buildDir </> name <.> "m"
     in
     (buildDir <//> "*o") %> \out -> do
@@ -49,6 +49,7 @@ oRule (Package name path _) (stage, dist, settings) =
             <> packageArgs stage pkgData
             <> includeArgs path dist
             <> concatArgs ["-optP"] (CppOpts pkgData) 
+            -- TODO: use HC_OPTS from pkgData
             -- TODO: now we have both -O and -O2
             <> arg ["-Wall", "-XHaskell2010", "-O2"]
             <> productArgs ["-odir", "-hidir", "-stubdir"] buildDir
@@ -59,10 +60,10 @@ oRule (Package name path _) (stage, dist, settings) =
 -- TODO: This rule looks hacky... combine it with the above?
 hiRule :: Package -> TodoItem -> Rules ()
 hiRule (Package name path _) (stage, dist, settings) =
-    let buildDir = toStandard $ path </> dist </> "build"
+    let buildDir = path </> dist </> "build"
     in
     (buildDir <//> "*hi") %> \out -> do
-        let way  = detectWay $ tail $ takeExtension out
+        let way   = detectWay $ tail $ takeExtension out
             oFile = out -<.> osuf way
         need [oFile]
 

@@ -6,7 +6,7 @@ import Package.Base
 buildPackageDependencies :: Package -> TodoItem -> Rules ()
 buildPackageDependencies (Package name path _) (stage, dist, settings) =
     let buildDir = toStandard $ path </> dist </> "build"
-        pkgData  = toStandard $ path </> dist </> "package-data.mk"
+        pkgData  = path </> dist </> "package-data.mk"
     in
     (buildDir </> name <.> "m") %> \out -> do
         need ["shake/src/Package/Dependencies.hs"]

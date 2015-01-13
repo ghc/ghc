@@ -11,9 +11,9 @@ import Package.Dependencies
 -- These are the packages we build:
 packages :: [Package]
 packages = [libraryPackage "array"          Stage1 defaultSettings,
-            libraryPackage "deepseq"        Stage1 defaultSettings,
             libraryPackage "bin-package-db" Stage1 defaultSettings,
-            libraryPackage "binary"         Stage1 defaultSettings]
+            libraryPackage "binary"         Stage1 defaultSettings,
+            libraryPackage "deepseq"        Stage1 defaultSettings]
 
 -- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()
@@ -24,7 +24,7 @@ buildPackage = buildPackageData
 
 packageRules :: Rules ()
 packageRules = do
-    -- TODO: control targets from commang line arguments
+    -- TODO: control targets from command line arguments
     forM_ packages $ \pkg @ (Package name path todo) -> do
         forM_ todo $ \todoItem @ (stage, dist, settings) -> do
 

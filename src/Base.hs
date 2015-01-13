@@ -27,6 +27,8 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 instance Show Stage where
     show = show . fromEnum
 
+-- The returned list of strings is a list of arguments
+-- to be passed to a Builder
 type Args = Action [String]
 
 type Condition = Action Bool

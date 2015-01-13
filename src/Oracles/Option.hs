@@ -8,6 +8,10 @@ import Base
 import Oracles.Flag
 import Oracles.Base
 
+-- For each Option the files {default.config, user.config} contain
+-- a line of the form 'target-os = mingw32'.
+-- (showArgs TargetOS) is an action that consults the config files
+-- and returns ["mingw32"].
 -- TODO: separate single string options from multiple string ones.
 data Option = TargetOS
             | TargetArch
