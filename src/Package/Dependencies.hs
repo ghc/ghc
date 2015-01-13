@@ -22,5 +22,7 @@ buildPackageDependencies (Package name path _) (stage, dist, settings) =
             -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
             -- <> wayHcOpts vanilla
         -- Avoid rebuilding dependecies of out if it hasn't changed:
-        copyFileChanged (out <.> "new") out
+        -- Note: cannot use copyFileChanged as it depends on the source file
+        deps <- liftIO $ readFile $ out <.> "new"
+        writeFileChanged out deps
         removeFilesAfter "." [out <.> "new"]
