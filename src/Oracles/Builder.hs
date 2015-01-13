@@ -122,9 +122,13 @@ interestingInfo builder ss = case builder of
     GhcCabal -> prefixAndSuffix 3 0 ss
   where
     prefixAndSuffix n m ss =
-        if length ss <= n + m
+        if length ss <= n + m + 1
         then ss
-        else take n ss ++ ["..."] ++ drop (length ss - m) ss
+        else take n ss
+             ++ ["... skipping "
+             ++ show (length ss - n - m)
+             ++ " arguments ..."]
+             ++ drop (length ss - m) ss
 
 -- Check if the builder is uniquely specified in config files
 specified :: Builder -> Condition
