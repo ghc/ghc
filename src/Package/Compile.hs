@@ -31,8 +31,8 @@ suffixArgs way = arg ["-hisuf", hisuf way]
 
 oRule :: Package -> TodoItem -> Rules ()
 oRule (Package name path _) (stage, dist, settings) =
-    let buildDir = path </> dist </> "build"
-        pkgData  = path </> dist </> "package-data.mk"
+    let buildDir = toStandard $ path </> dist </> "build"
+        pkgData  = toStandard $ path </> dist </> "package-data.mk"
         depFile  = buildDir </> name <.> "m"
     in
     (buildDir <//> "*o") %> \out -> do
@@ -59,7 +59,7 @@ oRule (Package name path _) (stage, dist, settings) =
 -- TODO: This rule looks hacky... combine it with the above?
 hiRule :: Package -> TodoItem -> Rules ()
 hiRule (Package name path _) (stage, dist, settings) =
-    let buildDir = path </> dist </> "build"
+    let buildDir = toStandard $ path </> dist </> "build"
     in
     (buildDir <//> "*hi") %> \out -> do
         let way  = detectWay $ tail $ takeExtension out
