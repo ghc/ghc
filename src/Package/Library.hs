@@ -2,6 +2,7 @@
 module Package.Library (buildPackageLibrary) where
 
 import Package.Base
+import Data.List.Split
 
 arRule :: Package -> TodoItem -> Rules ()
 arRule (Package _ path _) (stage, dist, _) =
@@ -15,7 +16,8 @@ arRule (Package _ path _) (stage, dist, _) =
         need depObjs
         libObjs <- pkgLibObjects path dist stage way
         liftIO $ removeFiles "." [out]
-        terseRun Ar $ "q" <+> toStandard out <+> libObjs
+        forM_ (chunksOf 100 libObjs) $ \os -> do
+            terseRun Ar $ "q" <+> toStandard out <+> os
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule (Package name path _) (stage, dist, _) =
