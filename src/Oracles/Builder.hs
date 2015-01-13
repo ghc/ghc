@@ -2,8 +2,7 @@
 
 module Oracles.Builder (
     Builder (..),
-    with, run, terseRun, specified,
-    arArgs
+    with, run, terseRun, specified
     ) where
 
 import Data.Char
@@ -115,11 +114,13 @@ terseRun builder args = do
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
     Ar       -> prefixAndSuffix 3 1 ss
+    Ld       -> prefixAndSuffix 4 0 ss
     Ghc _    -> if head ss == "-M"
                 then prefixAndSuffix 1 1 ss
                 else prefixAndSuffix 0 4 ss
     GhcPkg _ -> prefixAndSuffix 2 0 ss
     GhcCabal -> prefixAndSuffix 3 0 ss
+    _        -> ss
   where
     prefixAndSuffix n m ss =
         if length ss <= n + m + 1
@@ -138,6 +139,3 @@ specified builder = do
         [_] -> True
         _   -> False
 
--- TODO: generalise for other builders
-arArgs :: Args
-arArgs = arg "q"

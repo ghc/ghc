@@ -54,14 +54,20 @@ echo        >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0
 # Done:
 "/usr/bin/ar" q  libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a @libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
 /usr/bin/ar: creating libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a
+
+# Skipping:
 "rm" -f libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a.contents
 
 # Done:
 "inplace/bin/ghc-stage1.exe" -hisuf p_hi -osuf  p_o -hcsuf p_hc -static -prof  -H32m -O    -this-package-key deeps_FT5iVCELxOr62eHY0nbvnU -hide-all-packages -i -ilibraries/deepseq/. -ilibraries/deepseq/dist-install/build -ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/dist-install/build -Ilibraries/deepseq/dist-install/build/autogen -Ilibraries/deepseq/.    -optP-include -optPlibraries/deepseq/dist-install/build/autogen/cabal_macros.h -package-key array_3w0nMK0JfaFJPpLFn2yWAJ -package-key base_469rOtLAqwTGFEOGWxSUiQ -package-key ghcpr_FgrV6cgh2JHBlbcx1OSlwt -Wall -XHaskell2010 -O2  -no-user-package-db -rtsopts      -odir libraries/deepseq/dist-install/build -hidir libraries/deepseq/dist-install/build -stubdir libraries/deepseq/dist-install/build -split-objs  -c libraries/deepseq/./Control/DeepSeq.hs -o libraries/deepseq/dist-install/build/Control/DeepSeq.p_o
 
-
+# Done:
 "C:/msys/home/chEEtah/ghc/inplace/mingw/bin/ld.exe"  -r -o libraries/deepseq/dist-install/build/HSdeeps_FT5iVCELxOr62eHY0nbvnU.o  libraries/deepseq/dist-install/build/Control/DeepSeq.o
+
+# Done:
 "rm" -f libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
+
+# Skipping:
 /usr/bin/find libraries/deepseq/dist-install/build/Control/DeepSeq_p_o_split -name '*.p_o' -print >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
 echo        >> libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
 "/usr/bin/ar" q  libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a @libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU_p.a.contents
