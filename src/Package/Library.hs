@@ -22,4 +22,5 @@ buildPackageLibrary (Package _ path _) (stage, dist, _) =
         depObjs <- pkgDepObjects path dist way
         need depObjs
         libObjs <- pkgLibObjects path dist stage way
+        liftIO $ removeFiles "" [out]
         terseRun Ar $ arArgs <+> out <+> libObjs
