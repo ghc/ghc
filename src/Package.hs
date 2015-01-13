@@ -3,6 +3,7 @@ module Package (packageRules) where
 import Package.Base
 import Package.Data
 import Package.Compile
+import Package.Library
 import Package.Dependencies
 
 -- See Package.Base for definitions of basic types
@@ -16,12 +17,13 @@ buildPackage :: Package -> TodoItem -> Rules ()
 buildPackage = buildPackageData
             <> buildPackageDependencies
             <> buildPackageCompile
+            <> buildPackageLibrary
 
 packageRules :: Rules ()
 packageRules = do
     -- TODO: control targets from commang line arguments
-    want [ "libraries/deepseq/dist-install/build/Control/DeepSeq.o"
-         , "libraries/deepseq/dist-install/build/Control/DeepSeq.p_o" ]
+    want [ "libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.a"
+         , "libraries/deepseq/dist-install/build/libHSdeeps_FT5iVCELxOr62eHY0nbvnU.p_a" ]
     forM_ packages $ \pkg -> do
         forM_ (pkgTodo pkg) $ \todoItem -> do
             buildPackage pkg todoItem
