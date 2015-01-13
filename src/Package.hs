@@ -12,7 +12,8 @@ import Package.Dependencies
 packages :: [Package]
 packages = [libraryPackage "array"          Stage1 defaultSettings,
             libraryPackage "deepseq"        Stage1 defaultSettings,
-            libraryPackage "bin-package-db" Stage1 defaultSettings]
+            libraryPackage "bin-package-db" Stage1 defaultSettings,
+            libraryPackage "binary"         Stage1 defaultSettings]
 
 -- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()
@@ -32,7 +33,10 @@ packageRules = do
          , "libraries/array/dist-install/build/HSarray_3w0nMK0JfaFJPpLFn2yWAJ.o"
          , "libraries/bin-package-db/dist-install/build/libHSbinpa_9qPPbdABQ6HK3eua2jBtib.a"
          , "libraries/bin-package-db/dist-install/build/libHSbinpa_9qPPbdABQ6HK3eua2jBtib.p_a"
-         , "libraries/bin-package-db/dist-install/build/HSbinpa_9qPPbdABQ6HK3eua2jBtib.o" ]
+         , "libraries/bin-package-db/dist-install/build/HSbinpa_9qPPbdABQ6HK3eua2jBtib.o"
+         , "libraries/binary/dist-install/build/HSbinar_8WpSY1EWq5j1AwY619xVVw.o"
+         , "libraries/binary/dist-install/build/libHSbinar_8WpSY1EWq5j1AwY619xVVw.a"
+         , "libraries/binary/dist-install/build/libHSbinar_8WpSY1EWq5j1AwY619xVVw.p_a" ]
     forM_ packages $ \pkg -> do
         forM_ (pkgTodo pkg) $ \todoItem -> do
             buildPackage pkg todoItem
