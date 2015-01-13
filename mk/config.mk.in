@@ -344,7 +344,7 @@ LAX_DEPENDENCIES = NO
 # the debugging RTS flavour, rts/ghc.mk overrides these to turn off
 # optimisation.
 GhcRtsHcOpts=-O2
-GhcRtsCcOpts=-O2 -fomit-frame-pointer
+GhcRtsCcOpts=-O2 -fomit-frame-pointer -g
 
 # Include support for CPU performance counters via the PAPI library in the RTS?
 # (PAPI: http://icl.cs.utk.edu/papi/)
