@@ -14,7 +14,7 @@ module Ways (
 
     wayHcArgs, 
     wayPrefix,
-    hisuf, osuf, hcsuf,
+    hisuf, osuf, hcsuf, obootsuf, ssuf, libsuf,
     detectWay
     ) where
 
@@ -125,7 +125,7 @@ dropDynamic way
     | way == debugDynamic             = debug
     | way == loggingDynamic           = logging
     | way == threadedLoggingDynamic   = threadedLogging
-    | otherwise = error $ "Cannot drop Dynamic from way " ++ tag way ++ "."
+    | otherwise                       = way
 
 -- Detect way from a given extension. Fail if the result is not unique.
 -- TODO: This may be slow -- optimise if overhead is significant.
