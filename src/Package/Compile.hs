@@ -29,8 +29,8 @@ suffixArgs way = arg ["-hisuf", hisuf way]
               <> arg [ "-osuf",  osuf way]
               <> arg ["-hcsuf", hcsuf way]
 
-buildPackageCompile :: Package -> TodoItem -> Rules ()
-buildPackageCompile (Package name path _) (stage, dist, settings) =
+oRule :: Package -> TodoItem -> Rules ()
+oRule (Package name path _) (stage, dist, settings) =
     let buildDir = path </> dist </> "build"
         pkgData  = path </> dist </> "package-data.mk"
         depFile  = buildDir </> name <.> "m"
@@ -54,3 +54,16 @@ buildPackageCompile (Package name path _) (stage, dist, settings) =
             <> when (splitObjects stage) (arg "-split-objs")
             <> arg ("-c":srcs)
             <> arg ["-o", toStandard out]
+
+-- TODO: This rule looks a bit of a hack... combine it with the above?
+hiRule :: Package -> TodoItem -> Rules ()
+hiRule (Package name path _) (stage, dist, settings) =
+    let buildDir = path </> dist </> "build"
+    in
+    (buildDir <//> "*hi") %> \out -> do
+        let way  = detectWay $ tail $ takeExtension out
+            oFile = out -<.> osuf way
+        need [oFile]
+
+buildPackageCompile :: Package -> TodoItem -> Rules ()
+buildPackageCompile = oRule <> hiRule
