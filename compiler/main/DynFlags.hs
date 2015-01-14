@@ -1022,9 +1022,9 @@ opt_lc dflags = sOpt_lc (settings dflags)
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
-versionedAppDir :: IO FilePath
-versionedAppDir = do
-  appdir <- getAppUserDataDirectory "ghc"
+versionedAppDir :: DynFlags -> IO FilePath
+versionedAppDir dflags = do
+  appdir <- getAppUserDataDirectory (programName dflags)
   return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
 
 -- | The target code type of the compilation (if any).
@@ -3771,7 +3771,7 @@ interpretPackageEnv dflags = do
 
     namedEnvPath :: String -> MaybeT IO FilePath
     namedEnvPath name = do
-     appdir <- liftMaybeT $ versionedAppDir
+     appdir <- liftMaybeT $ versionedAppDir dflags
      return $ appdir </> "environments" </> name
 
     loadEnvName :: String -> MaybeT IO String
