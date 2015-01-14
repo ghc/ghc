@@ -212,19 +212,27 @@ lookupHashTable(HashTable *table, StgWord key)
 // If the table is modified concurrently, the function behavior is undefined.
 //
 int keysHashTable(HashTable *table, StgWord keys[], int szKeys) {
-    int segment;
+    int segment, index;
     int k = 0;
-    for(segment=0;segment<HDIRSIZE && table->dir[segment];segment+=1) {
-        int index;
-        for(index=0;index<HSEGSIZE;index+=1) {
-            HashList *hl;
-            for(hl=table->dir[segment][index];hl;hl=hl->next) {
-                if (k == szKeys)
-                  return k;
+    HashList *hl;
+
+
+    /* The last bucket with something in it is table->max + table->split - 1 */
+    segment = (table->max + table->split - 1) / HSEGSIZE;
+    index = (table->max + table->split - 1) % HSEGSIZE;
+
+    while (segment >= 0 && k < szKeys) {
+        while (index >= 0 && k < szKeys) {
+            hl = table->dir[segment][index];
+            while (hl && k < szKeys) {
                 keys[k] = hl->key;
                 k += 1;
+                hl = hl->next;
             }
+            index--;
         }
+        segment--;
+        index = HSEGSIZE - 1;
     }
     return k;
 }

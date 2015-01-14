@@ -16,8 +16,8 @@
 
 /** Inserts an entry in the Static Pointer Table.
  *
- * The key is a fingerprint computed from the StaticName of a static pointer
- * and the spe_closure is a pointer to the closure defining the table entry.
+ * The key is a fingerprint computed from the static pointer and the spe_closure
+ * is a pointer to the closure defining the table entry.
  *
  * A stable pointer to the closure is made to prevent it from being garbage
  * collected while the entry exists on the table.

@@ -1,5 +1,5 @@
-StaticPtrInfo {spInfoPackageId = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:1", spInfoSrcLoc = (10,32)}
-StaticPtrInfo {spInfoPackageId = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:2", spInfoSrcLoc = (11,33)}
-StaticPtrInfo {spInfoPackageId = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:0", spInfoSrcLoc = (21,13)}
-StaticPtrInfo {spInfoPackageId = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:3", spInfoSrcLoc = (13,33)}
-StaticPtrInfo {spInfoPackageId = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:4", spInfoSrcLoc = (14,33)}
+StaticPtrInfo {spInfoPackageKey = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:1", spInfoSrcLoc = (10,32)}
+StaticPtrInfo {spInfoPackageKey = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:2", spInfoSrcLoc = (11,33)}
+StaticPtrInfo {spInfoPackageKey = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:0", spInfoSrcLoc = (21,13)}
+StaticPtrInfo {spInfoPackageKey = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:3", spInfoSrcLoc = (13,33)}
+StaticPtrInfo {spInfoPackageKey = "main", spInfoModuleName = "Main", spInfoName = "sptEntry:4", spInfoSrcLoc = (14,33)}

@@ -403,8 +403,8 @@ dsExpr (PArrSeq _ _)
     g = ... static f ...
 ==>
     sptEntry:N = StaticPtr
-        (fingerprintString "pkgId:module.sptEntry:N")
-        (StaticPtrInfo "current pkg id" "current module" "sptEntry:0")
+        (fingerprintString "pkgKey:module.sptEntry:N")
+        (StaticPtrInfo "current pkg key" "current module" "sptEntry:0")
         f
     g = ... sptEntry:N
 \end{verbatim}
