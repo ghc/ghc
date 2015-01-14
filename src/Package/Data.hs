@@ -15,7 +15,7 @@ libraryArgs ways =
     argEnable x key = arg $ (if x then "--enable-" else "--disable-") ++ key
 
 configureArgs :: Stage -> Settings -> Args
-configureArgs stage settings = 
+configureArgs stage settings =
     let argConf key as = do
             s <- unwords <$> arg as
             unless (null s) $ arg $ "--configure-option=" ++ key ++ "=" ++ s
@@ -59,6 +59,7 @@ buildPackageData :: Package -> TodoItem -> Rules ()
 buildPackageData (Package name path _) (stage, dist, settings) =
     let pathDist  = path </> dist
         configure = path </> "configure"
+        cabal     = path </> takeBaseName name <.> "cabal"
         cabalArgs = arg ["configure", path, dist]
             -- this is a positional argument, hence:
             -- * if it is empty, we need to emit one empty string argument
@@ -91,7 +92,7 @@ buildPackageData (Package name path _) (stage, dist, settings) =
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
         need ["shake/src/Package/Data.hs"]
-        need [path </> name <.> "cabal"]
+        need [cabal]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
         terseRun GhcCabal cabalArgs
         when (registerPackage settings) $ terseRun (GhcPkg stage) ghcPkgArgs
