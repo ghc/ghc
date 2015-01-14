@@ -4,7 +4,7 @@
     ExplicitForAll
   , GADTs
   , RebindableSyntax #-}
-module T5821a 
+module T5908
        ( Writer
        , runWriter
        , execWriter

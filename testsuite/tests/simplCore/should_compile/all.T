@@ -209,3 +209,4 @@ test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rul
 test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniques'])
 test('T9583', only_ways(['optasm']), compile, [''])
 test('T9565', only_ways(['optasm']), compile, [''])
+test('T5821', only_ways(['optasm']), compile, [''])

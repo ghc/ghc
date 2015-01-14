@@ -30,4 +30,4 @@ test('DoParamM', reqlib('mtl'), compile_fail, [''])
 test('T5038', normal, compile_and_run, [''])
 test('T4851', normal, compile, [''])
 
-test('T5821', normal, compile, [''])
+test('T5908', normal, compile, [''])
