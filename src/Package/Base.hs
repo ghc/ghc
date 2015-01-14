@@ -8,7 +8,7 @@ module Package.Base (
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     bootPkgConstraints,
-    pathArgs, packageArgs, includeArgs, pkgHsSources, 
+    pathArgs, packageArgs, includeArgs, pkgHsSources,
     pkgDepObjects, pkgLibObjects
     ) where
 
@@ -65,13 +65,12 @@ commonLdArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
 commonCppArgs :: Args
 commonCppArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
 
--- TODO: simplify
 commonCcWarninigArgs :: Args
-commonCcWarninigArgs = when Validating $
-       GccIsClang <?> arg "-Wno-unknown-pragmas" 
-    <> (not GccIsClang && not GccLt46) <?> arg "-Wno-error=inline" 
-    <> (GccIsClang && not GccLt46 && windowsHost) <?>
-       arg "-Werror=unused-but-set-variable"
+commonCcWarninigArgs = when Validating $ arg
+       [ when GccIsClang                      $ arg "-Wno-unknown-pragmas"
+       , when (not GccIsClang && not GccLt46) $ arg "-Wno-error=inline"
+       , when (GccIsClang && not GccLt46 && windowsHost) $
+         arg "-Werror=unused-but-set-variable" ]
 
 bootPkgConstraints :: Args
 bootPkgConstraints = mempty
@@ -100,7 +99,7 @@ packageArgs stage pkgData = do
                     productArgs "-package"          (Deps       pkgData)
 
 includeArgs :: FilePath -> FilePath -> Args
-includeArgs path dist = 
+includeArgs path dist =
     let pkgData  = toStandard $ path </> dist </> "package-data.mk"
         buildDir = toStandard $ path </> dist </> "build"
     in arg "-i"
@@ -117,13 +116,13 @@ pkgHsSources path dist = do
     findModuleFiles pkgData dirs [".hs", ".lhs"]
 
 -- Find objects we depend on (we don't want to depend on split objects)
--- TODO: look for non-hs objects too 
+-- TODO: look for non-hs objects too
 pkgDepObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepObjects path dist way = do
     let pkgData  = path </> dist </> "package-data.mk"
         buildDir = path </> dist </> "build"
     dirs <- map (normaliseEx . (path </>)) <$> arg (SrcDirs pkgData)
-    fmap concat $ forM dirs $ \d -> 
+    fmap concat $ forM dirs $ \d ->
         map (toStandard . (buildDir ++) . (-<.> osuf way) . drop (length d))
         <$> (findModuleFiles pkgData [d] [".hs", ".lhs"])
 

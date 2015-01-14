@@ -16,7 +16,7 @@ import Oracles.Option
 --
 -- Ghc Stage0 is the bootstrapping compiler
 -- Ghc StageN, N > 0, is the one built on stage (N - 1)
--- GhcPkg Stage0 is the bootstrapping GhcPkg 
+-- GhcPkg Stage0 is the bootstrapping GhcPkg
 -- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
 data Builder = Ar
              | Ld
@@ -72,15 +72,15 @@ needBuilder ghc @ (Ghc stage) = do
     laxDeps <- test LaxDeps
     if laxDeps then orderOnly [exe] else need [exe]
 
-needBuilder builder = do 
+needBuilder builder = do
     [exe] <- showArgs builder
     need [exe]
 
 -- Action 'with Gcc' returns '--with-gcc=/path/to/gcc' and needs Gcc
 -- Raises an error if the builder is not uniquely specified in config files
 with :: Builder -> Args
-with builder = do 
-    let key = case builder of 
+with builder = do
+    let key = case builder of
             Ar       -> "--with-ar="
             Ld       -> "--with-ld="
             Gcc      -> "--with-gcc="
@@ -107,13 +107,11 @@ run builder args = do
 -- Raises an error if the builder is not uniquely specified in config files
 terseRun :: Builder -> Args -> Action ()
 terseRun builder args = do
-    needBuilder builder
-    [exe] <- showArgs builder
     args' <- args
-    putNormal $ "|--------\n| Running " ++ show builder ++ " with arguments:"
+    putNormal $ "/--------\n| Running " ++ show builder ++ " with arguments:"
     mapM_ (putNormal . ("|   " ++)) $ interestingInfo builder args'
-    putNormal "|--------"
-    quietly $ cmd [exe] args'
+    putNormal "\\--------"
+    quietly $ run builder args
 
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
