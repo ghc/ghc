@@ -688,10 +688,9 @@ solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
 -- Discards all Derived stuff in result
 -- Postcondition: fully zonked and unflattened constraints
 solveWantedsTcM wanted
-  = do { ev_binds_var <- TcM.newTcEvBinds
-       ; wanteds' <- solveWantedsTcMWithEvBinds ev_binds_var wanted solveWantedsAndDrop
-       ; binds <- TcRnMonad.getTcEvBinds ev_binds_var
-       ; return (wanteds', binds) }
+  = do { (wanted1, binds) <- runTcS (solveWantedsAndDrop wanted)
+       ; wanted2 <- zonkWC wanted1
+       ; return (wanted2, binds) }
 
 solveWantedsAndDrop :: WantedConstraints -> TcS (WantedConstraints)
 -- Since solveWanteds returns the residual WantedConstraints,
