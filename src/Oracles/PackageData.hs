@@ -20,6 +20,7 @@ data PackageData = Modules     FilePath
                  | DepKeys     FilePath
                  | Synopsis    FilePath
                  | CppOpts     FilePath
+                 | HsOpts      FilePath
 
 instance ShowArgs PackageData where
     showArgs packageData = do
@@ -32,8 +33,10 @@ instance ShowArgs PackageData where
                DepKeys     file -> ("DEP_KEYS"    , file, "" )
                Synopsis    file -> ("SYNOPSIS"    , file, "" )
                CppOpts     file -> ("CPP_OPTS"    , file, "" )
+               HsOpts      file -> ("HC_OPTS"     , file, "" )
             fullKey = replaceSeparators '_' $ takeDirectory file ++ "_" ++ key
-        res <- askOracle $ PackageDataKey (file, fullKey)
+            file'   = toStandard $ normaliseEx file
+        res <- askOracle $ PackageDataKey (file', fullKey)
         return $ words $ case res of
             Nothing    -> error $ "No key '" ++ key ++ "' in " ++ file ++ "."
             Just ""    -> defaultValue
