@@ -389,42 +389,6 @@ gotten from the binding for fromT_1.
 
 It might be better to have just one level of AbsBinds, but that requires more
 thought!
-
-Note [Implementing SPECIALISE pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Example:
-        f :: (Eq a, Ix b) => a -> b -> Bool
-        {-# SPECIALISE f :: (Ix p, Ix q) => Int -> (p,q) -> Bool #-}
-        f = <poly_rhs>
-
-From this the typechecker generates
-
-    AbsBinds [ab] [d1,d2] [([ab], f, f_mono, prags)] binds
-
-    SpecPrag (wrap_fn :: forall a b. (Eq a, Ix b) => XXX
-                      -> forall p q. (Ix p, Ix q) => XXX[ Int/a, (p,q)/b ])
-
-Note that wrap_fn can transform *any* function with the right type prefix
-    forall ab. (Eq a, Ix b) => XXX
-regardless of XXX.  It's sort of polymorphic in XXX.  This is
-useful: we use the same wrapper to transform each of the class ops, as
-well as the dict.
-
-From these we generate:
-
-    Rule:       forall p, q, (dp:Ix p), (dq:Ix q).
-                    f Int (p,q) dInt ($dfInPair dp dq) = f_spec p q dp dq
-
-    Spec bind:  f_spec = wrap_fn <poly_rhs>
-
-Note that
-
-  * The LHS of the rule may mention dictionary *expressions* (eg
-    $dfIxPair dp dq), and that is essential because the dp, dq are
-    needed on the RHS.
-
-  * The RHS of f_spec, <poly_rhs> has a *copy* of 'binds', so that it
-    can fully specialise it.
 -}
 
 ------------------------
@@ -432,7 +396,7 @@ dsSpecs :: CoreExpr     -- Its rhs
         -> TcSpecPrags
         -> DsM ( OrdList (Id,CoreExpr)  -- Binding for specialised Ids
                , [CoreRule] )           -- Rules for the Global Ids
--- See Note [Implementing SPECIALISE pragmas]
+-- See Note [Handling SPECIALISE pragmas] in TcBinds
 dsSpecs _ IsDefaultMethod = return (nilOL, [])
 dsSpecs poly_rhs (SpecPrags sps)
   = do { pairs <- mapMaybeM (dsSpec (Just poly_rhs)) sps
@@ -698,7 +662,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
          Here we want to end up with
             RULE forall d:Eq a.  f ($dfEqList d) = f_spec d
          Of course, the ($dfEqlist d) in the pattern makes it less likely
-         to match, but ther is no other way to get d:Eq a
+         to match, but there is no other way to get d:Eq a
 
    NB 2: We do drop_dicts *before* simplOptEpxr, so that we expect all
          the evidence bindings to be wrapped around the outside of the
@@ -714,7 +678,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
              useAbstractMonad :: MonadAbstractIOST m => m Int
          Here, deriving (MonadAbstractIOST (ReaderST s)) is a lot of code
          but the RHS uses no dictionaries, so we want to end up with
-             RULE forall s (d :: MonadBstractIOST (ReaderT s)).
+             RULE forall s (d :: MonadAbstractIOST (ReaderT s)).
                 useAbstractMonad (ReaderT s) d = $suseAbstractMonad s
 
    Trac #8848 is a good example of where there are some intersting

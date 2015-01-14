@@ -22,18 +22,15 @@ T7848.hs:6:57:
               (&) = x
 
 T7848.hs:10:9:
-    Couldn't match type ‘a’ with ‘t -> t1 -> A -> A -> A -> A -> t2’
+    Couldn't match expected type ‘t -> t1 -> A -> A -> A -> A -> t2’
+                with actual type ‘a’
       ‘a’ is a rigid type variable bound by
           the type signature for: (&) :: a at T7848.hs:10:9
-    Expected type: forall a. a
-      Actual type: t -> t1 -> A -> A -> A -> A -> t2
     Relevant bindings include
       z :: t1 (bound at T7848.hs:6:12)
       (&) :: t1 (bound at T7848.hs:6:8)
       (+) :: t (bound at T7848.hs:6:3)
       x :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
-    When checking that: t -> t1 -> A -> A -> A -> A -> t2
-      is more polymorphic than: forall a. a
     In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
     In an equation for ‘x’:
         x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)

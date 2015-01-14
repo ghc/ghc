@@ -1566,6 +1566,7 @@ mk_meth_spec_prags :: Id -> [LTcSpecPrag] -> [LTcSpecPrag] -> TcSpecPrags
         --   * spec_prags_from_inst: derived from {-# SPECIALISE instance :: <blah> #-}
         --     These ones have the dfun inside, but [perhaps surprisingly]
         --     the correct wrapper.
+        -- See Note [Handling SPECIALISE pragmas] in TcBinds
 mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
   = SpecPrags (spec_prags_for_me ++ spec_prags_from_inst)
   where
@@ -1804,7 +1805,7 @@ tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
   = addErrCtxt (spec_ctxt prag) $
     do  { (tyvars, theta, clas, tys) <- tcHsInstHead SpecInstCtxt hs_ty
         ; let spec_dfun_ty = mkDictFunTy tyvars theta clas tys
-        ; co_fn <- tcSubType SpecInstCtxt (idType dfun_id) spec_dfun_ty
+        ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
     spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)

@@ -2033,10 +2033,11 @@ data CtOrigin
   = GivenOrigin SkolemInfo
 
   -- All the others are for *wanted* constraints
-  | OccurrenceOf Name           -- Occurrence of an overloaded identifier
-  | AppOrigin                   -- An application of some kind
+  | OccurrenceOf Name              -- Occurrence of an overloaded identifier
+  | AppOrigin                      -- An application of some kind
 
-  | SpecPragOrigin Name         -- Specialisation pragma for identifier
+  | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for 
+                                   -- function or instance
 
   | TypeEqOrigin { uo_actual   :: TcType
                  , uo_expected :: TcType }
@@ -2097,6 +2098,12 @@ pprCtOrigin :: CtOrigin -> SDoc
 
 pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
+pprCtOrigin (SpecPragOrigin ctxt) 
+  = case ctxt of
+       FunSigCtxt n _ -> ptext (sLit "a SPECIALISE pragma for") <+> quotes (ppr n)
+       SpecInstCtxt   -> ptext (sLit "a SPECIALISE INSTANCE pragma")
+       _              -> ptext (sLit "a SPECIALISE pragma")  -- Never happens I think
+
 pprCtOrigin (FunDepOrigin1 pred1 loc1 pred2 loc2)
   = hang (ctoHerald <+> ptext (sLit "a functional dependency between constraints:"))
        2 (vcat [ hang (quotes (ppr pred1)) 2 (pprArisingAt loc1)
@@ -2140,7 +2147,6 @@ pprCtOrigin simple_origin
 pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
-pprCtO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
 pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
 pprCtO RecordUpdOrigin       = ptext (sLit "a record update")
 pprCtO ExprSigOrigin         = ptext (sLit "an expression type signature")
