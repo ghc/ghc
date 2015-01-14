@@ -5,8 +5,11 @@ module TcSimplify(
        quantifyPred, growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
-       simplifyRule, simplifyTop, simplifyInteractive,
-       solveWantedsTcM
+       simplifyTop, simplifyInteractive,
+       solveWantedsTcM,
+
+       -- For Rules we need these twoo
+       solveWanteds, runTcS
   ) where
 
 #include "HsVersions.h"
@@ -39,7 +42,6 @@ import PrelNames
 import Control.Monad    ( unless )
 import DynFlags         ( ExtensionFlag( Opt_AllowAmbiguousTypes ) )
 import Class            ( classKey )
-import BasicTypes       ( RuleName )
 import Maybes           ( isNothing )
 import Outputable
 import FastString
@@ -610,65 +612,6 @@ the constraints before simplifying.
 This only half-works, but then let-generalisation only half-works.
 
 
-*********************************************************************************
-*                                                                                 *
-*                             RULES                                               *
-*                                                                                 *
-***********************************************************************************
-
-See note [Simplifying RULE constraints] in TcRule
-
-Note [RULE quantification over equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Deciding which equalities to quantify over is tricky:
- * We do not want to quantify over insoluble equalities (Int ~ Bool)
-    (a) because we prefer to report a LHS type error
-    (b) because if such things end up in 'givens' we get a bogus
-        "inaccessible code" error
-
- * But we do want to quantify over things like (a ~ F b), where
-   F is a type function.
-
-The difficulty is that it's hard to tell what is insoluble!
-So we see whether the simplificaiotn step yielded any type errors,
-and if so refrain from quantifying over *any* equalites.
--}
-
-simplifyRule :: RuleName
-             -> WantedConstraints       -- Constraints from LHS
-             -> WantedConstraints       -- Constraints from RHS
-             -> TcM ([EvVar], WantedConstraints)   -- LHS evidence variables
--- See Note [Simplifying RULE constraints] in TcRule
-simplifyRule name lhs_wanted rhs_wanted
-  = do {         -- We allow ourselves to unify environment
-                 -- variables: runTcS runs with topTcLevel
-         (resid_wanted, _) <- solveWantedsTcM (lhs_wanted `andWC` rhs_wanted)
-                              -- Post: these are zonked and unflattened
-
-       ; zonked_lhs_simples <- TcM.zonkSimples (wc_simple lhs_wanted)
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_simples
-             quantify_me  -- Note [RULE quantification over equalities]
-               | insolubleWC resid_wanted = quantify_insol
-               | otherwise                = quantify_normal
-
-             quantify_insol ct = not (isEqPred (ctPred ct))
-
-             quantify_normal ct
-               | EqPred NomEq t1 t2 <- classifyPredType (ctPred ct)
-               = not (t1 `tcEqType` t2)
-               | otherwise
-               = True
-
-       ; traceTc "simplifyRule" $
-         vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
-              , text "zonked_lhs_simples" <+> ppr zonked_lhs_simples
-              , text "q_cts"      <+> ppr q_cts
-              , text "non_q_cts"  <+> ppr non_q_cts ]
-
-       ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
-                , lhs_wanted { wc_simple = non_q_cts }) }
-
-{-
 *********************************************************************************
 *                                                                                 *
 *                                 Main Simplifier                                 *
