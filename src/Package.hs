@@ -13,7 +13,8 @@ packages :: [Package]
 packages = [libraryPackage "array"          Stage1 defaultSettings,
             libraryPackage "bin-package-db" Stage1 defaultSettings,
             libraryPackage "binary"         Stage1 defaultSettings,
-            libraryPackage "deepseq"        Stage1 defaultSettings]
+            libraryPackage "deepseq"        Stage1 defaultSettings,
+            libraryPackage "Cabal/Cabal"    Stage1 defaultSettings]
 
 -- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()
@@ -28,7 +29,8 @@ packageRules = do
     forM_ packages $ \pkg @ (Package name path todo) -> do
         forM_ todo $ \todoItem @ (stage, dist, settings) -> do
 
-            -- Want top .o and .a files for the pkg/todo combo:
+            -- Want top .o and .a files for the pkg/todo combo
+            -- TODO: Check BUILD_GHCI_LIB flag to decide if .o is needed
             action $ do
                 let buildDir = path </> dist </> "build"
                     pkgData  = path </> dist </> "package-data.mk"
