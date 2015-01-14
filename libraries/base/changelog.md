@@ -176,7 +176,8 @@
   * There are now `Foldable` and `Traversable` instances for `Either a`,
    `Const r`, and `(,) a`.
 
-  * There is now a `Monoid`, `Generic`, and `Generic1` instance for `Const`.
+  * There are now `Show`, `Read`, `Eq`, `Ord`, `Monoid`, `Generic`, and
+    `Generic1` instances for `Const`.
 
   * There is now a `Data` instance for `Data.Version`.
 

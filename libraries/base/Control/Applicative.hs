@@ -61,11 +61,19 @@ import Data.Functor ((<$>))
 import GHC.Base
 import GHC.Generics
 import GHC.List (repeat, zipWith)
-import GHC.Read (Read)
-import GHC.Show (Show)
+import GHC.Read (Read(readsPrec), readParen, lex)
+import GHC.Show (Show(showsPrec), showParen, showString)
 
 newtype Const a b = Const { getConst :: a }
-                  deriving (Generic, Generic1, Monoid)
+                  deriving (Generic, Generic1, Monoid, Eq, Ord)
+
+instance Read a => Read (Const a b) where
+    readsPrec d = readParen (d > 10)
+        $ \r -> [(Const x,t) | ("Const", s) <- lex r, (x, t) <- readsPrec 11 s]
+
+instance Show a => Show (Const a b) where
+    showsPrec d (Const x) = showParen (d > 10) $
+                            showString "Const " . showsPrec 11 x
 
 instance Foldable (Const m) where
     foldMap _ _ = mempty
