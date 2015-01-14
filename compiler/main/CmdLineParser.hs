@@ -18,7 +18,7 @@ module CmdLineParser
       Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
       errorsToGhcException,
 
-      EwM(..), runEwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
+      EwM, runEwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
     ) where
 
 #include "HsVersions.h"

@@ -354,10 +354,9 @@ getPackageConfRefs dflags = do
 
 resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
 resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
-resolvePackageConfig _ UserPkgConf = handleIO (\_ -> return Nothing) $ do
-  dir <- versionedAppDir
+resolvePackageConfig dflags UserPkgConf = handleIO (\_ -> return Nothing) $ do
+  dir <- versionedAppDir dflags
   let pkgconf = dir </> "package.conf.d"
-
   exist <- doesDirectoryExist pkgconf
   return $ if exist then Just pkgconf else Nothing
 resolvePackageConfig _ (PkgConfFile name) = return $ Just name
