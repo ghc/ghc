@@ -79,8 +79,8 @@ unsafeLookupStaticPtr k = unsafePerformIO $ sptLookup k
 
 -- | Miscelaneous information available for debugging purposes.
 data StaticPtrInfo = StaticPtrInfo
-    { -- | PackageId of the package where the static pointer is defined
-      spInfoPackageId  :: String
+    { -- | Package key of the package where the static pointer is defined
+      spInfoPackageKey  :: String
       -- | Name of the module where the static pointer is defined
     , spInfoModuleName :: String
       -- | An internal name that is distinct for every static pointer defined in

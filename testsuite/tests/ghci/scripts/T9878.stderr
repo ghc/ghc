@@ -1,0 +1,4 @@
+
+T9878.hs:6:21:
+    The static form is not supported in interpreted mode.
+    Please use -fobject-code.

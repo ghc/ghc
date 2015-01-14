@@ -317,6 +317,15 @@ wired-in. See the Notes about the NameSorts in Name.hs.
 -}
 
 rnExpr e@(HsStatic expr) = do
+    target <- fmap hscTarget getDynFlags
+    case target of
+      -- SPT entries are expected to exist in object code so far, and this is
+      -- not the case in interpreted mode. See bug #9878.
+      HscInterpreted -> addErr $ sep
+        [ text "The static form is not supported in interpreted mode."
+        , text "Please use -fobject-code."
+        ]
+      _ -> return ()
     (expr',fvExpr) <- rnLExpr expr
     stage <- getStage
     case stage of
