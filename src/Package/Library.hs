@@ -2,7 +2,6 @@
 module Package.Library (buildPackageLibrary) where
 
 import Package.Base
-import Data.List.Split
 
 arRule :: Package -> TodoItem -> Rules ()
 arRule (Package _ path _) (stage, dist, _) =
@@ -16,9 +15,11 @@ arRule (Package _ path _) (stage, dist, _) =
         libObjs <- pkgLibObjects path dist stage way
         liftIO $ removeFiles "." [out]
         -- Splitting argument list into chunks as otherwise Ar chokes up
-        -- TODO: use simpler list notation for passing arguments
-        forM_ (chunksOf 100 libObjs) $ \os -> do
-            terseRun Ar $ "q" <+> toStandard out <+> os
+        maxChunk <- argSizeLimit
+        forM_ (chunksOfSize maxChunk libObjs) $ \os -> do
+            terseRun Ar [ arg "q"
+                        , arg $ toStandard out
+                        , arg os ]
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule (Package name path _) (stage, dist, _) =
@@ -29,12 +30,14 @@ ldRule (Package name path _) (stage, dist, _) =
         need ["shake/src/Package/Library.hs"]
         depObjs <- pkgDepObjects path dist vanilla
         need depObjs
-        terseRun Ld $ arg (ConfLdLinkerArgs stage)
-            <> arg ["-r", "-o", toStandard out]
-            <> arg depObjs
+        terseRun Ld [ arg (ConfLdLinkerArgs stage)
+                    , arg "-r"
+                    , arg "-o"
+                    , arg $ toStandard out
+                    , arg depObjs ]
         synopsis <- unwords <$> arg (Synopsis pkgData)
-        putNormal $ "Successfully built package " ++ name ++ "." 
-        putNormal $ "Package synopsis: " ++ synopsis ++ "."
+        putNormal $ "/--------\nSuccessfully built package " ++ name ++ "."
+        putNormal $ "Package synopsis: " ++ synopsis ++ ".\n\\--------"
 
 buildPackageLibrary :: Package -> TodoItem -> Rules ()
 buildPackageLibrary = arRule <> ldRule
