@@ -10,21 +10,20 @@ import Package.Dependencies
 
 -- These are the packages we build:
 packages :: [Package]
-packages = [ libraryPackage "array"            Stage1 defaultSettings
-           , libraryPackage "bin-package-db"   Stage0 defaultSettings
-           , libraryPackage "bin-package-db"   Stage1 defaultSettings
-           , libraryPackage "binary"           Stage1 defaultSettings
-           , libraryPackage "deepseq"          Stage1 defaultSettings
-           , libraryPackage "Cabal/Cabal"      Stage1 defaultSettings
-           , libraryPackage "containers"       Stage1 defaultSettings
-           , libraryPackage "filepath"         Stage1 defaultSettings
-           , libraryPackage "hoopl"            Stage1 defaultSettings
-           , libraryPackage "hpc"              Stage1 defaultSettings
-           , libraryPackage "parallel"         Stage1 defaultSettings
-           , libraryPackage "pretty"           Stage1 defaultSettings
-           , libraryPackage "stm"              Stage1 defaultSettings
-           , libraryPackage "template-haskell" Stage1 defaultSettings
-           , libraryPackage "transformers"     Stage1 defaultSettings ]
+packages = [ libraryPackage "array"            [        Stage1] defaultSettings
+           , libraryPackage "bin-package-db"   [Stage0, Stage1] defaultSettings
+           , libraryPackage "binary"           [Stage0, Stage1] defaultSettings
+           , libraryPackage "deepseq"          [        Stage1] defaultSettings
+           , libraryPackage "Cabal/Cabal"      [        Stage1] defaultSettings
+           , libraryPackage "containers"       [        Stage1] defaultSettings
+           , libraryPackage "filepath"         [        Stage1] defaultSettings
+           , libraryPackage "hoopl"            [Stage0, Stage1] defaultSettings
+           , libraryPackage "hpc"              [Stage0, Stage1] defaultSettings
+           , libraryPackage "parallel"         [        Stage1] defaultSettings
+           , libraryPackage "pretty"           [        Stage1] defaultSettings
+           , libraryPackage "stm"              [        Stage1] defaultSettings
+           , libraryPackage "template-haskell" [        Stage1] defaultSettings
+           , libraryPackage "transformers"     [Stage0, Stage1] defaultSettings ]
 
 -- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()

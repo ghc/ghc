@@ -3,41 +3,67 @@ module Package.Library (buildPackageLibrary) where
 
 import Package.Base
 
+argListDir :: FilePath
+argListDir = "shake/arg/buildPackageLibrary"
+
+arArgs :: [FilePath] -> FilePath -> Args
+arArgs objs result = arg $ [ arg "q"
+                           , arg result
+                           , arg objs ]
+
 arRule :: Package -> TodoItem -> Rules ()
-arRule (Package _ path _) (stage, dist, _) =
+arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
     let buildDir = path </> dist </> "build"
     in
     (buildDir <//> "*a") %> \out -> do
         let way = detectWay $ tail $ takeExtension out
-        need ["shake/src/Package/Library.hs"]
         depObjs <- pkgDepObjects path dist way
-        need depObjs
+        need $ [argListPath argListDir pkg stage] ++ depObjs
         libObjs <- pkgLibObjects path dist stage way
         liftIO $ removeFiles "." [out]
         -- Splitting argument list into chunks as otherwise Ar chokes up
         maxChunk <- argSizeLimit
         forM_ (chunksOfSize maxChunk libObjs) $ \os -> do
-            terseRun Ar [ arg "q"
-                        , arg $ toStandard out
-                        , arg os ]
+            terseRun Ar $ arArgs os $ toStandard out
+
+ldArgs :: Package -> TodoItem -> FilePath -> Args
+ldArgs (Package _ path _) (stage, dist, _) result = do
+    depObjs <- pkgDepObjects path dist vanilla
+    need depObjs
+    arg $ [arg (ConfLdLinkerArgs stage)
+          , arg "-r"
+          , arg "-o"
+          , arg result
+          , arg depObjs ]
 
 ldRule :: Package -> TodoItem -> Rules ()
-ldRule (Package name path _) (stage, dist, _) =
+ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     let buildDir = path </> dist </> "build"
         pkgData  = path </> dist </> "package-data.mk"
     in
     priority 2 $ (buildDir </> "*.o") %> \out -> do
-        need ["shake/src/Package/Library.hs"]
-        depObjs <- pkgDepObjects path dist vanilla
-        need depObjs
-        terseRun Ld [ arg (ConfLdLinkerArgs stage)
-                    , arg "-r"
-                    , arg "-o"
-                    , arg $ toStandard out
-                    , arg depObjs ]
+        need [argListPath argListDir pkg stage]
+        terseRun Ld $ ldArgs pkg todo $ toStandard out
         synopsis <- unwords <$> arg (Synopsis pkgData)
-        putNormal $ "/--------\nSuccessfully built package " ++ name ++ "."
-        putNormal $ "Package synopsis: " ++ synopsis ++ ".\n\\--------"
+        putColoured Vivid Green $ "/--------\n| Successfully built package "
+            ++ name ++ " (stage " ++ show stage ++ ")."
+        putColoured Vivid Green $ "| Package synopsis: " ++ synopsis ++ "."
+            ++ "\n\\--------"
+
+argListRule :: Package -> TodoItem -> Rules ()
+argListRule pkg @ (Package _ path _) todo @ (stage, dist, settings) =
+    (argListPath argListDir pkg stage) %> \out -> do
+        need $ ["shake/src/Package/Library.hs"] ++ sourceDependecies
+        ways' <- ways settings
+        ldList <- argList Ld (ldArgs pkg todo "output.o") ""
+        arList <- forM ways' $ \way -> do
+            depObjs <- pkgDepObjects path dist way
+            need depObjs
+            libObjs   <- pkgLibObjects path dist stage way
+            extension <- libsuf way
+            argList Ar (arArgs libObjs $ "output" <.> extension)
+                $ "way '" ++ tag way ++ "'"
+        writeFileChanged out $ unlines $ [ldList] ++ arList
 
 buildPackageLibrary :: Package -> TodoItem -> Rules ()
-buildPackageLibrary = arRule <> ldRule
+buildPackageLibrary = argListRule <> arRule <> ldRule

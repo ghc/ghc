@@ -3,6 +3,9 @@ module Package.Data (buildPackageData) where
 
 import Package.Base
 
+argListDir :: FilePath
+argListDir = "shake/arg/buildPackageData"
+
 libraryArgs :: [Way] -> Args
 libraryArgs ways =
        argEnable False "library-for-ghci" -- TODO: why always disable?
@@ -55,32 +58,38 @@ postProcessPackageData file = do
           where
             (prefix, suffix) = break (== '=') line
 
-buildPackageData :: Package -> TodoItem -> Rules ()
-buildPackageData (Package name path _) (stage, dist, settings) =
+cabalArgs :: Package -> TodoItem -> Args
+cabalArgs (Package _ path _) (stage, dist, settings) =
+    arg ["configure", path, dist]
+    -- this is a positional argument, hence:
+    -- * if it is empty, we need to emit one empty string argument
+    -- * otherwise, we must collapse it into one space-separated string
+    <> arg (unwords <$> customDllArgs settings)
+    <> with (Ghc stage) -- TODO: used limited to max stage1 GHC
+    <> with (GhcPkg stage)
+    <> customConfArgs settings
+    <> (libraryArgs =<< ways settings)
+    <> when (specified HsColour) (with HsColour)
+    <> configureArgs stage settings
+    <> when (stage == Stage0) bootPkgConstraints
+    <> with Gcc
+    <> when (stage /= Stage0) (with Ld)
+    <> with Ar
+    <> with Alex
+    <> with Happy -- TODO: reorder with's
+
+ghcPkgArgs :: Package -> TodoItem -> Args
+ghcPkgArgs (Package _ path _) (stage, dist, _) =
+    arg ["update", "--force"]
+    <> (stage == Stage0) <?>
+       arg "--package-db=libraries/bootstrapping.conf"
+    <> arg (toStandard $ path </> dist </> "inplace-pkg-config")
+
+buildRule :: Package -> TodoItem -> Rules ()
+buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
     let pathDist  = path </> dist
         configure = path </> "configure"
         cabal     = path </> takeBaseName name <.> "cabal"
-        cabalArgs = arg ["configure", path, dist]
-            -- this is a positional argument, hence:
-            -- * if it is empty, we need to emit one empty string argument
-            -- * otherwise, we must collapse it into one space-separated string
-            <> arg (unwords <$> customDllArgs settings)
-            <> with (Ghc stage) -- TODO: used limited to max stage1 GHC
-            <> with (GhcPkg stage)
-            <> customConfArgs settings
-            <> (libraryArgs =<< ways settings)
-            <> when (specified HsColour) (with HsColour)
-            <> configureArgs stage settings
-            <> when (stage == Stage0) bootPkgConstraints
-            <> with Gcc
-            <> when (stage /= Stage0) (with Ld)
-            <> with Ar
-            <> with Alex
-            <> with Happy -- TODO: reorder with's
-        ghcPkgArgs = arg ["update", "--force"]
-            <> (stage == Stage0) <?>
-               arg "--package-db=libraries/bootstrapping.conf"
-            <> arg (toStandard $ pathDist </> "inplace-pkg-config")
     in
     (pathDist </>) <$>
     [ "package-data.mk"
@@ -91,9 +100,20 @@ buildPackageData (Package name path _) (stage, dist, settings) =
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
-        need ["shake/src/Package/Data.hs"]
-        need [cabal]
+        need [argListPath argListDir pkg stage, cabal]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        terseRun GhcCabal cabalArgs
-        when (registerPackage settings) $ terseRun (GhcPkg stage) ghcPkgArgs
+        terseRun GhcCabal $ cabalArgs pkg todo
+        when (registerPackage settings) $
+            terseRun (GhcPkg stage) $ ghcPkgArgs pkg todo
         postProcessPackageData $ pathDist </> "package-data.mk"
+
+argListRule :: Package -> TodoItem -> Rules ()
+argListRule pkg todo @ (stage, _, _) =
+    (argListPath argListDir pkg stage) %> \out -> do
+        need $ ["shake/src/Package/Data.hs"] ++ sourceDependecies
+        cabalList  <- argList GhcCabal       (cabalArgs pkg todo)  ""
+        ghcPkgList <- argList (GhcPkg stage) (ghcPkgArgs pkg todo) ""
+        writeFileChanged out $ cabalList ++ "\n" ++ ghcPkgList
+
+buildPackageData :: Package -> TodoItem -> Rules ()
+buildPackageData = argListRule <> buildRule

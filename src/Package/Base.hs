@@ -10,7 +10,8 @@ module Package.Base (
     bootPkgConstraints,
     pathArgs, packageArgs, includeArgs, pkgHsSources,
     pkgDepObjects, pkgLibObjects,
-    argSizeLimit
+    argSizeLimit,
+    sourceDependecies, argList, argListPath
     ) where
 
 import Base
@@ -46,16 +47,18 @@ data Package = Package
          pkgTodo :: [TodoItem] -- [(Stage1, "dist-install", defaultSettings)]
      }
 
-libraryPackage :: String -> Stage -> (Stage -> Settings) -> Package
-libraryPackage name stage settings =
+libraryPackage :: String -> [Stage] -> (Stage -> Settings) -> Package
+libraryPackage name stages settings =
     Package
         name
         (toStandard $ "libraries" </> name)
-        [(
-            stage,
-            if stage == Stage0 then "dist-boot" else "dist-install",
-            settings stage
-        )]
+        [
+        ( stage
+        , if stage == Stage0 then "dist-boot" else "dist-install"
+        , settings stage
+        )
+        | stage <- stages
+        ]
 
 commonCcArgs :: Args
 commonCcArgs = when Validating $ arg ["-Werror", "-Wall"]
@@ -141,12 +144,13 @@ pkgLibObjects path dist stage way = do
 
 findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
 findModuleFiles pkgData directories suffixes = do
-    mods  <- arg (Modules pkgData)
-    files <- getDirectoryFiles "" $ do
-        dir     <- directories
-        modPath <- map (replaceEq '.' pathSeparator) mods
-        suffix  <- suffixes
-        return $ dir </> modPath ++ suffix
+    modPaths <- map (replaceEq '.' pathSeparator) <$> arg (Modules pkgData)
+    fileList <- forM directories $ \dir     ->
+                forM modPaths    $ \modPath ->
+                forM suffixes    $ \suffix  -> do
+                    let file = dir </> modPath ++ suffix
+                    when (doesDirectoryExist $ dropFileName file) $ return file
+    files <- getDirectoryFiles "" $ concat $ concat fileList
     return $ map (toStandard . normaliseEx) files
 
 -- The argument list has a limited size on Windows. Since Windows 7 the limit
@@ -159,3 +163,30 @@ argSizeLimit = do
     return $ if windows
              then 31000
              else 1048576 -- surely, 1MB should be enough?
+
+-- List of source files, which need to be tracked by the build system
+-- to make sure the argument lists have not changed.
+sourceDependecies :: [FilePath]
+sourceDependecies = [ "shake/src/Package/Base.hs"
+                    , "shake/src/Oracles/Base.hs"
+                    , "shake/src/Oracles/Flag.hs"
+                    , "shake/src/Oracles/Option.hs"
+                    , "shake/src/Oracles/Builder.hs"
+                    , "shake/src/Oracles/PackageData.hs"
+                    , "shake/src/Ways.hs"
+                    , "shake/src/Util.hs"
+                    , "shake/src/Oracles.hs"
+                    ]
+
+-- Convert Builder's argument list to a String
+argList :: Builder -> Args -> String -> Action String
+argList builder args comment = do
+    list <- args
+    return $ show builder ++ " arguments"
+           ++ if comment == "" then "" else ("(" ++ comment ++ ")")
+           ++ ":\n" ++ concatMap (\s -> "    " ++ s ++ "\n") list
+
+-- Path to argument list for a given Package/Stage combination
+argListPath :: FilePath -> Package -> Stage -> FilePath
+argListPath dir (Package name _ _) stage =
+    dir </> takeBaseName name ++ " (stage " ++ show stage ++ ")" <.> "txt"
