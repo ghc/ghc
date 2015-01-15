@@ -826,9 +826,9 @@ renameSig ctxt sig@(GenericSig vs ty)
         ; (new_ty, fvs) <- rnHsSigType (ppr_sig_bndrs vs) ty
         ; return (GenericSig new_v new_ty, fvs) }
 
-renameSig _ (SpecInstSig ty)
+renameSig _ (SpecInstSig src ty)
   = do  { (new_ty, fvs) <- rnLHsType SpecInstSigCtx ty
-        ; return (SpecInstSig new_ty,fvs) }
+        ; return (SpecInstSig src new_ty,fvs) }
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
@@ -854,9 +854,9 @@ renameSig ctxt sig@(FixSig (FixitySig vs f))
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; return (FixSig (FixitySig new_vs f), emptyFVs) }
 
-renameSig ctxt sig@(MinimalSig bf)
+renameSig ctxt sig@(MinimalSig s bf)
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
-       return (MinimalSig new_bf, emptyFVs)
+       return (MinimalSig s new_bf, emptyFVs)
 
 renameSig ctxt sig@(PatSynSig v (flag, qtvs) prov req ty)
   = do  { v' <- lookupSigOccRn ctxt sig v
@@ -978,7 +978,7 @@ rnMatch' :: Outputable (body RdrName) => HsMatchContext Name
          -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
          -> Match RdrName (Located (body RdrName))
          -> RnM (Match Name (Located (body Name)), FreeVars)
-rnMatch' ctxt rnBody match@(Match pats maybe_rhs_sig grhss)
+rnMatch' ctxt rnBody match@(Match _mf pats maybe_rhs_sig grhss)
   = do  {       -- Result type signatures are no longer supported
           case maybe_rhs_sig of
                 Nothing -> return ()
@@ -989,7 +989,7 @@ rnMatch' ctxt rnBody match@(Match pats maybe_rhs_sig grhss)
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
 
-        ; return (Match pats' Nothing grhss', grhss_fvs) }}
+        ; return (Match Nothing pats' Nothing grhss', grhss_fvs) }}
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
 emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alternatives in") <+> pp_ctxt)

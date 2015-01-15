@@ -245,7 +245,8 @@ module GHC (
 
         -- * API Annotations
         ApiAnns,AnnKeywordId(..),AnnotationComment(..),
-        getAnnotation, getAnnotationComments,
+        getAnnotation, getAndRemoveAnnotation,
+        getAnnotationComments, getAndRemoveAnnotationComments,
 
         -- * Miscellaneous
         --sessionHscEnv,

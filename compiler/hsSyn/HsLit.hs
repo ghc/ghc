@@ -19,12 +19,11 @@ module HsLit where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr( SyntaxExpr, pprExpr )
-import BasicTypes ( FractionalLit(..) )
+import BasicTypes ( FractionalLit(..),SourceText )
 import Type       ( Type )
 import Outputable
 import FastString
 import PlaceHolder ( PostTc,PostRn,DataId )
-import Lexer       ( SourceText )
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -37,7 +36,8 @@ import Data.Data hiding ( Fixity )
 ************************************************************************
 -}
 
--- Note [literal source text] for SourceText fields in the following
+-- Note [literal source text] in BasicTypes for SourceText fields in
+-- the following
 data HsLit
   = HsChar          SourceText Char        -- Character
   | HsCharPrim      SourceText Char        -- Unboxed character
@@ -84,7 +84,8 @@ data HsOverLit id       -- An overloaded literal
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsOverLit id)
 
--- Note [literal source text] for SourceText fields in the following
+-- Note [literal source text] in BasicTypes for SourceText fields in
+-- the following
 data OverLitVal
   = HsIntegral   !SourceText !Integer    -- Integer-looking literals;
   | HsFractional !FractionalLit          -- Frac-looking literals
@@ -95,36 +96,6 @@ overLitType :: HsOverLit a -> PostTc a Type
 overLitType = ol_type
 
 {-
-Note [literal source text]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The lexer/parser converts literals from their original source text
-versions to an appropriate internal representation. This is a problem
-for tools doing source to source conversions, so the original source
-text is stored in literals where this can occur.
-
-Motivating examples for HsLit
-
-  HsChar          '\n', '\x20`
-  HsCharPrim      '\x41`#
-  HsString        "\x20\x41" == " A"
-  HsStringPrim    "\x20"#
-  HsInt           001
-  HsIntPrim       002#
-  HsWordPrim      003##
-  HsInt64Prim     004##
-  HsWord64Prim    005##
-  HsInteger       006
-
-For OverLitVal
-
-  HsIntegral      003,0x001
-  HsIsString      "\x41nd"
-
-
-
-
-
 Note [ol_rebindable]
 ~~~~~~~~~~~~~~~~~~~~
 The ol_rebindable field is True if this literal is actually

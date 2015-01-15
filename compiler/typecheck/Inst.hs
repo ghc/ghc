@@ -426,9 +426,9 @@ getOverlapFlag overlap_mode
               incoherent_ok = xopt Opt_IncoherentInstances  dflags
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
-              default_oflag | incoherent_ok = use Incoherent
-                            | overlap_ok    = use Overlaps
-                            | otherwise     = use NoOverlap
+              default_oflag | incoherent_ok = use (Incoherent "")
+                            | overlap_ok    = use (Overlaps "")
+                            | otherwise     = use (NoOverlap "")
 
               final_oflag = setOverlapModeMaybe default_oflag overlap_mode
         ; return final_oflag }

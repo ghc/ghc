@@ -168,7 +168,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
 
    (rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
    (rn_rule_decls,    src_fvs3) <- setXOptM Opt_ScopedTypeVariables $
-                                   rnList rnHsRuleDecl    rule_decls ;
+                                   rnList rnHsRuleDecls rule_decls ;
                            -- Inside RULES, scoped type variables are on
    (rn_vect_decls,    src_fvs4) <- rnList rnHsVectDecl    vect_decls ;
    (rn_foreign_decls, src_fvs5) <- rnList rnHsForeignDecl foreign_decls ;
@@ -308,11 +308,11 @@ gather them together.
 -}
 
 -- checks that the deprecations are defined locally, and that there are no duplicates
-rnSrcWarnDecls :: NameSet -> [LWarnDecl RdrName] -> RnM Warnings
+rnSrcWarnDecls :: NameSet -> [LWarnDecls RdrName] -> RnM Warnings
 rnSrcWarnDecls _ []
   = return NoWarnings
 
-rnSrcWarnDecls bndr_set decls
+rnSrcWarnDecls bndr_set decls'
   = do { -- check for duplicates
        ; mapM_ (\ dups -> let (L loc rdr:lrdr':_) = dups
                           in addErrAt loc (dupWarnDecl lrdr' rdr))
@@ -320,17 +320,21 @@ rnSrcWarnDecls bndr_set decls
        ; pairs_s <- mapM (addLocM rn_deprec) decls
        ; return (WarnSome ((concat pairs_s))) }
  where
+   decls = concatMap (\(L _ d) -> wd_warnings d) decls'
+
    sig_ctxt = TopSigCtxt bndr_set True
       -- True <=> Can give deprecations for class ops and record sels
 
-   rn_deprec (Warning rdr_name txt)
+   rn_deprec (Warning rdr_names txt)
        -- ensures that the names are defined locally
-     = do { names <- lookupLocalTcNames sig_ctxt what rdr_name
+     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
+                                rdr_names
           ; return [(nameOccName name, txt) | name <- names] }
 
    what = ptext (sLit "deprecation")
 
-   warn_rdr_dups = findDupRdrNames (map (\ (L loc (Warning rdr_name _)) -> L loc rdr_name) decls)
+   warn_rdr_dups = findDupRdrNames $ concatMap (\(L _ (Warning ns _)) -> ns)
+                                               decls
 
 findDupRdrNames :: [Located RdrName] -> [[Located RdrName]]
 findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
@@ -354,12 +358,13 @@ dupWarnDecl (L loc _) rdr_name
 -}
 
 rnAnnDecl :: AnnDecl RdrName -> RnM (AnnDecl Name, FreeVars)
-rnAnnDecl ann@(HsAnnotation provenance expr)
+rnAnnDecl ann@(HsAnnotation s provenance expr)
   = addErrCtxt (annCtxt ann) $
     do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
        ; (expr', expr_fvs) <- setStage (Splice False) $
                               rnLExpr expr
-       ; return (HsAnnotation provenance' expr', provenance_fvs `plusFV` expr_fvs) }
+       ; return (HsAnnotation s provenance' expr',
+                 provenance_fvs `plusFV` expr_fvs) }
 
 rnAnnProvenance :: AnnProvenance RdrName -> RnM (AnnProvenance Name, FreeVars)
 rnAnnProvenance provenance = do
@@ -712,6 +717,11 @@ standaloneDerivErr
 *********************************************************
 -}
 
+rnHsRuleDecls :: RuleDecls RdrName -> RnM (RuleDecls Name, FreeVars)
+rnHsRuleDecls (HsRules src rules)
+  = do { (rn_rules,fvs) <- rnList rnHsRuleDecl rules
+       ; return (HsRules src rn_rules,fvs) }
+
 rnHsRuleDecl :: RuleDecl RdrName -> RnM (RuleDecl Name, FreeVars)
 rnHsRuleDecl (HsRule rule_name act vars lhs _fv_lhs rhs _fv_rhs)
   = do { let rdr_names_w_loc = map get_var vars
@@ -832,35 +842,35 @@ badRuleLhsErr name lhs bad_e
 rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
-rnHsVectDecl (HsVect var rhs@(L _ (HsVar _)))
+rnHsVectDecl (HsVect s var rhs@(L _ (HsVar _)))
   = do { var' <- lookupLocatedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
-       ; return (HsVect var' rhs', fv_rhs `addOneFV` unLoc var')
+       ; return (HsVect s var' rhs', fv_rhs `addOneFV` unLoc var')
        }
-rnHsVectDecl (HsVect _var _rhs)
+rnHsVectDecl (HsVect _ _var _rhs)
   = failWith $ vcat
                [ ptext (sLit "IMPLEMENTATION RESTRICTION: right-hand side of a VECTORISE pragma")
                , ptext (sLit "must be an identifier")
                ]
-rnHsVectDecl (HsNoVect var)
+rnHsVectDecl (HsNoVect s var)
   = do { var' <- lookupLocatedTopBndrRn var           -- only applies to local (not imported) names
-       ; return (HsNoVect var', unitFV (unLoc var'))
+       ; return (HsNoVect s var', unitFV (unLoc var'))
        }
-rnHsVectDecl (HsVectTypeIn isScalar tycon Nothing)
+rnHsVectDecl (HsVectTypeIn s isScalar tycon Nothing)
   = do { tycon' <- lookupLocatedOccRn tycon
-       ; return (HsVectTypeIn isScalar tycon' Nothing, unitFV (unLoc tycon'))
+       ; return (HsVectTypeIn s isScalar tycon' Nothing, unitFV (unLoc tycon'))
        }
-rnHsVectDecl (HsVectTypeIn isScalar tycon (Just rhs_tycon))
+rnHsVectDecl (HsVectTypeIn s isScalar tycon (Just rhs_tycon))
   = do { tycon'     <- lookupLocatedOccRn tycon
        ; rhs_tycon' <- lookupLocatedOccRn rhs_tycon
-       ; return ( HsVectTypeIn isScalar tycon' (Just rhs_tycon')
+       ; return ( HsVectTypeIn s isScalar tycon' (Just rhs_tycon')
                 , mkFVs [unLoc tycon', unLoc rhs_tycon'])
        }
 rnHsVectDecl (HsVectTypeOut _ _ _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectTypeOut'"
-rnHsVectDecl (HsVectClassIn cls)
+rnHsVectDecl (HsVectClassIn s cls)
   = do { cls' <- lookupLocatedOccRn cls
-       ; return (HsVectClassIn cls', unitFV (unLoc cls'))
+       ; return (HsVectClassIn s cls', unitFV (unLoc cls'))
        }
 rnHsVectDecl (HsVectClassOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
@@ -1310,8 +1320,8 @@ rnConDecl decl@(ConDecl { con_names = names, con_qvars = tvs
         ; rdr_env <- getLocalRdrEnv
         ; let arg_tys    = hsConDeclArgTys details
               (free_kvs, free_tvs) = case res_ty of
-                                     ResTyH98 -> filterInScope rdr_env (get_rdr_tvs arg_tys)
-                                     ResTyGADT ty -> get_rdr_tvs (ty : arg_tys)
+                ResTyH98 -> filterInScope rdr_env (get_rdr_tvs arg_tys)
+                ResTyGADT _ ty -> get_rdr_tvs (ty : arg_tys)
 
          -- With an Explicit forall, check for unused binders
          -- With Implicit, find the mentioned ones, and use them as binders
@@ -1341,12 +1351,12 @@ rnConDecl decl@(ConDecl { con_names = names, con_qvars = tvs
     get_rdr_tvs tys = extractHsTysRdrTyVars (cxt ++ tys)
 
 rnConResult :: HsDocContext -> [Name]
-            -> HsConDetails (LHsType Name) [LConDeclField Name]
+            -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
             -> ResType (LHsType RdrName)
-            -> RnM (HsConDetails (LHsType Name) [LConDeclField Name],
+            -> RnM (HsConDetails (LHsType Name) (Located [LConDeclField Name]),
                     ResType (LHsType Name), FreeVars)
 rnConResult _   _   details ResTyH98 = return (details, ResTyH98, emptyFVs)
-rnConResult doc _con details (ResTyGADT ty)
+rnConResult doc _con details (ResTyGADT ls ty)
   = do { (ty', fvs) <- rnLHsType doc ty
        ; let (arg_tys, res_ty) = splitHsFunType ty'
                 -- We can finally split it up,
@@ -1359,14 +1369,14 @@ rnConResult doc _con details (ResTyGADT ty)
 
            RecCon {}    -> do { unless (null arg_tys)
                                        (addErr (badRecResTy (docOfHsDocContext doc)))
-                              ; return (details, ResTyGADT res_ty, fvs) }
+                              ; return (details, ResTyGADT ls res_ty, fvs) }
 
-           PrefixCon {} -> return (PrefixCon arg_tys, ResTyGADT res_ty, fvs) }
+           PrefixCon {} -> return (PrefixCon arg_tys, ResTyGADT ls res_ty, fvs)}
 
 rnConDeclDetails
-    :: HsDocContext
-    -> HsConDetails (LHsType RdrName) [LConDeclField RdrName]
-    -> RnM (HsConDetails (LHsType Name) [LConDeclField Name], FreeVars)
+   :: HsDocContext
+   -> HsConDetails (LHsType RdrName) (Located [LConDeclField RdrName])
+   -> RnM (HsConDetails (LHsType Name) (Located [LConDeclField Name]), FreeVars)
 rnConDeclDetails doc (PrefixCon tys)
   = do { (new_tys, fvs) <- rnLHsTypes doc tys
        ; return (PrefixCon new_tys, fvs) }
@@ -1376,11 +1386,11 @@ rnConDeclDetails doc (InfixCon ty1 ty2)
        ; (new_ty2, fvs2) <- rnLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
-rnConDeclDetails doc (RecCon fields)
+rnConDeclDetails doc (RecCon (L l fields))
   = do  { (new_fields, fvs) <- rnConDeclFields doc fields
                 -- No need to check for duplicate fields
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
-        ; return (RecCon new_fields, fvs) }
+        ; return (RecCon (L l new_fields), fvs) }
 
 -------------------------------------------------
 deprecRecSyntax :: ConDecl RdrName -> SDoc
@@ -1430,7 +1440,8 @@ extendRecordFieldEnv tycl_decls inst_decls
     get_con (ConDecl { con_names = cons, con_details = RecCon flds })
             (RecFields env fld_set)
         = do { cons' <- mapM lookup cons
-             ; flds' <- mapM lookup (concatMap (cd_fld_names . unLoc) flds)
+             ; flds' <- mapM lookup (concatMap (cd_fld_names . unLoc)
+                                               (unLoc flds))
              ; let env'    = foldl (\e c -> extendNameEnv e c flds') env cons'
 
                    fld_set' = extendNameSetList fld_set flds'
@@ -1445,7 +1456,8 @@ extendRecordFieldEnv tycl_decls inst_decls
 *********************************************************
 -}
 
-rnFds :: [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
+rnFds :: [Located (FunDep (Located RdrName))]
+  -> RnM [Located (FunDep (Located Name))]
 rnFds fds
   = mapM (wrapLocM rn_fds) fds
   where
@@ -1454,11 +1466,13 @@ rnFds fds
            ; tys2' <- rnHsTyVars tys2
            ; return (tys1', tys2') }
 
-rnHsTyVars :: [RdrName] -> RnM [Name]
+rnHsTyVars :: [Located RdrName] -> RnM [Located Name]
 rnHsTyVars tvs  = mapM rnHsTyVar tvs
 
-rnHsTyVar :: RdrName -> RnM Name
-rnHsTyVar tyvar = lookupOccRn tyvar
+rnHsTyVar :: Located RdrName -> RnM (Located Name)
+rnHsTyVar (L l tyvar) = do
+  tyvar' <- lookupOccRn tyvar
+  return (L l tyvar')
 
 {-
 *********************************************************

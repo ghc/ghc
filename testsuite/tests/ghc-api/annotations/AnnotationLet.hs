@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 module AnnotationLet (foo) where
 
 {
@@ -8,5 +9,9 @@ foo = let
         a _ = 2
         b = 2
       in a b
-
+;
+infixr 8 +
+;
+data ((f + g)) a = InL (f a) | InR (g a)
+;
 }

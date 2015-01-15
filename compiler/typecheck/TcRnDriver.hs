@@ -1200,7 +1200,8 @@ tcTopSrcDecls boot_details
                 -- bindings, rules, foreign decls
             ; tcg_env' = tcg_env { tcg_binds   = tcg_binds tcg_env `unionBags` all_binds
                                  , tcg_sigs    = tcg_sigs tcg_env `unionNameSet` sig_names
-                                 , tcg_rules   = tcg_rules tcg_env ++ rules
+                                 , tcg_rules   = tcg_rules tcg_env
+                                                      ++ flattenRuleDecls rules
                                  , tcg_vects   = tcg_vects tcg_env ++ vects
                                  , tcg_anns    = tcg_anns tcg_env ++ annotations
                                  , tcg_ann_env = extendAnnEnvList (tcg_ann_env tcg_env) annotations

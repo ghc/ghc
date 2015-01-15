@@ -335,7 +335,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
       Just (work_demands, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
-            work_prag = InlinePragma { inl_inline = inl_inline inl_prag
+            work_prag = InlinePragma { inl_src = "{-# INLINE"
+                                     , inl_inline = inl_inline inl_prag
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
                                      , inl_rule   = FunLike }
@@ -365,7 +366,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
 
             wrap_act  = ActiveAfter 0
             wrap_rhs  = wrap_fn work_id
-            wrap_prag = InlinePragma { inl_inline = Inline
+            wrap_prag = InlinePragma { inl_src = "{-# INLINE"
+                                     , inl_inline = Inline
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
                                      , inl_rule   = rule_match_info }

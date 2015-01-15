@@ -4,6 +4,7 @@ include $(TOP)/mk/test.mk
 
 clean:
 	rm -f *.o *.hi
+	rm -f annotations comments parseTree
 
 annotations: 
 	rm -f annotations.o annotations.hi

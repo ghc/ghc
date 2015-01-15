@@ -432,7 +432,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
               -- (deriving can't be used there)
       && not (isHsBootOrSig (tcg_src env))
 
-    overlapCheck ty = overlapMode (is_flag $ iSpec ty) /= NoOverlap
+    overlapCheck ty = case overlapMode (is_flag $ iSpec ty) of
+                        NoOverlap _ -> False
+                        _           -> True
     genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
     genInstErr i = hang (ptext (sLit $ "Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$
@@ -1801,7 +1803,7 @@ tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
 
 ------------------------------
 tcSpecInst :: Id -> Sig Name -> TcM TcSpecPrag
-tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
+tcSpecInst dfun_id prag@(SpecInstSig _ hs_ty)
   = addErrCtxt (spec_ctxt prag) $
     do  { (tyvars, theta, clas, tys) <- tcHsInstHead SpecInstCtxt hs_ty
         ; let spec_dfun_ty = mkDictFunTy tyvars theta clas tys

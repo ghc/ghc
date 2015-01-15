@@ -990,6 +990,7 @@ dynCompileExpr :: GhcMonad m => String -> m Dynamic
 dynCompileExpr expr = do
     iis <- getContext
     let importDecl = ImportDecl {
+                         ideclSourceSrc = Nothing,
                          ideclName = noLoc (mkModuleName "Data.Dynamic"),
                          ideclPkgQual = Nothing,
                          ideclSource = False,

@@ -1,6 +1,11 @@
 -- (c) The University of Glasgow, 1992-2006
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
    -- Workaround for Trac #5252 crashes the bootstrap compiler without -O
    -- When the earliest compiler we want to boostrap with is
@@ -77,6 +82,10 @@ import Util
 import Outputable
 import FastString
 
+#if __GLASGOW_HASKELL__ < 709
+import Data.Foldable ( Foldable )
+import Data.Traversable ( Traversable )
+#endif
 import Data.Bits
 import Data.Data
 import Data.List
@@ -515,6 +524,8 @@ pprUserRealSpan show_path (SrcSpanPoint src_path line col)
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data GenLocated l e = L l e
   deriving (Eq, Ord, Typeable, Data)
+deriving instance Foldable    (GenLocated l)
+deriving instance Traversable (GenLocated l)
 
 type Located e = GenLocated SrcSpan e
 type RealLocated e = GenLocated RealSrcSpan e

@@ -132,6 +132,7 @@ See also Note [Kind and type-variable binders] in RnTypes
 -}
 
 type LHsContext name = Located (HsContext name)
+      -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnUnit'
 
 type HsContext name = [LHsType name]
 
@@ -216,7 +217,7 @@ data HsTyVarBndr name
          name
 
   | KindedTyVar
-         name
+         (Located name)
          (LHsKind name)  -- The user-supplied kind signature
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -233,11 +234,6 @@ isHsKindedTyVar (KindedTyVar {}) = True
 hsTvbAllKinded :: LHsTyVarBndrs name -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvBndrs
 
---------------------------------------------------
--- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
---            'ApiAnnotation.AnnTilde','ApiAnnotation.AnnRarrow',
---            'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
---            'ApiAnnotation.AnnComma'
 data HsType name
   = HsForAllTy  HsExplicitFlag          -- Renamer leaves this flag unchanged, to record the way
                                         -- the user wrote it originally, so that the printer can
@@ -253,73 +249,119 @@ data HsType name
                 (LHsType name)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForall',
       --         'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
+
   | HsTyVar             name            -- Type variable, type constructor, or data constructor
                                         -- see Note [Promotions (HsTyVar)]
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsAppTy             (LHsType name)
                         (LHsType name)
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsFunTy             (LHsType name)   -- function type
                         (LHsType name)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
   | HsListTy            (LHsType name)  -- Element type
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
+      --         'ApiAnnotation.AnnClose' @']'@
 
   | HsPArrTy            (LHsType name)  -- Elem. type of parallel array: [:t:]
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
+      --         'ApiAnnotation.AnnClose' @':]'@
 
   | HsTupleTy           HsTupleSort
                         [LHsType name]  -- Element types (length gives arity)
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(' or '(#'@,
+    --         'ApiAnnotation.AnnClose' @')' or '#)'@
 
   | HsOpTy              (LHsType name) (LHsTyOp name) (LHsType name)
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsParTy             (LHsType name)   -- See Note [Parens in HsSyn] in HsExpr
         -- Parenthesis preserved for the precedence re-arrangement in RnTypes
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
+      --         'ApiAnnotation.AnnClose' @')'@
 
   | HsIParamTy          HsIPName         -- (?x :: ty)
                         (LHsType name)   -- Implicit parameters as they occur in contexts
+      -- ^
+      -- > (?x :: ty)
+      --
+      -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
   | HsEqTy              (LHsType name)   -- ty1 ~ ty2
                         (LHsType name)   -- Always allowed even without TypeOperators, and has special kinding rule
+      -- ^
+      -- > ty1 ~ ty2
+      --
+      -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
   | HsKindSig           (LHsType name)  -- (ty :: kind)
                         (LHsKind name)  -- A type with a kind signature
+      -- ^
+      -- > (ty :: kind)
+      --
+      -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
+      --         'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose' @')'@
 
   | HsQuasiQuoteTy      (HsQuasiQuote name)
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsSpliceTy          (HsSplice name)
                         (PostTc name Kind)
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@,
+      --         'ApiAnnotation.AnnClose' @')'@
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsBangTy    HsSrcBang (LHsType name)   -- Bang-style type annotations
-  | HsRecTy     [LConDeclField name]       -- Only in data type declarations
+      -- ^ - 'ApiAnnotation.AnnKeywordId' :
+      --         'ApiAnnotation.AnnOpen' @'{-\# UNPACK' or '{-\# NOUNPACK'@,
+      --         'ApiAnnotation.AnnClose' @'#-}'@
+      --         'ApiAnnotation.AnnBang' @\'!\'@
+
+  | HsRecTy     [LConDeclField name]    -- Only in data type declarations
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
+      --         'ApiAnnotation.AnnClose' @'}'@
 
   | HsCoreTy Type       -- An escape hatch for tunnelling a *closed*
                         -- Core Type through HsSyn.
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsExplicitListTy       -- A promoted explicit list
         (PostTc name Kind) -- See Note [Promoted lists and tuples]
         [LHsType name]
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
+      --         'ApiAnnotation.AnnClose' @']'@
 
   | HsExplicitTupleTy      -- A promoted explicit tuple
         [PostTc name Kind] -- See Note [Promoted lists and tuples]
         [LHsType name]
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'("@,
+      --         'ApiAnnotation.AnnClose' @')'@
 
   | HsTyLit HsTyLit      -- A promoted numeric literal.
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsWrapTy HsTyWrapper (HsType name)  -- only in typechecker output
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsWildcardTy           -- A type wildcard
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsNamedWildcardTy name -- A named wildcard
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
   deriving (Typeable)
 deriving instance (DataId name) => Data (HsType name)
 
-
+-- Note [literal source text] in BasicTypes for SourceText fields in
+-- the following
 data HsTyLit
-  = HsNumTy Integer
-  | HsStrTy FastString
+  = HsNumTy SourceText Integer
+  | HsStrTy SourceText FastString
     deriving (Data, Typeable)
 
 data HsTyWrapper
@@ -504,8 +546,8 @@ hsExplicitTvs _                                     = []
 
 ---------------------
 hsTyVarName :: HsTyVarBndr name -> name
-hsTyVarName (UserTyVar n)     = n
-hsTyVarName (KindedTyVar n _) = n
+hsTyVarName (UserTyVar n)           = n
+hsTyVarName (KindedTyVar (L _ n) _) = n
 
 hsLTyVarName :: LHsTyVarBndr name -> name
 hsLTyVarName = hsTyVarName . unLoc
@@ -812,5 +854,5 @@ ppr_fun_ty ctxt_prec ty1 ty2
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc
-ppr_tylit (HsNumTy i) = integer i
-ppr_tylit (HsStrTy s) = text (show s)
+ppr_tylit (HsNumTy _ i) = integer i
+ppr_tylit (HsStrTy _ s) = text (show s)

@@ -12,7 +12,7 @@ can be appended in linear time.
 {-# LANGUAGE CPP #-}
 module OrdList (
         OrdList,
-        nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
+        nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
         mapOL, fromOL, toOL, foldrOL, foldlOL
 ) where
 
@@ -51,12 +51,20 @@ snocOL   :: OrdList a   -> a         -> OrdList a
 consOL   :: a           -> OrdList a -> OrdList a
 appOL    :: OrdList a   -> OrdList a -> OrdList a
 concatOL :: [OrdList a] -> OrdList a
+lastOL   :: OrdList a   -> a
 
 nilOL        = None
 unitOL as    = One as
 snocOL as   b    = Snoc as b
 consOL a    bs   = Cons a bs
 concatOL aas = foldr appOL None aas
+
+lastOL None        = panic "lastOL"
+lastOL (One a)     = a
+lastOL (Many as)   = last as
+lastOL (Cons _ as) = lastOL as
+lastOL (Snoc _ a)  = a
+lastOL (Two _ as)  = lastOL as
 
 isNilOL None = True
 isNilOL _    = False

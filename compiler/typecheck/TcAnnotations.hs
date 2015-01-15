@@ -41,7 +41,7 @@ tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
 tcAnnotations anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl Name -> TcM Annotation
-tcAnnotation (L loc ann@(HsAnnotation provenance expr)) = do
+tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
     -- Work out what the full target of this annotation was
     mod <- getModule
     let target = annProvenanceToTarget mod provenance
@@ -50,9 +50,9 @@ tcAnnotation (L loc ann@(HsAnnotation provenance expr)) = do
     setSrcSpan loc $ addErrCtxt (annCtxt ann) $ runAnnotation target expr
 
 annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
-annProvenanceToTarget _   (ValueAnnProvenance name) = NamedTarget name
-annProvenanceToTarget _   (TypeAnnProvenance name)  = NamedTarget name
-annProvenanceToTarget mod ModuleAnnProvenance       = ModuleTarget mod
+annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
+annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
+annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 #endif
 
 annCtxt :: OutputableBndr id => AnnDecl id -> SDoc

@@ -237,12 +237,12 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
 
         ; return (HsIPBinds (IPBinds ip_binds' ev_binds), result) }
   where
-    ips = [ip | L _ (IPBind (Left ip) _) <- ip_binds]
+    ips = [ip | L _ (IPBind (Left (L _ ip)) _) <- ip_binds]
 
         -- I wonder if we should do these one at at time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
-    tc_ip_bind ipClass (IPBind (Left ip) expr)
+    tc_ip_bind ipClass (IPBind (Left (L _ ip)) expr)
        = do { ty <- newFlexiTyVarTy openTypeKind
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
@@ -1138,12 +1138,12 @@ tcVect :: VectDecl Name -> TcM (VectDecl TcId)
 --   during type checking.  Instead, constrain the rhs of a vectorisation declaration to be a single
 --   identifier (this is checked in 'rnHsVectDecl').  Fix this by enabling the use of 'vectType'
 --   from the vectoriser here.
-tcVect (HsVect name rhs)
+tcVect (HsVect s name rhs)
   = addErrCtxt (vectCtxt name) $
     do { var <- wrapLocM tcLookupId name
        ; let L rhs_loc (HsVar rhs_var_name) = rhs
        ; rhs_id <- tcLookupId rhs_var_name
-       ; return $ HsVect var (L rhs_loc (HsVar rhs_id))
+       ; return $ HsVect s var (L rhs_loc (HsVar rhs_id))
        }
 
 {- OLD CODE:
@@ -1172,12 +1172,12 @@ tcVect (HsVect name rhs)
        ; return $ HsVect (L loc id') (Just rhsWrapped)
        }
  -}
-tcVect (HsNoVect name)
+tcVect (HsNoVect s name)
   = addErrCtxt (vectCtxt name) $
     do { var <- wrapLocM tcLookupId name
-       ; return $ HsNoVect var
+       ; return $ HsNoVect s var
        }
-tcVect (HsVectTypeIn isScalar lname rhs_name)
+tcVect (HsVectTypeIn _ isScalar lname rhs_name)
   = addErrCtxt (vectCtxt lname) $
     do { tycon <- tcLookupLocatedTyCon lname
        ; checkTc (   not isScalar             -- either    we have a non-SCALAR declaration
@@ -1191,7 +1191,7 @@ tcVect (HsVectTypeIn isScalar lname rhs_name)
        }
 tcVect (HsVectTypeOut _ _ _)
   = panic "TcBinds.tcVect: Unexpected 'HsVectTypeOut'"
-tcVect (HsVectClassIn lname)
+tcVect (HsVectClassIn _ lname)
   = addErrCtxt (vectCtxt lname) $
     do { cls <- tcLookupLocatedClass lname
        ; return $ HsVectClassOut cls
@@ -1684,8 +1684,8 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
     restricted (PatSynBind {}) = panic "isRestrictedGroup/unrestricted PatSynBind"
     restricted (AbsBinds {}) = panic "isRestrictedGroup/unrestricted AbsBinds"
 
-    restricted_match (MG { mg_alts = L _ (Match [] _ _) : _ }) = True
-    restricted_match _                                         = False
+    restricted_match (MG { mg_alts = L _ (Match _ [] _ _) : _ }) = True
+    restricted_match _                                           = False
         -- No args => like a pattern binding
         -- Some args => a function binding
 

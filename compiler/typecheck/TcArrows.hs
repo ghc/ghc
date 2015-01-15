@@ -234,7 +234,9 @@ tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
 -- D;G |-a (\x.cmd) : (t,stk) --> res
 
 tc_cmd env
-       (HsCmdLam (MG { mg_alts = [L mtch_loc (match@(Match pats _maybe_rhs_sig grhss))], mg_origin = origin }))
+       (HsCmdLam (MG { mg_alts = [L mtch_loc
+                                   (match@(Match _ pats _maybe_rhs_sig grhss))],
+                       mg_origin = origin }))
        (cmd_stk, res_ty)
   = addErrCtxt (pprMatchInCtxt match_ctxt match)        $
     do  { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
@@ -244,7 +246,7 @@ tc_cmd env
                              tcPats LambdaExpr pats arg_tys     $
                              tc_grhss grhss cmd_stk' res_ty
 
-        ; let match' = L mtch_loc (Match pats' Nothing grhss')
+        ; let match' = L mtch_loc (Match Nothing pats' Nothing grhss')
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam (MG { mg_alts = [match'], mg_arg_tys = arg_tys
                                   , mg_res_ty = res_ty, mg_origin = origin })

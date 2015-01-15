@@ -651,8 +651,8 @@ tcTyClDecl1 _parent rec_info
          -- NB: Order is important due to the call to `mkGlobalThings' when
          --     tying the the type and class declaration type checking knot.
   where
-    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tc_fd_tyvar tvs1 ;
-                                ; tvs2' <- mapM tc_fd_tyvar tvs2 ;
+    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tc_fd_tyvar . unLoc) tvs1 ;
+                                ; tvs2' <- mapM (tc_fd_tyvar . unLoc) tvs2 ;
                                 ; return (tvs1', tvs2') }
     tc_fd_tyvar name   -- Scoped kind variables are bound to unification variables
                        -- which are now fixed, so we can zonk
@@ -1135,8 +1135,8 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
 
 -----------------------------------
 consUseGadtSyntax :: [LConDecl a] -> Bool
-consUseGadtSyntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = True
-consUseGadtSyntax _                                             = False
+consUseGadtSyntax (L _ (ConDecl { con_res = ResTyGADT _ _ }) : _) = True
+consUseGadtSyntax _                                               = False
                  -- All constructors have same shape
 
 -----------------------------------
@@ -1176,16 +1176,18 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
              --    ResTyGADT: *all* the quantified type variables
              -- c.f. the comment on con_qvars in HsDecls
        ; tkvs <- case res_ty of
-                   ResTyH98         -> quantifyTyVars (mkVarSet tmpl_tvs) (tyVarsOfTypes (ctxt++arg_tys))
-                   ResTyGADT res_ty -> quantifyTyVars emptyVarSet (tyVarsOfTypes (res_ty:ctxt++arg_tys))
+                   ResTyH98           -> quantifyTyVars (mkVarSet tmpl_tvs)
+                                                 (tyVarsOfTypes (ctxt++arg_tys))
+                   ResTyGADT _ res_ty -> quantifyTyVars emptyVarSet
+                                          (tyVarsOfTypes (res_ty:ctxt++arg_tys))
 
              -- Zonk to Types
        ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv tkvs
        ; arg_tys <- zonkTcTypeToTypes ze arg_tys
        ; ctxt    <- zonkTcTypeToTypes ze ctxt
        ; res_ty  <- case res_ty of
-                      ResTyH98     -> return ResTyH98
-                      ResTyGADT ty -> ResTyGADT <$> zonkTcTypeToType ze ty
+                      ResTyH98        -> return ResTyH98
+                      ResTyGADT ls ty -> ResTyGADT ls <$> zonkTcTypeToType ze ty
 
        ; let (univ_tvs, ex_tvs, eq_preds, res_ty') = rejigConRes tmpl_tvs res_tmpl qtkvs res_ty
 
@@ -1206,14 +1208,14 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
 
 
 tcConIsInfix :: Name
-             -> HsConDetails (LHsType Name) [LConDeclField Name]
+             -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
              -> ResType Type
              -> TcM Bool
 tcConIsInfix _   details ResTyH98
   = case details of
            InfixCon {}  -> return True
            _            -> return False
-tcConIsInfix con details (ResTyGADT _)
+tcConIsInfix con details (ResTyGADT _ _)
   = case details of
            InfixCon {}  -> return True
            RecCon {}    -> return False
@@ -1240,7 +1242,7 @@ tcConArgs new_or_data (RecCon fields)
        ; return (field_names, btys') }
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) fields
+    combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) (unLoc fields)
     explode (ns,ty) = zip (map unLoc ns) (repeat ty)
     exploded = concatMap explode combined
     (field_names,btys) = unzip exploded
@@ -1254,8 +1256,8 @@ tcConArg new_or_data bty
 
 tcConRes :: ResType (LHsType Name) -> TcM (ResType Type)
 tcConRes ResTyH98           = return ResTyH98
-tcConRes (ResTyGADT res_ty) = do { res_ty' <- tcHsLiftedType res_ty
-                                 ; return (ResTyGADT res_ty') }
+tcConRes (ResTyGADT ls res_ty) = do { res_ty' <- tcHsLiftedType res_ty
+                                    ; return (ResTyGADT ls res_ty') }
 
 {-
 Note [Infix GADT constructors]
@@ -1323,7 +1325,7 @@ rejigConRes tmpl_tvs res_ty dc_tvs ResTyH98
         --      data T a b c = forall d e. MkT ...
         -- The {a,b,c} are tc_tvs, and {d,e} are dc_tvs
 
-rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT res_ty)
+rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT _ res_ty)
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
         -- Then we generate
@@ -1589,7 +1591,7 @@ checkValidDataCon dflags existential_ok tc con
     }
   where
     ctxt = ConArgCtxt (dataConName con)
-    check_bang (HsSrcBang (Just want_unpack) has_bang, rep_bang, n)
+    check_bang (HsSrcBang _ (Just want_unpack) has_bang, rep_bang, n)
       | want_unpack, not has_bang
       = addWarnTc (bad_bang n (ptext (sLit "UNPACK pragma lacks '!'")))
       | want_unpack

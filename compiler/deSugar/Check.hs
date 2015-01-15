@@ -452,11 +452,11 @@ get_lit :: Pat id -> Maybe HsLit
 -- It doesn't matter which one, because they will only be compared
 -- with other HsLits gotten in the same way
 get_lit (LitPat lit)                                      = Just lit
-get_lit (NPat (OverLit { ol_val = HsIntegral src i})    mb _)
+get_lit (NPat (L _ (OverLit { ol_val = HsIntegral src i}))    mb _)
                         = Just (HsIntPrim src (mb_neg negate              mb i))
-get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _)
+get_lit (NPat (L _ (OverLit { ol_val = HsFractional f })) mb _)
                         = Just (HsFloatPrim (mb_neg negateFractionalLit mb f))
-get_lit (NPat (OverLit { ol_val = HsIsString src s })   _  _)
+get_lit (NPat (L _ (OverLit { ol_val = HsIsString src s }))   _  _)
                         = Just (HsStringPrim src (fastStringToByteString s))
 get_lit _                                                 = Nothing
 
@@ -727,7 +727,7 @@ tidy_pat (TuplePat ps boxity tys)
   where
     arity = length ps
 
-tidy_pat (NPat lit mb_neg eq) = tidyNPat tidy_lit_pat lit mb_neg eq
+tidy_pat (NPat (L _ lit) mb_neg eq) = tidyNPat tidy_lit_pat lit mb_neg eq
 tidy_pat (LitPat lit)         = tidy_lit_pat lit
 
 tidy_pat (ConPatIn {})        = panic "Check.tidy_pat: ConPatIn"

@@ -183,16 +183,16 @@ rnExpr expr@(SectionR {})
   = do  { addErr (sectionErr expr); rnSection expr }
 
 ---------------------------------------------
-rnExpr (HsCoreAnn ann expr)
+rnExpr (HsCoreAnn src ann expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsCoreAnn ann expr', fvs_expr) }
+       ; return (HsCoreAnn src ann expr', fvs_expr) }
 
-rnExpr (HsSCC lbl expr)
+rnExpr (HsSCC src lbl expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsSCC lbl expr', fvs_expr) }
-rnExpr (HsTickPragma info expr)
+       ; return (HsSCC src lbl expr', fvs_expr) }
+rnExpr (HsTickPragma src info expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsTickPragma info expr', fvs_expr) }
+       ; return (HsTickPragma src info expr', fvs_expr) }
 
 rnExpr (HsLam matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
@@ -559,7 +559,7 @@ methodNamesMatch :: MatchGroup Name (LHsCmd Name) -> FreeVars
 methodNamesMatch (MG { mg_alts = ms })
   = plusFVs (map do_one ms)
  where
-    do_one (L _ (Match _ _ grhss)) = methodNamesGRHSs grhss
+    do_one (L _ (Match _ _ _ grhss)) = methodNamesGRHSs grhss
 
 -------------------------------------------------
 -- gaw 2004

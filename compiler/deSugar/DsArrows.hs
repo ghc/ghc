@@ -399,7 +399,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp cmd arg) env_ids = do
 --              ---> premap (\ ((xs), (p1, ... (pk,stk)...)) -> ((ys),stk)) cmd
 
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdLam (MG { mg_alts = [L _ (Match pats _ (GRHSs [L _ (GRHS [] body)] _ ))] }))
+        (HsCmdLam (MG { mg_alts = [L _ (Match _ pats _
+                                       (GRHSs [L _ (GRHS [] body)] _ ))] }))
         env_ids = do
     let
         pat_vars = mkVarSet (collectPatsBinders pats)
@@ -1046,7 +1047,7 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 -- List of leaf expressions, with set of variables bound in each
 
 leavesMatch :: LMatch Id (Located (body Id)) -> [(Located (body Id), IdSet)]
-leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
+leavesMatch (L _ (Match _ pats _ (GRHSs grhss binds)))
   = let
         defined_vars = mkVarSet (collectPatsBinders pats)
                         `unionVarSet`
@@ -1065,11 +1066,11 @@ replaceLeavesMatch
         -> LMatch Id (Located (body Id))        -- the matches of a case command
         -> ([Located (body' Id)],               -- remaining leaf expressions
             LMatch Id (Located (body' Id)))     -- updated match
-replaceLeavesMatch _res_ty leaves (L loc (Match pat mt (GRHSs grhss binds)))
+replaceLeavesMatch _res_ty leaves (L loc (Match mf pat mt (GRHSs grhss binds)))
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (Match pat mt (GRHSs grhss' binds)))
+    (leaves', L loc (Match mf pat mt (GRHSs grhss' binds)))
 
 replaceLeavesGRHS
         :: [Located (body' Id)]                 -- replacement leaf expressions of that type

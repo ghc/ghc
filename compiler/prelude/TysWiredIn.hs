@@ -536,7 +536,7 @@ charTy = mkTyConTy charTyCon
 
 charTyCon :: TyCon
 charTyCon   = pcNonRecDataTyCon charTyConName
-                                (Just (CType Nothing (fsLit "HsChar")))
+                                (Just (CType "" Nothing (fsLit "HsChar")))
                                 [] [charDataCon]
 charDataCon :: DataCon
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
@@ -548,7 +548,9 @@ intTy :: Type
 intTy = mkTyConTy intTyCon
 
 intTyCon :: TyCon
-intTyCon = pcNonRecDataTyCon intTyConName (Just (CType Nothing (fsLit "HsInt"))) [] [intDataCon]
+intTyCon = pcNonRecDataTyCon intTyConName
+                             (Just (CType "" Nothing (fsLit "HsInt"))) []
+                             [intDataCon]
 intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
 
@@ -556,7 +558,9 @@ wordTy :: Type
 wordTy = mkTyConTy wordTyCon
 
 wordTyCon :: TyCon
-wordTyCon = pcNonRecDataTyCon wordTyConName (Just (CType Nothing (fsLit "HsWord"))) [] [wordDataCon]
+wordTyCon = pcNonRecDataTyCon wordTyConName
+                              (Just (CType "" Nothing (fsLit "HsWord"))) []
+                              [wordDataCon]
 wordDataCon :: DataCon
 wordDataCon = pcDataCon wordDataConName [] [wordPrimTy] wordTyCon
 
@@ -564,7 +568,9 @@ floatTy :: Type
 floatTy = mkTyConTy floatTyCon
 
 floatTyCon :: TyCon
-floatTyCon   = pcNonRecDataTyCon floatTyConName   (Just (CType Nothing (fsLit "HsFloat"))) [] [floatDataCon]
+floatTyCon   = pcNonRecDataTyCon floatTyConName
+                                 (Just (CType "" Nothing (fsLit "HsFloat"))) []
+                                 [floatDataCon]
 floatDataCon :: DataCon
 floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
 
@@ -572,7 +578,9 @@ doubleTy :: Type
 doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon :: TyCon
-doubleTyCon = pcNonRecDataTyCon doubleTyConName (Just (CType Nothing (fsLit "HsDouble"))) [] [doubleDataCon]
+doubleTyCon = pcNonRecDataTyCon doubleTyConName
+                                (Just (CType "" Nothing (fsLit "HsDouble"))) []
+                                [doubleDataCon]
 
 doubleDataCon :: DataCon
 doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
@@ -632,7 +640,7 @@ boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
 boolTyCon = pcTyCon True NonRecursive True boolTyConName
-                    (Just (CType Nothing (fsLit "HsBool")))
+                    (Just (CType "" Nothing (fsLit "HsBool")))
                     [] [falseDataCon, trueDataCon]
 
 falseDataCon, trueDataCon :: DataCon

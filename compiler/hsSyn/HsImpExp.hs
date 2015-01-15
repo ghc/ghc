@@ -13,6 +13,7 @@ module HsImpExp where
 import Module           ( ModuleName )
 import HsDoc            ( HsDocString )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
+import BasicTypes       ( SourceText )
 
 import Outputable
 import FastString
@@ -39,6 +40,8 @@ type LImportDecl name = Located (ImportDecl name)
 -- | A single Haskell @import@ declaration.
 data ImportDecl name
   = ImportDecl {
+      ideclSourceSrc :: Maybe SourceText,
+                                 -- Note [Pragma source text] in BasicTypes
       ideclName      :: Located ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe FastString,  -- ^ Package qualifier.
       ideclSource    :: Bool,              -- ^ True <=> {-\# SOURCE \#-} import
@@ -68,6 +71,7 @@ data ImportDecl name
 
 simpleImportDecl :: ModuleName -> ImportDecl name
 simpleImportDecl mn = ImportDecl {
+      ideclSourceSrc = Nothing,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
       ideclSource    = False,
@@ -131,7 +135,7 @@ data IE name
   = IEVar       (Located name)
         -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType'
-  | IEThingAbs           name      -- ^ Class/Type (can't tell)
+  | IEThingAbs  (Located name)     -- ^ Class/Type (can't tell)
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
   | IEThingAll  (Located name)     -- ^ Class/Type plus all methods/constructors
@@ -156,14 +160,14 @@ data IE name
 
 ieName :: IE name -> name
 ieName (IEVar (L _ n))         = n
-ieName (IEThingAbs  n)         = n
+ieName (IEThingAbs  (L _ n))   = n
 ieName (IEThingWith (L _ n) _) = n
 ieName (IEThingAll  (L _ n))   = n
 ieName _ = panic "ieName failed pattern match!"
 
 ieNames :: IE a -> [a]
 ieNames (IEVar       (L _ n)   ) = [n]
-ieNames (IEThingAbs       n    ) = [n]
+ieNames (IEThingAbs  (L _ n)   ) = [n]
 ieNames (IEThingAll  (L _ n)   ) = [n]
 ieNames (IEThingWith (L _ n) ns) = n : map unLoc ns
 ieNames (IEModuleContents _    ) = []
@@ -180,7 +184,7 @@ pprImpExp name = type_pref <+> pprPrefixOcc name
 
 instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEVar          var)    = pprPrefixOcc (unLoc var)
-    ppr (IEThingAbs     thing)  = pprImpExp thing
+    ppr (IEThingAbs     thing)  = pprImpExp (unLoc thing)
     ppr (IEThingAll      thing) = hcat [pprImpExp (unLoc thing), text "(..)"]
     ppr (IEThingWith thing withs)
         = pprImpExp (unLoc thing) <> parens (fsep (punctuate comma

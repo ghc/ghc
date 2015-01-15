@@ -22,6 +22,7 @@ import FastString
 import Binary
 import Outputable
 import Module
+import BasicTypes ( SourceText )
 
 import Data.Char
 import Data.Data
@@ -224,12 +225,17 @@ instance Outputable Header where
     ppr (Header h) = quotes $ ppr h
 
 -- | A C type, used in CAPI FFI calls
-data CType = CType (Maybe Header) -- header to include for this type
+--
+--  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CTYPE'@,
+--        'ApiAnnotation.AnnHeader','ApiAnnotation.AnnVal',
+--        'ApiAnnotation.AnnClose' @'\#-}'@,
+data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
+                   (Maybe Header) -- header to include for this type
                    FastString     -- the type itself
     deriving (Data, Typeable)
 
 instance Outputable CType where
-    ppr (CType mh ct) = hDoc <+> ftext ct
+    ppr (CType _ mh ct) = hDoc <+> ftext ct
         where hDoc = case mh of
                      Nothing -> empty
                      Just h -> ppr h
@@ -319,11 +325,13 @@ instance Binary CCallConv where
               _ -> do return JavaScriptCallConv
 
 instance Binary CType where
-    put_ bh (CType mh fs) = do put_ bh mh
-                               put_ bh fs
-    get bh = do mh <- get bh
+    put_ bh (CType s mh fs) = do put_ bh s
+                                 put_ bh mh
+                                 put_ bh fs
+    get bh = do s  <- get bh
+                mh <- get bh
                 fs <- get bh
-                return (CType mh fs)
+                return (CType s mh fs)
 
 instance Binary Header where
     put_ bh (Header h) = put_ bh h

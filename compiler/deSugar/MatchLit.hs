@@ -324,7 +324,7 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
                    _ -> Nothing
 
 tidyNPat _ over_lit mb_neg eq
-  = NPat over_lit mb_neg eq
+  = NPat (noLoc over_lit) mb_neg eq
 
 {-
 ************************************************************************
@@ -417,7 +417,7 @@ litValKey (HsIsString _ s) neg   = ASSERT( not neg) MachStr
 
 matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchNPats (var:vars) ty (eqn1:eqns)    -- All for the same literal
-  = do  { let NPat lit mb_neg eq_chk = firstPat eqn1
+  = do  { let NPat (L _ lit) mb_neg eq_chk = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing -> return lit_expr
@@ -450,7 +450,7 @@ We generate:
 matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- All NPlusKPats, for the *same* literal k
 matchNPlusKPats (var:vars) ty (eqn1:eqns)
-  = do  { let NPlusKPat (L _ n1) lit ge minus = firstPat eqn1
+  = do  { let NPlusKPat (L _ n1) (L _ lit) ge minus = firstPat eqn1
         ; ge_expr     <- dsExpr ge
         ; minus_expr  <- dsExpr minus
         ; lit_expr    <- dsOverLit lit

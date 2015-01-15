@@ -265,8 +265,8 @@ rnHsTyKi isType _ tyLit@(HsTyLit t)
        ; when (negLit t) (addErr negLitErr)
        ; return (HsTyLit t, emptyFVs) }
   where
-    negLit (HsStrTy _) = False
-    negLit (HsNumTy i) = i < 0
+    negLit (HsStrTy _ _) = False
+    negLit (HsNumTy _ i) = i < 0
     negLitErr = ptext (sLit "Illegal literal in type (type literals must not be negative):") <+> ppr tyLit
 
 rnHsTyKi isType doc (HsAppTy ty1 ty2)
@@ -425,12 +425,12 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
              rn_tv_bndr (L loc (UserTyVar rdr))
                = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
                     ; return (L loc (UserTyVar nm), emptyFVs) }
-             rn_tv_bndr (L loc (KindedTyVar rdr kind))
+             rn_tv_bndr (L loc (KindedTyVar (L lv rdr) kind))
                = do { sig_ok <- xoptM Opt_KindSignatures
                     ; unless sig_ok (badSigErr False doc kind)
                     ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
                     ; (kind', fvs) <- rnLHsKind doc kind
-                    ; return (L loc (KindedTyVar nm kind'), fvs) }
+                    ; return (L loc (KindedTyVar (L lv nm) kind'), fvs) }
 
        -- Check for duplicate or shadowed tyvar bindrs
        ; checkDupRdrNames tv_names_w_loc
@@ -740,7 +740,7 @@ checkPrecMatch :: Name -> MatchGroup Name body -> RnM ()
 checkPrecMatch op (MG { mg_alts = ms })
   = mapM_ check ms
   where
-    check (L _ (Match (L l1 p1 : L l2 p2 :_) _ _))
+    check (L _ (Match _ (L l1 p1 : L l2 p2 :_) _ _))
       = setSrcSpan (combineSrcSpans l1 l2) $
         do checkPrec op p1 False
            checkPrec op p2 True
