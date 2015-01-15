@@ -7,6 +7,7 @@ module Oracles.Builder (
 
 import Data.Char
 import Base
+import Util
 import Oracles.Base
 import Oracles.Flag
 import Oracles.Option
@@ -108,9 +109,11 @@ run builder as = do
 terseRun :: ShowArgs a => Builder -> a -> Action ()
 terseRun builder as = do
     args <- showArgs as
-    putNormal $ "/--------\n| Running " ++ show builder ++ " with arguments:"
-    mapM_ (putNormal . ("|   " ++)) $ interestingInfo builder args
-    putNormal "\\--------"
+    putColoured Vivid White $ "/--------\n" ++
+        "| Running " ++ show builder ++ " with arguments:"
+    mapM_ (putColoured Vivid White . ("|   " ++)) $
+        interestingInfo builder args
+    putColoured Vivid White $ "\\--------"
     quietly $ run builder as
 
 interestingInfo :: Builder -> [String] -> [String]

@@ -1,11 +1,15 @@
 module Util (
     module Data.Char,
+    module System.Console.ANSI,
     replaceIf, replaceEq, replaceSeparators,
-    chunksOfSize
+    chunksOfSize,
+    putColoured
     ) where
 
 import Base
 import Data.Char
+import System.Console.ANSI
+import System.IO
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
@@ -30,3 +34,10 @@ chunksOfSize size ss = reverse chunk : chunksOfSize size rest
                                 if newSize > size
                                 then (chunk   , s:ss)
                                 else (newChunk, rest)
+
+putColoured :: ColorIntensity -> Color -> String -> Action ()
+putColoured intensity colour msg = do
+    liftIO $ setSGR [SetColor Foreground intensity colour]
+    putNormal msg
+    liftIO $ setSGR []
+    liftIO $ hFlush stdout
