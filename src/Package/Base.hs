@@ -9,7 +9,8 @@ module Package.Base (
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     bootPkgConstraints,
     pathArgs, packageArgs, includeArgs, pkgHsSources,
-    pkgDepObjects, pkgLibObjects
+    pkgDepObjects, pkgLibObjects,
+    argSizeLimit
     ) where
 
 import Base
@@ -147,3 +148,14 @@ findModuleFiles pkgData directories suffixes = do
         suffix  <- suffixes
         return $ dir </> modPath ++ suffix
     return $ map (toStandard . normaliseEx) files
+
+-- The argument list has a limited size on Windows. Since Windows 7 the limit
+-- is 32768 (theoretically). In practice we use 31000 to leave some breathing
+-- space for the builder's path & name, auxiliary flags, and other overheads.
+-- Use this function to set limits for other operating systems if necessary.
+argSizeLimit :: Action Int
+argSizeLimit = do
+    windows <- windowsHost
+    return $ if windows
+             then 31000
+             else 1048576 -- surely, 1MB should be enough?
