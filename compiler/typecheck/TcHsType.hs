@@ -522,12 +522,12 @@ tc_hs_type ty@(HsSpliceTy {}) _exp_kind
 tc_hs_type (HsWrapTy {}) _exp_kind
   = panic "tc_hs_type HsWrapTy"  -- We kind checked something twice
 
-tc_hs_type hs_ty@(HsTyLit (HsNumTy n)) exp_kind
+tc_hs_type hs_ty@(HsTyLit (HsNumTy _ n)) exp_kind
   = do { checkExpectedKind hs_ty typeNatKind exp_kind
        ; checkWiredInTyCon typeNatKindCon
        ; return (mkNumLitTy n) }
 
-tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind
+tc_hs_type hs_ty@(HsTyLit (HsStrTy _ s)) exp_kind
   = do { checkExpectedKind hs_ty typeSymbolKind exp_kind
        ; checkWiredInTyCon typeSymbolKindCon
        ; return (mkStrLitTy s) }
@@ -958,7 +958,7 @@ kcHsTyVarBndrs cusk (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
                        _ | cusk        -> return liftedTypeKind
                          | otherwise   -> newMetaKindVar
            ; return (n, kind) }
-    kc_hs_tv (KindedTyVar n k)
+    kc_hs_tv (KindedTyVar (L _ n) k)
       = do { kind <- tcLHsKind k
                -- In an associated type decl, the type variable may already
                -- be in scope; in that case we want to make sure its kind
@@ -1103,7 +1103,7 @@ kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
     kc_tv :: LHsTyVarBndr Name -> Kind -> TcM (Name, Kind)
     kc_tv (L _ (UserTyVar n)) exp_k
       = return (n, exp_k)
-    kc_tv (L _ (KindedTyVar n hs_k)) exp_k
+    kc_tv (L _ (KindedTyVar (L _ n) hs_k)) exp_k
       = do { k <- tcLHsKind hs_k
            ; checkKind k exp_k
            ; return (n, exp_k) }
@@ -1144,9 +1144,10 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
     --           type T b_30 a_29 :: *
     -- Here the a_29 is shared
     tc_hs_tv (L _ (UserTyVar n))        kind = return (mkTyVar n kind)
-    tc_hs_tv (L _ (KindedTyVar n hs_k)) kind = do { tc_kind <- tcLHsKind hs_k
-                                                  ; checkKind kind tc_kind
-                                                  ; return (mkTyVar n kind) }
+    tc_hs_tv (L _ (KindedTyVar (L _ n) hs_k)) kind
+                                        = do { tc_kind <- tcLHsKind hs_k
+                                             ; checkKind kind tc_kind
+                                             ; return (mkTyVar n kind) }
 
 -----------------------------------
 tcDataKindSig :: Kind -> TcM [TyVar]

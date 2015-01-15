@@ -515,8 +515,9 @@ tcPatToExpr args = go
            ; return (ExplicitTuple (map (noLoc . Present) exprs) box)
            }
     go1   (LitPat lit)             = return $ HsLit lit
-    go1   (NPat n Nothing _)       = return $ HsOverLit n
-    go1   (NPat n (Just neg) _)    = return $ noLoc neg `HsApp` noLoc (HsOverLit n)
+    go1   (NPat (L _ n) Nothing _) = return $ HsOverLit n
+    go1   (NPat (L _ n) (Just neg) _)
+      = return $ noLoc neg `HsApp` noLoc (HsOverLit n)
     go1   (SigPatIn pat (HsWB ty _ _ wcs))
       = do { expr <- go pat
            ; return $ ExprWithTySig expr ty wcs }

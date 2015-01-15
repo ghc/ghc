@@ -161,17 +161,17 @@ tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
 tcExpr (HsPar expr)  res_ty = do { expr' <- tcMonoExprNC expr res_ty
                                  ; return (HsPar expr') }
 
-tcExpr (HsSCC lbl expr) res_ty
+tcExpr (HsSCC src lbl expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsSCC lbl expr') }
+       ; return (HsSCC src lbl expr') }
 
-tcExpr (HsTickPragma info expr) res_ty
+tcExpr (HsTickPragma src info expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsTickPragma info expr') }
+       ; return (HsTickPragma src info expr') }
 
-tcExpr (HsCoreAnn lbl expr) res_ty
+tcExpr (HsCoreAnn src lbl expr) res_ty
   = do  { expr' <- tcMonoExpr expr res_ty
-        ; return (HsCoreAnn lbl expr') }
+        ; return (HsCoreAnn src lbl expr') }
 
 tcExpr (HsOverLit lit) res_ty
   = do  { lit' <- newOverloadedLit (LiteralOrigin lit) lit res_ty

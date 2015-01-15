@@ -84,7 +84,9 @@ module BasicTypes(
 
         FractionalLit(..), negateFractionalLit, integralFractionalLit,
 
-        HValue(..)
+        HValue(..),
+
+        SourceText
    ) where
 
 import FastString
@@ -261,14 +263,15 @@ initialVersion = 1
 -}
 
 -- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt = WarningTxt [Located FastString]
-                | DeprecatedTxt [Located FastString]
+-- For SourceText usage, see note [Pragma source text]
+data WarningTxt = WarningTxt (Located SourceText) [Located FastString]
+                | DeprecatedTxt (Located SourceText) [Located FastString]
     deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
-    ppr (WarningTxt    ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
-    ppr (DeprecatedTxt ds) = text "Deprecated:" <+>
-                             doubleQuotes (vcat (map (ftext . unLoc) ds))
+    ppr (WarningTxt    _ ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
+    ppr (DeprecatedTxt _ ds) = text "Deprecated:" <+>
+                               doubleQuotes (vcat (map (ftext . unLoc) ds))
 
 {-
 ************************************************************************
@@ -446,6 +449,13 @@ instance Outputable Origin where
 -- | The semantics allowed for overlapping instances for a particular
 -- instance. See Note [Safe Haskell isSafeOverlap] (in `InstEnv.lhs`) for a
 -- explanation of the `isSafeOverlap` field.
+--
+-- - 'ApiAnnotation.AnnKeywordId' :
+--      'ApiAnnotation.AnnOpen' @'\{-\# OVERLAPPABLE'@ or
+--                              @'\{-\# OVERLAPPING'@ or
+--                              @'\{-\# OVERLAPS'@ or
+--                              @'\{-\# INCOHERENT'@,
+--      'ApiAnnotation.AnnClose' @`\#-\}`@,
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool
@@ -458,27 +468,29 @@ setOverlapModeMaybe f (Just m) = f { overlapMode = m }
 hasOverlappableFlag :: OverlapMode -> Bool
 hasOverlappableFlag mode =
   case mode of
-    Overlappable -> True
-    Overlaps     -> True
-    Incoherent   -> True
-    _            -> False
+    Overlappable _ -> True
+    Overlaps     _ -> True
+    Incoherent   _ -> True
+    _              -> False
 
 hasOverlappingFlag :: OverlapMode -> Bool
 hasOverlappingFlag mode =
   case mode of
-    Overlapping  -> True
-    Overlaps     -> True
-    Incoherent   -> True
-    _            -> False
+    Overlapping  _ -> True
+    Overlaps     _ -> True
+    Incoherent   _ -> True
+    _              -> False
 
 data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
-  = NoOverlap
+  = NoOverlap SourceText
+                  -- See Note [Pragma source text]
     -- ^ This instance must not overlap another `NoOverlap` instance.
     -- However, it may be overlapped by `Overlapping` instances,
     -- and it may overlap `Overlappable` instances.
 
 
-  | Overlappable
+  | Overlappable SourceText
+                  -- See Note [Pragma source text]
     -- ^ Silently ignore this instance if you find a
     -- more specific one that matches the constraint
     -- you are trying to resolve
@@ -492,7 +504,8 @@ data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
     -- its ambiguous which to choose)
 
 
-  | Overlapping
+  | Overlapping SourceText
+                  -- See Note [Pragma source text]
     -- ^ Silently ignore any more general instances that may be
     --   used to solve the constraint.
     --
@@ -505,10 +518,12 @@ data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
     -- it is ambiguous which to choose)
 
 
-  | Overlaps
+  | Overlaps SourceText
+                  -- See Note [Pragma source text]
     -- ^ Equivalent to having both `Overlapping` and `Overlappable` flags.
 
-  | Incoherent
+  | Incoherent SourceText
+                  -- See Note [Pragma source text]
     -- ^ Behave like Overlappable and Overlapping, and in addition pick
     -- an an arbitrary one if there are multiple matching candidates, and
     -- don't worry about later instantiation
@@ -527,11 +542,11 @@ instance Outputable OverlapFlag where
    ppr flag = ppr (overlapMode flag) <+> pprSafeOverlap (isSafeOverlap flag)
 
 instance Outputable OverlapMode where
-   ppr NoOverlap    = empty
-   ppr Overlappable = ptext (sLit "[overlappable]")
-   ppr Overlapping  = ptext (sLit "[overlapping]")
-   ppr Overlaps     = ptext (sLit "[overlap ok]")
-   ppr Incoherent   = ptext (sLit "[incoherent]")
+   ppr (NoOverlap    _) = empty
+   ppr (Overlappable _) = ptext (sLit "[overlappable]")
+   ppr (Overlapping  _) = ptext (sLit "[overlapping]")
+   ppr (Overlaps     _) = ptext (sLit "[overlap ok]")
+   ppr (Incoherent   _) = ptext (sLit "[incoherent]")
 
 pprSafeOverlap :: Bool -> SDoc
 pprSafeOverlap True  = ptext $ sLit "[safe]"
@@ -766,6 +781,72 @@ failed Failed    = True
 {-
 ************************************************************************
 *                                                                      *
+\subsection{Source Text}
+*                                                                      *
+************************************************************************
+Keeping Source Text for source to source conversions
+
+Note [Pragma source text]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The lexer does a case-insensitive match for pragmas, as well as
+accepting both UK and US spelling variants.
+
+So
+
+  {-# SPECIALISE #-}
+  {-# SPECIALIZE #-}
+  {-# Specialize #-}
+
+will all generate ITspec_prag token for the start of the pragma.
+
+In order to be able to do source to source conversions, the original
+source text for the token needs to be preserved, hence the
+`SourceText` field.
+
+So the lexer will then generate
+
+  ITspec_prag "{ -# SPECIALISE"
+  ITspec_prag "{ -# SPECIALIZE"
+  ITspec_prag "{ -# Specialize"
+
+for the cases above.
+ [without the space between '{' and '-', otherwise this comment won't parse]
+
+
+Note [literal source text]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The lexer/parser converts literals from their original source text
+versions to an appropriate internal representation. This is a problem
+for tools doing source to source conversions, so the original source
+text is stored in literals where this can occur.
+
+Motivating examples for HsLit
+
+  HsChar          '\n', '\x20`
+  HsCharPrim      '\x41`#
+  HsString        "\x20\x41" == " A"
+  HsStringPrim    "\x20"#
+  HsInt           001
+  HsIntPrim       002#
+  HsWordPrim      003##
+  HsInt64Prim     004##
+  HsWord64Prim    005##
+  HsInteger       006
+
+For OverLitVal
+
+  HsIntegral      003,0x001
+  HsIsString      "\x41nd"
+-}
+
+type SourceText = String -- Note [literal source text],[Pragma source text]
+
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Activation}
 *                                                                      *
 ************************************************************************
@@ -798,7 +879,8 @@ data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
 
 data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
-      { inl_inline :: InlineSpec
+      { inl_src    :: SourceText -- Note [Pragma source text]
+      , inl_inline :: InlineSpec
 
       , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n
                                      --            explicit (non-type, non-dictionary) args
@@ -888,7 +970,8 @@ isEmptyInlineSpec _               = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
-defaultInlinePragma = InlinePragma { inl_act = AlwaysActive
+defaultInlinePragma = InlinePragma { inl_src = "{-# INLINE"
+                                   , inl_act = AlwaysActive
                                    , inl_rule = FunLike
                                    , inl_inline = EmptyInlineSpec
                                    , inl_sat = Nothing }

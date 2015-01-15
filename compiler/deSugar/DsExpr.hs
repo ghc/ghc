@@ -300,13 +300,18 @@ dsExpr (ExplicitTuple tup_args boxity)
                   mkCoreConApps (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
                                 (map (Type . exprType) args ++ args) }
 
-dsExpr (HsSCC cc expr@(L loc _)) = do
-    mod_name <- getModule
-    count <- goptM Opt_ProfCountEntries
-    uniq <- newUnique
-    Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr
+dsExpr (HsSCC _ cc expr@(L loc _)) = do
+    dflags <- getDynFlags
+    if gopt Opt_SccProfilingOn dflags
+      then do
+        mod_name <- getModule
+        count <- goptM Opt_ProfCountEntries
+        uniq <- newUnique
+        Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True)
+               <$> dsLExpr expr
+      else dsLExpr expr
 
-dsExpr (HsCoreAnn _ expr)
+dsExpr (HsCoreAnn _ _ expr)
   = dsLExpr expr
 
 dsExpr (HsCase discrim matches)
@@ -669,19 +674,25 @@ dsExpr (HsBinTick ixT ixF e) = do
        mkBinaryTickBox ixT ixF e2
      }
 
+dsExpr (HsTickPragma _ _ expr) = do
+  dflags <- getDynFlags
+  if gopt Opt_Hpc dflags
+    then panic "dsExpr:HsTickPragma"
+    else dsLExpr expr
+
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (ExprWithTySig {})  = panic "dsExpr:ExprWithTySig"
 dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
 dsExpr (HsQuasiQuoteE {})  = panic "dsExpr:HsQuasiQuoteE"
 dsExpr (HsArrApp      {})  = panic "dsExpr:HsArrApp"
 dsExpr (HsArrForm     {})  = panic "dsExpr:HsArrForm"
-dsExpr (HsTickPragma  {})  = panic "dsExpr:HsTickPragma"
 dsExpr (EWildPat      {})  = panic "dsExpr:EWildPat"
 dsExpr (EAsPat        {})  = panic "dsExpr:EAsPat"
 dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 dsExpr (HsType        {})  = panic "dsExpr:HsType"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
+
 
 
 findField :: [LHsRecField Id arg] -> Name -> [arg]

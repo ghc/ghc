@@ -147,9 +147,11 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; fix_ds   <- mapM repFixD fixds
                      ; _        <- mapM no_default_decl defds
                      ; for_ds   <- mapM repForD fords
-                     ; _        <- mapM no_warn warnds
+                     ; _        <- mapM no_warn (concatMap (wd_warnings . unLoc)
+                                                           warnds)
                      ; ann_ds   <- mapM repAnnD annds
-                     ; rule_ds  <- mapM repRuleD ruleds
+                     ; rule_ds  <- mapM repRuleD (concatMap (rds_rules . unLoc)
+                                                            ruleds)
                      ; _        <- mapM no_vect vects
                      ; _        <- mapM no_doc docs
 
@@ -361,7 +363,7 @@ mk_extra_tvs tc tvs defn
       = do { uniq <- newUnique
            ; let { occ = mkTyVarOccFS (fsLit "t")
                  ; nm = mkInternalName uniq occ loc
-                 ; hs_tv = L loc (KindedTyVar nm kind) }
+                 ; hs_tv = L loc (KindedTyVar (noLoc nm) kind) }
            ; hs_tvs <- go rest
            ; return (hs_tv : hs_tvs) }
 
@@ -374,13 +376,14 @@ mk_extra_tvs tc tvs defn
 -------------------------
 -- represent fundeps
 --
-repLFunDeps :: [Located (FunDep Name)] -> DsM (Core [TH.FunDep])
+repLFunDeps :: [Located (FunDep (Located Name))] -> DsM (Core [TH.FunDep])
 repLFunDeps fds = repList funDepTyConName repLFunDep fds
 
-repLFunDep :: Located (FunDep Name) -> DsM (Core TH.FunDep)
-repLFunDep (L _ (xs, ys)) = do xs' <- repList nameTyConName lookupBinder xs
-                               ys' <- repList nameTyConName lookupBinder ys
-                               repFunDep xs' ys'
+repLFunDep :: Located (FunDep (Located Name)) -> DsM (Core TH.FunDep)
+repLFunDep (L _ (xs, ys))
+   = do xs' <- repList nameTyConName (lookupBinder . unLoc) xs
+        ys' <- repList nameTyConName (lookupBinder . unLoc) ys
+        repFunDep xs' ys'
 
 -- represent family declaration flavours
 --
@@ -550,17 +553,17 @@ repRuleBndr (L _ (RuleBndrSig n (HsWB { hswb_cts = ty })))
        ; rep2 typedRuleVarName [n', ty'] }
 
 repAnnD :: LAnnDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repAnnD (L loc (HsAnnotation ann_prov (L _ exp)))
+repAnnD (L loc (HsAnnotation _ ann_prov (L _ exp)))
   = do { target <- repAnnProv ann_prov
        ; exp'   <- repE exp
        ; dec    <- repPragAnn target exp'
        ; return (loc, dec) }
 
 repAnnProv :: AnnProvenance Name -> DsM (Core TH.AnnTarget)
-repAnnProv (ValueAnnProvenance n)
+repAnnProv (ValueAnnProvenance (L _ n))
   = do { MkC n' <- globalVar n  -- ANNs are allowed only at top-level
        ; rep2 valueAnnotationName [ n' ] }
-repAnnProv (TypeAnnProvenance n)
+repAnnProv (TypeAnnProvenance (L _ n))
   = do { MkC n' <- globalVar n
        ; rep2 typeAnnotationName [ n' ] }
 repAnnProv ModuleAnnProvenance
@@ -619,7 +622,7 @@ mkGadtCtxt :: [Name]            -- Tyvars of the data type
 -- This function is fiddly, but not really hard
 mkGadtCtxt _ ResTyH98
   = return ([], [])
-mkGadtCtxt data_tvs (ResTyGADT res_ty)
+mkGadtCtxt data_tvs (ResTyGADT _ res_ty)
   | Just (_, tys) <- hsTyGetAppHead_maybe res_ty
   , data_tvs `equalLength` tys
   = return (go [] [] (data_tvs `zip` tys))
@@ -651,9 +654,9 @@ repBangTy ty= do
   rep2 strictTypeName [s, t]
   where
     (str, ty') = case ty of
-                   L _ (HsBangTy (HsSrcBang (Just True) True) ty) -> (unpackedName,  ty)
-                   L _ (HsBangTy (HsSrcBang _     True) ty)       -> (isStrictName,  ty)
-                   _                                              -> (notStrictName, ty)
+         L _ (HsBangTy (HsSrcBang _ (Just True) True) ty) -> (unpackedName,  ty)
+         L _ (HsBangTy (HsSrcBang _ _     True) ty)       -> (isStrictName,  ty)
+         _                                                -> (notStrictName, ty)
 
 -------------------------------------------------------
 --                      Deriving clause
@@ -695,7 +698,7 @@ rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm tys ispec))
    = concatMapM (\t -> rep_specialise nm t ispec loc) tys
-rep_sig (L loc (SpecInstSig ty))      = rep_specialiseInst ty loc
+rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 
 rep_ty_sig :: Name -> SrcSpan -> LHsType Name -> Located Name
@@ -913,11 +916,11 @@ repTy (HsTyLit lit) = do
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> DsM (Core TH.TyLitQ)
-repTyLit (HsNumTy i) = do iExpr <- mkIntegerExpr i
-                          rep2 numTyLitName [iExpr]
-repTyLit (HsStrTy s) = do { s' <- mkStringExprFS s
-                         ; rep2 strTyLitName [s']
-                         }
+repTyLit (HsNumTy _ i) = do iExpr <- mkIntegerExpr i
+                            rep2 numTyLitName [iExpr]
+repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
+                            ; rep2 strTyLitName [s']
+                            }
 
 -- represent a kind
 --
@@ -1104,7 +1107,7 @@ repE e                     = notHandled "Expression form" (ppr e)
 -- Building representations of auxillary structures like Match, Clause, Stmt,
 
 repMatchTup ::  LMatch Name (LHsExpr Name) -> DsM (Core TH.MatchQ)
-repMatchTup (L _ (Match [p] _ (GRHSs guards wheres))) =
+repMatchTup (L _ (Match _ [p] _ (GRHSs guards wheres))) =
   do { ss1 <- mkGenSyms (collectPatBinders p)
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
@@ -1116,7 +1119,7 @@ repMatchTup (L _ (Match [p] _ (GRHSs guards wheres))) =
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
 repClauseTup ::  LMatch Name (LHsExpr Name) -> DsM (Core TH.ClauseQ)
-repClauseTup (L _ (Match ps _ (GRHSs guards wheres))) =
+repClauseTup (L _ (Match _ ps _ (GRHSs guards wheres))) =
   do { ss1 <- mkGenSyms (collectPatsBinders ps)
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
@@ -1268,8 +1271,10 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- Note GHC treats declarations of a variable (not a pattern)
 -- e.g.  x = g 5 as a Fun MonoBinds. This is indicated by a single match
 -- with an empty list of patterns
-rep_bind (L loc (FunBind { fun_id = fn,
-                           fun_matches = MG { mg_alts = [L _ (Match [] _ (GRHSs guards wheres))] } }))
+rep_bind (L loc (FunBind
+                 { fun_id = fn,
+                   fun_matches = MG { mg_alts = [L _ (Match _ [] _
+                                                   (GRHSs guards wheres))] } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; fn'  <- lookupLBinder fn
@@ -1328,7 +1333,7 @@ rep_bind (L _ dec@(PatSynBind {})) = notHandled "pattern synonyms" (ppr dec)
 -- (\ p1 .. pn -> exp) by causing an error.
 
 repLambda :: LMatch Name (LHsExpr Name) -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [] e)] EmptyLocalBinds)))
+repLambda (L _ (Match _ ps _ (GRHSs [L _ (GRHS [] e)] EmptyLocalBinds)))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
@@ -1380,7 +1385,7 @@ repP (ConPatIn dc details)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
-repP (NPat l Nothing _)  = do { a <- repOverloadedLiteral l; repPlit a }
+repP (NPat (L _ l) Nothing _)  = do { a <- repOverloadedLiteral l; repPlit a }
 repP (ViewPat e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
 repP p@(NPat _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
 repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
@@ -1848,7 +1853,7 @@ repConstr con (PrefixCon ps)
     = do arg_tys  <- repList strictTypeQTyConName repBangTy ps
          rep2 normalCName [unC con, unC arg_tys]
 
-repConstr con (RecCon ips)
+repConstr con (RecCon (L _ ips))
     = do { args <- concatMapM rep_ip ips
          ; arg_vtys <- coreList varStrictTypeQTyConName args
          ; rep2 recCName [unC con, unC arg_vtys] }

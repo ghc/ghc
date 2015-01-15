@@ -110,7 +110,8 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 
       preludeImportDecl :: LImportDecl RdrName
       preludeImportDecl
-        = L loc $ ImportDecl { ideclName      = L loc pRELUDE_NAME,
+        = L loc $ ImportDecl { ideclSourceSrc = Nothing,
+                               ideclName      = L loc pRELUDE_NAME,
                                ideclPkgQual   = Nothing,
                                ideclSource    = False,
                                ideclSafe      = False,  -- Not a safe import

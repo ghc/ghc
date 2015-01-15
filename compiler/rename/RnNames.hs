@@ -755,7 +755,7 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
                                        AvailTC parent [name])],
                                      warns)
 
-        IEThingAbs tc
+        IEThingAbs (L l tc)
             | want_hiding   -- hiding ( C )
                        -- Here the 'C' can be a data constructor
                        --  *or* a type/class, or even both
@@ -764,10 +764,10 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
                in
                case catIELookupM [ tc_name, dc_name ] of
                  []    -> failLookupWith BadImport
-                 names -> return ([mkIEThingAbs name | name <- names], [])
+                 names -> return ([mkIEThingAbs l name | name <- names], [])
             | otherwise
             -> do nameAvail <- lookup_name tc
-                  return ([mkIEThingAbs nameAvail], [])
+                  return ([mkIEThingAbs l nameAvail], [])
 
         IEThingWith (L l rdr_tc) rdr_ns -> do
            (name, AvailTC _ ns, mb_parent) <- lookup_name rdr_tc
@@ -801,8 +801,10 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
         -- all errors.
 
       where
-        mkIEThingAbs (n, av, Nothing    ) = (IEThingAbs n, trimAvail av n)
-        mkIEThingAbs (n, _,  Just parent) = (IEThingAbs n, AvailTC parent [n])
+        mkIEThingAbs l (n, av, Nothing    ) = (IEThingAbs (L l n),
+                                               trimAvail av n)
+        mkIEThingAbs l (n, _,  Just parent) = (IEThingAbs (L l n),
+                                               AvailTC parent [n])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport | want_hiding -> return ([], [BadImportW])
@@ -1133,11 +1135,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
         = do gre <- lookupGreRn rdr
              return (IEVar (L l (gre_name gre)), greExportAvail gre)
 
-    lookup_ie (IEThingAbs rdr)
+    lookup_ie (IEThingAbs (L l rdr))
         = do gre <- lookupGreRn rdr
              let name = gre_name gre
                  avail = greExportAvail gre
-             return (IEThingAbs name, avail)
+             return (IEThingAbs (L l name), avail)
 
     lookup_ie ie@(IEThingAll (L l rdr))
         = do name <- lookupGlobalOccRn rdr
@@ -1417,7 +1419,7 @@ findImportUsage imports rdr_env rdrs
 
         add_unused :: IE Name -> NameSet -> NameSet
         add_unused (IEVar (L _ n))      acc = add_unused_name n acc
-        add_unused (IEThingAbs n)       acc = add_unused_name n acc
+        add_unused (IEThingAbs (L _ n)) acc = add_unused_name n acc
         add_unused (IEThingAll (L _ n)) acc = add_unused_all  n acc
         add_unused (IEThingWith (L _ p) ns) acc
                                           = add_unused_with p (map unLoc ns) acc
@@ -1568,7 +1570,7 @@ printMinimalImports imports_w_usage
     to_ie _ (Avail n)
        = [IEVar (noLoc n)]
     to_ie _ (AvailTC n [m])
-       | n==m = [IEThingAbs n]
+       | n==m = [IEThingAbs (noLoc n)]
     to_ie ifaces (AvailTC n ns)
       = case [xs | iface <- ifaces
                  , AvailTC x xs <- mi_exports iface
@@ -1771,10 +1773,10 @@ missingImportListItem ie
   = ptext (sLit "The import item") <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
-moduleWarn mod (WarningTxt txt)
+moduleWarn mod (WarningTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"),
           nest 2 (vcat (map ppr txt)) ]
-moduleWarn mod (DeprecatedTxt txt)
+moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
                                 <+> ptext (sLit "is deprecated:"),
           nest 2 (vcat (map ppr txt)) ]

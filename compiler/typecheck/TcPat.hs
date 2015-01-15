@@ -590,7 +590,7 @@ tc_pat _ (LitPat simple_lit) pat_ty thing_inside
 
 ------------------------
 -- Overloaded patterns: n, and n+k
-tc_pat _ (NPat over_lit mb_neg eq) pat_ty thing_inside
+tc_pat _ (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
         ; lit'    <- newOverloadedLit orig over_lit pat_ty
         ; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
@@ -601,9 +601,9 @@ tc_pat _ (NPat over_lit mb_neg eq) pat_ty thing_inside
                             do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
                                ; return (Just neg') }
         ; res <- thing_inside
-        ; return (NPat lit' mb_neg' eq', res) }
+        ; return (NPat (L l lit') mb_neg' eq', res) }
 
-tc_pat penv (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
+tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
   = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; let pat_ty' = idType bndr_id
               orig    = LiteralOrigin lit
@@ -612,7 +612,7 @@ tc_pat penv (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
         -- The '>=' and '-' parts are re-mappable syntax
         ; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
         ; minus' <- tcSyntaxOp orig minus (mkFunTys [pat_ty', pat_ty'] pat_ty')
-        ; let pat' = NPlusKPat (L nm_loc bndr_id) lit' ge' minus'
+        ; let pat' = NPlusKPat (L nm_loc bndr_id) (L loc lit') ge' minus'
 
         -- The Report says that n+k patterns must be in Integral
         -- We may not want this when using re-mappable syntax, though (ToDo?)

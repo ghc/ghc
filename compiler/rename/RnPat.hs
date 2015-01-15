@@ -381,28 +381,30 @@ rnPatAndThen mk (LitPat lit)
   | HsString src s <- lit
   = do { ovlStr <- liftCps (xoptM Opt_OverloadedStrings)
        ; if ovlStr
-         then rnPatAndThen mk (mkNPat (mkHsIsString src s placeHolderType)
+         then rnPatAndThen mk
+                           (mkNPat (noLoc (mkHsIsString src s placeHolderType))
                                       Nothing)
          else normal_lit }
   | otherwise = normal_lit
   where
     normal_lit = do { liftCps (rnLit lit); return (LitPat lit) }
 
-rnPatAndThen _ (NPat lit mb_neg _eq)
+rnPatAndThen _ (NPat (L l lit) mb_neg _eq)
   = do { lit'    <- liftCpsFV $ rnOverLit lit
        ; mb_neg' <- liftCpsFV $ case mb_neg of
                       Nothing -> return (Nothing, emptyFVs)
                       Just _  -> do { (neg, fvs) <- lookupSyntaxName negateName
                                     ; return (Just neg, fvs) }
        ; eq' <- liftCpsFV $ lookupSyntaxName eqName
-       ; return (NPat lit' mb_neg' eq') }
+       ; return (NPat (L l lit') mb_neg' eq') }
 
-rnPatAndThen mk (NPlusKPat rdr lit _ _)
-  = do { new_name <- newPatLName mk rdr
+rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _)
+  = do { new_name <- newPatName mk rdr
        ; lit'  <- liftCpsFV $ rnOverLit lit
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
-       ; return (NPlusKPat new_name lit' ge minus) }
+       ; return (NPlusKPat (L (nameSrcSpan new_name) new_name)
+                           (L l lit') ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat rdr pat)

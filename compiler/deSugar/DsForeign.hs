@@ -713,7 +713,7 @@ toCType = f False
            -- Note that we aren't looking through type synonyms or
            -- anything, as it may be the synonym that is annotated.
            | TyConApp tycon _ <- t
-           , Just (CType mHeader cType) <- tyConCType_maybe tycon
+           , Just (CType _ mHeader cType) <- tyConCType_maybe tycon
               = (mHeader, ftext cType)
            -- If we don't know a C type for this type, then try looking
            -- through one layer of type synonym etc.

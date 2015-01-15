@@ -86,6 +86,20 @@ import Data.Data
 
 -- | Do not use the data constructors of RdrName directly: prefer the family
 -- of functions that creates them, such as 'mkRdrUnqual'
+--
+-- - Note: A Located RdrName will only have API Annotations if it is a
+--         compound one,
+--   e.g.
+--
+-- > `bar`
+-- > ( ~ )
+--
+-- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
+--           'ApiAnnotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
+--           'ApiAnnotation.AnnClose' @')'@ or @']'@ or @':]'@,,
+--           'ApiAnnotation.AnnBackquote' @'`'@,
+--           'ApiAnnotation.AnnVal','ApiAnnotation.AnnTildehsh',
+--           'ApiAnnotation.AnnTilde',
 data RdrName
   = Unqual OccName
         -- ^ Used for ordinary, unqualified occurrences, e.g. @x@, @y@ or @Foo@.

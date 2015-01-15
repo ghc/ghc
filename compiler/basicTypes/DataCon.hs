@@ -453,6 +453,7 @@ data HsBang
   = HsNoBang     -- Equivalent to (HsSrcBang Nothing False)
 
   | HsSrcBang    -- What the user wrote in the source code
+       (Maybe SourceText) -- Note [Pragma source text] in BasicTypes
        (Maybe Bool)       -- Just True    {-# UNPACK #-}
                           -- Just False   {-# NOUNPACK #-}
                           -- Nothing      no pragma
@@ -574,11 +575,11 @@ instance Data.Data DataCon where
     dataTypeOf _ = mkNoRepType "DataCon"
 
 instance Outputable HsBang where
-    ppr HsNoBang              = empty
-    ppr (HsSrcBang prag bang) = pp_unpk prag <+> ppWhen bang (char '!')
-    ppr (HsUnpack Nothing)    = ptext (sLit "Unpk")
-    ppr (HsUnpack (Just co))  = ptext (sLit "Unpk") <> parens (ppr co)
-    ppr HsStrict              = ptext (sLit "SrictNotUnpacked")
+    ppr HsNoBang                = empty
+    ppr (HsSrcBang _ prag bang) = pp_unpk prag <+> ppWhen bang (char '!')
+    ppr (HsUnpack Nothing)      = ptext (sLit "Unpk")
+    ppr (HsUnpack (Just co))    = ptext (sLit "Unpk") <> parens (ppr co)
+    ppr HsStrict                = ptext (sLit "SrictNotUnpacked")
 
 pp_unpk :: Maybe Bool -> SDoc
 pp_unpk Nothing      = empty
@@ -593,16 +594,16 @@ instance Outputable StrictnessMark where
 eqHsBang :: HsBang -> HsBang -> Bool
 eqHsBang HsNoBang             HsNoBang             = True
 eqHsBang HsStrict             HsStrict             = True
-eqHsBang (HsSrcBang u1 b1)    (HsSrcBang u2 b2)    = u1==u2 && b1==b2
+eqHsBang (HsSrcBang _ u1 b1)  (HsSrcBang _ u2 b2)  = u1==u2 && b1==b2
 eqHsBang (HsUnpack Nothing)   (HsUnpack Nothing)   = True
 eqHsBang (HsUnpack (Just c1)) (HsUnpack (Just c2)) = eqType (coercionType c1) (coercionType c2)
 eqHsBang _ _ = False
 
 isBanged :: HsBang -> Bool
-isBanged HsNoBang           = False
-isBanged (HsSrcBang _ bang) = bang
-isBanged (HsUnpack {})      = True
-isBanged (HsStrict {})      = True
+isBanged HsNoBang             = False
+isBanged (HsSrcBang _ _ bang) = bang
+isBanged (HsUnpack {})        = True
+isBanged (HsStrict {})        = True
 
 isMarkedStrict :: StrictnessMark -> Bool
 isMarkedStrict NotMarkedStrict = False

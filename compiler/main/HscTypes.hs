@@ -2387,6 +2387,7 @@ ms_imps ms =
     -- text, such as those induced by the use of plugins (the -plgFoo
     -- flag)
     mk_additional_import mod_nm = noLoc $ ImportDecl {
+      ideclSourceSrc = Nothing,
       ideclName      = noLoc mod_nm,
       ideclPkgQual   = Nothing,
       ideclSource    = False,

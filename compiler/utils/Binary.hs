@@ -775,18 +775,20 @@ instance Binary Activation where
                       return (ActiveAfter ab)
 
 instance Binary InlinePragma where
-    put_ bh (InlinePragma a b c d) = do
+    put_ bh (InlinePragma s a b c d) = do
+            put_ bh s
             put_ bh a
             put_ bh b
             put_ bh c
             put_ bh d
 
     get bh = do
+           s <- get bh
            a <- get bh
            b <- get bh
            c <- get bh
            d <- get bh
-           return (InlinePragma a b c d)
+           return (InlinePragma s a b c d)
 
 instance Binary RuleMatchInfo where
     put_ bh FunLike = putByte bh 0
@@ -832,19 +834,19 @@ instance Binary RecFlag where
               _ -> do return NonRecursive
 
 instance Binary OverlapMode where
-    put_ bh NoOverlap     = putByte bh 0
-    put_ bh Overlaps      = putByte bh 1
-    put_ bh Incoherent    = putByte bh 2
-    put_ bh Overlapping   = putByte bh 3
-    put_ bh Overlappable  = putByte bh 4
+    put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
+    put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
+    put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
+    put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
+    put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
     get bh = do
         h <- getByte bh
         case h of
-            0 -> return NoOverlap
-            1 -> return Overlaps
-            2 -> return Incoherent
-            3 -> return Overlapping
-            4 -> return Overlappable
+            0 -> (get bh) >>= \s -> return $ NoOverlap s
+            1 -> (get bh) >>= \s -> return $ Overlaps s
+            2 -> (get bh) >>= \s -> return $ Incoherent s
+            3 -> (get bh) >>= \s -> return $ Overlapping s
+            4 -> (get bh) >>= \s -> return $ Overlappable s
             _ -> panic ("get OverlapMode" ++ show h)
 
 
@@ -880,20 +882,24 @@ instance Binary Fixity where
           return (Fixity aa ab)
 
 instance Binary WarningTxt where
-    put_ bh (WarningTxt w) = do
+    put_ bh (WarningTxt s w) = do
             putByte bh 0
+            put_ bh s
             put_ bh w
-    put_ bh (DeprecatedTxt d) = do
+    put_ bh (DeprecatedTxt s d) = do
             putByte bh 1
+            put_ bh s
             put_ bh d
 
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do w <- get bh
-                      return (WarningTxt w)
-              _ -> do d <- get bh
-                      return (DeprecatedTxt d)
+              0 -> do s <- get bh
+                      w <- get bh
+                      return (WarningTxt s w)
+              _ -> do s <- get bh
+                      d <- get bh
+                      return (DeprecatedTxt s d)
 
 instance Binary a => Binary (GenLocated SrcSpan a) where
     put_ bh (L l x) = do

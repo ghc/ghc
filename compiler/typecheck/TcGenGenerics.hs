@@ -125,7 +125,7 @@ metaTyConsToDerivStuff tc metaDts =
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
         mk_inst clas tc dfun_name
           = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
-                            OverlapFlag { overlapMode   = NoOverlap
+                            OverlapFlag { overlapMode   = (NoOverlap "")
                                         , isSafeOverlap = safeLanguageOn dflags }
                             [] clas tys
           where

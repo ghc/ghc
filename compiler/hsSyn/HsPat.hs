@@ -67,10 +67,17 @@ data Pat id
 
   | VarPat      id                      -- Variable
   | LazyPat     (LPat id)               -- Lazy pattern
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
+
   | AsPat       (Located id) (LPat id)  -- As pattern
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+
   | ParPat      (LPat id)               -- Parenthesised pattern
                                         -- See Note [Parens in HsSyn] in HsExpr
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
+    --                                    'ApiAnnotation.AnnClose' @')'@
   | BangPat     (LPat id)               -- Bang pattern
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 
         ------------ Lists, tuples, arrays ---------------
   | ListPat     [LPat id]                            -- Syntactic list
@@ -79,6 +86,8 @@ data Pat id
                    -- For OverloadedLists a Just (ty,fn) gives
                    -- overall type of the pattern, and the toList
                    -- function to convert the scrutinee to a list value
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
+    --                                    'ApiAnnotation.AnnClose' @']'@
 
   | TuplePat    [LPat id]        -- Tuple sub-patterns
                 Boxity           -- UnitPat is TuplePat []
@@ -99,9 +108,14 @@ data Pat id
         -- of the tuple is of type 'a' not Int.  See selectMatchVar
         -- (June 14: I'm not sure this comment is right; the sub-patterns
         --           will be wrapped in CoPats, no?)
+    -- ^ - 'ApiAnnotation.AnnKeywordId' :
+    --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
+    --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
   | PArrPat     [LPat id]               -- Syntactic parallel array
                 (PostTc id Type)        -- The type of the elements
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
+    --                                    'ApiAnnotation.AnnClose' @':]'@
 
         ------------ Constructor patterns ---------------
   | ConPatIn    (Located id)
@@ -124,6 +138,7 @@ data Pat id
     }
 
         ------------ View patterns ---------------
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
   | ViewPat       (LHsExpr id)
                   (LPat id)
                   (PostTc id Type)  -- The overall type of the pattern
@@ -131,6 +146,8 @@ data Pat id
                                     -- for hsPatType.
 
         ------------ Pattern splices ---------------
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@
+  --        'ApiAnnotation.AnnClose' @')'@
   | SplicePat       (HsSplice id)
 
         ------------ Quasiquoted patterns ---------------
@@ -143,17 +160,19 @@ data Pat id
 
   | NPat                -- Used for all overloaded literals,
                         -- including overloaded strings with -XOverloadedStrings
-                    (HsOverLit id)              -- ALWAYS positive
+                    (Located (HsOverLit id))    -- ALWAYS positive
                     (Maybe (SyntaxExpr id))     -- Just (Name of 'negate') for negative
                                                 -- patterns, Nothing otherwise
                     (SyntaxExpr id)             -- Equality checker, of type t->t->Bool
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVal' @'+'@
   | NPlusKPat       (Located id)        -- n+k pattern
-                    (HsOverLit id)      -- It'll always be an HsIntegral
+                    (Located (HsOverLit id)) -- It'll always be an HsIntegral
                     (SyntaxExpr id)     -- (>=) function, of type t->t->Bool
                     (SyntaxExpr id)     -- Name of '-' (see RnEnv.lookupSyntaxName)
 
         ------------ Pattern type signatures ---------------
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
   | SigPatIn        (LPat id)                  -- Pattern with a type signature
                     (HsWithBndrs id (LHsType id)) -- Signature can bind both
                                                   -- kind and type vars

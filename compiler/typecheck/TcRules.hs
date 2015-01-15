@@ -118,8 +118,13 @@ revert to SimplCheck when going under an implication.
           quantified constraints as givens
 -}
 
-tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
-tcRules decls = mapM (wrapLocM tcRule) decls
+tcRules :: [LRuleDecls Name] -> TcM [LRuleDecls TcId]
+tcRules decls = mapM (wrapLocM tcRuleDecls) decls
+
+tcRuleDecls :: RuleDecls Name -> TcM (RuleDecls TcId)
+tcRuleDecls (HsRules src decls)
+   = do { tc_decls <- mapM (wrapLocM tcRule) decls
+        ; return (HsRules src tc_decls) }
 
 tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
 tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)

@@ -814,7 +814,7 @@ lookupInstEnv' ie vis_mods cls tys
 
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances] and Note [Incoherent instances]
-      | Incoherent <- overlapMode oflag
+      | Incoherent _ <- overlapMode oflag
       = find ms us rest
 
       | otherwise
@@ -900,7 +900,9 @@ lookupInstEnv (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = v
 
 ---------------
 is_incoherent :: InstMatch -> Bool
-is_incoherent (inst, _) = overlapMode (is_flag inst) == Incoherent
+is_incoherent (inst, _) = case overlapMode (is_flag inst) of
+                            Incoherent _ -> True
+                            _            -> False
 
 ---------------
 insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
