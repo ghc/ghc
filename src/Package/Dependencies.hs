@@ -17,11 +17,8 @@ buildPackageDependencies (Package name path _) (stage, dist, settings) =
             <> productArgs ["-odir", "-stubdir", "-hidir"] buildDir
             <> arg ["-dep-makefile", toStandard $ out <.> "new"]
             <> productArgs "-dep-suffix" (map wayPrefix <$> ways settings)
+            <> arg (HsOpts pkgData)
             <> arg (pkgHsSources path dist)
-            -- TODO: Check that skipping all _HC_OPTS is safe.
-            -- <> arg SrcHcOpts
-            -- TODO: i) is this needed? ii) shall we run GHC -M multiple times?
-            -- <> wayHcOpts vanilla
         -- Avoid rebuilding dependecies of out if it hasn't changed:
         -- Note: cannot use copyFileChanged as it depends on the source file
         deps <- liftIO $ readFile $ out <.> "new"
