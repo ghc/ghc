@@ -95,27 +95,27 @@ with builder = do
 
 -- Run the builder with a given collection of arguments
 -- Raises an error if the builder is not uniquely specified in config files
-run :: Builder -> Args -> Action ()
-run builder args = do
+run :: ShowArgs a => Builder -> a -> Action ()
+run builder as = do
     needBuilder builder
     [exe] <- showArgs builder
-    args' <- args
-    cmd [exe] args'
+    args  <- showArgs as
+    cmd [exe] args
 
 -- Run the builder with a given collection of arguments printing out a
 -- terse commentary with only 'interesting' info for the builder.
 -- Raises an error if the builder is not uniquely specified in config files
-terseRun :: Builder -> Args -> Action ()
-terseRun builder args = do
-    args' <- args
+terseRun :: ShowArgs a => Builder -> a -> Action ()
+terseRun builder as = do
+    args <- showArgs as
     putNormal $ "/--------\n| Running " ++ show builder ++ " with arguments:"
-    mapM_ (putNormal . ("|   " ++)) $ interestingInfo builder args'
+    mapM_ (putNormal . ("|   " ++)) $ interestingInfo builder args
     putNormal "\\--------"
-    quietly $ run builder args
+    quietly $ run builder as
 
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
-    Ar       -> prefixAndSuffix 3 1 ss
+    Ar       -> prefixAndSuffix 2 1 ss
     Ld       -> prefixAndSuffix 4 0 ss
     Ghc _    -> if head ss == "-M"
                 then prefixAndSuffix 1 1 ss
