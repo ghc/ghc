@@ -11,6 +11,7 @@ import Package.Dependencies
 -- These are the packages we build:
 packages :: [Package]
 packages = [ libraryPackage "array"            Stage1 defaultSettings
+           , libraryPackage "bin-package-db"   Stage0 defaultSettings
            , libraryPackage "bin-package-db"   Stage1 defaultSettings
            , libraryPackage "binary"           Stage1 defaultSettings
            , libraryPackage "deepseq"          Stage1 defaultSettings
