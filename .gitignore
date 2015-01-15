@@ -3,3 +3,4 @@
 _shake/
 _build/
 cfg/default.config
+arg/*.txt
