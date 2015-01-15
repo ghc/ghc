@@ -81,6 +81,7 @@ splitObjects stage = do
     splitObjectsBroken <- test SplitObjectsBroken
     ghcUnregisterised  <- test GhcUnregisterised
     return $ not splitObjectsBroken && not ghcUnregisterised
+           && stage == Stage1
            && arch `elem` ["i386", "x86_64", "powerpc", "sparc"]
            && os   `elem` ["mingw32", "cygwin32", "linux", "darwin",
                            "solaris2", "freebsd", "dragonfly", "netbsd",
