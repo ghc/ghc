@@ -12,16 +12,18 @@ libraryPackagesInStage Stage0 =
     , "hoopl"
     , "hpc"
     , "transformers" ]
-libraryPackagesInStage Stage1 = []
-    --[ "array"
-    --, "deepseq"
-    --, "Cabal/Cabal"
-    --, "containers"
-    --, "filepath"
-    --, "parallel"
-    --, "pretty"
-    --, "stm"
-    --, "template-haskell" ]
+libraryPackagesInStage Stage1 =
+    libraryPackagesInStage Stage0 ++
+    [ "array"
+    , "deepseq"
+    , "Cabal/Cabal"
+    , "containers"
+    , "filepath"
+    , "parallel"
+    , "pretty"
+    , "stm"
+    , "template-haskell" ]
+
 libraryPackagesInStage _ = []
 
 libraryPackages :: [String]

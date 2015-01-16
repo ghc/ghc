@@ -65,6 +65,7 @@ instance ShowArgs a => ShowArgs [a] where
 instance ShowArgs a => ShowArgs (Action a) where
     showArgs = (showArgs =<<)
 
+-- TODO: improve args type safety
 args :: ShowArgs a => a -> Args
 args = showArgs
 
