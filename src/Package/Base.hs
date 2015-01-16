@@ -79,7 +79,7 @@ pathArgs key path as =
     map (\a -> key ++ toStandard (normaliseEx $ path </> a)) <$> arg as
 
 packageArgs :: Stage -> FilePath -> Args
-packageArgs stage pkgData = do
+packageArgs stage pathDist = do
     usePackageKey <- SupportsPackageKey || stage /= Stage0
     arg [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
@@ -88,56 +88,56 @@ packageArgs stage pkgData = do
           arg "-package-db libraries/bootstrapping.conf"
         , keyArgs usePackageKey ]
   where
-    keyArgs True  = productArgs "-this-package-key" (PackageKey pkgData) <>
-                    productArgs "-package-key"      (DepKeys    pkgData)
-    keyArgs False = productArgs "-package-name"     (PackageKey pkgData) <>
-                    productArgs "-package"          (Deps       pkgData)
+    keyArgs True  = productArgs "-this-package-key" (PackageKey pathDist) <>
+                    productArgs "-package-key"      (DepKeys    pathDist)
+    keyArgs False = productArgs "-package-name"     (PackageKey pathDist) <>
+                    productArgs "-package"          (Deps       pathDist)
 
 includeArgs :: FilePath -> FilePath -> Args
 includeArgs path dist =
-    let pkgData  = toStandard $ path </> dist </> "package-data.mk"
-        buildDir = toStandard $ path </> dist </> "build"
+    let pathDist = path </> dist
+        buildDir = toStandard $ pathDist </> "build"
     in arg [ arg "-i"
-           , pathArgs "-i" path $ SrcDirs pkgData
+           , pathArgs "-i" path $ SrcDirs pathDist
            , concatArgs ["-i", "-I"]
              [buildDir, toStandard $ buildDir </> "autogen"]
-           , pathArgs "-I" path $ IncludeDirs pkgData
+           , pathArgs "-I" path $ IncludeDirs pathDist
            , arg "-optP-include" -- TODO: Shall we also add -cpp?
            , concatArgs "-optP" $
              toStandard $ buildDir </> "autogen/cabal_macros.h" ]
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do
-    let pkgData = path </> dist </> "package-data.mk"
-    dirs <- map (path </>) <$> arg (SrcDirs pkgData)
-    findModuleFiles pkgData dirs [".hs", ".lhs"]
+    let pathDist = path </> dist
+    dirs <- map (path </>) <$> arg (SrcDirs pathDist)
+    findModuleFiles pathDist dirs [".hs", ".lhs"]
 
 -- Find objects we depend on (we don't want to depend on split objects)
 -- TODO: look for non-hs objects too
 pkgDepObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepObjects path dist way = do
-    let pkgData  = path </> dist </> "package-data.mk"
-        buildDir = path </> dist </> "build"
-    dirs <- map (normaliseEx . (path </>)) <$> arg (SrcDirs pkgData)
+    let pathDist = path </> dist
+        buildDir = pathDist </> "build"
+    dirs <- map (normaliseEx . (path </>)) <$> arg (SrcDirs pathDist)
     fmap concat $ forM dirs $ \d ->
         map (toStandard . (buildDir ++) . (-<.> osuf way) . drop (length d))
-        <$> (findModuleFiles pkgData [d] [".hs", ".lhs"])
+        <$> (findModuleFiles pathDist [d] [".hs", ".lhs"])
 
 -- Find objects that go to library
 pkgLibObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]
 pkgLibObjects path dist stage way = do
-    let pkgData  = path </> dist </> "package-data.mk"
-        buildDir = path </> dist </> "build"
+    let pathDist = path </> dist
+        buildDir = pathDist </> "build"
     split <- splitObjects stage
     if split
     then do
          let suffixes = ["_" ++ osuf way ++ "_split//*"]
-         findModuleFiles pkgData [buildDir] suffixes
+         findModuleFiles pathDist [buildDir] suffixes
     else pkgDepObjects path dist way
 
 findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
-findModuleFiles pkgData directories suffixes = do
-    modPaths <- map (replaceEq '.' pathSeparator) <$> arg (Modules pkgData)
+findModuleFiles pathDist directories suffixes = do
+    modPaths <- map (replaceEq '.' pathSeparator) <$> arg (Modules pathDist)
     fileList <- forM directories $ \dir     ->
                 forM modPaths    $ \modPath ->
                 forM suffixes    $ \suffix  -> do

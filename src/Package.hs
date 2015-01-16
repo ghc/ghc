@@ -32,17 +32,12 @@ packageRules = do
     forM_ packages $ \pkg @ (Package name path todo) -> do
         forM_ todo $ \todoItem @ (stage, dist, settings) -> do
 
-            action $ putNormal $ "package = " ++ name ++ ", dist = " ++ dist
-
             -- Want top .o and .a files for the pkg/todo combo
             -- TODO: Check BUILD_GHCI_LIB flag to decide if .o is needed
             action $ do
-                alwaysRerun
-                let buildDir = path </> dist </> "build"
-                    pkgData  = path </> dist </> "package-data.mk"
-                -- need [pkgData]
-                [key] <- arg (PackageKey pkgData)
-                putNormal $ "key = " ++ key
+                let pathDist = path </> dist
+                    buildDir = pathDist </> "build"
+                [key] <- arg (PackageKey pathDist)
                 let oFile = buildDir </> "Hs" ++ key <.> "o"
                 ways'  <- ways settings
                 aFiles <- forM ways' $ \way -> do

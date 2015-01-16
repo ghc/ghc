@@ -59,19 +59,17 @@ postProcessPackageData file = do
             (prefix, suffix) = break (== '=') line
 
 
-bootPkgConstraints :: Package -> TodoItem -> Args
-bootPkgConstraints (Package _ path _) (_, dist, _) = do
-    let pkgData  = path </> dist </> "package-data.mk"
-    deps <- arg $ DepNames pkgData
+bootPkgConstraints :: FilePath -> Args
+bootPkgConstraints pathDist = do
+    need [pathDist </> "package-data.mk"]
+    deps <- arg $ DepNames pathDist
     let depsStage0 = filter ((`elem` deps) . takeBaseName)
                      $ libraryPackageNames Stage0
-    putNormal $ "depsStage0 = " ++ show depsStage0
     forM depsStage0 $ \dep -> do
         let depPkg             = libraryPackage dep [Stage0] defaultSettings
             (_, depPkgDist, _) = head $ pkgTodo depPkg
-            depPkgData         = pkgPath depPkg </> depPkgDist
-                                 </> "package-data.mk"
-        [version] <- arg $ Version depPkgData
+            depPathDist        = pkgPath depPkg </> depPkgDist
+        [version] <- arg $ Version depPathDist
         return $ "--constraint " ++ dep ++ " == " ++ version
 
 cabalArgs :: Package -> TodoItem -> Args
@@ -87,7 +85,7 @@ cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = arg
     , libraryArgs =<< ways settings
     , when (specified HsColour) $ with HsColour
     , configureArgs stage settings
-    , when (stage == Stage0) $ bootPkgConstraints pkg todo
+    , when (stage == Stage0) $ bootPkgConstraints $ path </> dist
     , with Gcc
     , when (stage /= Stage0) $ with Ld
     , with Ar

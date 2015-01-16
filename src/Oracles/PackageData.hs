@@ -38,10 +38,11 @@ instance ShowArgs PackageData where
                Synopsis    file -> ("SYNOPSIS"    , file, "" )
                CppOpts     file -> ("CPP_OPTS"    , file, "" )
                HsOpts      file -> ("HC_OPTS"     , file, "" )
-            fullKey = replaceSeparators '_' $ takeDirectory file ++ "_" ++ key
-            file'   = toStandard $ normaliseEx file
-        res <- askOracle $ PackageDataKey (file', fullKey)
+            fullKey = replaceSeparators '_' $ file ++ "_" ++ key
+            pkgData = file </> "package-data.mk"
+        res <- askOracle $ PackageDataKey (pkgData, fullKey)
         return $ words $ case res of
-            Nothing    -> error $ "No key '" ++ key ++ "' in " ++ file ++ "."
+            Nothing    -> error $ "No key '" ++ key ++ "' in "
+                                ++ toStandard pkgData ++ "."
             Just ""    -> defaultValue
             Just value -> value

@@ -13,15 +13,15 @@ suffixArgs way =
 
 ghcArgs :: Package -> TodoItem -> Way -> [FilePath] -> FilePath -> Args
 ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
-    let buildDir = toStandard $ path </> dist </> "build"
-        pkgData  = path </> dist </> "package-data.mk"
+    let pathDist = path </> dist
+        buildDir = toStandard $ pathDist </> "build"
     in arg [ suffixArgs way
            , wayHcArgs way
            , arg SrcHcArgs
-           , packageArgs stage pkgData
+           , packageArgs stage pathDist
            , includeArgs path dist
-           , concatArgs ["-optP"] $ CppOpts pkgData
-           , arg $ HsOpts pkgData
+           , concatArgs ["-optP"] $ CppOpts pathDist
+           , arg $ HsOpts pathDist
            -- TODO: now we have both -O and -O2
            -- <> arg ["-O2"]
            , productArgs ["-odir", "-hidir", "-stubdir"] buildDir

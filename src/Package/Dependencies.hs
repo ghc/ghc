@@ -8,17 +8,17 @@ argListDir = "shake/arg/buildPackageDependencies"
 
 ghcArgs :: Package -> TodoItem -> Args
 ghcArgs (Package name path _) (stage, dist, settings) =
-    let buildDir = toStandard $ path </> dist </> "build"
-        pkgData  = path </> dist </> "package-data.mk"
+    let pathDist = path </> dist
+        buildDir = toStandard $ pathDist </> "build"
         depFile  = buildDir </> takeBaseName name <.> "m"
     in arg [ arg "-M"
-           , packageArgs stage pkgData
+           , packageArgs stage pathDist
            , includeArgs path dist
-           , concatArgs ["-optP"] $ CppOpts pkgData
+           , concatArgs ["-optP"] $ CppOpts pathDist
            , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
            , arg ["-dep-makefile", depFile <.> "new"]
            , productArgs "-dep-suffix" $ map wayPrefix <$> ways settings
-           , arg $ HsOpts pkgData
+           , arg $ HsOpts pathDist
            , arg $ pkgHsSources path dist ]
 
 buildRule :: Package -> TodoItem -> Rules ()

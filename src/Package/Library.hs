@@ -38,13 +38,13 @@ ldArgs (Package _ path _) (stage, dist, _) result = do
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
-    let buildDir = path </> dist </> "build"
-        pkgData  = path </> dist </> "package-data.mk"
+    let pathDist = path </> dist
+        buildDir = pathDist </> "build"
     in
     priority 2 $ (buildDir </> "*.o") %> \out -> do
         need [argListPath argListDir pkg stage]
         terseRun Ld $ ldArgs pkg todo $ toStandard out
-        synopsis <- unwords <$> arg (Synopsis pkgData)
+        synopsis <- unwords <$> arg (Synopsis pathDist)
         putColoured Vivid Green $ "/--------\n| Successfully built package "
             ++ name ++ " (stage " ++ show stage ++ ")."
         putColoured Vivid Green $ "| Package synopsis: " ++ synopsis ++ "."
