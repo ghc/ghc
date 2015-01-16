@@ -186,7 +186,15 @@ rnImportDecl this_mod
     -- at least not until TcIface.tcHiBootIface, which is too late to avoid
     -- typechecker crashes.  ToDo: what about indirect self-import?
     -- But 'import {-# SOURCE #-} M' is ok, even if a bit odd
-    when (not want_boot && imp_mod_name == moduleName this_mod)
+    when (not want_boot &&
+          imp_mod_name == moduleName this_mod &&
+          (case mb_pkg of  -- If we have import "<pkg>" M, then we should
+                           -- check that "<pkg>" is "this" (which is magic)
+                           -- or the name of this_mod's package.  Yurgh!
+                           -- c.f. GHC.findModule, and Trac #9997
+             Nothing     -> True
+             Just pkg_fs -> pkg_fs == fsLit "this" ||
+                            fsToPackageKey pkg_fs == modulePackageKey this_mod))
          (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
