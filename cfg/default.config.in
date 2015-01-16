@@ -34,6 +34,7 @@ supports-package-key = @SUPPORTS_PACKAGE_KEY@
 solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
 split-objects-broken = @SplitObjsBroken@
 ghc-unregisterised   = @Unregisterised@
+validating           = NO
 
 # Information about host and target systems:
 #===========================================
@@ -69,7 +70,7 @@ conf-ld-linker-args-stage-0  = @CONF_LD_LINKER_OPTS_STAGE0@
 conf-ld-linker-args-stage-1  = @CONF_LD_LINKER_OPTS_STAGE1@
 conf-ld-linker-args-stage-2  = @CONF_LD_LINKER_OPTS_STAGE2@
 
-src-hc-opts                  = -H32m -O
+src-hc-args                  = -H32m -O
 
 # Include and library directories:
 #=================================
