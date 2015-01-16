@@ -22,6 +22,7 @@ data Option = TargetOs
             | HostOsCpp
             | DynamicExtension
             | ProjectVersion
+            | GhcSourcePath
 
 data MultiOption = SrcHcArgs
                  | ConfCcArgs Stage
@@ -41,6 +42,7 @@ instance ShowArg Option where
         HostOsCpp               -> "host-os-cpp"
         DynamicExtension        -> "dynamic-extension"
         ProjectVersion          -> "project-version"
+        GhcSourcePath           -> "ghc-source-path"
 
 instance ShowArgs MultiOption where
     showArgs opt = showArgs $ fmap words $ askConfig $ case opt of

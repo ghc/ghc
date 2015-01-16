@@ -1,3 +1,6 @@
+# Edit 'user.config' to override these settings.
+#===============================================
+
 # Paths to builders:
 #===================
 
@@ -35,6 +38,7 @@ solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
 split-objects-broken = @SplitObjsBroken@
 ghc-unregisterised   = @Unregisterised@
 validating           = NO
+ghc-source-path      = @hardtop@
 
 # Information about host and target systems:
 #===========================================
