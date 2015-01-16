@@ -3,14 +3,15 @@
 module Oracles.Flag (
     module Control.Monad,
     module Prelude,
-    Flag (..), 
-    test, when, unless, not, (&&), (||), (<?>)
+    Flag (..),
+    test, when, unless, not, (&&), (||)
     ) where
 
 import Control.Monad hiding (when, unless)
 import qualified Prelude
 import Prelude hiding (not, (&&), (||))
 import Base
+import Util
 import Oracles.Base
 
 data Flag = LaxDeps
@@ -39,8 +40,8 @@ test flag = do
         SplitObjectsBroken -> ("split-objects-broken" , False)
         GhcUnregisterised  -> ("ghc-unregisterised"   , False)
     let defaultString = if defaultValue then "YES" else "NO"
-    value <- askConfigWithDefault key $
-        do putLoud $ "\nFlag '"
+    value <- askConfigWithDefault key $ -- TODO: warn just once
+        do putColoured Dull Red $ "\nFlag '"
                 ++ key
                 ++ "' not set in configuration files. "
                 ++ "Proceeding with default value '"
@@ -70,10 +71,6 @@ unless :: (ToCondition a, Monoid m) => a -> Action m -> Action m
 unless x act = do
     bool <- toCondition x
     if bool then mempty else act
-
--- Infix version of when
-(<?>) :: (ToCondition a, Monoid m) => a -> Action m -> Action m
-(<?>) = when
 
 class Not a where
     type NotResult a

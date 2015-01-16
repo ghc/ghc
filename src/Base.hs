@@ -8,7 +8,7 @@ module Base (
     module Data.Monoid,
     module Data.List,
     Stage (..),
-    Args, arg, ShowArgs (..),
+    Args, arg, ShowArg (..), ShowArgs (..),
     Condition (..),
     (<+>),
     filterOut,
@@ -36,6 +36,9 @@ type Condition = Action Bool
 instance Monoid a => Monoid (Action a) where
     mempty = return mempty
     mappend p q = mappend <$> p <*> q
+
+class ShowArg a where
+    showArg :: a -> Action String
 
 -- Using the Creators' trick for overlapping String instances
 class ShowArgs a where

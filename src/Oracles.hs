@@ -10,6 +10,7 @@ module Oracles (
 import Development.Shake.Config
 import qualified Data.HashMap.Strict as M
 import Base
+import Util
 import Config
 import Oracles.Base
 import Oracles.Flag
@@ -31,15 +32,21 @@ configOracle = do
                 ++ "' is missing; unwilling to proceed."
             return ()
         need [defaultConfig]
+        putNormal $ "Parsing " ++ toStandard defaultConfig ++ "..."
         cfgDefault <- liftIO $ readConfigFile defaultConfig
         existsUser <- doesFileExist userConfig
         cfgUser    <- if existsUser
-                      then liftIO $ readConfigFile userConfig
+                      then do
+                          putNormal $ "Parsing "
+                                    ++ toStandard userConfig ++ "..."
+                          liftIO $ readConfigFile userConfig
                       else do
-                          putLoud $ "\nUser defined configuration file '"
+                          putColoured Dull Red $
+                              "\nUser defined configuration file '"
                               ++ userConfig ++ "' is missing; "
                               ++ "proceeding with default configuration.\n"
                           return M.empty
+        putColoured Vivid Green $ "Finished processing configuration files."
         return $ cfgUser `M.union` cfgDefault
     addOracle $ \(ConfigKey key) -> M.lookup key <$> cfg ()
     return ()

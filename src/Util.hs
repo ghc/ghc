@@ -35,6 +35,7 @@ chunksOfSize size ss = reverse chunk : chunksOfSize size rest
                                 then (chunk   , s:ss)
                                 else (newChunk, rest)
 
+-- A more colourful version of Shake's putNormal
 putColoured :: ColorIntensity -> Color -> String -> Action ()
 putColoured intensity colour msg = do
     liftIO $ setSGR [SetColor Foreground intensity colour]

@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Oracles.Option (
-    Option (..),
+    Option (..), MultiOption (..),
     ghcWithInterpreter, platformSupportsSharedLibs, windowsHost, splitObjects
     ) where
 
@@ -10,47 +10,56 @@ import Oracles.Base
 
 -- For each Option the files {default.config, user.config} contain
 -- a line of the form 'target-os = mingw32'.
--- (showArgs TargetOS) is an action that consults the config files
--- and returns ["mingw32"].
--- TODO: separate single string options from multiple string ones.
-data Option = TargetOS
+-- (showArg TargetOs) is an action that consults the config files
+-- and returns "mingw32".
+--
+-- MultiOption is used for multiple string options separated by spaces,
+-- such as 'src-hc-args' = -H32m -O'.
+-- (showArgs SrcHcArgs) therefore returns a list of strings ["-H32", "-O"].
+data Option = TargetOs
             | TargetArch
             | TargetPlatformFull
-            | ConfCcArgs Stage
-            | ConfGccLinkerArgs Stage
-            | ConfLdLinkerArgs Stage
-            | ConfCppArgs Stage
-            | IconvIncludeDirs
-            | IconvLibDirs
-            | GmpIncludeDirs
-            | GmpLibDirs
-            | SrcHcOpts
             | HostOsCpp
             | DynamicExtension
             | ProjectVersion
 
-instance ShowArgs Option where
-    showArgs opt = showArgs $ fmap words $ askConfig $ case opt of 
-        TargetOS                -> "target-os"
+data MultiOption = SrcHcArgs
+                 | ConfCcArgs Stage
+                 | ConfGccLinkerArgs Stage
+                 | ConfLdLinkerArgs Stage
+                 | ConfCppArgs Stage
+                 | IconvIncludeDirs
+                 | IconvLibDirs
+                 | GmpIncludeDirs
+                 | GmpLibDirs
+
+instance ShowArg Option where
+    showArg opt = askConfig $ case opt of
+        TargetOs                -> "target-os"
         TargetArch              -> "target-arch"
         TargetPlatformFull      -> "target-platform-full"
-        ConfCcArgs        stage -> "conf-cc-args-stage-"         ++ show stage
-        ConfCppArgs       stage -> "conf-cpp-args-stage-"        ++ show stage
-        ConfGccLinkerArgs stage -> "conf-gcc-linker-args-stage-" ++ show stage
-        ConfLdLinkerArgs  stage -> "conf-ld-linker-args-stage-"  ++ show stage
-        IconvIncludeDirs        -> "iconv-include-dirs"
-        IconvLibDirs            -> "iconv-lib-dirs"
-        GmpIncludeDirs          -> "gmp-include-dirs"
-        GmpLibDirs              -> "gmp-lib-dirs"
-        SrcHcOpts               -> "src-hc-opts"
         HostOsCpp               -> "host-os-cpp"
         DynamicExtension        -> "dynamic-extension"
         ProjectVersion          -> "project-version"
 
+instance ShowArgs MultiOption where
+    showArgs opt = showArgs $ fmap words $ askConfig $ case opt of
+        SrcHcArgs               -> "src-hc-args"
+        ConfCcArgs        stage -> "conf-cc-args"         ++ showStage stage
+        ConfCppArgs       stage -> "conf-cpp-args"        ++ showStage stage
+        ConfGccLinkerArgs stage -> "conf-gcc-linker-args" ++ showStage stage
+        ConfLdLinkerArgs  stage -> "conf-ld-linker-args"  ++ showStage stage
+        IconvIncludeDirs        -> "iconv-include-dirs"
+        IconvLibDirs            -> "iconv-lib-dirs"
+        GmpIncludeDirs          -> "gmp-include-dirs"
+        GmpLibDirs              -> "gmp-lib-dirs"
+      where
+        showStage = ("-stage-" ++) . show
+
 ghcWithInterpreter :: Condition
 ghcWithInterpreter = do
-    [os]   <- showArgs TargetOS
-    [arch] <- showArgs TargetArch
+    os   <- showArg TargetOs
+    arch <- showArg TargetArch
     return $
         os `elem` ["mingw32", "cygwin32", "linux", "solaris2",
                    "freebsd", "dragonfly", "netbsd", "openbsd",
@@ -60,7 +69,7 @@ ghcWithInterpreter = do
 
 platformSupportsSharedLibs :: Condition
 platformSupportsSharedLibs = do
-    [platform] <- showArgs TargetPlatformFull
+    platform <- showArg TargetPlatformFull
     solarisBrokenShld <- test SolarisBrokenShld
     return $ notElem platform $
         ["powerpc-unknown-linux",
@@ -70,19 +79,17 @@ platformSupportsSharedLibs = do
 
 windowsHost :: Condition
 windowsHost = do
-    [hostOsCpp] <- showArgs HostOsCpp
+    hostOsCpp <- showArg HostOsCpp
     return $ hostOsCpp `elem` ["mingw32", "cygwin32"]
 
 -- TODO: refactor helper Condition functions into a separate file
 splitObjects :: Stage -> Condition
 splitObjects stage = do
-    [os]   <- showArgs TargetOS
-    [arch] <- showArgs TargetArch
-    splitObjectsBroken <- test SplitObjectsBroken
-    ghcUnregisterised  <- test GhcUnregisterised
-    return $ not splitObjectsBroken && not ghcUnregisterised
-           && stage == Stage1
-           && arch `elem` ["i386", "x86_64", "powerpc", "sparc"]
-           && os   `elem` ["mingw32", "cygwin32", "linux", "darwin",
-                           "solaris2", "freebsd", "dragonfly", "netbsd",
-                           "openbsd"]
+    arch <- showArg TargetArch
+    os   <- showArg TargetOs
+    not SplitObjectsBroken && not GhcUnregisterised
+        && stage == Stage1
+        && arch `elem` ["i386", "x86_64", "powerpc", "sparc"]
+        && os   `elem` ["mingw32", "cygwin32", "linux", "darwin",
+                       "solaris2", "freebsd", "dragonfly", "netbsd",
+                       "openbsd"]

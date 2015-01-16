@@ -1,18 +1,18 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Ways (
     WayUnit (..),
-    Way, tag, 
-    
-    allWays, defaultWays, 
+    Way, tag,
 
-    vanilla, profiling, logging, parallel, granSim, 
-    threaded, threadedProfiling, threadedLogging, 
+    allWays, defaultWays,
+
+    vanilla, profiling, logging, parallel, granSim,
+    threaded, threadedProfiling, threadedLogging,
     debug, debugProfiling, threadedDebug, threadedDebugProfiling,
     dynamic, profilingDynamic, threadedProfilingDynamic,
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic,
 
-    wayHcArgs, 
+    wayHcArgs,
     wayPrefix,
     hisuf, osuf, hcsuf, obootsuf, ssuf, libsuf,
     detectWay
@@ -61,8 +61,8 @@ debugDynamic             = Way "debug_dyn"     [Debug, Dynamic]
 loggingDynamic           = Way "l_dyn"         [Logging, Dynamic]
 threadedLoggingDynamic   = Way "thr_l_dyn"     [Threaded, Logging, Dynamic]
 
-allWays = [vanilla, profiling, logging, parallel, granSim, 
-    threaded, threadedProfiling, threadedLogging, 
+allWays = [vanilla, profiling, logging, parallel, granSim,
+    threaded, threadedProfiling, threadedLogging,
     debug, debugProfiling, threadedDebug, threadedDebugProfiling,
     dynamic, profilingDynamic, threadedProfilingDynamic,
     threadedDynamic, threadedDebugDynamic, debugDynamic,
@@ -72,22 +72,23 @@ defaultWays :: Stage -> Action [Way]
 defaultWays stage = do
     sharedLibs <- platformSupportsSharedLibs
     return $ [vanilla]
-          ++ [profiling | stage /= Stage0] 
+          ++ [profiling | stage /= Stage0]
           ++ [dynamic   | sharedLibs     ]
 
 -- TODO: do '-ticky' in all debug ways?
 wayHcArgs :: Way -> Args
-wayHcArgs (Way _ units) =
-       (Dynamic `notElem` units) <?> arg "-static"
-    <> (Dynamic    `elem` units) <?> arg ["-fPIC", "-dynamic"]
-    <> (Threaded   `elem` units) <?> arg "-optc-DTHREADED_RTS"
-    <> (Debug      `elem` units) <?> arg "-optc-DDEBUG"
-    <> (Profiling  `elem` units) <?> arg "-prof"
-    <> (Logging    `elem` units) <?> arg "-eventlog"
-    <> (Parallel   `elem` units) <?> arg "-parallel"
-    <> (GranSim    `elem` units) <?> arg "-gransim"
-    <> (units == [Debug] || units == [Debug, Dynamic]) <?>
-       arg ["-ticky", "-DTICKY_TICKY"]
+wayHcArgs (Way _ units) = arg
+    [ if (Dynamic    `elem` units)
+      then arg ["-fPIC", "-dynamic"]
+      else arg "-static"
+    , when (Threaded   `elem` units) $ arg "-optc-DTHREADED_RTS"
+    , when (Debug      `elem` units) $ arg "-optc-DDEBUG"
+    , when (Profiling  `elem` units) $ arg "-prof"
+    , when (Logging    `elem` units) $ arg "-eventlog"
+    , when (Parallel   `elem` units) $ arg "-parallel"
+    , when (GranSim    `elem` units) $ arg "-gransim"
+    , when (units == [Debug] || units == [Debug, Dynamic]) $
+      arg ["-ticky", "-DTICKY_TICKY"] ]
 
 wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""
@@ -110,8 +111,8 @@ libsuf way = do
     if Dynamic `notElem` units way
     then return $ staticSuffix ++ "a"
     else do
-        [extension] <- showArgs DynamicExtension
-        [version]   <- showArgs ProjectVersion
+        extension <- showArg DynamicExtension
+        version   <- showArg ProjectVersion
         return $ staticSuffix ++ "-ghc" ++ version ++ extension
 
 -- TODO: This may be slow -- optimise if overhead is significant.

@@ -30,8 +30,8 @@ data Builder = Ar
              | GhcPkg Stage
              deriving Show
 
-instance ShowArgs Builder where
-    showArgs builder = showArgs $ fmap (map toStandard . words) $ do
+instance ShowArg Builder where
+    showArg builder = toStandard <$> do
         let key = case builder of
                 Ar            -> "ar"
                 Ld            -> "ld"
@@ -49,7 +49,7 @@ instance ShowArgs Builder where
         cfgPath <- askConfigWithDefault key $
             error $ "\nCannot find path to '" ++ key
                   ++ "' in configuration files."
-        let cfgPathExe = if cfgPath /= "" then cfgPath -<.> exe else ""
+        let cfgPathExe = if null cfgPath then "" else cfgPath -<.> exe
         windows <- windowsHost
         -- Note, below is different from FilePath.isAbsolute:
         if (windows && "/" `isPrefixOf` cfgPathExe)
@@ -66,19 +66,17 @@ instance ShowArgs Builder where
 -- should reset the flag (at least temporarily).
 
 -- Make sure the builder exists on the given path and rebuild it if out of date
--- Raise an error if the builder is not uniquely specified in config files
 needBuilder :: Builder -> Action ()
 needBuilder ghc @ (Ghc stage) = do
-    [exe]   <- showArgs ghc
+    exe     <- showArg ghc
     laxDeps <- test LaxDeps
     if laxDeps then orderOnly [exe] else need [exe]
 
 needBuilder builder = do
-    [exe] <- showArgs builder
+    exe <- showArg builder
     need [exe]
 
 -- Action 'with Gcc' returns '--with-gcc=/path/to/gcc' and needs Gcc
--- Raises an error if the builder is not uniquely specified in config files
 with :: Builder -> Args
 with builder = do
     let key = case builder of
@@ -90,17 +88,17 @@ with builder = do
             Happy    -> "--with-happy="
             GhcPkg _ -> "--with-ghc-pkg="
             HsColour -> "--with-hscolour="
-    [exe] <- showArgs builder
+    exe <- showArg builder
     needBuilder builder
-    arg $ key ++ normaliseEx exe
+    return [key ++ exe]
 
 -- Run the builder with a given collection of arguments
 -- Raises an error if the builder is not uniquely specified in config files
 run :: ShowArgs a => Builder -> a -> Action ()
 run builder as = do
     needBuilder builder
-    [exe] <- showArgs builder
-    args  <- showArgs as
+    exe  <- showArg builder
+    args <- showArgs as
     cmd [exe] args
 
 -- Run the builder with a given collection of arguments printing out a
@@ -123,7 +121,7 @@ interestingInfo builder ss = case builder of
     Ghc _    -> if head ss == "-M"
                 then prefixAndSuffix 1 1 ss
                 else prefixAndSuffix 0 4 ss
-    GhcPkg _ -> prefixAndSuffix 2 0 ss
+    GhcPkg _ -> prefixAndSuffix 3 0 ss
     GhcCabal -> prefixAndSuffix 3 0 ss
     _        -> ss
   where
@@ -136,11 +134,6 @@ interestingInfo builder ss = case builder of
              ++ " arguments ..."]
              ++ drop (length ss - m) ss
 
--- Check if the builder is uniquely specified in config files
+-- Check if the builder is specified in config files
 specified :: Builder -> Condition
-specified builder = do
-    exes <- showArgs builder
-    return $ case exes of
-        [_] -> True
-        _   -> False
-
+specified = fmap (not . null) . showArg
