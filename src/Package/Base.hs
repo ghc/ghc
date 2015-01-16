@@ -7,11 +7,12 @@ module Package.Base (
     Package (..), Settings (..), TodoItem (..),
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
-    bootPkgConstraints,
     pathArgs, packageArgs, includeArgs, pkgHsSources,
     pkgDepObjects, pkgLibObjects,
     argSizeLimit,
-    sourceDependecies, argList, argListPath
+    sourceDependecies,
+    argList, argListWithComment,
+    argListPath
     ) where
 
 import Base
@@ -52,13 +53,10 @@ libraryPackage name stages settings =
     Package
         name
         (toStandard $ "libraries" </> name)
-        [
-        ( stage
+        [ (stage
         , if stage == Stage0 then "dist-boot" else "dist-install"
-        , settings stage
-        )
-        | stage <- stages
-        ]
+        , settings stage)
+        | stage <- stages ]
 
 commonCcArgs :: Args
 commonCcArgs = when Validating $ arg ["-Werror", "-Wall"]
@@ -76,16 +74,6 @@ commonCcWarninigArgs = when Validating $ arg
        , when (GccIsClang && not GccLt46 && windowsHost) $
          arg "-Werror=unused-but-set-variable" ]
 
-bootPkgConstraints :: Args
-bootPkgConstraints = mempty
-
--- TODO: implement bootPkgConstraints oracle
--- BOOT_PKG_CONSTRAINTS := \
--- $(foreach d,$(PACKAGES_STAGE0),\
---  $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
---   --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal |
---     sed "s/[^0-9.]//g")"))
-
 pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
 pathArgs key path as =
     map (\a -> key ++ toStandard (normaliseEx $ path </> a)) <$> arg as
@@ -93,9 +81,12 @@ pathArgs key path as =
 packageArgs :: Stage -> FilePath -> Args
 packageArgs stage pkgData = do
     usePackageKey <- SupportsPackageKey || stage /= Stage0
-    arg ["-hide-all-packages", "-no-user-package-db", "-include-pkg-deps"]
-        <> (stage == Stage0) <?> arg "-package-db libraries/bootstrapping.conf"
-        <> keyArgs usePackageKey
+    arg [ arg "-hide-all-packages"
+        , arg "-no-user-package-db"
+        , arg "-include-pkg-deps"
+        , when (stage == Stage0) $
+          arg "-package-db libraries/bootstrapping.conf"
+        , keyArgs usePackageKey ]
   where
     keyArgs True  = productArgs "-this-package-key" (PackageKey pkgData) <>
                     productArgs "-package-key"      (DepKeys    pkgData)
@@ -106,12 +97,14 @@ includeArgs :: FilePath -> FilePath -> Args
 includeArgs path dist =
     let pkgData  = toStandard $ path </> dist </> "package-data.mk"
         buildDir = toStandard $ path </> dist </> "build"
-    in arg "-i"
-    <> pathArgs "-i" path     (SrcDirs pkgData)
-    <> concatArgs ["-i", "-I"] [buildDir, toStandard $ buildDir </> "autogen"]
-    <> pathArgs "-I" path     (IncludeDirs pkgData)
-    <> arg "-optP-include" -- TODO: Shall we also add -cpp?
-    <> concatArgs "-optP" (toStandard $ buildDir </> "autogen/cabal_macros.h")
+    in arg [ arg "-i"
+           , pathArgs "-i" path $ SrcDirs pkgData
+           , concatArgs ["-i", "-I"]
+             [buildDir, toStandard $ buildDir </> "autogen"]
+           , pathArgs "-I" path $ IncludeDirs pkgData
+           , arg "-optP-include" -- TODO: Shall we also add -cpp?
+           , concatArgs "-optP" $
+             toStandard $ buildDir </> "autogen/cabal_macros.h" ]
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do
@@ -162,7 +155,7 @@ argSizeLimit = do
     windows <- windowsHost
     return $ if windows
              then 31000
-             else 1048576 -- surely, 1MB should be enough?
+             else 4194304 -- Cabal needs a bit more than 2MB!
 
 -- List of source files, which need to be tracked by the build system
 -- to make sure the argument lists have not changed.
@@ -175,16 +168,18 @@ sourceDependecies = [ "shake/src/Package/Base.hs"
                     , "shake/src/Oracles/PackageData.hs"
                     , "shake/src/Ways.hs"
                     , "shake/src/Util.hs"
-                    , "shake/src/Oracles.hs"
-                    ]
+                    , "shake/src/Oracles.hs" ]
 
--- Convert Builder's argument list to a String
-argList :: Builder -> Args -> String -> Action String
-argList builder args comment = do
-    list <- args
+-- Convert Builder's argument list to a printable String
+argListWithComment :: String -> Builder -> Args -> Action String
+argListWithComment comment builder args = do
+    args' <- args
     return $ show builder ++ " arguments"
-           ++ if comment == "" then "" else ("(" ++ comment ++ ")")
-           ++ ":\n" ++ concatMap (\s -> "    " ++ s ++ "\n") list
+           ++ (if null comment then "" else " (" ++ comment ++ ")")
+           ++ ":\n" ++ concatMap (\s -> "    " ++ s ++ "\n") args'
+
+argList :: Builder -> Args -> Action String
+argList = argListWithComment ""
 
 -- Path to argument list for a given Package/Stage combination
 argListPath :: FilePath -> Package -> Stage -> FilePath

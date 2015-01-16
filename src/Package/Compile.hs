@@ -8,27 +8,26 @@ argListDir :: FilePath
 argListDir = "shake/arg/buildPackageCompile"
 
 suffixArgs :: Way -> Args
-suffixArgs way = arg ["-hisuf", hisuf way]
-              <> arg [ "-osuf",  osuf way]
-              <> arg ["-hcsuf", hcsuf way]
+suffixArgs way =
+    return ["-hisuf", hisuf way, "-osuf", osuf way, "-hcsuf", hcsuf way]
 
 ghcArgs :: Package -> TodoItem -> Way -> [FilePath] -> FilePath -> Args
 ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
     let buildDir = toStandard $ path </> dist </> "build"
         pkgData  = path </> dist </> "package-data.mk"
-    in suffixArgs way
-    <> wayHcArgs way
-    <> arg SrcHcOpts
-    <> packageArgs stage pkgData
-    <> includeArgs path dist
-    <> concatArgs ["-optP"] (CppOpts pkgData)
-    <> arg (HsOpts pkgData)
-    -- TODO: now we have both -O and -O2
-    -- <> arg ["-O2"]
-    <> productArgs ["-odir", "-hidir", "-stubdir"] buildDir
-    <> when (splitObjects stage) (arg "-split-objs")
-    <> arg ("-c":srcs)
-    <> arg ["-o", result]
+    in arg [ suffixArgs way
+           , wayHcArgs way
+           , arg SrcHcArgs
+           , packageArgs stage pkgData
+           , includeArgs path dist
+           , concatArgs ["-optP"] $ CppOpts pkgData
+           , arg $ HsOpts pkgData
+           -- TODO: now we have both -O and -O2
+           -- <> arg ["-O2"]
+           , productArgs ["-odir", "-hidir", "-stubdir"] buildDir
+           , when (splitObjects stage) $ arg "-split-objs"
+           , arg ("-c":srcs)
+           , arg ["-o", result] ]
 
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
@@ -50,9 +49,10 @@ argListRule pkg todo @ (stage, _, settings) =
         need $ ["shake/src/Package/Compile.hs"] ++ sourceDependecies
         ways' <- ways settings
         ghcList <- forM ways' $ \way ->
-            argList (Ghc stage)
+            argListWithComment
+                ("way '" ++ tag way ++ "'")
+                (Ghc stage)
                 (ghcArgs pkg todo way ["input.hs"] $ "output" <.> osuf way)
-                $ "way '" ++ tag way ++ "'"
         writeFileChanged out $ unlines ghcList
 
 buildPackageCompile :: Package -> TodoItem -> Rules ()

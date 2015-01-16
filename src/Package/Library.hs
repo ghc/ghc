@@ -7,9 +7,9 @@ argListDir :: FilePath
 argListDir = "shake/arg/buildPackageLibrary"
 
 arArgs :: [FilePath] -> FilePath -> Args
-arArgs objs result = arg $ [ arg "q"
-                           , arg result
-                           , arg objs ]
+arArgs objs result = arg [ arg "q"
+                         , arg result
+                         , arg objs ]
 
 arRule :: Package -> TodoItem -> Rules ()
 arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
@@ -30,11 +30,11 @@ ldArgs :: Package -> TodoItem -> FilePath -> Args
 ldArgs (Package _ path _) (stage, dist, _) result = do
     depObjs <- pkgDepObjects path dist vanilla
     need depObjs
-    arg $ [arg (ConfLdLinkerArgs stage)
-          , arg "-r"
-          , arg "-o"
-          , arg result
-          , arg depObjs ]
+    arg [ arg $ ConfLdLinkerArgs stage
+        , arg "-r"
+        , arg "-o"
+        , arg result
+        , arg depObjs ]
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
@@ -55,14 +55,16 @@ argListRule pkg @ (Package _ path _) todo @ (stage, dist, settings) =
     (argListPath argListDir pkg stage) %> \out -> do
         need $ ["shake/src/Package/Library.hs"] ++ sourceDependecies
         ways' <- ways settings
-        ldList <- argList Ld (ldArgs pkg todo "output.o") ""
+        ldList <- argList Ld (ldArgs pkg todo "output.o")
         arList <- forM ways' $ \way -> do
             depObjs <- pkgDepObjects path dist way
             need depObjs
             libObjs   <- pkgLibObjects path dist stage way
             extension <- libsuf way
-            argList Ar (arArgs libObjs $ "output" <.> extension)
-                $ "way '" ++ tag way ++ "'"
+            argListWithComment
+                ("way '" ++ tag way ++ "'")
+                Ar
+                (arArgs libObjs $ "output" <.> extension)
         writeFileChanged out $ unlines $ [ldList] ++ arList
 
 buildPackageLibrary :: Package -> TodoItem -> Rules ()

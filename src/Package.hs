@@ -5,25 +5,18 @@ import Package.Data
 import Package.Compile
 import Package.Library
 import Package.Dependencies
+import Targets
 
 -- See Package.Base for definitions of basic types
 
--- These are the packages we build:
 packages :: [Package]
-packages = [ libraryPackage "array"            [        Stage1] defaultSettings
-           , libraryPackage "bin-package-db"   [Stage0, Stage1] defaultSettings
-           , libraryPackage "binary"           [Stage0, Stage1] defaultSettings
-           , libraryPackage "deepseq"          [        Stage1] defaultSettings
-           , libraryPackage "Cabal/Cabal"      [        Stage1] defaultSettings
-           , libraryPackage "containers"       [        Stage1] defaultSettings
-           , libraryPackage "filepath"         [        Stage1] defaultSettings
-           , libraryPackage "hoopl"            [Stage0, Stage1] defaultSettings
-           , libraryPackage "hpc"              [Stage0, Stage1] defaultSettings
-           , libraryPackage "parallel"         [        Stage1] defaultSettings
-           , libraryPackage "pretty"           [        Stage1] defaultSettings
-           , libraryPackage "stm"              [        Stage1] defaultSettings
-           , libraryPackage "template-haskell" [        Stage1] defaultSettings
-           , libraryPackage "transformers"     [Stage0, Stage1] defaultSettings ]
+packages = map lib $ libraryPackageNames Stage1
+  where
+    lib name =
+        libraryPackage
+            name
+            [s | s <- [Stage0, Stage1], name `elem` (libraryPackageNames s)]
+            defaultSettings
 
 -- Rule buildPackageX is defined in module Package.X
 buildPackage :: Package -> TodoItem -> Rules ()
@@ -35,15 +28,21 @@ buildPackage = buildPackageData
 packageRules :: Rules ()
 packageRules = do
     -- TODO: control targets from command line arguments
+
     forM_ packages $ \pkg @ (Package name path todo) -> do
         forM_ todo $ \todoItem @ (stage, dist, settings) -> do
+
+            action $ putNormal $ "package = " ++ name ++ ", dist = " ++ dist
 
             -- Want top .o and .a files for the pkg/todo combo
             -- TODO: Check BUILD_GHCI_LIB flag to decide if .o is needed
             action $ do
+                alwaysRerun
                 let buildDir = path </> dist </> "build"
                     pkgData  = path </> dist </> "package-data.mk"
+                -- need [pkgData]
                 [key] <- arg (PackageKey pkgData)
+                putNormal $ "key = " ++ key
                 let oFile = buildDir </> "Hs" ++ key <.> "o"
                 ways'  <- ways settings
                 aFiles <- forM ways' $ \way -> do

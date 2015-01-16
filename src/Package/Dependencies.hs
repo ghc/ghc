@@ -11,15 +11,15 @@ ghcArgs (Package name path _) (stage, dist, settings) =
     let buildDir = toStandard $ path </> dist </> "build"
         pkgData  = path </> dist </> "package-data.mk"
         depFile  = buildDir </> takeBaseName name <.> "m"
-    in arg "-M"
-    <> packageArgs stage pkgData
-    <> includeArgs path dist
-    <> concatArgs ["-optP"] (CppOpts pkgData)
-    <> productArgs ["-odir", "-stubdir", "-hidir"] buildDir
-    <> arg ["-dep-makefile", depFile <.> "new"]
-    <> productArgs "-dep-suffix" (map wayPrefix <$> ways settings)
-    <> arg (HsOpts pkgData)
-    <> arg (pkgHsSources path dist)
+    in arg [ arg "-M"
+           , packageArgs stage pkgData
+           , includeArgs path dist
+           , concatArgs ["-optP"] $ CppOpts pkgData
+           , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
+           , arg ["-dep-makefile", depFile <.> "new"]
+           , productArgs "-dep-suffix" $ map wayPrefix <$> ways settings
+           , arg $ HsOpts pkgData
+           , arg $ pkgHsSources path dist ]
 
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
@@ -38,7 +38,7 @@ argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, _) =
     (argListPath argListDir pkg stage) %> \out -> do
         need $ ["shake/src/Package/Dependencies.hs"] ++ sourceDependecies
-        ghcList <- argList (Ghc stage) (ghcArgs pkg todo) ""
+        ghcList <- argList (Ghc stage) $ ghcArgs pkg todo
         writeFileChanged out ghcList
 
 buildPackageDependencies :: Package -> TodoItem -> Rules ()
