@@ -8,7 +8,9 @@ module Base (
     module Data.Monoid,
     module Data.List,
     Stage (..),
-    Args, arg, ShowArg (..), ShowArgs (..),
+    Arg, Args,
+    ShowArg (..), ShowArgs (..),
+    arg, args,
     Condition (..),
     (<+>),
     filterOut,
@@ -27,8 +29,9 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 instance Show Stage where
     show = show . fromEnum
 
--- The returned list of strings is a list of arguments
+-- The returned string or list of strings is a part of an argument list
 -- to be passed to a Builder
+type Arg  = Action String
 type Args = Action [String]
 
 type Condition = Action Bool
@@ -38,7 +41,13 @@ instance Monoid a => Monoid (Action a) where
     mappend p q = mappend <$> p <*> q
 
 class ShowArg a where
-    showArg :: a -> Action String
+    showArg :: a -> Arg
+
+instance ShowArg String where
+    showArg = return
+
+instance ShowArg a => ShowArg (Action a) where
+    showArg = (showArg =<<)
 
 -- Using the Creators' trick for overlapping String instances
 class ShowArgs a where
@@ -56,8 +65,11 @@ instance ShowArgs a => ShowArgs [a] where
 instance ShowArgs a => ShowArgs (Action a) where
     showArgs = (showArgs =<<)
 
-arg :: ShowArgs a => a -> Args
-arg = showArgs
+args :: ShowArgs a => a -> Args
+args = showArgs
+
+arg :: ShowArg a => a -> Args
+arg = args . showArg
 
 -- Combine two heterogeneous ShowArgs values
 (<+>) :: (ShowArgs a, ShowArgs b) => a -> b -> Args

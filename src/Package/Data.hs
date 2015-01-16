@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Package.Data (buildPackageData) where
 
 import Package.Base
@@ -22,29 +22,29 @@ libraryArgs ways = do
 configureArgs :: Stage -> Settings -> Args
 configureArgs stage settings =
     let conf key as = do
-            s <- unwords <$> arg as
+            s <- unwords <$> args as
             unless (null s) $ arg $ "--configure-option=" ++ key ++ "=" ++ s
         cflags   = [ commonCcArgs `filterOut` "-Werror"
-                   , arg $ ConfCcArgs stage
+                   , args $ ConfCcArgs stage
                    , customCcArgs settings
                    , commonCcWarninigArgs ]
         ldflags  = [ commonLdArgs
-                   , arg $ ConfGccLinkerArgs stage
+                   , args $ ConfGccLinkerArgs stage
                    , customLdArgs settings ]
         cppflags = [ commonCppArgs
-                   , arg $ ConfCppArgs stage
+                   , args $ ConfCppArgs stage
                    , customCppArgs settings ]
-    in arg [ conf "CFLAGS"   cflags
-           , conf "LDFLAGS"  ldflags
-           , conf "CPPFLAGS" cppflags
-           , arg $ concat <$> "--gcc-options=" <+> cflags <+> " " <+> ldflags
-           , conf "--with-iconv-includes"  IconvIncludeDirs
-           , conf "--with-iconv-libraries" IconvLibDirs
-           , conf "--with-gmp-includes"    GmpIncludeDirs
-           , conf "--with-gmp-libraries"   GmpLibDirs
-           -- TODO: why TargetPlatformFull and not host?
-           , when CrossCompiling $ conf "--host" $ showArg TargetPlatformFull
-           , conf "--with-cc" $ showArg Gcc ]
+    in args [ conf "CFLAGS"   cflags
+            , conf "LDFLAGS"  ldflags
+            , conf "CPPFLAGS" cppflags
+            , arg $ concat <$> "--gcc-options=" <+> cflags <+> " " <+> ldflags
+            , conf "--with-iconv-includes"  IconvIncludeDirs
+            , conf "--with-iconv-libraries" IconvLibDirs
+            , conf "--with-gmp-includes"    GmpIncludeDirs
+            , conf "--with-gmp-libraries"   GmpLibDirs
+            -- TODO: why TargetPlatformFull and not host?
+            , when CrossCompiling $ conf "--host" $ arg TargetPlatformFull
+            , conf "--with-cc" $ arg Gcc ]
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
@@ -58,23 +58,24 @@ postProcessPackageData file = do
           where
             (prefix, suffix) = break (== '=') line
 
-
-bootPkgConstraints :: FilePath -> Args
-bootPkgConstraints pathDist = do
-    need [pathDist </> "package-data.mk"]
-    deps <- arg $ DepNames pathDist
-    let depsStage0 = filter ((`elem` deps) . takeBaseName)
-                     $ libraryPackageNames Stage0
-    forM depsStage0 $ \dep -> do
-        let depPkg             = libraryPackage dep [Stage0] defaultSettings
-            (_, depPkgDist, _) = head $ pkgTodo depPkg
-            depPathDist        = pkgPath depPkg </> depPkgDist
-        [version] <- arg $ Version depPathDist
-        return $ "--constraint " ++ dep ++ " == " ++ version
+bootPkgConstraints :: Args
+bootPkgConstraints = args $ do
+    forM (libraryPackagesInStage Stage0) $ \name -> do
+        let path     = pkgPath $ libraryPackage name [Stage0] defaultSettings
+            baseName = takeBaseName name
+            cabal    = path </> baseName <.> "cabal"
+        need [cabal]
+        content <- lines <$> liftIO (readFile cabal)
+        let versionLines = filter (("ersion:" `isPrefixOf`) . drop 1) content
+        case versionLines of
+            [versionLine] -> args ["--constraint", baseName ++ " == "
+                                    ++ dropWhile (not . isDigit) versionLine ]
+            _             -> redError $ "Cannot determine package version in '"
+                                      ++ toStandard cabal ++ "'."
 
 cabalArgs :: Package -> TodoItem -> Args
-cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = arg
-    [ arg ["configure", path, dist]
+cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = args
+    [ args ["configure", path, dist]
     -- this is a positional argument, hence:
     -- * if it is empty, we need to emit one empty string argument
     -- * otherwise, we must collapse it into one space-separated string
@@ -85,7 +86,7 @@ cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = arg
     , libraryArgs =<< ways settings
     , when (specified HsColour) $ with HsColour
     , configureArgs stage settings
-    , when (stage == Stage0) $ bootPkgConstraints $ path </> dist
+    , when (stage == Stage0) bootPkgConstraints
     , with Gcc
     , when (stage /= Stage0) $ with Ld
     , with Ar

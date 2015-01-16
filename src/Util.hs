@@ -3,7 +3,7 @@ module Util (
     module System.Console.ANSI,
     replaceIf, replaceEq, replaceSeparators,
     chunksOfSize,
-    putColoured
+    putColoured, redError
     ) where
 
 import Base
@@ -42,3 +42,9 @@ putColoured intensity colour msg = do
     putNormal msg
     liftIO $ setSGR []
     liftIO $ hFlush stdout
+
+-- A more colourful version of error
+redError :: String -> Action a
+redError msg = do
+    putColoured Vivid Red msg
+    return $ error $ "GHC build system error: " ++ msg

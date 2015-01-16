@@ -1,25 +1,28 @@
-module Targets (libraryPackageNames) where
+module Targets (libraryPackages, libraryPackagesInStage) where
 
 import Base
 
 -- These are the packages we build:
 -- TODO: this should eventually be removed and replaced by the top-level
 -- target, i.e. GHC (and perhaps, something else)
-libraryPackageNames :: Stage -> [String]
-libraryPackageNames Stage0 =
+libraryPackagesInStage :: Stage -> [String]
+libraryPackagesInStage Stage0 =
     [ "bin-package-db"
     , "binary"
     , "hoopl"
     , "hpc"
     , "transformers" ]
-libraryPackageNames Stage1 = libraryPackageNames Stage0 ++
-    [ "array"
-    , "deepseq"
-    , "Cabal/Cabal"
-    , "containers"
-    , "filepath"
-    , "parallel"
-    , "pretty"
-    , "stm"
-    , "template-haskell" ]
-libraryPackageNames _ = error "Not implemented"
+libraryPackagesInStage Stage1 = []
+    --[ "array"
+    --, "deepseq"
+    --, "Cabal/Cabal"
+    --, "containers"
+    --, "filepath"
+    --, "parallel"
+    --, "pretty"
+    --, "stm"
+    --, "template-haskell" ]
+libraryPackagesInStage _ = []
+
+libraryPackages :: [String]
+libraryPackages = concatMap libraryPackagesInStage [Stage0 ..]

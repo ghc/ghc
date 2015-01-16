@@ -11,15 +11,15 @@ ghcArgs (Package name path _) (stage, dist, settings) =
     let pathDist = path </> dist
         buildDir = toStandard $ pathDist </> "build"
         depFile  = buildDir </> takeBaseName name <.> "m"
-    in arg [ arg "-M"
-           , packageArgs stage pathDist
-           , includeArgs path dist
-           , concatArgs ["-optP"] $ CppOpts pathDist
-           , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
-           , arg ["-dep-makefile", depFile <.> "new"]
-           , productArgs "-dep-suffix" $ map wayPrefix <$> ways settings
-           , arg $ HsOpts pathDist
-           , arg $ pkgHsSources path dist ]
+    in args [ arg "-M"
+            , packageArgs stage pathDist
+            , includeArgs path dist
+            , concatArgs ["-optP"] $ CppArgs pathDist
+            , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
+            , args ["-dep-makefile", depFile <.> "new"]
+            , productArgs "-dep-suffix" $ map wayPrefix <$> ways settings
+            , args $ HsArgs pathDist
+            , args $ pkgHsSources path dist ]
 
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =

@@ -10,12 +10,12 @@ import Targets
 -- See Package.Base for definitions of basic types
 
 packages :: [Package]
-packages = map lib $ libraryPackageNames Stage1
+packages = map lib $ libraryPackages
   where
     lib name =
         libraryPackage
             name
-            [s | s <- [Stage0, Stage1], name `elem` (libraryPackageNames s)]
+            [s | s <- [Stage0 ..], name `elem` (libraryPackagesInStage s)]
             defaultSettings
 
 -- Rule buildPackageX is defined in module Package.X

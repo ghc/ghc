@@ -7,9 +7,9 @@ argListDir :: FilePath
 argListDir = "shake/arg/buildPackageLibrary"
 
 arArgs :: [FilePath] -> FilePath -> Args
-arArgs objs result = arg [ arg "q"
-                         , arg result
-                         , arg objs ]
+arArgs objs result = args [ arg "q"
+                          , arg result
+                          , args objs ]
 
 arRule :: Package -> TodoItem -> Rules ()
 arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
@@ -30,11 +30,11 @@ ldArgs :: Package -> TodoItem -> FilePath -> Args
 ldArgs (Package _ path _) (stage, dist, _) result = do
     depObjs <- pkgDepObjects path dist vanilla
     need depObjs
-    arg [ arg $ ConfLdLinkerArgs stage
-        , arg "-r"
-        , arg "-o"
-        , arg result
-        , arg depObjs ]
+    args [ args $ ConfLdLinkerArgs stage
+         , arg "-r"
+         , arg "-o"
+         , arg result
+         , args depObjs ]
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =

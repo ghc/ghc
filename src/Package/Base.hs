@@ -52,14 +52,14 @@ libraryPackage :: String -> [Stage] -> (Stage -> Settings) -> Package
 libraryPackage name stages settings =
     Package
         name
-        (toStandard $ "libraries" </> name)
+        ("libraries" </> name)
         [ (stage
         , if stage == Stage0 then "dist-boot" else "dist-install"
         , settings stage)
         | stage <- stages ]
 
 commonCcArgs :: Args
-commonCcArgs = when Validating $ arg ["-Werror", "-Wall"]
+commonCcArgs = when Validating $ args ["-Werror", "-Wall"]
 
 commonLdArgs :: Args
 commonLdArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
@@ -68,48 +68,47 @@ commonCppArgs :: Args
 commonCppArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
 
 commonCcWarninigArgs :: Args
-commonCcWarninigArgs = when Validating $ arg
-       [ when GccIsClang                      $ arg "-Wno-unknown-pragmas"
-       , when (not GccIsClang && not GccLt46) $ arg "-Wno-error=inline"
-       , when (GccIsClang && not GccLt46 && windowsHost) $
-         arg "-Werror=unused-but-set-variable" ]
+commonCcWarninigArgs = when Validating $
+    args [ when GccIsClang                      $ arg "-Wno-unknown-pragmas"
+         , when (not GccIsClang && not GccLt46) $ arg "-Wno-error=inline"
+         , when (GccIsClang && not GccLt46 && windowsHost) $
+           arg "-Werror=unused-but-set-variable" ]
 
 pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
 pathArgs key path as =
-    map (\a -> key ++ toStandard (normaliseEx $ path </> a)) <$> arg as
+    map (\a -> key ++ toStandard (normaliseEx $ path </> a)) <$> args as
 
 packageArgs :: Stage -> FilePath -> Args
 packageArgs stage pathDist = do
     usePackageKey <- SupportsPackageKey || stage /= Stage0
-    arg [ arg "-hide-all-packages"
-        , arg "-no-user-package-db"
-        , arg "-include-pkg-deps"
-        , when (stage == Stage0) $
-          arg "-package-db libraries/bootstrapping.conf"
-        , keyArgs usePackageKey ]
-  where
-    keyArgs True  = productArgs "-this-package-key" (PackageKey pathDist) <>
-                    productArgs "-package-key"      (DepKeys    pathDist)
-    keyArgs False = productArgs "-package-name"     (PackageKey pathDist) <>
-                    productArgs "-package"          (Deps       pathDist)
+    args [ arg "-hide-all-packages"
+         , arg "-no-user-package-db"
+         , arg "-include-pkg-deps"
+         , when (stage == Stage0) $
+           arg "-package-db libraries/bootstrapping.conf"
+         , if usePackageKey
+           then productArgs "-this-package-key" (arg  $ PackageKey pathDist)
+             <> productArgs "-package-key"      (args $ DepKeys    pathDist)
+           else productArgs "-package-name"     (arg  $ PackageKey pathDist)
+             <> productArgs "-package"          (args $ Deps       pathDist) ]
 
 includeArgs :: FilePath -> FilePath -> Args
 includeArgs path dist =
     let pathDist = path </> dist
         buildDir = toStandard $ pathDist </> "build"
-    in arg [ arg "-i"
-           , pathArgs "-i" path $ SrcDirs pathDist
-           , concatArgs ["-i", "-I"]
-             [buildDir, toStandard $ buildDir </> "autogen"]
-           , pathArgs "-I" path $ IncludeDirs pathDist
-           , arg "-optP-include" -- TODO: Shall we also add -cpp?
-           , concatArgs "-optP" $
-             toStandard $ buildDir </> "autogen/cabal_macros.h" ]
+    in args [ arg "-i"
+            , pathArgs "-i" path $ SrcDirs pathDist
+            , concatArgs ["-i", "-I"]
+              [buildDir, toStandard $ buildDir </> "autogen"]
+            , pathArgs "-I" path $ IncludeDirs pathDist
+            , arg "-optP-include" -- TODO: Shall we also add -cpp?
+            , concatArgs "-optP" $
+              toStandard $ buildDir </> "autogen/cabal_macros.h" ]
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do
     let pathDist = path </> dist
-    dirs <- map (path </>) <$> arg (SrcDirs pathDist)
+    dirs <- map (path </>) <$> args (SrcDirs pathDist)
     findModuleFiles pathDist dirs [".hs", ".lhs"]
 
 -- Find objects we depend on (we don't want to depend on split objects)
@@ -118,7 +117,7 @@ pkgDepObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepObjects path dist way = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
-    dirs <- map (normaliseEx . (path </>)) <$> arg (SrcDirs pathDist)
+    dirs <- map (normaliseEx . (path </>)) <$> args (SrcDirs pathDist)
     fmap concat $ forM dirs $ \d ->
         map (toStandard . (buildDir ++) . (-<.> osuf way) . drop (length d))
         <$> (findModuleFiles pathDist [d] [".hs", ".lhs"])
@@ -137,7 +136,7 @@ pkgLibObjects path dist stage way = do
 
 findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
 findModuleFiles pathDist directories suffixes = do
-    modPaths <- map (replaceEq '.' pathSeparator) <$> arg (Modules pathDist)
+    modPaths <- map (replaceEq '.' pathSeparator) <$> args (Modules pathDist)
     fileList <- forM directories $ \dir     ->
                 forM modPaths    $ \modPath ->
                 forM suffixes    $ \suffix  -> do

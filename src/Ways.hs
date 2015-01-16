@@ -77,9 +77,9 @@ defaultWays stage = do
 
 -- TODO: do '-ticky' in all debug ways?
 wayHcArgs :: Way -> Args
-wayHcArgs (Way _ units) = arg
+wayHcArgs (Way _ units) = args
     [ if (Dynamic    `elem` units)
-      then arg ["-fPIC", "-dynamic"]
+      then args ["-fPIC", "-dynamic"]
       else arg "-static"
     , when (Threaded   `elem` units) $ arg "-optc-DTHREADED_RTS"
     , when (Debug      `elem` units) $ arg "-optc-DDEBUG"
@@ -88,7 +88,7 @@ wayHcArgs (Way _ units) = arg
     , when (Parallel   `elem` units) $ arg "-parallel"
     , when (GranSim    `elem` units) $ arg "-gransim"
     , when (units == [Debug] || units == [Debug, Dynamic]) $
-      arg ["-ticky", "-DTICKY_TICKY"] ]
+      args ["-ticky", "-DTICKY_TICKY"] ]
 
 wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""

@@ -14,7 +14,7 @@ import Oracles.Base
 -- and returns "mingw32".
 --
 -- MultiOption is used for multiple string options separated by spaces,
--- such as 'src-hc-args' = -H32m -O'.
+-- such as 'src-hc-args = -H32m -O'.
 -- (showArgs SrcHcArgs) therefore returns a list of strings ["-H32", "-O"].
 data Option = TargetOs
             | TargetArch

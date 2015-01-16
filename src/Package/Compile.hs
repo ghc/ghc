@@ -15,19 +15,19 @@ ghcArgs :: Package -> TodoItem -> Way -> [FilePath] -> FilePath -> Args
 ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
     let pathDist = path </> dist
         buildDir = toStandard $ pathDist </> "build"
-    in arg [ suffixArgs way
-           , wayHcArgs way
-           , arg SrcHcArgs
-           , packageArgs stage pathDist
-           , includeArgs path dist
-           , concatArgs ["-optP"] $ CppOpts pathDist
-           , arg $ HsOpts pathDist
-           -- TODO: now we have both -O and -O2
-           -- <> arg ["-O2"]
-           , productArgs ["-odir", "-hidir", "-stubdir"] buildDir
-           , when (splitObjects stage) $ arg "-split-objs"
-           , arg ("-c":srcs)
-           , arg ["-o", result] ]
+    in args [ suffixArgs way
+            , wayHcArgs way
+            , args SrcHcArgs
+            , packageArgs stage pathDist
+            , includeArgs path dist
+            , concatArgs ["-optP"] $ CppArgs pathDist
+            , args $ HsArgs pathDist
+            -- TODO: now we have both -O and -O2
+            -- <> arg ["-O2"]
+            , productArgs ["-odir", "-hidir", "-stubdir"] buildDir
+            , when (splitObjects stage) $ arg "-split-objs"
+            , args ("-c":srcs)
+            , args ["-o", result] ]
 
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
