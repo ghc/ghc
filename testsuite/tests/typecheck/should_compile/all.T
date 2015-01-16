@@ -439,4 +439,4 @@ test('T9834', normal, compile, [''])
 test('T9892', normal, compile, [''])
 test('T9939', normal, compile, [''])
 test('T9973', normal, compile, [''])
-
+test('T9971', normal, compile, [''])
