@@ -12,12 +12,14 @@ import Util
 newtype PackageDataKey = PackageDataKey (FilePath, String)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-data PackageData = Modules     FilePath
+data PackageData = Version     FilePath
+                 | Modules     FilePath
                  | SrcDirs     FilePath
                  | PackageKey  FilePath
                  | IncludeDirs FilePath
                  | Deps        FilePath
                  | DepKeys     FilePath
+                 | DepNames    FilePath
                  | Synopsis    FilePath
                  | CppOpts     FilePath
                  | HsOpts      FilePath
@@ -25,12 +27,14 @@ data PackageData = Modules     FilePath
 instance ShowArgs PackageData where
     showArgs packageData = do
         let (key, file, defaultValue) = case packageData of
+               Version     file -> ("VERSION"     , file, "" )
                Modules     file -> ("MODULES"     , file, "" )
                SrcDirs     file -> ("HS_SRC_DIRS" , file, ".")
                PackageKey  file -> ("PACKAGE_KEY" , file, "" )
                IncludeDirs file -> ("INCLUDE_DIRS", file, ".")
                Deps        file -> ("DEPS"        , file, "" )
                DepKeys     file -> ("DEP_KEYS"    , file, "" )
+               DepNames    file -> ("DEP_NAMES"   , file, "" )
                Synopsis    file -> ("SYNOPSIS"    , file, "" )
                CppOpts     file -> ("CPP_OPTS"    , file, "" )
                HsOpts      file -> ("HC_OPTS"     , file, "" )
