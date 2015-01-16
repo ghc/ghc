@@ -490,12 +490,12 @@ can_eq_nc' _rdr_env _envs ev eq_rel s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
         pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
       ; stopWith ev "Discard given polytype equality" }
 
-can_eq_nc' _rdr_env _envs ev eq_rel (AppTy {}) ps_ty1 _ ps_ty2
-  | isGiven ev = try_decompose_app ev eq_rel ps_ty1 ps_ty2
-  | otherwise  = can_eq_wanted_app ev eq_rel ps_ty1 ps_ty2
-can_eq_nc' _rdr_env _envs ev eq_rel _ ps_ty1 (AppTy {}) ps_ty2
-  | isGiven ev = try_decompose_app ev eq_rel ps_ty1 ps_ty2
-  | otherwise  = can_eq_wanted_app ev eq_rel ps_ty1 ps_ty2
+can_eq_nc' _rdr_env _envs ev eq_rel ty1@(AppTy {}) _ ty2 _
+  | isGiven ev = try_decompose_app ev eq_rel ty1 ty2
+  | otherwise  = can_eq_wanted_app ev eq_rel ty1 ty2
+can_eq_nc' _rdr_env _envs ev eq_rel ty1 _ ty2@(AppTy {}) _
+  | isGiven ev = try_decompose_app ev eq_rel ty1 ty2
+  | otherwise  = can_eq_wanted_app ev eq_rel ty1 ty2
 
 -- Everything else is a definite type error, eg LitTy ~ TyConApp
 can_eq_nc' _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
@@ -620,29 +620,38 @@ can_eq_wanted_app ev eq_rel ty1 ty2
           `andWhenContinue` \ new_ev ->
           try_decompose_app new_ev eq_rel xi1 xi2 }
 
+---------
 try_decompose_app :: CtEvidence -> EqRel
                   -> TcType -> TcType -> TcS (StopOrContinue Ct)
--- Preconditions: neither is a type variable
+-- Preconditions: one or the other is an App;
+--                but neither is a type variable
 --                so can't turn it into an application if it
 --                   doesn't look like one already
 -- See Note [Canonicalising type applications]
-try_decompose_app ev NomEq  ty1 ty2
-  = try_decompose_nom_app ev ty1 ty2
+try_decompose_app ev eq_rel ty1 ty2
+  = case eq_rel of
+      NomEq  -> try_decompose_nom_app  ev ty1 ty2
+      ReprEq -> try_decompose_repr_app ev ty1 ty2
 
-try_decompose_app ev ReprEq ty1 ty2
+---------
+try_decompose_repr_app :: CtEvidence
+                       -> TcType -> TcType -> TcS (StopOrContinue Ct)
+-- Preconditions: like try_decompose_app, but also
+--                ev has a representational
+try_decompose_repr_app ev ty1 ty2
   | ty1 `eqType` ty2   -- See Note [AppTy reflexivity check]
   = canEqReflexive ev ReprEq ty1
 
   | otherwise
   = canEqFailure ev ReprEq ty1 ty2
 
+---------
 try_decompose_nom_app :: CtEvidence
                       -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- Preconditions: like try_decompose_app, but also
 --                ev has a nominal role
--- See Note [Canonicalising type applications]
 try_decompose_nom_app ev ty1 ty2
-   | AppTy s1 t1  <- ty1
+   | AppTy s1 t1 <- ty1
    = case tcSplitAppTy_maybe ty2 of
        Nothing      -> canEqHardFailure ev NomEq ty1 ty2
        Just (s2,t2) -> do_decompose s1 t1 s2 t2
@@ -652,8 +661,14 @@ try_decompose_nom_app ev ty1 ty2
        Nothing      -> canEqHardFailure ev NomEq ty1 ty2
        Just (s1,t1) -> do_decompose s1 t1 s2 t2
 
-   | otherwise  -- Neither is an AppTy
-   = canEqNC ev NomEq ty1 ty2
+   | otherwise  -- Neither is an AppTy; but one or other started that way
+                -- (precondition to can_eq_wanted_app)
+                -- So presumably one has become a TyConApp, which
+                -- is good: See Note [Canonicalising type applications]
+   = ASSERT2( isJust (tcSplitTyConApp_maybe ty1) || isJust (tcSplitTyConApp_maybe ty2)
+            , ppr ty1 $$ ppr ty2 )  -- If this assertion fails, we may fall
+                                    -- into an inifinite loop (Trac #9971)
+     canEqNC ev NomEq ty1 ty2
    where
      -- do_decompose is like xCtEvidence, but recurses
      -- to try_decompose_nom_app to decompose a chain of AppTys
@@ -827,8 +842,9 @@ decompose the application eagerly, yielding
 we get an error        "Can't match Array ~ Maybe",
 but we'd prefer to get "Can't match Array b ~ Maybe c".
 
-So instead can_eq_wanted_app flattens the LHS and RHS before using
-try_decompose_app to decompose it.
+So instead can_eq_wanted_app flattens the LHS and RHS, in the hope of
+replacing (a b) by (Array b), before using try_decompose_app to
+decompose it.
 
 Note [Make sure that insolubles are fully rewritten]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
