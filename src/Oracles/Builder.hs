@@ -47,8 +47,8 @@ instance ShowArg Builder where
                 GhcPkg Stage0 -> "system-ghc-pkg"
                 GhcPkg _      -> "ghc-pkg"
         cfgPath <- askConfigWithDefault key $
-            error $ "\nCannot find path to '" ++ key
-                  ++ "' in configuration files."
+            redError $ "\nCannot find path to '" ++ key
+                     ++ "' in configuration files."
         let cfgPathExe = if null cfgPath then "" else cfgPath -<.> exe
         windows <- windowsHost
         -- Note, below is different from FilePath.isAbsolute:
@@ -104,20 +104,24 @@ run builder as = do
 -- Run the builder with a given collection of arguments printing out a
 -- terse commentary with only 'interesting' info for the builder.
 -- Raises an error if the builder is not uniquely specified in config files
+-- TODO: make this a default 'run', rename current 'run' to verboseRun
 terseRun :: ShowArgs a => Builder -> a -> Action ()
 terseRun builder as = do
     args <- showArgs as
-    putColoured Vivid White $ "/--------\n" ++
+    putColoured White $ "/--------\n" ++
         "| Running " ++ show builder ++ " with arguments:"
-    mapM_ (putColoured Vivid White . ("|   " ++)) $
+    mapM_ (putColoured White . ("|   " ++)) $
         interestingInfo builder args
-    putColoured Vivid White $ "\\--------"
+    putColoured White $ "\\--------"
     quietly $ run builder as
 
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
     Ar       -> prefixAndSuffix 2 1 ss
     Ld       -> prefixAndSuffix 4 0 ss
+    Gcc      -> if head ss == "-MM"
+                then prefixAndSuffix 1 1 ss
+                else ss
     Ghc _    -> if head ss == "-M"
                 then prefixAndSuffix 1 1 ss
                 else prefixAndSuffix 0 4 ss

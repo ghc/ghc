@@ -3,13 +3,14 @@ module Util (
     module System.Console.ANSI,
     replaceIf, replaceEq, replaceSeparators,
     chunksOfSize,
-    putColoured, redError
+    putColoured, redError, redError_
     ) where
 
 import Base
 import Data.Char
 import System.Console.ANSI
 import System.IO
+import Control.Monad
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
@@ -36,9 +37,9 @@ chunksOfSize size ss = reverse chunk : chunksOfSize size rest
                                 else (newChunk, rest)
 
 -- A more colourful version of Shake's putNormal
-putColoured :: ColorIntensity -> Color -> String -> Action ()
-putColoured intensity colour msg = do
-    liftIO $ setSGR [SetColor Foreground intensity colour]
+putColoured :: Color -> String -> Action ()
+putColoured colour msg = do
+    liftIO $ setSGR [SetColor Foreground Vivid colour]
     putNormal msg
     liftIO $ setSGR []
     liftIO $ hFlush stdout
@@ -46,5 +47,8 @@ putColoured intensity colour msg = do
 -- A more colourful version of error
 redError :: String -> Action a
 redError msg = do
-    putColoured Vivid Red msg
-    return $ error $ "GHC build system error: " ++ msg
+    putColoured Red msg
+    error $ "GHC build system error: " ++ msg
+
+redError_ :: String -> Action ()
+redError_ = void . redError

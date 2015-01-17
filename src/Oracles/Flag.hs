@@ -41,7 +41,7 @@ test flag = do
         GhcUnregisterised  -> ("ghc-unregisterised"   , False)
     let defaultString = if defaultValue then "YES" else "NO"
     value <- askConfigWithDefault key $ -- TODO: warn just once
-        do putColoured Dull Red $ "\nFlag '"
+        do putColoured Red $ "\nFlag '"
                 ++ key
                 ++ "' not set in configuration files. "
                 ++ "Proceeding with default value '"
