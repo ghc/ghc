@@ -31,6 +31,8 @@ data MultiPackageData = Modules     FilePath
                       | DepNames    FilePath
                       | CppArgs     FilePath
                       | HsArgs      FilePath
+                      | CcArgs      FilePath
+                      | CSrcs       FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -59,6 +61,8 @@ instance ShowArgs MultiPackageData where
                DepNames    path -> ("DEP_NAMES"   , path, "" )
                CppArgs     path -> ("CPP_OPTS"    , path, "" )
                HsArgs      path -> ("HC_OPTS"     , path, "" )
+               CcArgs      path -> ("CC_OPTS"     , path, "" )
+               CSrcs       path -> ("C_SRCS"      , path, "" )
             fullKey = replaceSeparators '_' $ path ++ "_" ++ key
             pkgData = path </> "package-data.mk"
         res <- askOracle $ PackageDataKey (pkgData, fullKey)
