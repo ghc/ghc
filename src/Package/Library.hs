@@ -17,24 +17,26 @@ arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
     in
     (buildDir <//> "*a") %> \out -> do
         let way = detectWay $ tail $ takeExtension out
-        depObjs <- pkgDepObjects path dist way
-        need $ [argListPath argListDir pkg stage] ++ depObjs
-        libObjs <- pkgLibObjects path dist stage way
+        depHsObjs <- pkgDepHsObjects path dist way
+        cObjs <- pkgCObjects path dist way
+        need $ [argListPath argListDir pkg stage] ++ depHsObjs ++ cObjs
+        libHsObjs <- pkgLibHsObjects path dist stage way
         liftIO $ removeFiles "." [out]
         -- Splitting argument list into chunks as otherwise Ar chokes up
         maxChunk <- argSizeLimit
-        forM_ (chunksOfSize maxChunk libObjs) $ \os -> do
+        forM_ (chunksOfSize maxChunk $ libHsObjs ++ cObjs) $ \os -> do
             terseRun Ar $ arArgs os $ toStandard out
 
 ldArgs :: Package -> TodoItem -> FilePath -> Args
 ldArgs (Package _ path _) (stage, dist, _) result = do
-    depObjs <- pkgDepObjects path dist vanilla
-    need depObjs
+    hObjs <- pkgDepHsObjects path dist vanilla
+    cObjs <- pkgCObjects path dist vanilla
+    need $ hObjs ++ cObjs
     args [ args $ ConfLdLinkerArgs stage
          , arg "-r"
          , arg "-o"
          , arg result
-         , args depObjs ]
+         , args $ hObjs ++ cObjs ]
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
@@ -44,10 +46,10 @@ ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     priority 2 $ (buildDir </> "*.o") %> \out -> do
         need [argListPath argListDir pkg stage]
         terseRun Ld $ ldArgs pkg todo $ toStandard out
-        synopsis <- unwords <$> arg (Synopsis pathDist)
-        putColoured Vivid Green $ "/--------\n| Successfully built package "
+        synopsis <- dropWhileEnd isPunctuation <$> showArg (Synopsis pathDist)
+        putColoured Green $ "/--------\n| Successfully built package "
             ++ name ++ " (stage " ++ show stage ++ ")."
-        putColoured Vivid Green $ "| Package synopsis: " ++ synopsis ++ "."
+        putColoured Green $ "| Package synopsis: " ++ synopsis ++ "."
             ++ "\n\\--------"
 
 argListRule :: Package -> TodoItem -> Rules ()
@@ -57,14 +59,13 @@ argListRule pkg @ (Package _ path _) todo @ (stage, dist, settings) =
         ways' <- ways settings
         ldList <- argList Ld (ldArgs pkg todo "output.o")
         arList <- forM ways' $ \way -> do
-            depObjs <- pkgDepObjects path dist way
-            need depObjs
-            libObjs   <- pkgLibObjects path dist stage way
+            cObjs <- pkgCObjects path dist way
+            libHsObjs <- pkgLibHsObjects path dist stage way
             extension <- libsuf way
             argListWithComment
                 ("way '" ++ tag way ++ "'")
                 Ar
-                (arArgs libObjs $ "output" <.> extension)
+                (arArgs (libHsObjs ++ cObjs) $ "output" <.> extension)
         writeFileChanged out $ unlines $ [ldList] ++ arList
 
 buildPackageLibrary :: Package -> TodoItem -> Rules ()

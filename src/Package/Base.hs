@@ -7,8 +7,8 @@ module Package.Base (
     Package (..), Settings (..), TodoItem (..),
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
-    pathArgs, packageArgs, includeArgs, pkgHsSources,
-    pkgDepObjects, pkgLibObjects,
+    pathArgs, packageArgs, includeHcArgs, pkgHsSources,
+    pkgDepHsObjects, pkgLibHsObjects, pkgCObjects,
     argSizeLimit,
     sourceDependecies,
     argList, argListWithComment,
@@ -92,8 +92,8 @@ packageArgs stage pathDist = do
            else productArgs "-package-name"     (arg  $ PackageKey pathDist)
              <> productArgs "-package"          (args $ Deps       pathDist) ]
 
-includeArgs :: FilePath -> FilePath -> Args
-includeArgs path dist =
+includeHcArgs :: FilePath -> FilePath -> Args
+includeHcArgs path dist =
     let pathDist = path </> dist
         buildDir = toStandard $ pathDist </> "build"
     in args [ arg "-i"
@@ -111,10 +111,11 @@ pkgHsSources path dist = do
     dirs <- map (path </>) <$> args (SrcDirs pathDist)
     findModuleFiles pathDist dirs [".hs", ".lhs"]
 
--- Find objects we depend on (we don't want to depend on split objects)
--- TODO: look for non-hs objects too
-pkgDepObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
-pkgDepObjects path dist way = do
+-- TODO: look for non-{hs,c} objects too
+
+-- Find Haskell objects we depend on (we don't want to depend on split objects)
+pkgDepHsObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
+pkgDepHsObjects path dist way = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
     dirs <- map (normaliseEx . (path </>)) <$> args (SrcDirs pathDist)
@@ -122,9 +123,16 @@ pkgDepObjects path dist way = do
         map (toStandard . (buildDir ++) . (-<.> osuf way) . drop (length d))
         <$> (findModuleFiles pathDist [d] [".hs", ".lhs"])
 
--- Find objects that go to library
-pkgLibObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]
-pkgLibObjects path dist stage way = do
+pkgCObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
+pkgCObjects path dist way = do
+    let pathDist = path </> dist
+        buildDir = pathDist </> "build"
+    srcs <- args $ CSrcs pathDist
+    return $ map (toStandard . (buildDir </>) . (-<.> osuf way)) srcs
+
+-- Find Haskell objects that go to library
+pkgLibHsObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]
+pkgLibHsObjects path dist stage way = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
     split <- splitObjects stage
@@ -132,7 +140,7 @@ pkgLibObjects path dist stage way = do
     then do
          let suffixes = ["_" ++ osuf way ++ "_split//*"]
          findModuleFiles pathDist [buildDir] suffixes
-    else pkgDepObjects path dist way
+    else pkgDepHsObjects path dist way
 
 findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
 findModuleFiles pathDist directories suffixes = do

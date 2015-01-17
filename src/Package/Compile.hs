@@ -2,7 +2,6 @@
 module Package.Compile (buildPackageCompile) where
 
 import Package.Base
-import Development.Shake.Util
 
 argListDir :: FilePath
 argListDir = "shake/arg/buildPackageCompile"
@@ -19,7 +18,7 @@ ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
             , wayHcArgs way
             , args SrcHcArgs
             , packageArgs stage pathDist
-            , includeArgs path dist
+            , includeHcArgs path dist
             , concatArgs ["-optP"] $ CppArgs pathDist
             , args $ HsArgs pathDist
             -- TODO: now we have both -O and -O2
@@ -29,19 +28,47 @@ ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
             , args ("-c":srcs)
             , args ["-o", result] ]
 
+gccArgs :: Package -> TodoItem -> [FilePath] -> FilePath -> Args
+gccArgs (Package _ path _) (_, dist, _) srcs result =
+    let pathDist = path </> dist
+    in args [ args $ CcArgs pathDist
+            , commonCcArgs
+            , commonCcWarninigArgs
+            , pathArgs "-I" path $ IncludeDirs pathDist
+            , args ("-c":srcs)
+            , args ["-o", result] ]
+
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     let buildDir = toStandard $ path </> dist </> "build"
-        depFile  = buildDir </> takeBaseName name <.> "m"
+        hDepFile = buildDir </> "haskell.deps"
+        cDepFile = buildDir </> "c.deps"
     in
-    [buildDir <//> "*o", buildDir <//> "*hi"] &%> \[out, _] -> do
-        let way  = detectWay $ tail $ takeExtension out
-        need [argListPath argListDir pkg stage, depFile]
-        depContents <- parseMakefile <$> (liftIO $ readFile depFile)
-        let deps = concat $ snd $ unzip $ filter ((== out) . fst) depContents
-            srcs = filter ("//*hs" ?==) deps -- TODO: handle *.c sources
-        need deps
-        terseRun (Ghc stage) $ ghcArgs pkg todo way srcs (toStandard out)
+    forM_ allWays $ \way -> do -- TODO: optimise (too many ways in allWays)
+        let oPattern  = "*." ++ osuf way
+        let hiPattern = "*." ++ hisuf way
+        [buildDir <//> oPattern, buildDir <//> hiPattern] |%> \out -> do
+            need [argListPath argListDir pkg stage, hDepFile, cDepFile]
+            let obj = toStandard $ out -<.> osuf way
+                vanillaObj = toStandard $ out -<.> "o"
+            -- TODO: keep only vanilla dependencies in hDepFile
+            hDeps <- args $ DependencyList hDepFile obj
+            cDeps <- args $ DependencyList cDepFile $ takeFileName vanillaObj
+            let hSrcs = filter ("//*hs" ?==) hDeps
+                cSrcs = filter ("//*.c" ?==) cDeps
+            -- Report impossible cases
+            when (null $ hSrcs ++ cSrcs)
+                $ redError_ $ "No source files found for "
+                ++ toStandard out ++ "."
+            when (not (null hSrcs) && not (null cSrcs))
+                $ redError_ $ "Both c and Haskell sources found for "
+                ++ toStandard out ++ "."
+            -- Build using appropriate compiler
+            need $ hDeps ++ cDeps
+            when (not $ null hSrcs)
+                $ terseRun (Ghc stage) $ ghcArgs pkg todo way hSrcs obj
+            when (not $ null cSrcs)
+                $ terseRun Gcc $ gccArgs pkg todo cSrcs obj
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, settings) =

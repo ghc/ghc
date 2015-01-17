@@ -10,10 +10,10 @@ ghcArgs :: Package -> TodoItem -> Args
 ghcArgs (Package name path _) (stage, dist, settings) =
     let pathDist = path </> dist
         buildDir = toStandard $ pathDist </> "build"
-        depFile  = buildDir </> takeBaseName name <.> "m"
+        depFile  = buildDir </> "haskell.deps"
     in args [ arg "-M"
             , packageArgs stage pathDist
-            , includeArgs path dist
+            , includeHcArgs path dist
             , concatArgs ["-optP"] $ CppArgs pathDist
             , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
             , args ["-dep-makefile", depFile <.> "new"]
@@ -21,25 +21,79 @@ ghcArgs (Package name path _) (stage, dist, settings) =
             , args $ HsArgs pathDist
             , args $ pkgHsSources path dist ]
 
+--    $(CPP) $($1_$2_MKDEPENDC_OPTS)
+-- $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS)
+-- $($(basename $4)_CC_OPTS) -MM -x c $4 -MF $3.bit
+--
+-- $1_$2_$3_ALL_CC_OPTS = \
+-- $$(WAY_$3_CC_OPTS) \
+-- $$($1_$2_DIST_GCC_CC_OPTS) \
+-- $$($1_$2_$3_CC_OPTS) \
+-- $$($$(basename $$<)_CC_OPTS) \
+-- $$($1_$2_EXTRA_CC_OPTS) \
+-- $$(EXTRA_CC_OPTS)
+--
+-- $1_$2_DIST_CC_OPTS = \
+-- $$(SRC_CC_OPTS) \
+-- $$($1_CC_OPTS) \
+-- -I$1/$2/build/autogen \
+-- $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
+-- $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
+-- $$($1_$2_CC_OPTS) \
+-- $$($1_$2_CPP_OPTS) \
+-- $$($1_$2_CC_INC_FLAGS) \
+-- $$($1_$2_DEP_CC_OPTS) \
+-- $$(SRC_CC_WARNING_OPTS)
+
+-- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
+gccArgs :: FilePath -> Package -> TodoItem -> Args
+gccArgs sourceFile (Package _ path _) (stage, dist, _) =
+    let pathDist = path </> dist
+        buildDir = pathDist </> "build"
+        depFile  = buildDir </> takeFileName sourceFile <.> "deps"
+    in args [ arg "-MM"
+            , args $ CcArgs pathDist
+            , commonCcArgs
+            , commonCcWarninigArgs
+            , pathArgs "-I" path $ IncludeDirs pathDist
+            , args ["-MF", toStandard depFile]
+            , args ["-x", "c"]
+            , arg $ toStandard sourceFile ]
+
 buildRule :: Package -> TodoItem -> Rules ()
-buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
-    let buildDir = toStandard $ path </> dist </> "build"
-    in
-    (buildDir </> takeBaseName name <.> "m") %> \out -> do
+buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
+    let pathDist = path </> dist
+        buildDir = pathDist </> "build"
+        hDepFile = buildDir </> "haskell.deps"
+        cDepFile = buildDir </> "c.deps"
+
+    hDepFile %> \out -> do
         need [argListPath argListDir pkg stage]
         terseRun (Ghc stage) $ ghcArgs pkg todo
         -- Avoid rebuilding dependecies of out if it hasn't changed:
         -- Note: cannot use copyFileChanged as it depends on the source file
         deps <- liftIO $ readFile $ out <.> "new"
         writeFileChanged out deps
-        removeFilesAfter "." [out <.> "new"]
+        liftIO $ removeFiles "." [out <.> "new"]
+
+    cDepFile %> \out -> do
+        need [argListPath argListDir pkg stage]
+        srcs <- args $ CSrcs pathDist
+        deps <- fmap concat $ forM srcs $ \src -> do
+            let srcPath = path </> src
+                depFile = buildDir </> takeFileName src <.> "deps"
+            terseRun Gcc $ gccArgs srcPath pkg todo
+            liftIO $ readFile depFile
+        writeFileChanged out deps
+        liftIO $ removeFiles buildDir ["*.c.deps"]
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, _) =
     (argListPath argListDir pkg stage) %> \out -> do
         need $ ["shake/src/Package/Dependencies.hs"] ++ sourceDependecies
         ghcList <- argList (Ghc stage) $ ghcArgs pkg todo
-        writeFileChanged out ghcList
+        gccList <- argList Gcc $ gccArgs "source.c" pkg todo
+        writeFileChanged out $ ghcList ++ "\n" ++ gccList
 
 buildPackageDependencies :: Package -> TodoItem -> Rules ()
 buildPackageDependencies = argListRule <> buildRule
