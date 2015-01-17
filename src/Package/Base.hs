@@ -7,7 +7,7 @@ module Package.Base (
     Package (..), Settings (..), TodoItem (..),
     defaultSettings, libraryPackage,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
-    pathArgs, packageArgs, includeHcArgs, pkgHsSources,
+    pathArgs, packageArgs, includeGhcArgs, pkgHsSources,
     pkgDepHsObjects, pkgLibHsObjects, pkgCObjects,
     argSizeLimit,
     sourceDependecies,
@@ -92,8 +92,8 @@ packageArgs stage pathDist = do
            else productArgs "-package-name"     (arg  $ PackageKey pathDist)
              <> productArgs "-package"          (args $ Deps       pathDist) ]
 
-includeHcArgs :: FilePath -> FilePath -> Args
-includeHcArgs path dist =
+includeGhcArgs :: FilePath -> FilePath -> Args
+includeGhcArgs path dist =
     let pathDist = path </> dist
         buildDir = toStandard $ pathDist </> "build"
     in args [ arg "-i"

@@ -18,7 +18,7 @@ ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
             , wayHcArgs way
             , args SrcHcArgs
             , packageArgs stage pathDist
-            , includeHcArgs path dist
+            , includeGhcArgs path dist
             , concatArgs ["-optP"] $ CppArgs pathDist
             , args $ HsArgs pathDist
             -- TODO: now we have both -O and -O2

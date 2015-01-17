@@ -13,7 +13,7 @@ ghcArgs (Package name path _) (stage, dist, settings) =
         depFile  = buildDir </> "haskell.deps"
     in args [ arg "-M"
             , packageArgs stage pathDist
-            , includeHcArgs path dist
+            , includeGhcArgs path dist
             , concatArgs ["-optP"] $ CppArgs pathDist
             , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
             , args ["-dep-makefile", depFile <.> "new"]
@@ -21,10 +21,6 @@ ghcArgs (Package name path _) (stage, dist, settings) =
             , args $ HsArgs pathDist
             , args $ pkgHsSources path dist ]
 
---    $(CPP) $($1_$2_MKDEPENDC_OPTS)
--- $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS)
--- $($(basename $4)_CC_OPTS) -MM -x c $4 -MF $3.bit
---
 -- $1_$2_$3_ALL_CC_OPTS = \
 -- $$(WAY_$3_CC_OPTS) \
 -- $$($1_$2_DIST_GCC_CC_OPTS) \
