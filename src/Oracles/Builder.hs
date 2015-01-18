@@ -21,11 +21,11 @@ import Oracles.Option
 -- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
 data Builder = Ar
              | Ld
-             | Gcc
              | Alex
              | Happy
              | HsColour
              | GhcCabal
+             | Gcc Stage
              | Ghc Stage
              | GhcPkg Stage
              deriving Show
@@ -35,7 +35,6 @@ instance ShowArg Builder where
         let key = case builder of
                 Ar            -> "ar"
                 Ld            -> "ld"
-                Gcc           -> "gcc"
                 Alex          -> "alex"
                 Happy         -> "happy"
                 HsColour      -> "hscolour"
@@ -44,6 +43,8 @@ instance ShowArg Builder where
                 Ghc Stage1    -> "ghc-stage1"
                 Ghc Stage2    -> "ghc-stage2"
                 Ghc Stage3    -> "ghc-stage3"
+                Gcc Stage0    -> "system-gcc"
+                Gcc _         -> "gcc"
                 GhcPkg Stage0 -> "system-ghc-pkg"
                 GhcPkg _      -> "ghc-pkg"
         cfgPath <- askConfigWithDefault key $
@@ -82,7 +83,7 @@ with builder = do
     let key = case builder of
             Ar       -> "--with-ar="
             Ld       -> "--with-ld="
-            Gcc      -> "--with-gcc="
+            Gcc _    -> "--with-gcc="
             Ghc _    -> "--with-ghc="
             Alex     -> "--with-alex="
             Happy    -> "--with-happy="
@@ -119,7 +120,7 @@ interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
     Ar       -> prefixAndSuffix 2 1 ss
     Ld       -> prefixAndSuffix 4 0 ss
-    Gcc      -> if head ss == "-MM"
+    Gcc _    -> if head ss == "-MM"
                 then prefixAndSuffix 1 1 ss
                 else ss
     Ghc _    -> if head ss == "-M"

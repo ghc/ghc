@@ -56,7 +56,7 @@ instance ShowArgs MultiOption where
         GmpIncludeDirs          -> "gmp-include-dirs"
         GmpLibDirs              -> "gmp-lib-dirs"
       where
-        showStage = ("-stage-" ++) . show
+        showStage = ("-stage" ++) . show
 
 ghcWithInterpreter :: Condition
 ghcWithInterpreter = do

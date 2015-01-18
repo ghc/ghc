@@ -78,7 +78,7 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
         deps <- fmap concat $ forM srcs $ \src -> do
             let srcPath = path </> src
                 depFile = buildDir </> takeFileName src <.> "deps"
-            terseRun Gcc $ gccArgs srcPath pkg todo
+            terseRun (Gcc stage) $ gccArgs srcPath pkg todo
             liftIO $ readFile depFile
         writeFileChanged out deps
         liftIO $ removeFiles buildDir ["*.c.deps"]
@@ -88,7 +88,7 @@ argListRule pkg todo @ (stage, _, _) =
     (argListPath argListDir pkg stage) %> \out -> do
         need $ ["shake/src/Package/Dependencies.hs"] ++ sourceDependecies
         ghcList <- argList (Ghc stage) $ ghcArgs pkg todo
-        gccList <- argList Gcc $ gccArgs "source.c" pkg todo
+        gccList <- argList (Gcc stage) $ gccArgs "source.c" pkg todo
         writeFileChanged out $ ghcList ++ "\n" ++ gccList
 
 buildPackageDependencies :: Package -> TodoItem -> Rules ()

@@ -6,6 +6,7 @@ module Oracles.Base (
     ) where
 
 import Base
+import Util
 import Development.Shake.Classes
 
 newtype ConfigKey = ConfigKey String
@@ -13,11 +14,11 @@ newtype ConfigKey = ConfigKey String
 
 askConfigWithDefault :: String -> Action String -> Action String
 askConfigWithDefault key defaultAction = do
-    maybeValue <- askOracle $ ConfigKey key 
+    maybeValue <- askOracle $ ConfigKey key
     case maybeValue of
         Just value -> return value
         Nothing    -> defaultAction
 
 askConfig :: String -> Action String
 askConfig key = askConfigWithDefault key $
-    error $ "\nCannot find key '" ++ key ++ "' in configuration files."
+    redError $ "Cannot find key '" ++ key ++ "' in configuration files."

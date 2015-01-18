@@ -44,7 +44,7 @@ configureArgs stage settings =
             , conf "--with-gmp-libraries"   GmpLibDirs
             -- TODO: why TargetPlatformFull and not host?
             , when CrossCompiling $ conf "--host" $ arg TargetPlatformFull
-            , conf "--with-cc" $ arg Gcc ]
+            , conf "--with-cc" $ arg $ Gcc stage ]
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
@@ -86,15 +86,15 @@ cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = args
     -- * if it is empty, we need to emit one empty string argument
     -- * otherwise, we must collapse it into one space-separated string
     , arg (unwords <$> customDllArgs settings)
-    , with (Ghc stage) -- TODO: used limited to max stage1 GHC
-    , with (GhcPkg stage)
+    , with $ Ghc stage -- TODO: used to be limited to max stage1 GHC
+    , with $ GhcPkg stage
     , customConfArgs settings
     , when (stage == Stage0) bootPackageDb
     , libraryArgs =<< ways settings
     , when (specified HsColour) $ with HsColour
     , configureArgs stage settings
     , when (stage == Stage0) bootPkgConstraints
-    , with Gcc
+    , with $ Gcc stage
     , when (stage /= Stage0) $ with Ld
     , with Ar
     , with Alex

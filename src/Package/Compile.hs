@@ -68,7 +68,7 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
             when (not $ null hSrcs)
                 $ terseRun (Ghc stage) $ ghcArgs pkg todo way hSrcs obj
             when (not $ null cSrcs)
-                $ terseRun Gcc $ gccArgs pkg todo cSrcs obj
+                $ terseRun (Gcc stage) $ gccArgs pkg todo cSrcs obj
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, settings) =
@@ -80,7 +80,13 @@ argListRule pkg todo @ (stage, _, settings) =
                 ("way '" ++ tag way ++ "'")
                 (Ghc stage)
                 (ghcArgs pkg todo way ["input.hs"] $ "output" <.> osuf way)
-        writeFileChanged out $ unlines ghcList
+        gccList <- forM ways' $ \way ->
+            argListWithComment
+                ("way '" ++ tag way ++ "'")
+                (Gcc stage)
+                (gccArgs pkg todo ["input.c"] $ "output" <.> osuf way)
+
+        writeFileChanged out $ unlines ghcList ++ "\n" ++ unlines gccList
 
 buildPackageCompile :: Package -> TodoItem -> Rules ()
 buildPackageCompile = argListRule <> buildRule
