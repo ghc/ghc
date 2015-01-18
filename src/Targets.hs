@@ -6,23 +6,25 @@ import Base
 -- TODO: this should eventually be removed and replaced by the top-level
 -- target, i.e. GHC (and perhaps, something else)
 libraryPackagesInStage :: Stage -> [String]
-libraryPackagesInStage Stage0 = []
-    --[ "bin-package-db"
-    --, "binary"
-    --, "hoopl"
-    --, "hpc"
-    --, "transformers" ]
-libraryPackagesInStage Stage1 = ["directory", "bytestring"]
-    --libraryPackagesInStage Stage0 ++
-    --[ "array"
-    --, "deepseq"
-    --, "Cabal/Cabal"
-    --, "containers"
-    --, "filepath"
-    --, "parallel"
-    --, "pretty"
-    --, "stm"
-    --, "template-haskell" ]
+libraryPackagesInStage Stage0 =
+    [ "bin-package-db"
+    , "binary"
+    , "hoopl"
+    , "hpc"
+    , "transformers" ]
+libraryPackagesInStage Stage1 =
+    libraryPackagesInStage Stage0 ++
+    [ "array"
+    , "bytestring"
+    , "Cabal/Cabal"
+    , "containers"
+    , "deepseq"
+    , "directory"
+    , "filepath"
+    , "parallel"
+    , "pretty"
+    , "stm"
+    , "template-haskell" ]
 
 libraryPackagesInStage _ = []
 
