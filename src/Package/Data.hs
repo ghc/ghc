@@ -124,9 +124,9 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
     ] &%> \_ -> do
         need [argListPath argListDir pkg stage, cabal]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        terseRun GhcCabal $ cabalArgs pkg todo
+        run GhcCabal $ cabalArgs pkg todo
         when (registerPackage settings) $
-            terseRun (GhcPkg stage) $ ghcPkgArgs pkg todo
+            run (GhcPkg stage) $ ghcPkgArgs pkg todo
         postProcessPackageData $ pathDist </> "package-data.mk"
 
 argListRule :: Package -> TodoItem -> Rules ()

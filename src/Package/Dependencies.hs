@@ -63,12 +63,7 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
 
     (buildDir </> "haskell.deps") %> \out -> do
         need [argListPath argListDir pkg stage]
-        terseRun (Ghc stage) $ ghcArgs pkg todo
-        -- Avoid rebuilding dependecies of out if it hasn't changed:
-        -- Note: cannot use copyFileChanged as it depends on the source file
-        --deps <- liftIO $ readFile $ out <.> "new"
-        --writeFileChanged out deps
-        --liftIO $ removeFiles "." [out <.> "new"]
+        run (Ghc stage) $ ghcArgs pkg todo
 
     (buildDir </> "c.deps") %> \out -> do
         need [argListPath argListDir pkg stage]
@@ -76,7 +71,7 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
         deps <- fmap concat $ forM srcs $ \src -> do
             let srcPath = path </> src
                 depFile = buildDir </> takeFileName src <.> "deps"
-            terseRun (Gcc stage) $ gccArgs srcPath pkg todo
+            run (Gcc stage) $ gccArgs srcPath pkg todo
             liftIO $ readFile depFile
         writeFileChanged out deps
         liftIO $ removeFiles buildDir ["*.c.deps"]

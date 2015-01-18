@@ -66,9 +66,9 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
             -- Build using appropriate compiler
             need $ hDeps ++ cDeps
             when (not $ null hSrcs)
-                $ terseRun (Ghc stage) $ ghcArgs pkg todo way hSrcs obj
+                $ run (Ghc stage) $ ghcArgs pkg todo way hSrcs obj
             when (not $ null cSrcs)
-                $ terseRun (Gcc stage) $ gccArgs pkg todo cSrcs obj
+                $ run (Gcc stage) $ gccArgs pkg todo cSrcs obj
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, settings) =

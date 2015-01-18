@@ -2,7 +2,7 @@
 
 module Oracles.Builder (
     Builder (..),
-    with, run, terseRun, specified
+    with, run, verboseRun, specified
     ) where
 
 import Data.Char
@@ -94,9 +94,8 @@ with builder = do
     return [key ++ exe]
 
 -- Run the builder with a given collection of arguments
--- Raises an error if the builder is not uniquely specified in config files
-run :: ShowArgs a => Builder -> a -> Action ()
-run builder as = do
+verboseRun :: ShowArgs a => Builder -> a -> Action ()
+verboseRun builder as = do
     needBuilder builder
     exe  <- showArg builder
     args <- showArgs as
@@ -104,17 +103,15 @@ run builder as = do
 
 -- Run the builder with a given collection of arguments printing out a
 -- terse commentary with only 'interesting' info for the builder.
--- Raises an error if the builder is not uniquely specified in config files
--- TODO: make this a default 'run', rename current 'run' to verboseRun
-terseRun :: ShowArgs a => Builder -> a -> Action ()
-terseRun builder as = do
+run :: ShowArgs a => Builder -> a -> Action ()
+run builder as = do
     args <- showArgs as
     putColoured White $ "/--------\n" ++
         "| Running " ++ show builder ++ " with arguments:"
     mapM_ (putColoured White . ("|   " ++)) $
         interestingInfo builder args
     putColoured White $ "\\--------"
-    quietly $ run builder as
+    quietly $ verboseRun builder as
 
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
