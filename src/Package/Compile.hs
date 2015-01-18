@@ -47,10 +47,14 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     forM_ allWays $ \way -> do -- TODO: optimise (too many ways in allWays)
         let oPattern  = "*." ++ osuf way
         let hiPattern = "*." ++ hisuf way
-        [buildDir <//> oPattern, buildDir <//> hiPattern] |%> \out -> do
+
+        (buildDir <//> hiPattern) %> \out -> do
+            let obj = out -<.> osuf way
+            need [obj]
+
+        (buildDir <//> oPattern) %> \obj -> do
             need [argListPath argListDir pkg stage]
-            let obj = toStandard $ out -<.> osuf way
-                vanillaObj = toStandard $ out -<.> "o"
+            let vanillaObj = obj -<.> "o"
             -- TODO: keep only vanilla dependencies in hDepFile
             hDeps <- args $ DependencyList hDepFile obj
             cDeps <- args $ DependencyList cDepFile $ takeFileName vanillaObj
@@ -59,16 +63,17 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
             -- Report impossible cases
             when (null $ hSrcs ++ cSrcs)
                 $ redError_ $ "No source files found for "
-                ++ toStandard out ++ "."
+                ++ toStandard obj ++ "."
             when (not (null hSrcs) && not (null cSrcs))
                 $ redError_ $ "Both c and Haskell sources found for "
-                ++ toStandard out ++ "."
+                ++ toStandard obj ++ "."
             -- Build using appropriate compiler
             need $ hDeps ++ cDeps
             when (not $ null hSrcs)
                 $ run (Ghc stage) $ ghcArgs pkg todo way hSrcs obj
             when (not $ null cSrcs)
                 $ run (Gcc stage) $ gccArgs pkg todo cSrcs obj
+
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, settings) =

@@ -67,15 +67,17 @@ packageDataOracle = do
 -- Oracle for 'path/dist/*.deps' files
 dependencyOracle :: Rules ()
 dependencyOracle = do
-    deps <- newCache $ \depFile -> do
-        need [depFile]
-        putOracle $ "Parsing " ++ toStandard depFile ++ "..."
-        contents <- parseMakefile <$> (liftIO $ readFile depFile)
+    deps <- newCache $ \file -> do
+        need [file]
+        putOracle $ "Parsing " ++ file ++ "..."
+        contents <- parseMakefile <$> (liftIO $ readFile file)
         return $ M.fromList
+               $ map (bimap toStandard (map toStandard))
                $ map (bimap head concat . unzip)
                $ groupBy ((==) `on` fst)
                $ sortBy (compare `on` fst) contents
-    addOracle $ \(DependencyListKey (file, obj)) -> M.lookup obj <$> deps file
+    addOracle $ \(DependencyListKey (file, obj)) ->
+        M.lookup (toStandard obj) <$> deps (toStandard file)
     return ()
 
 oracleRules :: Rules ()
