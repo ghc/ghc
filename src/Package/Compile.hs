@@ -48,7 +48,7 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
         let oPattern  = "*." ++ osuf way
         let hiPattern = "*." ++ hisuf way
         [buildDir <//> oPattern, buildDir <//> hiPattern] |%> \out -> do
-            need [argListPath argListDir pkg stage, hDepFile, cDepFile]
+            need [argListPath argListDir pkg stage]
             let obj = toStandard $ out -<.> osuf way
                 vanillaObj = toStandard $ out -<.> "o"
             -- TODO: keep only vanilla dependencies in hDepFile

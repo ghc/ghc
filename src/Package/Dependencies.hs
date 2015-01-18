@@ -16,7 +16,7 @@ ghcArgs (Package name path _) (stage, dist, settings) =
             , includeGhcArgs path dist
             , concatArgs ["-optP"] $ CppArgs pathDist
             , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
-            , args ["-dep-makefile", depFile <.> "new"]
+            , args ["-dep-makefile", depFile ]
             , productArgs "-dep-suffix" $ map wayPrefix <$> ways settings
             , args $ HsArgs pathDist
             , args $ pkgHsSources path dist ]
@@ -60,19 +60,17 @@ buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
-        hDepFile = buildDir </> "haskell.deps"
-        cDepFile = buildDir </> "c.deps"
 
-    hDepFile %> \out -> do
+    (buildDir </> "haskell.deps") %> \out -> do
         need [argListPath argListDir pkg stage]
         terseRun (Ghc stage) $ ghcArgs pkg todo
         -- Avoid rebuilding dependecies of out if it hasn't changed:
         -- Note: cannot use copyFileChanged as it depends on the source file
-        deps <- liftIO $ readFile $ out <.> "new"
-        writeFileChanged out deps
-        liftIO $ removeFiles "." [out <.> "new"]
+        --deps <- liftIO $ readFile $ out <.> "new"
+        --writeFileChanged out deps
+        --liftIO $ removeFiles "." [out <.> "new"]
 
-    cDepFile %> \out -> do
+    (buildDir </> "c.deps") %> \out -> do
         need [argListPath argListDir pkg stage]
         srcs <- args $ CSrcs pathDist
         deps <- fmap concat $ forM srcs $ \src -> do
