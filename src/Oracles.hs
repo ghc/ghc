@@ -35,12 +35,12 @@ configOracle = do
                       ++ (defaultConfig <.> "in")
                       ++ "' is missing; unwilling to proceed."
         need [defaultConfig]
-        putOracle $ "Parsing " ++ unifyPath defaultConfig ++ "..."
+        putOracle $ "Reading " ++ unifyPath defaultConfig ++ "..."
         cfgDefault <- liftIO $ readConfigFile defaultConfig
         existsUser <- doesFileExist userConfig
         cfgUser    <- if existsUser
                       then do
-                          putOracle $ "Parsing "
+                          putOracle $ "Reading "
                                     ++ unifyPath userConfig ++ "..."
                           liftIO $ readConfigFile userConfig
                       else do
@@ -59,7 +59,7 @@ packageDataOracle :: Rules ()
 packageDataOracle = do
     pkgData <- newCache $ \file -> do
         need [file]
-        putOracle $ "Parsing " ++ file ++ "..."
+        putOracle $ "Reading " ++ file ++ "..."
         liftIO $ readConfigFile file
     addOracle $ \(PackageDataKey (file, key)) ->
         M.lookup key <$> pkgData (unifyPath file)
@@ -70,7 +70,7 @@ dependencyOracle :: Rules ()
 dependencyOracle = do
     deps <- newCache $ \file -> do
         need [file]
-        putOracle $ "Parsing " ++ file ++ "..."
+        putOracle $ "Reading " ++ file ++ "..."
         contents <- parseMakefile <$> (liftIO $ readFile file)
         return $ M.fromList
                $ map (bimap unifyPath (map unifyPath))

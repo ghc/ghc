@@ -38,42 +38,41 @@ gccArgs (Package _ path _) (_, dist, _) srcs result =
             , args ("-c":srcs)
             , args ["-o", result] ]
 
+compileC :: Package -> TodoItem -> [FilePath] -> FilePath -> Action ()
+compileC pkg todo @ (stage, _, _) deps obj = do
+    need deps
+    let srcs = filter ("//*.c" ?==) deps
+    run (Gcc stage) $ gccArgs pkg todo srcs obj
+
+compileHaskell :: Package -> TodoItem -> FilePath -> Way -> Action ()
+compileHaskell pkg @ (Package _ path _) todo @ (stage, dist, _) obj way = do
+    let buildDir = unifyPath $ path </> dist </> "build"
+    -- TODO: keep only vanilla dependencies in 'haskell.deps'
+    deps <- args $ DependencyList (buildDir </> "haskell.deps") obj
+    need deps
+    let srcs = filter ("//*hs" ?==) deps
+    run (Ghc stage) $ ghcArgs pkg todo way srcs obj
+
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     let buildDir = unifyPath $ path </> dist </> "build"
-        hDepFile = buildDir </> "haskell.deps"
         cDepFile = buildDir </> "c.deps"
     in
     forM_ allWays $ \way -> do -- TODO: optimise (too many ways in allWays)
         let oPattern  = "*." ++ osuf way
         let hiPattern = "*." ++ hisuf way
 
-        (buildDir <//> hiPattern) %> \out -> do
-            let obj = out -<.> osuf way
+        (buildDir <//> hiPattern) %> \hi -> do
+            let obj = hi -<.> osuf way
             need [obj]
 
         (buildDir <//> oPattern) %> \obj -> do
             need [argListPath argListDir pkg stage]
-            let vanillaObj = obj -<.> "o"
-            -- TODO: keep only vanilla dependencies in hDepFile
-            hDeps <- args $ DependencyList hDepFile obj
-            cDeps <- args $ DependencyList cDepFile $ takeFileName vanillaObj
-            let hSrcs = filter ("//*hs" ?==) hDeps
-                cSrcs = filter ("//*.c" ?==) cDeps
-            -- Report impossible cases
-            when (null $ hSrcs ++ cSrcs)
-                $ redError_ $ "No source files found for "
-                ++ unifyPath obj ++ "."
-            when (not (null hSrcs) && not (null cSrcs))
-                $ redError_ $ "Both c and Haskell sources found for "
-                ++ unifyPath obj ++ "."
-            -- Build using appropriate compiler
-            need $ hDeps ++ cDeps
-            when (not $ null hSrcs)
-                $ run (Ghc stage) $ ghcArgs pkg todo way hSrcs obj
-            when (not $ null cSrcs)
-                $ run (Gcc stage) $ gccArgs pkg todo cSrcs obj
-
+            let vanillaObjName = takeFileName obj -<.> "o"
+            cDeps <- args $ DependencyList cDepFile vanillaObjName
+            if null cDeps
+            then compileHaskell pkg todo obj way
+            else compileC pkg todo cDeps obj
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, settings) =

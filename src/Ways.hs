@@ -130,7 +130,6 @@ dropDynamic way
 
 -- Detect way from a given extension. Fail if the result is not unique.
 -- TODO: This may be slow -- optimise if overhead is significant.
--- TODO: No longer needed -- remove?
 detectWay :: FilePath -> Way
 detectWay extension =
     let prefix = reverse $ dropWhile (/= '_') $ reverse extension

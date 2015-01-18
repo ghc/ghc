@@ -9,6 +9,7 @@ libraryPackagesInStage :: Stage -> [String]
 libraryPackagesInStage Stage0 =
     [ "bin-package-db"
     , "binary"
+    , "Cabal/Cabal"
     , "hoopl"
     , "hpc"
     , "transformers" ]
@@ -16,7 +17,6 @@ libraryPackagesInStage Stage1 =
     libraryPackagesInStage Stage0 ++
     [ "array"
     , "bytestring"
-    , "Cabal/Cabal"
     , "containers"
     , "deepseq"
     , "directory"

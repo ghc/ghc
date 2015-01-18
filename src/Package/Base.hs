@@ -19,6 +19,7 @@ import Base
 import Ways
 import Util
 import Oracles
+import qualified System.Directory as S
 
 data Settings = Settings
      {
@@ -137,19 +138,23 @@ pkgLibHsObjects path dist stage way = do
     split <- splitObjects stage
     if split
     then do
-         let suffixes = ["_" ++ osuf way ++ "_split//*"]
-         findModuleFiles pathDist [buildDir] suffixes
+         let suffix = "_" ++ osuf way ++ "_split/*." ++ osuf way
+         findModuleFiles pathDist [buildDir] [suffix]
     else pkgDepHsObjects path dist way
 
 findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
 findModuleFiles pathDist directories suffixes = do
     modPaths <- map (replaceEq '.' pathSeparator) <$> args (Modules pathDist)
-    fileList <- forM directories $ \dir     ->
-                forM modPaths    $ \modPath ->
-                forM suffixes    $ \suffix  -> do
-                    let file = dir </> modPath ++ suffix
-                    when (doesDirectoryExist $ dropFileName file) $ return file
-    files <- getDirectoryFiles "" $ concat $ concat fileList
+    fileList <- forM [ dir </> modPath ++ suffix
+                     | dir     <- directories
+                     , modPath <- modPaths
+                     , suffix  <- suffixes
+                     ] $ \file -> do
+                         let dir = takeDirectory file
+                         dirExists <- liftIO $ S.doesDirectoryExist dir
+                         when dirExists $ return file
+
+    files <- getDirectoryFiles "" fileList
     return $ map unifyPath files
 
 -- The argument list has a limited size on Windows. Since Windows 7 the limit
