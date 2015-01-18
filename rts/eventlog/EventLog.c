@@ -500,6 +500,15 @@ moreCapEventBufs (nat from, nat to)
     for (c = from; c < to; ++c) {
         initEventsBuf(&capEventBuf[c], EVENT_LOG_SIZE, c);
     }
+
+    // The from == 0 already covered in initEventLogging, so we are interested
+    // only in case when we are increasing capabilities number
+    if (from > 0) {
+        for (c = from; c < to; ++c) {
+           postBlockMarker(&capEventBuf[c]);
+        }
+    }
+
 }
 
 
