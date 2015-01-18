@@ -13,7 +13,7 @@ suffixArgs way =
 ghcArgs :: Package -> TodoItem -> Way -> [FilePath] -> FilePath -> Args
 ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
     let pathDist = path </> dist
-        buildDir = toStandard $ pathDist </> "build"
+        buildDir = unifyPath $ pathDist </> "build"
     in args [ suffixArgs way
             , wayHcArgs way
             , args SrcHcArgs
@@ -40,7 +40,7 @@ gccArgs (Package _ path _) (_, dist, _) srcs result =
 
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
-    let buildDir = toStandard $ path </> dist </> "build"
+    let buildDir = unifyPath $ path </> dist </> "build"
         hDepFile = buildDir </> "haskell.deps"
         cDepFile = buildDir </> "c.deps"
     in
@@ -63,10 +63,10 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
             -- Report impossible cases
             when (null $ hSrcs ++ cSrcs)
                 $ redError_ $ "No source files found for "
-                ++ toStandard obj ++ "."
+                ++ unifyPath obj ++ "."
             when (not (null hSrcs) && not (null cSrcs))
                 $ redError_ $ "Both c and Haskell sources found for "
-                ++ toStandard obj ++ "."
+                ++ unifyPath obj ++ "."
             -- Build using appropriate compiler
             need $ hDeps ++ cDeps
             when (not $ null hSrcs)

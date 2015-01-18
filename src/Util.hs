@@ -2,6 +2,7 @@ module Util (
     module Data.Char,
     module System.Console.ANSI,
     replaceIf, replaceEq, replaceSeparators,
+    unifyPath,
     chunksOfSize,
     putColoured, redError, redError_
     ) where
@@ -20,6 +21,9 @@ replaceEq from = replaceIf (== from)
 
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
+
+unifyPath :: FilePath -> FilePath
+unifyPath = toStandard . normaliseEx
 
 -- (chunksOfSize size ss) splits a list of strings 'ss' into chunks not
 -- exceeding the given 'size'.

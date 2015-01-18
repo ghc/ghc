@@ -52,7 +52,7 @@ libraryPackage :: String -> [Stage] -> (Stage -> Settings) -> Package
 libraryPackage name stages settings =
     Package
         name
-        ("libraries" </> name)
+        (unifyPath $ "libraries" </> name)
         [ (stage
         , if stage == Stage0 then "dist-boot" else "dist-install"
         , settings stage)
@@ -75,8 +75,7 @@ commonCcWarninigArgs = when Validating $
            arg "-Werror=unused-but-set-variable" ]
 
 pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
-pathArgs key path as =
-    map (\a -> key ++ toStandard (normaliseEx $ path </> a)) <$> args as
+pathArgs key path as = map (\a -> key ++ unifyPath (path </> a)) <$> args as
 
 packageArgs :: Stage -> FilePath -> Args
 packageArgs stage pathDist = do
@@ -95,15 +94,15 @@ packageArgs stage pathDist = do
 includeGhcArgs :: FilePath -> FilePath -> Args
 includeGhcArgs path dist =
     let pathDist = path </> dist
-        buildDir = toStandard $ pathDist </> "build"
+        buildDir = unifyPath $ pathDist </> "build"
     in args [ arg "-i"
             , pathArgs "-i" path $ SrcDirs pathDist
             , concatArgs ["-i", "-I"]
-              [buildDir, toStandard $ buildDir </> "autogen"]
+              [buildDir, unifyPath $ buildDir </> "autogen"]
             , pathArgs "-I" path $ IncludeDirs pathDist
             , arg "-optP-include" -- TODO: Shall we also add -cpp?
             , concatArgs "-optP" $
-              toStandard $ buildDir </> "autogen/cabal_macros.h" ]
+              unifyPath $ buildDir </> "autogen/cabal_macros.h" ]
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do
@@ -118,9 +117,9 @@ pkgDepHsObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepHsObjects path dist way = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
-    dirs <- map (normaliseEx . (path </>)) <$> args (SrcDirs pathDist)
+    dirs <- map (unifyPath . (path </>)) <$> args (SrcDirs pathDist)
     fmap concat $ forM dirs $ \d ->
-        map (toStandard . (buildDir ++) . (-<.> osuf way) . drop (length d))
+        map (unifyPath . (buildDir ++) . (-<.> osuf way) . drop (length d))
         <$> (findModuleFiles pathDist [d] [".hs", ".lhs"])
 
 pkgCObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
@@ -128,13 +127,13 @@ pkgCObjects path dist way = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
     srcs <- args $ CSrcs pathDist
-    return $ map (toStandard . (buildDir </>) . (-<.> osuf way)) srcs
+    return $ map (unifyPath . (buildDir </>) . (-<.> osuf way)) srcs
 
 -- Find Haskell objects that go to library
 pkgLibHsObjects :: FilePath -> FilePath -> Stage -> Way -> Action [FilePath]
 pkgLibHsObjects path dist stage way = do
     let pathDist = path </> dist
-        buildDir = pathDist </> "build"
+        buildDir = unifyPath $ pathDist </> "build"
     split <- splitObjects stage
     if split
     then do
@@ -151,7 +150,7 @@ findModuleFiles pathDist directories suffixes = do
                     let file = dir </> modPath ++ suffix
                     when (doesDirectoryExist $ dropFileName file) $ return file
     files <- getDirectoryFiles "" $ concat $ concat fileList
-    return $ map (toStandard . normaliseEx) files
+    return $ map unifyPath files
 
 -- The argument list has a limited size on Windows. Since Windows 7 the limit
 -- is 32768 (theoretically). In practice we use 31000 to leave some breathing

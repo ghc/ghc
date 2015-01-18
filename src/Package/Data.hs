@@ -71,13 +71,12 @@ bootPkgConstraints = args $ do
             [versionLine] -> args ["--constraint", baseName ++ " == "
                                     ++ dropWhile (not . isDigit) versionLine ]
             _             -> redError $ "Cannot determine package version in '"
-                                      ++ toStandard cabal ++ "'."
+                                      ++ unifyPath cabal ++ "'."
 
 bootPackageDb :: Args
 bootPackageDb = do
     top <- showArg GhcSourcePath
-    arg $ toStandard
-        $ "--package-db=" ++ top </> "libraries/bootstrapping.conf"
+    arg $ unifyPath $ "--package-db=" ++ top </> "libraries/bootstrapping.conf"
 
 cabalArgs :: Package -> TodoItem -> Args
 cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = args
@@ -104,7 +103,7 @@ ghcPkgArgs :: Package -> TodoItem -> Args
 ghcPkgArgs (Package _ path _) (stage, dist, _) = args $
     [ arg "update"
     , arg "--force"
-    , arg $ toStandard $ path </> dist </> "inplace-pkg-config"
+    , arg $ unifyPath $ path </> dist </> "inplace-pkg-config"
     , when (stage == Stage0) bootPackageDb ]
 
 buildRule :: Package -> TodoItem -> Rules ()

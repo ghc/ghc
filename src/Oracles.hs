@@ -35,13 +35,13 @@ configOracle = do
                       ++ (defaultConfig <.> "in")
                       ++ "' is missing; unwilling to proceed."
         need [defaultConfig]
-        putOracle $ "Parsing " ++ toStandard defaultConfig ++ "..."
+        putOracle $ "Parsing " ++ unifyPath defaultConfig ++ "..."
         cfgDefault <- liftIO $ readConfigFile defaultConfig
         existsUser <- doesFileExist userConfig
         cfgUser    <- if existsUser
                       then do
                           putOracle $ "Parsing "
-                                    ++ toStandard userConfig ++ "..."
+                                    ++ unifyPath userConfig ++ "..."
                           liftIO $ readConfigFile userConfig
                       else do
                           putColoured Red $
@@ -59,9 +59,10 @@ packageDataOracle :: Rules ()
 packageDataOracle = do
     pkgData <- newCache $ \file -> do
         need [file]
-        putOracle $ "Parsing " ++ toStandard file ++ "..."
+        putOracle $ "Parsing " ++ file ++ "..."
         liftIO $ readConfigFile file
-    addOracle $ \(PackageDataKey (file, key)) -> M.lookup key <$> pkgData file
+    addOracle $ \(PackageDataKey (file, key)) ->
+        M.lookup key <$> pkgData (unifyPath file)
     return ()
 
 -- Oracle for 'path/dist/*.deps' files
@@ -72,12 +73,12 @@ dependencyOracle = do
         putOracle $ "Parsing " ++ file ++ "..."
         contents <- parseMakefile <$> (liftIO $ readFile file)
         return $ M.fromList
-               $ map (bimap toStandard (map toStandard))
+               $ map (bimap unifyPath (map unifyPath))
                $ map (bimap head concat . unzip)
                $ groupBy ((==) `on` fst)
                $ sortBy (compare `on` fst) contents
     addOracle $ \(DependencyListKey (file, obj)) ->
-        M.lookup (toStandard obj) <$> deps (toStandard file)
+        M.lookup (unifyPath obj) <$> deps (unifyPath file)
     return ()
 
 oracleRules :: Rules ()

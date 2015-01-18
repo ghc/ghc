@@ -9,7 +9,7 @@ argListDir = "shake/arg/buildPackageDependencies"
 ghcArgs :: Package -> TodoItem -> Args
 ghcArgs (Package name path _) (stage, dist, settings) =
     let pathDist = path </> dist
-        buildDir = toStandard $ pathDist </> "build"
+        buildDir = unifyPath $ pathDist </> "build"
         depFile  = buildDir </> "haskell.deps"
     in args [ arg "-M"
             , packageArgs stage pathDist
@@ -52,9 +52,9 @@ gccArgs sourceFile (Package _ path _) (stage, dist, _) =
             , commonCcArgs
             , commonCcWarninigArgs
             , pathArgs "-I" path $ IncludeDirs pathDist
-            , args ["-MF", toStandard depFile]
+            , args ["-MF", unifyPath depFile]
             , args ["-x", "c"]
-            , arg $ toStandard sourceFile ]
+            , arg $ unifyPath sourceFile ]
 
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do

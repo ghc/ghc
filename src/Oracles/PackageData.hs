@@ -47,7 +47,7 @@ instance ShowArg PackageData where
             pkgData = path </> "package-data.mk"
         res <- askOracle $ PackageDataKey (pkgData, fullKey)
         return $ fromMaybe
-            (error $ "No key '" ++ key ++ "' in " ++ toStandard pkgData ++ ".")
+            (error $ "No key '" ++ key ++ "' in " ++ unifyPath pkgData ++ ".")
             res
 
 instance ShowArgs MultiPackageData where
@@ -68,6 +68,6 @@ instance ShowArgs MultiPackageData where
         res <- askOracle $ PackageDataKey (pkgData, fullKey)
         return $ words $ case res of
             Nothing    -> error $ "No key '" ++ key ++ "' in "
-                                ++ toStandard pkgData ++ "."
+                                ++ unifyPath pkgData ++ "."
             Just ""    -> defaultValue
             Just value -> value

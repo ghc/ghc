@@ -25,7 +25,7 @@ arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
         -- Splitting argument list into chunks as otherwise Ar chokes up
         maxChunk <- argSizeLimit
         forM_ (chunksOfSize maxChunk $ libHsObjs ++ cObjs) $ \os -> do
-            run Ar $ arArgs os $ toStandard out
+            run Ar $ arArgs os $ unifyPath out
 
 ldArgs :: Package -> TodoItem -> FilePath -> Args
 ldArgs (Package _ path _) (stage, dist, _) result = do
@@ -45,7 +45,7 @@ ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     in
     priority 2 $ (buildDir </> "*.o") %> \out -> do
         need [argListPath argListDir pkg stage]
-        run Ld $ ldArgs pkg todo $ toStandard out
+        run Ld $ ldArgs pkg todo $ unifyPath out
         synopsis <- dropWhileEnd isPunctuation <$> showArg (Synopsis pathDist)
         putColoured Green $ "/--------\n| Successfully built package "
             ++ name ++ " (stage " ++ show stage ++ ")."
@@ -60,12 +60,12 @@ argListRule pkg @ (Package _ path _) todo @ (stage, dist, settings) =
         ldList <- argList Ld (ldArgs pkg todo "output.o")
         arList <- forM ways' $ \way -> do
             cObjs <- pkgCObjects path dist way
-            libHsObjs <- pkgLibHsObjects path dist stage way
-            extension <- libsuf way
+            hObjs <- pkgLibHsObjects path dist stage way
+            ext   <- libsuf way
             argListWithComment
                 ("way '" ++ tag way ++ "'")
                 Ar
-                (arArgs (libHsObjs ++ cObjs) $ "output" <.> extension)
+                (arArgs (hObjs ++ cObjs) $ "output" <.> ext)
         writeFileChanged out $ unlines $ [ldList] ++ arList
 
 buildPackageLibrary :: Package -> TodoItem -> Rules ()
