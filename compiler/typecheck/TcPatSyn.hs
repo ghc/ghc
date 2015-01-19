@@ -348,43 +348,34 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
     hang (ptext (sLit "Right-hand side of bidirectional pattern synonym cannot be used as an expression"))
        2 (ppr lpat)
 
-  | otherwise
+  | otherwise  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn name
-       ; let (worker_id, need_dummy_arg) = fromMaybe (panic "mkPatSynWrapper") $
-                                           patSynBuilder patsyn
+       ; let Just (worker_id, need_dummy_arg) = patSynBuilder patsyn
+                   -- Bidirectional, so patSynBuilder returns Just
 
-       ; let match_dummy = mkMatch [nlWildPatName] (noLoc $ HsLam mg) emptyLocalBinds
-             mg' | need_dummy_arg = mkMatchGroupName Generated [match_dummy]
-                 | otherwise      = mg
+             match_group' | need_dummy_arg = add_dummy_arg match_group
+                          | otherwise      = match_group
 
-       ; let (worker_tvs, worker_theta, worker_tau) = tcSplitSigmaTy (idType worker_id)
-             bind = FunBind { fun_id = L loc (idName worker_id)
-                            , fun_infix = False
-                            , fun_matches = mg'
-                            , fun_co_fn = idHsWrapper
-                            , bind_fvs = placeHolderNamesTc
-                            , fun_tick = [] }
+             bind = FunBind { fun_id      = L loc (idName worker_id)
+                            , fun_infix   = False
+                            , fun_matches = match_group'
+                            , fun_co_fn   = idHsWrapper
+                            , bind_fvs    = placeHolderNamesTc
+                            , fun_tick    = [] }
 
-             sig = TcSigInfo{ sig_id = worker_id
-                            , sig_tvs = map (\tv -> (Nothing, tv)) worker_tvs
-                            , sig_theta = worker_theta
-                            , sig_tau = worker_tau
-                            , sig_loc = noSrcSpan
-                            , sig_extra_cts = Nothing
-                            , sig_partial = False
-                            , sig_warn_redundant = False  -- See Note [Redundant constraints for builder]
-                            , sig_nwcs = []
-                            }
+       ; sig <- instTcTySigFromId worker_id
+                -- See Note [Redundant constraints for builder]
 
        ; (worker_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
        ; traceTc "tcPatSynDecl worker" $ ppr worker_binds
        ; return worker_binds }
   where
-    Just mg = mb_match_group
-    mb_match_group = case dir of
-                        Unidirectional           -> Nothing
-                        ExplicitBidirectional mg -> Just mg
-                        ImplicitBidirectional    -> fmap mk_mg (tcPatToExpr args lpat)
+    Just match_group = mb_match_group
+    mb_match_group 
+       = case dir of
+           Unidirectional                    -> Nothing
+           ExplicitBidirectional explicit_mg -> Just explicit_mg
+           ImplicitBidirectional             -> fmap mk_mg (tcPatToExpr args lpat)
 
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
     mk_mg body = mkMatchGroupName Generated [wrapper_match]
@@ -393,8 +384,14 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                  wrapper_match = mkMatch wrapper_args body EmptyLocalBinds
 
     args = case details of
-              PrefixPatSyn args -> args
+              PrefixPatSyn args     -> args
               InfixPatSyn arg1 arg2 -> [arg1, arg2]
+
+    add_dummy_arg :: MatchGroup Name (LHsExpr Name) -> MatchGroup Name (LHsExpr Name)
+    add_dummy_arg mg@(MG { mg_alts = [L loc (Match [] ty grhss)] })
+      = mg { mg_alts = [L loc (Match [nlWildPatName] ty grhss)] }
+    add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
+                             pprMatches (PatSyn :: HsMatchContext Name) other_mg
 
 tcPatSynBuilderOcc :: CtOrigin -> PatSyn -> TcM (HsExpr TcId, TcRhoType)
 -- The result type should be fully instantiated
@@ -422,7 +419,8 @@ The builder can have redundant constraints, which are awkard to eliminate.
 Consider
    pattern P = Just 34
 To match against this pattern we need (Eq a, Num a).  But to build
-(Just 34) we need only (Num a).
+(Just 34) we need only (Num a).  Fortunately instTcSigFromId sets
+sig_warn_redundant to False.
 
 ************************************************************************
 *                                                                      *
@@ -432,7 +430,6 @@ To match against this pattern we need (Eq a, Num a).  But to build
 
 Note [As-patterns in pattern synonym definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The rationale for rejecting as-patterns in pattern synonym definitions
 is that an as-pattern would introduce nonindependent pattern synonym
 arguments, e.g. given a pattern synonym like:
@@ -445,7 +442,27 @@ one could write a nonsensical function like
 
 or
         g (K (Just True) False) = ...
--}
+
+Note [Type signatures and the builder expression]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   pattern L x = Left x :: Either [a] [b]
+
+In tc{Infer/Check}PatSynDecl we will check that the pattern has the
+specified type.  We check the pattern *as a pattern*, so the type
+signature is a pattern signature, and so brings 'a' and 'b' into
+scope.  But we don't have a way to bind 'a, b' in the LHS, as we do
+'x', say.  Nevertheless, the sigature may be useful to constrain
+the type.
+
+When making the binding for the *builder*, though, we don't want
+  $buildL x = Left x :: Either [a] [b]
+because that wil either mean (forall a b. Either [a] [b]), or we'll
+get a complaint that 'a' and 'b' are out of scope. (Actually the
+latter; Trac #9867.)  No, the job of the signature is done, so when
+converting the pattern to an expression (for the builder RHS) we
+simply discard the signature.
+ -}
 
 tcCheckPatSynPat :: LPat Name -> TcM ()
 tcCheckPatSynPat = go
@@ -499,40 +516,37 @@ tcPatToExpr args = go
     lhsVars = mkNameSet (map unLoc args)
 
     go :: LPat Name -> Maybe (LHsExpr Name)
-    go (L loc (ConPatIn conName info))
-      = do { let con = L loc (HsVar (unLoc conName))
-           ; exprs <- mapM go (hsConPatArgs info)
-           ; return $ foldl (\x y -> L loc (HsApp x y)) con exprs }
+    go (L loc (ConPatIn (L _ con) info))
+      = do { exprs <- mapM go (hsConPatArgs info)
+           ; return $ L loc $
+             foldl (\x y -> HsApp (L loc x) y) (HsVar con) exprs }
+
+    go (L _ (SigPatIn pat _)) = go pat
+        -- See Note [Type signatures and the builder expression]
+
     go (L loc p) = fmap (L loc) $ go1 p
 
     go1 :: Pat Name -> Maybe (HsExpr Name)
     go1   (VarPat var)
-      | var `elemNameSet` lhsVars  = return $ HsVar var
-      | otherwise                  = Nothing
-    go1   (LazyPat pat)            = fmap HsPar $ go pat
-    go1   (ParPat pat)             = fmap HsPar $ go pat
-    go1   (BangPat pat)            = fmap HsPar $ go pat
-    go1   (PArrPat pats ptt)
-      = do { exprs <- mapM go pats
-           ; return $ ExplicitPArr ptt exprs }
-    go1   (ListPat pats ptt reb)
-      = do { exprs <- mapM go pats
-           ; return $ ExplicitList ptt (fmap snd reb) exprs }
-    go1   (TuplePat pats box _)
-      = do { exprs <- mapM go pats
-           ; return (ExplicitTuple (map (noLoc . Present) exprs) box)
-           }
-    go1   (LitPat lit)             = return $ HsLit lit
-    go1   (NPat (L _ n) Nothing _) = return $ HsOverLit n
-    go1   (NPat (L _ n) (Just neg) _)
-      = return $ noLoc neg `HsApp` noLoc (HsOverLit n)
-    go1   (SigPatIn pat (HsWB ty _ _ wcs))
-      = do { expr <- go pat
-           ; return $ ExprWithTySig expr ty wcs }
-    go1   (ConPatOut{})            = panic "ConPatOut in output of renamer"
-    go1   (SigPatOut{})            = panic "SigPatOut in output of renamer"
-    go1   (CoPat{})                = panic "CoPat in output of renamer"
-    go1   _                        = Nothing
+      | var `elemNameSet` lhsVars     = return $ HsVar var
+      | otherwise                     = Nothing
+    go1   (LazyPat pat)               = fmap HsPar $ go pat
+    go1   (ParPat pat)                = fmap HsPar $ go pat
+    go1   (BangPat pat)               = fmap HsPar $ go pat
+    go1   (PArrPat pats ptt)          = do { exprs <- mapM go pats
+                                           ; return $ ExplicitPArr ptt exprs }
+    go1   (ListPat pats ptt reb)      = do { exprs <- mapM go pats
+                                           ; return $ ExplicitList ptt (fmap snd reb) exprs }
+    go1   (TuplePat pats box _)       = do { exprs <- mapM go pats
+                                           ; return $ ExplicitTuple
+                                                (map (noLoc . Present) exprs) box }
+    go1   (LitPat lit)                = return $ HsLit lit
+    go1   (NPat (L _ n) Nothing _)    = return $ HsOverLit n
+    go1   (NPat (L _ n) (Just neg) _) = return $ noLoc neg `HsApp` noLoc (HsOverLit n)
+    go1   (ConPatOut{})               = panic "ConPatOut in output of renamer"
+    go1   (SigPatOut{})               = panic "SigPatOut in output of renamer"
+    go1   (CoPat{})                   = panic "CoPat in output of renamer"
+    go1   _                           = Nothing
 
 -- Walk the whole pattern and for all ConPatOuts, collect the
 -- existentially-bound type variables and evidence binding variables.
