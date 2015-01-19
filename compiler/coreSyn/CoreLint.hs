@@ -1759,7 +1759,7 @@ withoutAnnots pass guts = do
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
   -- them in absence of @Opt_Debug@?
-  let nukeTicks = snd . stripTicks (not . tickishIsCode)
+  let nukeTicks = stripTicksE (not . tickishIsCode)
       nukeAnnotsBind :: CoreBind -> CoreBind
       nukeAnnotsBind bind = case bind of
         Rec bs     -> Rec $ map (\(b,e) -> (b, nukeTicks e)) bs

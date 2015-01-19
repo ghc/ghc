@@ -15,7 +15,7 @@ import Var              ( Var )
 import Id               ( Id, idType, idInlineActivation, zapIdOccInfo )
 import CoreUtils        ( mkAltExpr
                         , exprIsTrivial
-                        , stripTicks, stripTicksTopE, mkTick, mkTicks )
+                        , stripTicksE, stripTicksT, stripTicksTopE, mkTick, mkTicks )
 import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
@@ -190,7 +190,8 @@ cseRhs env (id',rhs)
   where
     rhs' = cseExpr env rhs
 
-    (ticks, rhs'') = stripTicks tickishFloatable rhs'
+    ticks = stripTicksT tickishFloatable rhs'
+    rhs'' = stripTicksE tickishFloatable rhs'
     -- We don't want to lose the source notes when a common sub
     -- expression gets eliminated. Hence we push all (!) of them on
     -- top of the replaced sub-expression. This is probably not too
@@ -206,7 +207,8 @@ tryForCSE env expr
   | otherwise                              = expr'
   where
     expr' = cseExpr env expr
-    (ticks, expr'') = stripTicks tickishFloatable expr'
+    expr'' = stripTicksE tickishFloatable expr'
+    ticks = stripTicksT tickishFloatable expr'
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr env (Type t)               = Type (substTy (csEnvSubst env) t)
@@ -296,7 +298,7 @@ lookupCSEnv (CS { cs_map = csmap }) expr
 extendCSEnv :: CSEnv -> OutExpr -> Id -> CSEnv
 extendCSEnv cse expr id
   = cse { cs_map = extendCoreMap (cs_map cse) sexpr (sexpr,id) }
-  where (_, sexpr) = stripTicks tickishFloatable expr
+  where sexpr = stripTicksE tickishFloatable expr
 
 csEnvSubst :: CSEnv -> Subst
 csEnvSubst = cs_subst
