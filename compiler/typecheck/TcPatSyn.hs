@@ -388,8 +388,8 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
               InfixPatSyn arg1 arg2 -> [arg1, arg2]
 
     add_dummy_arg :: MatchGroup Name (LHsExpr Name) -> MatchGroup Name (LHsExpr Name)
-    add_dummy_arg mg@(MG { mg_alts = [L loc (Match [] ty grhss)] })
-      = mg { mg_alts = [L loc (Match [nlWildPatName] ty grhss)] }
+    add_dummy_arg mg@(MG { mg_alts = [L loc (Match Nothing [] ty grhss)] })
+      = mg { mg_alts = [L loc (Match Nothing [nlWildPatName] ty grhss)] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
 
