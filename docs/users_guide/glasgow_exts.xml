@@ -1072,90 +1072,129 @@ would bring into scope the data constructor <literal>Just</literal> from the
 
 <para>
   Given a pattern synonym definition of the form
-</para>
 <programlisting>
   pattern P var1 var2 ... varN &lt;- pat
 </programlisting>
-<para>
   it is assigned a <emphasis>pattern type</emphasis> of the form
-</para>
 <programlisting>
   pattern P :: CProv => CReq => t1 -> t2 -> ... -> tN -> t
 </programlisting>
-<para>
   where <replaceable>CProv</replaceable> and
   <replaceable>CReq</replaceable> are type contexts, and
   <replaceable>t1</replaceable>, <replaceable>t2</replaceable>, ...,
   <replaceable>tN</replaceable> and <replaceable>t</replaceable> are
-  types. If <replaceable>CReq</replaceable> is empty
-  (<literal>()</literal>) it can be omitted.
-</para>
-
-<para>
-A pattern synonym of this type can be used in a pattern if the
-instatiated (monomorphic) type satisfies the constraints of
-<replaceable>CReq</replaceable>. In this case, it extends the context
-available in the right-hand side of the match with
-<replaceable>CProv</replaceable>, just like how an existentially-typed
-data constructor can extend the context.
-</para>
-
-<para>
-For example, in the following program:
-</para>
+  types.
+Notice the unusual form of the type, with two contexts <replaceable>CProv</replaceable> and <replaceable>CReq</replaceable>:
+<itemizedlist>
+<listitem><para><replaceable>CReq</replaceable> are the constraints <emphasis>required</emphasis> to match the pattern.</para></listitem>
+<listitem><para><replaceable>CProv</replaceable> are the constraints <emphasis>made available (provided)</emphasis>
+by a successful pattern match.</para></listitem>
+</itemizedlist>
+For example, consider
 <programlisting>
-{-# LANGUAGE PatternSynonyms, GADTs #-}
-module ShouldCompile where
-
 data T a where
-	MkT :: (Show b) => a -> b -> T a
+  MkT :: (Show b) => a -> b -> T a
 
-pattern ExNumPat x = MkT 42 x
-</programlisting>
+f1 :: (Eq a, Num a) => MkT a -> String
+f1 (MkT 42 x) = show x
 
-<para>
-the inferred pattern type of <literal>ExNumPat</literal> is
-</para>
-
-<programlisting>
 pattern ExNumPat :: (Show b) => (Num a, Eq a) => b -> T a
+pattern ExNumPat x = MkT 42 x
+
+f2 :: (Eq a, Num a) => MkT a -> String
+f2 (ExNumPat x) = show x
 </programlisting>
-
-<para>
-  and so can be used in a function definition like the following:
+Here <literal>f1</literal> does not use pattern synonyms.  To match against the
+numeric pattern <literal>42</literal> <emphasis>requires</emphasis> the caller to
+satisfy the constraints <literal>(Num a, Eq a)</literal>,
+so they appear in <literal>f1</literal>'s type.  The call to <literal>show</literal> generates a <literal>(Show b)</literal>
+constraint, where <literal>b</literal> is an existentially type variable bound by the pattern match
+on <literal>MkT</literal>. But the same pattern match also <emphasis>provides</emphasis> the constraint
+<literal>(Show b)</literal> (see <literal>MkT</literal>'s type), and so all is well.
 </para>
-
-<programlisting>
-  f :: (Num t, Eq t) => T t -> String
-  f (ExNumPat x) = show x
-</programlisting>
-
 <para>
-  For bidirectional pattern synonyms, uses as expressions have the type
+Exactly the same reasoning applies to <literal>ExNumPat</literal>:
+matching against <literal>ExNumPat</literal> <emphasis>requires</emphasis> 
+the constraints <literal>(Num a, Eq a)</literal>, and <emphasis>provides</emphasis>
+the constraint <literal>(Show b)</literal>.
 </para>
-<programlisting>
-  (CProv, CReq) => t1 -> t2 -> ... -> tN -> t
-</programlisting>
-
 <para>
-  So in the previous example, <literal>ExNumPat</literal>,
-  when used in an expression, has type
-</para>
-<programlisting>
-  ExNumPat :: (Show b, Num a, Eq a) => b -> T t
-</programlisting>
-</sect3>
+Note also the following points
+<itemizedlist>
+<listitem><para>
+In the common case where <replaceable>CReq</replaceable> is empty,
+  <literal>()</literal>, it can be omitted altogether.
+</para> </listitem>
 
-<para>
-  Pattern synonyms can also be given a type signature in the source
-  program, e.g.:
-</para>
-
+<listitem><para>
+You may specify an explicit <emphasis>pattern signature</emphasis>, as
+we did for <literal>ExNumPat</literal> above, to specify the type of a pattern,
+just as you can for a function.  As usual, the type signature can be less polymorphic
+than the inferred type.  For example
 <programlisting>
   -- Inferred type would be 'a -> [a]'
   pattern SinglePair :: (a, a) -> [(a, a)]
   pattern SinglePair x = [x]
 </programlisting>
+</para> </listitem>
+
+<listitem><para>
+The GHCi <literal>:info</literal> command shows pattern types in this format.
+</para> </listitem>
+
+<listitem><para>
+For a bidirectional pattern synonym, a use of the pattern synonym as an expression has the type
+<programlisting>
+  (CProv, CReq) => t1 -> t2 -> ... -> tN -> t
+</programlisting>
+  So in the previous example, when used in an expression, <literal>ExNumPat</literal> has type
+<programlisting>
+  ExNumPat :: (Show b, Num a, Eq a) => b -> T t
+</programlisting>
+Notice that this is a tiny bit more restrictive than the expression <literal>MkT 42 x</literal>
+which would not require <literal>(Eq a)</literal>.
+</para> </listitem>
+
+<listitem><para>
+Consider these two pattern synonyms:
+<programlisting>
+data S a where
+   S1 :: Bool -> S Bool
+
+pattern P1 b = Just b  -- P1 ::             Bool -> Maybe Bool
+pattern P2 b = S1 b    -- P2 :: (b~Bool) => Bool -> S b
+
+f :: Maybe a -> String
+f (P1 x) = "no no no"     -- Type-incorrect
+
+g :: S a -> String
+g (P2 b) = "yes yes yes"  -- Fine
+</programlisting>
+Pattern <literal>P1</literal> can only match against a value of type <literal>Maybe Bool</literal>,
+so function <literal>f</literal> is rejected because the type signature is <literal>Maybe a</literal>.
+(To see this, imagine expanding the pattern synonym.)
+</para>
+<para>
+On the other hand, function <literal>g</literal> works fine, becuase matching against <literal>P2</literal>
+(which wraps the GADT <literal>S</literal>) provides the local equality <literal>(a~Bool)</literal>.
+If you were to give an explicit pattern signature <literal>P2 :: Bool -> S Bool</literal>, then <literal>P2</literal>
+would become less polymorphic, and would behave exactly like <literal>P1</literal> so that <literal>g</literal>
+would then be rejected.
+</para>
+<para>
+In short, if you want GADT-like behaviour for pattern synonyms,
+then (unlike unlike concrete data constructors like <literal>S1</literal>)
+you must write its type with explicit provided equalities.
+For a concrete data construoctr like <literal>S1</literal> you can write
+its type signature as eigher <literal>S1 :: Bool -> S Bool</literal> or
+<literal>S1 :: (b~Bool) => Bool -> S b</literal>; the two are equivalent.
+Not so for pattern synonyms: the two forms are different, in order to
+distinguish the two cases above. (See <ulink url="https://ghc.haskell.org/trac/ghc/ticket/9953">Trac #9953</ulink> for
+discussion of this choice.)
+</para></listitem>
+</itemizedlist>
+</para>
+</sect3>
 
 <sect3><title>Matching of pattern synonyms</title>
 
@@ -1173,7 +1212,7 @@ f (Pair True True) = True
 f _                = False
 
 f' [x, y] | True &lt;- x, True &lt;- y = True
-f' _                                   = False
+f' _                              = False
 </programlisting>
 
 <para>
