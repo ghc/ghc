@@ -331,6 +331,10 @@ basicKnownKeyNames
         -- Implicit parameters
         ipClassName,
 
+        -- Source locations
+        callStackDataConName, callStackTyConName,
+        srcLocDataConName,
+
         -- Annotation type checking
         toAnnotationWrapperName
 
@@ -462,6 +466,12 @@ gHC_IP          = mkBaseModule (fsLit "GHC.IP")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
+
+gHC_SRCLOC :: Module
+gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
+
+gHC_STACK :: Module
+gHC_STACK = mkBaseModule (fsLit "GHC.Stack")
 
 gHC_STATICPTR :: Module
 gHC_STATICPTR = mkBaseModule (fsLit "GHC.StaticPtr")
@@ -1187,6 +1197,15 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 ipClassName :: Name
 ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
 
+-- Source Locations
+callStackDataConName, callStackTyConName, srcLocDataConName :: Name
+callStackDataConName
+  = conName gHC_STACK (fsLit "CallStack") callStackDataConKey
+callStackTyConName
+  = tcQual  gHC_STACK (fsLit "CallStack") callStackTyConKey
+srcLocDataConName
+  = conName gHC_SRCLOC (fsLit "SrcLoc")   srcLocDataConKey
+
 -- plugins
 pLUGINS :: Module
 pLUGINS = mkThisGhcModule (fsLit "Plugins")
@@ -1540,6 +1559,9 @@ staticPtrInfoTyConKey = mkPreludeTyConUnique 181
 typeRepTyConKey :: Unique
 typeRepTyConKey = mkPreludeTyConUnique 183
 
+callStackTyConKey :: Unique
+callStackTyConKey = mkPreludeTyConUnique 182
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1611,6 +1633,10 @@ staticPtrInfoDataConKey                 = mkPreludeDataConUnique 34
 
 fingerprintDataConKey :: Unique
 fingerprintDataConKey                   = mkPreludeDataConUnique 35
+
+callStackDataConKey, srcLocDataConKey :: Unique
+callStackDataConKey                     = mkPreludeDataConUnique 36
+srcLocDataConKey                        = mkPreludeDataConUnique 37
 
 {-
 ************************************************************************

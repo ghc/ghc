@@ -1260,6 +1260,14 @@ zonkEvTerm env (EvTypeable ev) =
                    t'  <- zonkTcTypeToType env t
                    return (ev',t')
 
+zonkEvTerm env (EvCallStack cs)
+  = case cs of
+      EvCsEmpty -> return (EvCallStack cs)
+      EvCsTop n l tm -> do { tm' <- zonkEvTerm env tm
+                           ; return (EvCallStack (EvCsTop n l tm')) }
+      EvCsPushCall n l tm -> do { tm' <- zonkEvTerm env tm
+                                ; return (EvCallStack (EvCsPushCall n l tm')) }
+
 zonkEvTerm env (EvSuperClass d n) = do { d' <- zonkEvTerm env d
                                        ; return (EvSuperClass d' n) }
 zonkEvTerm env (EvDFunApp df tys tms)
@@ -1460,7 +1468,7 @@ zonkCoToCo env co
                                    do { (env', tv') <- zonkTyBndrX env tv
                                       ; co' <- zonkCoToCo env' co
                                       ; return (mkForAllCo tv' co') }
-                                   
+
 zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- This variant collects unbound type variables in a mutable variable
 -- Works on both types and kinds

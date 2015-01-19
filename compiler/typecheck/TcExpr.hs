@@ -196,10 +196,8 @@ tcExpr (HsIPVar x) res_ty
        ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty =
-    case unwrapNewTyCon_maybe (classTyCon ipClass) of
-      Just (_,_,ax) -> HsWrap $ mkWpCast $ mkTcUnbranchedAxInstCo Representational ax [x,ty]
-      Nothing       -> panic "The dictionary for `IP` is not a newtype?"
+  fromDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
+                          unwrapIP $ mkClassPred ipClass [x,ty]
 
 tcExpr (HsLam match) res_ty
   = do  { (co_fn, match') <- tcMatchLambda match res_ty
