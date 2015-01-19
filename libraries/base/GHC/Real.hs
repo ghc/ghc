@@ -25,7 +25,7 @@ module GHC.Real
      Rational,
 
      (%), (^), (^%^), (^^), (^^%^^), denominator, divZeroError, even,
-     fromIntegral, gcd, infinity, integralEnumFrom,
+     fromIntegral, gcd, gcdInt', gcdWord', infinity, integralEnumFrom,
      integralEnumFromThen, integralEnumFromThenTo, integralEnumFromTo, lcm,
      notANumber, numerator, numericEnumFrom, numericEnumFromThen,
      numericEnumFromThenTo, numericEnumFromTo, odd, overflowError, ratioPrec,
