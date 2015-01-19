@@ -560,17 +560,15 @@ deriveAutoTypeable auto_typeable done_specs tycl_decls
         -- omitted because the user had manually requested an instance
 
     do_one cls (L _ decl)
+      | isClassDecl decl  -- Traverse into class declarations to check if they have ATs (#9999)
+      = concatMapM (do_one cls) (map (fmap FamDecl) (tcdATs decl))
+      | otherwise
       = do { tc <- tcLookupTyCon (tcdName decl)
-           -- Traverse into class declarations to check if they have ATs (#9999)
-           ; ats <- if isClassDecl decl
-                    then concatMapM (do_one cls) (map (fmap FamDecl) (tcdATs decl))
-                    else return []
-           ; rest <- if (isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
+           ; if (isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
                                        || tyConName tc `elemNameSet` done_tcs)
                      -- Do not derive Typeable for type synonyms or type families
-                     then return []
-                     else mkPolyKindedTypeableEqn cls tc
-          ; return (ats ++ rest) }
+             then return []
+             else mkPolyKindedTypeableEqn cls tc }
 
 ------------------------------------------------------------------
 deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
