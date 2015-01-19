@@ -134,11 +134,15 @@ See also Note [Kind and type-variable binders] in RnTypes
 type LHsContext name = Located (HsContext name)
       -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnUnit'
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
 type HsContext name = [LHsType name]
 
 type LHsType name = Located (HsType name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
       --   in a list
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 type HsKind name = HsType name
 type LHsKind name = Located (HsKind name)
 
@@ -207,6 +211,8 @@ data HsTyVarBndr name
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --          'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (HsTyVarBndr name)
 
@@ -235,39 +241,57 @@ data HsType name
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForall',
       --         'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsTyVar             name            -- Type variable, type constructor, or data constructor
                                         -- see Note [Promotions (HsTyVar)]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsAppTy             (LHsType name)
                         (LHsType name)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsFunTy             (LHsType name)   -- function type
                         (LHsType name)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsListTy            (LHsType name)  -- Element type
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
       --         'ApiAnnotation.AnnClose' @']'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsPArrTy            (LHsType name)  -- Elem. type of parallel array: [:t:]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
       --         'ApiAnnotation.AnnClose' @':]'@
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsTupleTy           HsTupleSort
                         [LHsType name]  -- Element types (length gives arity)
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(' or '(#'@,
     --         'ApiAnnotation.AnnClose' @')' or '#)'@
 
+    -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsOpTy              (LHsType name) (LHsTyOp name) (LHsType name)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsParTy             (LHsType name)   -- See Note [Parens in HsSyn] in HsExpr
         -- Parenthesis preserved for the precedence re-arrangement in RnTypes
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
       --         'ApiAnnotation.AnnClose' @')'@
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsIParamTy          HsIPName         -- (?x :: ty)
                         (LHsType name)   -- Implicit parameters as they occur in contexts
@@ -276,12 +300,16 @@ data HsType name
       --
       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsEqTy              (LHsType name)   -- ty1 ~ ty2
                         (LHsType name)   -- Always allowed even without TypeOperators, and has special kinding rule
       -- ^
       -- > ty1 ~ ty2
       --
       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsKindSig           (LHsType name)  -- (ty :: kind)
                         (LHsKind name)  -- A type with a kind signature
@@ -291,16 +319,24 @@ data HsType name
       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
       --         'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose' @')'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsQuasiQuoteTy      (HsQuasiQuote name)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsSpliceTy          (HsSplice name)
                         (PostTc name Kind)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@,
       --         'ApiAnnotation.AnnClose' @')'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsBangTy    HsSrcBang (LHsType name)   -- Bang-style type annotations
       -- ^ - 'ApiAnnotation.AnnKeywordId' :
@@ -308,13 +344,19 @@ data HsType name
       --         'ApiAnnotation.AnnClose' @'#-}'@
       --         'ApiAnnotation.AnnBang' @\'!\'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsRecTy     [LConDeclField name]    -- Only in data type declarations
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
       --         'ApiAnnotation.AnnClose' @'}'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsCoreTy Type       -- An escape hatch for tunnelling a *closed*
                         -- Core Type through HsSyn.
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsExplicitListTy       -- A promoted explicit list
         (PostTc name Kind) -- See Note [Promoted lists and tuples]
@@ -322,27 +364,39 @@ data HsType name
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
       --         'ApiAnnotation.AnnClose' @']'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsExplicitTupleTy      -- A promoted explicit tuple
         [PostTc name Kind] -- See Note [Promoted lists and tuples]
         [LHsType name]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'("@,
       --         'ApiAnnotation.AnnClose' @')'@
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsTyLit HsTyLit      -- A promoted numeric literal.
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsWrapTy HsTyWrapper (HsType name)  -- only in typechecker output
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsWildcardTy           -- A type wildcard
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
+      -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsNamedWildcardTy name -- A named wildcard
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (HsType name)
 
--- Note [literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
 data HsTyLit
   = HsNumTy SourceText Integer
@@ -467,11 +521,15 @@ data HsExplicitFlag = Qualified | Implicit | Explicit deriving (Data, Typeable)
 type LConDeclField name = Located (ConDeclField name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
       --   in a list
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_names :: [Located name],
                    cd_fld_type  :: LBangType name,
                    cd_fld_doc   :: Maybe LHsDocString }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
 

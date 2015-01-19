@@ -17,9 +17,9 @@ import qualified Data.Map as Map
 import Data.Data
 
 
-{- Note [Api annotations]
-   ~~~~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [Api annotations]
+~~~~~~~~~~~~~~~~~~~~~~
 In order to do source to source conversions using the GHC API, the
 locations of all elements of the original source needs to be tracked.
 The includes keywords such as 'let' / 'in' / 'do' etc as well as
@@ -66,8 +66,8 @@ This is done in the lexer / parser as follows.
 
 The PState variable in the lexer has the following variables added
 
->  annotations :: [(ApiAnnKey,SrcSpan)],
->  comment_q :: [Located Token],
+>  annotations :: [(ApiAnnKey,[SrcSpan])],
+>  comment_q :: [Located AnnotationComment],
 >  annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
 
 The first and last store the values that end up in the ApiAnns value
@@ -114,6 +114,9 @@ So the production in Parser.y for the HsLet AST element is
 This adds an AnnLet annotation for 'let', an AnnIn for 'in', as well
 as any annotations that may arise in the binds. This will include open
 and closing braces if they are used to delimit the let expressions.
+
+The wiki page describing this feature is
+https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations
 
 -}
 -- ---------------------------------------------------------------------
@@ -172,6 +175,9 @@ getAndRemoveAnnotationComments (anns,canns) span =
 -- available in the @'pm_annotations'@ field of @'GHC.ParsedModule'@.
 -- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set in
 -- @'DynFlags.DynFlags'@ before parsing.
+--
+-- The wiki page describing this feature is
+-- https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations
 --
 -- Note: in general the names of these are taken from the
 -- corresponding token, unless otherwise noted

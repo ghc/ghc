@@ -250,6 +250,8 @@ Note that (Foo a) might not be an instance of Ord.
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
 --             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data DataCon
   = MkData {
         dcName    :: Name,      -- This is the name of the *source data con*

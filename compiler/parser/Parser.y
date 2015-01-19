@@ -253,7 +253,10 @@ structured editors.
 
 The helper functions are defined at the bottom of this file.
 
-See https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations for some background.
+See
+  https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations and
+  https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations
+for some background.
 
 -- -----------------------------------------------------------------------------
 

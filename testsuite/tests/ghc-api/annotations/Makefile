@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 clean:
 	rm -f *.o *.hi
-	rm -f annotations comments parseTree
+	rm -f annotations comments parseTree exampleTest
 
 annotations: 
 	rm -f annotations.o annotations.hi
@@ -21,5 +21,9 @@ comments:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc comments
 	./comments "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
+exampleTest:
+	rm -f exampleTest.o exampleTest.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc exampleTest
+	./exampleTest "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: clean

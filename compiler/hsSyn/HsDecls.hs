@@ -124,6 +124,8 @@ type LHsDecl id = Located (HsDecl id)
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
         --
 
+-- For details on above see note [Api annotations] in ApiAnnotation
+
 -- | A Haskell Declaration
 data HsDecl id
   = TyClD       (TyClDecl id)     -- ^ A type or class declaration.
@@ -468,12 +470,15 @@ data TyClDecl name
     --             'ApiAnnotation.AnnOpen','ApiAnnotation.AnnDcolon',
     --             'ApiAnnotation.AnnClose'
 
+    -- For details on above see note [Api annotations] in ApiAnnotation
     FamDecl { tcdFam :: FamilyDecl name }
 
   | -- | @type@ declaration
     --
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
     --             'ApiAnnotation.AnnEqual',
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
     SynDecl { tcdLName  :: Located name            -- ^ Type constructor
             , tcdTyVars :: LHsTyVarBndrs name      -- ^ Type variables; for an associated type
                                                   --   these include outer binders
@@ -486,6 +491,8 @@ data TyClDecl name
     --              'ApiAnnotation.AnnFamily',
     --              'ApiAnnotation.AnnNewType',
     --              'ApiAnnotation.AnnNewType','ApiAnnotation.AnnWhere'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
     DataDecl { tcdLName    :: Located name        -- ^ Type constructor
              , tcdTyVars   :: LHsTyVarBndrs name  -- ^ Type variables; for an assoicated type
                                                   --   these include outer binders
@@ -515,6 +522,8 @@ data TyClDecl name
         --   - The tcdFDs will have 'ApiAnnotation.AnnVbar',
         --                          'ApiAnnotation.AnnComma'
         --                          'ApiAnnotation.AnnRarrow'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
 
   deriving (Typeable)
 deriving instance (DataId id) => Data (TyClDecl id)
@@ -820,6 +829,8 @@ data HsDataDefn name   -- The payload of a data type defn
                      --  - 'ApiAnnotation.AnnKeywordId' :
                      --       'ApiAnnotation.AnnDeriving',
                      --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
+
+             -- For details on above see note [Api annotations] in ApiAnnotation
    }
     deriving( Typeable )
 deriving instance (DataId id) => Data (HsDataDefn id)
@@ -832,6 +843,8 @@ data NewOrData
 type LConDecl name = Located (ConDecl name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when
       --   in a GADT constructor list
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
 
 -- |
 --
@@ -854,6 +867,8 @@ type LConDecl name = Located (ConDecl name)
 --            'ApiAnnotation.AnnEqual','ApiAnnotation.AnnVbar',
 --            'ApiAnnotation.AnnDarrow','ApiAnnotation.AnnDarrow',
 --            'ApiAnnotation.AnnForall','ApiAnnotation.AnnDot'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data ConDecl name
   = ConDecl
     { con_names     :: [Located name]
@@ -1027,6 +1042,9 @@ It is parameterised over its tfe_pats field:
 type LTyFamInstEqn  name = Located (TyFamInstEqn  name)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
   --   when in a list
+
+-- For details on above see note [Api annotations] in ApiAnnotation
+
 type LTyFamDefltEqn name = Located (TyFamDefltEqn name)
 
 type HsTyPats name = HsWithBndrs name [LHsType name]
@@ -1046,6 +1064,8 @@ data TyFamEqn name pats
        , tfe_rhs   :: LHsType name }
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
   deriving( Typeable )
 deriving instance (DataId name, Data pats) => Data (TyFamEqn name pats)
 
@@ -1057,6 +1077,8 @@ data TyFamInstDecl name
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
     --           'ApiAnnotation.AnnInstance',
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
   deriving( Typeable )
 deriving instance (DataId name) => Data (TyFamInstDecl name)
 
@@ -1075,6 +1097,8 @@ data DataFamInstDecl name
     --           'ApiAnnotation.AnnNewType','ApiAnnotation.AnnInstance',
     --           'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen',
     --           'ApiAnnotation.AnnClose'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
   deriving( Typeable )
 deriving instance (DataId name) => Data (DataFamInstDecl name)
 
@@ -1095,12 +1119,14 @@ data ClsInstDecl name
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
          --                                    'ApiAnnotation.AnnClose',
 
+        -- For details on above see note [Api annotations] in ApiAnnotation
       }
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInstance',
     --           'ApiAnnotation.AnnWhere',
     --           'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
-    --
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId id) => Data (ClsInstDecl id)
 
@@ -1240,7 +1266,9 @@ data DerivDecl name = DerivDecl
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
          --                                    'ApiAnnotation.AnnClose',
          --                                    'ApiAnnotation.AnnDeriving',
-         --                                    'ApiAnnotation.AnnInstance',
+         --                                    'ApiAnnotation.AnnInstance'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
         }
   deriving (Typeable)
 deriving instance (DataId name) => Data (DerivDecl name)
@@ -1268,6 +1296,7 @@ data DefaultDecl name
         -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnDefault',
         --          'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
+        -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (DefaultDecl name)
 
@@ -1306,6 +1335,8 @@ data ForeignDecl name
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForeign',
         --           'ApiAnnotation.AnnImport','ApiAnnotation.AnnExport',
         --           'ApiAnnotation.AnnDcolon'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ForeignDecl name)
 {-
@@ -1435,6 +1466,8 @@ data RuleDecl name
         --           'ApiAnnotation.AnnClose',
         --           'ApiAnnotation.AnnForall','ApiAnnotation.AnnDot',
         --           'ApiAnnotation.AnnEqual',
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (RuleDecl name)
 
@@ -1448,6 +1481,8 @@ data RuleBndr name
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --     'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (RuleBndr name)
 
@@ -1497,11 +1532,15 @@ data VectDecl name
       (LHsExpr name)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --           'ApiAnnotation.AnnEqual','ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | HsNoVect
       SourceText   -- Note [Pragma source text] in BasicTypes
       (Located name)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --                                    'ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | HsVectTypeIn                -- pre type-checking
       SourceText                -- Note [Pragma source text] in BasicTypes
       Bool                      -- 'TRUE' => SCALAR declaration
@@ -1510,6 +1549,8 @@ data VectDecl name
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --           'ApiAnnotation.AnnType','ApiAnnotation.AnnClose',
         --           'ApiAnnotation.AnnEqual'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | HsVectTypeOut               -- post type-checking
       Bool                      -- 'TRUE' => SCALAR declaration
       TyCon
@@ -1519,6 +1560,8 @@ data VectDecl name
       (Located name)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --           'ApiAnnotation.AnnClass','ApiAnnotation.AnnClose',
+
+       -- For details on above see note [Api annotations] in ApiAnnotation
   | HsVectClassOut              -- post type-checking
       Class
   | HsVectInstIn                -- pre type-checking (always SCALAR)  !!!FIXME: should be superfluous now
@@ -1653,6 +1696,8 @@ data AnnDecl name = HsAnnotation
       --           'ApiAnnotation.AnnType'
       --           'ApiAnnotation.AnnModule'
       --           'ApiAnnotation.AnnClose'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (AnnDecl name)
 
@@ -1696,6 +1741,8 @@ data RoleAnnotDecl name
                   [Located (Maybe Role)] -- optional annotations
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
       --           'ApiAnnotation.AnnRole'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (RoleAnnotDecl name) where

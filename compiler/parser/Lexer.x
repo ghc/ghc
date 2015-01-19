@@ -639,15 +639,15 @@ data Token
 
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
 
-  | ITchar     SourceText Char       -- Note [literal source text] in BasicTypes
-  | ITstring   SourceText FastString -- Note [literal source text] in BasicTypes
-  | ITinteger  SourceText Integer    -- Note [literal source text] in BasicTypes
+  | ITchar     SourceText Char       -- Note [Literal source text] in BasicTypes
+  | ITstring   SourceText FastString -- Note [Literal source text] in BasicTypes
+  | ITinteger  SourceText Integer    -- Note [Literal source text] in BasicTypes
   | ITrational FractionalLit
 
-  | ITprimchar   SourceText Char     -- Note [literal source text] in BasicTypes
-  | ITprimstring SourceText ByteString -- Note [literal source text] @BasicTypes
-  | ITprimint    SourceText Integer  -- Note [literal source text] in BasicTypes
-  | ITprimword   SourceText Integer  -- Note [literal source text] in BasicTypes
+  | ITprimchar   SourceText Char     -- Note [Literal source text] in BasicTypes
+  | ITprimstring SourceText ByteString -- Note [Literal source text] @BasicTypes
+  | ITprimint    SourceText Integer  -- Note [Literal source text] in BasicTypes
+  | ITprimword   SourceText Integer  -- Note [Literal source text] in BasicTypes
   | ITprimfloat  FractionalLit
   | ITprimdouble FractionalLit
 

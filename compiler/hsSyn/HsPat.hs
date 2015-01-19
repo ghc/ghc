@@ -59,6 +59,8 @@ type OutPat id = LPat id        -- No 'In' constructors
 type LPat id = Located (Pat id)
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data Pat id
   =     ------------ Simple patterns ---------------
     WildPat     (PostTc id Type)        -- Wild card
@@ -69,15 +71,23 @@ data Pat id
   | LazyPat     (LPat id)               -- Lazy pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
+    -- For details on above see note [Api annotations] in ApiAnnotation
+
   | AsPat       (Located id) (LPat id)  -- As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
   | ParPat      (LPat id)               -- Parenthesised pattern
                                         -- See Note [Parens in HsSyn] in HsExpr
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
     --                                    'ApiAnnotation.AnnClose' @')'@
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
   | BangPat     (LPat id)               -- Bang pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
         ------------ Lists, tuples, arrays ---------------
   | ListPat     [LPat id]                            -- Syntactic list
@@ -88,6 +98,8 @@ data Pat id
                    -- function to convert the scrutinee to a list value
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
     --                                    'ApiAnnotation.AnnClose' @']'@
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
   | TuplePat    [LPat id]        -- Tuple sub-patterns
                 Boxity           -- UnitPat is TuplePat []
@@ -112,11 +124,13 @@ data Pat id
     --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
     --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
+    -- For details on above see note [Api annotations] in ApiAnnotation
   | PArrPat     [LPat id]               -- Syntactic parallel array
                 (PostTc id Type)        -- The type of the elements
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
     --                                    'ApiAnnotation.AnnClose' @':]'@
 
+    -- For details on above see note [Api annotations] in ApiAnnotation
         ------------ Constructor patterns ---------------
   | ConPatIn    (Located id)
                 (HsConPatDetails id)
@@ -139,6 +153,8 @@ data Pat id
 
         ------------ View patterns ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ViewPat       (LHsExpr id)
                   (LPat id)
                   (PostTc id Type)  -- The overall type of the pattern
@@ -148,6 +164,8 @@ data Pat id
         ------------ Pattern splices ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@
   --        'ApiAnnotation.AnnClose' @')'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | SplicePat       (HsSplice id)
 
         ------------ Quasiquoted patterns ---------------
@@ -166,6 +184,8 @@ data Pat id
                     (SyntaxExpr id)             -- Equality checker, of type t->t->Bool
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVal' @'+'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | NPlusKPat       (Located id)        -- n+k pattern
                     (Located (HsOverLit id)) -- It'll always be an HsIntegral
                     (SyntaxExpr id)     -- (>=) function, of type t->t->Bool
@@ -173,6 +193,8 @@ data Pat id
 
         ------------ Pattern type signatures ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | SigPatIn        (LPat id)                  -- Pattern with a type signature
                     (HsWithBndrs id (LHsType id)) -- Signature can bind both
                                                   -- kind and type vars
@@ -233,6 +255,8 @@ data HsRecFields id arg         -- A bunch of record fields
 
 type LHsRecField id arg = Located (HsRecField id arg)
 -- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data HsRecField id arg = HsRecField {
         hsRecFieldId  :: Located id,
         hsRecFieldArg :: arg,           -- Filled in by renamer
