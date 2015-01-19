@@ -10,6 +10,7 @@
 	path = libraries/Cabal
 	url = ../packages/Cabal.git
 	ignore = untracked
+	branch = 1.22
 [submodule "libraries/containers"]
 	path = libraries/containers
 	url = ../packages/containers.git
