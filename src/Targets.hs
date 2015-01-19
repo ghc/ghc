@@ -21,6 +21,7 @@ libraryPackagesInStage Stage1 =
     , "deepseq"
     , "directory"
     , "filepath"
+    , "ghc-prim"
     , "parallel"
     , "pretty"
     , "stm"

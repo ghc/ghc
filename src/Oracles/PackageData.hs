@@ -23,16 +23,17 @@ data PackageData = Version     FilePath
                  | PackageKey  FilePath
                  | Synopsis    FilePath
 
-data MultiPackageData = Modules     FilePath
-                      | SrcDirs     FilePath
-                      | IncludeDirs FilePath
-                      | Deps        FilePath
-                      | DepKeys     FilePath
-                      | DepNames    FilePath
-                      | CppArgs     FilePath
-                      | HsArgs      FilePath
-                      | CcArgs      FilePath
-                      | CSrcs       FilePath
+data MultiPackageData = Modules        FilePath
+                      | SrcDirs        FilePath
+                      | IncludeDirs    FilePath
+                      | Deps           FilePath
+                      | DepKeys        FilePath
+                      | DepNames       FilePath
+                      | CppArgs        FilePath
+                      | HsArgs         FilePath
+                      | CcArgs         FilePath
+                      | CSrcs          FilePath
+                      | DepIncludeDirs FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -53,16 +54,17 @@ instance ShowArg PackageData where
 instance ShowArgs MultiPackageData where
     showArgs packageData = do
         let (key, path, defaultValue) = case packageData of
-               Modules     path -> ("MODULES"     , path, "" )
-               SrcDirs     path -> ("HS_SRC_DIRS" , path, ".")
-               IncludeDirs path -> ("INCLUDE_DIRS", path, ".")
-               Deps        path -> ("DEPS"        , path, "" )
-               DepKeys     path -> ("DEP_KEYS"    , path, "" )
-               DepNames    path -> ("DEP_NAMES"   , path, "" )
-               CppArgs     path -> ("CPP_OPTS"    , path, "" )
-               HsArgs      path -> ("HC_OPTS"     , path, "" )
-               CcArgs      path -> ("CC_OPTS"     , path, "" )
-               CSrcs       path -> ("C_SRCS"      , path, "" )
+               Modules        path -> ("MODULES"         , path, "" )
+               SrcDirs        path -> ("HS_SRC_DIRS"     , path, ".")
+               IncludeDirs    path -> ("INCLUDE_DIRS"    , path, ".")
+               Deps           path -> ("DEPS"            , path, "" )
+               DepKeys        path -> ("DEP_KEYS"        , path, "" )
+               DepNames       path -> ("DEP_NAMES"       , path, "" )
+               CppArgs        path -> ("CPP_OPTS"        , path, "" )
+               HsArgs         path -> ("HC_OPTS"         , path, "" )
+               CcArgs         path -> ("CC_OPTS"         , path, "" )
+               CSrcs          path -> ("C_SRCS"          , path, "" )
+               DepIncludeDirs path -> ("DEP_LIB_REL_DIRS", path, "" )
             fullKey = replaceSeparators '_' $ path ++ "_" ++ key
             pkgData = path </> "package-data.mk"
         res <- askOracle $ PackageDataKey (pkgData, fullKey)

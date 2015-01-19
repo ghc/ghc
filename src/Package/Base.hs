@@ -155,7 +155,7 @@ findModuleFiles pathDist directories suffixes = do
                      ] $ \file -> do
                          let dir = takeDirectory file
                          dirExists <- liftIO $ S.doesDirectoryExist dir
-                         when dirExists $ return file
+                         when dirExists $ return $ unifyPath file
     files <- getDirectoryFiles "" fileList
     return $ map unifyPath files
 
