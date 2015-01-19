@@ -28,12 +28,12 @@
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
-import base_ControlziExceptionziBase_nestedAtomically_closure;
+import CLOSURE base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
-import ghczmprim_GHCziTypes_False_closure;
+import CLOSURE ghczmprim_GHCziTypes_False_closure;
 #if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
-import sm_mutex;
+import CLOSURE sm_mutex;
 #endif
 
 /*-----------------------------------------------------------------------------
