@@ -199,6 +199,26 @@
            </listitem>
            <listitem>
              <para>
+               A new warning flag, <option>-fwarn-unticked-promoted-constructors</option>
+               has been added. This flag causes GHC to warn when you use a promoted constructor without using a "tick" preceding its name.
+             </para>
+             <para>For example:
+             </para>
+<programlisting>
+data Nat = Succ Nat | Zero
+
+data Vec n s where
+  Nil  :: Vec Zero a
+  Cons :: a -> Vec n a -> Vec (Succ n) a
+</programlisting>
+               <para> Will raise two warnings because <function>Zero</function>
+               and <function>Succ</function> are not written as <function>'Zero</function> and
+               <function>'Succ</function>.
+               </para>
+             <para>This warning is enabled by default in <literal>-Wall</literal> mode.</para>
+           </listitem>
+           <listitem>
+             <para>
                Added the option <option>-dth-dec-file</option>.
 
                This dumps out a .th.hs file of all Template Haskell
