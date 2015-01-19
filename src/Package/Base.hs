@@ -7,7 +7,8 @@ module Package.Base (
     Package (..), Settings (..), TodoItem (..),
     defaultSettings, libraryPackage, standardLibrary,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
-    pathArgs, packageArgs, includeGhcArgs, pkgHsSources,
+    pathArgs, packageArgs,
+    includeGccArgs, includeGhcArgs, pkgHsSources,
     pkgDepHsObjects, pkgLibHsObjects, pkgCObjects,
     argSizeLimit,
     sourceDependecies,
@@ -98,6 +99,12 @@ packageArgs stage pathDist = do
              <> productArgs "-package-key"      (args $ DepKeys    pathDist)
            else productArgs "-package-name"     (arg  $ PackageKey pathDist)
              <> productArgs "-package"          (args $ Deps       pathDist) ]
+
+includeGccArgs :: FilePath -> FilePath -> Args
+includeGccArgs path dist =
+    let pathDist = path </> dist
+    in args [ pathArgs "-I" path $ IncludeDirs pathDist
+            , pathArgs "-I" path $ DepIncludeDirs pathDist ]
 
 includeGhcArgs :: FilePath -> FilePath -> Args
 includeGhcArgs path dist =

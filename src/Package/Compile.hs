@@ -34,8 +34,7 @@ gccArgs (Package _ path _) (_, dist, _) srcs result =
     in args [ args $ CcArgs pathDist
             , commonCcArgs
             , commonCcWarninigArgs
-            , pathArgs "-I" path $ IncludeDirs pathDist
-            , pathArgs "-I" path $ DepIncludeDirs pathDist
+            , includeGccArgs path dist
             , args ("-c":srcs)
             , args ["-o", result] ]
 

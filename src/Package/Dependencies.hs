@@ -51,7 +51,7 @@ gccArgs sourceFile (Package _ path _) (stage, dist, _) =
             , args $ CcArgs pathDist
             , commonCcArgs
             , commonCcWarninigArgs
-            , pathArgs "-I" path $ IncludeDirs pathDist
+            , includeGccArgs path dist
             , args ["-MF", unifyPath depFile]
             , args ["-x", "c"]
             , arg $ unifyPath sourceFile ]
