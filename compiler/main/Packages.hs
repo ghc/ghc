@@ -452,18 +452,6 @@ mungePackagePaths top_dir pkgroot pkg =
 -- Modify our copy of the package database based on a package flag
 -- (-package, -hide-package, -ignore-package).
 
--- | A horrible hack, the problem is the package key we'll turn
--- up here is going to get edited when we select the wired in
--- packages, so preemptively pick up the right one.  Also, this elem
--- test is slow.  The alternative is to change wired in packages first, but
--- then we are no longer able to match against package keys e.g. from when
--- a user passes in a package flag.
-calcKey :: PackageConfig -> PackageKey
-calcKey p | pk <- packageNameString p
-          , pk `elem` wired_in_pkgids
-                      = stringToPackageKey pk
-          | otherwise = packageConfigId p
-
 applyPackageFlag
    :: DynFlags
    -> UnusablePackages
@@ -484,7 +472,8 @@ applyPackageFlag dflags unusable (pkgs, vm) flag =
          Right (p:_,_) -> return (pkgs, vm')
           where
            n = fsPackageName p
-           vm' = addToUFM_C edit vm_cleared (calcKey p) (b, map convRn rns, n)
+           vm' = addToUFM_C edit vm_cleared (packageConfigId p)
+                            (b, map convRn rns, n)
            edit (b, rns, n) (b', rns', _) = (b || b', rns ++ rns', n)
            convRn (a,b) = (mkModuleName a, mkModuleName b)
            -- ToDo: ATM, -hide-all-packages implicitly triggers change in
@@ -492,7 +481,7 @@ applyPackageFlag dflags unusable (pkgs, vm) flag =
            -- flag
            vm_cleared | gopt Opt_HideAllPackages dflags = vm
                       | otherwise = filterUFM_Directly
-                            (\k (_,_,n') -> k == getUnique (calcKey p)
+                            (\k (_,_,n') -> k == getUnique (packageConfigId p)
                                                 || n /= n') vm
          _ -> panic "applyPackageFlag"
 
@@ -500,7 +489,7 @@ applyPackageFlag dflags unusable (pkgs, vm) flag =
        case selectPackages (matchingStr str) pkgs unusable of
          Left ps       -> packageFlagErr dflags flag ps
          Right (ps,_) -> return (pkgs, vm')
-          where vm' = delListFromUFM vm (map calcKey ps)
+          where vm' = delListFromUFM vm (map packageConfigId ps)
 
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
@@ -604,9 +593,10 @@ wired_in_pkgids = map packageKeyString wiredInPackageKeys
 findWiredInPackages
    :: DynFlags
    -> [PackageConfig]           -- database
-   -> IO [PackageConfig]
+   -> VisibilityMap             -- info on what packages are visible
+   -> IO ([PackageConfig], VisibilityMap)
 
-findWiredInPackages dflags pkgs = do
+findWiredInPackages dflags pkgs vis_map = do
   --
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base).
@@ -621,18 +611,29 @@ findWiredInPackages dflags pkgs = do
         -- one.
         --
         -- When choosing which package to map to a wired-in package
-        -- name, we pick the latest version (modern Cabal makes it difficult
-        -- to install multiple versions of wired-in packages, however!)
-        -- To override the default choice, -ignore-package could be used to
-        -- hide newer versions.
+        -- name, we try to pick the latest version of exposed packages.
+        -- However, if there are no exposed wired in packages available
+        -- (e.g. -hide-all-packages was used), we can't bail: we *have*
+        -- to assign a package for the wired-in package: so we try again
+        -- with hidden packages included to (and pick the latest
+        -- version).
+        --
+        -- You can also override the default choice by using -ignore-package:
+        -- this works even when there is no exposed wired in package
+        -- available.
         --
         findWiredInPackage :: [PackageConfig] -> String
-                           -> IO (Maybe InstalledPackageId)
+                           -> IO (Maybe PackageConfig)
         findWiredInPackage pkgs wired_pkg =
-           let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ] in
-           case all_ps of
-                []   -> notfound
-                many -> pick (head (sortByVersion many))
+           let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
+               all_exposed_ps =
+                    [ p | p <- all_ps
+                        , elemUFM (packageConfigId p) vis_map ] in
+           case all_exposed_ps of
+            [] -> case all_ps of
+                       []   -> notfound
+                       many -> pick (head (sortByVersion many))
+            many -> pick (head (sortByVersion many))
           where
                 notfound = do
                           debugTraceMsg dflags 2 $
@@ -641,19 +642,20 @@ findWiredInPackages dflags pkgs = do
                                  <> ptext (sLit " not found.")
                           return Nothing
                 pick :: PackageConfig
-                     -> IO (Maybe InstalledPackageId)
+                     -> IO (Maybe PackageConfig)
                 pick pkg = do
                         debugTraceMsg dflags 2 $
                             ptext (sLit "wired-in package ")
                                  <> text wired_pkg
                                  <> ptext (sLit " mapped to ")
                                  <> ppr (installedPackageId pkg)
-                        return (Just (installedPackageId pkg))
+                        return (Just pkg)
 
 
-  mb_wired_in_ids <- mapM (findWiredInPackage pkgs) wired_in_pkgids
+  mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wired_in_pkgids
   let
-        wired_in_ids = catMaybes mb_wired_in_ids
+        wired_in_pkgs = catMaybes mb_wired_in_pkgs
+        wired_in_ids = map installedPackageId wired_in_pkgs
 
         -- this is old: we used to assume that if there were
         -- multiple versions of wired-in packages installed that
@@ -677,7 +679,14 @@ findWiredInPackages dflags pkgs = do
                   | otherwise
                   = pkg
 
-  return $ updateWiredInDependencies pkgs
+        updateVisibilityMap vis_map = foldl' f vis_map wired_in_pkgs
+          where f vm p = case lookupUFM vis_map (packageConfigId p) of
+                            Nothing -> vm
+                            Just r -> addToUFM vm (stringToPackageKey
+                                                    (packageNameString p)) r
+
+
+  return (updateWiredInDependencies pkgs, updateVisibilityMap vis_map)
 
 -- ----------------------------------------------------------------------------
 
@@ -909,9 +918,9 @@ mkPackageState dflags0 pkgs0 preload0 this_package = do
       initial = if gopt Opt_HideAllPackages dflags
                     then emptyUFM
                     else foldl' calcInitial emptyUFM pkgs1
-      vis_map0 = foldUFM (\p vm ->
+      vis_map1 = foldUFM (\p vm ->
                             if exposed p
-                               then addToUFM vm (calcKey p)
+                               then addToUFM vm (packageConfigId p)
                                              (True, [], fsPackageName p)
                                else vm)
                          emptyUFM initial
@@ -922,15 +931,16 @@ mkPackageState dflags0 pkgs0 preload0 this_package = do
   -- This needs to know about the unusable packages, since if a user tries
   -- to enable an unusable package, we should let them know.
   --
-  (pkgs2, vis_map) <- foldM (applyPackageFlag dflags unusable)
-                            (pkgs1, vis_map0) other_flags
+  (pkgs2, vis_map2) <- foldM (applyPackageFlag dflags unusable)
+                            (pkgs1, vis_map1) other_flags
 
   --
   -- Sort out which packages are wired in. This has to be done last, since
   -- it modifies the package keys of wired in packages, but when we process
-  -- package arguments we need to key against the old versions.
+  -- package arguments we need to key against the old versions.  We also
+  -- have to update the visibility map in the process.
   --
-  pkgs3 <- findWiredInPackages dflags pkgs2
+  (pkgs3, vis_map) <- findWiredInPackages dflags pkgs2 vis_map2
 
   --
   -- Here we build up a set of the packages mentioned in -package
