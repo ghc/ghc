@@ -15,7 +15,7 @@
 
 -- http://ghc.haskell.org/trac/ghc/ticket/1773
 
-module Control.Category ((<<<), (>>>), Category(..)) where
+module Control.Category where
 
 import qualified GHC.Base (id,(.))
 import Data.Type.Coercion

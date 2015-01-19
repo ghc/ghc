@@ -16,12 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Num
-     (
-       module GHC.Integer
-     , Num(..)
-     , subtract
-     ) where
+module GHC.Num (module GHC.Num, module GHC.Integer) where
 
 import GHC.Base
 import GHC.Integer

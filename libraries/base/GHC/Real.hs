@@ -18,19 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Real
-     (
-     Fractional(..), Integral(..), Ratio(..), Real(..), RealFrac(..),
-
-     Rational,
-
-     (%), (^), (^%^), (^^), (^^%^^), denominator, divZeroError, even,
-     fromIntegral, gcd, gcdInt', gcdWord', infinity, integralEnumFrom,
-     integralEnumFromThen, integralEnumFromThenTo, integralEnumFromTo, lcm,
-     notANumber, numerator, numericEnumFrom, numericEnumFromThen,
-     numericEnumFromThenTo, numericEnumFromTo, odd, overflowError, ratioPrec,
-     ratioPrec1, ratioZeroDenominatorError, realToFrac, reduce, showSigned
-     ) where
+module GHC.Real where
 
 import GHC.Base
 import GHC.Num

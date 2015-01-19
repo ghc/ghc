@@ -93,28 +93,17 @@ Other Prelude modules are much easier with fewer complex dependencies.
 #include "MachDeps.h"
 
 module GHC.Base
-       (
-       module GHC.Classes,
-       module GHC.CString,
-       module GHC.Magic,
-       module GHC.Types,
-       module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
-                               -- to avoid lots of people having to
-       module GHC.Err,         -- import it explicitly
-
-
-       Alternative(..), Applicative(..), Functor(..), Maybe(..), Monad(..),
-       MonadPlus(..), Monoid(..), Opaque(..), String,
-
-
-       ($), ($!), (++), (.), (<**>), (=<<), ap, asTypeOf, assert, augment,
-       bindIO, breakpoint, breakpointCond, build, const, divInt, divModInt,
-       divModInt#, eqString, flip, foldr, getTag, iShiftL#, iShiftRA#,
-       iShiftRL#, id, join, liftA, liftA2, liftA3, liftM, liftM2, liftM3,
-       liftM4, liftM5, map, mapFB, mapM, maxInt, minInt, modInt, ord,
-       otherwise, quotInt, quotRemInt, remInt, returnIO, sequence, shiftL#,
-       shiftRL#, thenIO, unIO, unsafeChr, until, when
-       ) where
+        (
+        module GHC.Base,
+        module GHC.Classes,
+        module GHC.CString,
+        module GHC.Magic,
+        module GHC.Types,
+        module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
+                                -- to avoid lots of people having to
+        module GHC.Err          -- import it explicitly
+  )
+        where
 
 import GHC.Types
 import GHC.Classes

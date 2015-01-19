@@ -17,24 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Classes
-      (
-        (&&)
-      , (||)
-      , compareInt
-      , compareInt#
-      , divInt#
-      , eqInt
-      , geInt
-      , gtInt
-      , leInt
-      , ltInt
-      , modInt#
-      , neInt
-      , not
-      , Eq(..)
-      , Ord(..)
-      ) where
+module GHC.Classes where
 
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
