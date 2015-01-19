@@ -55,6 +55,8 @@ type LHsExpr id = Located (HsExpr id)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
   --   in a list
 
+  -- For details on above see note [Api annotations] in ApiAnnotation
+
 -------------------------
 -- | PostTcExpr is an evidence expression attached to the syntax tree by the
 -- type checker (c.f. postTcType).
@@ -136,11 +138,15 @@ data HsExpr id
        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
        --       'ApiAnnotation.AnnRarrow',
 
+       -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsLamCase (PostTc id Type) (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
        --
        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
        --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
        --           'ApiAnnotation.AnnClose'
+
+       -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsApp     (LHsExpr id) (LHsExpr id) -- ^ Application
 
@@ -159,11 +165,15 @@ data HsExpr id
   -- of 'negate'
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnMinus'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | NegApp      (LHsExpr id)
                 (SyntaxExpr id)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
   --             'ApiAnnotation.AnnClose' @')'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsPar       (LHsExpr id)    -- ^ Parenthesised expr; see Note [Parens in HsSyn]
 
   | SectionL    (LHsExpr id)    -- operand; see Note [Sections in HsSyn]
@@ -175,6 +185,8 @@ data HsExpr id
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
   --         'ApiAnnotation.AnnClose'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ExplicitTuple
         [LHsTupArg id]
         Boxity
@@ -182,6 +194,8 @@ data HsExpr id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
   --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
   --       'ApiAnnotation.AnnClose' @'}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCase      (LHsExpr id)
                 (MatchGroup id (LHsExpr id))
 
@@ -189,6 +203,8 @@ data HsExpr id
   --       'ApiAnnotation.AnnSemi',
   --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
   --       'ApiAnnotation.AnnElse',
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsIf        (Maybe (SyntaxExpr id)) -- cond function
                                         -- Nothing => use the built-in 'if'
                                         -- See Note [Rebindable if]
@@ -200,6 +216,8 @@ data HsExpr id
   --
   -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf'
   --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsMultiIf   (PostTc id Type) [LGRHS id (LHsExpr id)]
 
   -- | let(rec)
@@ -207,6 +225,8 @@ data HsExpr id
   -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
   --       'ApiAnnotation.AnnOpen' @'{'@,
   --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsLet       (HsLocalBinds id)
                 (LHsExpr  id)
 
@@ -214,6 +234,8 @@ data HsExpr id
   --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
   --             'ApiAnnotation.AnnVbar',
   --             'ApiAnnotation.AnnClose'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsDo        (HsStmtContext Name) -- The parameterisation is unimportant
                                      -- because in this context we never use
                                      -- the PatGuard or ParStmt variant
@@ -224,6 +246,8 @@ data HsExpr id
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
   --              'ApiAnnotation.AnnClose' @']'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ExplicitList
                 (PostTc id Type)        -- Gives type of components of list
                 (Maybe (SyntaxExpr id)) -- For OverloadedLists, the fromListN witness
@@ -235,6 +259,8 @@ data HsExpr id
   --              'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnComma',
   --              'ApiAnnotation.AnnVbar'
   --              'ApiAnnotation.AnnClose' @':]'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ExplicitPArr
                 (PostTc id Type)   -- type of elements of the parallel array
                 [LHsExpr id]
@@ -243,6 +269,8 @@ data HsExpr id
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordCon   (Located id)       -- The constructor.  After type checking
                                    -- it's the dataConWrapId of the constructor
                 PostTcExpr         -- Data con Id applied to type args
@@ -252,6 +280,8 @@ data HsExpr id
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
@@ -267,6 +297,8 @@ data HsExpr id
   -- | Expression with an explicit type signature. @e :: type@
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ExprWithTySig
                 (LHsExpr id)
                 (LHsType id)
@@ -285,6 +317,8 @@ data HsExpr id
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
   --              'ApiAnnotation.AnnComma','ApiAnnotation.AnnDotdot',
   --              'ApiAnnotation.AnnClose' @']'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ArithSeq
                 PostTcExpr
                 (Maybe (SyntaxExpr id))   -- For OverloadedLists, the fromList witness
@@ -298,6 +332,8 @@ data HsExpr id
   --              'ApiAnnotation.AnnComma','ApiAnnotation.AnnDotdot',
   --              'ApiAnnotation.AnnVbar',
   --              'ApiAnnotation.AnnClose' @':]'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | PArrSeq
                 PostTcExpr
                 (ArithSeqInfo id)
@@ -305,12 +341,16 @@ data HsExpr id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# SCC'@,
   --             'ApiAnnotation.AnnVal' or 'ApiAnnotation.AnnValStr',
   --              'ApiAnnotation.AnnClose' @'\#-}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsSCC       SourceText            -- Note [Pragma source text] in BasicTypes
                 FastString            -- "set cost centre" SCC pragma
                 (LHsExpr id)          -- expr whose cost is to be measured
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCoreAnn   SourceText            -- Note [Pragma source text] in BasicTypes
                 FastString            -- hdaume: core annotation
                 (LHsExpr id)
@@ -321,6 +361,8 @@ data HsExpr id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
   --         'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
   --         'ApiAnnotation.AnnClose'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsBracket    (HsBracket id)
 
     -- See Note [Pending Splices]
@@ -337,6 +379,8 @@ data HsExpr id
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
   --         'ApiAnnotation.AnnClose'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsSpliceE    Bool                   -- True <=> typed splice
                  (HsSplice id)          -- False <=> untyped
 
@@ -350,6 +394,8 @@ data HsExpr id
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnProc',
   --          'ApiAnnotation.AnnRarrow'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsProc      (LPat id)               -- arrow abstraction, proc
                 (LHsCmdTop id)          -- body of the abstraction
                                         -- always has an empty stack
@@ -357,6 +403,8 @@ data HsExpr id
   ---------------------------------------
   -- static pointers extension
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnStatic',
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsStatic    (LHsExpr id)
 
   ---------------------------------------
@@ -367,6 +415,8 @@ data HsExpr id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
   --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
   --          'ApiAnnotation.AnnRarrowtail'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
         (LHsExpr id)     -- arrow expression, f
         (LHsExpr id)     -- input expression, arg
@@ -378,6 +428,8 @@ data HsExpr id
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(|'@,
   --         'ApiAnnotation.AnnClose' @'|)'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
         (LHsExpr id)     -- the operator
                          -- after type-checking, a type abstraction to be
@@ -406,6 +458,8 @@ data HsExpr id
   --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnColon',
   --       'ApiAnnotation.AnnVal',
   --       'ApiAnnotation.AnnClose' @'\#-}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsTickPragma                      -- A pragma introduced tick
      SourceText                       -- Note [Pragma source text] in BasicTypes
      (FastString,(Int,Int),(Int,Int)) -- external span for this tick
@@ -418,14 +472,20 @@ data HsExpr id
   | EWildPat                 -- wildcard
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | EAsPat      (Located id) -- as pattern
                 (LHsExpr id)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | EViewPat    (LHsExpr id) -- view pattern
                 (LHsExpr id)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | ELazyPat    (LHsExpr id) -- ~ pattern
 
   | HsType      (LHsType id) -- Explicit type argument; e.g  f {| Int |} x y
@@ -444,6 +504,8 @@ deriving instance (DataId id) => Data (HsExpr id)
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
 type LHsTupArg id = Located (HsTupArg id)
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data HsTupArg id
   = Present (LHsExpr id)     -- ^ The argument
   | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
@@ -782,6 +844,8 @@ data HsCmd id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
   --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
   --          'ApiAnnotation.AnnRarrowtail'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   = HsCmdArrApp          -- Arrow tail, or arrow application (f -< arg)
         (LHsExpr id)     -- arrow expression, f
         (LHsExpr id)     -- input expression, arg
@@ -793,6 +857,8 @@ data HsCmd id
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(|'@,
   --         'ApiAnnotation.AnnClose' @'|)'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCmdArrForm         -- Command formation,  (| e cmd1 .. cmdn |)
         (LHsExpr id)     -- the operator
                          -- after type-checking, a type abstraction to be
@@ -808,15 +874,21 @@ data HsCmd id
        -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
        --       'ApiAnnotation.AnnRarrow',
 
+       -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsCmdPar    (LHsCmd id)                     -- parenthesised command
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
     --             'ApiAnnotation.AnnClose' @')'@
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsCmdCase   (LHsExpr id)
                 (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
     --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
     --       'ApiAnnotation.AnnClose' @'}'@
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsCmdIf     (Maybe (SyntaxExpr id))         -- cond function
                 (LHsExpr id)                    -- predicate
@@ -827,11 +899,15 @@ data HsCmd id
     --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
     --       'ApiAnnotation.AnnElse',
 
+    -- For details on above see note [Api annotations] in ApiAnnotation
+
   | HsCmdLet    (HsLocalBinds id)               -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
     --       'ApiAnnotation.AnnOpen' @'{'@,
     --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsCmdDo     [CmdLStmt id]
                 (PostTc id Type)                -- Type of the whole expression
@@ -839,6 +915,8 @@ data HsCmd id
     --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
     --             'ApiAnnotation.AnnVbar',
     --             'ApiAnnotation.AnnClose'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsCmdCast   TcCoercion     -- A simpler version of HsWrap in HsExpr
                 (HsCmd id)     -- If   cmd :: arg1 --> res
@@ -999,6 +1077,8 @@ deriving instance (Data body,DataId id) => Data (MatchGroup id body)
 type LMatch id body = Located (Match id body)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data Match id body
   = Match {
         m_fun_id_infix :: (Maybe (Located id,Bool)),
@@ -1057,6 +1137,8 @@ hsLMatchPats (L _ (Match _ pats _ _)) = pats
 --        'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
 --        'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 --        'ApiAnnotation.AnnRarrow','ApiAnnotation.AnnSemi'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data GRHSs id body
   = GRHSs {
       grhssGRHSs :: [LGRHS id body],       -- ^ Guarded RHSs
@@ -1174,6 +1256,8 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 --         'ApiAnnotation.AnnComma','ApiAnnotation.AnnThen',
 --         'ApiAnnotation.AnnBy','ApiAnnotation.AnnBy',
 --         'ApiAnnotation.AnnGroup','ApiAnnotation.AnnUsing'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data StmtLR idL idR body -- body should always be (LHs**** idR)
   = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp,
               -- and (after the renamer) DoExpr, MDoExpr
@@ -1184,6 +1268,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                   -- For DoExpr, MDoExpr, we don't appply a 'return' at all
                                   -- See Note [Monad Comprehensions]
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | BindStmt (LPat idL)
              body
              (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
@@ -1199,6 +1285,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet'
   --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@,
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | LetStmt  (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
@@ -1229,6 +1317,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
 
   -- Recursive statement (see Note [How RecStmt works] below)
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRec'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | RecStmt
      { recS_stmts :: [LStmtLR idL idR body]
 

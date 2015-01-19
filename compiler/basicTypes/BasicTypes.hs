@@ -458,6 +458,8 @@ instance Outputable Origin where
 --                              @'\{-\# OVERLAPS'@ or
 --                              @'\{-\# INCOHERENT'@,
 --      'ApiAnnotation.AnnClose' @`\#-\}`@,
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool
@@ -790,7 +792,6 @@ Keeping Source Text for source to source conversions
 
 Note [Pragma source text]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The lexer does a case-insensitive match for pragmas, as well as
 accepting both UK and US spelling variants.
 
@@ -816,9 +817,8 @@ for the cases above.
  [without the space between '{' and '-', otherwise this comment won't parse]
 
 
-Note [literal source text]
+Note [Literal source text]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The lexer/parser converts literals from their original source text
 versions to an appropriate internal representation. This is a problem
 for tools doing source to source conversions, so the original source
@@ -826,24 +826,24 @@ text is stored in literals where this can occur.
 
 Motivating examples for HsLit
 
-  HsChar          '\n', '\x20`
-  HsCharPrim      '\x41`#
+  HsChar          '\n'       == '\x20`
+  HsCharPrim      '\x41`#    == `A`
   HsString        "\x20\x41" == " A"
-  HsStringPrim    "\x20"#
-  HsInt           001
-  HsIntPrim       002#
-  HsWordPrim      003##
-  HsInt64Prim     004##
-  HsWord64Prim    005##
-  HsInteger       006
+  HsStringPrim    "\x20"#    == " "#
+  HsInt           001        == 1
+  HsIntPrim       002#       == 2#
+  HsWordPrim      003##      == 3##
+  HsInt64Prim     004##      == 4##
+  HsWord64Prim    005##      == 5##
+  HsInteger       006        == 6
 
 For OverLitVal
 
-  HsIntegral      003,0x001
-  HsIsString      "\x41nd"
+  HsIntegral      003      == 0x003
+  HsIsString      "\x41nd" == "And"
 -}
 
-type SourceText = String -- Note [literal source text],[Pragma source text]
+type SourceText = String -- Note [Literal source text],[Pragma source text]
 
 
 {-

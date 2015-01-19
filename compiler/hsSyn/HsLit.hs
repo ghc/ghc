@@ -36,7 +36,7 @@ import Data.Data hiding ( Fixity )
 ************************************************************************
 -}
 
--- Note [literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
 data HsLit
   = HsChar          SourceText Char        -- Character
@@ -84,7 +84,7 @@ data HsOverLit id       -- An overloaded literal
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsOverLit id)
 
--- Note [literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
 data OverLitVal
   = HsIntegral   !SourceText !Integer    -- Integer-looking literals;

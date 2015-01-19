@@ -136,6 +136,8 @@ data HsBindLR idL idR
     --
     --  - 'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
     --    'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
     FunBind {
 
         fun_id :: Located idL, -- Note [fun_id in Match] in HsExpr
@@ -173,6 +175,8 @@ data HsBindLR idL idR
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang',
   --       'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
   --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
   | PatBind {
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
@@ -216,6 +220,8 @@ data HsBindLR idL idR
         --          'ApiAnnotation.AnnWhere'
         --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@
 
+        -- For details on above see note [Api annotations] in ApiAnnotation
+
   deriving (Typeable)
 deriving instance (DataId idL, DataId idR)
   => Data (HsBindLR idL idR)
@@ -244,6 +250,8 @@ data ABExport id
 --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
 --             'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen' @'{'@,
 --             'ApiAnnotation.AnnClose' @'}'@,
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data PatSynBind idL idR
   = PSB { psb_id   :: Located idL,             -- ^ Name of the pattern synonym
           psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
@@ -559,6 +567,8 @@ type LIPBind id = Located (IPBind id)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
 
+-- For details on above see note [Api annotations] in ApiAnnotation
+
 -- | Implicit parameter bindings.
 --
 -- These bindings start off as (Left "x") in the parser and stay
@@ -567,6 +577,8 @@ type LIPBind id = Located (IPBind id)
 -- evidence for the implicit parameter.
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
   = IPBind (Either (Located HsIPName) id) (LHsExpr id)
   deriving (Typeable)
@@ -613,6 +625,8 @@ data Sig name
       --
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
       --          'ApiAnnotation.AnnComma'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
     TypeSig [Located name] (LHsType name) (PostRn name [Name])
 
       -- | A pattern synonym type signature
@@ -622,6 +636,8 @@ data Sig name
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
       --           'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnForall'
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
   | PatSynSig (Located name)
               (HsExplicitFlag, LHsTyVarBndrs name)
               (LHsContext name) -- Provided context
@@ -634,6 +650,8 @@ data Sig name
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
         --           'ApiAnnotation.AnnDcolon'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | GenericSig [Located name] (LHsType name)
 
         -- | A type signature in generated code, notably the code
@@ -650,6 +668,8 @@ data Sig name
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInfix',
         --           'ApiAnnotation.AnnVal'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | FixSig (FixitySig name)
 
         -- | An inline pragma
@@ -661,6 +681,8 @@ data Sig name
         --       'ApiAnnotation.AnnClose','ApiAnnotation.AnnOpen',
         --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnTilde',
         --       'ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | InlineSig   (Located name)  -- Function name
                 InlinePragma    -- Never defaultInlinePragma
 
@@ -674,6 +696,8 @@ data Sig name
         --      'ApiAnnotation.AnnVal',
         --      'ApiAnnotation.AnnClose' @']'@ and @'\#-}'@,
         --      'ApiAnnotation.AnnDcolon'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | SpecSig     (Located name)  -- Specialise a function or datatype  ...
                 [LHsType name]  -- ... to these types
                 InlinePragma    -- The pragma on SPECIALISE_INLINE form.
@@ -689,6 +713,8 @@ data Sig name
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --      'ApiAnnotation.AnnInstance','ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | SpecInstSig SourceText (LHsType name)
                   -- Note [Pragma source text] in BasicTypes
 
@@ -699,6 +725,8 @@ data Sig name
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --      'ApiAnnotation.AnnVbar','ApiAnnotation.AnnComma',
         --      'ApiAnnotation.AnnClose'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | MinimalSig SourceText (BooleanFormula (Located name))
                -- Note [Pragma source text] in BasicTypes
 

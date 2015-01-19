@@ -35,7 +35,8 @@ type LImportDecl name = Located (ImportDecl name)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
-        --
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
 
 -- | A single Haskell @import@ declaration.
 data ImportDecl name
@@ -67,6 +68,7 @@ data ImportDecl name
      --    'ApiAnnotation.AnnClose' attached
      --     to location in ideclHiding
 
+     -- For details on above see note [Api annotations] in ApiAnnotation
        deriving (Data, Typeable)
 
 simpleImportDecl :: ModuleName -> ImportDecl name
@@ -128,21 +130,28 @@ type LIE name = Located (IE name)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
-        --
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
 
 -- | Imported or exported entity.
 data IE name
   = IEVar       (Located name)
         -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | IEThingAbs  (Located name)     -- ^ Class/Type (can't tell)
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | IEThingAll  (Located name)     -- ^ Class/Type plus all methods/constructors
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
         --       'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose',
         --                                 'ApiAnnotation.AnnType'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
 
   | IEThingWith (Located name) [Located name]
                  -- ^ Class/Type plus some methods/constructors
@@ -150,9 +159,13 @@ data IE name
         --                                   'ApiAnnotation.AnnClose',
         --                                   'ApiAnnotation.AnnComma',
         --                                   'ApiAnnotation.AnnType'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | IEModuleContents  (Located ModuleName) -- ^ (Export Only)
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
   | IEGroup             Int HsDocString  -- ^ Doc section heading
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc

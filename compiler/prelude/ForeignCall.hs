@@ -229,6 +229,8 @@ instance Outputable Header where
 --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CTYPE'@,
 --        'ApiAnnotation.AnnHeader','ApiAnnotation.AnnVal',
 --        'ApiAnnotation.AnnClose' @'\#-}'@,
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
                    (Maybe Header) -- header to include for this type
                    FastString     -- the type itself

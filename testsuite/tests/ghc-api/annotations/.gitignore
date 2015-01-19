@@ -1,6 +1,7 @@
 annotations
 parseTree
 comments
+exampleTest
 *.hi
 *.o
 *.run.*

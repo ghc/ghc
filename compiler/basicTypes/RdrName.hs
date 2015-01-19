@@ -100,6 +100,8 @@ import Data.Data
 --           'ApiAnnotation.AnnBackquote' @'`'@,
 --           'ApiAnnotation.AnnVal','ApiAnnotation.AnnTildehsh',
 --           'ApiAnnotation.AnnTilde',
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 data RdrName
   = Unqual OccName
         -- ^ Used for ordinary, unqualified occurrences, e.g. @x@, @y@ or @Foo@.

@@ -73,7 +73,8 @@ data HsModule name
         --
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
         --                                   ,'ApiAnnotation.AnnClose'
-        --
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
       hsmodImports :: [LImportDecl name],
         -- ^ We snaffle interesting stuff out of the imported interfaces early
         -- on, adding that info to TyDecls/etc; so this list is often empty,
@@ -86,12 +87,15 @@ data HsModule name
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
         --                                   ,'ApiAnnotation.AnnClose'
         --
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
         --
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
         --                                   ,'ApiAnnotation.AnnClose'
-        --
+
+        -- For details on above see note [Api annotations] in ApiAnnotation
    }
      -- ^ 'ApiAnnotation.AnnKeywordId's
      --
@@ -100,7 +104,8 @@ data HsModule name
      --  - 'ApiAnnotation.AnnOpen','ApiAnnotation.AnnSemi',
      --    'ApiAnnotation.AnnClose' for explicit braces and semi around
      --    hsmodImports,hsmodDecls if this style is used.
-     --
+
+     -- For details on above see note [Api annotations] in ApiAnnotation
       deriving (Typeable)
 deriving instance (DataId name) => Data (HsModule name)
 

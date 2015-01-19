@@ -85,6 +85,8 @@ data Class
 --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 --
 --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'',
+
+-- For details on above see note [Api annotations] in ApiAnnotation
 type FunDep a = ([a],[a])
 
 type ClassOpItem = (Id, DefMeth)
