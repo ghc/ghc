@@ -30,18 +30,25 @@ data WayUnit = Profiling
              | Dynamic
              deriving Eq
 
+-- TODO: think about Booleans instead of a list of ways.
 data Way = Way
      {
          tag         :: String,    -- e.g., "thr_p"
          units       :: [WayUnit]  -- e.g., [Threaded, Profiling]
      }
-     deriving Eq
+
+instance Eq Way where
+    -- The tag is fully determined by the units
+    a == b = units a == units b
 
 vanilla   = Way "v"  []
 profiling = Way "p"  [Profiling]
 logging   = Way "l"  [Logging]
 parallel  = Way "mp" [Parallel]
 granSim   = Way "gm" [GranSim]
+
+isVanilla :: Way -> Bool
+isVanilla = null . units
 
 -- RTS only ways
 -- TODO: do we need to define *only* these? Shall we generalise/simplify?
@@ -91,8 +98,8 @@ wayHcArgs (Way _ units) = args
       args ["-ticky", "-DTICKY_TICKY"] ]
 
 wayPrefix :: Way -> String
-wayPrefix way | way == vanilla = ""
-              | otherwise      = tag way ++ "_"
+wayPrefix way | isVanilla way = ""
+              | otherwise     = tag way ++ "_"
 
 hisuf, osuf, hcsuf, obootsuf, ssuf :: Way -> String
 osuf     = (++ "o"     ) . wayPrefix
@@ -105,15 +112,21 @@ obootsuf = (++ "o-boot") . wayPrefix
 -- from other suffixes. For example, in the profiling way it used to be
 -- "_p.a" instead of ".p_a" which is how other suffixes work. I decided
 -- to make all suffixes consistent: ".way_extension".
+-- TODO: find out why we need version number in the dynamic suffix
+-- The current theory: dynamic libraries are eventually placed in a single
+-- giant directory in the load path of the dynamic linker, and hence we must
+-- distinguish different versions of GHC. In contrast static libraries live
+-- in their own per-package directory and hence do not need a unique filename.
+-- We also need to respect the system's dynamic extension, e.g. .dll or .so.
+-- TODO: fix the extension
 libsuf :: Way -> Action String
-libsuf way = do
-    let staticSuffix = wayPrefix $ dropDynamic way
-    if Dynamic `notElem` units way
-    then return $ staticSuffix ++ "a"
-    else do
-        extension <- showArg DynamicExtension
-        version   <- showArg ProjectVersion
-        return $ staticSuffix ++ "-ghc" ++ version ++ extension
+libsuf way | Dynamic `notElem` units way
+           = return $ wayPrefix way ++ "a"             -- e.g., p_a
+           | otherwise
+           = do extension <- showArg DynamicExtension  -- e.g., .dll or .so
+                version   <- showArg ProjectVersion    -- e.g., 7.11.20141222
+                let suffix = wayPrefix $ dropDynamic way
+                return $ suffix ++ "-ghc" ++ version ++ extension -- e.g. p_-ghc7.11.20141222.dll
 
 -- TODO: This may be slow -- optimise if overhead is significant.
 dropDynamic :: Way -> Way

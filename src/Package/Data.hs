@@ -48,7 +48,14 @@ configureArgs stage settings =
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
+-- For example, get rid of
+-- libraries/Win32_dist-install_CMM_SRCS  := $(addprefix cbits/,$(notdir ...
+-- Reason: we don't need them and we can't parse them.
 -- 2) Replace '/' and '\' with '_' before '='
+-- For example libraries/deepseq/dist-install_VERSION = 1.4.0.0
+-- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
+-- Reason: Shake's built-in makefile parser doesn't recognise slashes
+
 postProcessPackageData :: FilePath -> Action ()
 postProcessPackageData file = do
     pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)
@@ -60,9 +67,8 @@ postProcessPackageData file = do
 
 bootPkgConstraints :: Args
 bootPkgConstraints = args $ do
-    forM (libraryPackagesInStage Stage0) $ \name -> do
-        let path     = pkgPath $ libraryPackage name [Stage0] defaultSettings
-            baseName = takeBaseName name
+    forM (targetPackagesInStage Stage0) $ \pkg @ (Package name path _) -> do
+        let baseName = takeBaseName name
             cabal    = path </> baseName <.> "cabal"
         need [cabal]
         content <- lines <$> liftIO (readFile cabal)
@@ -111,7 +117,9 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
     let pathDist  = path </> dist
         configure = path </> "configure"
         cabal     = path </> takeBaseName name <.> "cabal"
+        -- takeBaseName: see Note [Cabal package wierdness] in Targets.hs
     in
+    -- All these files are produced by a single run of GhcCabal
     (pathDist </>) <$>
     [ "package-data.mk"
     , "haddock-prologue.txt"
@@ -123,6 +131,8 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
     ] &%> \_ -> do
         need [cabal]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
+        -- GhcCabal will run the configure script, so we depend on it
+        -- We still don't know who build the configure script from configure.ac
         run GhcCabal $ cabalArgs pkg todo
         when (registerPackage settings) $
             run (GhcPkg stage) $ ghcPkgArgs pkg todo
@@ -133,10 +143,12 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, _) =
     (argListPath argListDir pkg stage) %> \out -> do
+        -- TODO: depend on ALL source files.
         need $ ["shake/src/Package/Data.hs"] ++ sourceDependecies
         cabalList  <- argList GhcCabal       $ cabalArgs pkg todo
         ghcPkgList <- argList (GhcPkg stage) $ ghcPkgArgs pkg todo
         writeFileChanged out $ cabalList ++ "\n" ++ ghcPkgList
 
+-- How to build package-data.mk using GhcCabal to process package.cabal
 buildPackageData :: Package -> TodoItem -> Rules ()
 buildPackageData = argListRule <> buildRule

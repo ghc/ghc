@@ -5,7 +5,7 @@ module Package.Base (
     module Util,
     module Oracles,
     Package (..), Settings (..), TodoItem (..),
-    defaultSettings, libraryPackage,
+    defaultSettings, libraryPackage, standardLibrary,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     pathArgs, packageArgs, includeGhcArgs, pkgHsSources,
     pkgDepHsObjects, pkgLibHsObjects, pkgCObjects,
@@ -37,7 +37,11 @@ defaultSettings stage =
     Settings mempty mempty mempty mempty mempty True (defaultWays stage)
 
 -- Stage is the stage of the GHC that we use to build the package
--- FilePath is the directory to put the build results
+-- FilePath is the directory to put the build results (relative to pkgPath)
+-- The typical structure of that directory is:
+-- * build/           : contains compiled object code
+-- * doc/             : produced by haddock
+-- * package-data.mk  : contains output of ghc-cabal applied to package.cabal
 -- Settings may be different for different combinations of Stage & FilePath
 type TodoItem = (Stage, FilePath, Settings)
 
@@ -58,6 +62,9 @@ libraryPackage name stages settings =
         , if stage == Stage0 then "dist-boot" else "dist-install"
         , settings stage)
         | stage <- stages ]
+
+standardLibrary :: String -> [Stage] -> Package
+standardLibrary name stages = libraryPackage name stages defaultSettings
 
 commonCcArgs :: Args
 commonCcArgs = when Validating $ args ["-Werror", "-Wall"]

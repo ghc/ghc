@@ -64,11 +64,13 @@ instance ShowArgs MultiPackageData where
                HsArgs         path -> ("HC_OPTS"         , path, "" )
                CcArgs         path -> ("CC_OPTS"         , path, "" )
                CSrcs          path -> ("C_SRCS"          , path, "" )
-               DepIncludeDirs path -> ("DEP_LIB_REL_DIRS", path, "" )
+               DepIncludeDirs path -> ("DEP_INCLUDE_DIRS_SINGLE_QUOTED"
+                                      , path, "")
             fullKey = replaceSeparators '_' $ path ++ "_" ++ key
             pkgData = path </> "package-data.mk"
+            unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
         res <- askOracle $ PackageDataKey (pkgData, fullKey)
-        return $ words $ case res of
+        return $ map unquote $ words $ case res of
             Nothing    -> error $ "No key '" ++ key ++ "' in "
                                 ++ unifyPath pkgData ++ "."
             Just ""    -> defaultValue
