@@ -71,12 +71,12 @@ $(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
 	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ $(ProjectPatchLevel2)" >> $@; \
 	fi
 	@echo >> $@
-	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\\'     >> $@
-	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \\'            >> $@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\'            >> $@
-	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \\'>> $@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\'            >> $@
-	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \\'   >> $@
+	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\'      >> $@
+	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \'             >> $@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $@
+	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \' >> $@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $@
+	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \'    >> $@
 	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'    >> $@
 	@echo >> $@
 	@echo "#endif /* __GHCVERSION_H__ */"          >> $@
