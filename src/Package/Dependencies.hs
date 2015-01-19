@@ -61,12 +61,12 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
 
-    (buildDir </> "haskell.deps") %> \out -> do
-        need [argListPath argListDir pkg stage]
+    (buildDir </> "haskell.deps") %> \_ -> do
         run (Ghc stage) $ ghcArgs pkg todo
+        -- Finally, record the argument list
+        need [argListPath argListDir pkg stage]
 
     (buildDir </> "c.deps") %> \out -> do
-        need [argListPath argListDir pkg stage]
         srcs <- args $ CSrcs pathDist
         deps <- fmap concat $ forM srcs $ \src -> do
             let srcPath = path </> src
@@ -75,6 +75,8 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
             liftIO $ readFile depFile
         writeFileChanged out deps
         liftIO $ removeFiles buildDir ["*.c.deps"]
+        -- Finally, record the argument list
+        need [argListPath argListDir pkg stage]
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, _) =

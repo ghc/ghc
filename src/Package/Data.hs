@@ -121,12 +121,14 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
-        need [argListPath argListDir pkg stage, cabal]
+        need [cabal]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
         run GhcCabal $ cabalArgs pkg todo
         when (registerPackage settings) $
             run (GhcPkg stage) $ ghcPkgArgs pkg todo
         postProcessPackageData $ pathDist </> "package-data.mk"
+        -- Finally, record the argument list
+        need [argListPath argListDir pkg stage]
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, _) =

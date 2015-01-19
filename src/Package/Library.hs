@@ -26,13 +26,15 @@ arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
         let way = detectWay $ tail $ takeExtension out
         cObjs <- pkgCObjects path dist way
         hsObjs <- pkgDepHsObjects path dist way
-        need $ [argListPath argListDir pkg stage] ++ cObjs ++ hsObjs
+        need $ cObjs ++ hsObjs
         libHsObjs <- pkgLibHsObjects path dist stage way
         liftIO $ removeFiles "." [out]
         -- Splitting argument list into chunks as otherwise Ar chokes up
         maxChunk <- argSizeLimit
         forM_ (chunksOfSize maxChunk $ cObjs ++ libHsObjs) $ \objs -> do
             run Ar $ arArgs objs $ unifyPath out
+        -- Finally, record the argument list
+        need [argListPath argListDir pkg stage]
 
 ldRule :: Package -> TodoItem -> Rules ()
 ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
@@ -42,13 +44,15 @@ ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
     priority 2 $ (buildDir </> "*.o") %> \out -> do
         cObjs <- pkgCObjects path dist vanilla
         hObjs <- pkgDepHsObjects path dist vanilla
-        need $ [argListPath argListDir pkg stage] ++ cObjs ++ hObjs
+        need $ cObjs ++ hObjs
         run Ld $ ldArgs stage (cObjs ++ hObjs) $ unifyPath out
         synopsis <- dropWhileEnd isPunctuation <$> showArg (Synopsis pathDist)
         putColoured Green $ "/--------\n| Successfully built package '"
             ++ name ++ "' (stage " ++ show stage ++ ")."
         putColoured Green $ "| Package synopsis: " ++ synopsis ++ "."
             ++ "\n\\--------"
+        -- Finally, record the argument list
+        need [argListPath argListDir pkg stage]
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg @ (Package _ path _) todo @ (stage, dist, settings) =

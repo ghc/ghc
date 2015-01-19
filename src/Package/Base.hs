@@ -108,8 +108,9 @@ includeGhcArgs path dist =
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do
     let pathDist = path </> dist
+        autogen = pathDist </> "build/autogen"
     dirs <- map (path </>) <$> args (SrcDirs pathDist)
-    findModuleFiles pathDist dirs [".hs", ".lhs"]
+    findModuleFiles pathDist (autogen:dirs) [".hs", ".lhs"]
 
 -- TODO: look for non-{hs,c} objects too
 
@@ -136,11 +137,13 @@ pkgLibHsObjects path dist stage way = do
     let pathDist = path </> dist
         buildDir = unifyPath $ pathDist </> "build"
     split <- splitObjects stage
+    depObjs <- pkgDepHsObjects path dist way
     if split
     then do
+         need depObjs -- Otherwise, split objects may not yet be available
          let suffix = "_" ++ osuf way ++ "_split/*." ++ osuf way
          findModuleFiles pathDist [buildDir] [suffix]
-    else pkgDepHsObjects path dist way
+    else do return depObjs
 
 findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
 findModuleFiles pathDist directories suffixes = do
@@ -153,7 +156,6 @@ findModuleFiles pathDist directories suffixes = do
                          let dir = takeDirectory file
                          dirExists <- liftIO $ S.doesDirectoryExist dir
                          when dirExists $ return file
-
     files <- getDirectoryFiles "" fileList
     return $ map unifyPath files
 

@@ -49,8 +49,10 @@ compileHaskell pkg @ (Package _ path _) todo @ (stage, dist, _) obj way = do
     let buildDir = unifyPath $ path </> dist </> "build"
     -- TODO: keep only vanilla dependencies in 'haskell.deps'
     deps <- args $ DependencyList (buildDir </> "haskell.deps") obj
+    let (srcs, his) = partition ("//*hs" ?==) deps
+        objs = map (-<.> osuf way) his
+    -- Need *.o files instead of *.hi files to avoid recursive rules
     need deps
-    let srcs = filter ("//*hs" ?==) deps
     run (Ghc stage) $ ghcArgs pkg todo way srcs obj
 
 buildRule :: Package -> TodoItem -> Rules ()
@@ -64,15 +66,19 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
 
         (buildDir <//> hiPattern) %> \hi -> do
             let obj = hi -<.> osuf way
-            need [obj]
+            -- TODO: Understand why 'need [obj]' doesn't work, leading to
+            -- recursive rules error. Below is a workaround.
+            -- putColoured Yellow $ "Hi " ++ hi
+            compileHaskell pkg todo obj way
 
         (buildDir <//> oPattern) %> \obj -> do
-            need [argListPath argListDir pkg stage]
             let vanillaObjName = takeFileName obj -<.> "o"
             cDeps <- args $ DependencyList cDepFile vanillaObjName
             if null cDeps
             then compileHaskell pkg todo obj way
             else compileC pkg todo cDeps obj
+            -- Finally, record the argument list
+            need [argListPath argListDir pkg stage]
 
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, settings) =
