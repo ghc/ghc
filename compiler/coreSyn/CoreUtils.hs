@@ -44,7 +44,8 @@ module CoreUtils (
         dataConRepInstPat, dataConRepFSInstPat,
 
         -- * Working with ticks
-        stripTicksTop, stripTicksTopE, stripTicksTopT, stripTicks,
+        stripTicksTop, stripTicksTopE, stripTicksTopT,
+        stripTicksE, stripTicksT
     ) where
 
 #include "HsVersions.h"
@@ -77,10 +78,6 @@ import Pair
 import Data.Function       ( on )
 import Data.List
 import Data.Ord            ( comparing )
-import Control.Applicative
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable    ( traverse )
-#endif
 import OrdList
 
 {-
@@ -358,25 +355,37 @@ stripTicksTopT p = go []
 
 -- | Completely strip ticks satisfying a predicate from an
 -- expression. Note this is O(n) in the size of the expression!
-stripTicks :: (Tickish Id -> Bool) -> Expr b -> ([Tickish Id], Expr b)
-stripTicks p expr = (fromOL ticks, expr')
-  where (ticks, expr') = go expr
-        -- Note that  OrdList (Tickish Id) is a Monoid, which makes
-        -- ((,) (OrdList (Tickish Id))) an Applicative.
-        go (App e a)        = App <$> go e <*> go a
-        go (Lam b e)        = Lam b <$> go e
-        go (Let b e)        = Let <$> go_bs b <*> go e
-        go (Case e b t as)  = Case <$> go e <*> pure b <*> pure t
-                                   <*> traverse go_a as
-        go (Cast e c)       = Cast <$> go e <*> pure c
+stripTicksE :: (Tickish Id -> Bool) -> Expr b -> Expr b
+stripTicksE p expr = go expr
+  where go (App e a)        = App (go e) (go a)
+        go (Lam b e)        = Lam b (go e)
+        go (Let b e)        = Let (go_bs b) (go e)
+        go (Case e b t as)  = Case (go e) b t (map go_a as)
+        go (Cast e c)       = Cast (go e) c
         go (Tick t e)
-          | p t             = let (ts, e') = go e in (t `consOL` ts, e')
-          | otherwise       = Tick t <$> go e
-        go other            = pure other
-        go_bs (NonRec b e)  = NonRec b <$> go e
-        go_bs (Rec bs)      = Rec <$> traverse go_b bs
-        go_b (b, e)         = (,) <$> pure b <*> go e
-        go_a (c,bs,e)       = (,,) <$> pure c <*> pure bs <*> go e
+          | p t             = go e
+          | otherwise       = Tick t (go e)
+        go other            = other
+        go_bs (NonRec b e)  = NonRec b (go e)
+        go_bs (Rec bs)      = Rec (map go_b bs)
+        go_b (b, e)         = (b, go e)
+        go_a (c,bs,e)       = (c,bs, go e)
+
+stripTicksT :: (Tickish Id -> Bool) -> Expr b -> [Tickish Id]
+stripTicksT p expr = fromOL $ go expr
+  where go (App e a)        = go e `appOL` go a
+        go (Lam _ e)        = go e
+        go (Let b e)        = go_bs b `appOL` go e
+        go (Case e _ _ as)  = go e `appOL` concatOL (map go_a as)
+        go (Cast e _)       = go e
+        go (Tick t e)
+          | p t             = t `consOL` go e
+          | otherwise       = go e
+        go _                = nilOL
+        go_bs (NonRec _ e)  = go e
+        go_bs (Rec bs)      = concatOL (map go_b bs)
+        go_b (_, e)         = go e
+        go_a (_, _, e)      = go e
 
 {-
 ************************************************************************

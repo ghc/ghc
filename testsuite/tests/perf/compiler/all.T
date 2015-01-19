@@ -601,3 +601,13 @@ test('T9872d',
       ],
      compile,
      [''])
+
+test('T9961',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 772510192, 5)
+          # 2015-01-12    807117816   Initally created
+          ]),
+      ],
+     compile,
+     ['-O'])
