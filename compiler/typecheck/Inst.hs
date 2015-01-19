@@ -646,5 +646,3 @@ tyVarsOfImplic (Implic { ic_skols = skols
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
-
-

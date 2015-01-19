@@ -16,6 +16,7 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   EvTerm(..), mkEvCast, evVarsOfTerm,
   EvLit(..), evTermCoercion,
+  EvCallStack(..),
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -27,7 +28,8 @@ module TcEvidence (
   mkTcAxiomRuleCo, mkTcPhantomCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo,
   isTcReflCo, getTcCoVar_maybe,
-  tcCoercionRole, eqVarRole
+  tcCoercionRole, eqVarRole,
+  unwrapIP, wrapIP
   ) where
 #include "HsVersions.h"
 
@@ -54,6 +56,7 @@ import Data.Traversable (traverse, sequenceA)
 import qualified Data.Data as Data
 import Outputable
 import FastString
+import SrcLoc
 import Data.IORef( IORef )
 
 {-
@@ -722,13 +725,27 @@ data EvTerm
   | EvLit EvLit       -- Dictionary for KnownNat and KnownSymbol classes.
                       -- Note [KnownNat & KnownSymbol and EvLit]
 
-  deriving( Data.Data, Data.Typeable)
+  | EvCallStack EvCallStack -- Dictionary for CallStack implicit parameters
+
+  deriving( Data.Data, Data.Typeable )
 
 
 data EvLit
   = EvNum Integer
   | EvStr FastString
-    deriving( Data.Data, Data.Typeable)
+    deriving( Data.Data, Data.Typeable )
+
+-- | Evidence for @CallStack@ implicit parameters.
+data EvCallStack
+  -- See Note [Overview of implicit CallStacks]
+  = EvCsEmpty
+  | EvCsPushCall Name RealSrcSpan EvTerm
+    -- ^ @EvCsPushCall name loc stk@ represents a call to @name@, occurring at
+    -- @loc@, in a calling context @stk@.
+  | EvCsTop FastString RealSrcSpan EvTerm
+    -- ^ @EvCsTop name loc stk@ represents a use of an implicit parameter
+    -- @?name@, occurring at @loc@, in a calling context @stk@.
+  deriving( Data.Data, Data.Typeable )
 
 {-
 Note [Coercion evidence terms]
@@ -819,6 +836,119 @@ The story for kind `Symbol` is analogous:
   * class KnownSymbol
   * newtype SSymbol
   * Evidence: EvLit (EvStr n)
+
+
+Note [Overview of implicit CallStacks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(See https://ghc.haskell.org/trac/ghc/wiki/ExplicitCallStack/ImplicitLocations)
+
+The goal of CallStack evidence terms is to reify locations
+in the program source as runtime values, without any support
+from the RTS. We accomplish this by assigning a special meaning
+to implicit parameters of type GHC.Stack.CallStack. A use of
+a CallStack IP, e.g.
+
+  head []    = error (show (?loc :: CallStack))
+  head (x:_) = x
+
+will be solved with the source location that gave rise to the IP
+constraint (here, the use of ?loc). If there is already
+a CallStack IP in scope, e.g. passed-in as an argument
+
+  head :: (?loc :: CallStack) => [a] -> a
+  head []    = error (show (?loc :: CallStack))
+  head (x:_) = x
+
+we will push the new location onto the CallStack that was passed
+in. These two cases are reflected by the EvCallStack evidence
+type. In the first case, we will create an evidence term
+
+  EvCsTop "?loc" <?loc's location> EvCsEmpty
+
+and in the second we'll have a given constraint
+
+  [G] d :: IP "loc" CallStack
+
+in scope, and will create an evidence term
+
+  EvCsTop "?loc" <?loc's location> d
+
+When we call a function that uses a CallStack IP, e.g.
+
+  f = head xs
+
+we create an evidence term
+
+  EvCsPushCall "head" <head's location> EvCsEmpty
+
+again pushing onto a given evidence term if one exists.
+
+This provides a lightweight mechanism for building up call-stacks
+explicitly, but is notably limited by the fact that the stack will
+stop at the first function whose type does not include a CallStack IP.
+For example, using the above definition of head:
+
+  f :: [a] -> a
+  f = head
+
+  g = f []
+
+the resulting CallStack will include use of ?loc inside head and
+the call to head inside f, but NOT the call to f inside g, because f
+did not explicitly request a CallStack.
+
+Important Details:
+- GHC should NEVER report an insoluble CallStack constraint.
+
+- A CallStack (defined in GHC.Stack) is a [(String, SrcLoc)], where the String
+  is the name of the binder that is used at the SrcLoc. SrcLoc is defined in
+  GHC.SrcLoc and contains the package/module/file name, as well as the full
+  source-span. Both CallStack and SrcLoc are kept abstract so only GHC can
+  construct new values.
+
+- Consider the use of ?stk in:
+
+    head :: (?stk :: CallStack) => [a] -> a
+    head [] = error (show ?stk)
+
+  When solving the use of ?stk we'll have a given
+
+   [G] d :: IP "stk" CallStack
+
+  in scope. In the interaction phase, GHC would normally solve the use of ?stk
+  directly from the given, i.e. re-using the dicionary. But this is NOT what we
+  want! We want to generate a *new* CallStack with ?loc's SrcLoc pushed onto
+  the given CallStack. So we must take care in TcInteract.interactDict to
+  prioritize solving wanted CallStacks.
+
+- We will automatically solve any wanted CallStack regardless of the name of the
+  IP, i.e.
+
+    f = show (?stk :: CallStack)
+    g = show (?loc :: CallStack)
+
+  are both valid. However, we will only push new SrcLocs onto existing
+  CallStacks when the IP names match, e.g. in
+
+    head :: (?loc :: CallStack) => [a] -> a
+    head [] = error (show (?stk :: CallStack))
+
+  the printed CallStack will NOT include head's call-site. This reflects the
+  standard scoping rules of implicit-parameters. (See TcInteract.interactDict)
+
+- An EvCallStack term desugars to a CoreExpr of type `IP "some str" CallStack`.
+  The desugarer will need to unwrap the IP newtype before pushing a new
+  call-site onto a given stack (See DsBinds.dsEvCallStack)
+
+- We only want to intercept constraints that arose due to the use of an IP or a
+  function call. In particular, we do NOT want to intercept the
+
+    (?stk :: CallStack) => [a] -> a
+      ~
+    (?stk :: CallStack) => [a] -> a
+
+  constraint that arises from the ambiguity check on `head`s type signature.
+  (See TcEvidence.isCallStackIP)
 -}
 
 mkEvCast :: EvTerm -> TcCoercion -> EvTerm
@@ -853,9 +983,16 @@ evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo c
 evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
+evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
+
+evVarsOfCallStack :: EvCallStack -> VarSet
+evVarsOfCallStack cs = case cs of
+  EvCsEmpty -> emptyVarSet
+  EvCsTop _ _ tm -> evVarsOfTerm tm
+  EvCsPushCall _ _ tm -> evVarsOfTerm tm
 
 {-
 ************************************************************************
@@ -920,9 +1057,40 @@ instance Outputable EvTerm where
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
   ppr (EvLit l)          = ppr l
+  ppr (EvCallStack cs)   = ppr cs
   ppr (EvDelayedError ty msg) =     ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
   ppr (EvStr s) = text (show s)
+
+instance Outputable EvCallStack where
+  ppr EvCsEmpty
+    = ptext (sLit "[]")
+  ppr (EvCsTop name loc tm)
+    = angleBrackets (ppr (name,loc)) <+> ptext (sLit ":") <+> ppr tm
+  ppr (EvCsPushCall name loc tm)
+    = angleBrackets (ppr (name,loc)) <+> ptext (sLit ":") <+> ppr tm
+
+----------------------------------------------------------------------
+-- Helper functions for dealing with IP newtype-dictionaries
+----------------------------------------------------------------------
+
+-- | Create a 'Coercion' that unwraps an implicit-parameter dictionary
+-- to expose the underlying value. We expect the 'Type' to have the form
+-- `IP sym ty`, return a 'Coercion' `co :: IP sym ty ~ ty`.
+unwrapIP :: Type -> Coercion
+unwrapIP ty =
+  case unwrapNewTyCon_maybe tc of
+    Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys
+    Nothing       -> pprPanic "unwrapIP" $
+                       text "The dictionary for" <+> quotes (ppr tc)
+                         <+> text "is not a newtype!"
+  where
+  (tc, tys) = splitTyConApp ty
+
+-- | Create a 'Coercion' that wraps a value in an implicit-parameter
+-- dictionary. See 'unwrapIP'.
+wrapIP :: Type -> Coercion
+wrapIP ty = mkSymCo (unwrapIP ty)

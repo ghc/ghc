@@ -34,6 +34,32 @@
                     TODO FIXME.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    Implicit parameters of the new base type
+                    <literal>GHC.Stack.CallStack</literal> are treated
+                    specially, and automatically solved for the current source
+                    location. For example
+                    <programlisting>
+                      f = print (?stk :: CallStack)
+                    </programlisting>
+                    will print the singleton stack containing the occurrence of
+                    <literal>?stk</literal>. If there is another
+                    <literal>CallStack</literal> implicit in-scope, the new location
+                    will be appended to the existing stack, e.g.
+                    <programlisting>
+                      f :: (?stk :: CallStack) => IO ()
+                      f = print (?stk :: CallStack)
+                    </programlisting>
+                    will print the occurrence of <literal>?stk</literal> and the
+                    call-site of <literal>f</literal>. The name of the implicit
+                    parameter does not matter.
+               </para>
+                <para>
+                    See the release notes for base for a description of the
+                    <literal>CallStack</literal> type.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -127,6 +153,23 @@
             <listitem>
                 <para>
                     Version number XXXXX (was 4.7.0.0)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A new module <literal>GHC.SrcLoc</literal> was added,
+                    exporting a new type <literal>SrcLoc</literal>. A
+                    <literal>SrcLoc</literal> contains package, module,
+                    and file names, as well as start and end positions.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A new type <literal>CallStack</literal> was added for use
+                    with the new implicit callstack parameters. A
+                    <literal>CallStack</literal> is a
+                    <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
+                    call.
                </para>
            </listitem>
        </itemizedlist>

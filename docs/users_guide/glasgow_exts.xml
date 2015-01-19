@@ -7701,6 +7701,56 @@ inner binding of <literal>?x</literal>, so <literal>(f 9)</literal> will return
 <literal>14</literal>.
 </para>
 </sect3>
+
+<sect3><title>Special implicit parameters</title>
+<para>
+GHC treats implicit parameters of type <literal>GHC.Stack.CallStack</literal>
+specially, by resolving them to the current location in the program. Consider:
+<programlisting>
+  f :: String
+  f = show (?loc :: CallStack)
+</programlisting>
+GHC will automatically resolve <literal>?loc</literal> to its source
+location. If another implicit parameter with type <literal>CallStack</literal> is
+in scope, GHC will append the two locations, creating an explicit call-stack. For example:
+<programlisting>
+  f :: (?stk :: CallStack) => String
+  f = show (?stk :: CallStack)
+</programlisting>
+will produce the location of <literal>?stk</literal>, followed by
+<literal>f</literal>'s call-site. Note that the name of the implicit parameter does not
+matter (we used <literal>?loc</literal> above), GHC will solve any implicit parameter
+with the right type. The name does, however, matter when pushing new locations onto
+existing stacks. Consider:
+<programlisting>
+  f :: (?stk :: CallStack) => String
+  f = show (?loc :: CallStack)
+</programlisting>
+When we call <literal>f</literal>, the stack will include the use of <literal>?loc</literal>,
+but not the call to <literal>f</literal>; in this case the names must match.
+</para>
+<para>
+<literal>CallStack</literal> is kept abstract, but
+GHC provides a function
+<programlisting>
+  getCallStack :: CallStack -> [(String, SrcLoc)]
+</programlisting>
+to access the individual call-sites in the stack. The <literal>String</literal>
+is the name of the function that was called, and the <literal>SrcLoc</literal>
+provides the package, module, and file name, as well as the line and column
+numbers. The stack will never be empty, as the first call-site
+will be the location at which the implicit parameter was used. GHC will also
+never infer <literal>?loc :: CallStack</literal> as a type constraint, which
+means that functions must explicitly ask to be told about their call-sites.
+</para>
+<para>
+A potential "gotcha" when using implicit <literal>CallStack</literal>s is that
+the <literal>:type</literal> command in GHCi will not report the
+<literal>?loc :: CallStack</literal> constraint, as the typechecker will
+immediately solve it. Use <literal>:info</literal> instead to print the
+unsolved type.
+</para>
+</sect3>
 </sect2>
 
 <sect2 id="kinding">

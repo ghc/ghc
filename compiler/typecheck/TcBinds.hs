@@ -56,7 +56,6 @@ import BasicTypes
 import Outputable
 import FastString
 import Type(mkStrLitTy)
-import Class(classTyCon)
 import PrelNames(ipClassName)
 import TcValidity (checkValidType)
 
@@ -253,10 +252,8 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
 
     -- Coerces a `t` into a dictionry for `IP "x" t`.
     -- co : t -> IP "x" t
-    toDict ipClass x ty =
-      case unwrapNewTyCon_maybe (classTyCon ipClass) of
-        Just (_,_,ax) -> HsWrap $ mkWpCast $ mkTcSymCo $ mkTcUnbranchedAxInstCo Representational ax [x,ty]
-        Nothing       -> panic "The dictionary for `IP` is not a newtype?"
+    toDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
+                          wrapIP $ mkClassPred ipClass [x,ty]
 
 {-
 Note [Implicit parameter untouchables]

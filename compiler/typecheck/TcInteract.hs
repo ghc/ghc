@@ -8,6 +8,8 @@ module TcInteract (
 #include "HsVersions.h"
 
 import BasicTypes ()
+import HsTypes ( hsIPNameFS )
+import FastString
 import TcCanonical
 import TcFlatten
 import VarSet
@@ -18,7 +20,8 @@ import CoAxiom(sfInteractTop, sfInteractInert)
 
 import Var
 import TcType
-import PrelNames (knownNatClassName, knownSymbolClassName, ipClassNameKey )
+import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
+                   callStackTyConKey )
 import Id( idType )
 import Class
 import TyCon
@@ -42,7 +45,6 @@ import Control.Monad
 import Maybes( isJust )
 import Pair (Pair(..))
 import Unique( hasKey )
-import FastString ( sLit )
 import DynFlags
 import Util
 
@@ -606,6 +608,26 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
+  -- don't ever try to solve CallStack IPs directly from other dicts,
+  -- we always build new dicts instead.
+  -- See Note [Overview of implicit CallStacks]
+  | [_ip, ty] <- tys
+  , isWanted ev_w
+  , Just mkEvCs <- isCallStackIP (ctEvLoc ev_w) cls ty
+  = do let ev_cs =
+             case lookupInertDict inerts (ctEvLoc ev_w) cls tys of
+               Just ev | isGiven ev -> mkEvCs (ctEvTerm ev)
+               _ -> mkEvCs (EvCallStack EvCsEmpty)
+
+       -- now we have ev_cs :: CallStack, but the evidence term should
+       -- be a dictionary, so we have to coerce ev_cs to a
+       -- dictionary for `IP ip CallStack`
+       let ip_ty = mkClassPred cls tys
+       let ev_tm = mkEvCast (EvCallStack ev_cs) (TcCoercion $ wrapIP ip_ty)
+       addSolvedDict ev_w cls tys
+       setWantedEvBind (ctEvId ev_w) ev_tm
+       stopWith ev_w "Wanted CallStack IP"
+
   | Just ctev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
   = do { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
        ; case inert_effect of
@@ -1732,3 +1754,23 @@ overlapping checks. There we are interested in validating the following principl
 But for the Given Overlap check our goal is just related to completeness of
 constraint solving.
 -}
+
+-- | Is the constraint for an implicit CallStack parameter?
+isCallStackIP :: CtLoc -> Class -> Type -> Maybe (EvTerm -> EvCallStack)
+isCallStackIP loc cls ty
+  | Just (tc, []) <- splitTyConApp_maybe ty
+  , cls `hasKey` ipClassNameKey && tc `hasKey` callStackTyConKey
+  = occOrigin (ctLocOrigin loc)
+  where
+  -- We only want to grab constraints that arose due to the use of an IP or a
+  -- function call. See Note [Overview of implicit CallStacks]
+  occOrigin (OccurrenceOf n)
+    = Just (EvCsPushCall n locSpan)
+  occOrigin (IPOccOrigin n)
+    = Just (EvCsTop ('?' `consFS` hsIPNameFS n) locSpan)
+  occOrigin _
+    = Nothing
+  locSpan
+    = ctLocSpan loc
+isCallStackIP _ _ _
+  = Nothing
