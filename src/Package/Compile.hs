@@ -49,9 +49,7 @@ compileHaskell pkg @ (Package _ path _) todo @ (stage, dist, _) obj way = do
     let buildDir = unifyPath $ path </> dist </> "build"
     -- TODO: keep only vanilla dependencies in 'haskell.deps'
     deps <- args $ DependencyList (buildDir </> "haskell.deps") obj
-    let (srcs, his) = partition ("//*hs" ?==) deps
-        objs = map (-<.> osuf way) his
-    -- Need *.o files instead of *.hi files to avoid recursive rules
+    let srcs = filter ("//*hs" ?==) deps
     need deps
     run (Ghc stage) $ ghcArgs pkg todo way srcs obj
 
