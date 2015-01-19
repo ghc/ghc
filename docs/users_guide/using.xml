@@ -1862,7 +1862,7 @@ data Vec n s where
             and <function>Succ</function> are not written as <function>'Zero</function> and
             <function>'Succ</function>.
             </para>
-            <para>This warning is off by default.</para>
+            <para>This warning is is enabled by default in <literal>-Wall</literal> mode.</para>
         </listitem>
       </varlistentry>
 
