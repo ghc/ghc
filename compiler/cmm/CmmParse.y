@@ -575,6 +575,10 @@ importName
         : NAME  
         { ($1, mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction) }
 
+        -- as previous 'NAME', but 'IsData'
+        | 'CLOSURE' NAME
+        { ($2, mkForeignLabel $2 Nothing ForeignLabelInExternalPackage IsData) }
+
         -- A label imported with an explicit packageId.
         | STRING NAME
         { ($2, mkCmmCodeLabel (fsToPackageKey (mkFastString $1)) $2) }
