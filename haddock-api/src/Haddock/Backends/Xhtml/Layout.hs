@@ -148,6 +148,20 @@ subTable qual decls = Just $ table << aboves (concatMap subRow decls)
        docElement td << fmap (docToHtml Nothing qual) mdoc)
       : map (cell . (td <<)) subs
 
+-- | Sub table with source information (optional).
+subTableSrc :: Qualification -> LinksInfo -> Bool -> DocName -> [(SubDecl,SrcSpan)] -> Maybe Html
+subTableSrc _ _  _ _ [] = Nothing
+subTableSrc qual lnks splice dn decls = Just $ table << aboves (concatMap subRow decls)
+  where
+    subRow ((decl, mdoc, subs),loc) =
+      (td ! [theclass "src"] << decl
+      <+> linkHtml loc
+      <->
+      docElement td << fmap (docToHtml Nothing qual) mdoc
+      )
+      : map (cell . (td <<)) subs
+    linkHtml loc@(RealSrcSpan _) = links lnks loc splice dn
+    linkHtml _ = noHtml
 
 subBlock :: [Html] -> Maybe Html
 subBlock [] = Nothing
@@ -174,13 +188,15 @@ subEquations :: Qualification -> [SubDecl] -> Html
 subEquations qual = divSubDecls "equations" "Equations" . subTable qual
 
 
+-- | Generate sub table for instance declarations, with source
 subInstances :: Qualification
              -> String -- ^ Class name, used for anchor generation
-             -> [SubDecl] -> Html
-subInstances qual nm = maybe noHtml wrap . instTable
+             -> LinksInfo -> Bool -> DocName
+             -> [(SubDecl,SrcSpan)] -> Html
+subInstances qual nm lnks splice dn = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTable qual
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice dn
     subSection = thediv ! [theclass "subs instances"]
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
@@ -200,12 +216,19 @@ declElem = paragraph ! [theclass "src"]
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> Bool -> [DocName] -> Html -> Html
-topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names html =
-    declElem << (html <+> srcLink <+> wikiLink)
+topDeclElem lnks loc splice names html =
+    declElem << (html <+> (links lnks loc splice $ head names))
+        -- FIXME: is it ok to simply take the first name?
+
+-- | Adds a source and wiki link at the right hand side of the box.
+-- Name must be documented, otherwise we wouldn't get here.
+links :: LinksInfo -> SrcSpan -> Bool -> DocName -> Html
+links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice (Documented n mdl) =
+   (srcLink <+> wikiLink)
   where srcLink = let nameUrl = Map.lookup origPkg sourceMap
                       lineUrl = Map.lookup origPkg lineMap
                       mUrl | splice    = lineUrl
-                                         -- Use the lineUrl as a backup
+                                        -- Use the lineUrl as a backup
                            | otherwise = maybe lineUrl Just nameUrl in
           case mUrl of
             Nothing  -> noHtml
@@ -227,10 +250,7 @@ topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names htm
         origMod = nameModule n
         origPkg = modulePackageKey origMod
 
-        -- Name must be documented, otherwise we wouldn't get here
-        Documented n mdl = head names
-        -- FIXME: is it ok to simply take the first name?
-
         fname = case loc of
-                RealSrcSpan l -> unpackFS (srcSpanFile l)
-                UnhelpfulSpan _ -> error "topDeclElem UnhelpfulSpan"
+          RealSrcSpan l -> unpackFS (srcSpanFile l)
+          UnhelpfulSpan _ -> error "links: UnhelpfulSpan"
+links _ _ _ _ = noHtml

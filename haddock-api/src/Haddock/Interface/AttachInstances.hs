@@ -72,21 +72,22 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
       mb_info <- getAllInfo (tcdName d)
       insts <- case mb_info of
         Just (_, _, cls_instances, fam_instances) ->
-          let fam_insts = [ (synifyFamInst i opaque, n)
+          let fam_insts = [ (L (getSrcSpan n) $ synifyFamInst i opaque, doc)
                           | i <- sortBy (comparing instFam) fam_instances
-                          , let n = instLookup instDocMap (getName i) iface ifaceMap instIfaceMap
+                          , let n = getName i
+                          , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
                           , not $ isNameHidden expInfo (fi_fam i)
                           , not $ any (isTypeHidden expInfo) (fi_tys i)
                           , let opaque = isTypeHidden expInfo (fi_rhs i)
                           ]
-              cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
+              cls_insts = [ (L (getSrcSpan n) $ synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
                           | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
                           , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                           , not $ isInstanceHidden expInfo cls tys
                           ]
               -- fam_insts but with failing type fams filtered out
-              cleanFamInsts = [ (fi, n) | (Right fi, n) <- fam_insts ]
-              famInstErrs = [ errm | (Left errm, _) <- fam_insts ]
+              cleanFamInsts = [ (L l fi, n) | (L l (Right fi), n) <- fam_insts ]
+              famInstErrs = [ errm | (L _ (Left errm), _) <- fam_insts ]
           in do
             dfs <- getDynFlags
             let mkBug = (text "haddock-bug:" <+>) . text

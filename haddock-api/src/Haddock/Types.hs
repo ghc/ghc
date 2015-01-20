@@ -300,8 +300,8 @@ instance OutputableBndr a => Outputable (InstType a) where
   ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
   ppr (DataInst  a) = text "DataInst"  <+> ppr a
 
--- | An instance head that may have documentation.
-type DocInstance name = (InstHead name, Maybe (MDoc name))
+-- | An instance head that may have documentation and a source location.
+type DocInstance name = (Located (InstHead name), Maybe (MDoc name))
 
 -- | The head of an instance. Consists of a class name, a list of kind
 -- parameters, a list of type parameters and an instance type

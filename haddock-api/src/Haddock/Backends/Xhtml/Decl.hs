@@ -18,7 +18,6 @@ module Haddock.Backends.Xhtml.Decl (
   tyvarNames
 ) where
 
-
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
@@ -270,7 +269,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
-      = ppInstances instances docname unicode qual
+      = ppInstances links instances docname unicode qual
 
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
@@ -492,18 +491,19 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instancesBit = ppInstances instances nm unicode qual
+    instancesBit = ppInstances links instances nm unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
-ppInstances :: [DocInstance DocName] -> DocName -> Unicode -> Qualification -> Html
-ppInstances instances baseName unicode qual
-  = subInstances qual instName (map instDecl instances)
+ppInstances :: LinksInfo -> [DocInstance DocName] -> DocName -> Unicode -> Qualification -> Html
+ppInstances links instances baseName unicode qual
+  = subInstances qual instName links True baseName (map instDecl instances)
+  -- force Splice = True to use line URLs
   where
     instName = getOccString $ getName baseName
-    instDecl :: DocInstance DocName -> SubDecl
-    instDecl (inst, maybeDoc) = (instHead inst, maybeDoc, [])
+    instDecl :: DocInstance DocName -> (SubDecl,SrcSpan)
+    instDecl (L l inst, maybeDoc) = ((instHead inst, maybeDoc, []),l)
     instHead (n, ks, ts, ClassInst cs) = ppContextNoLocs cs unicode qual
         <+> ppAppNameTypes n ks ts unicode qual
     instHead (n, ks, ts, TypeInst rhs) = keyword "type"
@@ -582,7 +582,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
                                      (map unLoc (con_names (unLoc c)))) fixities
       ]
 
-    instancesBit = ppInstances instances docname unicode qual
+    instancesBit = ppInstances links instances docname unicode qual
 
 
 

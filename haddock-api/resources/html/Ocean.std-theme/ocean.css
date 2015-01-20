@@ -378,6 +378,15 @@ div#style-menu-holder {
   margin: 0 -0.5em 0 0.5em;
 }
 
+#interface td.src .link {
+  float: right;
+  color: #919191;
+  border-left: 1px solid #919191;
+  background: #f0f0f0;
+  padding: 0 0.5em 0.2em;
+  margin: 0 -0.5em 0 0.5em;
+}
+
 #interface span.fixity {
   color: #919191;
   border-left: 1px solid #919191;
