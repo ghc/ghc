@@ -18,6 +18,9 @@ instance Show IntegerLibrary where
 integerLibrary :: IntegerLibrary
 integerLibrary = IntegerGmp2
 
+integerLibraryName :: String
+integerLibraryName = show integerLibrary
+
 buildHaddock :: Bool
 buildHaddock = True
 
@@ -26,42 +29,42 @@ buildHaddock = True
 -- target, i.e. GHC (and perhaps, something else)
 targetPackages :: [Package]
 targetPackages =
-    [   standardLibrary "array"               [        Stage1]
-    --,     customLibrary "base"                [        Stage1] baseConfArgs
-    ,   standardLibrary "bin-package-db"      [Stage0, Stage1]
-    ,   standardLibrary "binary"              [Stage0, Stage1]
-    ,   standardLibrary "bytestring"          [        Stage1]
-    -- see Note [Cabal package weirdness]
-    , customNameLibrary "Cabal/Cabal"         [Stage0, Stage1] cabalTraits
-    ,   standardLibrary "containers"          [        Stage1]
-    ,   standardLibrary "deepseq"             [        Stage1]
-    ,   standardLibrary "directory"           [        Stage1]
-    ,   standardLibrary "filepath"            [        Stage1]
-    ,     customLibrary "ghc-prim"            [        Stage1] ghcPrimConfArgs
-    ,   standardLibrary "haskeline"           [        Stage1]
-    ,   standardLibrary "hoopl"               [Stage0, Stage1]
-    ,   standardLibrary "hpc"                 [Stage0, Stage1]
-    , customNameLibrary (show integerLibrary) [        Stage1] integerLibTraits
-    ,   standardLibrary "parallel"            [        Stage1]
-    ,   standardLibrary "pretty"              [        Stage1]
-    ,   standardLibrary "primitive"           [        Stage1]
-    ,   standardLibrary "process"             [        Stage1]
-    ,   standardLibrary "stm"                 [        Stage1]
-    ,   standardLibrary "template-haskell"    [        Stage1]
-    ,     customLibrary "terminfo"            [Stage0, Stage1] whenTerminfo
-    ,   standardLibrary "time"                [        Stage1]
-    ,   standardLibrary "transformers"        [Stage0, Stage1]
-    ,     customLibrary "unix"                [        Stage1] whenUnix
-    ,     customLibrary "Win32"               [        Stage1] whenWin32
-    ,     customLibrary "xhtml"               [        Stage1] whenXhtml
+    [   standardLibrary "array"            [        Stage1]
+    ,     customLibrary "base"             [        Stage1] baseConfArgs
+    ,   standardLibrary "bin-package-db"   [Stage0, Stage1]
+    ,   standardLibrary "binary"           [Stage0, Stage1]
+    ,   standardLibrary "bytestring"       [        Stage1]
+    , customNameLibrary "Cabal/Cabal"      [Stage0, Stage1] cabalTraits
+    ,   standardLibrary "containers"       [        Stage1]
+    ,   standardLibrary "deepseq"          [        Stage1]
+    ,   standardLibrary "directory"        [        Stage1]
+    ,   standardLibrary "filepath"         [        Stage1]
+    ,     customLibrary "ghc-prim"         [        Stage1] ghcPrimConfArgs
+    ,   standardLibrary "haskeline"        [        Stage1]
+    ,   standardLibrary "hoopl"            [Stage0, Stage1]
+    ,   standardLibrary "hpc"              [Stage0, Stage1]
+    , customNameLibrary integerLibraryName [        Stage1] integerLibTraits
+    ,   standardLibrary "parallel"         [        Stage1]
+    ,   standardLibrary "pretty"           [        Stage1]
+    ,   standardLibrary "primitive"        [        Stage1]
+    ,   standardLibrary "process"          [        Stage1]
+    ,   standardLibrary "stm"              [        Stage1]
+    ,   standardLibrary "template-haskell" [        Stage1]
+    ,     customLibrary "terminfo"         [Stage0, Stage1] whenTerminfo
+    ,   standardLibrary "time"             [        Stage1]
+    ,   standardLibrary "transformers"     [Stage0, Stage1]
+    ,     customLibrary "unix"             [        Stage1] whenUnix
+    ,     customLibrary "Win32"            [        Stage1] whenWin32
+    ,     customLibrary "xhtml"            [        Stage1] whenXhtml
     ]
 
 baseConfArgs :: Settings -> Settings
 baseConfArgs settings =
     settings { customConfArgs = arg $ "--flags=" ++ show integerLibrary }
 
+-- see Note [Cabal package weirdness]
 cabalTraits :: (String, Settings -> Settings)
-cabalTraits = ("Cabal", id) -- change cabalName, keep the other settings intact
+cabalTraits = ("Cabal", id) -- change cabalName, keep other settings intact
 
 ghcPrimConfArgs :: Settings -> Settings
 ghcPrimConfArgs settings =
@@ -76,7 +79,9 @@ integerLibTraits = (cabalName, traits)
         IntegerSimple -> "integer-simple"
     traits settings = settings
         {
-            customCcArgs = arg "-Ilibraries/integer-gmp2/gmp"
+            customConfArgs = when windowsHost $
+                             arg "--configure-option=--with-intree-gmp",
+            customCcArgs   = arg "-Ilibraries/integer-gmp2/gmp"
         }
 
 whenTerminfo :: Settings -> Settings

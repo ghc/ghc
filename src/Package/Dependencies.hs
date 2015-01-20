@@ -43,13 +43,14 @@ ghcArgs (Package name path _ _) (stage, dist, settings) =
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 gccArgs :: FilePath -> Package -> TodoItem -> Args
-gccArgs sourceFile (Package _ path _ _) (stage, dist, _) =
+gccArgs sourceFile (Package _ path _ _) (stage, dist, settings) =
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
         depFile  = buildDir </> takeFileName sourceFile <.> "deps"
-    in args [ args ["-MM", "-E"] -- TODO: add a Cpp Builder instead
+    in args [ args ["-E", "-MM"] -- TODO: add a Cpp Builder instead
             , args $ CcArgs pathDist
             , commonCcArgs
+            , customCcArgs settings
             , commonCcWarninigArgs
             , includeGccArgs path dist
             , args ["-MF", unifyPath depFile]

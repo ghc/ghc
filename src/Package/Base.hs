@@ -125,7 +125,9 @@ packageArgs stage pathDist = do
 includeGccArgs :: FilePath -> FilePath -> Args
 includeGccArgs path dist =
     let pathDist = path </> dist
-    in args [ pathArgs "-I" path $ IncludeDirs pathDist
+        autogen  = pathDist </> "build/autogen"
+    in args [ arg $ "-I" ++ unifyPath autogen
+            , pathArgs "-I" path $ IncludeDirs pathDist
             , pathArgs "-I" path $ DepIncludeDirs pathDist ]
 
 includeGhcArgs :: FilePath -> FilePath -> Args

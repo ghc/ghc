@@ -29,10 +29,11 @@ ghcArgs (Package _ path _ _) (stage, dist, _) way srcs result =
             , args ["-o", result] ]
 
 gccArgs :: Package -> TodoItem -> [FilePath] -> FilePath -> Args
-gccArgs (Package _ path _ _) (_, dist, _) srcs result =
+gccArgs (Package _ path _ _) (_, dist, settings) srcs result =
     let pathDist = path </> dist
     in args [ args $ CcArgs pathDist
             , commonCcArgs
+            , customCcArgs settings
             , commonCcWarninigArgs
             , includeGccArgs path dist
             , args ("-c":srcs)
