@@ -11,8 +11,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 {-# LANGUAGE CPP #-}
 
 module FunDeps (
-        FDEq (..),
-        Equation(..), pprEquation,
+        FunDepEqn(..), pprEquation,
         improveFromInstEnv, improveFromAnother,
         checkInstCoverage, checkFunDeps,
         pprFundeps
@@ -34,6 +33,7 @@ import SrcLoc
 import Util
 import FastString
 
+import Pair             ( Pair(..) )
 import Data.List        ( nubBy )
 import Data.Maybe       ( isJust )
 
@@ -49,21 +49,23 @@ Each functional dependency with one variable in the RHS is responsible
 for generating a single equality. For instance:
      class C a b | a -> b
 The constraints ([Wanted] C Int Bool) and [Wanted] C Int alpha
-     FDEq { fd_pos      = 1
-          , fd_ty_left  = Bool
-          , fd_ty_right = alpha }
+will generate the folloing FunDepEqn
+     FDEqn { fd_qtvs = []
+           , fd_eqs  = [Pair Bool alpha]
+           , fd_pred1 = C Int Bool
+           , fd_pred2 = C Int alpha
+           , fd_loc = ... }
 However notice that a functional dependency may have more than one variable
-in the RHS which will create more than one FDEq. Example:
+in the RHS which will create more than one pair of types in fd_eqs. Example:
      class C a b c | a -> b c
      [Wanted] C Int alpha alpha
      [Wanted] C Int Bool beta
 Will generate:
-        fd1 = FDEq { fd_pos = 1, fd_ty_left = alpha, fd_ty_right = Bool } and
-        fd2 = FDEq { fd_pos = 2, fd_ty_left = alpha, fd_ty_right = beta }
-
-We record the paremeter position so that can immediately rewrite a constraint
-using the produced FDEqs and remove it from our worklist.
-
+     FDEqn { fd_qtvs = []
+           , fd_eqs  = [Pair Bool alpha, Pair alpha beta]
+           , fd_pred1 = C Int Bool
+           , fd_pred2 = C Int alpha
+           , fd_loc = ... }
 
 INVARIANT: Corresponding types aren't already equal
 That is, there exists at least one non-identity equality in FDEqs.
@@ -95,19 +97,15 @@ unification variables when producing the FD constraints.
 Finally, the position parameters will help us rewrite the wanted constraint ``on the spot''
 -}
 
-data Equation loc
-   = FDEqn { fd_qtvs :: [TyVar]                 -- Instantiate these type and kind vars to fresh unification vars
-           , fd_eqs  :: [FDEq]                  --   and then make these equal
-           , fd_pred1, fd_pred2 :: PredType     -- The Equation arose from combining these two constraints
-           , fd_loc :: loc  }
+data FunDepEqn loc
+  = FDEqn { fd_qtvs :: [TyVar]   -- Instantiate these type and kind vars
+                                 --   to fresh unification vars,
+                                 -- Non-empty only for FunDepEqns arising from instance decls
 
-data FDEq = FDEq { fd_pos      :: Int -- We use '0' for the first position
-                 , fd_ty_left  :: Type
-                 , fd_ty_right :: Type }
-
-instance Outputable FDEq where
-  ppr (FDEq { fd_pos = p, fd_ty_left = tyl, fd_ty_right = tyr })
-    = parens (int p <> comma <+> ppr tyl <> comma <+> ppr tyr)
+          , fd_eqs  :: [Pair Type]  -- Make these pairs of types equal
+          , fd_pred1 :: PredType    -- The FunDepEqn arose from 
+          , fd_pred2 :: PredType    --  combining these two constraints 
+          , fd_loc :: loc  }
 
 {-
 Given a bunch of predicates that must hold, such as
@@ -139,84 +137,74 @@ NOTA BENE:
 -}
 
 instFD :: FunDep TyVar -> [TyVar] -> [Type] -> FunDep Type
--- A simpler version of instFD_WithPos to be used in checking instance coverage etc.
+-- (instFD fd tvs tys) returns fd instantiated with (tvs -> tys)
 instFD (ls,rs) tvs tys
   = (map lookup ls, map lookup rs)
   where
     env       = zipVarEnv tvs tys
     lookup tv = lookupVarEnv_NF env tv
 
-instFD_WithPos :: FunDep TyVar -> [TyVar] -> [Type] -> ([Type], [(Int,Type)])
--- Returns a FunDep between the types accompanied along with their
--- position (<=0) in the types argument list.
-instFD_WithPos (ls,rs) tvs tys
-  = (map (snd . lookup) ls, map lookup rs)
-  where
-    ind_tys   = zip [0..] tys
-    env       = zipVarEnv tvs ind_tys
-    lookup tv = lookupVarEnv_NF env tv
-
 zipAndComputeFDEqs :: (Type -> Type -> Bool) -- Discard this FDEq if true
-                   -> [Type]
-                   -> [(Int,Type)]
-                   -> [FDEq]
--- Create a list of FDEqs from two lists of types, making sure
--- that the types are not equal.
-zipAndComputeFDEqs discard (ty1:tys1) ((i2,ty2):tys2)
+                   -> [Type] -> [Type]
+                   -> [Pair Type]
+-- Create a list of (Type,Type) pairs from two lists of types,
+-- making sure that the types are not already equal
+zipAndComputeFDEqs discard (ty1:tys1) (ty2:tys2)
  | discard ty1 ty2 = zipAndComputeFDEqs discard tys1 tys2
- | otherwise = FDEq { fd_pos      = i2
-                    , fd_ty_left  = ty1
-                    , fd_ty_right = ty2 } : zipAndComputeFDEqs discard tys1 tys2
+ | otherwise       = Pair ty1 ty2 : zipAndComputeFDEqs discard tys1 tys2
 zipAndComputeFDEqs _ _ _ = []
 
 -- Improve a class constraint from another class constraint
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-improveFromAnother :: PredType -- Template item (usually given, or inert)
+improveFromAnother :: loc
+                   -> PredType -- Template item (usually given, or inert)
                    -> PredType -- Workitem [that can be improved]
-                   -> [Equation ()]
+                   -> [FunDepEqn loc]
 -- Post: FDEqs always oriented from the other to the workitem
 --       Equations have empty quantified variables
-improveFromAnother pred1 pred2
+improveFromAnother loc pred1 pred2
   | Just (cls1, tys1) <- getClassPredTys_maybe pred1
   , Just (cls2, tys2) <- getClassPredTys_maybe pred2
   , tys1 `lengthAtLeast` 2 && cls1 == cls2
-  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2, fd_loc = () }
+  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2, fd_loc = loc }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
     , fd <- cls_fds
-    , let (ltys1, rs1)  = instFD         fd cls_tvs tys1
-          (ltys2, irs2) = instFD_WithPos fd cls_tvs tys2
+    , let (ltys1, rs1) = instFD fd cls_tvs tys1
+          (ltys2, rs2) = instFD fd cls_tvs tys2
     , eqTypes ltys1 ltys2               -- The LHSs match
-    , let eqs = zipAndComputeFDEqs eqType rs1 irs2
+    , let eqs = zipAndComputeFDEqs eqType rs1 rs2
     , not (null eqs) ]
 
-improveFromAnother _ _ = []
+improveFromAnother _ _ _ = []
 
 
 -- Improve a class constraint from instance declarations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-pprEquation :: Equation a -> SDoc
+pprEquation :: FunDepEqn a -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
-          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (FDEq _ t1 t2) <- pairs])]
+          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 
+                       | Pair t1 t2 <- pairs])]
 
 improveFromInstEnv :: InstEnvs
+                   -> (PredType -> SrcSpan -> loc)
                    -> PredType
-                   -> [Equation SrcSpan] -- Needs to be an Equation because
-                                         -- of quantified variables
+                   -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
+                                      -- of quantified variables
 -- Post: Equations oriented from the template (matching instance) to the workitem!
-improveFromInstEnv _inst_env pred
+improveFromInstEnv _inst_env _ pred
   | not (isClassPred pred)
   = panic "improveFromInstEnv: not a class predicate"
-improveFromInstEnv inst_env pred
+improveFromInstEnv inst_env mk_loc pred
   | Just (cls, tys) <- getClassPredTys_maybe pred
   , tys `lengthAtLeast` 2
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
         rough_tcs          = roughMatchTcs tys
   = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs
-            , fd_pred1 = p_inst, fd_pred2=pred
-            , fd_loc = getSrcSpan (is_dfun ispec) }
+            , fd_pred1 = p_inst, fd_pred2 = pred
+            , fd_loc = mk_loc p_inst (getSrcSpan (is_dfun ispec)) }
     | fd <- cls_fds             -- Iterate through the fundeps first,
                                 -- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
@@ -229,14 +217,14 @@ improveFromInstEnv inst_env pred
                                     emptyVarSet tys trimmed_tcs -- NB: orientation
     , let p_inst = mkClassPred cls (is_tys ispec)
     ]
-improveFromInstEnv _ _ = []
+improveFromInstEnv _ _ _ = []
 
 
 checkClsFD :: FunDep TyVar -> [TyVar]             -- One functional dependency from the class
            -> ClsInst                             -- An instance template
            -> TyVarSet -> [Type] -> [Maybe Name]  -- Arguments of this (C tys) predicate
                                                   -- TyVarSet are extra tyvars that can be instantiated
-           -> [([TyVar], [FDEq])]
+           -> [([TyVar], [Pair Type])]
 
 checkClsFD fd clas_tvs
            (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
@@ -302,10 +290,9 @@ checkClsFD fd clas_tvs
                         -- work of the ls1/ls2 unification leaving a smaller unification problem
                   where
                     rtys1' = map (substTy subst) rtys1
-                    irs2'  = map (\(i,x) -> (i,substTy subst x)) irs2
-                    rtys2' = map snd irs2'
+                    rtys2' = map (substTy subst) rtys2
 
-                    fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' irs2'
+                    fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' rtys2'
                         -- Don't discard anything!
                         -- We could discard equal types but it's an overkill to call
                         -- eqType again, since we know for sure that /at least one/
@@ -335,8 +322,8 @@ checkClsFD fd clas_tvs
                | tv `elemVarSet` extra_qtvs = BindMe
                | otherwise                  = Skolem
 
-    (ltys1, rtys1) = instFD         fd clas_tvs tys_inst
-    (ltys2, irs2)  = instFD_WithPos fd clas_tvs tys_actual
+    (ltys1, rtys1) = instFD fd clas_tvs tys_inst
+    (ltys2, rtys2) = instFD fd clas_tvs tys_actual
 
 {-
 ************************************************************************

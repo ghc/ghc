@@ -38,7 +38,7 @@ import TcSMonad
 import Bag
 
 import Data.List( partition, foldl', deleteFirstsBy )
-
+import SrcLoc
 import VarEnv
 
 import Control.Monad
@@ -644,9 +644,13 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
   = interactGivenIP inerts workItem
 
   | otherwise
-  = do { mapBagM_ (addFunDepWork workItem) (findDictsByClass (inert_dicts inerts) cls)
-               -- Standard thing: create derived fds and keep on going. Importantly we don't
-               -- throw workitem back in the worklist because this can cause loops (see #5236)
+  = do { mapBagM_ (addFunDepWork workItem) 
+                  (findDictsByClass (inert_dicts inerts) cls)
+               -- Create derived fds and keep on going.
+               -- No need to check flavour; fundeps work between
+               -- any pair of constraints, regardless of flavour
+               -- Importantly we don't throw workitem back in the 
+               -- worklist bebcause this can cause loops (see #5236)
        ; continueWith workItem  }
 
 interactDict _ wi = pprPanic "interactDict" (ppr wi)
@@ -672,17 +676,15 @@ interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
 interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
 
 addFunDepWork :: Ct -> Ct -> TcS ()
+-- Add derived constraints from type-class functional dependencies.
 addFunDepWork work_ct inert_ct
-  = do {  let fd_eqns :: [Equation CtLoc]
-              fd_eqns = [ eqn { fd_loc = derived_loc }
-                        | eqn <- improveFromAnother inert_pred work_pred ]
-       ; rewriteWithFunDeps fd_eqns
+  = emitFunDepDeriveds $
+    improveFromAnother derived_loc inert_pred work_pred
                 -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                 -- NB: We do create FDs for given to report insoluble equations that arise
                 -- from pairs of Givens, and also because of floating when we approximate
                 -- implications. The relevant test is: typecheck/should_fail/FDsFromGivens.hs
                 -- Also see Note [When improvement happens]
-    }
   where
     work_pred  = ctPred work_ct
     inert_pred = ctPred inert_ct
@@ -1214,19 +1216,18 @@ To achieve this required some refactoring of FunDeps.lhs (nicer
 now!).
 -}
 
-rewriteWithFunDeps :: [Equation CtLoc] -> TcS ()
--- NB: The returned constraints are all Derived
--- Post: returns no trivial equalities (identities) and all EvVars returned are fresh
-rewriteWithFunDeps eqn_pred_locs
- = mapM_ instFunDepEqn eqn_pred_locs
-
-instFunDepEqn :: Equation CtLoc -> TcS ()
--- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
-  = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
-       ; mapM_ (do_one subst) eqs }
+emitFunDepDeriveds :: [FunDepEqn CtLoc] -> TcS ()
+emitFunDepDeriveds fd_eqns
+  = mapM_ do_one_FDEqn fd_eqns
   where
-    do_one subst (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
+    do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
+     | null tvs  -- Common shortcut
+     = mapM_ (unifyDerived loc Nominal) eqs
+     | otherwise
+     = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
+          ; mapM_ (do_one_eq loc subst) eqs }
+
+    do_one_eq loc subst (Pair ty1 ty2)
        = unifyDerived loc Nominal $
          Pair (Type.substTy subst ty1) (Type.substTy subst ty2)
 
@@ -1270,20 +1271,22 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   | not (isWanted fl)   -- Never use instances for Given or Derived constraints
   = try_fundeps_and_return
 
-  | Just ev <- lookupSolvedDict inerts loc cls xis   -- Cached
+  | Just ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
   = do { setWantedEvBind dict_id (ctEvTerm ev);
        ; stopWith fl "Dict/Top (cached)" }
 
   | otherwise  -- Not cached
-   = do { lkup_inst_res <- matchClassInst inerts cls xis loc
+   = do { lkup_inst_res <- matchClassInst inerts cls xis dict_loc
          ; case lkup_inst_res of
                GenInst wtvs ev_term -> do { addSolvedDict fl cls xis
                                           ; solve_from_instance wtvs ev_term }
                NoInstance -> try_fundeps_and_return }
    where
      dict_id = ASSERT( isWanted fl ) ctEvId fl
-     pred = mkClassPred cls xis
-     loc = ctEvLoc fl
+     dict_pred = mkClassPred cls xis
+     dict_loc = ctEvLoc fl
+     dict_origin = ctLocOrigin dict_loc
+     deeper_loc = bumpCtLocDepth CountConstraints dict_loc
 
      solve_from_instance :: [CtEvidence] -> EvTerm -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
@@ -1298,7 +1301,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                ppr dict_id
              ; setWantedEvBind dict_id ev_term
              ; let mk_new_wanted ev
-                       = mkNonCanonical (ev {ctev_loc = bumpCtLocDepth CountConstraints loc })
+                     = mkNonCanonical (ev {ctev_loc = deeper_loc })
              ; updWorkListTcS (extendWorkListCts (map mk_new_wanted evs))
              ; stopWith fl "Dict/Top (solved, more work)" }
 
@@ -1309,13 +1312,16 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
      -- so we make sure we get on and solve it first. See Note [Weird fundeps]
      try_fundeps_and_return
        = do { instEnvs <- getInstEnvs
-            ; let fd_eqns :: [Equation CtLoc]
-                  fd_eqns = [ fd { fd_loc = loc { ctl_origin = FunDepOrigin2 pred (ctl_origin loc)
-                                                                             inst_pred inst_loc } }
-                            | fd@(FDEqn { fd_loc = inst_loc, fd_pred1 = inst_pred })
-                            <- improveFromInstEnv instEnvs pred ]
-            ; rewriteWithFunDeps fd_eqns
+            ; emitFunDepDeriveds $
+              improveFromInstEnv instEnvs mk_ct_loc dict_pred
             ; continueWith work_item }
+
+     mk_ct_loc :: PredType   -- From instance decl
+               -> SrcSpan    -- also from instance deol
+               -> CtLoc
+     mk_ct_loc inst_pred inst_loc
+       = dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
+                                               inst_pred inst_loc }
 
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
