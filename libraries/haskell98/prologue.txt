@@ -1,0 +1,9 @@
+This package provides compatibility with the modules of Haskell 98 and
+the FFI addendum, by means of wrappers around modules from the @base@ package
+(which in many cases have additional features).
+However @Prelude@, @Numeric@ and @Foreign@ are provided directly
+by the @base@ package.
+The modules of this package are documented in the /Revised Haskell 98 Report/,
+at <http://www.haskell.org/onlinereport/>,
+and the /Haskell 98 Foreign Function Interface/ addendum,
+at <http://www.cse.unsw.edu.au/~chak/haskell/ffi/>.

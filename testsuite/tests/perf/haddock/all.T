@@ -23,11 +23,13 @@ test('haddock.base',
             # 2014-10-07: 8322584616 (x86_64/Linux)
             # 2014-12-14: 9502647104 (x86_64/Linux) - Update to Haddock 2.16
             # 2014-01-08: 9014511528 (x86_64/Linux) - Eliminate so-called "silent superclass parameters" (and others)
-          ,(platform('i386-unknown-mingw32'), 4202377432, 5)
+
+          ,(platform('i386-unknown-mingw32'), 4434804940, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
             # 2014-04-04:                     3548581572 (x86/Windows, 64bit machine)
             # 2014-12-01:                     4202377432 (x86/Windows, 64bit machine)
+            # 2015-01-20:                     4434804940 (x86/Windows, 64bit machine)
 
           ,(wordsize(32), 3799130400, 1)])
             # 2012-08-14: 3046487920 (x86/OSX)
@@ -63,12 +65,13 @@ test('haddock.Cabal',
             # 2014-10-04: 6019839624 (x86_64/Linux - Burning Bridges, Cabal update)
             # 2014-12-14: 6387320816 (x86_64/Linux) - Update to Haddock 2.16
 
-          ,(platform('i386-unknown-mingw32'), 3088635556, 5)
+          ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
             # 2013-02-10:                     1906532680 (x86/Windows)
             # 2014-01-28:                     1966911336 (x86/Windows)
             # 2014-04-24:                     2052220292 (x86/Windows)
             # 2014-12-01:                     3088635556 (x86/Windows)
+            # 2015-01-20:                     3293415576 
 
           ,(wordsize(32), 2127198484, 1)])
             # 2012-08-14: 1648610180 (x86/OSX)
@@ -83,7 +86,7 @@ test('haddock.compiler',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 33562468736, 10)
-            # 2012-08-14: 26070600504 (amd64/Linux)
+            # 2012P-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
             # 2012-11-12: 25990254632 (amd64/Linux)
@@ -91,12 +94,14 @@ test('haddock.compiler',
             # 2012-11-27: 28708374824 (amd64/Linux)
             # 2014-09-10: 30353349160 (amd64/Linux) post-AMP cleanup
             # 2014-11-22: 33562468736 (amd64/Linux)
-          ,(platform('i386-unknown-mingw32'), 217933548, 10)
+
+          ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
             # 2013-11-13:                     14328363592 (x86/Windows, 64bit machine)
             # 2014-12-01:                       104140852 (x86/Windows, sudden shrinkage!)
             # 2014-12-10:                       217933548 increased again
+
           ,(wordsize(32), 15110426000, 1)])
             # 2012-08-14: 13471797488 (x86/OSX)
             # 2014-01-22: 14581475024 (x86/Linux - new haddock)
