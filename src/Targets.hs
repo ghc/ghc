@@ -60,7 +60,7 @@ targetPackages =
 
 baseConfArgs :: Settings -> Settings
 baseConfArgs settings =
-    settings { customConfArgs = arg $ "--flags=" ++ show integerLibrary }
+    settings { customConfArgs = arg $ "--flags=" ++ integerLibraryName }
 
 -- see Note [Cabal package weirdness]
 cabalTraits :: (String, Settings -> Settings)
