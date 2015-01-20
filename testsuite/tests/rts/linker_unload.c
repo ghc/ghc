@@ -2,11 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "Rts.h"
-#if defined(mingw32_HOST_OS)
 #include <malloc.h>
-#endif
+#include <string.h>
 
-#define ITERATIONS 10000
+#define ITERATIONS 1000
 
 #if defined(mingw32_HOST_OS)
 #define OBJPATH L"Test.o"
@@ -16,16 +15,7 @@
 
 typedef int testfun(int);
 
-void loadPkg(pathchar *path)
-{
-    int r;
-
-    r = loadArchive(path);
-    if (!r) {
-        errorBelch("loadObjs(%s) failed", path);
-        exit(1);
-    }
-}
+extern void loadPackages(void);
 
 int main (int argc, char *argv[])
 {
@@ -38,24 +28,7 @@ int main (int argc, char *argv[])
 
     initLinker_(0);
 
-    for (i=1; i < argc; i++) {
-#if defined(mingw32_HOST_OS)
-        size_t len = mbstowcs(NULL, argv[i], 0) + 1;
-        if (len == -1) {
-            errorBelch("invalid multibyte sequence in argument %d: %s", i, argv[i]);
-            exit(1);
-        }
-        wchar_t *buf = (wchar_t*)_alloca(len * sizeof(wchar_t));
-        size_t len2 = mbstowcs(buf, argv[i], len);
-        if (len != len2 + 1) {
-            errorBelch("something fishy is going on in argument %d: %s", i, argv[i]);
-            exit(1);
-        }
-        loadPkg(buf);
-#else
-        loadPkg(argv[i]);
-#endif
-    }
+    loadPackages();
 
     for (i=0; i < ITERATIONS; i++) {
         r = loadObj(OBJPATH);
