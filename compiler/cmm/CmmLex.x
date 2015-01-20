@@ -144,7 +144,6 @@ data CmmToken
   | CmmT_else
   | CmmT_export
   | CmmT_section
-  | CmmT_align
   | CmmT_goto
   | CmmT_if
   | CmmT_call
@@ -228,7 +227,6 @@ reservedWordsFM = listToUFM $
         ( "else",               CmmT_else ),
         ( "export",             CmmT_export ),
         ( "section",            CmmT_section ),
-        ( "align",              CmmT_align ),
         ( "goto",               CmmT_goto ),
         ( "if",                 CmmT_if ),
         ( "call",               CmmT_call ),
