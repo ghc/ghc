@@ -126,7 +126,8 @@ libsuf way | Dynamic `notElem` units way
            = do extension <- showArg DynamicExtension  -- e.g., .dll or .so
                 version   <- showArg ProjectVersion    -- e.g., 7.11.20141222
                 let suffix = wayPrefix $ dropDynamic way
-                return $ suffix ++ "-ghc" ++ version ++ extension -- e.g. p_-ghc7.11.20141222.dll
+                -- e.g., p_ghc7.11.20141222.dll (the result)
+                return $ suffix ++ "ghc" ++ version ++ extension
 
 -- TODO: This may be slow -- optimise if overhead is significant.
 dropDynamic :: Way -> Way

@@ -19,15 +19,15 @@ packageRules = do
     -- TODO: control targets from command line arguments
 
     -- The package list (targetPackages) is defined in Targets.hs
-    forM_ targetPackages $ \pkg @ (Package name path todo) -> do
+    forM_ targetPackages $ \pkg @ (Package name path _ todo) -> do
         forM_ todo $ \todoItem @ (stage, dist, settings) -> do
 
             -- Want top .o and .a files for the pkg/todo combo
             -- We build *only one* vanilla .o file (not sure why)
-            -- We build .way_a file for each way.
+            -- We build .way_a file for each way (or its dynamic version).
             -- TODO: Check BUILD_GHCI_LIB flag to decide if .o is needed
             -- TODO: move this into buildPackage
-            action $ do
+            action $ when (buildWhen settings) $ do
                 let pathDist = path </> dist
                     buildDir = pathDist </> "build"
                 key <- showArg (PackageKey pathDist)

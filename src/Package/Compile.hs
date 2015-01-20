@@ -11,7 +11,7 @@ suffixArgs way =
     return ["-hisuf", hisuf way, "-osuf", osuf way, "-hcsuf", hcsuf way]
 
 ghcArgs :: Package -> TodoItem -> Way -> [FilePath] -> FilePath -> Args
-ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
+ghcArgs (Package _ path _ _) (stage, dist, _) way srcs result =
     let pathDist = path </> dist
         buildDir = unifyPath $ pathDist </> "build"
     in args [ suffixArgs way
@@ -29,7 +29,7 @@ ghcArgs (Package _ path _) (stage, dist, _) way srcs result =
             , args ["-o", result] ]
 
 gccArgs :: Package -> TodoItem -> [FilePath] -> FilePath -> Args
-gccArgs (Package _ path _) (_, dist, _) srcs result =
+gccArgs (Package _ path _ _) (_, dist, _) srcs result =
     let pathDist = path </> dist
     in args [ args $ CcArgs pathDist
             , commonCcArgs
@@ -45,7 +45,7 @@ compileC pkg todo @ (stage, _, _) deps obj = do
     run (Gcc stage) $ gccArgs pkg todo srcs obj
 
 compileHaskell :: Package -> TodoItem -> FilePath -> Way -> Action ()
-compileHaskell pkg @ (Package _ path _) todo @ (stage, dist, _) obj way = do
+compileHaskell pkg @ (Package _ path _ _) todo @ (stage, dist, _) obj way = do
     let buildDir = unifyPath $ path </> dist </> "build"
     -- TODO: keep only vanilla dependencies in 'haskell.deps'
     deps <- args $ DependencyList (buildDir </> "haskell.deps") obj
@@ -54,7 +54,7 @@ compileHaskell pkg @ (Package _ path _) todo @ (stage, dist, _) obj way = do
     run (Ghc stage) $ ghcArgs pkg todo way srcs obj
 
 buildRule :: Package -> TodoItem -> Rules ()
-buildRule pkg @ (Package name path _) todo @ (stage, dist, _) =
+buildRule pkg @ (Package name path _ _) todo @ (stage, dist, _) =
     let buildDir = unifyPath $ path </> dist </> "build"
         cDepFile = buildDir </> "c.deps"
     in

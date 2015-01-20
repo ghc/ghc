@@ -67,14 +67,13 @@ postProcessPackageData file = do
 
 bootPkgConstraints :: Args
 bootPkgConstraints = args $ do
-    forM (targetPackagesInStage Stage0) $ \pkg @ (Package name path _) -> do
-        let baseName = takeBaseName name
-            cabal    = path </> baseName <.> "cabal"
+    forM (targetPackagesInStage Stage0) $ \pkg @ (Package _ _ cabal _) -> do
+        let depName = takeBaseName cabal
         need [cabal]
         content <- lines <$> liftIO (readFile cabal)
         let versionLines = filter (("ersion:" `isPrefixOf`) . drop 1) content
         case versionLines of
-            [versionLine] -> args ["--constraint", baseName ++ " == "
+            [versionLine] -> args ["--constraint", depName ++ " == "
                                     ++ dropWhile (not . isDigit) versionLine ]
             _             -> redError $ "Cannot determine package version in '"
                                       ++ unifyPath cabal ++ "'."
@@ -85,7 +84,7 @@ bootPackageDb = do
     arg $ unifyPath $ "--package-db=" ++ top </> "libraries/bootstrapping.conf"
 
 cabalArgs :: Package -> TodoItem -> Args
-cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = args
+cabalArgs pkg @ (Package _ path _ _) todo @ (stage, dist, settings) = args
     [ args ["configure", path, dist]
     -- this is a positional argument, hence:
     -- * if it is empty, we need to emit one empty string argument
@@ -106,18 +105,16 @@ cabalArgs pkg @ (Package _ path _) todo @ (stage, dist, settings) = args
     , with Happy ] -- TODO: reorder with's
 
 ghcPkgArgs :: Package -> TodoItem -> Args
-ghcPkgArgs (Package _ path _) (stage, dist, _) = args $
+ghcPkgArgs (Package _ path _ _) (stage, dist, _) = args $
     [ arg "update"
     , arg "--force"
     , arg $ unifyPath $ path </> dist </> "inplace-pkg-config"
     , when (stage == Stage0) bootPackageDb ]
 
 buildRule :: Package -> TodoItem -> Rules ()
-buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
+buildRule pkg @ (Package name path cabal _) todo @ (stage, dist, settings) =
     let pathDist  = path </> dist
         configure = path </> "configure"
-        cabal     = path </> takeBaseName name <.> "cabal"
-        -- takeBaseName: see Note [Cabal package wierdness] in Targets.hs
     in
     -- All these files are produced by a single run of GhcCabal
     (pathDist </>) <$>
@@ -143,7 +140,7 @@ buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) =
 argListRule :: Package -> TodoItem -> Rules ()
 argListRule pkg todo @ (stage, _, _) =
     (argListPath argListDir pkg stage) %> \out -> do
-        -- TODO: depend on ALL source files.
+        -- TODO: depend on ALL source files
         need $ ["shake/src/Package/Data.hs"] ++ sourceDependecies
         cabalList  <- argList GhcCabal       $ cabalArgs pkg todo
         ghcPkgList <- argList (GhcPkg stage) $ ghcPkgArgs pkg todo

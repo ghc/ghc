@@ -5,7 +5,7 @@ module Package.Base (
     module Util,
     module Oracles,
     Package (..), Settings (..), TodoItem (..),
-    defaultSettings, libraryPackage, standardLibrary,
+    defaultSettings, standardLibrary, customLibrary, customNameLibrary,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     pathArgs, packageArgs,
     includeGccArgs, includeGhcArgs, pkgHsSources,
@@ -24,18 +24,28 @@ import qualified System.Directory as S
 
 data Settings = Settings
      {
-         customConfArgs  :: Args,
-         customCcArgs    :: Args,
-         customLdArgs    :: Args,
-         customCppArgs   :: Args,
-         customDllArgs   :: Args,
-         registerPackage :: Bool,
-         ways            :: Action [Way]
-     }
+         customConfArgs  :: Args,         -- custom args for configure
+         customCcArgs    :: Args,         -- custom args for Gcc
+         customLdArgs    :: Args,         -- custom args for Ld
+         customCppArgs   :: Args,         -- custom args for C preprocessor
+         customDllArgs   :: Args,         -- custom dll args
+         registerPackage :: Bool,         -- do we need to call ghc-pkg update?
+         ways            :: Action [Way], -- ways to build
+         buildWhen       :: Condition     -- skip the package if need be, e.g.
+     }                                    -- don't build unix on Windows
 
 defaultSettings :: Stage -> Settings
-defaultSettings stage =
-    Settings mempty mempty mempty mempty mempty True (defaultWays stage)
+defaultSettings stage = Settings
+                        {
+                            customConfArgs  = mempty,
+                            customCcArgs    = mempty,
+                            customLdArgs    = mempty,
+                            customCppArgs   = mempty,
+                            customDllArgs   = mempty,
+                            registerPackage = True,
+                            ways            = defaultWays stage,
+                            buildWhen       = return True
+                        }
 
 -- Stage is the stage of the GHC that we use to build the package
 -- FilePath is the directory to put the build results (relative to pkgPath)
@@ -49,23 +59,35 @@ type TodoItem = (Stage, FilePath, Settings)
 -- pkgPath is the path to the source code relative to the root
 data Package = Package
      {
-         pkgName :: String,    -- For example: "deepseq"
-         pkgPath :: FilePath,  -- "libraries/deepseq"
-         pkgTodo :: [TodoItem] -- [(Stage1, "dist-install", defaultSettings)]
+         pkgName  :: String,    -- For example: "deepseq"
+         pkgPath  :: FilePath,  -- "libraries/deepseq"
+         pkgCabal :: FilePath,  -- "libraries/deepseq/deepseq.cabal"
+         pkgTodo  :: [TodoItem] -- [(Stage1, "dist-install", defaultSettings)]
      }
 
-libraryPackage :: String -> [Stage] -> (Stage -> Settings) -> Package
-libraryPackage name stages settings =
+libraryPackage :: String -> String -> [Stage] -> (Stage -> Settings) -> Package
+libraryPackage name cabalName stages settings =
     Package
         name
         (unifyPath $ "libraries" </> name)
+        (unifyPath $ "libraries" </> name </> cabalName <.> "cabal")
         [ (stage
         , if stage == Stage0 then "dist-boot" else "dist-install"
         , settings stage)
         | stage <- stages ]
 
 standardLibrary :: String -> [Stage] -> Package
-standardLibrary name stages = libraryPackage name stages defaultSettings
+standardLibrary name stages = libraryPackage name name stages defaultSettings
+
+customLibrary :: String -> [Stage] -> (Settings -> Settings) -> Package
+customLibrary name stages traits = libraryPackage name name stages settings
+  where
+    settings = traits . defaultSettings
+
+customNameLibrary :: String -> [Stage]
+                  -> (String, Settings -> Settings) -> Package
+customNameLibrary name stages (cabalName, traits) =
+    libraryPackage name cabalName stages (traits . defaultSettings)
 
 commonCcArgs :: Args
 commonCcArgs = when Validating $ args ["-Werror", "-Wall"]
@@ -133,7 +155,8 @@ pkgDepHsObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepHsObjects path dist way = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
-    dirs <- map (unifyPath . (path </>)) <$> args (SrcDirs pathDist)
+    dirs <- map (dropWhileEnd isPathSeparator . unifyPath . (path </>))
+            <$> args (SrcDirs pathDist)
     fmap concat $ forM dirs $ \d ->
         map (unifyPath . (buildDir ++) . (-<.> osuf way) . drop (length d))
         <$> (findModuleFiles pathDist [d] [".hs", ".lhs"])
@@ -210,5 +233,5 @@ argList = argListWithComment ""
 
 -- Path to argument list for a given Package/Stage combination
 argListPath :: FilePath -> Package -> Stage -> FilePath
-argListPath dir (Package name _ _) stage =
+argListPath dir (Package name _ _ _) stage =
     dir </> takeBaseName name ++ " (stage " ++ show stage ++ ")" <.> "txt"

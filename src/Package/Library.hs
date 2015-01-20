@@ -19,7 +19,7 @@ ldArgs stage objs result = args [ args $ ConfLdLinkerArgs stage
                                 , args objs ]
 
 arRule :: Package -> TodoItem -> Rules ()
-arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
+arRule pkg @ (Package _ path _ _) todo @ (stage, dist, _) =
     let buildDir = path </> dist </> "build"
     in
     (buildDir <//> "*a") %> \out -> do
@@ -37,7 +37,7 @@ arRule pkg @ (Package _ path _) todo @ (stage, dist, _) =
         need [argListPath argListDir pkg stage]
 
 ldRule :: Package -> TodoItem -> Rules ()
-ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
+ldRule pkg @ (Package name path _ _) todo @ (stage, dist, _) =
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
     in
@@ -55,7 +55,7 @@ ldRule pkg @ (Package name path _) todo @ (stage, dist, _) =
         need [argListPath argListDir pkg stage]
 
 argListRule :: Package -> TodoItem -> Rules ()
-argListRule pkg @ (Package _ path _) todo @ (stage, dist, settings) =
+argListRule pkg @ (Package _ path _ _) todo @ (stage, dist, settings) =
     (argListPath argListDir pkg stage) %> \out -> do
         need $ ["shake/src/Package/Library.hs"] ++ sourceDependecies
         cObjsV  <- pkgCObjects path dist vanilla

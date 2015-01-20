@@ -7,7 +7,7 @@ argListDir :: FilePath
 argListDir = "shake/arg/buildPackageDependencies"
 
 ghcArgs :: Package -> TodoItem -> Args
-ghcArgs (Package name path _) (stage, dist, settings) =
+ghcArgs (Package name path _ _) (stage, dist, settings) =
     let pathDist = path </> dist
         buildDir = unifyPath $ pathDist </> "build"
         depFile  = buildDir </> "haskell.deps"
@@ -43,11 +43,11 @@ ghcArgs (Package name path _) (stage, dist, settings) =
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 gccArgs :: FilePath -> Package -> TodoItem -> Args
-gccArgs sourceFile (Package _ path _) (stage, dist, _) =
+gccArgs sourceFile (Package _ path _ _) (stage, dist, _) =
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
         depFile  = buildDir </> takeFileName sourceFile <.> "deps"
-    in args [ arg "-MM"
+    in args [ args ["-MM", "-E"] -- TODO: add a Cpp Builder instead
             , args $ CcArgs pathDist
             , commonCcArgs
             , commonCcWarninigArgs
@@ -57,7 +57,7 @@ gccArgs sourceFile (Package _ path _) (stage, dist, _) =
             , arg $ unifyPath sourceFile ]
 
 buildRule :: Package -> TodoItem -> Rules ()
-buildRule pkg @ (Package name path _) todo @ (stage, dist, settings) = do
+buildRule pkg @ (Package name path _ _) todo @ (stage, dist, settings) = do
     let pathDist = path </> dist
         buildDir = pathDist </> "build"
 
