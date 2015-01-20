@@ -22,3 +22,5 @@ test('ImpExp_Imp', [extra_clean(['ImpExp_Exp.hi', 'ImpExp_Exp.o'])], multimod_co
 test('T9857', normal, compile, [''])
 test('T9889', normal, compile, [''])
 test('T9867', normal, compile, [''])
+test('T9975a', normal, compile_fail, [''])
+test('T9975b', normal, compile, [''])
