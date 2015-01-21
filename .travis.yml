@@ -10,14 +10,18 @@ before_install:
  - sudo apt-get update
  - sudo apt-get install ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:$PATH
+ - sudo apt-get install cabal-install-1.22
+ - export PATH=/opt/cabal/1.22/bin:$PATH
+ - cabal --version
  - cd haddock-library
  - cabal install --only-dependencies --enable-tests
  - cabal install doctest
- - cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test
+ # --ghc-options=-Werror
+ - cabal configure --enable-tests && cabal build && cabal test
  - doctest -isrc -i$(echo vendor/attoparsec-*) -optP-include -optPdist/build/autogen/cabal_macros.h src/Documentation/Haddock/Parser.hs
  - cabal install
  - cd ..
- - (cd haddock-api/ && cabal install --only-dependencies --enable-tests && cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test && cabal install)
+ - (cd haddock-api/ && cabal install --only-dependencies --enable-tests && cabal configure --enable-tests && cabal build && cabal test && cabal install)
 
 script:
- - cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test
+ - cabal configure --enable-tests && cabal build && cabal test
