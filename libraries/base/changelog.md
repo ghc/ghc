@@ -140,8 +140,6 @@
 
   * Add `callocArray` and `callocArray0` to `Foreign.Marshal.Array`. (#9859)
 
-  * Restore invariant in `Data (Ratio a)` instance (#10011)
-
 ## 4.7.0.2  *Dec 2014*
 
   * Bundled with GHC 7.8.4
