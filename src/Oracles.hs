@@ -11,6 +11,7 @@ module Oracles (
 import Development.Shake.Config
 import Development.Shake.Util
 import qualified Data.HashMap.Strict as M
+-- TODO: get rid of Bifunctor dependency
 import Data.Bifunctor
 import Base
 import Util

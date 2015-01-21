@@ -39,9 +39,9 @@ defaultSettings stage = Settings
                         {
                             customConfArgs  = mempty,
                             customCcArgs    = mempty,
-                            customLdArgs    = mempty,
-                            customCppArgs   = mempty,
-                            customDllArgs   = mempty,
+                            customLdArgs    = mempty, -- currently not used
+                            customCppArgs   = mempty, -- currently not used
+                            customDllArgs   = mempty, -- only for compiler
                             registerPackage = True,
                             ways            = defaultWays stage,
                             buildWhen       = return True
@@ -54,6 +54,11 @@ defaultSettings stage = Settings
 -- * doc/             : produced by haddock
 -- * package-data.mk  : contains output of ghc-cabal applied to package.cabal
 -- Settings may be different for different combinations of Stage & FilePath
+-- TODO: the above may be incorrect, settings seem to *only* depend on the
+-- stage. In fact Stage seem to define FilePath and Settings, therefore we
+-- can drop the TodoItem and replace it by [Stage] and two functions
+--    * distDirectory :: Package -> Stage -> FilePath
+--    * settings      :: Package -> Stage -> Settings
 type TodoItem = (Stage, FilePath, Settings)
 
 -- pkgPath is the path to the source code relative to the root

@@ -3,6 +3,7 @@ module Package.Dependencies (buildPackageDependencies) where
 
 import Package.Base
 
+-- TODO: use oracles instead of arg files.
 argListDir :: FilePath
 argListDir = "shake/arg/buildPackageDependencies"
 
@@ -49,9 +50,9 @@ gccArgs sourceFile (Package _ path _ _) (stage, dist, settings) =
         depFile  = buildDir </> takeFileName sourceFile <.> "deps"
     in args [ args ["-E", "-MM"] -- TODO: add a Cpp Builder instead
             , args $ CcArgs pathDist
-            , commonCcArgs
-            , customCcArgs settings
-            , commonCcWarninigArgs
+            , commonCcArgs          -- TODO: remove?
+            , customCcArgs settings -- TODO: Replace by customCppArgs?
+            , commonCcWarninigArgs  -- TODO: remove?
             , includeGccArgs path dist
             , args ["-MF", unifyPath depFile]
             , args ["-x", "c"]

@@ -15,12 +15,14 @@ instance Show IntegerLibrary where
          IntegerGmp2   -> "integer-gmp2"
          IntegerSimple -> "integer-simple"
 
+-- TODO: keep or move to configuration files? see Note [configuration files]
 integerLibrary :: IntegerLibrary
 integerLibrary = IntegerGmp2
 
 integerLibraryName :: String
 integerLibraryName = show integerLibrary
 
+-- see Note [configuration files]
 buildHaddock :: Bool
 buildHaddock = True
 
@@ -107,6 +109,23 @@ targetPackagesInStage stage = filter inStage targetPackages
     inStage (Package _ _ _ todoItems) = any matchStage todoItems
     matchStage (todoStage, _, _)    = todoStage == stage
 
+-- TODISCUSS
 -- Note [Cabal package weirdness]
 -- Find out if we can move the contents to just Cabal/
 -- What is Cabal/cabal-install? Do we need it?
+
+-- TODISCUSS
+-- Note [configuration files]
+-- In this file we have two configuration options: integerLibrary and
+-- buildHaddock. Arguably, their place should be among other configuration
+-- options in the config files, however, moving integerLibrary there would
+-- actually be quite painful, because it would then be confined to live in
+-- the Action monad.
+-- In general, shall we keep as many options as possible inside Shake, or
+-- leave them in one place -- configuration files? We could try to move
+-- everything to Shake which would be great:
+--    * type safety and better abstractions
+--    * useable outside the Action monad, e.g. for creating rules
+--    * recompiling Shake is much faster then re-running configure script
+--    * ... no more autoconf/configure and native Windows build?! Sign me up!
+-- However, moving everything to Shake seems unfeasible at the moment.

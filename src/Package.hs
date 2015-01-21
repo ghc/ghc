@@ -26,7 +26,7 @@ packageRules = do
             -- We build *only one* vanilla .o file (not sure why)
             -- We build .way_a file for each way (or its dynamic version).
             -- TODO: Check BUILD_GHCI_LIB flag to decide if .o is needed
-            -- TODO: move this into buildPackage
+            -- TODO: move this into a separate file (perhaps, to Targets.hs?)
             action $ when (buildWhen settings) $ do
                 let pathDist = path </> dist
                     buildDir = pathDist </> "build"

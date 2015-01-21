@@ -26,8 +26,8 @@ configureArgs stage settings =
             unless (null s) $ arg $ "--configure-option=" ++ key ++ "=" ++ s
         cflags   = [ commonCcArgs `filterOut` "-Werror"
                    , args $ ConfCcArgs stage
-                   -- , customCcArgs settings -- TODO: fix
-                   , commonCcWarninigArgs ] -- TODO: check if cflags are glued
+                   -- , customCcArgs settings -- TODO: bring this back
+                   , commonCcWarninigArgs ] -- TODO: check why cflags are glued
         ldflags  = [ commonLdArgs
                    , args $ ConfGccLinkerArgs stage
                    , customLdArgs settings ]
