@@ -1059,15 +1059,15 @@ instance Data Word64 where
 ------------------------------------------------------------------------------
 
 ratioConstr :: Constr
-ratioConstr = mkConstr ratioDataType ":%" [] Infix
+ratioConstr = mkConstr ratioDataType "%" [] Infix
 
 ratioDataType :: DataType
 ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
 
-instance Data a => Data (Ratio a) where
-  gfoldl k z (a :% b) = z (:%) `k` a `k` b
+instance (Data a, Integral a) => Data (Ratio a) where
+  gfoldl k z (a :% b) = z (%) `k` a `k` b
   toConstr _ = ratioConstr
-  gunfold k z c | constrIndex c == 1 = k (k (z (:%)))
+  gunfold k z c | constrIndex c == 1 = k (k (z (%)))
   gunfold _ _ _ = error "Data.Data.gunfold(Ratio)"
   dataTypeOf _  = ratioDataType
 
