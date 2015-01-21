@@ -93,7 +93,8 @@ parseParas input = case parseParasState input of
                         }
 
 parseParasState :: String -> (ParserState, DocH mod Identifier)
-parseParasState = parse (p <* skipSpace) . encodeUtf8 . (++ "\n")
+parseParasState =
+    parse (p <* skipSpace) . encodeUtf8 . (++ "\n") . filter (/= '\r')
   where
     p :: Parser (DocH mod Identifier)
     p = docConcat <$> paragraph `sepBy` many (skipHorizontalSpace *> "\n")
@@ -105,7 +106,7 @@ parseParagraphs input = case parseParasState input of
 -- | Parse a text paragraph. Actually just a wrapper over 'parseStringBS' which
 -- drops leading whitespace and encodes the string to UTF8 first.
 parseString :: String -> DocH mod Identifier
-parseString = parseStringBS . encodeUtf8 . dropWhile isSpace
+parseString = parseStringBS . encodeUtf8 . dropWhile isSpace . filter (/= '\r')
 
 parseStringBS :: BS.ByteString -> DocH mod Identifier
 parseStringBS = snd . parse p
