@@ -1059,7 +1059,7 @@ instance Data Word64 where
 ------------------------------------------------------------------------------
 
 ratioConstr :: Constr
-ratioConstr = mkConstr ratioDataType "%" [] Infix
+ratioConstr = mkConstr ratioDataType ":%" [] Infix
 
 ratioDataType :: DataType
 ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
