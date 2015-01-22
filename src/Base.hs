@@ -12,7 +12,6 @@ module Base (
     ShowArg (..), ShowArgs (..),
     arg, args,
     Condition (..),
-    (<+>),
     filterOut,
     productArgs, concatArgs
     ) where
@@ -49,34 +48,26 @@ instance ShowArg String where
 instance ShowArg a => ShowArg (Action a) where
     showArg = (showArg =<<)
 
--- Using the Creators' trick for overlapping String instances
 class ShowArgs a where
-    showArgs     :: a -> Args
-    showListArgs :: [a] -> Args
-    showListArgs = mconcat . map showArgs
+    showArgs :: a -> Args
 
-instance ShowArgs Char where
-    showArgs c     = return [[c]]
-    showListArgs s = return [s]
+instance ShowArgs [String] where
+    showArgs = return
 
-instance ShowArgs a => ShowArgs [a] where
-    showArgs = showListArgs
+instance ShowArgs [Arg] where
+    showArgs = sequence
+
+instance ShowArgs [Args] where
+    showArgs = mconcat
 
 instance ShowArgs a => ShowArgs (Action a) where
     showArgs = (showArgs =<<)
 
--- TODO: improve args type safety
 args :: ShowArgs a => a -> Args
 args = showArgs
 
 arg :: ShowArg a => a -> Args
-arg = args . showArg
-
--- Combine two heterogeneous ShowArgs values
-(<+>) :: (ShowArgs a, ShowArgs b) => a -> b -> Args
-a <+> b = (<>) <$> showArgs a <*> showArgs b
-
-infixr 6 <+>
+arg a = args [showArg a]
 
 -- Filter out given arg(s) from a collection
 filterOut :: ShowArgs a => Args -> a -> Args
@@ -85,7 +76,7 @@ filterOut as exclude = do
     filter (`notElem` exclude') <$> as
 
 -- Generate a cross product collection of two argument collections
--- Example: productArgs ["-a", "-b"] "c" = arg ["-a", "c", "-b", "c"]
+-- Example: productArgs ["-a", "-b"] "c" = args ["-a", "c", "-b", "c"]
 productArgs :: (ShowArgs a, ShowArgs b) => a -> b -> Args
 productArgs as bs = do
     as' <- showArgs as
@@ -93,7 +84,7 @@ productArgs as bs = do
     return $ concat $ sequence [as', bs']
 
 -- Similar to productArgs but concat resulting arguments pairwise
--- Example: concatArgs ["-a", "-b"] "c" = arg ["-ac", "-bc"]
+-- Example: concatArgs ["-a", "-b"] "c" = args ["-ac", "-bc"]
 concatArgs :: (ShowArgs a, ShowArgs b) => a -> b -> Args
 concatArgs as bs = do
     as' <- showArgs as

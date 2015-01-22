@@ -23,7 +23,7 @@ ghcArgs (Package _ path _ _) (stage, dist, _) way srcs result =
             , args $ HsArgs pathDist
             -- TODO: now we have both -O and -O2
             -- <> arg ["-O2"]
-            , productArgs ["-odir", "-hidir", "-stubdir"] buildDir
+            , productArgs ["-odir", "-hidir", "-stubdir"] [buildDir]
             , when (splitObjects stage) $ arg "-split-objs"
             , args ("-c":srcs)
             , args ["-o", result] ]

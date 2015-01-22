@@ -24,7 +24,7 @@ configureArgs stage settings =
     let conf key as = do
             s <- unwords <$> args as
             unless (null s) $ arg $ "--configure-option=" ++ key ++ "=" ++ s
-        cflags   = [ commonCcArgs `filterOut` "-Werror"
+        cflags   = [ commonCcArgs `filterOut` ["-Werror"]
                    , args $ ConfCcArgs stage
                    -- , customCcArgs settings -- TODO: bring this back
                    , commonCcWarninigArgs ] -- TODO: check why cflags are glued
@@ -37,7 +37,8 @@ configureArgs stage settings =
     in args [ conf "CFLAGS"   cflags
             , conf "LDFLAGS"  ldflags
             , conf "CPPFLAGS" cppflags
-            , arg $ concat <$> "--gcc-options=" <+> cflags <+> " " <+> ldflags
+            , arg $ concat <$>
+              arg "--gcc-options=" <> args cflags <> arg " " <> args ldflags
             , conf "--with-iconv-includes"  IconvIncludeDirs
             , conf "--with-iconv-libraries" IconvLibDirs
             , conf "--with-gmp-includes"    GmpIncludeDirs
@@ -73,8 +74,8 @@ bootPkgConstraints = args $ do
         content <- lines <$> liftIO (readFile cabal)
         let versionLines = filter (("ersion:" `isPrefixOf`) . drop 1) content
         case versionLines of
-            [versionLine] -> args ["--constraint", depName ++ " == "
-                                    ++ dropWhile (not . isDigit) versionLine ]
+            [versionLine] -> return $ "--constraint " ++ depName ++ " == "
+                                    ++ dropWhile (not . isDigit) versionLine
             _             -> redError $ "Cannot determine package version in '"
                                       ++ unifyPath cabal ++ "'."
 

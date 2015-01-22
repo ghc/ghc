@@ -16,9 +16,9 @@ ghcArgs (Package name path _ _) (stage, dist, settings) =
             , packageArgs stage pathDist
             , includeGhcArgs path dist
             , concatArgs ["-optP"] $ CppArgs pathDist
-            , productArgs ["-odir", "-stubdir", "-hidir"] buildDir
-            , args ["-dep-makefile", depFile ]
-            , productArgs "-dep-suffix" $ map wayPrefix <$> ways settings
+            , productArgs ["-odir", "-stubdir", "-hidir"] [buildDir]
+            , args ["-dep-makefile", depFile]
+            , productArgs ["-dep-suffix"] $ map wayPrefix <$> ways settings
             , args $ HsArgs pathDist
             , args $ pkgHsSources path dist ]
 

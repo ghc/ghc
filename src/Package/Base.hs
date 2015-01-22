@@ -122,10 +122,11 @@ packageArgs stage pathDist = do
          , when (stage == Stage0) $
            arg "-package-db libraries/bootstrapping.conf"
          , if usePackageKey
-           then productArgs "-this-package-key" (arg  $ PackageKey pathDist)
-             <> productArgs "-package-key"      (args $ DepKeys    pathDist)
-           else productArgs "-package-name"     (arg  $ PackageKey pathDist)
-             <> productArgs "-package"          (args $ Deps       pathDist) ]
+           then productArgs ["-this-package-key"] [arg  $ PackageKey pathDist]
+             <> productArgs ["-package-key"     ] [args $ DepKeys    pathDist]
+           else productArgs ["-package-name"    ] [arg  $ PackageKey pathDist]
+             <> productArgs ["-package"         ] [args $ Deps       pathDist]
+         ]
 
 includeGccArgs :: FilePath -> FilePath -> Args
 includeGccArgs path dist =
@@ -145,8 +146,9 @@ includeGhcArgs path dist =
               [buildDir, unifyPath $ buildDir </> "autogen"]
             , pathArgs "-I" path $ IncludeDirs pathDist
             , arg "-optP-include" -- TODO: Shall we also add -cpp?
-            , concatArgs "-optP" $
-              unifyPath $ buildDir </> "autogen/cabal_macros.h" ]
+            , concatArgs ["-optP"]
+              [unifyPath $ buildDir </> "autogen/cabal_macros.h"]
+            ]
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do
