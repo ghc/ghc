@@ -103,7 +103,7 @@
 	path = utils/haddock
 	url = ../haddock.git
 	ignore = none
-	branch = ghc-head
+	branch = master
 [submodule "nofib"]
 	path = nofib
 	url = ../nofib.git
