@@ -34,7 +34,6 @@ import GHC hiding (NoLink)
 import DynFlags (ExtensionFlag, Language)
 import OccName
 import Outputable
-import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
 
 -----------------------------------------------------------------------------

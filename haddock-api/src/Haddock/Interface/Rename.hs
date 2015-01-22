@@ -13,7 +13,7 @@
 module Haddock.Interface.Rename (renameInterface) where
 
 
-import Data.Traversable (traverse, Traversable)
+import Data.Traversable (mapM)
 
 import Haddock.GhcUtils
 import Haddock.Types
@@ -28,7 +28,6 @@ import Control.Applicative
 import Control.Monad hiding (mapM)
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
-import Data.Traversable (mapM)
 import Prelude hiding (mapM)
 
 

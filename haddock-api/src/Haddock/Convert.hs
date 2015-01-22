@@ -23,7 +23,6 @@ import CoAxiom
 import ConLike
 import Data.Either (lefts, rights)
 import Data.List( partition )
-import Data.Monoid (mempty)
 import DataCon
 import FamInstEnv
 import Haddock.Types
