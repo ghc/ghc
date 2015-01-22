@@ -578,7 +578,7 @@ test('T9872a',
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
           # 2014-12-18    2680733672    Reduce type families even more eagerly
-           (wordsize(32), 1325592896, 5)
+           (wordsize(32), 1400000000, 5)
           ]),
       ],
      compile_fail,
@@ -615,7 +615,7 @@ test('T9872d',
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
-           (wordsize(32), 328810212, 5)
+           (wordsize(32), 353644844, 5)
           ]),
       ],
      compile,
@@ -624,9 +624,8 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 772510192, 5),
+          [(wordsize(64), 772510192, 5)
           # 2015-01-12    807117816   Initally created
-           (wordsize(32), 375647160, 5)
           ]),
       ],
      compile,
