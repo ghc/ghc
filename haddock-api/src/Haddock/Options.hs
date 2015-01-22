@@ -28,15 +28,21 @@ module Haddock.Options (
   qualification,
   verbosity,
   ghcFlags,
-  readIfaceArgs
+  readIfaceArgs,
+  optPackageName,
+  optPackageVersion
 ) where
 
 
-import Distribution.Verbosity
-import Haddock.Utils
-import Haddock.Types
-import System.Console.GetOpt
 import qualified Data.Char as Char
+import           Data.Version
+import           Distribution.Verbosity
+import           FastString
+import           Haddock.Types
+import           Haddock.Utils
+import           Packages
+import           System.Console.GetOpt
+import qualified Text.ParserCombinators.ReadP as RP
 
 
 data Flag
@@ -83,7 +89,9 @@ data Flag
   | Flag_Qualification String
   | Flag_PrettyHtml
   | Flag_NoPrintMissingDocs
-  deriving (Eq)
+  | Flag_PackageName String
+  | Flag_PackageVersion String
+  deriving (Eq, Show)
 
 
 options :: Bool -> [OptDescr Flag]
@@ -107,7 +115,7 @@ options backwardsCompat =
     Option []  ["latex-style"]  (ReqArg Flag_LaTeXStyle "FILE") "provide your own LaTeX style in FILE",
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
-      "output for Hoogle",
+      "output for Hoogle; you may want --package-name and --package-version too",
     Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL")
       "URL for a source code link on the contents\nand index pages",
     Option ['s'] (if backwardsCompat then ["source", "source-module"] else ["source-module"])
@@ -171,7 +179,11 @@ options backwardsCompat =
     Option [] ["pretty-html"] (NoArg Flag_PrettyHtml)
       "generate html with newlines and indenting (for use with --html)",
     Option [] ["no-print-missing-docs"] (NoArg Flag_NoPrintMissingDocs)
-      "don't print information about any undocumented entities"
+      "don't print information about any undocumented entities",
+    Option [] ["package-name"] (ReqArg Flag_PackageName "NAME")
+      "name of the package being documented",
+    Option [] ["package-version"] (ReqArg Flag_PackageVersion "VERSION")
+      "version of the package being documented in usual x.y.z.w format"
   ]
 
 
@@ -191,6 +203,15 @@ parseHaddockOpts params =
     (_, _, errors)    -> do
       usage <- getUsage
       throwE (concat errors ++ usage)
+
+optPackageVersion :: [Flag] -> Maybe Data.Version.Version
+optPackageVersion flags =
+  let ver = optLast [ v | Flag_PackageVersion v <- flags ]
+  in ver >>= fmap fst . optLast . RP.readP_to_S parseVersion
+
+optPackageName :: [Flag] -> Maybe PackageName
+optPackageName flags =
+  optLast [ PackageName $ mkFastString n | Flag_PackageName n <- flags ]
 
 
 optTitle :: [Flag] -> Maybe String
