@@ -285,6 +285,8 @@ scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
 
     for (i = 0; i < size / BITS_IN(W_); i++) {
         bitmap = large_srt->l.bitmap[i];
+        // skip zero words: bitmaps can be very sparse, and this helps
+        // performance a lot in some cases.
         if (bitmap != 0) {
             for (j = 0; j < BITS_IN(W_); j++) {
                 if ((bitmap & 1) != 0) {

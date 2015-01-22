@@ -191,7 +191,13 @@ tc_patsyn_finish lname dir is_infix lpat'
                  (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
                  wrapped_args
                  pat_ty
-  = do { (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
+  = do { traceTc "tc_patsyn_finish {" $
+           ppr (unLoc lname) $$ ppr (unLoc lpat') $$
+           ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
+           ppr (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts) $$
+           ppr wrapped_args $$
+           ppr pat_ty
+       ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
                                          (univ_tvs, req_theta, req_ev_binds, req_dicts)
                                          (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
                                          wrapped_args
@@ -350,38 +356,38 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
 
   | otherwise  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn name
-       ; let Just (worker_id, need_dummy_arg) = patSynBuilder patsyn
+       ; let Just (builder_id, need_dummy_arg) = patSynBuilder patsyn
                    -- Bidirectional, so patSynBuilder returns Just
 
              match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group
 
-             bind = FunBind { fun_id      = L loc (idName worker_id)
+             bind = FunBind { fun_id      = L loc (idName builder_id)
                             , fun_infix   = False
                             , fun_matches = match_group'
                             , fun_co_fn   = idHsWrapper
                             , bind_fvs    = placeHolderNamesTc
                             , fun_tick    = [] }
 
-       ; sig <- instTcTySigFromId worker_id
+       ; sig <- instTcTySigFromId builder_id
                 -- See Note [Redundant constraints for builder]
 
-       ; (worker_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
-       ; traceTc "tcPatSynDecl worker" $ ppr worker_binds
-       ; return worker_binds }
+       ; (builder_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
+       ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
+       ; return builder_binds }
   where
     Just match_group = mb_match_group
-    mb_match_group 
+    mb_match_group
        = case dir of
            Unidirectional                    -> Nothing
            ExplicitBidirectional explicit_mg -> Just explicit_mg
            ImplicitBidirectional             -> fmap mk_mg (tcPatToExpr args lpat)
 
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
-    mk_mg body = mkMatchGroupName Generated [wrapper_match]
+    mk_mg body = mkMatchGroupName Generated [builder_match]
                where
-                 wrapper_args  = [L loc (VarPat n) | L loc n <- args]
-                 wrapper_match = mkMatch wrapper_args body EmptyLocalBinds
+                 builder_args  = [L loc (VarPat n) | L loc n <- args]
+                 builder_match = mkMatch builder_args body EmptyLocalBinds
 
     args = case details of
               PrefixPatSyn args     -> args

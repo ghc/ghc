@@ -361,13 +361,47 @@ compilation and registration of multiple packages (whose source code is
 specified by the Backpack file).  A Backpack file replaces use of
 \texttt{-shape-of}, \texttt{-sig-of} and \texttt{-package} flags.\footnote{Backpack files are \emph{generated} by Cabal.  Cabal is responsible for downloading source files, resolving what versions of packages are to be used, executing conditional statements.  Once the Cabal files are compiled into a Backpack file, it is passed to GHC, which is responsible for instantiating holes and compiling the packages.  The package descriptions in a Backpack file are not full Cabal packages, but contain the minimum information necessary for GHC to work: they are more akin to entries in the installed package database (with some differences).}\footnote{One design goal of this separate package language from Cabal is that it can more easily be incorporated into a language specification, without needing the specification to pull in a full description of Cabal.}
 
+Here is a very simple Backpack file which defines two packages:\footnote{It could have been written as two separate files: the effect of processing this Backpack file is to compile both packages simultaneously.}
+
+\begin{verbatim}
+package a
+    exposed-modules:     A
+
+package b
+    includes:            a
+    exposed-modules:     B
+\end{verbatim}
+
+Here is a more complicated Backpack file taking advantage of the availability
+of signatures in Backpack:
+
+\begin{verbatim}
+installed package base
+    installed-id:        base-4.0.6-0123456789abcdef
+
+package p
+    includes:            base
+    exposed-modules:     P
+    other-modules:       InternalsP
+    required-signatures: Map
+    source-dir:          /srv/code/p
+    installed-id:        p-2.0.1-abcdef0123456789
+                         p-2.0.1-def0123456789abc
+
+package q
+    includes:            base, p (Map as QMap)
+    exposed-modules:     Q
+    other-modules:       QMap
+    source-dir:          /srv/code/q
+\end{verbatim}
+
 A Backpack file consists of a list of named packages, each of which
 is composed of fields (similar to fields in Cabal package description)
 which specify various aspects of the package.  A package may optionally
 be an \emph{installed} package (specified by the \texttt{installed}
 keyword), in which case the package refers to an existing package
 (with no holes) in the installed package database; in this case,
-all fields are omitted except for \texttt{id}, which identifies the
+all fields are omitted except for \texttt{installed-id}, which identifies the
 specific package in use.
 
 All packages in a Backpack file live in the global namespace.
@@ -379,10 +413,12 @@ backpack ::= package_0
              ...
              package_n
 
-package ::= ["installed"] "package" pkgname
+package ::= "package" pkgname
                 field_0
                 ...
                 field_n
+          | "installed package" pkgname
+                "installed-id:" ipid
 
 pkgname ::= /* package name, e.g. containers (no version!) */
 
@@ -393,7 +429,6 @@ field ::= "includes:"            includes
         | "required-signatures:" modnames
         | "reexported-modules:"  reexports
         | "source-dir:"          path
-        | "installed-ids:"       ipids
         | pkgdb_field
 \end{verbatim}
 
@@ -417,7 +452,14 @@ allowed.  Each package has all exposed modules and signatures are
 brought into scope under their original names, unless there is a
 parenthesized, comma-separated thinning and renaming specification which
 causes only the specified modules are brought into scope (under new
-names, if the \texttt{as} keyword is used).
+names, if the \texttt{as} keyword is used).  Here is an example
+\texttt{includes} field, which brings into scope all exposed modules
+from \texttt{base}, \texttt{P1} and \texttt{P2} from \texttt{p}, and
+\texttt{Q} from \texttt{q} under the name \texttt{MyQ}.
+
+\begin{verbatim}
+    includes: base, p (P1, P2), q (Q as MyQ)
+\end{verbatim}
 
 Package inclusion is the mechanism by which holes are instantiated:
 a hole and an implementation which are brought in the same scope with
@@ -434,16 +476,27 @@ modnames ::= modname_0 ... modname_n
 The \texttt{exposed-modules}, \texttt{other-modules},
 \texttt{exposed-signatures} and \texttt{required-signatures} are exactly
 analogous to their Cabal counterparts, and consist of lists of module names
-which are to be compiled from the package's source directory.
+which are to be compiled from the package's source directory.  For example,
+to expose modules \texttt{P} and \texttt{Q}, you would write:
+
+\begin{verbatim}
+    exposed-modules: P Q
+\end{verbatim}
 
 \subsection{\texttt{reexported-modules}}
 
 \begin{verbatim}
-reexports ::= modname "as" modname
+reexports ::= reexport_0 "," ... "," reexport_n
+reexport  ::= modname "as" modname
+            | modname
 \end{verbatim}
 
 The \texttt{reexported-modules} field is exactly analogous to its Cabal
-counterpart, and allows reexporting an in-scope module under a different name.\footnote{This is different from \emph{aliasing} in the original Backpack language, since reexported modules are not visible in the current package.}
+counterpart, and allows reexporting an in-scope module under a different name.\footnote{This is different from \emph{aliasing} in the original Backpack language, since reexported modules are not visible in the current package.}  For example, to reexport a locally available module \texttt{P} under the name \texttt{Q}, write:
+
+\begin{verbatim}
+    reexported-modules: P as Q
+\end{verbatim}
 
 \subsection{\texttt{source-dir}}
 
@@ -456,25 +509,30 @@ the package in question live, e.g. if \texttt{source-dir: /foo}
 then we expect the \texttt{hs} file for module \texttt{A} to live
 in \texttt{/foo/A.hs}.
 
-\subsection{\texttt{installed-ids}}
+\subsection{\texttt{installed-id}}
 
 \begin{verbatim}
-ipids ::= ipid_0 ... ipid_n
 ipid ::= /* installed package ID, e.g. containers-0.8-HASH */
 \end{verbatim}
 
-The \texttt{installed-ids} field specifies existing, \emph{compiled} packages in
-the installed package database, which should be used when possible
-instead of recompiling the package in question.  If the package in
-question is an \emph{indefinite} package (with holes), there may be
-multiple \texttt{installed-ids}, corresponding to compilations of the package
-with different hole instantiations.
+The \texttt{installed-id} field specifies an existing, \emph{compiled} package in
+the installed package database, which should be used.  This information
+is only used in the case of an \texttt{installed package} entry, because
+we would otherwise not have enough information to calculate a package
+key for the package.  It is analogous to the \texttt{-package-id} flag.
 
-The \texttt{installed-ids} field is mandatory for an \texttt{installed package}:
-it specifies the installed package database entry which can be used
-to find the omitted installed package database fields.
+\Red{This is enough if, in a package database, a given package key is
+    unique.  If package keys are not unique, it might also be necessary
+    to explicitly provide multiple multiple \texttt{installed-id}s for
+an indefinite package, corresponding to valid compilations of the
+package with different hole instantiations.  This never happens with
+current Cabal, since version numbers are built into package keys.}
 
 \subsection{Installed package database fields}
+
+\begin{verbatim}
+    pkgdb_field ::= ...
+\end{verbatim}
 
 GHC's installed package database supports a number of other fields
 which are necessary for GHC to build some packages, e.g., the \texttt{extraLibraries}
@@ -482,6 +540,8 @@ field which specifies operating system libraries which also have to
 be linked in.  Backpack packages accept any fields which are valid in the
 installed package database, except for: \texttt{name}, \texttt{id}, \texttt{key}
 and \texttt{instantiated-with} (which are computed by GHC itself).
+The full list of available fields can be found in the \texttt{bin-package-db}
+package.
 
 \subsection{Structure of a Backpack file}
 

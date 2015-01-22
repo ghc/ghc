@@ -309,7 +309,6 @@ import Data.Maybe
         'else'          { L _ (CmmT_else) }
         'export'        { L _ (CmmT_export) }
         'section'       { L _ (CmmT_section) }
-        'align'         { L _ (CmmT_align) }
         'goto'          { L _ (CmmT_goto) }
         'if'            { L _ (CmmT_if) }
         'call'          { L _ (CmmT_call) }
