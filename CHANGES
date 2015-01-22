@@ -26,6 +26,10 @@ Changes in version 2.16.0
 
  * properly render package ID (not package key) in index (#329)
 
+ * links to source location of class instance definitions
+
+ * Fix code blocks in presence of Windows line endings
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
