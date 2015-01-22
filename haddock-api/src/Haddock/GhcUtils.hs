@@ -16,18 +16,14 @@
 module Haddock.GhcUtils where
 
 
-import Data.Version
 import Control.Applicative  ( (<$>) )
 import Control.Arrow
-import Data.Foldable hiding (concatMap)
 import Data.Function
-import Data.Traversable
 
 import Exception
 import Outputable
 import Name
 import Lexeme
-import Packages
 import Module
 import RdrName (GlobalRdrEnv)
 import GhcMonad (withSession)
@@ -39,15 +35,6 @@ import Class
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
-
-
--- return the (name,version) of the package
-modulePackageInfo :: DynFlags -> Module -> (PackageName, Version)
-modulePackageInfo dflags modu =
-    (packageName pkg, packageVersion pkg)
-  where
-    pkg = getPackageDetails dflags (modulePackageKey modu)
-
 
 lookupLoadedHomeModuleGRE  :: GhcMonad m => ModuleName -> m (Maybe GlobalRdrEnv)
 lookupLoadedHomeModuleGRE mod_name = withSession $ \hsc_env ->
@@ -288,4 +275,3 @@ setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling with -fvia-C.
 setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
-

@@ -25,6 +25,7 @@ module Haddock (
   withGhc
 ) where
 
+import Data.Version
 import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
@@ -36,7 +37,6 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
-import Haddock.GhcUtils hiding (pretty)
 
 import Control.Monad hiding (forM_)
 import Data.Foldable (forM_)
@@ -66,9 +66,9 @@ import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
 import StaticFlags (discardStaticFlags)
+import Packages
 import Panic (handleGhcException)
 import Module
-import PackageConfig
 import FastString
 
 --------------------------------------------------------------------------------
@@ -252,7 +252,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     pkgMod           = ifaceMod (head ifaces)
     pkgKey            = modulePackageKey pkgMod
     pkgStr           = Just (packageKeyString pkgKey)
-    (pkgName,pkgVer) = modulePackageInfo dflags pkgMod
+    (pkgName,pkgVer) = modulePackageInfo dflags flags pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
     srcMap' = maybe srcMap (\path -> Map.insert pkgKey path srcMap) srcEntity
@@ -298,6 +298,27 @@ render dflags flags qual ifaces installedIfaces srcMap = do
   when (Flag_LaTeX `elem` flags) $ do
     ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                   libDir
+
+-- | From GHC 7.10, this function has a potential to crash with a
+-- nasty message such as @expectJust getPackageDetails@ because
+-- package name and versions can no longer reliably be extracted in
+-- all cases: if the package is not installed yet then this info is no
+-- longer available. The @--package-name@ and @--package-version@
+-- Haddock flags allow the user to specify this information and it is
+-- returned here if present: if it is not present, the error will
+-- occur. Nasty but that's how it is for now. Potential TODO.
+modulePackageInfo :: DynFlags
+                  -> [Flag] -- ^ Haddock flags are checked as they may
+                            -- contain the package name or version
+                            -- provided by the user which we
+                            -- prioritise
+                  -> Module -> (PackageName, Data.Version.Version)
+modulePackageInfo dflags flags modu =
+  (fromMaybe (packageName pkg) (optPackageName flags),
+   fromMaybe (packageVersion pkg) (optPackageVersion flags))
+  where
+    pkg = getPackageDetails dflags (modulePackageKey modu)
+
 
 -------------------------------------------------------------------------------
 -- * Reading and dumping interface files
