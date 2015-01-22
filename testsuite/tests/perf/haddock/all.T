@@ -45,7 +45,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 6387320816, 5)
+          [(wordsize(64), 6710234312, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -64,6 +64,7 @@ test('haddock.Cabal',
             # 2014-09-24: 5840893376 (x86_64/Linux - Cabal update)
             # 2014-10-04: 6019839624 (x86_64/Linux - Burning Bridges, Cabal update)
             # 2014-12-14: 6387320816 (x86_64/Linux) - Update to Haddock 2.16
+            # 2015-01-22: 6710234312 (x86_64/Linux) - Cabal updated
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

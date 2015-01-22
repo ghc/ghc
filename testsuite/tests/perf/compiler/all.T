@@ -129,7 +129,7 @@ test('T3294',
              # 2014-04-24 19882188 (x86/Windows, 64bit machine)
              # 2014-12-22 26525384 (x86/Windows) Increase due to silent superclasses?
 
-           (wordsize(64), 40000000, 15)]),
+           (wordsize(64), 45000000, 20)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
              #  (increase due to new codegen, see #7198)
@@ -141,6 +141,8 @@ test('T3294',
              #  (reason for increase back to earlier value unknown)
              # 2014-07-14:     36670800  (amd64/Linux)
              #  (reason unknown, setting expected value somewhere in between)
+             # 2015-01-22:     45000000  (amd64/Linux)
+             #  varies between 40959592 and 52914488... increasing to +-20%
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 1377050640, 5),
@@ -242,7 +244,7 @@ test('T3064',
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
             # 2014-12-22:     23 (x86/Linux) death to silent superclasses
-           (wordsize(64), 27, 20)]),
+           (wordsize(64), 32, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -254,6 +256,7 @@ test('T3064',
             # (amd64/Linux) (09/09/2014): 42, AMP changes (larger interfaces, more loading)
             # (amd64/Linux) 2014-10-13: 38: Stricter seqDmdType
             # (amd64/Linux) 2014-12-22: 27: death to silent superclasses
+            # (amd64/Linux) 2015-01-22: 32: Varies from 30 to 34, at least here.
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 122836340, 10),
