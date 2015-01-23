@@ -302,14 +302,6 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 <programlisting>splitAt undefined [] = undefined</programlisting>
             </para>
           </varlistentry>
-          <varlistentry>
-            <term><literal>zip</literal> and <literal>zipWith</literal> semantics</term>
-            <para><literal>zip</literal> and <literal>zipWith</literal> can give
-            less defined results than the Report specifies in certain cases. This deviation
-            is needed to allow more opportunities for list fusion. In particular,
-            termination of the left list cannot be used to avoid hitting bottom in the
-            right list. See the documentation for details.</para>
-          </varlistentry>
 	  <varlistentry>
 	    <term><literal>Read</literal>ing integers</term>
 	    <listitem>

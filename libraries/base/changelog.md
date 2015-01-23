@@ -77,10 +77,6 @@
 
   * Generalise `Control.Monad.{foldM,foldM_}` to `Foldable`
 
-  * `foldr2` (together with `zip` and `zipWith`) is made a bit stricter in the
-    second argument, so that the fusion RULES for it do not change the
-    semantics. (#9596)
-
   * `scanr`, `mapAccumL` and `filterM` now take part in list fusion (#9355,
     #9502, #9546)
 

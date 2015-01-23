@@ -875,7 +875,7 @@ xs !! n
 foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
 foldr2 k z = go
   where
-        go []    !_ys    = z -- see #9495 for the !
+        go []    _ys     = z
         go _xs   []      = z
         go (x:xs) (y:ys) = k x y (go xs ys)
 {-# INLINE [0] foldr2 #-}
@@ -884,20 +884,26 @@ foldr2_left :: (a -> b -> c -> d) -> d -> a -> ([b] -> c) -> [b] -> d
 foldr2_left _k  z _x _r []     = z
 foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 
-foldr2_right :: (a -> b -> c -> d) -> d -> b -> ([a] -> c) -> [a] -> d
-foldr2_right _k z  _y _r []     = z
-foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
-
 -- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
--- foldr2 k z xs ys = foldr (foldr2_right k z) (\_ -> z) ys xs
 {-# RULES
 "foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
-
-"foldr2/right"  forall k z xs (g::forall b.(a->b->b)->b->b) .
-                  foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
  #-}
-
+-- There used to be a foldr2/right rule, allowing foldr2 to fuse with a build
+-- form on the right. However, this causes trouble if the right list ends in
+-- a bottom that is only avoided by the left list ending at that spot. That is,
+-- foldr2 f z [a,b,c] (d:e:f:_|_), where the right list is produced by a build
+-- form, would cause the foldr2/right rule to introduce bottom. Example:
+--
+-- zip [1,2,3,4] (unfoldr (\s -> if s > 4 then undefined else Just (s,s+1)) 1)
+--
+-- should produce
+--
+-- [(1,1),(2,2),(3,3),(4,4)]
+--
+-- but with the foldr2/right rule it would instead produce
+--
+-- (1,1):(2,2):(3,3):(4,4):_|_
 
 -- Zips for larger tuples are in the List module.
 
@@ -906,19 +912,12 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 -- If one input list is short, excess elements of the longer list are
 -- discarded.
 --
--- NOTE: GHC's implementation of @zip@ deviates slightly from the
--- standard. In particular, Haskell 98 and Haskell 2010 require that
--- @zip [x1,x2,...,xn] (y1:y2:...:yn:_|_) = [(x1,y1),(x2,y2),...,(xn,yn)]@
--- In GHC, however,
--- @zip [x1,x2,...,xn] (y1:y2:...:yn:_|_) = (x1,y1):(x2,y2):...:(xn,yn):_|_@
--- That is, you cannot use termination of the left list to avoid hitting
--- bottom in the right list.
-
--- This deviation is necessary to make fusion with 'build' in the right
--- list preserve semantics.
+-- 'zip' is right-lazy:
+--
+-- > zip [] _|_ = []
 {-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
-zip []     !_bs   = [] -- see #9495 for the !
+zip []     _bs    = []
 zip _as    []     = []
 zip (a:as) (b:bs) = (a,b) : zip as bs
 
@@ -950,20 +949,12 @@ zip3 _      _      _      = []
 -- For example, @'zipWith' (+)@ is applied to two lists to produce the
 -- list of corresponding sums.
 --
--- NOTE: GHC's implementation of @zipWith@ deviates slightly from the
--- standard. In particular, Haskell 98 and Haskell 2010 require that
--- @zipWith (,) [x1,x2,...,xn] (y1:y2:...:yn:_|_) = [(x1,y1),(x2,y2),...,(xn,yn)]@
--- In GHC, however,
--- @zipWith (,) [x1,x2,...,xn] (y1:y2:...:yn:_|_) = (x1,y1):(x2,y2):...:(xn,yn):_|_@
--- That is, you cannot use termination of the left list to avoid hitting
--- bottom in the right list.
-
--- This deviation is necessary to make fusion with 'build' in the right
--- list preserve semantics.
-
+-- 'zipWith' is right-lazy:
+--
+-- > zipWith f [] _|_ = []
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-zipWith _f []     !_bs   = [] -- see #9495 for the !
+zipWith _f []     _bs    = []
 zipWith _f _as    []     = []
 zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
 
