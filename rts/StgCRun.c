@@ -755,18 +755,20 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     StgRegTable * r;
     __asm__ volatile (
         /*
-         * save callee-saves registers on behalf of the STG code.
-         * floating point registers only need the bottom 64 bits preserved.
-         * x16 and x17 are ip0 and ip1, but we can't refer to them by that name with clang.
+         * Save callee-saves registers on behalf of the STG code.
+         * Floating point registers only need the bottom 64 bits preserved.
+         * We need to use the the names x16, x17, x29 and x30 instead of ip0
+         * ip1, fp and lp because one of either clang or gcc doesn't understand
+         * the later names.
          */
-        "stp fp,  lr,  [sp, #-16]!\n\t"
-        "mov fp, sp\n\t"
+        "stp x29,  x30,  [sp, #-16]!\n\t"
+        "mov x29, sp\n\t"
         "stp x16, x17, [sp, #-16]!\n\t"
         "stp x19, x20, [sp, #-16]!\n\t"
         "stp x21, x22, [sp, #-16]!\n\t"
         "stp x23, x24, [sp, #-16]!\n\t"
         "stp x25, x26, [sp, #-16]!\n\t"
-        "stp x27, x28, [sp, #-16]!\n\t" 
+        "stp x27, x28, [sp, #-16]!\n\t"
         "stp d8,  d9,  [sp, #-16]!\n\t"
         "stp d10, d11, [sp, #-16]!\n\t"
         "stp d12, d13, [sp, #-16]!\n\t"
@@ -814,12 +816,12 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         "ldp x21, x22, [sp], #16\n\t"
         "ldp x19, x20, [sp], #16\n\t"
         "ldp x16, x17, [sp], #16\n\t"
-        "ldp fp,  lr,  [sp], #16\n\t"
+        "ldp x29,  x30,  [sp], #16\n\t"
 
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
         : "%x19", "%x20", "%x21", "%x22", "%x23", "%x24", "%x25", "%x26", "%x27", "%x28",
-          "%x16", "%x17", "%lr"
+          "%x16", "%x17", "%x30"
     );
     return r;
 }
