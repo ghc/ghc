@@ -1,0 +1,122 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Cost semantics  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+grammar
+
+heap :: 'Heap_' ::= {{ com Values on the heap }}
+  | cl                  :: :: HeapClosure {{ com Closure }}
+  | K args              :: :: HeapConstructor {{ com Data constructor }}
+  | x                   :: :: HeapIndirection {{ com Indirection }}
+
+cost :: 'cost_' ::=
+  | alloc K :: :: AllocateCon
+  | alloc cl :: :: AllocateClosure
+  | alloc PAP :: :: AllocatePAP
+
+t {{ tex \theta }} :: 't_' ::=
+  | {} :: :: empty
+  | { ccs |-> cost } :: :: inject
+  | t <> t' :: :: append
+
+G {{ tex \Gamma }}, D {{ tex \Delta }}, T {{ tex \Theta }} :: 'G_' ::= {{ com Heap }}
+  | G [ Gp ] :: :: vn {{ com Heap with assignment }}
+
+Gp :: 'Gp_' ::= {{ com Heap assignment }}
+  | x |- ccs -> heap :: :: prod
+    {{ tex [[x]] \overset{[[ccs]]}{\mapsto} [[heap]] }}
+
+formula :: 'formula_' ::=
+  | judgement :: :: judgement
+  % all the random extra stuff we didn't want to gunk up the inductive
+  % types with...
+  | alt' = alt :: :: Galt
+  | ccs' /= ccs :: :: Gccsneq
+  | Gp in G :: :: Gin
+  | x fresh :: :: Gfresh
+
+v :: 'v_' ::=
+  | cl                :: :: HClosureReentrant
+  | K args            :: :: HConstructor
+
+ret :: 'ret_' ::= {{ com Return values }}
+  | a      :: :: Return {{ com Normal return }}
+  | { x args } :: :: LetNoEscape {{ com Jump to let-no-escape }}
+
+subrules
+  v <:: heap
+
+defns
+
+Jcost :: '' ::=
+
+defn
+    ccs , G : e  >- t ->  D : ret , ccs' :: :: cost :: ''
+        {{tex [[ccs]] [[,]] [[G]] [[:]] [[e]]\ \Downarrow_{[[t]]}\ [[D]] [[:]] [[ret]] [[,]] [[ccs']] }}
+        by
+
+    --------------------------------------- :: Lit
+    ccs, G : lit  >-{}->  G : lit, ccs
+
+    x |- ccs0 -> v in G
+    --------------------------------------- :: Whnf
+    ccs, G : x nil  >-{}->  G : x, ccs
+
+    ccs0, G : e  >-t->  D : z, ccs'
+    --------------------------------------- :: Thunk
+    ccs, G [ x |- ccs0 -> \ u _ nil . e ] : x nil  >-t->  D [ x |- ccs0 -> z ] : z, ccs'
+
+    f |- ccs0 -> \ r ccs1 </ yi // i /> </ xj // j /> . e in G
+    z fresh
+    --------------------------------------- :: AppUnder
+    ccs, G : f </ ai // i /> >- { ccs |-> alloc PAP } -> G [ z |- ccs -> \ r _ </ xj // j /> . f </ ai // i /> </ xj // j /> ] : z, ccs
+    % NB: PAPs not charged!
+
+    ccs ^ ccs0, G : e >-t-> D : z, ccs'
+    ------------------------------------------------- :: App
+    ccs, G [ f |- ccs0 -> \ r CCCS </ xi // i /> . e ] : f </ ai // i /> >-t->  D : z, ccs'
+
+    ccs, G : e >-t-> D : z, ccs'
+    ccs1 /= CCCS
+    ------------------------------------------------- :: AppTop
+    ccs, G [ f |- _ -> \ r ccs1 </ xi // i /> . e ] : f </ ai // i /> >-t->  D : z, ccs'
+
+    ccs, G : f </ ai // i /> >-t-> D : f', ccs'
+    ccs, D : f' </ bj // j /> >-t'-> T : z, ccs''
+    ---------------------------------------- :: AppOver
+    ccs, G : f </ ai // i /> </ bj // j /> >-t <> t'->  T : z, ccs''
+
+    z fresh
+    ---------------------------------------- :: ConApp
+    ccs, G : K </ ai // i />  >- { ccs |-> alloc K } ->  G [ z |- ccs -> K </ ai // i /> ] : z, ccs
+
+    altj = Kk </ xi // i /> -> e'
+    ccs, G : e >- t -> D [ y |- _ -> Kk </ ai // i /> ] : y, ccs'
+    ccs, D [ y |- _ -> Kk </ ai // i /> ] : e' [ y / x ] </ [ ai / xi ] // i /> >- t' -> T : z, ccs''
+    --------------------------------------------------------------- :: Case
+    ccs, G : case e as x of </ altj // j /> >- t <> t' -> T : z, ccs''
+
+    y fresh
+    ccs, G [ y |- ccs -> cl ] : e [ x / y ] >- t -> D : z, ccs'
+    ------------------------------------------------------------ :: LetClosure
+    ccs, G : let x = cl in e  >- { ccs |-> alloc cl } <> t ->  D : z, ccs'
+
+    y fresh
+    ccs, G [ y |- ccs -> K </ ai // i /> ] : e [ x / y ] >- t -> D : z, ccs'
+    ------------------------------------------------------------ :: LetCon
+    ccs, G : let x = K CCCS </ ai // i /> in e  >- { ccs |-> alloc K } <> t ->  D : z, ccs'
+
+    ccs, G : e >- t -> D : { f </ ai // i /> } , ccs'
+    ccs, D : e' </ [ ai / xi ] // i /> >- t' -> T : z, ccs''
+    ------------------------------------------------------------ :: LneClosure
+    ccs, G : lne f = \ upd _ </ x // i /> . e' in e  >- t <> t' ->  T : z, ccs''
+
+    ccs, G : e >- t -> D : x , ccs'
+    ccs, D : K </ ai // i /> >- t' -> T : z, ccs''
+    --------------------------------------------------------------- :: LneCon
+    ccs, G : lne x = K _ </ ai // i /> in e  >- t <> t' ->  T : z, ccs''
+
+    ccs # cc, G : e >- t -> D : z, ccs'
+    --------------------------------------- :: SCC
+    ccs, G : scc cc e >- t -> D : z, ccs'
