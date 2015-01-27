@@ -150,7 +150,6 @@ import Outputable
 import HscStats         ( ppSourceStats )
 import HscTypes
 import FastString
-import UniqFM           ( emptyUFM )
 import UniqSupply
 import Bag
 import Exception
@@ -181,8 +180,7 @@ newHscEnv dflags = do
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
-    fc_var  <- newIORef emptyUFM
-    mlc_var <- newIORef emptyModuleEnv
+    fc_var  <- newIORef emptyModuleEnv
     return HscEnv {  hsc_dflags       = dflags,
                      hsc_targets      = [],
                      hsc_mod_graph    = [],
@@ -191,7 +189,6 @@ newHscEnv dflags = do
                      hsc_EPS          = eps_var,
                      hsc_NC           = nc_var,
                      hsc_FC           = fc_var,
-                     hsc_MLC          = mlc_var,
                      hsc_type_env_var = Nothing }
 
 
