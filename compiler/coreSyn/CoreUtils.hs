@@ -297,10 +297,18 @@ mkTick t orig_expr = mkTick' id id orig_expr
          else top $ Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
 
     Var x
-      | not (isFunTy (idType x)) && tickishPlace t == PlaceCostCentre
+      | notFunction && tickishPlace t == PlaceCostCentre
       -> orig_expr
-      | canSplit
+      | notFunction && canSplit
       -> top $ Tick (mkNoScope t) $ rest expr
+      where
+        -- SCCs can be eliminated on variables provided the variable
+        -- is not a function.  In these cases the SCC makes no difference:
+        -- the cost of evaluating the variable will be attributed to its
+        -- definition site.  When the variable refers to a function, however,
+        -- an SCC annotation on the variable affects the cost-centre stack
+        -- when the function is called, so we must retain those.
+        notFunction = not (isFunTy (idType x))
 
     Lit{}
       | tickishPlace t == PlaceCostCentre

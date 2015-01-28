@@ -23,7 +23,10 @@ test('T3001-2',
      compile_and_run, ['-package bytestring'])
 
 test('scc001', [req_profiling,
-                extra_ways(['prof']), only_ways(prof_ways)],
+                extra_ways(['prof']), only_ways(prof_ways),
+                expect_broken_for(10037,['prof'])],
+        # As with ioprof001, the unoptimised profile is different but
+        # not badly wrong (CAF attribution is different).
      compile_and_run,
      ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
@@ -43,6 +46,11 @@ test('scc004', [req_profiling,
      compile_and_run,
      [''])
 
+test('scc005', [req_profiling,
+                extra_ways(['prof']), only_ways(prof_ways)],
+     compile_and_run,
+     [''])
+
 test('T5314',
      [ only_ways(prof_ways),
        extra_ways(extra_prof_ways),
@@ -56,7 +64,8 @@ test('T680',
      ['-fno-full-laziness']) # Note [consistent stacks]
 
 test('T2552',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
+     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
+       expect_broken_for(10037,['prof'])],
      compile_and_run,
      [''])
 
@@ -67,7 +76,7 @@ test('T949',
 
 test('ioprof',
      [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
-       expect_fail_for(['prof']),
+       expect_broken_for(10037,['prof']),
         # The results for 'prof' are fine, but the ordering changes.
         # We care more about getting the optimised results right, so ignoring
         # this for now.
@@ -101,7 +110,9 @@ test('T5559', # unicode in cost centre names
 #       -fno-full-laziness
 
 test('callstack001',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
+     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
+       expect_broken_for(10037,['prof'])],
+     # unoptimised results are different w.r.t. CAF attribution
      compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
 test('callstack002',
