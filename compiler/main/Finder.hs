@@ -40,9 +40,8 @@ import DynFlags
 import Outputable
 import UniqFM
 import Maybes           ( expectJust )
-import Exception        ( evaluate )
 
-import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
+import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef' )
 import System.Directory
 import System.FilePath
 import Control.Monad
@@ -80,27 +79,26 @@ flushFinderCaches hsc_env = do
 
 flushModLocationCache :: PackageKey -> IORef ModLocationCache -> IO ()
 flushModLocationCache this_pkg ref = do
-  atomicModifyIORef ref $ \fm -> (filterModuleEnv is_ext fm, ())
-  _ <- evaluate =<< readIORef ref
+  atomicModifyIORef' ref $ \fm -> (filterModuleEnv is_ext fm, ())
   return ()
   where is_ext mod _ | modulePackageKey mod /= this_pkg = True
                      | otherwise = False
 
 addToFinderCache :: IORef FinderCache -> ModuleName -> FindResult -> IO ()
 addToFinderCache ref key val =
-  atomicModifyIORef ref $ \c -> (addToUFM c key val, ())
+  atomicModifyIORef' ref $ \c -> (addToUFM c key val, ())
 
 addToModLocationCache :: IORef ModLocationCache -> Module -> ModLocation -> IO ()
 addToModLocationCache ref key val =
-  atomicModifyIORef ref $ \c -> (extendModuleEnv c key val, ())
+  atomicModifyIORef' ref $ \c -> (extendModuleEnv c key val, ())
 
 removeFromFinderCache :: IORef FinderCache -> ModuleName -> IO ()
 removeFromFinderCache ref key =
-  atomicModifyIORef ref $ \c -> (delFromUFM c key, ())
+  atomicModifyIORef' ref $ \c -> (delFromUFM c key, ())
 
 removeFromModLocationCache :: IORef ModLocationCache -> Module -> IO ()
 removeFromModLocationCache ref key =
-  atomicModifyIORef ref $ \c -> (delModuleEnv c key, ())
+  atomicModifyIORef' ref $ \c -> (delModuleEnv c key, ())
 
 lookupFinderCache :: IORef FinderCache -> ModuleName -> IO (Maybe FindResult)
 lookupFinderCache ref key = do

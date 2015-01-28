@@ -853,7 +853,7 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
   where
     writeLogQueue :: LogQueue -> Maybe (Severity,SrcSpan,PprStyle,MsgDoc) -> IO ()
     writeLogQueue (LogQueue ref sem) msg = do
-        atomicModifyIORef ref $ \msgs -> (msg:msgs,())
+        atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
         _ <- tryPutMVar sem ()
         return ()
 
@@ -869,7 +869,7 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
     printLogs !dflags (LogQueue ref sem) = read_msgs
       where read_msgs = do
                 takeMVar sem
-                msgs <- atomicModifyIORef ref $ \xs -> ([], reverse xs)
+                msgs <- atomicModifyIORef' ref $ \xs -> ([], reverse xs)
                 print_loop msgs
 
             print_loop [] = read_msgs
@@ -1021,7 +1021,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
 
                 -- Prune the old HPT unless this is an hs-boot module.
                 unless (isBootSummary mod) $
-                    atomicModifyIORef old_hpt_var $ \old_hpt ->
+                    atomicModifyIORef' old_hpt_var $ \old_hpt ->
                         (delFromUFM old_hpt this_mod, ())
 
                 -- Update and fetch the global HscEnv.

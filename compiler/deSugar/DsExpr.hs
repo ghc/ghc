@@ -63,7 +63,7 @@ import Outputable
 import FastString
 
 import IdInfo
-import Data.IORef       ( atomicModifyIORef, modifyIORef )
+import Data.IORef       ( atomicModifyIORef', modifyIORef )
 
 import Control.Monad
 import GHC.Fingerprint
@@ -973,7 +973,7 @@ mkSptEntryName loc = do
            let -- Note [Generating fresh names for ccall wrapper]
                -- in compiler/typecheck/TcEnv.hs
                wrapperRef = nextWrapperNum dflags
-           wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
+           wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
                let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
                 in (extendModuleEnv mod_env thisMod (num+1), num)
            return $ mkVarOcc $ what ++ ":" ++ show wrapperNum

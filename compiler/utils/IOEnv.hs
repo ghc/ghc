@@ -38,7 +38,7 @@ import Module
 import Panic
 
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
-                          atomicModifyIORef )
+                          atomicModifyIORef, atomicModifyIORef' )
 import Data.Typeable
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
@@ -194,10 +194,7 @@ atomicUpdMutVar var upd = liftIO (atomicModifyIORef var upd)
 
 -- | Strict variant of 'atomicUpdMutVar'.
 atomicUpdMutVar' :: IORef a -> (a -> (a, b)) -> IOEnv env b
-atomicUpdMutVar' var upd = do
-  r <- atomicUpdMutVar var upd
-  _ <- liftIO . evaluate =<< readMutVar var
-  return r
+atomicUpdMutVar' var upd = liftIO (atomicModifyIORef' var upd)
 
 ----------------------------------------------------------------------
 -- Accessing the environment

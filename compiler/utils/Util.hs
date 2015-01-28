@@ -107,7 +107,7 @@ import Exception
 import Panic
 
 import Data.Data
-import Data.IORef       ( IORef, newIORef, atomicModifyIORef )
+import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
 
@@ -808,7 +808,7 @@ global a = unsafePerformIO (newIORef a)
 
 consIORef :: IORef [a] -> a -> IO ()
 consIORef var x = do
-  atomicModifyIORef var (\xs -> (x:xs,()))
+  atomicModifyIORef' var (\xs -> (x:xs,()))
 
 globalM :: IO a -> IORef a
 globalM ma = unsafePerformIO (ma >>= newIORef)

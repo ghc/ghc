@@ -1034,7 +1034,7 @@ cleanTempDirs dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
    $ do let ref = dirsToClean dflags
-        ds <- atomicModifyIORef ref $ \ds -> (Map.empty, ds)
+        ds <- atomicModifyIORef' ref $ \ds -> (Map.empty, ds)
         removeTmpDirs dflags (Map.elems ds)
 
 cleanTempFiles :: DynFlags -> IO ()
@@ -1042,7 +1042,7 @@ cleanTempFiles dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
    $ do let ref = filesToClean dflags
-        fs <- atomicModifyIORef ref $ \fs -> ([],fs)
+        fs <- atomicModifyIORef' ref $ \fs -> ([],fs)
         removeTmpFiles dflags fs
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
@@ -1050,7 +1050,7 @@ cleanTempFilesExcept dflags dont_delete
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
    $ do let ref = filesToClean dflags
-        to_delete <- atomicModifyIORef ref $ \files ->
+        to_delete <- atomicModifyIORef' ref $ \files ->
             let (to_keep,to_delete) = partition (`elem` dont_delete) files
             in  (to_keep,to_delete)
         removeTmpFiles dflags to_delete
@@ -1058,7 +1058,7 @@ cleanTempFilesExcept dflags dont_delete
 
 -- Return a unique numeric temp file suffix
 newTempSuffix :: DynFlags -> IO Int
-newTempSuffix dflags = atomicModifyIORef (nextTempSuffix dflags) $ \n -> (n+1,n)
+newTempSuffix dflags = atomicModifyIORef' (nextTempSuffix dflags) $ \n -> (n+1,n)
 
 -- Find a temporary name that doesn't already exist.
 newTempName :: DynFlags -> Suffix -> IO FilePath
@@ -1120,7 +1120,7 @@ getTempDir dflags = do
 
         -- 2. Update the dirsToClean mapping unless an entry already exists
         -- (i.e. unless another thread beat us to it).
-        their_dir <- atomicModifyIORef dir_ref $ \mapping ->
+        their_dir <- atomicModifyIORef' dir_ref $ \mapping ->
             case Map.lookup tmp_dir mapping of
                 Just dir -> (mapping, Just dir)
                 Nothing  -> (Map.insert tmp_dir our_dir mapping, Nothing)
@@ -1141,7 +1141,7 @@ getTempDir dflags = do
 addFilesToClean :: DynFlags -> [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
 addFilesToClean dflags new_files
-    = atomicModifyIORef (filesToClean dflags) $ \files -> (new_files++files, ())
+    = atomicModifyIORef' (filesToClean dflags) $ \files -> (new_files++files, ())
 
 removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
 removeTmpDirs dflags ds

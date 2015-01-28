@@ -34,9 +34,8 @@ import SrcLoc
 import Util
 
 import Outputable
-import Exception     ( evaluate )
 
-import Data.IORef    ( atomicModifyIORef, readIORef )
+import Data.IORef    ( atomicModifyIORef' )
 
 {-
 *********************************************************
@@ -233,9 +232,7 @@ newtype NameCacheUpdater = NCU { updateNameCache :: forall c. (NameCache -> (Nam
 mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
 mkNameCacheUpdater = do
   nc_var <- hsc_NC `fmap` getTopEnv
-  let update_nc f = do r <- atomicModifyIORef nc_var f
-                       _ <- evaluate =<< readIORef nc_var
-                       return r
+  let update_nc f = atomicModifyIORef' nc_var f
   return (NCU update_nc)
 
 initNameCache :: UniqSupply -> [Name] -> NameCache

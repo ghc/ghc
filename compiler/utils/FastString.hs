@@ -109,7 +109,7 @@ import ExtsCompat46
 import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.Data
-import Data.IORef       ( IORef, newIORef, readIORef, atomicModifyIORef )
+import Data.IORef       ( IORef, newIORef, readIORef, atomicModifyIORef' )
 import Data.Maybe       ( isJust )
 import Data.Char
 import Data.List        ( elemIndex )
@@ -340,7 +340,7 @@ mkFastStringWith mk_fs !ptr !len = do
             n <- get_uid
             new_fs <- mk_fs n
 
-            atomicModifyIORef bucket $ \ls2 ->
+            atomicModifyIORef' bucket $ \ls2 ->
                 -- Note [Double-checking the bucket]
                 let delta_ls = case ls1 of
                         []  -> ls2
@@ -357,7 +357,7 @@ mkFastStringWith mk_fs !ptr !len = do
   where
     !(FastStringTable uid _arr) = string_table
 
-    get_uid = atomicModifyIORef uid $ \n -> (n+1,n)
+    get_uid = atomicModifyIORef' uid $ \n -> (n+1,n)
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
@@ -502,7 +502,7 @@ zEncodeFS fs@(FastString _ _ _ ref) =
         case m of
           Just zfs -> return zfs
           Nothing -> do
-            atomicModifyIORef ref $ \m' -> case m' of
+            atomicModifyIORef' ref $ \m' -> case m' of
               Nothing  -> let zfs = mkZFastString (zEncodeString (unpackFS fs))
                           in (Just zfs, zfs)
               Just zfs -> (m', zfs)

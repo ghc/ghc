@@ -142,7 +142,7 @@ bindSuspensions t = do
                                     return (RefWrap ty term, names)
                       }
         doSuspension freeNames ct ty hval _name = do
-          name <- atomicModifyIORef freeNames (\x->(tail x, head x))
+          name <- atomicModifyIORef' freeNames (\x->(tail x, head x))
           n <- newGrimName name
           return (Suspension ct ty hval (Just n), [(n,ty,hval)])
 

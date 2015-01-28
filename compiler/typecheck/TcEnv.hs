@@ -843,7 +843,7 @@ mkWrapperName what nameBase
              wrapperRef = nextWrapperNum dflags
              pkg = packageKeyString  (modulePackageKey thisMod)
              mod = moduleNameString (moduleName      thisMod)
-         wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
+         wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
              let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
                  mod_env' = extendModuleEnv mod_env thisMod (num+1)
              in (mod_env', num)
