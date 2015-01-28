@@ -753,7 +753,7 @@ echo "[]" > package.conf
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.5.0.1 (was 1.4.1)
+                    Version number 1.5.0.1 (was 1.4.2)
                </para>
            </listitem>
        </itemizedlist>
