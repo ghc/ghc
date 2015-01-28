@@ -636,16 +636,22 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
              tyvars_msg = map loc_msg tyvars
              msg = vcat [ hang (ptext (sLit "Found hole") <+> quotes (ppr occ))
                              2 (ptext (sLit "with type:") <+> pprType (ctEvPred (ctEvidence ct)))
-                        , ppUnless (null tyvars_msg) (ptext (sLit "Where:") <+> vcat tyvars_msg)
-                        , pts_hint ]
+                        , ppUnless (null tyvars) (ptext (sLit "Where:") <+> vcat tyvars_msg)
+                        , hint ]
        ; (ctxt, binds_doc, _) <- relevantBindings False ctxt ct
                -- The 'False' means "don't filter the bindings"; see Trac #8191
        ; mkErrorMsgFromCt ctxt ct (msg $$ binds_doc) }
   where
-    pts_hint
+    hint
       | TypeHole  <- hole_sort
       , HoleError <- cec_type_holes ctxt
       = ptext (sLit "To use the inferred type, enable PartialTypeSignatures")
+
+      | ExprHole <- hole_sort         -- Give hint for, say,   f x = _x
+      , lengthFS (occNameFS occ) > 1  -- Don't give this hint for plain "_", which isn't legal Haskell
+      = ptext (sLit "Or perhaps") <+> quotes (ppr occ)
+        <+> ptext (sLit "is mis-spelled, or not in scope")
+
       | otherwise
       = empty
 

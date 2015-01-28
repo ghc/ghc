@@ -9,6 +9,7 @@ holes3.hs:3:5:
 
 holes3.hs:6:7:
     Found hole ‘_gr’ with type: Char
+    Or perhaps ‘_gr’ is mis-spelled, or not in scope
     Relevant bindings include
       x :: Int (bound at holes3.hs:6:3)
       g :: Int -> Char (bound at holes3.hs:6:1)
@@ -17,6 +18,7 @@ holes3.hs:6:7:
 
 holes3.hs:8:5:
     Found hole ‘_aa’ with type: [Char]
+    Or perhaps ‘_aa’ is mis-spelled, or not in scope
     Relevant bindings include h :: [Char] (bound at holes3.hs:8:1)
     In the first argument of ‘(++)’, namely ‘_aa’
     In the expression: _aa ++ "a"
@@ -25,6 +27,7 @@ holes3.hs:8:5:
 holes3.hs:11:15:
     Found hole ‘_x’ with type: b0
     Where: ‘b0’ is an ambiguous type variable
+    Or perhaps ‘_x’ is mis-spelled, or not in scope
     Relevant bindings include
       y :: [a] (bound at holes3.hs:11:3)
       z :: [a] -> [a] (bound at holes3.hs:11:1)

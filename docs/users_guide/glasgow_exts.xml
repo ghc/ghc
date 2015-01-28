@@ -8595,19 +8595,6 @@ check the type of the term they are about to write.
 </para>
 
 <para>
-To run and test a piece of code containing holes, use the
-<literal>-fdefer-typed-holes</literal> flag. This flag defers errors
-produced by typed holes and converts them into warnings. The result is that
-typed hole errors are converted into warnings (controlled by
-<literal>-fwarn-typed-holes</literal>). The result is that a hole will behave
-like <literal>undefined</literal>, but with the added benefits that it shows a
-warning at compile time and will show another warning message if it gets
-evaluated. This behaviour follows that of the
-<literal>-fdefer-type-errors</literal> option, which implies
-<literal>-fdefer-typed-holes</literal>. See <xref linkend="defer-type-errors"/>.
-</para>
-
-<para>
 For example, compiling the following module with GHC:
 <programlisting>
 f :: a -> a
@@ -8628,29 +8615,31 @@ hole.hs:2:7:
 </para>
 
 <para>
-Multiple typed holes can be used to find common type variables between expressions. For example:
-<programlisting>
-sum :: [Int] -> Int
-sum xs = foldr _f _z xs
-</programlisting>
-Shows:
-<programlisting>
-holes.hs:2:15:
-    Found hole `_f' with type: Int -> Int -> Int
-    In the first argument of `foldr', namely `_'
-    In the expression: foldr _a _b _c
-    In an equation for `sum': sum x = foldr _a _b _c
-
-holes.hs:2:17:
-    Found hole `_z' with type: Int
-    In the second argument of `foldr', namely `_'
-    In the expression: foldr _a _b _c
-    In an equation for `sum': sum x = foldr _a _b _c
-</programlisting>
-</para>
-
+Here are some more details:
+<itemizedlist>
+<listitem>
 <para>
-Unbound identifiers with the same name are never unified, even within the same function, but always printed individually.
+A "<literal>Found hole</literal>" error usually terminates compilation, like
+any other type error.  After all, you have omitted some code from your program.
+Nevertheless, you can run and test a piece of code containing holes, by using the flag
+<option>-fdefer-typed-holes</option> flag. This flag defers errors
+produced by typed holes until runtime, and converts them into compile-time warnings.
+These warnings can in turn
+be suppressed entirely by <option>-fnowarn-typed-holes</option>).
+</para>
+<para>
+The result is that a hole will behave
+like <literal>undefined</literal>, but with the added benefits that it shows a
+warning at compile time and will show another warning message if it gets
+evaluated at runtime.. This behaviour follows that of the
+<literal>-fdefer-type-errors</literal> option, which implies
+<literal>-fdefer-typed-holes</literal>. See <xref linkend="defer-type-errors"/>.
+</para>
+</listitem>
+
+<listitem><para>
+Unbound identifiers with the same name are never unified, even within the 
+same function, but shown individually.
 For example:
 <programlisting>
 cons = _x : _x
@@ -8676,8 +8665,20 @@ unbound.hs:1:13:
     In the expression: _x : _x
     In an equation for `cons': cons = _x : _x
 </programlisting>
-This ensures that an unbound identifier is never reported with a too polymorphic type, like
-<literal>forall a. a</literal>, when used multiple times for types that can not be unified.
+Notice the two different types reported for the two different occurrences of <literal>_x</literal>.
+</para></listitem>
+
+<listitem><para>
+No language extension is required to use typed holes.  The lexeme "<literal>_</literal>" was previously
+illegal in Haskell, but now has a more informative error message.  The lexeme "<literal>_x</literal>"
+is a perfectly legal varaible, and its behaviour is unchanged when it is in scope.  For example
+<programlisting>
+f _x = _x + 1
+</programlisting>
+does not elict any errors.  Only a variable starting with an underscore <emphasis>that is not in scope</emphasis>
+is treated as an error (which it always was), albeit now with a more informative error message
+</para></listitem>
+</itemizedlist>
 </para>
 
 </sect1>
