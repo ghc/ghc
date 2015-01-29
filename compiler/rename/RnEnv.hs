@@ -905,10 +905,12 @@ addUsedRdrNames rdrs
                    (\s -> foldr Set.insert s rdrs) }
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
-warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported (imp_spec : _) })
+warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported imp_specs@(imp_spec : _) })
   = do { dflags <- getDynFlags
        ; when (wopt Opt_WarnWarningsDeprecations dflags) $
          do { iface <- loadInterfaceForName doc name
+            ; unless (any isNothing $ map is_warning imp_specs) $
+                mapM_ (addWarn . mk_msg . fromJust . is_warning) imp_specs
             ; case lookupImpDeprec iface gre of
                 Just txt -> addWarn (mk_msg txt)
                 Nothing  -> return () } }

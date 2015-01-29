@@ -119,10 +119,12 @@ wired-in Ids.
 
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
- = map (Avail . idName) ghcPrimIds ++
-   map (Avail . idName . primOpId) allThePrimOps ++
-   [ AvailTC n [n]
-   | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
+    = map (Avail . mkNameWarn . idName) ghcPrimIds ++
+      map (Avail . mkNameWarn . idName . primOpId) allThePrimOps ++
+      [ AvailTC (mkNameWarn n) [mkNameWarn n]
+      | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
+  where
+    mkNameWarn n = NameWarn n Nothing
 
 {-
 ************************************************************************

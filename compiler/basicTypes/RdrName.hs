@@ -62,6 +62,7 @@ module RdrName (
 
 #include "HsVersions.h"
 
+import BasicTypes
 import Module
 import Name
 import Avail
@@ -509,22 +510,25 @@ That's why plusParent picks the "best" case.
 -- | make a 'GlobalRdrEnv' where all the elements point to the same
 -- Provenance (useful for "hiding" imports, or imports with
 -- no details).
-gresFromAvails :: Provenance -> [AvailInfo] -> [GlobalRdrElt]
+gresFromAvails :: (Maybe WarningTxt -> Provenance) -> [AvailInfo]
+               -> [GlobalRdrElt]
 gresFromAvails prov avails
   = concatMap (gresFromAvail (const prov)) avails
 
-gresFromAvail :: (Name -> Provenance) -> AvailInfo -> [GlobalRdrElt]
+gresFromAvail :: (Name -> Maybe WarningTxt -> Provenance) -> AvailInfo
+              -> [GlobalRdrElt]
 gresFromAvail prov_fn avail
   = [ GRE {gre_name = n,
            gre_par = mkParent n avail,
-           gre_prov = prov_fn n}
-    | n <- availNames avail ]
-  where
+           gre_prov = prov_fn n mw}
+    | NameWarn n mw <- availNameWarns avail ]
 
 mkParent :: Name -> AvailInfo -> Parent
 mkParent _ (Avail _)                 = NoParent
-mkParent n (AvailTC m _) | n == m    = NoParent
-                         | otherwise = ParentIs m
+mkParent n (AvailTC m _) | n == mn   = NoParent
+                         | otherwise = ParentIs mn
+  where
+    mn = nameWarnName m
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
@@ -741,7 +745,7 @@ shadow_name env name
            (Just old_mod, Just new_mod) | new_mod == old_mod -> Nothing
            (Just old_mod, _) -> Just (old_gre { gre_prov = Imported [fake_imp_spec] })
               where
-                 fake_imp_spec = ImpSpec id_spec ImpAll  -- Urgh!
+                 fake_imp_spec = ImpSpec id_spec ImpAll Nothing -- Urgh!
                  old_mod_name = moduleName old_mod
                  id_spec = ImpDeclSpec { is_mod = old_mod_name
                                        , is_as = old_mod_name
@@ -815,7 +819,8 @@ data Provenance
                         -- INVARIANT: the list of 'ImportSpec' is non-empty
 
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
-                            is_item :: ImpItemSpec }
+                            is_item :: ImpItemSpec,
+                            is_warning :: Maybe WarningTxt }
                 deriving( Eq, Ord )
 
 -- | Describes a particular import declaration and is
@@ -860,8 +865,8 @@ qualSpecOK :: ModuleName -> ImportSpec -> Bool
 qualSpecOK mod is = mod == is_as (is_decl is)
 
 importSpecLoc :: ImportSpec -> SrcSpan
-importSpecLoc (ImpSpec decl ImpAll) = is_dloc decl
-importSpecLoc (ImpSpec _    item)   = is_iloc item
+importSpecLoc (ImpSpec decl ImpAll _) = is_dloc decl
+importSpecLoc (ImpSpec _    item _)   = is_iloc item
 
 importSpecModule :: ImportSpec -> ModuleName
 importSpecModule is = is_mod (is_decl is)

@@ -855,7 +855,7 @@ availsToGlobalRdrEnv mod_name avails
   where
       -- We're building a GlobalRdrEnv as if the user imported
       -- all the specified modules into the global interactive module
-    imp_prov = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
+    imp_prov mw = Imported [ImpSpec { is_decl = decl, is_item = ImpAll, is_warning = mw }]
     decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }

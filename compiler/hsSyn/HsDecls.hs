@@ -1668,7 +1668,7 @@ data WarnDecls name = Warnings { wd_src :: SourceText
 type LWarnDecl name = Located (WarnDecl name)
 
 data WarnDecl name = Warning [Located name] WarningTxt
-  deriving (Data, Typeable)
+  deriving (Eq, Data, Typeable)
 
 instance OutputableBndr name => Outputable (WarnDecls name) where
     ppr (Warnings _ decls) = ppr decls

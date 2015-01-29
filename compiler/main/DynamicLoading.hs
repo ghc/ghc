@@ -213,7 +213,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                     -- Try and find the required name in the exports
                     let decl_spec = ImpDeclSpec { is_mod = mod_name, is_as = mod_name
                                                 , is_qual = False, is_dloc = noSrcSpan }
-                        provenance = Imported [ImpSpec decl_spec ImpAll]
+                        provenance mw = Imported [ImpSpec decl_spec ImpAll mw]
                         env = mkGlobalRdrEnv (gresFromAvails provenance (mi_exports iface))
                     case lookupGRE_RdrName rdr_name env of
                         [gre] -> return (Just (gre_name gre))

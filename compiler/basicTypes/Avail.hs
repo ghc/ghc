@@ -8,24 +8,54 @@ module Avail (
     availsToNameSet,
     availsToNameEnv,
     availName, availNames,
-    stableAvailCmp
+    stableAvailCmp,
+
+    NameWarn(..),
+    nameWarnName,
+    availNameWarns,
   ) where
 
 import Name
 import NameEnv
 import NameSet
 
+import BasicTypes
 import Binary
 import Outputable
 import Util
 
 -- -----------------------------------------------------------------------------
+-- The NameWarn type
+
+data NameWarn = NameWarn Name (Maybe WarningTxt)
+
+nameWarnName :: NameWarn -> Name
+nameWarnName (NameWarn n _) = n
+
+-- XXX?
+instance Eq NameWarn where
+    x == y = nameWarnName x == nameWarnName y
+
+instance Outputable NameWarn where
+    ppr (NameWarn n m) = ppr n <> braces wd
+        where wd = case m of
+                   Nothing -> text "no warning"
+                   Just w -> text "warning:" <+> ppr w
+
+instance Binary NameWarn where
+    put_ h (NameWarn n w) = do put_ h n
+                               put_ h w
+    get h = do n <- get h
+               w <- get h
+               return (NameWarn n w)
+
+-- -----------------------------------------------------------------------------
 -- The AvailInfo type
 
 -- | Records what things are "available", i.e. in scope
-data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
-               | AvailTC Name
-                         [Name]  -- ^ A type or class in scope. Parameters:
+data AvailInfo = Avail NameWarn  -- ^ An ordinary identifier in scope
+               | AvailTC NameWarn
+                     [NameWarn]  -- ^ A type or class in scope. Parameters:
                                  --
                                  --  1) The name of the type or class
                                  --  2) The available pieces of type or class.
@@ -44,10 +74,14 @@ type Avails = [AvailInfo]
 
 -- | Compare lexicographically
 stableAvailCmp :: AvailInfo -> AvailInfo -> Ordering
-stableAvailCmp (Avail n1)     (Avail n2)     = n1 `stableNameCmp` n2
+stableAvailCmp (Avail n1)     (Avail n2)     = nameWarnName n1 `stableNameCmp`
+                                               nameWarnName n2
 stableAvailCmp (Avail {})     (AvailTC {})   = LT
-stableAvailCmp (AvailTC n ns) (AvailTC m ms) = (n `stableNameCmp` m) `thenCmp`
-                                               (cmpList stableNameCmp ns ms)
+stableAvailCmp (AvailTC n ns) (AvailTC m ms) = (nameWarnName n `stableNameCmp`
+                                                nameWarnName m) `thenCmp`
+                                               (cmpList stableNameCmp
+                                                        (map nameWarnName ns)
+                                                        (map nameWarnName ms))
 stableAvailCmp (AvailTC {})   (Avail {})     = GT
 
 
@@ -66,13 +100,19 @@ availsToNameEnv avails = foldr add emptyNameEnv avails
 -- | Just the main name made available, i.e. not the available pieces
 -- of type or class brought into scope by the 'GenAvailInfo'
 availName :: AvailInfo -> Name
-availName (Avail n)     = n
-availName (AvailTC n _) = n
+availName = nameWarnName . availNameWarn
+
+availNameWarn :: AvailInfo -> NameWarn
+availNameWarn (Avail nw)     = nw
+availNameWarn (AvailTC nw _) = nw
 
 -- | All names made available by the availability information
 availNames :: AvailInfo -> [Name]
-availNames (Avail n)      = [n]
-availNames (AvailTC _ ns) = ns
+availNames = map nameWarnName . availNameWarns
+
+availNameWarns :: AvailInfo -> [NameWarn]
+availNameWarns (Avail nw)      = [nw]
+availNameWarns (AvailTC _ nws) = nws
 
 -- -----------------------------------------------------------------------------
 -- Printing
@@ -100,4 +140,3 @@ instance Binary AvailInfo where
               _ -> do ab <- get bh
                       ac <- get bh
                       return (AvailTC ab ac)
-

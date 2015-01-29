@@ -168,7 +168,7 @@ tcRnSignature dflags hsc_src
            | otherwise -> do
             { sig_iface <- initIfaceTcRn $ loadSysInterface (text "sig-of") sof
             ; let { gr = mkGlobalRdrEnv
-                              (gresFromAvails LocalDef (mi_exports sig_iface))
+                              (gresFromAvails (const LocalDef) (mi_exports sig_iface))
                   ; avails = calculateAvails dflags
                                     sig_iface False{- safe -} False{- boot -} }
             ; return (tcg_env

@@ -1752,17 +1752,21 @@ tyThingsTyVars tts =
 -- | The Names that a TyThing should bring into scope.  Used to build
 -- the GlobalRdrEnv for the InteractiveContext.
 tyThingAvailInfo :: TyThing -> AvailInfo
-tyThingAvailInfo (ATyCon t)
-   = case tyConClass_maybe t of
-        Just c  -> AvailTC n (n : map getName (classMethods c)
-                  ++ map getName (classATs c))
-             where n = getName c
-        Nothing -> AvailTC n (n : map getName dcs ++
-                                   concatMap dataConFieldLabels dcs)
-             where n = getName t
-                   dcs = tyConDataCons t
-tyThingAvailInfo t
-   = Avail (getName t)
+tyThingAvailInfo t = case t of
+     ATyCon t ->
+         let (n, ns) = case tyConClass_maybe t of
+                       Just c  -> (n, n : map getName (classMethods c)
+                                       ++ map getName (classATs c))
+                           where n = getName c
+
+                       Nothing -> (n, n : map getName dcs ++
+                                          concatMap dataConFieldLabels dcs)
+                           where n = getName t
+                                 dcs = tyConDataCons t
+         in AvailTC (mkNameWarn n) (map mkNameWarn ns)
+     _ -> Avail (mkNameWarn $ getName t)
+   where
+     mkNameWarn name = NameWarn name Nothing
 
 {-
 ************************************************************************

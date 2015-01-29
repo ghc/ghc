@@ -13,6 +13,7 @@ module HsImpExp where
 import Module           ( ModuleName )
 import HsDoc            ( HsDocString )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
+import HsDecls          ( WarnDecl )
 import BasicTypes       ( SourceText )
 
 import Outputable
@@ -169,6 +170,7 @@ data IE name
   | IEGroup             Int HsDocString  -- ^ Doc section heading
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
+  | IEWarning           (WarnDecl name)
   deriving (Eq, Data, Typeable)
 
 ieName :: IE name -> name
@@ -187,6 +189,7 @@ ieNames (IEModuleContents _    ) = []
 ieNames (IEGroup          _ _  ) = []
 ieNames (IEDoc            _    ) = []
 ieNames (IEDocNamed       _    ) = []
+ieNames (IEWarning {}          ) = []
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
@@ -207,3 +210,4 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
+    ppr (IEWarning w)           = text "<IEWarning:" <+> ppr w <+> char '>'

@@ -462,7 +462,8 @@ renameDeriv is_boot inst_infos bagBinds
         ; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
         ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
         ; let bndrs = collectHsValBinders rn_aux_lhs
-        ; envs <- extendGlobalRdrEnvRn (map Avail bndrs) emptyFsEnv ;
+        ; let mkAvail n = Avail (NameWarn n Nothing)
+        ; envs <- extendGlobalRdrEnvRn (map mkAvail bndrs) emptyFsEnv ;
         ; setEnvs envs $
     do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs) False) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos

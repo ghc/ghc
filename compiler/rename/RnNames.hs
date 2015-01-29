@@ -44,7 +44,7 @@ import ListSetOps
 import Control.Monad
 import Data.Map         ( Map )
 import qualified Data.Map as Map
-import Data.List        ( partition, (\\), find )
+import Data.List        ( partition, find )
 import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
@@ -555,12 +555,12 @@ getLocalNonValBinders fixity_env
       -- declaration, not just the name
     new_simple :: Located RdrName -> RnM AvailInfo
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
-                            ; return (Avail nm) }
+                            ; return (mkAvail nm) }
 
     new_tc tc_decl              -- NOT for type/data instances
         = do { let bndrs = hsLTyClDeclBinders tc_decl
              ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
-             ; return (AvailTC main_name names) }
+             ; return (mkAvailTC main_name names) }
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
     new_assoc (L _ (TyFamInstD {})) = return []
@@ -583,8 +583,13 @@ getLocalNonValBinders fixity_env
     new_di mb_cls ti_decl
         = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
              ; sub_names <- mapM newTopSrcBinder (hsDataFamInstBinders ti_decl)
-             ; return (AvailTC (unLoc main_name) sub_names) }
+             ; return (mkAvailTC (unLoc main_name) sub_names) }
                         -- main_name is not bound here!
+
+    -- XXX
+    mkNameWarn n = NameWarn n Nothing
+    mkAvail n = Avail (mkNameWarn n)
+    mkAvailTC n ns = AvailTC (mkNameWarn n) (map mkNameWarn ns)
 
 {-
 Note [Looking up family names in family instances]
@@ -647,7 +652,7 @@ filterImports
 filterImports iface decl_spec Nothing
   = return (Nothing, gresFromAvails prov (concatMap mi_exports iface))
   where
-    prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
+    prov mw = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll, is_warning = mw }]
 
 
 filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
@@ -662,7 +667,7 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
             names  = availsToNameSet (map snd items2)
             keep n = not (n `elemNameSet` names)
             pruned_avails = filterAvails keep all_avails
-            hiding_prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
+            hiding_prov mw = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll, is_warning = mw }]
 
             gres | want_hiding = gresFromAvails hiding_prov pruned_avails
                  | otherwise   = concatMap (gresFromIE decl_spec) items2
@@ -682,11 +687,15 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
         -- 'combine' is only called for associated types which appear twice
         -- in the all_avails. In the example, we combine
         --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
+        combine :: (Name, AvailInfo, Maybe Name)
+                -> (Name, AvailInfo, Maybe Name)
+                -> (Name, AvailInfo, Maybe Name)
         combine (name1, a1@(AvailTC p1 _), mp1)
                 (name2, a2@(AvailTC p2 _), mp2)
           = ASSERT( name1 == name2 && isNothing mp1 && isNothing mp2 )
-            if p1 == name1 then (name1, a1, Just p2)
-                           else (name1, a2, Just p1)
+            -- XXX?
+            if nameWarnName p1 == name1 then (name1, a1, Just (nameWarnName p2))
+                           else (name1, a2, Just (nameWarnName p1))
         combine x y = pprPanic "filterImports/combine" (ppr x $$ ppr y)
 
     lookup_name :: RdrName -> IELookupM (Name, AvailInfo, Maybe Name)
@@ -749,11 +758,12 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
               -- non-associated ty/cls
               Nothing     -> return ([(IEThingAll (L l name), avail)], warns)
               -- associated ty
-              Just parent -> return ([(IEThingAll (L l name),
-                                       AvailTC name2 (subs \\ [name])),
-                                      (IEThingAll (L l name),
-                                       AvailTC parent [name])],
-                                     warns)
+              Just parent -> let subs' = filter ((name /=) . nameWarnName) subs
+                             in return ([(IEThingAll (L l name),
+                                          AvailTC name2 subs'),
+                                         (IEThingAll (L l name),
+                                          mkAvailTC parent [name])],
+                                        warns)
 
         IEThingAbs (L l tc)
             | want_hiding   -- hiding ( C )
@@ -776,9 +786,9 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
            let subnames = case ns of   -- The tc is first in ns,
                             [] -> []   -- if it is there at all
                                        -- See the AvailTC Invariant in Avail.hs
-                            (n1:ns1) | n1 == name -> ns1
+                            (n1:ns1) | nameWarnName n1 == name -> ns1
                                      | otherwise  -> ns
-               mb_children = lookupChildren subnames rdr_ns
+               mb_children = lookupChildren (map nameWarnName subnames) rdr_ns
 
            children <- if any isNothing mb_children
                        then failLookupWith BadImport
@@ -787,13 +797,13 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
            case mb_parent of
              -- non-associated ty/cls
              Nothing     -> return ([(IEThingWith (L l name) children,
-                                      AvailTC name (name:map unLoc children))],
+                                      mkAvailTC name (name:map unLoc children))],
                                     [])
              -- associated ty
              Just parent -> return ([(IEThingWith (L l name) children,
-                                      AvailTC name (map unLoc children)),
+                                      mkAvailTC name (map unLoc children)),
                                      (IEThingWith (L l name) children,
-                                      AvailTC parent [name])],
+                                      mkAvailTC parent [name])],
                                     [])
 
         _other -> failLookupWith IllegalImport
@@ -804,11 +814,16 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
         mkIEThingAbs l (n, av, Nothing    ) = (IEThingAbs (L l n),
                                                trimAvail av n)
         mkIEThingAbs l (n, _,  Just parent) = (IEThingAbs (L l n),
-                                               AvailTC parent [n])
+                                               mkAvailTC parent [n])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport | want_hiding -> return ([], [BadImportW])
           _                       -> failLookupWith err
+
+
+        -- XXX
+        mkNameWarn n = NameWarn n Nothing
+        mkAvailTC n ns = AvailTC (mkNameWarn n) (map mkNameWarn ns)
 
 type IELookupM = MaybeErr IELookupError
 
@@ -845,11 +860,12 @@ catIELookupM ms = [ a | Succeeded a <- ms ]
 greExportAvail :: GlobalRdrElt -> AvailInfo
 greExportAvail gre
   = case gre_par gre of
-      ParentIs p                  -> AvailTC p [me]
-      NoParent   | isTyConName me -> AvailTC me [me]
-                 | otherwise      -> Avail   me
+      ParentIs p                  -> AvailTC (NameWarn p Nothing) [me]
+      NoParent | isTyConName me'  -> AvailTC me [me]
+               | otherwise        -> Avail   me
   where
-    me = gre_name gre
+    me' = gre_name gre
+    me = NameWarn me' Nothing -- XXX Wrong?
 
 plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
 plusAvail a1 a2
@@ -868,7 +884,8 @@ plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 
 trimAvail :: AvailInfo -> Name -> AvailInfo
 trimAvail (Avail n)      _ = Avail n
-trimAvail (AvailTC n ns) m = ASSERT( m `elem` ns) AvailTC n [m]
+-- XXX Wrong?:
+trimAvail (AvailTC n ns) m = ASSERT( m `elem` map nameWarnName ns) AvailTC n [NameWarn m Nothing]
 
 -- | filters 'AvailInfo's by the given predicate
 filterAvails  :: (Name -> Bool) -> [AvailInfo] -> [AvailInfo]
@@ -878,10 +895,10 @@ filterAvails keep avails = foldr (filterAvail keep) [] avails
 filterAvail :: (Name -> Bool) -> AvailInfo -> [AvailInfo] -> [AvailInfo]
 filterAvail keep ie rest =
   case ie of
-    Avail n | keep n    -> ie : rest
-            | otherwise -> rest
+    Avail n | keep (nameWarnName n) -> ie : rest
+            | otherwise             -> rest
     AvailTC tc ns ->
-        let left = filter keep ns in
+        let left = filter (keep . nameWarnName) ns in
         if null left then rest else AvailTC tc left : rest
 
 -- | Given an import\/export spec, construct the appropriate 'GlobalRdrElt's.
@@ -892,9 +909,9 @@ gresFromIE decl_spec (L loc ie, avail)
     is_explicit = case ie of
                     IEThingAll (L _ name) -> \n -> n == name
                     _                     -> \_ -> True
-    prov_fn name = Imported [imp_spec]
+    prov_fn name mw = Imported [imp_spec]
         where
-          imp_spec  = ImpSpec { is_decl = decl_spec, is_item = item_spec }
+          imp_spec  = ImpSpec { is_decl = decl_spec, is_item = item_spec, is_warning = mw }
           item_spec = ImpSome { is_explicit = is_explicit name, is_iloc = loc }
 
 mkChildEnv :: [GlobalRdrElt] -> NameEnv [Name]
@@ -985,11 +1002,12 @@ type ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ([LIE Name],             -- Export items with Names
         ExportOccMap,           -- Tracks exported occurrence names
-        [AvailInfo])            -- The accumulated exported stuff
+        [AvailInfo],            -- The accumulated exported stuff
                                 --   Not nub'd!
+        Map Name WarningTxt)    -- Warnings attached to exports
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ([], emptyOccEnv, [])
+emptyExportAccum = ([], emptyOccEnv, [], Map.empty)
 
 type ExportOccMap = OccEnv (Name, IE RdrName)
         -- Tracks what a particular exported OccName
@@ -1060,8 +1078,11 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    return (Nothing, avails)
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
-  = do (ie_names, _, exports) <- foldlM do_litem emptyExportAccum rdr_items
-       return (Just ie_names, exports)
+  = do (ie_names, _, exports, warnMap) <- foldlM do_litem emptyExportAccum rdr_items
+       -- XXX TODO: Ought to check that everything in the warnMap is
+       -- actually exported
+
+       return (Just ie_names, addAvailInfoWarnings warnMap exports)
   where
     do_litem :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)
@@ -1074,7 +1095,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                          (qual_name, _, _, _) <- xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
-    exports_from_item acc@(ie_names, occs, exports)
+    exports_from_item acc@(ie_names, occs, exports, warnMap)
                       (L loc (IEModuleContents (L lm mod)))
         | let earlier_mods = [ mod
                              | (L _ (IEModuleContents (L _ mod))) <- ie_names ]
@@ -1112,12 +1133,17 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; traceRn (vcat [ text "export mod" <+> ppr mod
                              , ppr new_exports ])
              ; return (L loc (IEModuleContents (L lm mod)) : ie_names,
-                       occs', new_exports ++ exports) }
+                       occs', new_exports ++ exports, warnMap) }
 
-    exports_from_item acc@(lie_names, occs, exports) (L loc ie)
+    exports_from_item (lie_names, occs, exports, warnMap)
+                      (L _ (IEWarning (Warning (L _ rdr:_) w)))
+        = do n <- lookupGlobalOccRn rdr -- XXX only handles head of warnings
+             return (lie_names, occs, exports, Map.insert n w warnMap)
+
+    exports_from_item acc@(lie_names, occs, exports, warnMap) (L loc ie)
         | isDoc ie
         = do new_ie <- lookup_doc_ie ie
-             return (L loc new_ie : lie_names, occs, exports)
+             return (L loc new_ie : lie_names, occs, exports, warnMap)
 
         | otherwise
         = do (new_ie, avail) <- lookup_ie ie
@@ -1127,7 +1153,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
              occs' <- check_occs ie occs (availNames avail)
 
-             return (L loc new_ie : lie_names, occs', avail : exports)
+             return (L loc new_ie : lie_names, occs', avail : exports, warnMap)
 
     -------------
     lookup_ie :: IE RdrName -> RnM (IE Name, AvailInfo)
@@ -1153,23 +1179,27 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
 
-             return (IEThingAll (L l name), AvailTC name (name:kids))
+             return (IEThingAll (L l name), mkAvailTC name (name:kids))
 
     lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs)
         = do name <- lookupGlobalOccRn rdr
              if isUnboundName name
-                then return (IEThingWith (L l name) [], AvailTC name [name])
+                then return (IEThingWith (L l name) [], mkAvailTC name [name])
                 else do
              let mb_names = lookupChildren (findChildren kids_env name) sub_rdrs
              if any isNothing mb_names
                 then do addErr (exportItemErr ie)
-                        return (IEThingWith (L l name) [], AvailTC name [name])
+                        return (IEThingWith (L l name) [], mkAvailTC name [name])
                 else do let names = catMaybes mb_names
                         addUsedKids rdr (map unLoc names)
                         return (IEThingWith (L l name) names
-                               , AvailTC name (name:map unLoc names))
+                               , mkAvailTC name (name:map unLoc names))
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
+
+    -- XXX
+    mkNameWarn n = NameWarn n Nothing
+    mkAvailTC n ns = AvailTC (mkNameWarn n) (map mkNameWarn ns)
 
     -------------
     lookup_doc_ie :: IE RdrName -> RnM (IE Name)
@@ -1194,6 +1224,13 @@ isDoc (IEDoc _)      = True
 isDoc (IEDocNamed _) = True
 isDoc (IEGroup _ _)  = True
 isDoc _ = False
+
+addAvailInfoWarnings :: Map Name WarningTxt -> [AvailInfo] -> [AvailInfo]
+addAvailInfoWarnings m = map f
+    where f (Avail n) = Avail (g n)
+          f (AvailTC n ns) = AvailTC (g n) (map g ns)
+
+          g (NameWarn n _) = NameWarn n (Map.lookup n m)
 
 -------------------------------
 isModuleExported :: Bool -> ModuleName -> GlobalRdrElt -> Bool
@@ -1409,7 +1446,7 @@ findImportUsage imports rdr_env rdrs
         used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
                       -- srcSpanEnd: see Note [The ImportMap]
         used_names   = availsToNameSet used_avails
-        used_parents = mkNameSet [n | AvailTC n _ <- used_avails]
+        used_parents = mkNameSet [n | AvailTC (NameWarn n _) _ <- used_avails]
 
         unused_imps   -- Not trivial; see eg Trac #7454
           = case imps of
@@ -1568,20 +1605,22 @@ printMinimalImports imports_w_usage
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie _ (Avail n)
-       = [IEVar (noLoc n)]
+       = [IEVar (noLoc (nameWarnName n))]
     to_ie _ (AvailTC n [m])
-       | n==m = [IEThingAbs (noLoc n)]
+       | n==m = [IEThingAbs (noLoc (nameWarnName n))]
     to_ie ifaces (AvailTC n ns)
       = case [xs | iface <- ifaces
                  , AvailTC x xs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
-           [xs] | all_used xs -> [IEThingAll (noLoc n)]
-                | otherwise   -> [IEThingWith (noLoc n)
-                                              (map noLoc (filter (/= n) ns))]
-           _other             -> map (IEVar . noLoc)  ns
+           [xs] | all_used xs -> [IEThingAll (noLoc n')]
+                | otherwise   -> [IEThingWith (noLoc n')
+                                              (map noLoc (filter (/= n') ns'))]
+           _other             -> map (IEVar . noLoc)  ns'
         where
+          n' = nameWarnName n
+          ns' = map nameWarnName ns
           all_used avail_occs = all (`elem` ns) avail_occs
 
 {-
@@ -1664,7 +1703,7 @@ badImportItemErr is_boot decl_spec ie avails
      Nothing  -> badImportItemErrStd is_boot decl_spec ie
   where
     checkIfDataCon (AvailTC _ ns) =
-      case find (\n -> importedFS == nameOccNameFS n) ns of
+      case find (\n -> importedFS == nameOccNameFS n) (map nameWarnName ns) of
         Just n  -> isDataConName n
         Nothing -> False
     checkIfDataCon _ = False

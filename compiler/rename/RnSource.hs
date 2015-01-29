@@ -128,7 +128,8 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                        -- Not pattern-synonym binders, because we did
                        -- them in step (B)
          all_bndrs   = extendNameSetList tc_bndrs val_binders ;
-         val_avails  = map Avail val_binders  } ;
+         val_avails  = map mkAvail val_binders ;
+         mkAvail n = Avail (NameWarn n Nothing) } ;
    traceRn (text "rnSrcDecls" <+> ppr val_avails) ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
    setEnvs (tcg_env, tcl_env) $ do {

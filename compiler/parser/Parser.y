@@ -582,6 +582,7 @@ export  :: { OrdList (LIE RdrName) }
                                              [mj AnnModule $1] }
         |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar $2))
                                              [mj AnnPattern $1] }
+        |  '{-# DEPRECATED' deprecations '#-}' { (mapOL (fmap IEWarning) $2) }
 
 export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }

@@ -268,7 +268,7 @@ initialVersion = 1
 -- For SourceText usage, see note [Pragma source text]
 data WarningTxt = WarningTxt (Located SourceText) [Located FastString]
                 | DeprecatedTxt (Located SourceText) [Located FastString]
-    deriving (Eq, Data, Typeable)
+    deriving (Eq, Ord, Data, Typeable)
 
 instance Outputable WarningTxt where
     ppr (WarningTxt    _ ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
