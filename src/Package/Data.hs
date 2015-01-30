@@ -74,8 +74,8 @@ bootPkgConstraints = args $ do
         content <- lines <$> liftIO (readFile cabal)
         let versionLines = filter (("ersion:" `isPrefixOf`) . drop 1) content
         case versionLines of
-            [versionLine] -> return $ "--constraint " ++ depName ++ " == "
-                                    ++ dropWhile (not . isDigit) versionLine
+            [versionLine] -> return $ args ["--constraint", depName ++ " == "
+                                    ++ dropWhile (not . isDigit) versionLine]
             _             -> redError $ "Cannot determine package version in '"
                                       ++ unifyPath cabal ++ "'."
 
