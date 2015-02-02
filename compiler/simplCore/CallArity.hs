@@ -347,7 +347,7 @@ t1) in the follwing code:
       t2 = if ... then go 1 else ...
   in go 0
 
-Detecting this would reqiure finding out what variables are only ever called
+Detecting this would require finding out what variables are only ever called
 from thunks. While this is certainly possible, we yet have to see this to be
 relevant in the wild.
 
