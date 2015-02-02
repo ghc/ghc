@@ -692,6 +692,17 @@ echo "[]" > package.conf
     </sect3>
 
     <sect3>
+        <title>haskeline</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.7.2.0 (was 0.7.1.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
         <title>hoopl</title>
         <itemizedlist>
             <listitem>
@@ -739,6 +750,17 @@ echo "[]" > package.conf
     </sect3>
 
     <sect3>
+        <title>pretty</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.2.0 (was 1.1.1.1)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
         <title>process</title>
         <itemizedlist>
             <listitem>
@@ -761,11 +783,33 @@ echo "[]" > package.conf
     </sect3>
 
     <sect3>
+        <title>terminfo</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.0.1 (was 0.4.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
         <title>time</title>
         <itemizedlist>
             <listitem>
                 <para>
                     Version number 1.5.0.1 (was 1.4.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>transformers</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.2.0 (was 0.3.0.0)
                </para>
            </listitem>
        </itemizedlist>
@@ -788,6 +832,17 @@ echo "[]" > package.conf
             <listitem>
                 <para>
                     Version number 2.3.0.2 (was 2.3.0.1)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>xhtml</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number remained at 3000.2.1
                </para>
            </listitem>
        </itemizedlist>
