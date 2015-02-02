@@ -72,7 +72,6 @@ import Data.Maybe (maybe)
 import Data.OldList (partition)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
-import GHC.Conc.Signal (runHandlers)
 import GHC.Conc.Sync (yield)
 import GHC.List (filter, replicate)
 import GHC.Num (Num(..))
@@ -163,7 +162,7 @@ handleControlEvent mgr fd _evt = do
   case msg of
     CMsgWakeup      -> return ()
     CMsgDie         -> writeIORef (emState mgr) Finished
-    CMsgSignal fp s -> runHandlers fp s
+    _               -> return ()
 
 newDefaultBackend :: IO Backend
 #if defined(HAVE_KQUEUE)

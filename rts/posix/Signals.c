@@ -251,18 +251,6 @@ generic_handler(int sig USED_IF_THREADS,
         }
     }
 
-    nat i;
-    int fd;
-    for (i=0; i < n_capabilities; i++) {
-        fd = capabilities[i]->io_manager_control_wr_fd;
-        if (0 <= fd) {
-            r = write(fd, buf, sizeof(siginfo_t)+1);
-            if (r == -1 && errno == EAGAIN) {
-                errorBelch("lost signal due to full pipe: %d\n", sig);
-            }
-        }
-    }
-
     // If the IO manager hasn't told us what the FD of the write end
     // of its pipe is, there's not much we can do here, so just ignore
     // the signal..
