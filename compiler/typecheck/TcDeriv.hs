@@ -382,10 +382,14 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; let (binds, newTyCons, famInsts, extraInstances) =
                 genAuxBinds loc (unionManyBags (auxDerivStuff : deriv_stuff))
 
-        ; (inst_info, rn_binds, rn_dus) <-
-            renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
-
         ; dflags <- getDynFlags
+        ; tcRepBinds <- genTypeableTyConReps dflags
+                          tycl_decls inst_decls
+
+        ; (inst_info, rn_binds, rn_dus) <-
+            renameDeriv is_boot (inst_infos ++ (bagToList extraInstances))
+                                            (unionBags tcRepBinds binds)
+
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
                         (ddump_deriving inst_info rn_binds newTyCons famInsts))
@@ -413,6 +417,72 @@ tcDeriving tycl_decls inst_decls deriv_decls
                 (vcat (map pprRepTy (bagToList repFamInsts))))
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
+
+genTypeableTyConReps :: DynFlags ->
+                        [LTyClDecl Name] ->
+                        [LInstDecl Name] ->
+                        TcM (Bag (LHsBind RdrName, LSig RdrName))
+genTypeableTyConReps dflags decls insts =
+  do tcs1 <- mapM tyConsFromDecl decls
+     tcs2 <- mapM tyConsFromInst insts
+     return $ listToBag [ genTypeableTyConRep dflags loc tc
+                                          | (loc,tc) <- concat (tcs1 ++ tcs2) ]
+  where
+
+  tyConFromDataCon (L l n) = do dc <- tcLookupDataCon n
+                                return (do tc <- promoteDataCon_maybe dc
+                                           return (l,tc))
+
+  -- Promoted data constructors from a data declaration, or
+  -- a data-family instance.
+  tyConsFromDataRHS = fmap catMaybes
+                    . mapM tyConFromDataCon
+                    . concatMap (con_names . unLoc)
+                    . dd_cons
+
+  -- Tycons from a data-family declaration; not promotable.
+  tyConFromDataFamDecl FamilyDecl { fdLName = L loc name } =
+    do tc <- tcLookupTyCon name
+       return (loc,tc)
+
+
+  -- tycons from a type-level declaration
+  tyConsFromDecl (L _ d)
+
+    -- data or newtype declaration: promoted tycon, tycon, promoted ctrs.
+    | isDataDecl d =
+      do let L loc name = tcdLName d
+         tc           <- tcLookupTyCon name
+         promotedCtrs <- tyConsFromDataRHS (tcdDataDefn d)
+         let tyCons = (loc,tc) : promotedCtrs
+
+         return (case promotableTyCon_maybe tc of
+                   Nothing -> tyCons
+                   Just kc -> (loc,kc) : tyCons)
+
+    -- data family: just the type constructor;  these are not promotable.
+    | isDataFamilyDecl d =
+      do res <- tyConFromDataFamDecl (tcdFam d)
+         return [res]
+
+    -- class: the type constructors of associated data families
+    | isClassDecl d =
+      let isData FamilyDecl { fdInfo = DataFamily } = True
+          isData _ = False
+
+      in mapM tyConFromDataFamDecl (filter isData (map unLoc (tcdATs d)))
+
+    | otherwise = return []
+
+
+  tyConsFromInst (L _ d) =
+    case d of
+      ClsInstD ci      -> fmap concat
+                        $ mapM (tyConsFromDataRHS . dfid_defn . unLoc)
+                        $ cid_datafam_insts ci
+      DataFamInstD dfi -> tyConsFromDataRHS (dfid_defn dfi)
+      TyFamInstD {}    -> return []
+
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
