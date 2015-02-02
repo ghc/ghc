@@ -676,6 +676,18 @@ echo "[]" > package.conf
                     Version number 0.3.1.0 (was 0.3.1.0)
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    The low-level prefetch API exported by
+                    <literal>GHC.Prim</literal> (added in GHC 7.8) has
+                    been overhauled to use <literal>State#</literal>
+                    parameters to serialize and thread state around.
+               </para>
+                <para>
+                    This API is still considered experimental, and
+                    will be prone to change.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
