@@ -986,7 +986,7 @@ rnMatch' ctxt rnBody match@(Match { m_fun_id_infix = mf, m_pats = pats
                 Just (L loc ty) -> addErrAt loc (resSigErr ctxt match ty)
 
                -- Now the main event
-               -- note that there are no local ficity decls for matches
+               -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt,mf) of
