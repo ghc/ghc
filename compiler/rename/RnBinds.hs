@@ -978,7 +978,8 @@ rnMatch' :: Outputable (body RdrName) => HsMatchContext Name
          -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
          -> Match RdrName (Located (body RdrName))
          -> RnM (Match Name (Located (body Name)), FreeVars)
-rnMatch' ctxt rnBody match@(Match _mf pats maybe_rhs_sig grhss)
+rnMatch' ctxt rnBody match@(Match { m_fun_id_infix = mf, m_pats = pats
+                                  , m_type = maybe_rhs_sig, m_grhss = grhss })
   = do  {       -- Result type signatures are no longer supported
           case maybe_rhs_sig of
                 Nothing -> return ()
@@ -988,8 +989,12 @@ rnMatch' ctxt rnBody match@(Match _mf pats maybe_rhs_sig grhss)
                -- note that there are no local ficity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
-
-        ; return (Match Nothing pats' Nothing grhss', grhss_fvs) }}
+        ; let mf' = case (ctxt,mf) of
+                      (FunRhs funid isinfix,Just (L lf _,_))
+                                                    -> Just (L lf funid,isinfix)
+                      _                             -> Nothing
+        ; return (Match { m_fun_id_infix = mf', m_pats = pats'
+                        , m_type = Nothing, m_grhss = grhss'}, grhss_fvs ) }}
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
 emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alternatives in") <+> pp_ctxt)
