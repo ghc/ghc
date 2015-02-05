@@ -105,7 +105,7 @@ initV hsc_env guts info thing_inside
                Yes genv _ x -> return $ Just (new_info genv, x)
                No reason    -> do { unqual <- mkPrintUnqualifiedDs
                                   ; liftIO $ 
-                                      printInfoForUser dflags unqual $ 
+                                      printOutputForUser dflags unqual $
                                         mkDumpDoc "Warning: vectorisation failure:" reason
                                   ; return Nothing
                                   }

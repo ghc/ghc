@@ -135,7 +135,7 @@ traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
   = do { dflags <- getDynFlags
        ; when (dopt Opt_D_dump_simpl_trace dflags) $ liftIO $
-         printInfoForUser dflags alwaysQualify $
+         printOutputForUser dflags alwaysQualify $
          hang (text herald) 2 doc }
 
 {-

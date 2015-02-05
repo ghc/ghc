@@ -1440,10 +1440,10 @@ completeCall env var cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
-            liftIO $ printInfoForUser dflags alwaysQualify $
+            liftIO $ printOutputForUser dflags alwaysQualify $
                 sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = liftIO $ printInfoForUser dflags alwaysQualify $
+      = liftIO $ printOutputForUser dflags alwaysQualify $
            sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]

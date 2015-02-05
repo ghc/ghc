@@ -551,7 +551,7 @@ printForUserTcRn :: SDoc -> TcRn ()
 printForUserTcRn doc
   = do { dflags <- getDynFlags
        ; printer <- getPrintUnqualified dflags
-       ; liftIO (printInfoForUser dflags printer doc) }
+       ; liftIO (printOutputForUser dflags printer doc) }
 
 -- | Typechecker debug
 debugDumpTcRn :: SDoc -> TcRn ()

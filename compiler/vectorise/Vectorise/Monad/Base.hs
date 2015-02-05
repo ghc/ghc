@@ -117,7 +117,7 @@ emitVt :: String -> SDoc -> VM ()
 emitVt herald doc
   = liftDs $ do
       dflags <- getDynFlags
-      liftIO . printInfoForUser dflags alwaysQualify $
+      liftIO . printOutputForUser dflags alwaysQualify $
         hang (text herald) 2 doc
 
 -- |Output a trace message if -ddump-vt-trace is active.
@@ -144,7 +144,7 @@ dumpVt :: String -> SDoc -> VM ()
 dumpVt header doc 
   = do { unqual <- liftDs mkPrintUnqualifiedDs
        ; dflags <- liftDs getDynFlags
-       ; liftIO $ printInfoForUser dflags unqual (mkDumpDoc header doc)
+       ; liftIO $ printOutputForUser dflags unqual (mkDumpDoc header doc)
        }
 
 
