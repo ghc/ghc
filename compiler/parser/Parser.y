@@ -1875,7 +1875,7 @@ decl    :: { Located (OrdList (LHsDecl RdrName)) }
 rhs     :: { Located ([AddAnn],GRHSs RdrName (LHsExpr RdrName)) }
         : '=' exp wherebinds    { sL (comb3 $1 $2 $3)
                                     ((mj AnnEqual $1 : (fst $ unLoc $3))
-                                    ,GRHSs (unguardedRHS (comb2 $1 $3) $2)
+                                    ,GRHSs (unguardedRHS (comb3 $1 $2 $3) $2)
                                    (snd $ unLoc $3)) }
         | gdrhs wherebinds      { sLL $1 $>  (fst $ unLoc $2
                                     ,GRHSs (reverse (unLoc $1))
