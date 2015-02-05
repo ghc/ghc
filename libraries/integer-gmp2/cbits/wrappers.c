@@ -9,6 +9,9 @@
 
 #define _ISOC99_SOURCE
 
+#include "HsFFI.h"
+#include "MachDeps.h"
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -20,8 +23,6 @@
 
 #include <gmp.h>
 
-#include "HsFFI.h"
-#include "MachDeps.h"
 
 // GMP 4.x compatibility
 #if !defined(__GNU_MP_VERSION)

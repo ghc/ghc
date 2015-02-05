@@ -2,8 +2,8 @@
 
 #define WCSUBST_INCL
 
-#include <stdlib.h>
 #include "HsFFI.h"
+#include <stdlib.h>
 
 HsInt u_iswupper(HsInt wc);
 HsInt u_iswdigit(HsInt wc);
