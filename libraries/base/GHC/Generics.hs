@@ -648,6 +648,8 @@ class Datatype d where
   datatypeName :: t d (f :: * -> *) a -> [Char]
   -- | The fully-qualified name of the module where the type is declared
   moduleName   :: t d (f :: * -> *) a -> [Char]
+  -- | The package name of the module where the type is declared
+  packageName :: t d (f :: * -> *) a -> [Char]
   -- | Marks if the datatype is actually a newtype
   isNewtype    :: t d (f :: * -> *) a -> Bool
   isNewtype _ = False
@@ -756,6 +758,7 @@ data C_Int
 instance Datatype D_Int where
   datatypeName _ = "Int"
   moduleName   _ = "GHC.Int"
+  packageName  _ = "base"
 
 instance Constructor C_Int where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
@@ -773,6 +776,7 @@ data C_Float
 instance Datatype D_Float where
   datatypeName _ = "Float"
   moduleName   _ = "GHC.Float"
+  packageName  _ = "base"
 
 instance Constructor C_Float where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
@@ -790,6 +794,7 @@ data C_Double
 instance Datatype D_Double where
   datatypeName _ = "Double"
   moduleName   _ = "GHC.Float"
+  packageName  _ = "base"
 
 instance Constructor C_Double where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
@@ -807,6 +812,7 @@ data C_Char
 instance Datatype D_Char where
   datatypeName _ = "Char"
   moduleName   _ = "GHC.Base"
+  packageName  _ = "base"
 
 instance Constructor C_Char where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...

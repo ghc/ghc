@@ -247,6 +247,7 @@ module GenBigTypes where
   instance Datatype D1BigSum where
     datatypeName _ = "BigSum"
     moduleName _ = "GenBigTypes"
+    packageName _ = "main"
 
   instance Constructor C1_0BigSum where
     conName _ = "C0"

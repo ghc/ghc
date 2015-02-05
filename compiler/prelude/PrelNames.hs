@@ -693,7 +693,7 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   prodDataCon_RDR, comp1DataCon_RDR,
   unPar1_RDR, unRec1_RDR, unK1_RDR, unComp1_RDR,
   from_RDR, from1_RDR, to_RDR, to1_RDR,
-  datatypeName_RDR, moduleName_RDR, isNewtypeName_RDR,
+  datatypeName_RDR, moduleName_RDR, packageName_RDR, isNewtypeName_RDR,
   conName_RDR, conFixity_RDR, conIsRecord_RDR,
   noArityDataCon_RDR, arityDataCon_RDR, selName_RDR,
   prefixDataCon_RDR, infixDataCon_RDR, leftAssocDataCon_RDR,
@@ -723,6 +723,7 @@ to1_RDR   = varQual_RDR gHC_GENERICS (fsLit "to1")
 
 datatypeName_RDR  = varQual_RDR gHC_GENERICS (fsLit "datatypeName")
 moduleName_RDR    = varQual_RDR gHC_GENERICS (fsLit "moduleName")
+packageName_RDR   = varQual_RDR gHC_GENERICS (fsLit "packageName")
 isNewtypeName_RDR = varQual_RDR gHC_GENERICS (fsLit "isNewtype")
 selName_RDR       = varQual_RDR gHC_GENERICS (fsLit "selName")
 conName_RDR       = varQual_RDR gHC_GENERICS (fsLit "conName")

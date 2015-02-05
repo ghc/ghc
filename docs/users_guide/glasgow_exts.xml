@@ -12358,6 +12358,7 @@ data C1_1UserTree
 instance Datatype D1UserTree where
   datatypeName _ = "UserTree"
   moduleName _   = "Main"
+  packageName _  = "main"
 
 instance Constructor C1_0UserTree where
   conName _ = "Node"

@@ -40,3 +40,4 @@ test('T7878', extra_clean(['T7878A.o'     ,'T7878A.hi'
 test('T8468', normal, compile_fail, [''])
 test('T8479', normal, compile, [''])
 test('T9563', normal, compile, [''])
+test('T10030', normal, compile_and_run, [''])

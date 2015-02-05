@@ -156,6 +156,7 @@ Derived instances:
   instance GHC.Generics.Datatype CanDoRep1_1.D1Da where
     GHC.Generics.datatypeName _ = "Da"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor CanDoRep1_1.C1_0Da where
     GHC.Generics.conName _ = "D0"
@@ -173,6 +174,7 @@ Derived instances:
   instance GHC.Generics.Datatype CanDoRep1_1.D1Db where
     GHC.Generics.datatypeName _ = "Db"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor CanDoRep1_1.C1_0Db where
     GHC.Generics.conName _ = "D0b"
@@ -190,6 +192,7 @@ Derived instances:
   instance GHC.Generics.Datatype CanDoRep1_1.D1Dc where
     GHC.Generics.datatypeName _ = "Dc"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor CanDoRep1_1.C1_0Dc where
     GHC.Generics.conName _ = "D0c"
@@ -207,6 +210,7 @@ Derived instances:
   instance GHC.Generics.Datatype CanDoRep1_1.D1Dd where
     GHC.Generics.datatypeName _ = "Dd"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor CanDoRep1_1.C1_0Dd where
     GHC.Generics.conName _ = "D0d"

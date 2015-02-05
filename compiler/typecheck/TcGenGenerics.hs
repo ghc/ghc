@@ -24,7 +24,8 @@ import DataCon
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
-import Module           ( Module, moduleName, moduleNameString )
+import Module           ( Module, moduleName, moduleNameString
+                        , modulePackageKey, packageKeyString )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
@@ -680,7 +681,8 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
                     [ unitBag (mkRdrFunBind (L loc name) matches)
                         | (name, matches) <- l ]
         dtBinds       = mkBag ( [ (datatypeName_RDR, dtName_matches)
-                                , (moduleName_RDR, moduleName_matches)]
+                                , (moduleName_RDR, moduleName_matches)
+                                , (packageName_RDR, pkgName_matches)]
                               ++ ifElseEmpty (isNewTyCon tycon)
                                 [ (isNewtypeName_RDR, isNewtype_matches) ] )
 
@@ -715,6 +717,8 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
         dtName_matches     = mkStringLHS . occNameString . nameOccName
                            $ tyConName_user
         moduleName_matches = mkStringLHS . moduleNameString . moduleName
+                           . nameModule . tyConName $ tycon
+        pkgName_matches    = mkStringLHS . packageKeyString . modulePackageKey
                            . nameModule . tyConName $ tycon
         isNewtype_matches  = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 

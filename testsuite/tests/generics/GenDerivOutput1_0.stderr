@@ -24,6 +24,7 @@ Derived instances:
   instance GHC.Generics.Datatype GenDerivOutput1_0.D1List where
     GHC.Generics.datatypeName _ = "List"
     GHC.Generics.moduleName _ = "GenDerivOutput1_0"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor GenDerivOutput1_0.C1_0List where
     GHC.Generics.conName _ = "Nil"

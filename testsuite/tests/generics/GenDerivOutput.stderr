@@ -91,6 +91,7 @@ Derived instances:
   instance GHC.Generics.Datatype GenDerivOutput.D1List where
     GHC.Generics.datatypeName _ = "List"
     GHC.Generics.moduleName _ = "GenDerivOutput"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor GenDerivOutput.C1_0List where
     GHC.Generics.conName _ = "Nil"
@@ -108,6 +109,7 @@ Derived instances:
   instance GHC.Generics.Datatype GenDerivOutput.D1Rose where
     GHC.Generics.datatypeName _ = "Rose"
     GHC.Generics.moduleName _ = "GenDerivOutput"
+    GHC.Generics.packageName _ = "main"
   
   instance GHC.Generics.Constructor GenDerivOutput.C1_0Rose where
     GHC.Generics.conName _ = "Empty"
