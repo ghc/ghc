@@ -498,14 +498,25 @@ pprParendType PromotedNilT        = text "'[]"
 pprParendType PromotedConsT       = text "(':)"
 pprParendType StarT               = char '*'
 pprParendType ConstraintT         = text "Constraint"
+pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)
 pprParendType other               = parens (ppr other)
 
 instance Ppr Type where
     ppr (ForallT tvars ctxt ty)
       = text "forall" <+> hsep (map ppr tvars) <+> text "."
                       <+> sep [pprCxt ctxt, ppr ty]
-    ppr (SigT ty k) = ppr ty <+> text "::" <+> ppr k
-    ppr ty          = pprTyApp (split ty)
+    ppr ty = pprTyApp (split ty)
+       -- Works, in a degnerate way, for SigT, and puts parens round (ty :: kind)
+       -- See Note [Pretty-printing kind signatures]
+
+{- Note [Pretty-printing kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's parser only recognises a kind signature in a type when there are
+parens around it.  E.g. the parens are required here:
+   f :: (Int :: *)
+   type instance F Int = (Bool :: *)
+So we always print a SigT with parens (see Trac #10050). -}
+
 
 pprTyApp :: (Type, [Type]) -> Doc
 pprTyApp (ArrowT, [arg1,arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
