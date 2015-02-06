@@ -706,7 +706,7 @@ unsafeAccum f arr ies = runST (do
     STArray l u n marr# <- thawSTArray arr
     ST (foldr (adjust f marr#) (done l u n marr#) ies))
 
-{-# INLINE [1] amap #-}
+{-# INLINE [1] amap #-}  -- See Note [amap]
 amap :: (a -> b) -> Array i a -> Array i b
 amap f arr@(Array l u n@(I# n#) _) = runST (ST $ \s1# ->
     case newArray# n# arrEleBottom s1# of
@@ -716,7 +716,8 @@ amap f arr@(Array l u n@(I# n#) _) = runST (ST $ \s1# ->
                 | otherwise = fill marr# (i, f (unsafeAt arr i)) (go (i+1)) s#
           in go 0 s2# )
 
-{-
+{- Note [amap]
+~~~~~~~~~~~~~~
 amap was originally defined like this:
 
  amap f arr@(Array l u n _) =
@@ -725,11 +726,12 @@ amap was originally defined like this:
 There are two problems:
 
 1. The enumFromTo implementation produces (spurious) code for the impossible
-case of n<0 that ends up duplicating the array freezing code.
+   case of n<0 that ends up duplicating the array freezing code.
 
-2. This implementation relies on list fusion for efficiency. In order to
-implement the amap/coerce rule, we need to delay inlining amap until simplifier
-phase 1, which is when the eftIntList rule kicks in and makes that impossible.
+2. This implementation relies on list fusion for efficiency. In order
+   to implement the "amap/coerce" rule, we need to delay inlining amap
+   until simplifier phase 1, which is when the eftIntList rule kicks
+   in and makes that impossible.  (c.f. Trac #8767)
 -}
 
 
@@ -737,7 +739,7 @@ phase 1, which is when the eftIntList rule kicks in and makes that impossible.
 -- Coercions for Haskell", section 6.5:
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 {-# RULES
-"amap/coerce" amap coerce = coerce
+"amap/coerce" amap coerce = coerce  -- See Note [amap]
  #-}
 
 -- Second functor law:
