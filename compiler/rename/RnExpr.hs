@@ -712,7 +712,7 @@ rnStmt _ _ (L loc (LetStmt binds)) thing_inside
         { (thing, fvs) <- thing_inside (collectLocalBinders binds')
         ; return (([L loc (LetStmt binds')], thing), fvs) }  }
 
-rnStmt ctxt rnBody (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
+rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = rec_stmts })) thing_inside
   = do  { (return_op, fvs1)  <- lookupStmtName ctxt returnMName
         ; (mfix_op,   fvs2)  <- lookupStmtName ctxt mfixName
         ; (bind_op,   fvs3)  <- lookupStmtName ctxt bindMName
@@ -733,7 +733,7 @@ rnStmt ctxt rnBody (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
         { let bndrs = nameSetElems $ foldr (unionNameSet . (\(ds,_,_,_) -> ds))
                                             emptyNameSet segs
         ; (thing, fvs_later) <- thing_inside bndrs
-        ; let (rec_stmts', fvs) = segmentRecStmts ctxt empty_rec_stmt segs fvs_later
+        ; let (rec_stmts', fvs) = segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
         ; return ((rec_stmts', thing), fvs `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) } }
 
 rnStmt ctxt _ (L loc (ParStmt segs _ _)) thing_inside
@@ -969,24 +969,25 @@ rn_rec_stmts_lhs fix_env stmts
 
 rn_rec_stmt :: (Outputable (body RdrName)) =>
                (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
-            -> [Name] -> LStmtLR Name RdrName (Located (body RdrName))
-            -> FreeVars -> RnM [Segment (LStmt Name (Located (body Name)))]
+            -> [Name]
+            -> (LStmtLR Name RdrName (Located (body RdrName)), FreeVars)
+            -> RnM [Segment (LStmt Name (Located (body Name)))]
         -- Rename a Stmt that is inside a RecStmt (or mdo)
         -- Assumes all binders are already in scope
         -- Turns each stmt into a singleton Stmt
-rn_rec_stmt rnBody _ (L loc (LastStmt body _)) _
+rn_rec_stmt rnBody _ (L loc (LastStmt body _), _)
   = do  { (body', fv_expr) <- rnBody body
         ; (ret_op, fvs1)   <- lookupSyntaxName returnMName
         ; return [(emptyNameSet, fv_expr `plusFV` fvs1, emptyNameSet,
                    L loc (LastStmt body' ret_op))] }
 
-rn_rec_stmt rnBody _ (L loc (BodyStmt body _ _ _)) _
+rn_rec_stmt rnBody _ (L loc (BodyStmt body _ _ _), _)
   = do { (body', fvs) <- rnBody body
        ; (then_op, fvs1) <- lookupSyntaxName thenMName
        ; return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
                  L loc (BodyStmt body' then_op noSyntaxExpr placeHolderType))] }
 
-rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _)) fv_pat
+rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
        ; (bind_op, fvs1) <- lookupSyntaxName bindMName
        ; (fail_op, fvs2) <- lookupSyntaxName failMName
@@ -995,27 +996,26 @@ rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _)) fv_pat
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
                   L loc (BindStmt pat' body' bind_op fail_op))] }
 
-rn_rec_stmt _ _ (L _ (LetStmt binds@(HsIPBinds _))) _
+rn_rec_stmt _ _ (L _ (LetStmt binds@(HsIPBinds _)), _)
   = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
-rn_rec_stmt _ all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
-  (binds', du_binds) <-
-      -- fixities and unused are handled above in rnRecStmtsAndThen
-      rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
-  return [(duDefs du_binds, allUses du_binds,
-           emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
+rn_rec_stmt _ all_bndrs (L loc (LetStmt (HsValBinds binds')), _)
+  = do { (binds', du_binds) <- rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
+           -- fixities and unused are handled above in rnRecStmtsAndThen
+       ; return [(duDefs du_binds, allUses du_binds,
+                  emptyNameSet, L loc (LetStmt (HsValBinds binds')))] }
 
 -- no RecStmt case because they get flattened above when doing the LHSes
-rn_rec_stmt _ _ stmt@(L _ (RecStmt {})) _
+rn_rec_stmt _ _ stmt@(L _ (RecStmt {}), _)
   = pprPanic "rn_rec_stmt: RecStmt" (ppr stmt)
 
-rn_rec_stmt _ _ stmt@(L _ (ParStmt {})) _       -- Syntactically illegal in mdo
+rn_rec_stmt _ _ stmt@(L _ (ParStmt {}), _)       -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: ParStmt" (ppr stmt)
 
-rn_rec_stmt _ _ stmt@(L _ (TransStmt {})) _     -- Syntactically illegal in mdo
+rn_rec_stmt _ _ stmt@(L _ (TransStmt {}), _)     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransStmt" (ppr stmt)
 
-rn_rec_stmt _ _ (L _ (LetStmt EmptyLocalBinds)) _
+rn_rec_stmt _ _ (L _ (LetStmt EmptyLocalBinds), _)
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
 
 rn_rec_stmts :: Outputable (body RdrName) =>
@@ -1024,16 +1024,19 @@ rn_rec_stmts :: Outputable (body RdrName) =>
              -> [(LStmtLR Name RdrName (Located (body RdrName)), FreeVars)]
              -> RnM [Segment (LStmt Name (Located (body Name)))]
 rn_rec_stmts rnBody bndrs stmts
-  = do { segs_s <- mapM (uncurry (rn_rec_stmt rnBody bndrs)) stmts
+  = do { segs_s <- mapM (rn_rec_stmt rnBody bndrs) stmts
        ; return (concat segs_s) }
 
 ---------------------------------------------
-segmentRecStmts :: HsStmtContext Name
+segmentRecStmts :: SrcSpan -> HsStmtContext Name
                 -> Stmt Name body
                 -> [Segment (LStmt Name body)] -> FreeVars
                 -> ([LStmt Name body], FreeVars)
 
-segmentRecStmts ctxt empty_rec_stmt segs fvs_later
+segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
+  | null segs
+  = ([], fvs_later)
+
   | MDoExpr <- ctxt
   = segsToStmts empty_rec_stmt grouped_segs fvs_later
                 -- Step 4: Turn the segments into Stmts
@@ -1043,7 +1046,7 @@ segmentRecStmts ctxt empty_rec_stmt segs fvs_later
                 --         used 'after' the RecStmt
 
   | otherwise
-  = ([ L (getLoc (head ss)) $
+  = ([ L loc $
        empty_rec_stmt { recS_stmts = ss
                       , recS_later_ids = nameSetElems (defs `intersectNameSet` fvs_later)
                       , recS_rec_ids   = nameSetElems (defs `intersectNameSet` uses) }]
@@ -1126,7 +1129,9 @@ glom it together with the first two groups
        r <- x }
 -}
 
-glomSegments :: HsStmtContext Name -> [Segment (LStmt Name body)] -> [Segment [LStmt Name body]]
+glomSegments :: HsStmtContext Name
+             -> [Segment (LStmt Name body)]
+             -> [Segment [LStmt Name body]]  -- Each segment has a non-empty list of Stmts
 -- See Note [Glomming segments]
 
 glomSegments _ [] = []
@@ -1156,7 +1161,7 @@ glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
 
 ----------------------------------------------------
 segsToStmts :: Stmt Name body                   -- A RecStmt with the SyntaxOps filled in
-            -> [Segment [LStmt Name body]]
+            -> [Segment [LStmt Name body]]      -- Each Segment has a non-empty list of Stmts
             -> FreeVars                         -- Free vars used 'later'
             -> ([LStmt Name body], FreeVars)
 
