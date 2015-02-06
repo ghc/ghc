@@ -6,3 +6,5 @@ test('mdo003', normal, compile_and_run, [''])
 test('mdo004', only_compiler_types(['ghc']), compile_and_run, [''])
 test('mdo005', normal, compile_and_run, [''])
 test('mdo006', normal, compile, [''])
+test('T10004', normal, compile, [''])
+
