@@ -50,7 +50,6 @@ tmp.d
 *.dyn_o
 *.dyn_hi
 *.dyn_hi-boot
-*o
 *.dll
 *.dylib
 *.so
