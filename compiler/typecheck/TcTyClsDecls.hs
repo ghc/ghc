@@ -1645,9 +1645,9 @@ checkValidClass cls
         -- Check that the class is unary, unless multiparameter type classes
         -- are enabled; also recognize deprecated nullary type classes
         -- extension (subsumed by multiparameter type classes, Trac #8993)
-        ; checkTc (multi_param_type_classes || arity == 1 ||
-                    (nullary_type_classes && arity == 0))
-                  (classArityErr arity cls)
+        ; checkTc (multi_param_type_classes || cls_arity == 1 ||
+                    (nullary_type_classes && cls_arity == 0))
+                  (classArityErr cls_arity cls)
         ; checkTc (fundep_classes || null fundeps) (classFunDepsErr cls)
 
         -- Check the super-classes
@@ -1667,7 +1667,8 @@ checkValidClass cls
         ; mapM_ check_at_defs at_stuff  }
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
-    arity = count isTypeVar tyvars    -- Ignore kind variables
+    cls_arity = count isTypeVar tyvars    -- Ignore kind variables
+    cls_tv_set = mkVarSet tyvars
 
     check_op constrained_class_methods (sel_id, dm)
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -1678,17 +1679,15 @@ checkValidClass cls
         ; traceTc "class op type" (ppr op_ty <+> ppr tau)
         ; checkValidType ctxt tau
 
-                -- Check that the type mentions at least one of
-                -- the class type variables...or at least one reachable
-                -- from one of the class variables.  Example: tc223
+                -- Check that the method type mentions a class variable
+                -- But actually check that the variables *reachable from*
+                -- the method type include a class variable.
+                -- Example: tc223
                 --   class Error e => Game b mv e | b -> mv e where
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
-                -- The check is disabled for nullary type classes,
-                -- since there is no possible ambiguity
-        ; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
-        ; checkTc (arity == 0 || tyVarsOfType tau `intersectsVarSet` grown_tyvars)
-                  (noClassTyVarErr cls (ptext (sLit "class method") <+> quotes (ppr sel_id)))
+        ; check_mentions (growThetaTyVars theta (tyVarsOfType tau))
+                         (ptext (sLit "class method") <+> quotes (ppr sel_id))
 
         ; case dm of
             GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
@@ -1711,9 +1710,17 @@ checkValidClass cls
                 -- type variable.  What a mess!
 
     check_at_defs (ATI fam_tc _)
-      = do { traceTc "check-at" (ppr fam_tc $$ ppr (tyConTyVars fam_tc) $$ ppr tyvars)
-           ; checkTc (any (`elem` tyvars) (tyConTyVars fam_tc))
-                     (noClassTyVarErr cls (ptext (sLit "associated type") <+> quotes (ppr fam_tc))) }
+      = check_mentions (mkVarSet (tyConTyVars fam_tc))
+                       (ptext (sLit "associated type") <+> quotes (ppr fam_tc))
+
+    check_mentions :: TyVarSet -> SDoc -> TcM ()
+       -- Check that the thing (method or associated type) mentions at least
+       -- one of the class type variables
+       -- The check is disabled for nullary type classes,
+       -- since there is no possible ambiguity (Trac #10020)
+    check_mentions thing_tvs thing_doc
+      = checkTc (cls_arity == 0 || thing_tvs `intersectsVarSet` cls_tv_set)
+                (noClassTyVarErr cls thing_doc)
 
 checkFamFlag :: Name -> TcM ()
 -- Check that we don't use families without -XTypeFamilies
