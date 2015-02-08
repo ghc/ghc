@@ -468,6 +468,7 @@ class Applicative m => Monad m where
 
     -- | Inject a value into the monadic type.
     return      :: a -> m a
+    return      = pure
 
     -- | Fail with a message.  This operation is not part of the
     -- mathematical definition of a monad, but is invoked on pattern-match
