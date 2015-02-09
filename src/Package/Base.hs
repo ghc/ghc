@@ -84,7 +84,7 @@ libraryPackage name cabalName stages settings =
     Package
         name
         (unifyPath $ "libraries" </> name)
-        (unifyPath $ "libraries" </> name </> cabalName <.> "cabal")
+        cabalName
         [ (stage
         , if stage == Stage0 then "dist-boot" else "dist-install"
         , settings stage)
