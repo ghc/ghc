@@ -571,7 +571,7 @@ setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
         ---------------------------------
         -- SPECIALISATION
 
--- See Note [Specialisations and RULES in IdInfo] in IdInfo.lhs
+-- See Note [Specialisations and RULES in IdInfo] in IdInfo.hs
 
 idSpecialisation :: Id -> SpecInfo
 idSpecialisation id = specInfo (idInfo id)
@@ -681,7 +681,7 @@ isStateHackType ty
         -- It would be better to spot that r was one-shot to start with, but
         -- I don't want to rely on that.
         --
-        -- Another good example is in fill_in in PrelPack.lhs.  We should be able to
+        -- Another good example is in fill_in in PrelPack.hs.  We should be able to
         -- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 

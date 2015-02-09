@@ -890,7 +890,7 @@ cvtLit (StringPrimL s) = do { let { s' = BS.pack s }
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- cvtLit should not be called on IntegerL, RationalL
         -- That precondition is established right here in
-        -- Convert.lhs, hence panic
+        -- Convert.hs, hence panic
 
 w8ToString :: [Word8] -> String
 w8ToString ws = map (\w -> chr (fromIntegral w)) ws

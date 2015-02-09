@@ -1003,7 +1003,7 @@ builtinIntegerRules =
   rule_unop           "complementInteger"   complementIntegerName   complement,
   rule_Int_binop      "shiftLInteger"       shiftLIntegerName       shiftL,
   rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR,
-  -- See Note [Integer division constant folding] in libraries/base/GHC/Real.lhs
+  -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
   rule_divop_one      "quotInteger"         quotIntegerName         quot,
   rule_divop_one      "remInteger"          remIntegerName          rem,
   rule_divop_one      "divInteger"          divIntegerName          div,
@@ -1134,7 +1134,7 @@ match_inline (Type _ : e : _)
 match_inline _ = Nothing
 
 
--- See Note [magicDictId magic] in `basicTypes/MkId.lhs`
+-- See Note [magicDictId magic] in `basicTypes/MkId.hs`
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]

@@ -240,7 +240,7 @@ newPatName (LetMk is_top fix_env) rdr_name
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
     --       then the top-level name is added to the global env
-    --       before going on to the RHSes (see RnSource.lhs).
+    --       before going on to the RHSes (see RnSource.hs).
 
 {-
 Note [View pattern usage]

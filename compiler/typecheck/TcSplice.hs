@@ -978,7 +978,7 @@ showSplice isDec what before after =
 
 -- | The splice data to be logged
 --
--- duplicates code in RnSplice.lhs
+-- duplicates code in RnSplice.hs
 data SpliceInfo
   = SpliceInfo
     { spliceIsDeclaration :: Bool
@@ -991,7 +991,7 @@ data SpliceInfo
 -- | outputs splice information for 2 flags which have different output formats:
 -- `-ddump-splices` and `-dth-dec-file`
 --
--- This duplicates code in RnSplice.lhs
+-- This duplicates code in RnSplice.hs
 traceSplice :: SpliceInfo -> TcM ()
 traceSplice sd = do
     loc <- case sd of

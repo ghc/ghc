@@ -824,7 +824,7 @@ runPhase (RealPhase (Unlit sf)) input_fn dflags
        -- Coverage.addTicksToBinds where we check that the filename in
        -- a SrcLoc is the same as the source filenaame, the two will
        -- look bogusly different. See test:
-       -- libraries/hpc/tests/function/subdir/tough2.lhs
+       -- libraries/hpc/tests/function/subdir/tough2.hs
        escape ('\\':cs) = '\\':'\\': escape cs
        escape ('\"':cs) = '\\':'\"': escape cs
        escape ('\'':cs) = '\\':'\'': escape cs
@@ -1690,7 +1690,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 
           -- ALL generated assembly must have this section to disable
           -- executable stacks.  See also
-          -- compiler/nativeGen/AsmCodeGen.lhs for another instance
+          -- compiler/nativeGen/AsmCodeGen.hs for another instance
           -- where we need to do this.
           (if platformHasGnuNonexecStack (targetPlatform dflags)
            then text ".section .note.GNU-stack,\"\",@progbits\n"

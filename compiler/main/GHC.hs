@@ -1185,7 +1185,7 @@ getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 
 -- -----------------------------------------------------------------------------
 
-{- ToDo: Move the primary logic here to compiler/main/Packages.lhs
+{- ToDo: Move the primary logic here to compiler/main/Packages.hs
 -- | Return all /external/ modules available in the package database.
 -- Modules from the current session (i.e., from the 'HomePackageTable') are
 -- not included.  This includes module names which are reexported by packages.

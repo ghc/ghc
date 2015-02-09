@@ -1086,7 +1086,7 @@ extendSigsWithLam env id
   = env
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type] in Demand.lhs
+-- See Note [Trimming a demand to a type] in Demand.hs
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where

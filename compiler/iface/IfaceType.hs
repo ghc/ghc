@@ -464,7 +464,7 @@ pprUserIfaceForAll tvs
      tv_has_kind_var (_,t) = not (isEmptyUniqSet (ifTyVarsOfType t))
 -------------------
 
--- See equivalent function in TypeRep.lhs
+-- See equivalent function in TypeRep.hs
 pprIfaceTyList :: TyPrec -> IfaceType -> IfaceType -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print
 -- it in list notation [t1, ...].

@@ -296,7 +296,7 @@ getCoreToDo dflags
             simpl_phase 0 ["post-liberate-case"] max_iter
             ]),         -- Run the simplifier after LiberateCase to vastly
                         -- reduce the possiblility of shadowing
-                        -- Reason: see Note [Shadowing] in SpecConstr.lhs
+                        -- Reason: see Note [Shadowing] in SpecConstr.hs
 
         runWhen spec_constr CoreDoSpecConstr,
 
@@ -631,7 +631,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                      (pprCoreBindings tagged_binds);
 
                 -- Get any new rules, and extend the rule base
-                -- See Note [Overall plumbing for rules] in Rules.lhs
+                -- See Note [Overall plumbing for rules] in Rules.hs
                 -- We need to do this regularly, because simplification can
                 -- poke on IdInfo thunks, which in turn brings in new rules
                 -- behind the scenes.  Otherwise there's a danger we'll simply

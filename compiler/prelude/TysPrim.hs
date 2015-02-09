@@ -330,7 +330,7 @@ constraintKindTyCon   = mkKindTyCon constraintKindTyConName   superKind
 -- ... and now their names
 
 -- If you edit these, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 superKindTyConName      = mkPrimTyConName (fsLit "BOX") superKindTyConKey superKindTyCon
 anyKindTyConName          = mkPrimTyConName (fsLit "AnyK") anyKindTyConKey anyKindTyCon
 liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon
@@ -528,7 +528,7 @@ realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
 
 {-
 Note: the ``state-pairing'' types are not truly primitive, so they are
-defined in \tr{TysWiredIn.lhs}, not here.
+defined in \tr{TysWiredIn.hs}, not here.
 
 ************************************************************************
 *                                                                      *

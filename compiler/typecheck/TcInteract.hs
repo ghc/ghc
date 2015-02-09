@@ -1212,7 +1212,7 @@ constraint right away.  This avoids two dangers
            with the same thing later, and produce the same equality
            again --> termination worries.
 
-To achieve this required some refactoring of FunDeps.lhs (nicer
+To achieve this required some refactoring of FunDeps.hs (nicer
 now!).
 -}
 

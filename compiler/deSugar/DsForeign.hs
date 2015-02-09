@@ -670,7 +670,7 @@ foreignExportInitialiser hs_fn =
    -- Initialise foreign exports by registering a stable pointer from an
    -- __attribute__((constructor)) function.
    -- The alternative is to do this from stginit functions generated in
-   -- codeGen/CodeGen.lhs; however, stginit functions have a negative impact
+   -- codeGen/CodeGen.hs; however, stginit functions have a negative impact
    -- on binary sizes and link times because the static linker will think that
    -- all modules that are imported directly or indirectly are actually used by
    -- the program.

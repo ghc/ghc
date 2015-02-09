@@ -108,7 +108,7 @@ The goal of this pass is to prepare for code generation.
     We want curried definitions for all of these in case they
     aren't inlined by some caller.
 
-9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.lhs
+9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.hs
 
 10. Convert (LitInteger i t) into the core representation
     for the Integer i. Normally this uses mkInteger, but if

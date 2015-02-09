@@ -242,7 +242,7 @@ These data types are the heart of the compiler
 -- *  A coercion
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data Expr b
   = Var   Id
   | Lit   Literal
@@ -265,13 +265,13 @@ type Arg b = Expr b
 -- The default alternative is @(DEFAULT, [], rhs)@
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 type Alt b = (AltCon, [b], Expr b)
 
 -- | A case alternative constructor (i.e. pattern match)
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data AltCon
   = DataAlt DataCon   --  ^ A plain data constructor: @case e of { Foo x -> ... }@.
                       -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
@@ -286,7 +286,7 @@ data AltCon
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
   deriving (Data, Typeable)
@@ -435,7 +435,7 @@ unboxed type.
 -- | Allows attaching extra information to points in expressions
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data Tickish id =
     -- | An @{-# SCC #-}@ profiling annotation, either automatically
     -- added by the desugarer as a result of -auto-all, or added by
@@ -761,7 +761,7 @@ data CoreRule
                 -- arguments, it simply discards them; the returned 'CoreExpr'
                 -- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
-                -- See Note [Extra args in rule matching] in Rules.lhs
+                -- See Note [Extra args in rule matching] in Rules.hs
 
 type RuleFun = DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
 type InScopeEnv = (InScopeSet, IdUnfoldingFun)
@@ -918,7 +918,7 @@ data UnfoldingSource
 
   | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
                        -- Only a few primop-like things have this property
-                       -- (see MkId.lhs, calls to mkCompulsoryUnfolding).
+                       -- (see MkId.hs, calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
 
 
@@ -1097,7 +1097,7 @@ isExpandableUnfolding _                                              = False
 
 expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 -- Expand an expandable unfolding; this is used in rule matching
---   See Note [Expanding variables] in Rules.lhs
+--   See Note [Expanding variables] in Rules.hs
 -- The key point here is that CONLIKE things can be expanded
 expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
 expandUnfolding_maybe _                                                       = Nothing
@@ -1253,7 +1253,7 @@ a list of CoreBind
 -}
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 type CoreProgram = [CoreBind]   -- See Note [CoreProgram]
 
 -- | The common case for the type of binders and variables when
@@ -1442,7 +1442,7 @@ varsToCoreExprs vs = map varToCoreExpr vs
 -- | Extract every variable by this group
 bindersOf  :: Bind b -> [b]
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 

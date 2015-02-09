@@ -1316,7 +1316,7 @@ for the Lift class in TH.Syntax, because that can lead to overlapping-instance
 errors in a polymorphic situation.
 
 If this check fails (which isn't impossible) we get another chance; see
-Note [Converting strings] in Convert.lhs
+Note [Converting strings] in Convert.hs
 
 Local record selectors
 ~~~~~~~~~~~~~~~~~~~~~~

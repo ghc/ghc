@@ -745,7 +745,7 @@ initializePicBase_ppc _ _ _ _
 --              call 1f
 -- 1:           popl %picReg
 --              addl __GLOBAL_OFFSET_TABLE__+.-1b, %picReg
--- (See PprMach.lhs)
+-- (See PprMach.hs)
 
 initializePicBase_x86
         :: Arch -> OS -> Reg

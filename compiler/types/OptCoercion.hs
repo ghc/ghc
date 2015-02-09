@@ -535,7 +535,7 @@ False) and that all is OK. But, all is not OK: we want to use the first branch
 of the axiom in this case, not the second. The problem is that the parameters
 of the first branch can unify with the supplied coercions, thus meaning that
 the first branch should be taken. See also Note [Branched instance checking]
-in types/FamInstEnv.lhs.
+in types/FamInstEnv.hs.
 
 Note [Why call checkAxInstCo during optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

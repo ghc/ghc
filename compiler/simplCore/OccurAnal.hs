@@ -283,7 +283,7 @@ But what is the graph?  NOT the same graph as was used for Note
 'f' that is *always* inlined if it is applicable.  We do *not* disable
 rules for loop-breakers.  It's up to whoever makes the rules to make
 sure that the rules themselves always terminate.  See Note [Rules for
-recursive functions] in Simplify.lhs
+recursive functions] in Simplify.hs
 
 Hence, if
     f's RHS (or its INLINE template if it has one) mentions g, and

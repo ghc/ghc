@@ -291,7 +291,7 @@ idRuleRhsVars is_active id
     get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
                   , ru_rhs = rhs, ru_act = act })
       | is_active act
-            -- See Note [Finding rule RHS free vars] in OccAnal.lhs
+            -- See Note [Finding rule RHS free vars] in OccAnal.hs
       = delFromUFM fvs fn        -- Note [Rule free var hack]
       where
         fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
@@ -390,7 +390,7 @@ delBinderFV :: Var -> VarSet -> VarSet
 -- the free tyvars of the types of the binders, and include these in the
 -- free vars of the group, attached to the top level of each RHS.
 --
--- This actually happened in the defn of errorIO in IOBase.lhs:
+-- This actually happened in the defn of errorIO in IOBase.hs:
 --      errorIO (ST io) = case (errorIO# io) of
 --                          _ -> bottom
 --                        where

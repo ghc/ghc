@@ -52,7 +52,7 @@ import ErrUtils
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
-the simplifier is in SimplCore.lhs.
+the simplifier is in SimplCore.hs.
 
 
 -----------------------------------------
@@ -2158,7 +2158,7 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
         --
         -- We really must record that b is already evaluated so that we don't
         -- go and re-evaluate it when constructing the result.
-        -- See Note [Data-con worker strictness] in MkId.lhs
+        -- See Note [Data-con worker strictness] in MkId.hs
     add_evals the_strs
         = go vs the_strs
         where
@@ -2627,7 +2627,7 @@ Note [Small alternative rhs]
 It is worth checking for a small RHS because otherwise we
 get extra let bindings that may cause an extra iteration of the simplifier to
 inline back in place.  Quite often the rhs is just a variable or constructor.
-The Ord instance of Maybe in PrelMaybe.lhs, for example, took several extra
+The Ord instance of Maybe in PrelMaybe.hs, for example, took several extra
 iterations because the version with the let bindings looked big, and so wasn't
 inlined, but after the join points had been inlined it looked smaller, and so
 was inlined.

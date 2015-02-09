@@ -53,7 +53,7 @@ The algorithm is based on the first technique, but there are some differences:
           left-to-right
 \end{itemize}
 (By the way the second technique is really similar to the one used in
- @Match.lhs@ to generate code)
+ @Match.hs@ to generate code)
 
 This function takes the equations of a pattern and returns:
 \begin{itemize}
@@ -628,7 +628,7 @@ make_whole_con con | isInfixCon con = nlInfixConPat name
                    Tidying equations
 ------------------------------------------------------------------------
 
-tidy_eqn does more or less the same thing as @tidy@ in @Match.lhs@;
+tidy_eqn does more or less the same thing as @tidy@ in @Match.hs@;
 that is, it removes syntactic sugar, reducing the number of cases that
 must be handled by the main checking algorithm.  One difference is
 that here we can do *all* the tidying at once (recursively), rather

@@ -603,7 +603,7 @@ we want
 not                                ([a], a -> a)
 
 The reason is that we then get better (shorter) type signatures in
-interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
+interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
 
 
                 Representation types
@@ -816,7 +816,7 @@ applyTys :: Type -> [KindOrType] -> Type
 -- there are more type args than foralls in 'undefined's type.
 
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 applyTys ty args = applyTysD empty ty args
 
 applyTysD :: SDoc -> Type -> [Type] -> Type     -- Debug version
@@ -1321,7 +1321,7 @@ cmpTypesX _   _         []        = GT
 -------------
 cmpTc :: TyCon -> TyCon -> Ordering
 -- Here we treat * and Constraint as equal
--- See Note [Kind Constraint and kind *] in Kinds.lhs
+-- See Note [Kind Constraint and kind *] in Kinds.hs
 --
 -- Also we treat OpenTypeKind as equal to either * or #
 -- See Note [Comparison with OpenTypeKind]

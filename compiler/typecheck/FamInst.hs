@@ -315,7 +315,7 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
 -- Check that the proposed new instance is OK,
 -- and then add it to the home inst env
 -- This must be lazy in the fam_inst arguments, see Note [Lazy axiom match]
--- in FamInstEnv.lhs
+-- in FamInstEnv.hs
 addLocalFamInst :: (FamInstEnv,[FamInst]) -> FamInst -> TcM (FamInstEnv, [FamInst])
 addLocalFamInst (home_fie, my_fis) fam_inst
         -- home_fie includes home package and this module

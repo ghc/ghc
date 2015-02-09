@@ -70,7 +70,7 @@ accSqueeze count maxCount squeeze ufm = acc count (eltsUFM ufm)
 ~~~~~~~~~~~~~~~~~~~~
 BL 2007/09
 Doing a nice fold over the UniqSet makes trivColorable use
-32% of total compile time and 42% of total alloc when compiling SHA1.lhs from darcs.
+32% of total compile time and 42% of total alloc when compiling SHA1.hs from darcs.
 Therefore the UniqFM is made non-abstract and we use custom fold.
 
 MS 2010/04
@@ -78,7 +78,7 @@ When converting UniqFM to use Data.IntMap, the fold cannot use UniqFM internal
 representation any more. But it is imperative that the assSqueeze stops
 the folding if the count gets greater or equal to maxCount. We thus convert
 UniqFM to a (lazy) list, do the fold and stops if necessary, which was
-the most efficient variant tried. Benchmark compiling 10-times SHA1.lhs follows.
+the most efficient variant tried. Benchmark compiling 10-times SHA1.hs follows.
 (original = previous implementation, folding = fold of the whole UFM,
  lazyFold = the current implementation,
  hackFold = using internal representation of Data.IntMap)

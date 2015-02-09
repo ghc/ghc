@@ -214,7 +214,7 @@ isSubKind :: Kind -> Kind -> Bool
 -- under arrrows or type constructors
 
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 isSubKind k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
   | isPromotedTyCon kc1 || isPromotedTyCon kc2
     -- handles promoted kinds (List *, Nat, etc.)
@@ -230,7 +230,7 @@ isSubKindCon :: TyCon -> TyCon -> Bool
 -- ^ @kc1 \`isSubKindCon\` kc2@ checks that @kc1@ <: @kc2@
 
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 isSubKindCon kc1 kc2
   | kc1 == kc2              = True
   | isOpenTypeKindCon kc2   = isSubOpenTypeKindCon kc1

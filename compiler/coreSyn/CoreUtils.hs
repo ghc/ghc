@@ -818,7 +818,7 @@ the moment we go for the slightly more aggressive version which treats
 
 
 Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
-~~~~~~~~~~~~~~~~~~   in CoreUnfold.lhs
+~~~~~~~~~~~~~~~~~~   in CoreUnfold.hs
 @exprIsCheap@ looks at a Core expression and returns \tr{True} if
 it is obviously in weak head normal form, or is cheap to get to WHNF.
 [Note that that's not the same as exprIsDupable; an expression might be

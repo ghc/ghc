@@ -677,7 +677,7 @@ and a case expression
 
   case x :: Map (Int, c) w of MapPair m -> ...
 
-As explained by [Wrappers for data instance tycons] in MkIds.lhs, the
+As explained by [Wrappers for data instance tycons] in MkIds.hs, the
 worker/wrapper types for MapPair are
 
   $WMapPair :: forall a b v. Map a (Map a b v) -> Map (a, b) v

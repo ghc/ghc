@@ -194,7 +194,7 @@ checkWiredInTyCon tc
           when (mod /= nameModule tc_name)
                (initIfaceTcRn (loadWiredInHomeIface tc_name))
                 -- Don't look for (non-existent) Float.hi when
-                -- compiling Float.lhs, which mentions Float of course
+                -- compiling Float.hs, which mentions Float of course
                 -- A bit yukky to call initIfaceTcRn here
         }
   where

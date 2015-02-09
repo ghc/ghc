@@ -1063,7 +1063,7 @@ data ModGuts
                                          -- ^ Family instances declared in this module
         mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
-                                         -- See Note [Overall plumbing for rules] in Rules.lhs
+                                         -- See Note [Overall plumbing for rules] in Rules.hs
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
         mg_warns     :: !Warnings,       -- ^ Warnings declared in the module
@@ -2706,7 +2706,7 @@ data HsParsedModule = HsParsedModule {
 *                                                                      *
 ************************************************************************
 
-This stuff is in here, rather than (say) in Linker.lhs, because the Linker.lhs
+This stuff is in here, rather than (say) in Linker.hs, because the Linker.hs
 stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
 -}
 

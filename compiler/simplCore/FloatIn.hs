@@ -83,7 +83,7 @@ The fix is
 to let bind the algebraic case scrutinees (done, I think) and
 the case alternatives (except the ones with an
 unboxed type)(not done, I think). This is best done in the
-SetLevels.lhs module, which tags things with their level numbers.
+SetLevels.hs module, which tags things with their level numbers.
 \item
 do the full laziness pass (floating lets outwards).
 \item

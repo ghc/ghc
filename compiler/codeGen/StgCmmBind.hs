@@ -741,7 +741,7 @@ closureDescription :: DynFlags
                    -> Name              -- Id of closure binding
                    -> String
         -- Not called for StgRhsCon which have global info tables built in
-        -- CgConTbls.lhs with a description generated from the data constructor
+        -- CgConTbls.hs with a description generated from the data constructor
 closureDescription dflags mod_name name
   = showSDocDump dflags (char '<' <>
                     (if isExternalName name

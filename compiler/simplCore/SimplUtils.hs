@@ -1488,7 +1488,7 @@ abstractFloats main_tvs body_env body
       = do { uniq <- getUniqueM
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
                   poly_ty   = mkForAllTys tvs_here (idType var) -- But new type of course
-                  poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.lhs
+                  poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.hs
                               mkLocalId poly_name poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
@@ -1621,7 +1621,7 @@ alternative; this picks up the common cases
      b) some branches equal to the DEFAULT (which occurs first)
 
 The case where Combine Identical Alternatives transformation showed up
-was like this (base/Foreign/C/Err/Error.lhs):
+was like this (base/Foreign/C/Err/Error.hs):
 
         x | p `is` 1 -> e1
           | p `is` 2 -> e2

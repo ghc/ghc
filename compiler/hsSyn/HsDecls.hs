@@ -370,7 +370,7 @@ Default methods
 
  - If there is a default method name at all, it's recorded in
    the ClassOpSig (in HsBinds), in the DefMeth field.
-   (DefMeth is defined in Class.lhs)
+   (DefMeth is defined in Class.hs)
 
 Source-code class decls and interface-code class decls are treated subtly
 differently, which has given me a great deal of confusion over the years.

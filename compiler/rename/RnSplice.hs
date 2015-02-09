@@ -413,7 +413,7 @@ showSplice what before after =
 
 -- | The splice data to be logged
 --
--- duplicates code in TcSplice.lhs
+-- duplicates code in TcSplice.hs
 data SpliceInfo
   = SpliceInfo
     { spliceIsDeclaration :: Bool
@@ -426,7 +426,7 @@ data SpliceInfo
 -- | outputs splice information for 2 flags which have different output formats:
 -- `-ddump-splices` and `-dth-dec-file`
 --
--- This duplicates code in TcSplice.lhs
+-- This duplicates code in TcSplice.hs
 traceSplice :: SpliceInfo -> TcM ()
 traceSplice sd = do
     loc <- case sd of

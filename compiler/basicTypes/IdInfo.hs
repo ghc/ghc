@@ -411,7 +411,7 @@ seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 ************************************************************************
 -}
 
--- CafInfo is used to build Static Reference Tables (see simplStg/SRT.lhs).
+-- CafInfo is used to build Static Reference Tables (see simplStg/SRT.hs).
 
 -- | Records whether an 'Id' makes Constant Applicative Form references
 data CafInfo

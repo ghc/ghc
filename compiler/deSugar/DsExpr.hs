@@ -481,14 +481,14 @@ For record construction we do this (assuming T has three arguments)
         T { op2 = e }
 ==>
         let err = /\a -> recConErr a
-        T (recConErr t1 "M.lhs/230/op1")
+        T (recConErr t1 "M.hs/230/op1")
           e
-          (recConErr t1 "M.lhs/230/op3")
+          (recConErr t1 "M.hs/230/op3")
 \end{verbatim}
 @recConErr@ then converts its arugment string into a proper message
 before printing it as
 \begin{verbatim}
-        M.lhs, line 230: missing field op1 was evaluated
+        M.hs, line 230: missing field op1 was evaluated
 \end{verbatim}
 
 We also handle @C{}@ as valid construction syntax for an unlabelled
@@ -533,7 +533,7 @@ Then we translate as follows:
         case r of
           T1 op1 _ op3 -> T1 op1 op2 op3
           T2 op4 _     -> T2 op4 op2
-          other        -> recUpdError "M.lhs/230"
+          other        -> recUpdError "M.hs/230"
 \end{verbatim}
 It's important that we use the constructor Ids for @T1@, @T2@ etc on the
 RHSs, and do not generate a Core constructor application directly, because the constructor

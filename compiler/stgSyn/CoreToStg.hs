@@ -89,7 +89,7 @@ import Control.Monad (liftM, ap)
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- In this pass we also collect information on which CAFs are live for
--- constructing SRTs (see SRT.lhs).
+-- constructing SRTs (see SRT.hs).
 --
 -- A top-level Id has CafInfo, which is
 --
@@ -441,7 +441,7 @@ coreToStgExpr (Case scrut bndr _ alts) = do
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
-        -- See Note [Nullary unboxed tuple] in Type.lhs
+        -- See Note [Nullary unboxed tuple] in Type.hs
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
         do { (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs

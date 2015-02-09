@@ -473,7 +473,7 @@ instance Binary DiffTime where
 -- we just change this instance to be portable like the rest of the
 -- instances? (binary package has code to steal for that)
 --
--- yes, we need Binary Integer and Binary Rational in basicTypes/Literal.lhs
+-- yes, we need Binary Integer and Binary Rational in basicTypes/Literal.hs
 
 instance Binary Integer where
     -- XXX This is hideous

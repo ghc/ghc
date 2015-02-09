@@ -1105,7 +1105,7 @@ linkPackage dflags pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as
-            -- compiler/ghci/Linker.lhs + rts/Linker.c link the
+            -- compiler/ghci/Linker.hs + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.

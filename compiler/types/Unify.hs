@@ -232,7 +232,7 @@ match_kind menv subst k1 k2
 --
 -- In fact I have no example in mind that *requires* this kind-matching
 -- to instantiate template type variables, but it seems like the right
--- thing to do.  C.f. Note [Matching variable types] in Rules.lhs
+-- thing to do.  C.f. Note [Matching variable types] in Rules.hs
 
 --------------
 match_tys :: MatchEnv -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv

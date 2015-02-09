@@ -413,7 +413,7 @@ data DataConRep
                                  -- and *including* all evidence args
 
         , dcr_stricts :: [StrictnessMark]  -- 1-1 with dcr_arg_tys
-                -- See also Note [Data-con worker strictness] in MkId.lhs
+                -- See also Note [Data-con worker strictness] in MkId.hs
 
         , dcr_bangs :: [HsImplBang]  -- The actual decisions made (including failures)
                                      -- about the original arguments; 1-1 with orig_arg_tys

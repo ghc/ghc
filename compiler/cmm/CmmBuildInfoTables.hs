@@ -198,7 +198,7 @@ buildSRT dflags topSRT cafs =
      return (topSRT, sub_tbls, blockSRTs)
 
 -- Construct an SRT bitmap.
--- Adapted from simpleStg/SRT.lhs, which expects Id's.
+-- Adapted from simpleStg/SRT.hs, which expects Id's.
 procpointSRT :: DynFlags -> CLabel -> Map CLabel Int -> [CLabel] ->
                 UniqSM (Maybe CmmDecl, C_SRT)
 procpointSRT _ _ _ [] =

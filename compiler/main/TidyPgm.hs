@@ -1263,7 +1263,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     --    the function returns bottom
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
+    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.hs
 
     --------- Arity ------------
     -- Usually the Id will have an accurate arity on it, because

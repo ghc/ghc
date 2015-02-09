@@ -152,7 +152,7 @@ data NameSpace = VarName        -- Variables, including "real" data constructors
    {-! derive: Binary !-}
 
 -- Note [Data Constructors]
--- see also: Note [Data Constructor Naming] in DataCon.lhs
+-- see also: Note [Data Constructor Naming] in DataCon.hs
 --
 -- $real_vs_source_data_constructors
 -- There are two forms of data constructor:

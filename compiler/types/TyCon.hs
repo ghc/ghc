@@ -156,7 +156,7 @@ Note [Type synonym families]
 
 Note [Data type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Wrappers for data instance tycons] in MkId.lhs
+See also Note [Wrappers for data instance tycons] in MkId.hs
 
 * Data type families are declared thus
         data family T a :: *
@@ -323,7 +323,7 @@ N.
 -- such as those for function and tuple types.
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data TyCon
   = -- | The function type constructor, @(->)@
     FunTyCon {

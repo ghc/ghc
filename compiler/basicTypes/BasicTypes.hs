@@ -449,7 +449,7 @@ instance Outputable Origin where
 -}
 
 -- | The semantics allowed for overlapping instances for a particular
--- instance. See Note [Safe Haskell isSafeOverlap] (in `InstEnv.lhs`) for a
+-- instance. See Note [Safe Haskell isSafeOverlap] (in `InstEnv.hs`) for a
 -- explanation of the `isSafeOverlap` field.
 --
 -- - 'ApiAnnotation.AnnKeywordId' :
@@ -955,7 +955,7 @@ The main effects of CONLIKE are:
     - A CoreUnfolding has a field that caches exprIsExpandable
 
     - The rule matcher consults this field.  See
-      Note [Expanding variables] in Rules.lhs.
+      Note [Expanding variables] in Rules.hs.
 -}
 
 isConLike :: RuleMatchInfo -> Bool
