@@ -68,16 +68,16 @@ postProcessPackageData file = do
 
 bootPkgConstraints :: Args
 bootPkgConstraints = args $ do
-    forM (targetPackagesInStage Stage0) $ \pkg @ (Package _ _ cabal _) -> do
-        let depName = takeBaseName cabal
-        need [cabal]
-        content <- lines <$> liftIO (readFile cabal)
+    forM (targetPackagesInStage Stage0) $ \pkg @ (Package _ path cabal _) -> do
+        let cabalPath = path </> cabal <.> "cabal"
+        need [cabalPath]
+        content <- lines <$> liftIO (readFile cabalPath)
         let versionLines = filter (("ersion:" `isPrefixOf`) . drop 1) content
         case versionLines of
-            [versionLine] -> return $ args ["--constraint", depName ++ " == "
+            [versionLine] -> return $ args ["--constraint", cabal ++ " == "
                                     ++ dropWhile (not . isDigit) versionLine]
             _             -> redError $ "Cannot determine package version in '"
-                                      ++ unifyPath cabal ++ "'."
+                                      ++ unifyPath cabalPath ++ "'."
 
 bootPackageDb :: Args
 bootPackageDb = do
@@ -115,6 +115,7 @@ ghcPkgArgs (Package _ path _ _) (stage, dist, _) = args $
 buildRule :: Package -> TodoItem -> Rules ()
 buildRule pkg @ (Package name path cabal _) todo @ (stage, dist, settings) =
     let pathDist  = path </> dist
+        cabalPath = path </> cabal <.> "cabal"
         configure = path </> "configure"
     in
     -- All these files are produced by a single run of GhcCabal
@@ -127,7 +128,7 @@ buildRule pkg @ (Package name path cabal _) todo @ (stage, dist, settings) =
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
-        need [cabal]
+        need [cabalPath]
         when (doesFileExist $ configure <.> "ac") $ need [configure]
         -- GhcCabal will run the configure script, so we depend on it
         -- We still don't know who build the configure script from configure.ac

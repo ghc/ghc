@@ -1,107 +1,94 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
-    targetPackages, targetPackagesInStage,
-    IntegerLibrary (..), integerLibrary,
-    buildHaddock
+    targetPackages, targetPackagesInStage
     ) where
 
 import Package.Base
 
-data IntegerLibrary = IntegerGmp | IntegerGmp2 | IntegerSimple
-
-instance Show IntegerLibrary where
-    show library = case library of
-         IntegerGmp    -> "integer-gmp"
-         IntegerGmp2   -> "integer-gmp2"
-         IntegerSimple -> "integer-simple"
-
--- TODO: keep or move to configuration files? see Note [configuration files]
-integerLibrary :: IntegerLibrary
-integerLibrary = IntegerGmp2
-
 integerLibraryName :: String
 integerLibraryName = show integerLibrary
-
--- see Note [configuration files]
-buildHaddock :: Bool
-buildHaddock = True
 
 -- These are the packages we build:
 -- TODO: this should eventually be removed and replaced by the top-level
 -- target, i.e. GHC (and perhaps, something else)
 targetPackages :: [Package]
 targetPackages =
-    [   standardLibrary "array"            [        Stage1]
-    ,     customLibrary "base"             [        Stage1] baseConfArgs
-    ,   standardLibrary "bin-package-db"   [Stage0, Stage1]
-    ,   standardLibrary "binary"           [Stage0, Stage1]
-    ,   standardLibrary "bytestring"       [        Stage1]
-    , customNameLibrary "Cabal/Cabal"      [Stage0, Stage1] cabalTraits
-    ,   standardLibrary "containers"       [        Stage1]
-    ,   standardLibrary "deepseq"          [        Stage1]
-    ,   standardLibrary "directory"        [        Stage1]
-    ,   standardLibrary "filepath"         [        Stage1]
-    ,     customLibrary "ghc-prim"         [        Stage1] ghcPrimConfArgs
-    ,   standardLibrary "haskeline"        [        Stage1]
-    ,   standardLibrary "hoopl"            [Stage0, Stage1]
-    ,   standardLibrary "hpc"              [Stage0, Stage1]
-    , customNameLibrary integerLibraryName [        Stage1] integerLibTraits
-    ,   standardLibrary "parallel"         [        Stage1]
-    ,   standardLibrary "pretty"           [        Stage1]
-    ,   standardLibrary "primitive"        [        Stage1]
-    ,   standardLibrary "process"          [        Stage1]
-    ,   standardLibrary "stm"              [        Stage1]
-    ,   standardLibrary "template-haskell" [        Stage1]
-    ,     customLibrary "terminfo"         [Stage0, Stage1] whenTerminfo
-    ,   standardLibrary "time"             [        Stage1]
-    ,   standardLibrary "transformers"     [Stage0, Stage1]
-    ,     customLibrary "unix"             [        Stage1] whenUnix
-    ,     customLibrary "Win32"            [        Stage1] whenWin32
-    ,     customLibrary "xhtml"            [        Stage1] whenXhtml
+    [ library "array"            [        Stage1]
+    , library "base"             [        Stage1] `customise` baseTraits
+    , library "bin-package-db"   [Stage0, Stage1]
+    , library "binary"           [Stage0, Stage1]
+    , library "bytestring"       [        Stage1]
+    , library "Cabal/Cabal"      [Stage0, Stage1] `customise` cabalTraits
+    , library "containers"       [        Stage1]
+    , library "deepseq"          [        Stage1]
+    , library "directory"        [        Stage1]
+    , library "filepath"         [        Stage1]
+    , library "ghc-prim"         [        Stage1] `customise` ghcPrimTraits
+    , library "haskeline"        [        Stage1]
+    , library "hoopl"            [Stage0, Stage1]
+    , library "hpc"              [Stage0, Stage1]
+    , library integerLibraryName [        Stage1] `customise` intLibTraits
+    , library "parallel"         [        Stage1]
+    , library "pretty"           [        Stage1]
+    , library "primitive"        [        Stage1]
+    , library "process"          [        Stage1]
+    , library "stm"              [        Stage1]
+    , library "template-haskell" [        Stage1]
+    , library "terminfo"         [Stage0, Stage1] `customise` terminfoTraits
+    , library "time"             [        Stage1]
+    , library "transformers"     [Stage0, Stage1]
+    , library "unix"             [        Stage1] `customise` unixTraits
+    , library "Win32"            [        Stage1] `customise` win32Traits
+    , library "xhtml"            [        Stage1] `customise` xhtmlTraits
     ]
 
-baseConfArgs :: Settings -> Settings
-baseConfArgs settings =
-    settings { customConfArgs = arg $ "--flags=" ++ integerLibraryName }
+baseTraits :: Package -> Package
+baseTraits = updateSettings (\settings ->
+    settings { customConfArgs = arg $ "--flags=" ++ integerLibraryName })
 
 -- see Note [Cabal package weirdness]
-cabalTraits :: (String, Settings -> Settings)
-cabalTraits = ("Cabal", id) -- change cabalName, keep other settings intact
+cabalTraits :: Package -> Package
+cabalTraits (Package name path cabal todo) = Package name path "Cabal" todo
 
-ghcPrimConfArgs :: Settings -> Settings
-ghcPrimConfArgs settings =
-    settings { customConfArgs = arg "--flag=include-ghc-prim" }
+ghcPrimTraits :: Package -> Package
+ghcPrimTraits = updateSettings (\settings ->
+    settings { customConfArgs = arg "--flag=include-ghc-prim" })
 
-integerLibTraits :: (String, Settings -> Settings)
-integerLibTraits = (cabalName, traits)
+intLibTraits :: Package -> Package
+intLibTraits (Package name path cabal todo) = updateSettings update pkg
   where
+    pkg = Package name path cabalName todo
     cabalName = case integerLibrary of
         IntegerGmp    -> "integer-gmp"
         IntegerGmp2   -> "integer-gmp" -- Indeed, why make life easier?
         IntegerSimple -> "integer-simple"
-    traits settings = settings
+    update settings = settings
         {
             customConfArgs = when windowsHost $
                              arg "--configure-option=--with-intree-gmp",
             customCcArgs   = arg "-Ilibraries/integer-gmp2/gmp"
         }
 
-whenTerminfo :: Settings -> Settings
-whenTerminfo settings = settings
+terminfoTraits :: Package -> Package
+terminfoTraits = updateSettings (\settings ->
+    settings
     {
         buildWhen = do
             os <- showArg TargetOs
             not windowsHost && (os /= "ios")
-    }
+    })
 
-whenUnix :: Settings -> Settings
-whenUnix settings = settings { buildWhen = not windowsHost }
+unixTraits :: Package -> Package
+unixTraits = updateSettings (\settings ->
+    settings { buildWhen = not windowsHost })
 
-whenWin32 :: Settings -> Settings
-whenWin32 settings = settings { buildWhen = windowsHost }
+win32Traits :: Package -> Package
+win32Traits = updateSettings (\settings ->
+    settings { buildWhen = windowsHost })
 
-whenXhtml :: Settings -> Settings
-whenXhtml settings = settings { buildWhen = return buildHaddock }
+xhtmlTraits :: Package -> Package
+xhtmlTraits = updateSettings (\settings ->
+    settings { buildWhen = return buildHaddock })
 
 targetPackagesInStage :: Stage -> [Package]
 targetPackagesInStage stage = filter inStage targetPackages

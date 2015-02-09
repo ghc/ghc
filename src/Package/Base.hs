@@ -5,7 +5,7 @@ module Package.Base (
     module Util,
     module Oracles,
     Package (..), Settings (..), TodoItem (..),
-    defaultSettings, standardLibrary, customLibrary, customNameLibrary,
+    defaultSettings, library, customise, updateSettings,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     pathArgs, packageArgs,
     includeGccArgs, includeGhcArgs, pkgHsSources,
@@ -66,9 +66,18 @@ data Package = Package
      {
          pkgName  :: String,    -- For example: "deepseq"
          pkgPath  :: FilePath,  -- "libraries/deepseq"
-         pkgCabal :: FilePath,  -- "libraries/deepseq/deepseq.cabal"
+         pkgCabal :: FilePath,  -- "deepseq"
          pkgTodo  :: [TodoItem] -- [(Stage1, "dist-install", defaultSettings)]
      }
+
+updateSettings :: (Settings -> Settings) -> Package -> Package
+updateSettings update (Package name path cabal todo) =
+    Package name path cabal (map updateTodo todo)
+  where
+    updateTodo (stage, filePath, settings) = (stage, filePath, update settings)
+
+customise :: Package -> (Package -> Package) -> Package
+customise = flip ($)
 
 libraryPackage :: String -> String -> [Stage] -> (Stage -> Settings) -> Package
 libraryPackage name cabalName stages settings =
@@ -81,18 +90,8 @@ libraryPackage name cabalName stages settings =
         , settings stage)
         | stage <- stages ]
 
-standardLibrary :: String -> [Stage] -> Package
-standardLibrary name stages = libraryPackage name name stages defaultSettings
-
-customLibrary :: String -> [Stage] -> (Settings -> Settings) -> Package
-customLibrary name stages traits = libraryPackage name name stages settings
-  where
-    settings = traits . defaultSettings
-
-customNameLibrary :: String -> [Stage]
-                  -> (String, Settings -> Settings) -> Package
-customNameLibrary name stages (cabalName, traits) =
-    libraryPackage name cabalName stages (traits . defaultSettings)
+library :: String -> [Stage] -> Package
+library name stages = libraryPackage name name stages defaultSettings
 
 commonCcArgs :: Args
 commonCcArgs = when Validating $ args ["-Werror", "-Wall"]
