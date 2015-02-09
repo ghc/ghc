@@ -470,20 +470,39 @@ a `finally` sequel =
     _ <- sequel
     return r
 
--- | Forces its argument to be evaluated to weak head normal form when
--- the resultant 'IO' action is executed. It can be used to order
--- evaluation with respect to other 'IO' operations; its semantics are
--- given by
+-- | Evaluate the argument to weak head normal form.
 --
--- >   evaluate x `seq` y    ==>  y
--- >   evaluate x `catch` f  ==>  (return $! x) `catch` f
--- >   evaluate x >>= f      ==>  (return $! x) >>= f
+-- 'evaluate' is typically used to uncover any exceptions that a lazy value
+-- may contain, and possibly handle them.
 --
--- /Note:/ the first equation implies that @(evaluate x)@ is /not/ the
--- same as @(return $! x)@.  A correct definition is
+-- 'evaluate' only evaluates to /weak head normal form/. If deeper
+-- evaluation is needed, the @force@ function from @Control.DeepSeq@
+-- may be handy:
 --
--- >   evaluate x = (return $! x) >>= return
+-- > evaluate $ force x
 --
+-- There is a subtle difference between @'evaluate' x@ and @'return' '$!' x@,
+-- analogous to the difference between 'throwIO' and 'throw'. If the lazy
+-- value @x@ throws an exception, @'return' '$!' x@ will fail to return an
+-- 'IO' action and will throw an exception instead. @'evaluate' x@, on the
+-- other hand, always produces an 'IO' action; that action will throw an
+-- exception upon /execution/ iff @x@ throws an exception upon /evaluation/.
+--
+-- The practical implication of this difference is that due to the
+-- /imprecise exceptions/ semantics,
+--
+-- > (return $! error "foo") >> error "bar"
+--
+-- may throw either @"foo"@ or @"bar"@, depending on the optimizations
+-- performed by the compiler. On the other hand,
+--
+-- > evaluate (error "foo") >> error "bar"
+--
+-- is guaranteed to throw @"foo"@.
+--
+-- The rule of thumb is to use 'evaluate' to force or handle exceptions in
+-- lazy values. If, on the other hand, you are forcing a lazy value for
+-- efficiency reasons only and do not care about exceptions, you may
+-- use @'return' '$!' x@.
 evaluate :: a -> IO a
 evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
-
