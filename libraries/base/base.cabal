@@ -322,7 +322,6 @@ Library
         HsBase.h
         WCsubst.h
         consUtils.h
-        Typeable.h
 
     -- OS Specific
     if os(windows)
