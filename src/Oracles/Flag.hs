@@ -7,9 +7,9 @@ module Oracles.Flag (
     test, when, unless, not, (&&), (||)
     ) where
 
-import Control.Monad hiding (when, unless)
 import qualified Prelude
 import Prelude hiding (not, (&&), (||))
+import Control.Monad hiding (when, unless)
 import Base
 import Util
 import Oracles.Base

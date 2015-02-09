@@ -7,7 +7,6 @@ module Base (
     module Data.Function,
     module Data.Monoid,
     module Data.List,
-    module Settings,
     Stage (..),
     Arg, Args,
     ShowArg (..), ShowArgs (..),
@@ -23,7 +22,6 @@ import Control.Applicative
 import Data.Function
 import Data.Monoid
 import Data.List
-import Settings
 
 data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 

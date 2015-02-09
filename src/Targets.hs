@@ -5,9 +5,6 @@ module Targets (
 
 import Package.Base
 
-integerLibraryName :: String
-integerLibraryName = show integerLibrary
-
 -- These are the packages we build:
 -- TODO: this should eventually be removed and replaced by the top-level
 -- target, i.e. GHC (and perhaps, something else)
