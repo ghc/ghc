@@ -4,7 +4,7 @@
 --
 
 module LlvmCodeGen.Data (
-        genLlvmData
+        genLlvmData, genData
     ) where
 
 #include "HsVersions.h"

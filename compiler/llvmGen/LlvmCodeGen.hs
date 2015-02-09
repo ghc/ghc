@@ -138,13 +138,8 @@ cmmLlvmGen cmm@CmmProc{} = do
     -- generate llvm code from cmm
     llvmBC <- withClearVars $ genLlvmProc fixed_cmm
 
-    -- allocate IDs for info table and code, so the mangler can later
-    -- make sure they end up next to each other.
-    itableSection <- freshSectionId
-    _codeSection <- freshSectionId
-
     -- pretty print
-    (docs, ivars) <- fmap unzip $ mapM (pprLlvmCmmDecl itableSection) llvmBC
+    (docs, ivars) <- fmap unzip $ mapM pprLlvmCmmDecl llvmBC
 
     -- Output, note down used variables
     renderLlvm (vcat docs)

@@ -4,7 +4,7 @@
 -- | Pretty print helpers for the LLVM Code generator.
 --
 module LlvmCodeGen.Ppr (
-        pprLlvmHeader, pprLlvmCmmDecl, pprLlvmData, infoSection, iTableSuf
+        pprLlvmHeader, pprLlvmCmmDecl, pprLlvmData, infoSection
     ) where
 
 #include "HsVersions.h"
@@ -96,28 +96,36 @@ pprLlvmData (globals, types) =
 
 
 -- | Pretty print LLVM code
-pprLlvmCmmDecl :: Int -> LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
-pprLlvmCmmDecl _ (CmmData _ lmdata)
+pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
+pprLlvmCmmDecl (CmmData _ lmdata)
   = return (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmDecl count (CmmProc mb_info entry_lbl live (ListGraph blks))
-  = do (idoc, ivar) <- case mb_info of
-                        Nothing -> return (empty, [])
-                        Just (Statics info_lbl dat)
-                         -> pprInfoTable count info_lbl (Statics entry_lbl dat)
-
-       let sec = mkLayoutSection (count + 1)
-           (lbl',sec') = case mb_info of
-                           Nothing                   -> (entry_lbl, Nothing)
-                           Just (Statics info_lbl _) -> (info_lbl,  sec)
-           link = if externallyVisibleCLabel lbl'
+pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
+  = do let lbl = case mb_info of
+                     Nothing                   -> entry_lbl
+                     Just (Statics info_lbl _) -> info_lbl
+           link = if externallyVisibleCLabel lbl
                       then ExternallyVisible
                       else Internal
            lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
 
-       fun <- mkLlvmFunc live lbl' link  sec' lmblocks
-       let name = decName $ funcDecl fun
+       funDec <- llvmFunSig live lbl link
+       dflags <- getDynFlags
+       let buildArg = fsLit . showSDoc dflags . ppPlainName
+           funArgs = map buildArg (llvmFunArgs dflags live)
+
+       -- generate the info table
+       prefix <- case mb_info of
+                     Nothing -> return Nothing
+                     Just (Statics _ statics) -> do
+                       infoStatics <- mapM genData statics
+                       let infoTy = LMStruct $ map getStatType infoStatics
+                       return $ Just $ LMStaticStruc infoStatics infoTy
+
+       let fun = LlvmFunction funDec funArgs llvmStdFunAttrs Nothing
+                              prefix lmblocks
+           name = decName $ funcDecl fun
            defName = name `appendFS` fsLit "$def"
            funcDecl' = (funcDecl fun) { decName = defName }
            fun' = fun { funcDecl = funcDecl' }
@@ -138,55 +146,7 @@ pprLlvmCmmDecl count (CmmProc mb_info entry_lbl live (ListGraph blks))
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            (LMPointer $ LMInt 8))
 
-       return (ppLlvmGlobal alias $+$ idoc $+$ ppLlvmFunction fun', ivar)
-
-
--- | Pretty print CmmStatic
-pprInfoTable :: Int -> CLabel -> CmmStatics -> LlvmM (SDoc, [LlvmVar])
-pprInfoTable count info_lbl stat
-  = do (ldata, ltypes) <- genLlvmData (Text, stat)
-
-       dflags <- getDynFlags
-       platform <- getLlvmPlatform
-       let setSection :: LMGlobal -> LlvmM (LMGlobal, [LlvmVar])
-           setSection (LMGlobal (LMGlobalVar _ ty l _ _ c) d) = do
-             lbl <- strCLabel_llvm info_lbl
-             let sec = mkLayoutSection count
-                 ilabel = lbl `appendFS` fsLit iTableSuf
-                 gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
-                 -- See Note [Subsections Via Symbols]
-                 v = if (platformHasSubsectionsViaSymbols platform
-                         && l == ExternallyVisible)
-                        || l == Internal
-                     then [gv]
-                     else []
-             funInsert ilabel ty
-             return (LMGlobal gv d, v)
-           setSection v = return (v,[])
-
-       (ldata', llvmUsed) <- unzip `fmap` mapM setSection ldata
-       ldata'' <- mapM aliasify ldata'
-       let modUsedLabel (LMGlobalVar name ty link sect align const) =
-             LMGlobalVar (name `appendFS` fsLit "$def") ty link sect align const
-           modUsedLabel v = v
-           llvmUsed' = map modUsedLabel $ concat llvmUsed
-       return (pprLlvmData (concat ldata'', ltypes), llvmUsed')
-
-
--- | We generate labels for info tables by converting them to the same label
--- as for the entry code but adding this string as a suffix.
-iTableSuf :: String
-iTableSuf = "_itable"
-
-
--- | Create a specially crafted section declaration that encodes the order this
--- section should be in the final object code.
---
--- The LlvmMangler.llvmFixupAsm pass over the assembly produced by LLVM uses
--- this section declaration to do its processing.
-mkLayoutSection :: Int -> LMSection
-mkLayoutSection n
-  = Just (fsLit $ infoSection ++ show n)
+       return (ppLlvmGlobal alias $+$ ppLlvmFunction fun', [])
 
 
 -- | The section we are putting info tables and their entry code into, should

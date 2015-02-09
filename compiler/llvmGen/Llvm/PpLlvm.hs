@@ -77,12 +77,12 @@ ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
             Nothing   -> ppr (pLower $ getVarType var)
 
         -- Position of linkage is different for aliases.
-        const_link = case c of
-          Global   -> ppr link <+> text "global"
-          Constant -> ppr link <+> text "constant"
-          Alias    -> text "alias" <+> ppr link
+        const = case c of
+          Global   -> text "global"
+          Constant -> text "constant"
+          Alias    -> text "alias"
 
-    in ppAssignment var $ const_link <+> rhs <> sect <> align
+    in ppAssignment var $ ppr link <+> const <+> rhs <> sect <> align
        $+$ newLine
 
 ppLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
@@ -117,11 +117,11 @@ ppLlvmMeta (MetaNamed n m)
 
 -- | Print out an LLVM metadata value.
 ppLlvmMetaExpr :: MetaExpr -> SDoc
-ppLlvmMetaExpr (MetaStr    s ) = text "metadata !" <> doubleQuotes (ftext s)
-ppLlvmMetaExpr (MetaNode   n ) = text "metadata !" <> int n
+ppLlvmMetaExpr (MetaStr    s ) = text "!" <> doubleQuotes (ftext s)
+ppLlvmMetaExpr (MetaNode   n ) = text "!" <> int n
 ppLlvmMetaExpr (MetaVar    v ) = ppr v
 ppLlvmMetaExpr (MetaStruct es) =
-    text "metadata !{" <> hsep (punctuate comma (map ppLlvmMetaExpr es)) <> char '}'
+    text "!{" <> hsep (punctuate comma (map ppLlvmMetaExpr es)) <> char '}'
 
 
 -- | Print out a list of function definitions.
@@ -130,15 +130,18 @@ ppLlvmFunctions funcs = vcat $ map ppLlvmFunction funcs
 
 -- | Print out a function definition.
 ppLlvmFunction :: LlvmFunction -> SDoc
-ppLlvmFunction (LlvmFunction dec args attrs sec body) =
-    let attrDoc = ppSpaceJoin attrs
-        secDoc = case sec of
+ppLlvmFunction fun =
+    let attrDoc = ppSpaceJoin (funcAttrs fun)
+        secDoc = case funcSect fun of
                       Just s' -> text "section" <+> (doubleQuotes $ ftext s')
                       Nothing -> empty
-    in text "define" <+> ppLlvmFunctionHeader dec args
-        <+> attrDoc <+> secDoc
+        prefixDoc = case funcPrefix fun of
+                        Just v  -> text "prefix" <+> ppr v
+                        Nothing -> empty
+    in text "define" <+> ppLlvmFunctionHeader (funcDecl fun) (funcArgs fun)
+        <+> attrDoc <+> secDoc <+> prefixDoc
         $+$ lbrace
-        $+$ ppLlvmBlocks body
+        $+$ ppLlvmBlocks (funcBody fun)
         $+$ rbrace
         $+$ newLine
         $+$ newLine
@@ -269,7 +272,7 @@ ppCall ct fptr args attrs = case fptr of
     where
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
-                ppValues = ppCommaJoin args
+                ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
                 ppArgTy  = (ppCommaJoin $ map fst params) <>
                            (case argTy of
                                VarArgs   -> text ", ..."
@@ -280,6 +283,10 @@ ppCall ct fptr args attrs = case fptr of
                     <> fnty <+> ppName fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
+        -- Metadata needs to be marked as having the `metadata` type when used
+        -- in a call argument
+        ppCallMetaExpr (MetaVar v) = ppr v
+        ppCallMetaExpr v           = text "metadata" <+> ppr v
 
 ppMachOp :: LlvmMachOp -> LlvmVar -> LlvmVar -> SDoc
 ppMachOp op left right =

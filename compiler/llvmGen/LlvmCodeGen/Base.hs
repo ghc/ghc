@@ -24,11 +24,10 @@ module LlvmCodeGen.Base (
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta,
-        freshSectionId,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
-        llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, mkLlvmFunc, tysToParams,
+        llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
+        llvmPtrBits, tysToParams,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -133,15 +132,6 @@ llvmFunSig' live lbl link
                                  (map (toParams . getVarType) (llvmFunArgs dflags live))
                                  (llvmFunAlign dflags)
 
--- | Create a Haskell function in LLVM.
-mkLlvmFunc :: LiveGlobalRegs -> CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
-           -> LlvmM LlvmFunction
-mkLlvmFunc live lbl link sec blks
-  = do funDec <- llvmFunSig live lbl link
-       dflags <- getDynFlags
-       let funArgs = map (fsLit . Outp.showSDoc dflags . ppPlainName) (llvmFunArgs dflags live)
-       return $ LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
-
 -- | Alignment to use for functions
 llvmFunAlign :: DynFlags -> LMAlign
 llvmFunAlign dflags = Just (wORD_SIZE dflags)
@@ -186,13 +176,13 @@ type LlvmVersion = Int
 
 -- | The LLVM Version we assume if we don't know
 defaultLlvmVersion :: LlvmVersion
-defaultLlvmVersion = 30
+defaultLlvmVersion = 36
 
 minSupportLlvmVersion :: LlvmVersion
-minSupportLlvmVersion = 28
+minSupportLlvmVersion = 36
 
 maxSupportLlvmVersion :: LlvmVersion
-maxSupportLlvmVersion = 35
+maxSupportLlvmVersion = 36
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
@@ -203,7 +193,6 @@ data LlvmEnv = LlvmEnv
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
   , envUniq :: UniqSupply          -- ^ Supply of unique values
-  , envNextSection :: Int          -- ^ Supply of fresh section IDs
   , envFreshMeta :: Int            -- ^ Supply of fresh metadata IDs
   , envUniqMeta :: UniqFM Int      -- ^ Global metadata nodes
   , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
@@ -257,7 +246,6 @@ runLlvm dflags ver out us m = do
                       , envUniq = us
                       , envFreshMeta = 0
                       , envUniqMeta = emptyUFM
-                      , envNextSection = 1
                       }
 
 -- | Get environment (internal)
@@ -361,10 +349,6 @@ setUniqMeta f m = modifyEnv $ \env -> env { envUniqMeta = addToUFM (envUniqMeta 
 -- | Gets metadata node for given unique
 getUniqMeta :: Unique -> LlvmM (Maybe Int)
 getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
-
--- | Returns a fresh section ID
-freshSectionId :: LlvmM Int
-freshSectionId = LlvmM $ \env -> return (envNextSection env, env { envNextSection = envNextSection env + 1})
 
 -- ----------------------------------------------------------------------------
 -- * Internal functions

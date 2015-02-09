@@ -48,19 +48,22 @@ data LlvmModule = LlvmModule  {
 -- | An LLVM Function
 data LlvmFunction = LlvmFunction {
     -- | The signature of this declared function.
-    funcDecl  :: LlvmFunctionDecl,
+    funcDecl      :: LlvmFunctionDecl,
 
     -- | The functions arguments
-    funcArgs  :: [LMString],
+    funcArgs      :: [LMString],
 
     -- | The function attributes.
-    funcAttrs :: [LlvmFuncAttr],
+    funcAttrs     :: [LlvmFuncAttr],
 
     -- | The section to put the function into,
-    funcSect  :: LMSection,
+    funcSect      :: LMSection,
+
+    -- | Prefix data
+    funcPrefix    :: Maybe LlvmStatic,
 
     -- | The body of the functions.
-    funcBody  :: LlvmBlocks
+    funcBody      :: LlvmBlocks
   }
 
 type LlvmFunctions = [LlvmFunction]

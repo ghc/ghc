@@ -20,12 +20,12 @@ import Outputable
 --   information. They consist of metadata strings, metadata nodes, regular
 --   LLVM values (both literals and references to global variables) and
 --   metadata expressions (i.e., recursive data type). Some examples:
---     !{ metadata !"hello", metadata !0, i32 0 }
---     !{ metadata !1, metadata !{ i32 0 } }
+--     !{ !"hello", !0, i32 0 }
+--     !{ !1, !{ i32 0 } }
 --
 -- * Metadata nodes -- global metadata variables that attach a metadata
 --   expression to a number. For example:
---     !0 = metadata !{ [<metadata expressions>] !}
+--     !0 = !{ [<metadata expressions>] !}
 --
 -- * Named metadata -- global metadata variables that attach a metadata nodes
 --   to a name. Used ONLY to communicated module level information to LLVM
@@ -39,7 +39,7 @@ import Outputable
 -- * Attach to instructions -- metadata can be attached to LLVM instructions
 --   using a specific reference as follows:
 --     %l = load i32* @glob, !nontemporal !10
---     %m = load i32* @glob, !nontemporal !{ i32 0, metadata !{ i32 0 } }
+--     %m = load i32* @glob, !nontemporal !{ i32 0, !{ i32 0 } }
 --   Only metadata nodes or expressions can be attached, named metadata cannot.
 --   Refer to LLVM documentation for which instructions take metadata and its
 --   meaning.
@@ -63,10 +63,10 @@ data MetaExpr = MetaStr LMString
               deriving (Eq)
 
 instance Outputable MetaExpr where
-  ppr (MetaStr    s ) = text "metadata !\"" <> ftext s <> char '"'
-  ppr (MetaNode   n ) = text "metadata !" <> int n
+  ppr (MetaStr    s ) = text "!\"" <> ftext s <> char '"'
+  ppr (MetaNode   n ) = text "!" <> int n
   ppr (MetaVar    v ) = ppr v
-  ppr (MetaStruct es) = text "metadata !{ " <> ppCommaJoin es <> char '}'
+  ppr (MetaStruct es) = text "!{ " <> ppCommaJoin es <> char '}'
 
 -- | Associates some metadata with a specific label for attaching to an
 -- instruction.

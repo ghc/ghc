@@ -11,32 +11,23 @@ module LlvmMangler ( llvmFixupAsm ) where
 
 import DynFlags ( DynFlags )
 import ErrUtils ( showPass )
-import LlvmCodeGen.Ppr ( infoSection )
 
 import Control.Exception
 import Control.Monad ( when )
 import qualified Data.ByteString.Char8 as B
-import Data.Char
 import System.IO
-
-import Data.List ( sortBy )
-import Data.Function ( on )
 
 #if x86_64_TARGET_ARCH
 #define REWRITE_AVX
 #endif
 
 -- Magic Strings
-secStmt, infoSec, newLine, textStmt, dataStmt, syntaxUnified :: B.ByteString
+secStmt, newLine, textStmt, dataStmt, syntaxUnified :: B.ByteString
 secStmt       = B.pack "\t.section\t"
-infoSec       = B.pack infoSection
 newLine       = B.pack "\n"
 textStmt      = B.pack "\t.text"
 dataStmt      = B.pack "\t.data"
 syntaxUnified = B.pack "\t.syntax unified"
-
-infoLen :: Int
-infoLen = B.length infoSec
 
 -- Search Predicates
 isType :: B.ByteString -> Bool
@@ -53,7 +44,7 @@ llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w
     hClose r
-    let fixed = (map rewriteAVX . fixTables) ss
+    let fixed = map rewriteAVX ss
     mapM_ (writeSection w) fixed
     hClose w
     return ()
@@ -91,11 +82,7 @@ readSections r w = go B.empty [] []
 
       -- Decide whether to directly output the section or append it
       -- to the list for resorting.
-      let finishSection
-            | infoSec `B.isInfixOf` hdr =
-                cts `seq` return $ (hdr, cts):ss
-            | otherwise =
-                writeSection w (hdr, cts) >> return ss
+      let finishSection = writeSection w (hdr, cts) >> return ss
 
       case e_l of
         Right l | l == syntaxUnified
@@ -149,33 +136,3 @@ replace matchBS replaceBS = loop
           (hd,tl) | B.null tl -> hd
                   | otherwise -> hd `B.append` replaceBS `B.append`
                                  loop (B.drop (B.length matchBS) tl)
-
--- | Reorder and convert sections so info tables end up next to the
--- code. Also does stack fixups.
-fixTables :: [Section] -> [Section]
-fixTables ss = map strip sorted
-  where
-    -- Resort sections: We only assign a non-zero number to all
-    -- sections having the "STRIP ME" marker. As sortBy is stable,
-    -- this will cause all these sections to be appended to the end of
-    -- the file in the order given by the indexes.
-    extractIx hdr
-      | B.null a  = 0
-      | otherwise = 1 + readInt (B.takeWhile isDigit $ B.drop infoLen a)
-      where (_,a) = B.breakSubstring infoSec hdr
-
-    indexed = zip (map (extractIx . fst) ss) ss
-
-    sorted = map snd $ sortBy (compare `on` fst) indexed
-
-    -- Turn all the "STRIP ME" sections into normal text sections, as
-    -- they are in the right place now.
-    strip (hdr, cts)
-      | infoSec `B.isInfixOf` hdr = (textStmt, cts)
-      | otherwise                 = (hdr, cts)
-
--- | Read an int or error
-readInt :: B.ByteString -> Int
-readInt str | B.all isDigit str = (read . B.unpack) str
-            | otherwise = error $ "LLvmMangler Cannot read " ++ show str
-                                ++ " as it's not an Int"
