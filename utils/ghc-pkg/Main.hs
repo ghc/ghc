@@ -680,10 +680,18 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
   = do e <- tryIO $ getDirectoryContents path
        case e of
          Left err
-           | ioeGetErrorType err == InappropriateType ->
-              die ("ghc no longer supports single-file style package databases "
-                ++ "(" ++ path ++ ") use 'ghc-pkg init' to create the database "
-                ++ "with the correct format.")
+           | ioeGetErrorType err == InappropriateType -> do
+              -- We provide a limited degree of backwards compatibility for
+              -- old single-file style db:
+              mdb <- tryReadParseOldFileStyleDatabase verbosity
+                       mb_user_conf modify use_cache path
+              case mdb of
+                Just db -> return db
+                Nothing ->
+                  die $ "ghc no longer supports single-file style package "
+                     ++ "databases (" ++ path ++ ") use 'ghc-pkg init'"
+                     ++ "to create the database with the correct format."
+
            | otherwise -> ioError err
          Right fs
            | not use_cache -> ignore_cache (const $ return ())
@@ -823,6 +831,67 @@ mungePackagePaths top_dir pkgroot pkg =
 
 
 -- -----------------------------------------------------------------------------
+-- Workaround for old single-file style package dbs
+
+-- Single-file style package dbs have been deprecated for some time, but
+-- it turns out that Cabal was using them in one place. So this code is for a
+-- workaround to allow older Cabal versions to use this newer ghc.
+
+-- We check if the file db contains just "[]" and if so, we look for a new
+-- dir-style db in path.d/, ie in a dir next to the given file.
+-- We cannot just replace the file with a new dir style since Cabal still
+-- assumes it's a file and tries to overwrite with 'writeFile'.
+
+-- ghc itself also cooperates in this workaround
+
+tryReadParseOldFileStyleDatabase :: Verbosity -> Maybe (FilePath, Bool)
+                                 -> Bool -> Bool -> FilePath
+                                 -> IO (Maybe PackageDB)
+tryReadParseOldFileStyleDatabase verbosity mb_user_conf modify use_cache path = do
+  -- assumes we've already established that path exists and is not a dir
+  content <- readFile path `catchIO` \_ -> return ""
+  if take 2 content == "[]"
+    then do
+      path_abs <- absolutePath path
+      let path_dir = path <.> "d"
+      warn $ "Warning: ignoring old file-style db and trying " ++ path_dir
+      direxists <- doesDirectoryExist path_dir
+      if direxists
+         then do db <- readParseDatabase verbosity mb_user_conf
+                                   modify use_cache path_dir
+                 -- but pretend it was at the original location
+                 return $ Just db {
+                   location         = path,
+                   locationAbsolute = path_abs
+                 }
+         else   return $ Just PackageDB {
+                   location         = path,
+                   locationAbsolute = path_abs,
+                   packages         = []
+                 }
+
+    -- if the path is not a file, or is not an empty db then we fail
+    else return Nothing
+
+adjustOldFileStylePackageDB :: PackageDB -> IO PackageDB
+adjustOldFileStylePackageDB db = do
+  -- assumes we have not yet established if it's an old style or not
+  mcontent <- liftM Just (readFile (location db)) `catchIO` \_ -> return Nothing
+  case fmap (take 2) mcontent of
+    -- it is an old style and empty db, so look for a dir kind in location.d/
+    Just "[]" -> return db {
+                   location         = location db <.> "d",
+                   locationAbsolute = locationAbsolute db <.> "d"
+                 }
+    -- it is old style but not empty, we have to bail
+    Just  _   -> die $ "ghc no longer supports single-file style package "
+                    ++ "databases (" ++ location db ++ ") use 'ghc-pkg init'"
+                    ++ "to create the database with the correct format."
+    -- probably not old style, carry on as normal
+    Nothing   -> return db
+
+
+-- -----------------------------------------------------------------------------
 -- Creating a new package DB
 
 initPackageDB :: FilePath -> Verbosity -> [Flag] -> IO ()
@@ -941,8 +1010,9 @@ data DBOp = RemovePackage InstalledPackageInfo
 changeDB :: Verbosity -> [DBOp] -> PackageDB -> IO ()
 changeDB verbosity cmds db = do
   let db' = updateInternalDB db cmds
-  createDirectoryIfMissing True (location db)
-  changeDBDir verbosity cmds db'
+  db'' <- adjustOldFileStylePackageDB db'
+  createDirectoryIfMissing True (location db'')
+  changeDBDir verbosity cmds db''
 
 updateInternalDB :: PackageDB -> [DBOp] -> PackageDB
 updateInternalDB db cmds = db{ packages = foldl do_cmd (packages db) cmds }

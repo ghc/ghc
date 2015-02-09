@@ -367,13 +367,15 @@ readPackageConfig dflags conf_file = do
 
   proto_pkg_configs <-
     if isdir
-       then do let filename = conf_file </> "package.cache"
-               debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
-               readPackageDbForGhc filename
+       then readDirStylePackageConfig conf_file
        else do
             isfile <- doesFileExist conf_file
             if isfile
-               then throwGhcExceptionIO $ InstallationError $
+               then do
+                 mpkgs <- tryReadOldFileStylePackageConfig
+                 case mpkgs of
+                   Just pkgs -> return pkgs
+                   Nothing   -> throwGhcExceptionIO $ InstallationError $
                       "ghc no longer supports single-file style package " ++
                       "databases (" ++ conf_file ++
                       ") use 'ghc-pkg init' to create the database with " ++
@@ -388,6 +390,31 @@ readPackageConfig dflags conf_file = do
       pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
   --
   return pkg_configs2
+  where
+    readDirStylePackageConfig conf_dir = do
+      let filename = conf_dir </> "package.cache"
+      debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
+      readPackageDbForGhc filename
+
+    -- Single-file style package dbs have been deprecated for some time, but
+    -- it turns out that Cabal was using them in one place. So this is a
+    -- workaround to allow older Cabal versions to use this newer ghc.
+    -- We check if the file db contains just "[]" and if so, we look for a new
+    -- dir-style db in conf_file.d/, ie in a dir next to the given file.
+    -- We cannot just replace the file with a new dir style since Cabal still
+    -- assumes it's a file and tries to overwrite with 'writeFile'.
+    -- ghc-pkg also cooperates with this workaround.
+    tryReadOldFileStylePackageConfig = do
+      content <- readFile conf_file `catchIO` \_ -> return ""
+      if take 2 content == "[]"
+        then do
+          let conf_dir = conf_file <.> "d"
+          direxists <- doesDirectoryExist conf_dir
+          if direxists
+             then do debugTraceMsg dflags 2 (text "Ignoring old file-style db and trying:" <+> text conf_dir)
+                     liftM Just (readDirStylePackageConfig conf_dir)
+             else return (Just []) -- ghc-pkg will create it when it's updated
+        else return Nothing
 
 setBatchPackageFlags :: DynFlags -> [PackageConfig] -> [PackageConfig]
 setBatchPackageFlags dflags pkgs = maybeDistrustAll pkgs
