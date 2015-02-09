@@ -34,6 +34,7 @@ import Data.Version
 import FastString
 import Outputable
 import Module
+import Unique
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is the InstalledPackageInfo from bin-package-db,
@@ -65,6 +66,15 @@ instance BinaryStringRep SourcePackageId where
 instance BinaryStringRep PackageName where
   fromStringRep = PackageName . mkFastStringByteString
   toStringRep (PackageName s) = fastStringToByteString s
+
+instance Uniquable InstalledPackageId where
+  getUnique (InstalledPackageId n) = getUnique n
+
+instance Uniquable SourcePackageId where
+  getUnique (SourcePackageId n) = getUnique n
+
+instance Uniquable PackageName where
+  getUnique (PackageName n) = getUnique n
 
 instance Outputable InstalledPackageId where
   ppr (InstalledPackageId str) = ftext str
