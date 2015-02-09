@@ -19,3 +19,6 @@ ghc-e-fail1:
 
 ghc-e-fail2:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "type A = A"
+
+T9930fail:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -x hs T9930

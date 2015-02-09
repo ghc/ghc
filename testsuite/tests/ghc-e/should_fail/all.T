@@ -17,3 +17,6 @@ test('ghc-e-fail1', [exit_code(2), req_interp, ignore_output], run_command,
 
 test('ghc-e-fail2', [exit_code(2), req_interp, ignore_output], run_command,
      ['$MAKE --no-print-directory -s ghc-e-fail2'])
+
+test('T9930fail', [exit_code(2), ignore_output], run_command,
+     ['$MAKE --no-print-directory -s T9930fail'])
