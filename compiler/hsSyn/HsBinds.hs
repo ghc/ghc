@@ -627,7 +627,10 @@ data Sig name
       --          'ApiAnnotation.AnnComma'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-    TypeSig [Located name] (LHsType name) (PostRn name [Name])
+    TypeSig 
+       [Located name]         -- LHS of the signature; e.g.  f,g,h :: blah
+       (LHsType name)         -- RHS of the signature
+       (PostRn name [Name])   -- Wildcards (both named and anonymous) of the RHS
 
       -- | A pattern synonym type signature
       --
