@@ -427,14 +427,22 @@ guessOutputFile = modifySession $ \env ->
             ml_hs_file (ms_location ms)
         name = fmap dropExtension mainModuleSrcPath
 
+        name_exe = do
 #if defined(mingw32_HOST_OS)
-        -- we must add the .exe extention unconditionally here, otherwise
-        -- when name has an extension of its own, the .exe extension will
-        -- not be added by DriverPipeline.exeFileName.  See #2248
-        name_exe = fmap (<.> "exe") name
+          -- we must add the .exe extention unconditionally here, otherwise
+          -- when name has an extension of its own, the .exe extension will
+          -- not be added by DriverPipeline.exeFileName.  See #2248
+          name' <- fmap (<.> "exe") name
 #else
-        name_exe = name
+          name' <- name
 #endif
+          mainModuleSrcPath' <- mainModuleSrcPath
+          -- #9930: don't clobber input files (unless they ask for it)
+          if name' == mainModuleSrcPath'
+            then throwGhcException . UsageError $
+                 "default output name would overwrite the input file; " ++
+                 "must specify -o explicitly"
+            else Just name'
     in
     case outputFile dflags of
         Just _ -> env

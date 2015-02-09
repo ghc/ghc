@@ -13,3 +13,6 @@ T9905fail2:
 
 T9905fail3:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "import Prelude (+)" # syntax error
+
+T9930fail:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -x hs T9930

@@ -11,3 +11,6 @@ test('T9905fail2', [exit_code(2), req_interp, ignore_output], run_command,
 
 test('T9905fail3', [exit_code(2), req_interp, ignore_output], run_command,
      ['$MAKE --no-print-directory -s T9905fail3'])
+
+test('T9930fail', [exit_code(2), ignore_output], run_command,
+     ['$MAKE --no-print-directory -s T9930fail'])
