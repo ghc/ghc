@@ -52,7 +52,7 @@ defaultSettings stage = Settings
 -- The typical structure of that directory is:
 -- * build/           : contains compiled object code
 -- * doc/             : produced by haddock
--- * package-data.mk  : contains output of ghc-cabal applied to package.cabal
+-- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal.cabal
 -- Settings may be different for different combinations of Stage & FilePath
 -- TODO: the above may be incorrect, settings seem to *only* depend on the
 -- stage. In fact Stage seem to define FilePath and Settings, therefore we
