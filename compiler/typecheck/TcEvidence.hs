@@ -17,7 +17,7 @@ module TcEvidence (
   EvTerm(..), mkEvCast, evVarsOfTerm,
   EvLit(..), evTermCoercion,
   EvCallStack(..),
-  EvTypeable(..), EvTypeableKind(..),
+  EvTypeable(..),
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -735,7 +735,7 @@ data EvTerm
 
 -- | Instructions on how to make a 'Typeable' dictionary.
 data EvTypeable
-  = EvTypeableTyCon TyCon [EvTypeableKind] [(EvTerm, Type)]
+  = EvTypeableTyCon TyCon [Kind] [(EvTerm, Type)]
     -- ^ Dicitionary for concrete type constructors.
 
   | EvTypeableTyApp (EvTerm,Type) (EvTerm,Type)
@@ -745,11 +745,6 @@ data EvTypeable
   | EvTypeableTyLit Type
     -- ^ Dictionary for a type literal.
 
-  deriving ( Data.Data, Data.Typeable )
-
--- | Instructions on how to make evidence for the typeable representation
--- of a kind.
-data EvTypeableKind = EvTypeableKind TyCon [EvTypeableKind]
   deriving ( Data.Data, Data.Typeable )
 
 data EvLit
@@ -1111,12 +1106,6 @@ instance Outputable EvTypeable where
                                                      sep (map (ppr . fst) ts))
       EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
       EvTypeableTyLit x        -> ppr x
-
-instance Outputable EvTypeableKind where
-  ppr (EvTypeableKind kc ks) =
-    case ks of
-      [] -> ppr kc
-      _  -> parens (ppr kc <+> sep (map ppr ks))
 
 
 ----------------------------------------------------------------------

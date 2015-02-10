@@ -889,7 +889,7 @@ dsEvTypeable ev =
      (rep,ty) <-
         case ev of
           EvTypeableTyCon tc ks ts ->
-            do let ty = mkTyConApp tc (map toKind ks ++ map snd ts)
+            do let ty = mkTyConApp tc (ks ++ map snd ts)
                kReps <- mapM kindRep ks
                tReps <- mapM (getRep tyCl) ts
                return (tyConRep tc kReps tReps, ty)
@@ -927,8 +927,6 @@ dsEvTypeable ev =
   mkDict tc ty rep = mkCast (mkLams [mkWildValBinder proxyT] rep)
                             (getTypeableCo tc ty)
     where proxyT = mkProxyPrimTy (typeKind ty) ty
-
-  toKind (EvTypeableKind kc ks) = mkTyConApp kc (map toKind ks)
 
   kindRep k               = undefined
   tyConRep tc kReps tReps = undefined

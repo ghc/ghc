@@ -1876,10 +1876,12 @@ matchTypeableClass clas k t loc
          mkEv [ct1,ct2] (EvTypeableTyApp (ctEvTerm ct1,f) (ctEvTerm ct2,tk))
 
 
-  -- Representation for concrete kinds.
+  -- Representation for concrete kinds.  We just use the kind itself,
+  -- but first check to make sure that it is "simple" (i.e., made entirely
+  -- out of kind constructors).
   kindRep ki = do (kc,ks) <- splitTyConApp_maybe ki
-                  kReps   <- mapM kindRep ks
-                  return (EvTypeableKind kc kReps)
+                  mapM_ kindRep ks
+                  return ki
 
 
   -- Emit a `Typeable` constraint for the given type.
