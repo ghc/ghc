@@ -889,25 +889,41 @@ dsEvTypeable ev =
      (ty, rep) <-
         case ev of
           EvTypeableTyCon tc ks ts ->
-            do let ty = mkTyConApp tc (ks ++ map snd ts)
-               tcRep     <- undefined
-               kReps     <- mapM kindRep ks
-               tReps     <- mapM (getRep tyCl) ts
-               ctr       <- dsLookupGlobalId mkPolyTyConAppName
+            do ctr       <- dsLookupGlobalId mkPolyTyConAppName
                typeRepTc <- dsLookupTyCon typeRepTyConName
                let tyRepType = mkTyConApp typeRepTc []
-               return (ty, mkApps (Var ctr)
-                              [ tcRep
-                              , mkListExpr tyRepType kReps
-                              , mkListExpr tyRepType tReps
-                              ])
+                   mkRep cRep kReps tReps = mkApps (Var ctr)
+                                                   [ cRep
+                                                   , mkListExpr tyRepType kReps
+                                                   , mkListExpr tyRepType tReps
+                                                   ]
+
+
+               let kindRep k =
+                     case splitTyConApp_maybe k of
+                       Nothing -> panic "dsEvTypeable: not a kind constructor"
+                       Just (kc,ks) ->
+                         do kcRep <- undefined kc
+                            reps  <- mapM kindRep ks
+                            return (mkRep kcRep [] reps)
+
+               tcRep     <- undefined tc
+
+               kReps     <- mapM kindRep ks
+               tReps     <- mapM (getRep tyCl) ts
+
+               return ( mkTyConApp tc (ks ++ map snd ts)
+                      , mkRep tcRep kReps tReps
+                      )
 
           EvTypeableTyApp t1 t2 ->
-            do let ty = mkAppTy (snd t1) (snd t2)
-               e1  <- getRep tyCl t1
+            do e1  <- getRep tyCl t1
                e2  <- getRep tyCl t2
                ctr <- dsLookupGlobalId mkAppTyName
-               return (ty, mkApps (Var ctr) [ e1, e2 ])
+
+               return ( mkAppTy (snd t1) (snd t2)
+                      , mkApps (Var ctr) [ e1, e2 ]
+                      )
 
           EvTypeableTyLit ty ->
             do str <- case (isNumLitTy ty, isStrLitTy ty) of
@@ -941,7 +957,6 @@ dsEvTypeable ev =
                             (getTypeableCo tc ty)
     where proxyT = mkProxyPrimTy (typeKind ty) ty
 
-  kindRep k               = undefined
 
 
 
