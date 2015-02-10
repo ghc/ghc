@@ -945,7 +945,7 @@ dsEvTypeable ev =
                 $ mkLams [mkWildValBinder proxyT] (Var repName)
 
      -- package up the method as `Typeable` dictionary
-     return (mkCast method (getTypeableCo tyCl ty))
+     return $ mkCast method $ mkSymCo $ getTypeableCo tyCl ty
 
   where
   -- co: method -> Typeable k t
@@ -958,7 +958,7 @@ dsEvTypeable ev =
   getRep tc (ev,t) =
     do typeableExpr <- dsEvTerm ev
        let co     = getTypeableCo tc t
-           method = mkCast typeableExpr (mkSymCo co)
+           method = mkCast typeableExpr co
            proxy  = mkTyApps (Var proxyHashId) [t]
        return (mkApps method [proxy])
 
