@@ -40,7 +40,8 @@ import Digraph
 
 import PrelNames
 import TysPrim ( mkProxyPrimTy )
-import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
+import TyCon      ( isTupleTyCon, tyConDataCons_maybe
+                  , tyConName, isPromotedTyCon, isPromotedDataCon )
 import TcEvidence
 import TcType
 import Type
@@ -73,6 +74,7 @@ import Util
 import Control.Monad( when )
 import MonadUtils
 import Control.Monad(liftM)
+import Fingerprint(Fingerprint(..), fingerprintString)
 
 {-
 ************************************************************************
@@ -888,9 +890,12 @@ dsEvTypeable ev =
   do tyCl      <- dsLookupTyCon typeableClassName
      (ty, rep) <-
         case ev of
+
           EvTypeableTyCon tc ks ts ->
             do ctr       <- dsLookupGlobalId mkPolyTyConAppName
+               mkTyCon   <- dsLookupGlobalId mkTyConName
                typeRepTc <- dsLookupTyCon typeRepTyConName
+               dflags    <- getDynFlags
                let tyRepType = mkTyConApp typeRepTc []
                    mkRep cRep kReps tReps = mkApps (Var ctr)
                                                    [ cRep
@@ -903,11 +908,11 @@ dsEvTypeable ev =
                      case splitTyConApp_maybe k of
                        Nothing -> panic "dsEvTypeable: not a kind constructor"
                        Just (kc,ks) ->
-                         do kcRep <- undefined kc
+                         do kcRep <- tyConRep dflags mkTyCon kc
                             reps  <- mapM kindRep ks
                             return (mkRep kcRep [] reps)
 
-               tcRep     <- undefined tc
+               tcRep     <- tyConRep dflags mkTyCon tc
 
                kReps     <- mapM kindRep ks
                tReps     <- mapM (getRep tyCl) ts
@@ -956,6 +961,35 @@ dsEvTypeable ev =
   mkDict tc ty rep = mkCast (mkLams [mkWildValBinder proxyT] rep)
                             (getTypeableCo tc ty)
     where proxyT = mkProxyPrimTy (typeKind ty) ty
+
+  -- This part could be cached
+  tyConRep dflags mkTyCon tc =
+    do pkgStr  <- mkStringExprFS pkg_fs
+       modStr  <- mkStringExprFS modl_fs
+       nameStr <- mkStringExprFS name_fs
+       return (mkApps (Var mkTyCon) [ int64 high, int64 low
+                                    , pkgStr, modStr, nameStr
+                                    ])
+    where
+    tycon_name                = tyConName tc
+    modl                      = nameModule tycon_name
+    pkg                       = modulePackageKey modl
+
+    modl_fs                   = moduleNameFS (moduleName modl)
+    pkg_fs                    = packageKeyFS pkg
+    name_fs                   = occNameFS (nameOccName tycon_name)
+    hash_name_fs
+      | isPromotedTyCon tc    = appendFS (mkFastString "$k") name_fs
+      | isPromotedDataCon tc  = appendFS (mkFastString "$c") name_fs
+      | otherwise             = name_fs
+
+    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, hash_name_fs]
+    Fingerprint high low = fingerprintString hashThis
+
+    int64
+      | wORD_SIZE dflags == 4 = mkWord64LitWord64
+      | otherwise             = mkWordLit dflags . fromIntegral
+
 
 
 

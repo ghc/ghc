@@ -1692,6 +1692,11 @@ matchClassInst _ clas [ ty ] _
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
 
+
+
+matchClassInst inerts clas [k,t] loc
+  | className clas == typeableClassName = matchTypeableClass clas k t loc
+
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
         ; tclvl <- getTcLevel
