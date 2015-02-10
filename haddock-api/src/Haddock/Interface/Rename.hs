@@ -230,13 +230,9 @@ renameType t = case t of
   HsCoreTy a              -> pure (HsCoreTy a)
   HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
-  HsQuasiQuoteTy a        -> HsQuasiQuoteTy <$> renameHsQuasiQuote a
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
   HsWildcardTy            -> pure HsWildcardTy
   HsNamedWildcardTy a     -> HsNamedWildcardTy <$> rename a
-
-renameHsQuasiQuote :: HsQuasiQuote Name -> RnM (HsQuasiQuote DocName)
-renameHsQuasiQuote (HsQuasiQuote a b c) = HsQuasiQuote <$> rename a <*> pure b <*> pure c
 
 renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
 renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
