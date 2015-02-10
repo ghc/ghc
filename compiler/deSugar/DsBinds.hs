@@ -888,21 +888,19 @@ dsEvTerm (EvTypeable ev) = dsEvTypeable ev
 dsEvTypeable :: EvTypeable -> DsM CoreExpr
 dsEvTypeable ev =
   do tyCl      <- dsLookupTyCon typeableClassName
+     typeRepTc <- dsLookupTyCon typeRepTyConName
+     let tyRepType = mkTyConApp typeRepTc []
+
      (ty, rep) <-
         case ev of
 
           EvTypeableTyCon tc ks ts ->
             do ctr       <- dsLookupGlobalId mkPolyTyConAppName
                mkTyCon   <- dsLookupGlobalId mkTyConName
-               typeRepTc <- dsLookupTyCon typeRepTyConName
                dflags    <- getDynFlags
-               let tyRepType = mkTyConApp typeRepTc []
-                   mkRep cRep kReps tReps = mkApps (Var ctr)
-                                                   [ cRep
-                                                   , mkListExpr tyRepType kReps
-                                                   , mkListExpr tyRepType tReps
-                                                   ]
-
+               let mkRep cRep kReps tReps =
+                     mkApps (Var ctr) [ cRep, mkListExpr tyRepType kReps
+                                            , mkListExpr tyRepType tReps ]
 
                let kindRep k =
                      case splitTyConApp_maybe k of
@@ -939,8 +937,15 @@ dsEvTypeable ev =
                tag <- mkStringExpr str
                return (ty, mkApps (Var ctr) [ tag ])
 
+     -- TyRep -> Typeable t
+     -- see also: Note [Memoising typeOf]
+     repName <- newSysLocalDs tyRepType
+     let proxyT = mkProxyPrimTy (typeKind ty) ty
+         method = bindNonRec repName rep
+                $ mkLams [mkWildValBinder proxyT] (Var repName)
 
-     return (mkDict tyCl ty rep)
+     -- package up the method as `Typeable` dictionary
+     return (mkCast method (getTypeableCo tyCl ty))
 
   where
   -- co: method -> Typeable k t
@@ -956,11 +961,6 @@ dsEvTypeable ev =
            method = mkCast typeableExpr (mkSymCo co)
            proxy  = mkTyApps (Var proxyHashId) [t]
        return (mkApps method [proxy])
-
-  -- TyRep -> Typeable t
-  mkDict tc ty rep = mkCast (mkLams [mkWildValBinder proxyT] rep)
-                            (getTypeableCo tc ty)
-    where proxyT = mkProxyPrimTy (typeKind ty) ty
 
   -- This part could be cached
   tyConRep dflags mkTyCon tc =
@@ -989,6 +989,17 @@ dsEvTypeable ev =
     int64
       | wORD_SIZE dflags == 4 = mkWord64LitWord64
       | otherwise             = mkWordLit dflags . fromIntegral
+
+
+
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+See #3245, #9203
+
+IMPORTANT: we don't want to recalculate the TypeRep once per call with
+the proxy argument.  This is what went wrong in #3245 and #9203. So we
+help GHC by manually keeping the 'rep' *outside* the lambda.
+-}
 
 
 
