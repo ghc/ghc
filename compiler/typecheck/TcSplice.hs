@@ -948,7 +948,9 @@ getThing th_name
 
 reify :: TH.Name -> TcM TH.Info
 reify th_name
-  = do  { thing <- getThing th_name
+  = do  { traceTc "reify 1" (text (TH.showName th_name))
+        ; thing <- getThing th_name
+        ; traceTc "reify 2" (ppr thing)
         ; reifyThing thing }
 
 lookupThName :: TH.Name -> TcM Name
