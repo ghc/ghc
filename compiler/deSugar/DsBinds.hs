@@ -885,26 +885,39 @@ dsEvTerm (EvTypeable ev) = dsEvTypeable ev
 
 dsEvTypeable :: EvTypeable -> DsM CoreExpr
 dsEvTypeable ev =
-  do tyCl     <- dsLookupTyCon typeableClassName
-     (rep,ty) <-
+  do tyCl      <- dsLookupTyCon typeableClassName
+     (ty, rep) <-
         case ev of
           EvTypeableTyCon tc ks ts ->
             do let ty = mkTyConApp tc (ks ++ map snd ts)
-               kReps <- mapM kindRep ks
-               tReps <- mapM (getRep tyCl) ts
-               return (tyConRep tc kReps tReps, ty)
+               tcRep     <- undefined
+               kReps     <- mapM kindRep ks
+               tReps     <- mapM (getRep tyCl) ts
+               ctr       <- dsLookupGlobalId mkPolyTyConAppName
+               typeRepTc <- dsLookupTyCon typeRepTyConName
+               let tyRepType = mkTyConApp typeRepTc []
+               return (ty, mkApps (Var ctr)
+                              [ tcRep
+                              , mkListExpr tyRepType kReps
+                              , mkListExpr tyRepType tReps
+                              ])
 
           EvTypeableTyApp t1 t2 ->
             do let ty = mkAppTy (snd t1) (snd t2)
-               e1 <- getRep tyCl t1
-               e2 <- getRep tyCl t2
-               return (tyAppRep e1 e2, ty)
+               e1  <- getRep tyCl t1
+               e2  <- getRep tyCl t2
+               ctr <- dsLookupGlobalId mkAppTyName
+               return (ty, mkApps (Var ctr) [ e1, e2 ])
 
           EvTypeableTyLit ty ->
-            case (isNumLitTy ty, isStrLitTy ty) of
-              (Just n, _) -> return (litRep (show n), ty)
-              (_, Just n) -> return (litRep (show n), ty)
-              _           -> panic "dsEvTypeable: malformed TyLit evidence"
+            do str <- case (isNumLitTy ty, isStrLitTy ty) of
+                        (Just n, _) -> return (show n)
+                        (_, Just n) -> return (show n)
+                        _ -> panic "dsEvTypeable: malformed TyLit evidence"
+               ctr <- dsLookupGlobalId typeLitTypeRepName
+               tag <- mkStringExpr str
+               return (ty, mkApps (Var ctr) [ tag ])
+
 
      return (mkDict tyCl ty rep)
 
@@ -929,9 +942,6 @@ dsEvTypeable ev =
     where proxyT = mkProxyPrimTy (typeKind ty) ty
 
   kindRep k               = undefined
-  tyConRep tc kReps tReps = undefined
-  tyAppRep t1 t2          = undefined
-  litRep str              = undefined
 
 
 
