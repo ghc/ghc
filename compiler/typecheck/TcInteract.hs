@@ -14,6 +14,7 @@ import TcCanonical
 import TcFlatten
 import VarSet
 import Type
+import Kind (isKind)
 import Unify
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
 import CoAxiom(sfInteractTop, sfInteractInert)
@@ -21,7 +22,7 @@ import CoAxiom(sfInteractTop, sfInteractInert)
 import Var
 import TcType
 import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
-                   callStackTyConKey )
+                   callStackTyConKey, typeableClassName )
 import Id( idType )
 import Class
 import TyCon
@@ -1833,3 +1834,60 @@ isCallStackIP loc cls ty
     = ctLocSpan loc
 isCallStackIP _ _ _
   = Nothing
+
+
+
+-- | Assumes that we've checked that this is the 'Typeable' class,
+-- and it was applied to the correc arugment.
+matchTypeableClass :: Class -> Kind -> Type -> CtLoc -> TcS LookupInstResult
+matchTypeableClass clas k t loc
+  | isForAllTy k                               = return NoInstance
+  | Just (tc, ks_tys) <- splitTyConApp_maybe t = doTyConApp tc ks_tys
+  | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
+  | Just n            <- isNumLitTy t          = mkEv [] (EvTypeableTyLit t)
+  | Just s            <- isStrLitTy t          = mkEv [] (EvTypeableTyLit t)
+  | otherwise                                  = return NoInstance
+
+  where
+  -- Representation for type constructor applied to some kinds and some types.
+  doTyConApp tc ks_ts =
+    case mapM kindRep ks of
+      Nothing    -> return NoInstance      -- Not concrete kinds
+      Just kReps ->
+        do tCts <- mapM subGoal ts
+           mkEv tCts (EvTypeableTyCon tc kReps (map ctEvTerm tCts `zip` ts))
+    where
+    (ks,ts)    = span isKind ks_ts
+
+
+  {- Representation for an application of a type to a type-or-kind.
+  This may happen when the type expression starts with a type variable.
+  Example (ignoring kind parameter):
+    Typeable (f Int Char)                      -->
+    (Typeable (f Int), Typeable Char)          -->
+    (Typeable f, Typeable Int, Typeable Char)  --> (after some simp. steps)
+    Typeable f
+  -}
+  doTyApp f tk
+    | isKind tk = return NoInstance -- We can't solve until we know the ctr.
+    | otherwise =
+      do ct1 <- subGoal f
+         ct2 <- subGoal tk
+         mkEv [ct1,ct2] (EvTypeableTyApp (ctEvTerm ct1,f) (ctEvTerm ct2,tk))
+
+
+  -- Representation for concrete kinds.
+  kindRep ki = do (kc,ks) <- splitTyConApp_maybe ki
+                  kReps   <- mapM kindRep ks
+                  return (EvTypeableKind kc kReps)
+
+
+  -- Emit a `Typeable` constraint for the given type.
+  subGoal ty = do let goal = mkClassPred clas [ typeKind ty, ty ]
+                  (ev,_) <- newWantedEvVar loc goal
+                  return ev
+
+
+  mkEv subs ev = return (GenInst subs (EvTypeable ev))
+
+

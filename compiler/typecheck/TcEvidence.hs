@@ -17,6 +17,7 @@ module TcEvidence (
   EvTerm(..), mkEvCast, evVarsOfTerm,
   EvLit(..), evTermCoercion,
   EvCallStack(..),
+  EvTypeable(..), EvTypeableKind(..),
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -727,8 +728,29 @@ data EvTerm
 
   | EvCallStack EvCallStack -- Dictionary for CallStack implicit parameters
 
+  | EvTypeable EvTypeable   -- Dictionary for `Typeable`
+
   deriving( Data.Data, Data.Typeable )
 
+
+-- | Instructions on how to make a 'Typeable' dictionary.
+data EvTypeable
+  = EvTypeableTyCon TyCon [EvTypeableKind] [(EvTerm, Type)]
+    -- ^ Dicitionary for concrete type constructors.
+
+  | EvTypeableTyApp (EvTerm,Type) (EvTerm,Type)
+    -- ^ Dictionary for type applications;  this is used when we have
+    -- a type expression starting with a type variable (e.g., @Typeable (f a)@)
+
+  | EvTypeableTyLit Type
+    -- ^ Dictionary for a type literal.
+
+  deriving ( Data.Data, Data.Typeable )
+
+-- | Instructions on how to make evidence for the typeable representation
+-- of a kind.
+data EvTypeableKind = EvTypeableKind TyCon [EvTypeableKind]
+  deriving ( Data.Data, Data.Typeable )
 
 data EvLit
   = EvNum Integer
@@ -984,6 +1006,7 @@ evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
+evVarsOfTerm (EvTypeable ev)      = evVarsOfTypeable ev
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -993,6 +1016,13 @@ evVarsOfCallStack cs = case cs of
   EvCsEmpty -> emptyVarSet
   EvCsTop _ _ tm -> evVarsOfTerm tm
   EvCsPushCall _ _ tm -> evVarsOfTerm tm
+
+evVarsOfTypeable :: EvTypeable -> VarSet
+evVarsOfTypeable ev =
+  case ev of
+    EvTypeableTyCon _ _ es -> evVarsOfTerms (map fst es)
+    EvTypeableTyApp e1 e2  -> evVarsOfTerms (map fst [e1,e2])
+    EvTypeableTyLit _      -> emptyVarSet
 
 {-
 ************************************************************************
@@ -1060,6 +1090,7 @@ instance Outputable EvTerm where
   ppr (EvCallStack cs)   = ppr cs
   ppr (EvDelayedError ty msg) =     ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
+  ppr (EvTypeable ev)    = ppr ev
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
@@ -1072,6 +1103,21 @@ instance Outputable EvCallStack where
     = angleBrackets (ppr (name,loc)) <+> ptext (sLit ":") <+> ppr tm
   ppr (EvCsPushCall name loc tm)
     = angleBrackets (ppr (name,loc)) <+> ptext (sLit ":") <+> ppr tm
+
+instance Outputable EvTypeable where
+  ppr ev =
+    case ev of
+      EvTypeableTyCon tc ks ts -> parens (ppr tc <+> sep (map ppr ks) <+>
+                                                     sep (map (ppr . fst) ts))
+      EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
+      EvTypeableTyLit x        -> ppr x
+
+instance Outputable EvTypeableKind where
+  ppr (EvTypeableKind kc ks) =
+    case ks of
+      [] -> ppr kc
+      _  -> parens (ppr kc <+> sep (map ppr ks))
+
 
 ----------------------------------------------------------------------
 -- Helper functions for dealing with IP newtype-dictionaries

@@ -383,12 +383,13 @@ tcDeriving tycl_decls inst_decls deriv_decls
                 genAuxBinds loc (unionManyBags (auxDerivStuff : deriv_stuff))
 
         ; dflags <- getDynFlags
+{-
         ; tcRepBinds <- genTypeableTyConReps dflags
                           tycl_decls inst_decls
+-}
 
         ; (inst_info, rn_binds, rn_dus) <-
-            renameDeriv is_boot (inst_infos ++ (bagToList extraInstances))
-                                            (unionBags tcRepBinds binds)
+            renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
 
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"

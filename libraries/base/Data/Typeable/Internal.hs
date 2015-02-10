@@ -27,6 +27,7 @@
 module Data.Typeable.Internal (
     Proxy (..),
     TypeRep(..),
+    KindRep,
     Fingerprint(..),
     typeOf, typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7,
     Typeable1, Typeable2, Typeable3, Typeable4, Typeable5, Typeable6, Typeable7,
@@ -35,11 +36,13 @@ module Data.Typeable.Internal (
     mkTyCon,
     mkTyCon3,
     mkTyConApp,
+    mkPolyTyConApp,
     mkAppTy,
     typeRepTyCon,
     Typeable(..),
     mkFunTy,
     splitTyConApp,
+    splitPolyTyConApp,
     funResultTy,
     typeRepArgs,
     typeRepHash,
@@ -84,14 +87,17 @@ import {-# SOURCE #-} GHC.Fingerprint
 
 -- | A concrete representation of a (monomorphic) type.  'TypeRep'
 -- supports reasonably efficient equality.
-data TypeRep = TypeRep {-# UNPACK #-} !Fingerprint TyCon [TypeRep]
+data TypeRep = TypeRep {-# UNPACK #-} !Fingerprint TyCon [KindRep] [TypeRep]
+
+type KindRep = TypeRep
 
 -- Compare keys for equality
 instance Eq TypeRep where
-  (TypeRep k1 _ _) == (TypeRep k2 _ _) = k1 == k2
+  TypeRep x _ _ _ == TypeRep y _ _ _ = x == y
 
 instance Ord TypeRep where
-  (TypeRep k1 _ _) <= (TypeRep k2 _ _) = k1 <= k2
+  TypeRep x _ _ _ <= TypeRep y _ _ _ = x <= y
+
 
 -- | An abstract representation of a type constructor.  'TyCon' objects can
 -- be built using 'mkTyCon'.
@@ -126,25 +132,33 @@ mkTyCon :: Word#   -> Word#   -> String -> String -> String -> TyCon
 mkTyCon high# low# pkg modl name
   = TyCon (Fingerprint (W64# high#) (W64# low#)) pkg modl name
 
--- | Applies a type constructor to a sequence of types
-mkTyConApp  :: TyCon -> [TypeRep] -> TypeRep
-mkTyConApp tc@(TyCon tc_k _ _ _) []
-  = TypeRep tc_k tc [] -- optimisation: all derived Typeable instances
-                       -- end up here, and it helps generate smaller
-                       -- code for derived Typeable.
-mkTyConApp tc@(TyCon tc_k _ _ _) args
-  = TypeRep (fingerprintFingerprints (tc_k : arg_ks)) tc args
+-- | Applies a polymorhic type constructor to a sequence of kinds and types
+mkPolyTyConApp :: TyCon -> [KindRep] -> [TypeRep] -> TypeRep
+mkPolyTyConApp tc@(TyCon tc_k _ _ _) [] [] = TypeRep tc_k tc [] []
+mkPolyTyConApp tc@(TyCon tc_k _ _ _) kinds types =
+  TypeRep (fingerprintFingerprints (tc_k : arg_ks)) tc kinds types
   where
-    arg_ks = [k | TypeRep k _ _ <- args]
+  arg_ks = [ k | TypeRep k _ _ _ <- kinds ++ types ]
+
+-- | Applies a monomorphic type constructor to a sequence of types
+mkTyConApp  :: TyCon -> [TypeRep] -> TypeRep
+mkTyConApp tc = mkPolyTyConApp tc []
 
 -- | A special case of 'mkTyConApp', which applies the function
 -- type constructor to a pair of types.
 mkFunTy  :: TypeRep -> TypeRep -> TypeRep
 mkFunTy f a = mkTyConApp funTc [f,a]
 
--- | Splits a type constructor application
+-- | Splits a type constructor application.
+-- Note that if the type construcotr is polymorphic, this will
+-- not return the kinds that were used.
+-- See 'splitPolyTyConApp' if you need all parts.
 splitTyConApp :: TypeRep -> (TyCon,[TypeRep])
-splitTyConApp (TypeRep _ tc trs) = (tc,trs)
+splitTyConApp (TypeRep _ tc _ trs) = (tc,trs)
+
+-- | Split a type constructor application
+splitPolyTyConApp :: TypeRep -> (TyCon,[KindRep],[TypeRep])
+splitPolyTyConApp (TypeRep _ tc ks trs) = (tc,ks,trs)
 
 -- | Applies a type to a function type.  Returns: @'Just' u@ if the
 -- first argument represents a function of type @t -> u@ and the
@@ -158,7 +172,7 @@ funResultTy trFun trArg
 
 -- | Adds a TypeRep argument to a TypeRep.
 mkAppTy :: TypeRep -> TypeRep -> TypeRep
-mkAppTy (TypeRep _ tc trs) arg_tr = mkTyConApp tc (trs ++ [arg_tr])
+mkAppTy (TypeRep _ tc ks trs) arg_tr = mkPolyTyConApp tc ks (trs ++ [arg_tr])
    -- Notice that we call mkTyConApp to construct the fingerprint from tc and
    -- the arg fingerprints.  Simply combining the current fingerprint with
    -- the new one won't give the same answer, but of course we want to
@@ -183,11 +197,15 @@ mkTyCon3 pkg modl name =
 
 -- | Observe the type constructor of a type representation
 typeRepTyCon :: TypeRep -> TyCon
-typeRepTyCon (TypeRep _ tc _) = tc
+typeRepTyCon (TypeRep _ tc _ _) = tc
 
 -- | Observe the argument types of a type representation
 typeRepArgs :: TypeRep -> [TypeRep]
-typeRepArgs (TypeRep _ _ args) = args
+typeRepArgs (TypeRep _ _ _ tys) = tys
+
+-- | Observe the argument kinds of a type representation
+typeRepKinds :: TypeRep -> [KindRep]
+typeRepKinds (TypeRep _ _ ks _) = ks
 
 -- | Observe string encoding of a type representation
 {-# DEPRECATED tyConString "renamed to 'tyConName'; 'tyConModule' and 'tyConPackage' are also available." #-} -- deprecated in 7.4
@@ -285,7 +303,7 @@ help GHC by manually keeping the 'rep' *outside* the lambda.
 ----------------- Showing TypeReps --------------------
 
 instance Show TypeRep where
-  showsPrec p (TypeRep _ tycon tys) =
+  showsPrec p (TypeRep _ tycon kinds tys) =
     case tys of
       [] -> showsPrec p tycon
       [x]   | tycon == listTc -> showChar '[' . shows x . showChar ']'
@@ -298,7 +316,7 @@ instance Show TypeRep where
             showParen (p > 9) $
             showsPrec p tycon .
             showChar ' '      .
-            showArgs (showChar ' ') tys
+            showArgs (showChar ' ') (kinds ++ tys)
 
 showsTypeRep :: TypeRep -> ShowS
 showsTypeRep = shows
@@ -517,4 +535,22 @@ instance {-# INCOHERENT #-} KnownSymbol s => Typeable (s :: Symbol) where
     modu = "GHC.TypeLits"
     nm   = show (symbolVal' (proxy# :: Proxy# s))
     mk a b c = a ++ " " ++ b ++ " " ++ c
+
+
+
+-- | An internal function, to make representations for type literals.
+typeLitTypeRep :: String -> TypeRep
+typeLitTypeRep nm = rep
+    where
+    rep = mkTyConApp tc []
+    tc = TyCon
+           { tyConHash     = fingerprintString (mk pack modu nm)
+           , tyConPackage  = pack
+           , tyConModule   = modu
+           , tyConName     = nm
+           }
+    pack = "base"
+    modu = "GHC.TypeLits"
+    mk a b c = a ++ " " ++ b ++ " " ++ c
+
 

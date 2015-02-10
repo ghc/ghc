@@ -39,6 +39,7 @@ import UniqSupply
 import Digraph
 
 import PrelNames
+import TysPrim ( mkProxyPrimTy )
 import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
 import TcEvidence
 import TcType
@@ -47,6 +48,7 @@ import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, tupleCon, mkListTy
                   , mkBoxedTupleTy, stringTy )
 import Id
+import MkId(proxyHashId)
 import Class
 import DataCon  ( dataConTyCon, dataConWorkId )
 import Name
@@ -878,6 +880,62 @@ dsEvTerm (EvLit l) =
     EvStr s -> mkStringExprFS s
 
 dsEvTerm (EvCallStack cs) = dsEvCallStack cs
+
+dsEvTerm (EvTypeable ev) = dsEvTypeable ev
+
+dsEvTypeable :: EvTypeable -> DsM CoreExpr
+dsEvTypeable ev =
+  do tyCl     <- dsLookupTyCon typeableClassName
+     (rep,ty) <-
+        case ev of
+          EvTypeableTyCon tc ks ts ->
+            do let ty = mkTyConApp tc (map toKind ks ++ map snd ts)
+               kReps <- mapM kindRep ks
+               tReps <- mapM (getRep tyCl) ts
+               return (tyConRep tc kReps tReps, ty)
+
+          EvTypeableTyApp t1 t2 ->
+            do let ty = mkAppTy (snd t1) (snd t2)
+               e1 <- getRep tyCl t1
+               e2 <- getRep tyCl t2
+               return (tyAppRep e1 e2, ty)
+
+          EvTypeableTyLit ty ->
+            case (isNumLitTy ty, isStrLitTy ty) of
+              (Just n, _) -> return (litRep (show n), ty)
+              (_, Just n) -> return (litRep (show n), ty)
+              _           -> panic "dsEvTypeable: malformed TyLit evidence"
+
+     return (mkDict tyCl ty rep)
+
+  where
+  -- co: method -> Typeable k t
+  getTypeableCo tc t =
+    case instNewTyCon_maybe tc [typeKind t, t] of
+      Just (_,co) -> co
+      _           -> panic "Class `Typeable` is not a `newtype`."
+
+  -- Typeable t -> TyRep
+  getRep tc (ev,t) =
+    do typeableExpr <- dsEvTerm ev
+       let co     = getTypeableCo tc t
+           method = mkCast typeableExpr (mkSymCo co)
+           proxy  = mkTyApps (Var proxyHashId) [t]
+       return (mkApps method [proxy])
+
+  -- TyRep -> Typeable t
+  mkDict tc ty rep = mkCast (mkLams [mkWildValBinder proxyT] rep)
+                            (getTypeableCo tc ty)
+    where proxyT = mkProxyPrimTy (typeKind ty) ty
+
+  toKind (EvTypeableKind kc ks) = mkTyConApp kc (map toKind ks)
+
+  kindRep k               = undefined
+  tyConRep tc kReps tReps = undefined
+  tyAppRep t1 t2          = undefined
+  litRep str              = undefined
+
+
 
 dsEvCallStack :: EvCallStack -> DsM CoreExpr
 -- See Note [Overview of implicit CallStacks] in TcEvidence.hs
