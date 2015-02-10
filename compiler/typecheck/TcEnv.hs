@@ -413,7 +413,7 @@ Note especially that
    That's important because some are not closed (ie have free tyvars)
    and the compiler assumes that the global type env (tcg_type_env) has
    no free tyvars.  Actually, only ones with Internal names can be non-closed
-   so we jsut add those
+   so we just add those
 
  * The tct_closed flag depends on whether the thing has free (RuntimeUnk)
    type variables

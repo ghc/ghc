@@ -941,9 +941,9 @@ getThing th_name
         -- ToDo: this tcLookup could fail, which would give a
         --       rather unhelpful error message
   where
-    ppr_ns (TH.Name _ (TH.NameG TH.DataName _pkg _mod)) = text "data"
+    ppr_ns (TH.Name _ (TH.NameG TH.DataName  _pkg _mod)) = text "data"
     ppr_ns (TH.Name _ (TH.NameG TH.TcClsName _pkg _mod)) = text "tc"
-    ppr_ns (TH.Name _ (TH.NameG TH.VarName _pkg _mod)) = text "var"
+    ppr_ns (TH.Name _ (TH.NameG TH.VarName   _pkg _mod)) = text "var"
     ppr_ns _ = panic "reify/ppr_ns"
 
 reify :: TH.Name -> TcM TH.Info
