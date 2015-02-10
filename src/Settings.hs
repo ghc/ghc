@@ -7,6 +7,7 @@ module Settings (
 
 import Base
 import Ways
+import Oracles.Builder
 
 data IntegerLibrary = IntegerGmp | IntegerGmp2 | IntegerSimple
 
@@ -22,52 +23,45 @@ integerLibraryName = case integerLibrary of
 buildHaddock :: Bool
 buildHaddock = True
 
--- A Parameterised Graph datatype for storing argument lists with conditions
-data PG a b = Epsilon
-            | Vertex a
-            | Overlay (PG a b) (PG a b)
-            | Sequence (PG a b) (PG a b)
-            | Condition b (PG a b)
+-- A generic Parameterised Graph datatype for parameterised argument lists
+data PG p v = Epsilon
+            | Vertex v
+            | Overlay (PG p v) (PG p v)
+            | Sequence (PG p v) (PG p v)
+            | Condition p (PG p v)
 
-instance Monoid (PG a b) where
+instance Monoid (PG p v) where
     mempty  = Epsilon
     mappend = Overlay
 
-type ArgsExpression = PG String Predicate
-type WaysExpression = PG Way    Predicate
+data Predicate a = Evaluated Bool                  -- Evaluated predicate
+                 | Parameter a                     -- To be evaluated later
+                 | Not (Predicate a)               -- Negate predicate
+                 | And (Predicate a) (Predicate a) -- Conjunction
+                 | Or  (Predicate a) (Predicate a) -- Disjunction
 
-data Match = MatchPackage  FilePath      -- Match a Package name
-           | MatchFile     FilePath      -- Match a file
-           | MatchStage    Stage         -- Match a Stage
-           | MatchWay      Way           -- Match a Way
-           | MatchKeyValue String String -- Match a key with a value (config)
-
--- A Matcher takes a Match description and attempts to evaluate it.
+-- Evaluator takes a Parameter and attempts to evaluate it.
 -- Returns Nothing if the attempt fails.
-type Matcher = Match -> Maybe Bool
+type Evaluator a = a -> Maybe Bool
 
--- A Monoid instance for matchers (returns first successful match)
-instance Monoid Matcher where
+-- Monoid instance for evaluators (returns first successful evaluation)
+instance Monoid (Evaluator a) where
     mempty        = const Nothing
-    p `mappend` q = \m -> getFirst $ First (p m) <> First (q m)
+    e `mappend` f = \p -> getFirst $ First (e p) <> First (f p)
 
-data Predicate = Evaluated Bool          -- Evaluated predicate
-               | If  Match               -- Perform a match to evaluate
-               | Not Predicate           -- Negate predicate
-               | And Predicate Predicate -- Conjunction of two predicates
-               | Or  Predicate Predicate -- Disjunction of two predicates
-
-match :: Predicate -> Matcher -> Predicate
-match p @ (Evaluated _) _ = p
-match p @ (If match   ) m = case m match of
+-- Apply an evalulator to a predicate (partial evaluation, or projection)
+apply :: Evaluator a -> Predicate a -> Predicate a
+apply _ p @ (Evaluated _) = p
+apply e p @ (Parameter q) = case e q of
     Just bool -> Evaluated bool
     Nothing   -> p
-match (Not p  ) m = match p m
-match (And p q) m = And (match p m) (match q m)
-match (Or  p q) m = Or  (match p m) (match q m)
+apply e (Not p  ) = Not (apply e p)
+apply e (And p q) = And (apply e p) (apply e q)
+apply e (Or  p q) = Or  (apply e p) (apply e q)
 
--- returns Nothing if the given predicate cannot be uniquely evaluated
-evalPredicate :: Predicate -> Maybe Bool
+-- Attempt to evaluate a predicate. Returns Nothing if the predicate
+-- cannot be uniquely evaluated due to remaining parameters.
+evalPredicate :: Predicate a -> Maybe Bool
 evalPredicate (Evaluated bool) = Just bool
 evalPredicate (Not p)          = not <$> evalPredicate p
 evalPredicate (And p q)
@@ -84,15 +78,98 @@ evalPredicate (Or p q)
   where
     p' = evalPredicate p
     q' = evalPredicate q
-evalPredicate (If _) = Nothing
+evalPredicate (Parameter _) = Nothing -- cannot evaluate Parameter
 
--- returns Nothing if the given expression cannot be uniquely evaluated
-evalPG :: PG a Predicate -> Maybe [a]
-evalPG Epsilon = Just []
-evalPG (Vertex v) = Just [v]
-evalPG (Overlay  p q)  = (++) <$> evalPG p <*> evalPG q
-evalPG (Sequence p q)  = (++) <$> evalPG p <*> evalPG q
-evalPG (Condition x p) = case evalPredicate x of
-    Just True  -> evalPG p
+-- Flatten a PG into a list. Returns Nothing if the given expression
+-- cannot be uniquely evaluated due to remaining parameters.
+linearise :: PG (Predicate a) v -> Maybe [v]
+linearise Epsilon = Just []
+linearise (Vertex v) = Just [v]
+linearise (Overlay  p q)  = (++) <$> linearise p <*> linearise q
+linearise (Sequence p q)  = (++) <$> linearise p <*> linearise q
+linearise (Condition x p) = case evalPredicate x of
+    Just True  -> linearise p
     Just False -> Just []
     Nothing    -> Nothing
+
+(~>) :: PG p v -> PG p v -> PG p v
+a ~> b = Sequence a b
+
+type PGP p v = PG (Predicate p) v
+
+disjuction :: [a] -> (a -> Predicate p) -> PGP p v -> PGP p v
+disjuction []     _       = id
+disjuction (a:as) convert = Condition (foldr Or (convert a) $ map convert as)
+
+-- GHC build specific
+
+data BuildParameter = WhenPackage  FilePath
+                    | WhenBuilder  Builder
+                    | WhenStage    Stage
+                    | WhenWay      Way
+                    | WhenFile     FilePath
+                    | WhenKeyValue String String -- from config files
+
+type Expression a = PGP BuildParameter a
+
+type Rewrite a = Expression a -> Expression a
+
+type ArgsExpression = Expression String
+
+alternatives :: (b -> BuildParameter) -> [b] -> Rewrite a
+alternatives p bs = disjuction bs (Parameter . p)
+
+whenPackages :: [FilePath] -> Rewrite a
+whenPackages = alternatives WhenPackage
+
+whenBuilders :: [Builder] -> Rewrite a
+whenBuilders = alternatives WhenBuilder
+
+whenStages :: [Stage] -> Rewrite a
+whenStages = alternatives WhenStage
+
+unlessStage :: Stage -> Rewrite a
+unlessStage stage = Condition (Not $ Parameter $ WhenStage stage)
+
+whenWays :: [Way] -> Rewrite a
+whenWays = alternatives WhenWay
+
+whenFiles :: [FilePath] -> Rewrite a
+whenFiles = alternatives WhenFile
+
+whenKeyValues :: String -> [String] -> Rewrite a
+whenKeyValues key = alternatives (WhenKeyValue key)
+
+whenKeyValue :: String -> String -> Rewrite a
+whenKeyValue key value = whenKeyValues key [value]
+
+whenPackageKey :: Rewrite a
+whenPackageKey = whenKeyValue "supports-package-key" "YES" . unlessStage Stage0
+
+--packageArgs =
+--    Vertex "-hide-all-packages"
+--    ~>
+--    Vertex "-no-user-package-db"
+--    ~>
+--    Vertex "-include-pkg-deps"
+--    ~> If (MatchStage Stage0)
+--          (Vertex "-package-db libraries/bootstrapping.conf")
+--    ~> If usePackageKey
+--          (
+
+--          )
+
+--packageArgs :: Stage -> FilePath -> Args
+--packageArgs stage pathDist = do
+--    usePackageKey <- SupportsPackageKey || stage /= Stage0
+--    args [ arg "-hide-all-packages"
+--         , arg "-no-user-package-db"
+--         , arg "-include-pkg-deps"
+--         , when (stage == Stage0) $
+--           arg "-package-db libraries/bootstrapping.conf"
+--         , if usePackageKey
+--           then productArgs ["-this-package-key"] [arg  $ PackageKey pathDist]
+--             <> productArgs ["-package-key"     ] [args $ DepKeys    pathDist]
+--           else productArgs ["-package-name"    ] [arg  $ PackageKey pathDist]
+--             <> productArgs ["-package"         ] [args $ Deps       pathDist]
+--         ]

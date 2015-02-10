@@ -16,7 +16,7 @@ module Base (
     productArgs, concatArgs
     ) where
 
-import Development.Shake hiding ((*>))
+import Development.Shake hiding ((*>), alternatives)
 import Development.Shake.FilePath
 import Control.Applicative
 import Data.Function
