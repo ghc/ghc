@@ -614,11 +614,11 @@ zonkExpr env (HsTcBracketOut body bs)
   = do bs' <- mapM zonk_b bs
        return (HsTcBracketOut body bs')
   where
-    zonk_b (PendSplice n e) = do e' <- zonkLExpr env e
-                                 return (PendSplice n e')
+    zonk_b (PendingTcSplice n e) = do e' <- zonkLExpr env e
+                                      return (PendingTcSplice n e')
 
-zonkExpr _ (HsSpliceE t s) = WARN( True, ppr s ) -- Should not happen
-                             return (HsSpliceE t s)
+zonkExpr _ (HsSpliceE s) = WARN( True, ppr s ) -- Should not happen
+                           return (HsSpliceE s)
 
 zonkExpr env (OpApp e1 op fixity e2)
   = do new_e1 <- zonkLExpr env e1

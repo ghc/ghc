@@ -16,4 +16,4 @@
     In an equation for ‘x’: x = [d| a = () |] :: Q Exp
 (deferred type error)
     Code: x
-    In the splice: $x
+    In the untyped splice: $x

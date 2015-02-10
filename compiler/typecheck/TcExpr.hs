@@ -822,10 +822,7 @@ tcExpr (PArrSeq _ _) _
 ************************************************************************
 -}
 
-tcExpr (HsSpliceE is_ty splice)  res_ty
-  = ASSERT( is_ty )   -- Untyped splices are expanded by the renamer
-   tcSpliceExpr splice res_ty
-
+tcExpr (HsSpliceE splice)        res_ty = tcSpliceExpr splice res_ty
 tcExpr (HsBracket brack)         res_ty = tcTypedBracket   brack res_ty
 tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
 
@@ -1293,7 +1290,7 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; let pending_splice = PendSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id))
+        ; let pending_splice = PendingTcSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }

@@ -14,7 +14,6 @@ module RnSource (
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSpliceDecl )
-import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
 
 import HsSyn
 import RdrName
@@ -1513,10 +1512,6 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
   where
     badImplicitSplice = ptext (sLit "Parse error: naked expression at top level")
                      $$ ptext (sLit "Perhaps you intended to use TemplateHaskell")
-
-add gp _ (QuasiQuoteD qq) ds            -- Expand quasiquotes
-  = do { ds' <- runQuasiQuoteDecl qq
-       ; addl gp (ds' ++ ds) }
 
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds

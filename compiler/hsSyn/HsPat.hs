@@ -29,7 +29,7 @@ module HsPat (
         pprParendLPat, pprConArgs
     ) where
 
-import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprUntypedSplice)
+import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
 
 -- friends:
 import HsBinds
@@ -166,11 +166,7 @@ data Pat id
   --        'ApiAnnotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | SplicePat       (HsSplice id)
-
-        ------------ Quasiquoted patterns ---------------
-        -- See Note [Quasi-quote overview] in TcSplice
-  | QuasiQuotePat   (HsQuasiQuote id)
+  | SplicePat       (HsSplice id)   -- Includes quasi-quotes
 
         ------------ Literal and n+k patterns ---------------
   | LitPat          HsLit               -- Used for *non-overloaded* literal patterns:
@@ -333,8 +329,7 @@ pprPat (LitPat s)           = ppr s
 pprPat (NPat l Nothing  _)  = ppr l
 pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)  = hcat [ppr n, char '+', ppr k]
-pprPat (SplicePat splice)   = pprUntypedSplice splice
-pprPat (QuasiQuotePat qq)   = ppr qq
+pprPat (SplicePat splice)   = pprSplice splice
 pprPat (CoPat co pat _)     = pprHsWrapper (ppr pat) co
 pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)   = ppr pat <+> dcolon <+> ppr ty
@@ -490,14 +485,12 @@ isIrrefutableHsPat pat
     -- Both should be gotten rid of by renamer before
     -- isIrrefutablePat is called
     go1 (SplicePat {})     = urk pat
-    go1 (QuasiQuotePat {}) = urk pat
 
     urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
 
 hsPatNeedsParens :: Pat a -> Bool
 hsPatNeedsParens (NPlusKPat {})      = True
 hsPatNeedsParens (SplicePat {})      = False
-hsPatNeedsParens (QuasiQuotePat {})  = True
 hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
 hsPatNeedsParens p@(ConPatOut {})    = conPatNeedsParens (pat_args p)
 hsPatNeedsParens (SigPatIn {})       = True

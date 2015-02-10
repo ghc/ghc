@@ -376,12 +376,10 @@ mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
 mkSpliceDecl lexpr@(L loc expr)
-  | HsQuasiQuoteE qq <- expr          = QuasiQuoteD qq
-  | HsSpliceE is_typed splice <- expr = ASSERT( not is_typed )
-                                        SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
-  | otherwise                         = SpliceD (SpliceDecl (L loc splice) ImplicitSplice)
+  | HsSpliceE splice <- expr = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
+  | otherwise                = SpliceD (SpliceDecl (L loc splice) ImplicitSplice)
   where
-    splice = mkHsSplice lexpr
+    splice = mkUntypedSplice lexpr
 
 mkRoleAnnotDecl :: SrcSpan
                 -> Located RdrName                   -- type being annotated
@@ -877,10 +875,9 @@ checkAPat msg loc e0 = do
    RecordCon c _ (HsRecFields fs dd)
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
-   HsSpliceE is_typed s | not is_typed
-                        -> return (SplicePat s)
-   HsQuasiQuoteE q      -> return (QuasiQuotePat q)
-   _                    -> patFail msg loc e0
+   HsSpliceE s | not (isTypedSplice s)
+               -> return (SplicePat s)
+   _           -> patFail msg loc e0
 
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer

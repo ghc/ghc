@@ -474,9 +474,6 @@ tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
 
         ; return (LazyPat pat', res) }
 
-tc_pat _ p@(QuasiQuotePat _) _ _
-  = pprPanic "Should never see QuasiQuotePat in type checker" (ppr p)
-
 tc_pat _ (WildPat _) pat_ty thing_inside
   = do  { res <- thing_inside
         ; return (WildPat pat_ty, res) }

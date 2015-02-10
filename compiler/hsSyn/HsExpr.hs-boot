@@ -59,8 +59,7 @@ pprLExpr :: (OutputableBndr i) =>
 pprExpr :: (OutputableBndr i) =>
         HsExpr i -> SDoc
 
-pprUntypedSplice :: (OutputableBndr i) =>
-                    HsSplice i -> SDoc
+pprSplice :: (OutputableBndr i) => HsSplice i -> SDoc
 
 pprPatBind :: (OutputableBndr bndr, OutputableBndr id, Outputable body)
            => LPat bndr -> GRHSs id body -> SDoc

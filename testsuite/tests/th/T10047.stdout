@@ -1,0 +1,2 @@
+[| $(dyn "foo") |] :: ExpQ
+[| [n|foo|] |] :: ExpQ

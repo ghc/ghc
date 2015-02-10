@@ -4,8 +4,8 @@ TH_unresolvedInfix2.hs:14:11:
         must have lower precedence than that of the operand,
           namely ‘:+’ [infixl 6]
         in the section: ‘:+ N :+ N’
-    In the splice:
+    In the untyped splice:
       $(let
-          plus = conE ...
-          n = conE ...
+          plus = conE ':+
+          n = conE 'N
         in infixE Nothing plus (Just $ uInfixE n plus n))

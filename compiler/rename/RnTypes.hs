@@ -25,7 +25,6 @@ module RnTypes (
         extractWildcards, filterInScope
   ) where
 
-import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
 import {-# SOURCE #-} RnSplice( rnSpliceType )
 
 import DynFlags
@@ -294,13 +293,6 @@ rnHsTyKi isType doc (HsDocTy ty haddock_doc)
     do { (ty', fvs) <- rnLHsType doc ty
        ; haddock_doc' <- rnLHsDoc haddock_doc
        ; return (HsDocTy ty' haddock_doc', fvs) }
-
-rnHsTyKi isType doc (HsQuasiQuoteTy qq)
-  = ASSERT( isType )
-    do { ty <- runQuasiQuoteType qq
-         -- Wrap the result of the quasi-quoter in parens so that we don't
-         -- lose the outermost location set by runQuasiQuote (#7918)
-       ; rnHsType doc (HsParTy ty) }
 
 rnHsTyKi isType _ (HsCoreTy ty)
   = ASSERT( isType )
@@ -984,7 +976,6 @@ extract_lty (L _ ty) acc
       HsOpTy ty1 (_, (L _ tv)) ty2 -> extract_tv tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty                -> extract_lty ty acc
       HsCoreTy {}               -> acc  -- The type is closed
-      HsQuasiQuoteTy {}         -> acc  -- Quasi quotes mention no type variables
       HsSpliceTy {}             -> acc  -- Type splices mention no type variables
       HsDocTy ty _              -> extract_lty ty acc
       HsExplicitListTy _ tys    -> extract_ltys tys acc

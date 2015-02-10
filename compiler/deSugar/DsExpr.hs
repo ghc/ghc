@@ -650,7 +650,7 @@ dsExpr (HsTcBracketOut x ps) = dsBracket x ps
 #else
 dsExpr (HsTcBracketOut _ _) = panic "dsExpr HsBracketOut"
 #endif
-dsExpr (HsSpliceE _ s)      = pprPanic "dsExpr:splice" (ppr s)
+dsExpr (HsSpliceE s)  = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
 dsExpr (HsProc pat cmd) = dsProcExpr pat cmd
@@ -683,7 +683,6 @@ dsExpr (HsTickPragma _ _ expr) = do
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (ExprWithTySig {})  = panic "dsExpr:ExprWithTySig"
 dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
-dsExpr (HsQuasiQuoteE {})  = panic "dsExpr:HsQuasiQuoteE"
 dsExpr (HsArrApp      {})  = panic "dsExpr:HsArrApp"
 dsExpr (HsArrForm     {})  = panic "dsExpr:HsArrForm"
 dsExpr (EWildPat      {})  = panic "dsExpr:EWildPat"

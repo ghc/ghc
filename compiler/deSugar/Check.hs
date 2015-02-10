@@ -153,7 +153,6 @@ untidy b (L loc p) = L loc (untidy' b p)
     untidy' _ (ConPatOut {})         = panic "Check.untidy: ConPatOut"
     untidy' _ (ViewPat {})           = panic "Check.untidy: ViewPat"
     untidy' _ (SplicePat {})         = panic "Check.untidy: SplicePat"
-    untidy' _ (QuasiQuotePat {})     = panic "Check.untidy: QuasiQuotePat"
     untidy' _ (NPat {})              = panic "Check.untidy: NPat"
     untidy' _ (NPlusKPat {})         = panic "Check.untidy: NPlusKPat"
     untidy' _ (SigPatOut {})         = panic "Check.untidy: SigPatOut"
@@ -732,7 +731,6 @@ tidy_pat (LitPat lit)         = tidy_lit_pat lit
 
 tidy_pat (ConPatIn {})        = panic "Check.tidy_pat: ConPatIn"
 tidy_pat (SplicePat {})       = panic "Check.tidy_pat: SplicePat"
-tidy_pat (QuasiQuotePat {})   = panic "Check.tidy_pat: QuasiQuotePat"
 tidy_pat (SigPatIn {})        = panic "Check.tidy_pat: SigPatIn"
 
 tidy_lit_pat :: HsLit -> Pat Id

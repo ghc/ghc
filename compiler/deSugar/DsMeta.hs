@@ -78,7 +78,7 @@ dsBracket :: HsBracket Name -> [PendingTcSplice] -> DsM CoreExpr
 dsBracket brack splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
-    new_bit = mkNameEnv [(n, DsSplice (unLoc e)) | PendSplice n e <- splices]
+    new_bit = mkNameEnv [(n, DsSplice (unLoc e)) | PendingTcSplice n e <- splices]
 
     do_brack (VarBr _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr e)   = do { MkC e1  <- repLE e     ; return e1 }
@@ -970,12 +970,17 @@ repRole (L _ Nothing)                 = rep2 inferRName []
 repSplice :: HsSplice Name -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsSplice n _)
- = do { mb_val <- dsLookupMetaEnv n
+repSplice (HsTypedSplice   n _)  = rep_splice n
+repSplice (HsUntypedSplice n _)  = rep_splice n
+repSplice (HsQuasiQuote n _ _ _) = rep_splice n
+
+rep_splice :: Name -> DsM (Core a)
+rep_splice splice_name
+ = do { mb_val <- dsLookupMetaEnv splice_name
        ; case mb_val of
            Just (DsSplice e) -> do { e' <- dsExpr e
                                    ; return (MkC e') }
-           _ -> pprPanic "HsSplice" (ppr n) }
+           _ -> pprPanic "HsSplice" (ppr splice_name) }
                         -- Should not happen; statically checked
 
 -----------------------------------------------------------------------------
@@ -1094,7 +1099,7 @@ repE (ArithSeq _ _ aseq) =
                              ds3 <- repLE e3
                              repFromThenTo ds1 ds2 ds3
 
-repE (HsSpliceE _ splice)  = repSplice splice
+repE (HsSpliceE splice)    = repSplice splice
 repE (HsStatic e)          = repLE e >>= rep2 staticEName . (:[]) . unC
 repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)

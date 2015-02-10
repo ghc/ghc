@@ -18,8 +18,6 @@ module RnExpr (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
-
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import HsSyn
@@ -153,14 +151,7 @@ rnExpr (NegApp e _)
 -- (not with an rnExpr crash) in a stage-1 compiler.
 rnExpr e@(HsBracket br_body) = rnBracket e br_body
 
-rnExpr (HsSpliceE is_typed splice) = rnSpliceExpr is_typed splice
-
-
-rnExpr (HsQuasiQuoteE qq)
-  = do { lexpr' <- runQuasiQuoteExpr qq
-         -- Wrap the result of the quasi-quoter in parens so that we don't
-         -- lose the outermost location set by runQuasiQuote (#7918)
-       ; rnExpr (HsPar lexpr') }
+rnExpr (HsSpliceE splice) = rnSpliceExpr splice
 
 ---------------------------------------------
 --      Sections

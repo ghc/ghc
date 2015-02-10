@@ -492,7 +492,6 @@ tcCheckPatSynPat = go
     go1   (SigPatIn pat _)    = go pat
     go1   (ViewPat _ pat _)   = go pat
     go1 p@SplicePat{}         = thInPatSynErr p
-    go1 p@QuasiQuotePat{}     = thInPatSynErr p
     go1 p@NPlusKPat{}         = nPlusKPatInPatSynErr p
     go1   ConPatOut{}         = panic "ConPatOut in output of renamer"
     go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
@@ -575,7 +574,6 @@ tcCollectEx = return . go
     go1 (TuplePat ps _ _)   = mconcat . map go $ ps
     go1 (PArrPat ps _)      = mconcat . map go $ ps
     go1 (ViewPat _ p _)     = go p
-    go1 (QuasiQuotePat qq)  = pprPanic "TODO: tcInstPatSyn QuasiQuotePat" $ ppr qq
     go1 con@ConPatOut{}     = mappend (mkVarSet (pat_tvs con), pat_dicts con) $
                                  goConDetails $ pat_args con
     go1 (SigPatOut p _)     = go p

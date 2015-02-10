@@ -23,7 +23,6 @@ module HsTypes (
         HsWithBndrs(..),
         HsTupleSort(..), HsExplicitFlag(..),
         HsContext, LHsContext,
-        HsQuasiQuote(..),
         HsTyWrapper(..),
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
@@ -49,7 +48,7 @@ module HsTypes (
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
     ) where
 
-import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
+import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
@@ -68,28 +67,6 @@ import Maybes( isJust )
 
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
-
-{-
-************************************************************************
-*                                                                      *
-        Quasi quotes; used in types and elsewhere
-*                                                                      *
-************************************************************************
--}
-
-data HsQuasiQuote id = HsQuasiQuote
-                           id           -- The quasi-quoter
-                           SrcSpan      -- The span of the enclosed string
-                           FastString   -- The enclosed string
-  deriving (Data, Typeable)
-
-instance OutputableBndr id => Outputable (HsQuasiQuote id) where
-    ppr = ppr_qq
-
-ppr_qq :: OutputableBndr id => HsQuasiQuote id -> SDoc
-ppr_qq (HsQuasiQuote quoter _ quote) =
-    char '[' <> ppr quoter <> ptext (sLit "|") <>
-    ppr quote <> ptext (sLit "|]")
 
 {-
 ************************************************************************
@@ -336,12 +313,7 @@ data HsType name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsQuasiQuoteTy      (HsQuasiQuote name)
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
-
-      -- For details on above see note [Api annotations] in ApiAnnotation
-
-  | HsSpliceTy          (HsSplice name)
+  | HsSpliceTy          (HsSplice name)   -- Includes quasi-quotes
                         (PostTc name Kind)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@,
       --         'ApiAnnotation.AnnClose' @')'@
@@ -840,7 +812,6 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp extra tvs ctxt ty)
     sep [pprHsForAllExtra exp extra tvs ctxt, ppr_mono_lty TopPrec ty]
 
 ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty TyConPrec ty
-ppr_mono_ty _    (HsQuasiQuoteTy qq) = ppr qq
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
 ppr_mono_ty _    (HsTyVar name)      = pprPrefixOcc name
 ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
@@ -852,7 +823,7 @@ ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty TopPrec ty <+> dcolo
 ppr_mono_ty _    (HsListTy ty)       = brackets (ppr_mono_lty TopPrec ty)
 ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty TopPrec ty)
 ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec FunPrec (ppr n <+> dcolon <+> ppr_mono_lty TopPrec ty)
-ppr_mono_ty _    (HsSpliceTy s _)    = pprUntypedSplice s
+ppr_mono_ty _    (HsSpliceTy s _)    = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)

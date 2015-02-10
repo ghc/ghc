@@ -53,7 +53,7 @@ module HsUtils(
   emptyRecStmt, emptyRecStmtName, emptyRecStmtId, mkRecStmt,
 
   -- Template Haskell
-  mkHsSpliceTy, mkHsSpliceE, mkHsSpliceTE, mkHsSplice,
+  mkHsSpliceTy, mkHsSpliceE, mkHsSpliceTE, mkUntypedSplice,
   mkHsQuasiQuote, unqualQuasiQuote,
 
   -- Flags
@@ -281,23 +281,23 @@ mkRecStmt stmts  = emptyRecStmt { recS_stmts = stmts }
 mkHsOpApp :: LHsExpr id -> id -> LHsExpr id -> HsExpr id
 mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 
-mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
-mkHsSplice e = HsSplice unqualSplice e
-
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
+mkUntypedSplice :: LHsExpr RdrName -> HsSplice RdrName
+mkUntypedSplice e = HsUntypedSplice unqualSplice e
+
 mkHsSpliceE :: LHsExpr RdrName -> HsExpr RdrName
-mkHsSpliceE e = HsSpliceE False (mkHsSplice e)
+mkHsSpliceE e = HsSpliceE (mkUntypedSplice e)
 
 mkHsSpliceTE :: LHsExpr RdrName -> HsExpr RdrName
-mkHsSpliceTE e = HsSpliceE True (mkHsSplice e)
+mkHsSpliceTE e = HsSpliceE (HsTypedSplice unqualSplice e)
 
 mkHsSpliceTy :: LHsExpr RdrName -> HsType RdrName
-mkHsSpliceTy e = HsSpliceTy (mkHsSplice e) placeHolderKind
+mkHsSpliceTy e = HsSpliceTy (HsUntypedSplice unqualSplice e) placeHolderKind
 
-mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsQuasiQuote RdrName
-mkHsQuasiQuote quoter span quote = HsQuasiQuote quoter span quote
+mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice RdrName
+mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualSplice quoter span quote
 
 unqualQuasiQuote :: RdrName
 unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
@@ -705,7 +705,6 @@ collect_lpat (L _ pat) bndrs
     go (SigPatIn pat _)           = collect_lpat pat bndrs
     go (SigPatOut pat _)          = collect_lpat pat bndrs
     go (SplicePat _)              = bndrs
-    go (QuasiQuotePat _)          = bndrs
     go (CoPat _ pat _)            = go pat
 
 {-

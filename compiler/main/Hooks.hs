@@ -20,13 +20,11 @@ module Hooks ( Hooks
              , runPhaseHook
              , runMetaHook
              , linkHook
-             , runQuasiQuoteHook
              , runRnSpliceHook
              , getValueSafelyHook
              ) where
 
 import DynFlags
-import HsTypes
 import Name
 import PipelineMonad
 import HscTypes
@@ -58,7 +56,7 @@ import Data.Maybe
 --   uses the default built-in behaviour
 
 emptyHooks :: Hooks
-emptyHooks = Hooks Nothing Nothing Nothing Nothing Nothing Nothing
+emptyHooks = Hooks Nothing Nothing Nothing Nothing Nothing
                    Nothing Nothing Nothing Nothing Nothing Nothing
                    Nothing
 
@@ -73,8 +71,7 @@ data Hooks = Hooks
   , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath))
   , runMetaHook            :: Maybe (MetaHook TcM)
   , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool -> HomePackageTable -> IO SuccessFlag)
-  , runQuasiQuoteHook      :: Maybe (HsQuasiQuote Name -> RnM (HsQuasiQuote Name))
-  , runRnSpliceHook        :: Maybe (LHsExpr Name -> RnM (LHsExpr Name))
+  , runRnSpliceHook        :: Maybe (HsSplice Name -> RnM (HsSplice Name))
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type -> IO (Maybe HValue))
   }
 

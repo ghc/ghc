@@ -1543,7 +1543,7 @@ atype :: { LHsType RdrName }
         | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy   $2) [mop $1,mcp $3] }
         | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig $2 $4)
                                              [mop $1,mj AnnDcolon $3,mcp $5] }
-        | quasiquote                  { sL1 $1 (HsQuasiQuoteTy (unLoc $1)) }
+        | quasiquote                  { sL1 $1 (HsSpliceTy (unLoc $1) placeHolderKind) }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy $2)
                                              [mo $1,mc $3] }
         | TH_ID_SPLICE                { sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
@@ -1958,7 +1958,7 @@ explicit_activation :: { ([AddAnn],Activation) }  -- In brackets
 -----------------------------------------------------------------------------
 -- Expressions
 
-quasiquote :: { Located (HsQuasiQuote RdrName) }
+quasiquote :: { Located (HsSplice RdrName) }
         : TH_QUASIQUOTE   { let { loc = getLoc $1
                                 ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkUnqual varName quoter }
@@ -2180,7 +2180,7 @@ aexp2   :: { LHsExpr RdrName }
                                           [mo $1,mc $3] }
         | '[d|' cvtopbody '|]' {% ams (sLL $1 $> $ HsBracket (DecBrL (snd $2)))
                                       (mo $1:mc $3:fst $2) }
-        | quasiquote          { sL1 $1 (HsQuasiQuoteE (unLoc $1)) }
+        | quasiquote          { sL1 $1 (HsSpliceE (unLoc $1)) }
 
         -- arrow notation extension
         | '(|' aexp2 cmdargs '|)'  {% ams (sLL $1 $> $ HsArrForm $2

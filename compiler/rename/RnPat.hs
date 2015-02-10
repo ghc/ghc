@@ -36,7 +36,6 @@ module RnPat (-- main entry points
 
 import {-# SOURCE #-} RnExpr ( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSplicePat )
-import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
 
 #include "HsVersions.h"
 
@@ -453,14 +452,8 @@ rnPatAndThen mk (TuplePat pats boxed _)
 rnPatAndThen mk (SplicePat splice)
   = do { eith <- liftCpsFV $ rnSplicePat splice
        ; case eith of   -- See Note [rnSplicePat] in RnSplice
-           Left not_yet_renamed -> rnPatAndThen mk not_yet_renamed
+           Left  not_yet_renamed -> rnPatAndThen mk not_yet_renamed
            Right already_renamed -> return already_renamed }
-
-rnPatAndThen mk (QuasiQuotePat qq)
-  = do { pat <- liftCps $ runQuasiQuotePat qq
-         -- Wrap the result of the quasi-quoter in parens so that we don't
-         -- lose the outermost location set by runQuasiQuote (#7918)
-       ; rnPatAndThen mk (ParPat pat) }
 
 rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 

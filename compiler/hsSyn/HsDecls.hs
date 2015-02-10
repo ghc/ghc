@@ -79,7 +79,7 @@ module HsDecls (
     ) where
 
 -- friends:
-import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr, pprUntypedSplice )
+import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr, pprSplice )
         -- Because Expr imports Decls via HsBracket
 
 import HsBinds
@@ -139,9 +139,8 @@ data HsDecl id
   | AnnD        (AnnDecl id)
   | RuleD       (RuleDecls id)
   | VectD       (VectDecl id)
-  | SpliceD     (SpliceDecl id)
+  | SpliceD     (SpliceDecl id)   -- Includes quasi-quotes
   | DocD        (DocDecl)
-  | QuasiQuoteD (HsQuasiQuote id)
   | RoleAnnotD  (RoleAnnotDecl id)
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsDecl id)
@@ -265,7 +264,6 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (AnnD ad)               = ppr ad
     ppr (SpliceD dd)            = ppr dd
     ppr (DocD doc)              = ppr doc
-    ppr (QuasiQuoteD qq)        = ppr qq
     ppr (RoleAnnotD ra)         = ppr ra
 
 instance OutputableBndr name => Outputable (HsGroup name) where
@@ -316,7 +314,7 @@ data SpliceDecl id
 deriving instance (DataId id) => Data (SpliceDecl id)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
-   ppr (SpliceDecl (L _ e) _) = pprUntypedSplice e
+   ppr (SpliceDecl (L _ e) _) = pprSplice e
 
 {-
 ************************************************************************

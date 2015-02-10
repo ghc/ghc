@@ -24,8 +24,8 @@ module TcRnDriver (
     ) where
 
 #ifdef GHCI
-import {-# SOURCE #-} TcSplice ( runQuasi, traceSplice, SpliceInfo(..) )
-import RnSplice ( rnTopSpliceDecls )
+import {-# SOURCE #-} TcSplice ( runQuasi )
+import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 #endif
 
 import DynFlags
@@ -568,11 +568,10 @@ tc_rn_src_decls boot_details ds
 
                     -- Dump generated top-level declarations
                     ; let msg = "top-level declarations added with addTopDecls"
-                    ; traceSplice $ SpliceInfo True
-                                               msg
-                                               Nothing
-                                               Nothing
-                                               (ppr th_rn_decls)
+                    ; traceSplice $ SpliceInfo { spliceDescription = msg
+                                               , spliceIsDecl    = True
+                                               , spliceSource    = Nothing
+                                               , spliceGenerated = ppr th_rn_decls }
 
                     ; return (tcg_env, appendGroups rn_decls th_rn_decls)
                     }

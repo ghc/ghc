@@ -626,7 +626,7 @@ stageRestrictionError :: SDoc -> TcM a
 stageRestrictionError pp_thing
   = failWithTc $
     sep [ ptext (sLit "GHC stage restriction:")
-        , nest 2 (vcat [ pp_thing <+> ptext (sLit "is used in a top-level splice or annotation,")
+        , nest 2 (vcat [ pp_thing <+> ptext (sLit "is used in a top-level splice, quasi-quote, or annotation,")
                        , ptext (sLit "and must be imported, not defined locally")])]
 
 topIdLvl :: Id -> ThLevel

@@ -1,5 +1,5 @@
 
-T3177a.hs:8:6:
+T3177a.hs:8:8:
     ‘Int’ is applied to too many type arguments
     In the type signature for ‘f’: f :: Int Int
 
