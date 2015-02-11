@@ -141,7 +141,7 @@ matchExpectedFunTys herald arity orig_ty
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty' -> go n_req ty'
-               Flexi        -> defer n_req ty }
+               Flexi        -> defer n_req ty (isReturnTyVar tv) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -159,15 +159,21 @@ matchExpectedFunTys herald arity orig_ty
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also Trac #9605.
     go n_req ty = addErrCtxtM mk_ctxt $
-                  defer n_req ty
+                  defer n_req ty False
 
     ------------
-    defer n_req fun_ty
-      = do { arg_tys <- newFlexiTyVarTys n_req openTypeKind
+    -- If we decide that a ReturnTv (see Note [ReturnTv] in TcType) should
+    -- really be a function type, then we need to allow the argument and
+    -- result types also to be ReturnTvs.
+    defer n_req fun_ty is_return
+      = do { arg_tys <- mapM new_ty_var_ty (nOfThem n_req openTypeKind)
                         -- See Note [Foralls to left of arrow]
-           ; res_ty  <- newFlexiTyVarTy openTypeKind
+           ; res_ty  <- new_ty_var_ty openTypeKind
            ; co   <- unifyType fun_ty (mkFunTys arg_tys res_ty)
            ; return (co, arg_tys, res_ty) }
+      where
+        new_ty_var_ty | is_return = newReturnTyVarTy
+                      | otherwise = newFlexiTyVarTy
 
     ------------
     mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
@@ -1000,7 +1006,7 @@ checkTauTvUpdate dflags tv ty
   where
     details = ASSERT2( isMetaTyVar tv, ppr tv ) tcTyVarDetails tv
     info         = mtv_info details
-    is_return_tv = case info of { ReturnTv -> True; _ -> False }
+    is_return_tv = isReturnTyVar tv
     impredicative = canUnifyWithPolyType dflags details (tyVarKind tv)
 
     defer_me :: TcType -> Bool
