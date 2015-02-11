@@ -1277,9 +1277,9 @@ lookupFixityRn name
            Nothing ->
 
     do { this_mod <- getModule
-       ; if nameIsLocalOrFrom this_mod name || isInteractiveModule (nameModule name)
-               -- Interactive modules are all in the fixity env,
-               -- and don't have entries in the HPT
+       ; if nameIsLocalOrFrom this_mod name
+               -- Local (and interactive) names are all in the
+               -- fixity env, and don't have entries in the HPT
          then return defaultFixity
          else lookup_imported } } }
   where

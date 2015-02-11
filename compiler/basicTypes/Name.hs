@@ -189,7 +189,6 @@ nameSrcSpan name = n_loc  name
 ************************************************************************
 -}
 
-nameIsLocalOrFrom :: Module -> Name -> Bool
 isInternalName    :: Name -> Bool
 isExternalName    :: Name -> Bool
 isSystemName      :: Name -> Bool
@@ -218,9 +217,32 @@ nameModule_maybe (Name { n_sort = External mod})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
 nameModule_maybe _                                  = Nothing
 
+nameIsLocalOrFrom :: Module -> Name -> Bool
+-- ^ Returns True if the name is
+--   (a) Internal
+--   (b) External but from the specified module
+--   (c) External but from the 'interactive' package
+--
+-- The key idea is that
+--    False means: the entity is defined in some other module
+--                 you can find the details (type, fixity, instances)
+--                     in some interface file
+--                 those details will be stored in the EPT or HPT
+--
+--    True means:  the entity is defined in this module or earlier in
+--                     the GHCi session
+--                 you can find details (type, fixity, instances) in the
+--                     TcGblEnv or TcLclEnv
+--
+-- The isInteractiveModule part is because successive interactions of a GCHi session
+-- each give rise to a fresh module (Ghci1, Ghci2, etc), but they all come
+-- from the magic 'interactive' package; and all the details are kept in the
+-- TcLclEnv, TcGblEnv, NOT in the HPT or EPT.
+-- See Note [The interactive package] in HscTypes
+
 nameIsLocalOrFrom from name
-  | isExternalName name = from == nameModule name
-  | otherwise           = True
+  | Just mod <- nameModule_maybe name = from == mod || isInteractiveModule mod
+  | otherwise                         = True
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
@@ -334,7 +356,8 @@ localiseName n = n { n_sort = Internal }
 -- |Create a localised variant of a name.
 --
 -- If the name is external, encode the original's module name to disambiguate.
---
+-- SPJ says: this looks like a rather odd-looking function; but it seems to
+--           be used only during vectorisation, so I'm not going to worry
 mkLocalisedOccName :: Module -> (Maybe String -> OccName -> OccName) -> Name -> OccName
 mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
   where

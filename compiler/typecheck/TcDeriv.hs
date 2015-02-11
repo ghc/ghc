@@ -31,7 +31,7 @@ import TcHsType
 import TcMType
 import TcSimplify
 import LoadIface( loadInterfaceForName )
-import Module( getModule, isInteractiveModule )
+import Module( getModule )
 
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
@@ -2101,7 +2101,7 @@ getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
 -- c.f. RnEnv.lookupFixity, and Trac #9830
 getDataConFixityFun tc
   = do { this_mod <- getModule
-       ; if nameIsLocalOrFrom this_mod name || isInteractiveModule (nameModule name)
+       ; if nameIsLocalOrFrom this_mod name
          then do { fix_env <- getFixityEnv
                  ; return (lookupFixity fix_env) }
          else do { iface <- loadInterfaceForName doc name
