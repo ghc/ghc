@@ -680,8 +680,17 @@ try_decompose_repr_app ev ty1 ty2
   | ty1 `eqType` ty2   -- See Note [AppTy reflexivity check]
   = canEqReflexive ev ReprEq ty1
 
-  | otherwise
+  | AppTy {} <- ty1
   = canEqFailure ev ReprEq ty1 ty2
+
+  | AppTy {} <- ty2
+  = canEqFailure ev ReprEq ty1 ty2
+
+  | otherwise  -- flattening in can_eq_wanted_app exposed some TyConApps!
+  = ASSERT2( isJust (tcSplitTyConApp_maybe ty1) || isJust (tcSplitTyConApp_maybe ty2)
+            , ppr ty1 $$ ppr ty2 )  -- If this assertion fails, we may fall
+                                    -- into an infinite loop
+    canEqNC ev ReprEq ty1 ty2
 
 ---------
 try_decompose_nom_app :: CtEvidence
@@ -705,7 +714,7 @@ try_decompose_nom_app ev ty1 ty2
                 -- is good: See Note [Canonicalising type applications]
    = ASSERT2( isJust (tcSplitTyConApp_maybe ty1) || isJust (tcSplitTyConApp_maybe ty2)
             , ppr ty1 $$ ppr ty2 )  -- If this assertion fails, we may fall
-                                    -- into an inifinite loop (Trac #9971)
+                                    -- into an infinite loop (Trac #9971)
      canEqNC ev NomEq ty1 ty2
    where
      -- Recurses to try_decompose_nom_app to decompose a chain of AppTys
