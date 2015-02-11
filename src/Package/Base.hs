@@ -4,7 +4,6 @@ module Package.Base (
     module Ways,
     module Util,
     module Oracles,
-    module Settings,
     Package (..), Settings (..), TodoItem (..),
     defaultSettings, library, customise, updateSettings,
     commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
@@ -21,7 +20,6 @@ import Base
 import Ways
 import Util
 import Oracles
-import Settings
 import qualified System.Directory as S
 
 data Settings = Settings
@@ -71,6 +69,9 @@ data Package = Package
          pkgCabal :: FilePath,  -- "deepseq"
          pkgTodo  :: [TodoItem] -- [(Stage1, "dist-install", defaultSettings)]
      }
+
+instance Eq Package where
+    (==) = (==) `on` pkgName
 
 updateSettings :: (Settings -> Settings) -> Package -> Package
 updateSettings update (Package name path cabal todo) =

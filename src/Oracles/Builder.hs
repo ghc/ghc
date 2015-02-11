@@ -29,7 +29,7 @@ data Builder = Ar
              | Gcc Stage
              | Ghc Stage
              | GhcPkg Stage
-             deriving Show
+             deriving (Show, Eq)
 
 instance ShowArg Builder where
     showArg builder = toStandard <$> do
