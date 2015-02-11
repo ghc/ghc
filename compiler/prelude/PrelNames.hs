@@ -685,11 +685,10 @@ showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
 
-typeRep_RDR, mkTyCon_RDR, mkTyConApp_RDR, typeable_TyCon_RDR :: RdrName
+typeRep_RDR, mkTyCon_RDR, mkTyConApp_RDR :: RdrName
 typeRep_RDR       = varQual_RDR tYPEABLE_INTERNAL    (fsLit "typeRep#")
 mkTyCon_RDR       = varQual_RDR tYPEABLE_INTERNAL    (fsLit "mkTyCon")
 mkTyConApp_RDR    = varQual_RDR tYPEABLE_INTERNAL    (fsLit "mkTyConApp")
-typeable_TyCon_RDR = tcQual_RDR tYPEABLE_INTERNAL    (fsLit "TyCon")
 
 undefined_RDR :: RdrName
 undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")

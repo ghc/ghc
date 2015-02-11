@@ -72,8 +72,6 @@ module OccName (
         mkPReprTyConOcc,
         mkPADFunOcc,
 
-        mkTyConRepOcc,
-
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
 
@@ -609,7 +607,6 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
-
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -660,9 +657,6 @@ mkGenRCo = mk_simple_deriv tcName "CoRep_"
 --      $cMkT :: Data.Generics.Basics.Constr
 mkDataTOcc = mk_simple_deriv varName  "$t"
 mkDataCOcc = mk_simple_deriv varName  "$c"
-
-mkTyConRepOcc :: Maybe String -> OccName -> OccName
-mkTyConRepOcc = mk_simple_deriv_with varName "$tcr"
 
 -- Vectorisation
 mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
