@@ -1246,44 +1246,6 @@ getPrecedence get_fixity nm
           --     into account for either Read or Show; hence we
           --     ignore associativity here
 
-{- XXX
-genTypeableTyConRep :: DynFlags -> SrcSpan -> TyCon ->
-                                (LHsBind RdrName, LSig RdrName)
-genTypeableTyConRep dflags loc tycon =
-      ( mk_easy_FunBind loc rep_name [] tycon_rep
-      , L loc (TypeSig [L loc rep_name] sig_ty PlaceHolder)
-      )
-  where
-    rep_name   = mk_tc_deriv_name tycon (mkTyConRepOcc suf)
-    suf        = if isPromotedTyCon tycon then Just "k" else
-                 if isPromotedDataCon tycon then Just "c" else Nothing
-
-    sig_ty     = nlHsTyVar typeable_TyCon_RDR
-
-    tycon_name = tyConName tycon
-    modl       = nameModule tycon_name
-    pkg        = modulePackageKey modl
-
-    modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageKeyFS pkg
-    name_fs    = occNameFS (nameOccName tycon_name)
-
-    tycon_rep = nlHsApps mkTyCon_RDR
-                    (map nlHsLit [int64 high,
-                                  int64 low,
-                                  HsString "" pkg_fs,
-                                  HsString "" modl_fs,
-                                  HsString "" name_fs])
-
-    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
-    Fingerprint high low = fingerprintString hashThis
-
-    int64
-      | wORD_SIZE dflags == 4 = HsWord64Prim "" . fromIntegral
-      | otherwise             = HsWordPrim "" . fromIntegral
--}
-
-
 {-
 ************************************************************************
 *                                                                      *
