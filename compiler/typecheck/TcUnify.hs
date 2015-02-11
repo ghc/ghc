@@ -979,7 +979,7 @@ checkTauTvUpdate dflags tv ty
        ; case sub_k of
            Nothing           -> return Nothing
            Just LT           -> return Nothing
-           _  | is_return_tv -> if tv `elemVarSet` tyVarsOfType ty
+           _  | is_return_tv -> if tv `elemVarSet` tyVarsOfType ty1
                                 then return Nothing
                                 else return (Just ty1)
            _  | defer_me ty1   -- Quick test
