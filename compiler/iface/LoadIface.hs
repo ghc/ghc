@@ -320,17 +320,15 @@ loadModuleInterfaces doc mods
     load mod = loadSysInterface (doc <+> parens (ppr mod)) mod
 
 -- | Loads the interface for a given Name.
+-- Should only be called for an imported name;
+-- otherwise loadSysInterface may not find the interface
 loadInterfaceForName :: SDoc -> Name -> TcRn ModIface
 loadInterfaceForName doc name
-  = do {
-    when debugIsOn $ do
-        -- Should not be called with a name from the module being compiled
-        { this_mod <- getModule
-        ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc )
-        }
-  ; ASSERT2( isExternalName name, ppr name )
-    initIfaceTcRn $ loadSysInterface doc (nameModule name)
-  }
+  = do { when debugIsOn $  -- Check pre-condition
+         do { this_mod <- getModule
+            ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc ) }
+      ; ASSERT2( isExternalName name, ppr name )
+        initIfaceTcRn $ loadSysInterface doc (nameModule name) }
 
 -- | Loads the interface for a given Module.
 loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface

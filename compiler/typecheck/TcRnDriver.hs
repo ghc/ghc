@@ -1989,17 +1989,23 @@ loadUnqualIfaces hsc_env ictxt
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
 
-    unqual_mods = [ mod
+    unqual_mods = [ nameModule name
                   | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt)
                   , let name = gre_name gre
-                  , not (isInternalName name)
-                  , let mod = nameModule name
-                  , not (modulePackageKey mod == this_pkg || isInteractiveModule mod)
-                      -- Don't attempt to load an interface for stuff
-                      -- from the command line, or from the home package
+                  , from_external_package name
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
     doc = ptext (sLit "Need interface for module whose export(s) are in scope unqualified")
+
+    from_external_package name  -- True <=> the Name comes from some other package
+                                --          (not the home package, not the interactive package)
+      | Just mod <- nameModule_maybe name
+      , modulePackageKey mod /= this_pkg    -- Not the home package
+      , not (isInteractiveModule mod)       -- Not the 'interactive' package
+      = True
+      | otherwise
+      = False
+
 
 {-
 ************************************************************************
