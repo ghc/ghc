@@ -102,6 +102,10 @@ typedef struct {
 
     // Called for every GC
     void (* gcDoneHook) (const struct GCDetails_ *stats);
+
+    // Called when GC sync takes too long (+RTS --long-gc-sync=<time>)
+    void (* longGCSync) (uint32_t this_cap, Time time_ns);
+    void (* longGCSyncEnd) (Time time_ns);
 } RtsConfig;
 
 // Clients should start with defaultRtsConfig and then customise it.

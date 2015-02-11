@@ -65,6 +65,8 @@ typedef struct _GC_FLAGS {
     Time    idleGCDelayTime;    /* units: TIME_RESOLUTION */
     bool doIdleGC;
 
+    Time    longGCSync;         /* units: TIME_RESOLUTION */
+
     StgWord heapBase;           /* address to ask the OS for memory */
 
     StgWord allocLimitGrace;    /* units: *blocks*

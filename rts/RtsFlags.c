@@ -69,7 +69,9 @@ const RtsConfig defaultRtsConfig  = {
     .stackOverflowHook = StackOverflowHook,
     .outOfHeapHook = OutOfHeapHook,
     .mallocFailHook = MallocFailHook,
-    .gcDoneHook = NULL
+    .gcDoneHook = NULL,
+    .longGCSync = LongGCSync,
+    .longGCSyncEnd = LongGCSyncEnd
 };
 
 /*
@@ -165,6 +167,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.numa               = false;
     RtsFlags.GcFlags.numaMask           = 1;
     RtsFlags.GcFlags.ringBell           = false;
+    RtsFlags.GcFlags.longGCSync         = 0; /* detection turned off */
 
     RtsFlags.DebugFlags.scheduler       = false;
     RtsFlags.DebugFlags.interpreter     = false;
@@ -937,6 +940,16 @@ error = true;
                       }
                   }
 #endif
+                  else if (!strncmp("long-gc-sync=", &rts_argv[arg][2], 13)) {
+                      OPTION_SAFE;
+                      if (rts_argv[arg][2] == '\0') {
+                          /* use default */
+                      } else {
+                          RtsFlags.GcFlags.longGCSync =
+                              fsecondsToTime(atof(rts_argv[arg]+16));
+                      }
+                      break;
+                  }
                   else {
                       OPTION_SAFE;
                       errorBelch("unknown RTS option: %s",rts_argv[arg]);

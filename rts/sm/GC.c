@@ -48,6 +48,7 @@
 #include "Stable.h"
 #include "CheckUnload.h"
 #include "CNF.h"
+#include "RtsFlags.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -825,11 +826,6 @@ static void heapOverflow(void)
    Initialise the gc_thread structures.
    -------------------------------------------------------------------------- */
 
-#define GC_THREAD_INACTIVE             0
-#define GC_THREAD_STANDING_BY          1
-#define GC_THREAD_RUNNING              2
-#define GC_THREAD_WAITING_TO_CONTINUE  3
-
 static void
 new_gc_thread (uint32_t n, gc_thread *t)
 {
@@ -1132,6 +1128,9 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     const uint32_t me = cap->no;
     uint32_t i, j;
     bool retry = true;
+    Time t0, t1, t2;
+
+    t0 = t1 = t2 = getProcessElapsedTime();
 
     while(retry) {
         for (i=0; i < n_threads; i++) {
@@ -1153,6 +1152,19 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
             if (!retry) break;
             yieldThread();
         }
+
+        t2 = getProcessElapsedTime();
+        if (RtsFlags.GcFlags.longGCSync != 0 &&
+            t2 - t1 > RtsFlags.GcFlags.longGCSync) {
+            /* call this every longGCSync of delay */
+            rtsConfig.longGCSync(cap->no, t2 - t0);
+            t1 = t2;
+        }
+    }
+
+    if (RtsFlags.GcFlags.longGCSync != 0 &&
+        t2 - t0 > RtsFlags.GcFlags.longGCSync) {
+        rtsConfig.longGCSyncEnd(t2 - t0);
     }
 }
 

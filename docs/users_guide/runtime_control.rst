@@ -728,6 +728,44 @@ performance.
     that indicates the NUMA nodes on which to run the program.  For
     example, ``--numa=3`` would run the program on NUMA nodes 0 and 1.
 
+.. rts-flag:: --long-gc-sync
+              --long-gc-sync=<seconds>
+
+    .. index::
+       single: GC sync time, measuring
+
+    When a GC starts, all the running mutator threads have to stop and
+    synchronise.  The period between when the GC is initiated and all
+    the mutator threads are stopped is called the GC synchronisation
+    phase. If this phase is taking a long time (longer than 1ms is
+    considered long), then it can have a severe impact on overall
+    throughput.
+
+    A long GC sync can be caused by a mutator thread that is inside an
+    ``unsafe`` FFI call, or running in a loop that doesn't allocate
+    memory and so doesn't yield.  To fix the former, make the call
+    ``safe``, and to fix the latter, either avoid calling the code in
+    question or compile it with :ghc-flag:`-fomit-yields`.
+
+    By default, the flag will cause a warning to be emitted to stderr
+    when the sync time exceeds the specified time.  This behaviour can
+    be overriden, however: the ``longGCSync()`` hook is called when
+    the sync time is exceeded during the sync period, and the
+    ``longGCSyncEnd()`` hook at the end. Both of these hooks can be
+    overriden in the ``RtsConfig`` when the runtime is started with
+    ``hs_init_ghc()``. The default implementations of these hooks
+    (``LongGcSync()`` and ``LongGCSyncEnd()`` respectively) print
+    warnings to stderr.
+
+    One way to use this flag is to set a breakpoint on
+    ``LongGCSync()`` in the debugger, and find the thread that is
+    delaying the sync. You probably want to use :ghc-flag:`-g` to
+    provide more info to the debugger.
+
+    The GC sync time, along with other GC stats, are available by
+    calling the ``getRTSStats()`` function from C, or
+    ``GHC.Stats.getRTSStats`` from Haskell.
+
 .. _rts-options-statistics:
 
 RTS options to produce runtime statistics
