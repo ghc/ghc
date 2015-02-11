@@ -19,7 +19,7 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
-  newReturnTyVar,
+  newReturnTyVar, newReturnTyVarTy,
   newMetaKindVar, newMetaKindVars,
   mkTcTyVarName, cloneMetaTyVar,
 
@@ -433,6 +433,9 @@ newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
 newReturnTyVar :: Kind -> TcM TcTyVar
 newReturnTyVar kind = newMetaTyVar ReturnTv kind
+
+newReturnTyVarTy :: Kind -> TcM TcType
+newReturnTyVarTy kind = TyVarTy <$> newReturnTyVar kind
 
 tcInstTyVars :: [TKVar] -> TcM (TvSubst, [TcTyVar])
 -- Instantiate with META type variables
