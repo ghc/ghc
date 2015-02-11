@@ -4,6 +4,7 @@ module Targets (
     ) where
 
 import Package.Base
+import Settings
 
 -- These are the packages we build:
 -- TODO: this should eventually be removed and replaced by the top-level
