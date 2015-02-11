@@ -49,6 +49,7 @@ import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
+import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -424,6 +425,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     bad_typeable_instance i
       = typeableClassName == is_cls_nm (iSpec i)
 
+
     overlapCheck ty = case overlapMode (is_flag $ iSpec ty) of
                         NoOverlap _ -> False
                         _           -> True
@@ -433,10 +435,19 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
-    typeable_err i
-      = setSrcSpan (getSrcSpan (iSpec i)) $
-        addErrTc $ ptext
-          (sLit "Class `Typeable` does not support user-specified instances.")
+    -- Report an error or a warning for a `Typeable` instances.
+    -- If we are workikng on an .hs-boot file, we just report a warning,
+    -- and ignore the instance.  We do this, to give users a chance to fix
+    -- their code.
+    typeable_err i =
+      setSrcSpan (getSrcSpan (iSpec i)) $
+        do env <- getGblEnv
+           if isHsBootOrSig (tcg_src env)
+             then addWarnTc $ vcat
+                  [ ptext (sLit "`Typeable` instances in .hs-boot files are ignored.")
+                  , ptext (sLit "This warning will become an error in future versions of the compiler.")
+                  ]
+             else addErrTc $ ptext (sLit "Class `Typeable` does not support user-specified instances.")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
