@@ -666,8 +666,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; (tvs, theta, cls, inst_tys) <- setXOptM Opt_DataKinds $ -- for polykinded typeable
-                                        tcHsInstHead TcType.InstDeclCtxt deriv_ty
+       ; (tvs, theta, cls, inst_tys) <- tcHsInstHead TcType.InstDeclCtxt deriv_ty
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
@@ -695,7 +694,6 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
                     ; return [spec] }
 
            _  -> -- Complain about functions, primitive types, etc,
-                 -- except for the Typeable class
                  failWithTc $ derivingThingErr False cls cls_tys inst_ty $
                  ptext (sLit "The last argument of the instance must be a data or newtype application")
         }

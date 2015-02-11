@@ -43,13 +43,12 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, genericClassNames )
+import PrelNames  ( typeableClassName, genericClassNames )
 import Bag
 import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -371,7 +370,6 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             -- round)
 
             -- Do class and family instance declarations
-       ; env <- getGblEnv
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
        ; let (local_infos_s, fam_insts_s) = unzip stuff
              fam_insts    = concat fam_insts_s
@@ -379,7 +377,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              -- Handwritten instances of the poly-kinded Typeable class are
              -- forbidden, so we handle those separately
              (typeable_instances, local_infos)
-                = partition (bad_typeable_instance env) local_infos'
+                = partition bad_typeable_instance local_infos'
 
        ; addClsInsts local_infos $
          addFamInsts fam_insts   $
@@ -423,14 +421,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     }}
   where
     -- Separate the Typeable instances from the rest
-    bad_typeable_instance env i
-      =       -- Class name is Typeable
-         typeableClassName == is_cls_nm (iSpec i)
-              -- but not those that come from Data.Typeable.Internal
-      && tcg_mod env /= tYPEABLE_INTERNAL
-              -- nor those from an .hs-boot or .hsig file
-              -- (deriving can't be used there)
-      && not (isHsBootOrSig (tcg_src env))
+    bad_typeable_instance i
+      = typeableClassName == is_cls_nm (iSpec i)
 
     overlapCheck ty = case overlapMode (is_flag $ iSpec ty) of
                         NoOverlap _ -> False
@@ -442,17 +434,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                      2 (pprInstanceHdr (iSpec i))
 
     typeable_err i
-      = setSrcSpan (getSrcSpan ispec) $
-        addErrTc $ hang (ptext (sLit "Typeable instances can only be derived"))
-                      2 (vcat [ ptext (sLit "Try") <+> quotes (ptext (sLit "deriving instance Typeable")
-                                                <+> pp_tc)
-                              , ptext (sLit "(requires StandaloneDeriving)") ])
-      where
-        ispec = iSpec i
-        pp_tc | [_kind, ty] <- is_tys ispec
-              , Just (tc,_) <- tcSplitTyConApp_maybe ty
-              = ppr tc
-              | otherwise = ptext (sLit "<tycon>")
+      = setSrcSpan (getSrcSpan (iSpec i)) $
+        addErrTc $ ptext
+          (sLit "Class `Typeable` does not support user-specified instances.")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -1069,6 +1053,9 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
                                  -- sc_co :: sc_pred ~ norm_sc_pred
       , ClassPred cls tys <- classifyPredType norm_sc_pred
       , className cls /= typeableClassName
+        -- `Typeable` has custom solving rules, which is why we exlucde it
+        -- from the short cut, and fall throught to calling the solver.
+
       = do { sc_ev_tm <- emit_sc_cls_pred norm_sc_pred cls tys
            ; sc_ev_id <- newEvVar sc_pred
            ; let tc_co = TcCoercion (mkSubCo (mkSymCo sc_co))
