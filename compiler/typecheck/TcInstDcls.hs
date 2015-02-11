@@ -1068,6 +1068,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
       | (sc_co, norm_sc_pred) <- normaliseType fam_envs Nominal sc_pred
                                  -- sc_co :: sc_pred ~ norm_sc_pred
       , ClassPred cls tys <- classifyPredType norm_sc_pred
+      , className cls /= typeableClassName
       = do { sc_ev_tm <- emit_sc_cls_pred norm_sc_pred cls tys
            ; sc_ev_id <- newEvVar sc_pred
            ; let tc_co = TcCoercion (mkSubCo (mkSymCo sc_co))
