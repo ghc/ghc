@@ -50,33 +50,15 @@ module Data.Typeable.Internal (
     showsTypeRep,
     tyConString,
     rnfTyCon,
-    listTc, funTc
+    listTc, funTc,
+    typeRepKinds,
+    typeLitTypeRep
   ) where
 
 import GHC.Base
 import GHC.Word
 import GHC.Show
-import GHC.Read ( Read )
 import Data.Proxy
-import GHC.Num
-import GHC.Real
--- import GHC.IORef
--- import GHC.IOArray
--- import GHC.MVar
-import GHC.ST           ( ST, STret )
-import GHC.STRef        ( STRef )
-import GHC.Ptr          ( Ptr, FunPtr )
--- import GHC.Stable
-import GHC.Arr          ( Array, STArray, Ix )
-import GHC.TypeLits ( Nat, Symbol, KnownNat, KnownSymbol, natVal', symbolVal' )
-import Data.Type.Coercion
-import Data.Type.Equality
-import Text.ParserCombinators.ReadP ( ReadP )
-import Text.Read.Lex ( Lexeme, Number )
-import Text.ParserCombinators.ReadPrec ( ReadPrec )
-import GHC.Float ( FFFormat, RealFloat, Floating )
-import Data.Bits ( Bits, FiniteBits )
-import GHC.Enum ( Bounded, Enum )
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
