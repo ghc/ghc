@@ -685,7 +685,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
        ; case tcSplitTyConApp_maybe inst_ty of
            Just (tc, tc_args)
               | className cls == typeableClassName
-              -> do addWarnTc (text "Standalone deriving `Typeable` has no effect.")
+              -> do -- addWarnTc (text "Standalone deriving `Typeable` has no effect.")
                     return []
 
               | isAlgTyCon tc  -- All other classes
@@ -720,7 +720,7 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
         ; if className cls == typeableClassName
-          then do addWarnTc (text "Deriving `Typeable` has no effect.")
+          then do -- addWarnTc (text "Deriving `Typeable` has no effect.")
                   return []
 
           else
