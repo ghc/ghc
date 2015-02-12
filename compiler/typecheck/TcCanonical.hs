@@ -709,21 +709,22 @@ canDecomposableTyConApp :: CtEvidence -> EqRel
                         -> TcS (StopOrContinue Ct)
 -- See Note [Decomposing TyConApps]
 canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
-  | tc1 /= tc2 || length tys1 /= length tys2
-    -- Fail straight away for better error messages
-  = let eq_failure
-          | isDataFamilyTyCon tc1 || isDataFamilyTyCon tc2
-                -- See Note [Use canEqFailure in canDecomposableTyConApp]
-          = canEqFailure
-          | otherwise
-          = canEqHardFailure in
-    eq_failure ev eq_rel (mkTyConApp tc1 tys1) (mkTyConApp tc2 tys2)
-
-  | otherwise
+  | tc1 == tc2
+  , length tys1 == length tys2  -- Success: decompose!
   = do { traceTcS "canDecomposableTyConApp"
                   (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
        ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
        ; stopWith ev "Decomposed TyConApp" }
+
+  -- Fail straight away for better error messages
+  -- See Note [Use canEqFailure in canDecomposableTyConApp]
+  | isDataFamilyTyCon tc1 || isDataFamilyTyCon tc2
+  = canEqFailure ev eq_rel ty1 ty2
+  | otherwise
+  = canEqHardFailure ev eq_rel ty1 ty2
+  where
+    ty1 = mkTyConApp tc1 tys1
+    ty2 = mkTyConApp tc2 tys2
 
 {-
 Note [Use canEqFailure in canDecomposableTyConApp]
