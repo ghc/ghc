@@ -959,7 +959,7 @@ dsEvTypeable ev =
     do typeableExpr <- dsEvTerm ev
        let co     = getTypeableCo tc t
            method = mkCast typeableExpr co
-           proxy  = mkTyApps (Var proxyHashId) [t]
+           proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
        return (mkApps method [proxy])
 
   -- This part could be cached
