@@ -980,21 +980,27 @@ checkTauTvUpdate dflags tv ty
   = ASSERT( not (isTyVarTy ty) )
     return Nothing
   | otherwise
-  = do { ty1   <- zonkTcType ty
-       ; sub_k <- unifyKindX (tyVarKind tv) (typeKind ty1)
+  = do { ty    <- zonkTcType ty
+       ; sub_k <- unifyKindX (tyVarKind tv) (typeKind ty)
        ; case sub_k of
-           Nothing           -> return Nothing
-           Just LT           -> return Nothing
-           _  | is_return_tv -> if tv `elemVarSet` tyVarsOfType ty1
-                                then return Nothing
-                                else return (Just ty1)
-           _  | defer_me ty1   -- Quick test
+           Nothing -> return Nothing  -- Kinds don't unify
+           Just LT -> return Nothing  -- (tv :: *) ~ (ty :: ?)
+                                      -- Don't unify because that would widen tv's kind
+
+           _  | is_return_tv  -- ReturnTv: a simple occurs-check is all that we need
+                              -- See Note [ReturnTv] in TcType
+              -> if tv `elemVarSet` tyVarsOfType ty
+                 then return Nothing
+                 else return (Just ty)
+
+           _  | defer_me ty   -- Quick test
               -> -- Failed quick test so try harder
-                 case occurCheckExpand dflags tv ty1 of
+                 case occurCheckExpand dflags tv ty of
                    OC_OK ty2 | defer_me ty2 -> return Nothing
                              | otherwise    -> return (Just ty2)
                    _ -> return Nothing
-              | otherwise   -> return (Just ty1) }
+
+           _  | otherwise   -> return (Just ty) }
   where
     details = ASSERT2( isMetaTyVar tv, ppr tv ) tcTyVarDetails tv
     info         = mtv_info details
