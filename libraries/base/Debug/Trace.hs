@@ -102,6 +102,10 @@ For example, this returns the value of @f x@ but first outputs the message.
 
 > trace ("calling f with x = " ++ show x) (f x)
 
+The 'trace' function evaluates the message (i.e. the first argument) completely
+before printing it; so if the message is not fully defined, none of it
+will be printed.
+
 The 'trace' function should /only/ be used for debugging, or for monitoring
 execution. The function is not referentially transparent: its type indicates
 that it is a pure function but it has the side effect of outputting the
