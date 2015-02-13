@@ -443,12 +443,12 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
       setSrcSpan (getSrcSpan (iSpec i)) $
         do env <- getGblEnv
            if isHsBootOrSig (tcg_src env)
-             then return ()
-                {-
-                  addWarnTc $ vcat
-                  [ ptext (sLit "`Typeable` instances in .hs-boot files are ignored.")
-                  , ptext (sLit "This warning will become an error in future versions of the compiler.")
-                  ] -}
+             then
+               do warn <- woptM Opt_WarnDerivingTypeable
+                  when warn $ addWarnTc $ vcat
+                    [ ptext (sLit "`Typeable` instances in .hs-boot files are ignored.")
+                    , ptext (sLit "This warning will become an error in future versions of the compiler.")
+                    ]
              else addErrTc $ ptext (sLit "Class `Typeable` does not support user-specified instances.")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
