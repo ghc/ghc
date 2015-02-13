@@ -536,7 +536,7 @@ can_eq_fam_nc :: CtEvidence -> EqRel -> SwapFlag
               -> TcS (StopOrContinue Ct)
 -- Canonicalise a non-canonical equality of form (F tys ~ ty)
 --   or the swapped version thereof
--- Flatten both sides and go round again
+-- Flatten the LHS and go round again
 can_eq_fam_nc ev eq_rel swapped fn tys rhs ps_rhs
   = do { (xi_lhs, co_lhs) <- flattenFamApp FM_FlattenAll ev fn tys
        ; rewriteEqEvidence ev eq_rel swapped xi_lhs rhs co_lhs
