@@ -124,38 +124,8 @@ Note [The flattening story]
   This just unites the two fsks into one.
   Always solve given from wanted if poss.
 
-* [Firing rule: wanteds]
-    (work item) [W] x : F tys ~ fmv
-    instantiate axiom: ax_co : F tys ~ rhs
-
-   Dischard fmv:
-      fmv := alpha
-      x := ax_co ; sym x2
-      [W] x2 : alpha ~ rhs  (Non-canonical)
-   discharging the work item. This is the way that fmv's get
-   unified; even though they are "untouchable".
-
-   NB: this deals with the case where fmv appears in xi, which can
-   happen; it just happens through the non-canonical stuff
-
-   Possible short cut (shortCutReduction) if rhs = G rhs_tys,
-   where G is a type function.  Then
-      - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
-      - Add G rhs_xis ~ fmv to flat cache
-      - New wanted [W] x2 : G rhs_xis ~ fmv
-      - Discharge x := co ; G cos ; x2
-
-* [Firing rule: givens]
-    (work item) [G] g : F tys ~ fsk
-    instantiate axiom: co : F tys ~ rhs
-
-   Now add non-canonical (since rhs is not flat)
-      [G] (sym g ; co) : fsk ~ rhs
-
-   Short cut (shortCutReduction) for when rhs = G rhs_tys and G is a type function
-      [G] (co ; g) : G tys ~ fsk
-   But need to flatten tys:  flat_cos : tys ~ flat_tys
-      [G] (sym (G flat_cos) ; co ; g) : G flat_tys ~ fsk
+* For top-level reductions, see Note [Top-level reductions for type functions]
+  in TcInteract
 
 
 Why given-fsks, alone, doesn't work
