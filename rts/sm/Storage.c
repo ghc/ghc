@@ -746,7 +746,10 @@ StgPtr allocate (Capability *cap, W_ n)
     TICK_ALLOC_HEAP_NOCTR(WDS(n));
     CCS_ALLOC(cap->r.rCCCS,n);
     if (cap->r.rCurrentTSO != NULL) {
-        cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_);
+        // cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_)
+        ASSIGN_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit),
+                     (PK_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit))
+                      - n*sizeof(W_)));
     }
 
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
@@ -897,7 +900,10 @@ allocatePinned (Capability *cap, W_ n)
     TICK_ALLOC_HEAP_NOCTR(WDS(n));
     CCS_ALLOC(cap->r.rCCCS,n);
     if (cap->r.rCurrentTSO != NULL) {
-        cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_);
+        // cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_);
+        ASSIGN_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit),
+                     (PK_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit))
+                      - n*sizeof(W_)));
     }
 
     bd = cap->pinned_object_block;

@@ -155,6 +155,9 @@ typedef struct StgTSO_ {
      * This is an integer, because we might update it in a place where
      * it isn't convenient to raise the exception, so we want it to
      * stay negative until we get around to checking it.
+     *
+     * Use only PK_Int64/ASSIGN_Int64 macros to get/set the value of alloc_limit
+     * in C code otherwise you will cause alignment issues on SPARC
      */
     StgInt64  alloc_limit;     /* in bytes */
 
