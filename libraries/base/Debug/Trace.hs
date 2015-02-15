@@ -60,7 +60,11 @@ import Data.List
 -- The 'trace', 'traceShow' and 'traceIO' functions print messages to an output
 -- stream. They are intended for \"printf debugging\", that is: tracing the flow
 -- of execution and printing interesting values.
-
+--
+-- All these functions evaluate the message completely before printing
+-- it; so if the message is not fully defined, none of it will be
+-- printed.
+--
 -- The usual output stream is 'System.IO.stderr'. For Windows GUI applications
 -- (that have no stderr) the output is directed to the Windows debug console.
 -- Some implementations of these functions may decorate the string that\'s
@@ -101,10 +105,6 @@ before returning the second argument as its result.
 For example, this returns the value of @f x@ but first outputs the message.
 
 > trace ("calling f with x = " ++ show x) (f x)
-
-The 'trace' function evaluates the message (i.e. the first argument) completely
-before printing it; so if the message is not fully defined, none of it
-will be printed.
 
 The 'trace' function should /only/ be used for debugging, or for monitoring
 execution. The function is not referentially transparent: its type indicates
