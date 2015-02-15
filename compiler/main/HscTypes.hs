@@ -1410,7 +1410,8 @@ extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults new_
                             -- a new mod_index (Trac #9426)
           , ic_tythings   = new_tythings ++ old_tythings
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
-          , ic_instances  = (new_cls_insts ++ old_cls_insts, new_fam_insts ++ old_fam_insts)
+          , ic_instances  = ( new_cls_insts ++ old_cls_insts
+                            , new_fam_insts ++ old_fam_insts )
           , ic_default    = defaults }
   where
     new_tythings = map AnId ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) new_patsyns
