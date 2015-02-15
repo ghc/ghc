@@ -586,7 +586,7 @@ skolemiseUnboundMetaTyVar tv details
         ; writeMetaTyVar tv (mkTyVarTy final_tv)
         ; return final_tv }
   where
-    -- If a wildcard type called _a is generalised, we rename it to tw_a
+    -- If a wildcard type called _a is generalised, we rename it to w_a
     generaliseWildcardVarName :: OccName -> OccName
     generaliseWildcardVarName name | startsWithUnderscore name
       = mkOccNameFS (occNameSpace name) (appendFS (fsLit "w") (occNameFS name))

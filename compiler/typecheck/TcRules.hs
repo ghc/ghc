@@ -60,7 +60,13 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
     do { traceTc "---- Rule ------" (ppr name)
 
         -- Note [Typechecking rules]
-       ; vars <- tcRuleBndrs hs_bndrs
+       ; (vars, bndr_wanted) <- captureConstraints $
+                                tcRuleBndrs hs_bndrs
+              -- bndr_wanted constraints can include wildcard hole
+              -- constraints, which we should not forget about.
+              -- It may mention the skolem type variables bound by
+              -- the RULE.  c.f. Trac #10072
+
        ; let (id_bndrs, tv_bndrs) = partition isId vars
        ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
             <- tcExtendTyVarEnv tv_bndrs $
@@ -70,7 +76,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                   ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
-       ; (lhs_evs, other_lhs_wanted) <- simplifyRule (unLoc name) lhs_wanted
+       ; (lhs_evs, other_lhs_wanted) <- simplifyRule (unLoc name) 
+                                                     (bndr_wanted `andWC` lhs_wanted)
                                                      rhs_wanted
 
         -- Now figure out what to quantify over
