@@ -15,6 +15,7 @@ overlay_options
         . hpcDirOpt
         . resetHpcDirsOpt
         . outputOpt
+        . verbosityOpt
 
 overlay_plugin :: Plugin
 overlay_plugin = Plugin { name = "overlay"

@@ -27,6 +27,8 @@ data Flags = Flags
   , combineFun          :: CombineFun   -- tick-wise combine
   , postFun             :: PostFun      --
   , mergeModule         :: MergeFun     -- module-wise merge
+
+  , verbosity           :: Verbosity
   }
 
 default_flags :: Flags
@@ -48,7 +50,19 @@ default_flags = Flags
   , combineFun          = ADD
   , postFun             = ID
   , mergeModule         = INTERSECTION
+
+  , verbosity           = Normal
   }
+
+
+data Verbosity = Silent | Normal | Verbose
+  deriving (Eq, Ord)
+
+verbosityFromString :: String -> Verbosity
+verbosityFromString "0" = Silent
+verbosityFromString "1" = Normal
+verbosityFromString "2" = Verbose
+verbosityFromString v   = error $ "unknown verbosity: " ++ v
 
 
 -- We do this after reading flags, because the defaults
@@ -73,7 +87,7 @@ infoArg :: String -> FlagOptSeq
 infoArg info = (:) $ Option [] [] (NoArg $ id) info
 
 excludeOpt, includeOpt, hpcDirOpt, resetHpcDirsOpt, srcDirOpt,
-    destDirOpt, outputOpt,
+    destDirOpt, outputOpt, verbosityOpt,
     perModuleOpt, decListOpt, xmlOutputOpt, funTotalsOpt,
     altHighlightOpt, combineFunOpt, combineFunOptInfo, mapFunOpt,
     mapFunOptInfo, unionModuleOpt :: FlagOptSeq
@@ -100,6 +114,11 @@ destDirOpt      = anArg "destdir"   "path to write output to" "DIR"
 
 
 outputOpt     = anArg "output"    "output FILE" "FILE"        $ \ a f -> f { outputFile = a }
+
+verbosityOpt  = anArg "verbosity" "verbosity level, 0-2" "[0-2]"
+                (\ a f -> f { verbosity  = verbosityFromString a })
+              . infoArg "default 1"
+
 -- markup
 
 perModuleOpt  = noArg "per-module" "show module level detail" $ \ f -> f { perModule = True }

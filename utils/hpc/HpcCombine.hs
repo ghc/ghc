@@ -21,6 +21,7 @@ sum_options
         . includeOpt
         . outputOpt
         . unionModuleOpt
+        . verbosityOpt
 
 sum_plugin :: Plugin
 sum_plugin = Plugin { name = "sum"
@@ -40,6 +41,7 @@ combine_options
         . combineFunOpt
         . combineFunOptInfo
         . unionModuleOpt
+        . verbosityOpt
 
 combine_plugin :: Plugin
 combine_plugin = Plugin { name = "combine"
@@ -59,6 +61,7 @@ map_options
         . mapFunOpt
         . mapFunOptInfo
         . unionModuleOpt
+        . verbosityOpt
 
 map_plugin :: Plugin
 map_plugin = Plugin { name = "map"

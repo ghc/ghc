@@ -15,6 +15,7 @@ showtix_options
         . hpcDirOpt
         . resetHpcDirsOpt
         . outputOpt
+        . verbosityOpt
 
 showtix_plugin :: Plugin
 showtix_plugin = Plugin { name = "show"

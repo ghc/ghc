@@ -274,5 +274,6 @@ report_options
         . hpcDirOpt
         . resetHpcDirsOpt
         . xmlOutputOpt
+        . verbosityOpt
 
 
