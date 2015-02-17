@@ -706,7 +706,7 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                       then do
                         warn ("WARNING: cache does not exist: " ++ cache)
                         warn ("ghc will fail to read this package db. " ++
-                              "Use 'ghc-pkg recache' to fix.")
+                              recacheAdvice)
                       else do
                         warn ("WARNING: cache cannot be read: " ++ show ex)
                         warn "ghc will fail to read this package db."
@@ -736,7 +736,7 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                           whenReportCacheErrors $ do
                               warn ("WARNING: cache is out of date: " ++ cache)
                               warn ("ghc will see an old view of this " ++
-                                    "package db. Use 'ghc-pkg recache' to fix.")
+                                    "package db. " ++ recacheAdvice)
                           ignore_cache compareTimestampToCache
             where
                  ignore_cache :: (FilePath -> IO ()) -> IO PackageDB
@@ -753,6 +753,12 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                      when (   verbosity >  Normal
                            || verbosity >= Normal && not modify)
   where
+    recacheAdvice
+      | Just (user_conf, True) <- mb_user_conf, path == user_conf
+      = "Use 'ghc-pkg recache --user' to fix."
+      | otherwise
+      = "Use 'ghc-pkg recache' to fix."
+
     mkPackageDB pkgs = do
       path_abs <- absolutePath path
       return PackageDB {
