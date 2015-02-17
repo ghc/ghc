@@ -65,6 +65,8 @@ export CC
 
 # --with-hs-cpp/--with-hs-cpp-flags
 FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
+AC_SUBST([HaskellCPPCmd])
+AC_SUBST([HaskellCPPArgs])
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------

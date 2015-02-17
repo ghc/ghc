@@ -2146,7 +2146,7 @@ dnl ** what cpp to use?
 dnl --------------------------------------------------------------
 AC_ARG_WITH(hs-cpp,
 [AC_HELP_STRING([--with-hs-cpp=ARG],
-        [Use ARG as the path to cpp [default=autodetect]])],
+      [Path to the (C) preprocessor for Haskell files [default=autodetect]])],
 [
     if test "$HostOS" = "mingw32"
     then
@@ -2157,6 +2157,8 @@ AC_ARG_WITH(hs-cpp,
 ],
 [
 
+    # We can't use $CPP here, since HS_CPP_CMD is expected to be a single
+    # command (no flags), and AC_PROG_CPP defines CPP as "/usr/bin/gcc -E".
     HS_CPP_CMD=$WhatGccIsCalled
 
     SOLARIS_GCC_CPP_BROKEN=NO
@@ -2198,7 +2200,7 @@ dnl ** what cpp flags to use?
 dnl -----------------------------------------------------------
 AC_ARG_WITH(hs-cpp-flags,
   [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
-          [Use ARG as the path to hs cpp [default=autodetect]])],
+      [Flags to the (C) preprocessor for Haskell files [default=autodetect]])],
   [
       if test "$HostOS" = "mingw32"
       then
@@ -2210,11 +2212,11 @@ AC_ARG_WITH(hs-cpp-flags,
 [
   $HS_CPP_CMD -x c /dev/null -dM -E > conftest.txt 2>&1
   if grep "__clang__" conftest.txt >/dev/null 2>&1; then
-    HS_CPP_ARGS="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs "
+    HS_CPP_ARGS="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs"
   else
       $HS_CPP_CMD  -v > conftest.txt 2>&1
       if  grep "gcc" conftest.txt >/dev/null 2>&1; then
-          HS_CPP_ARGS="-E -undef -traditional "
+          HS_CPP_ARGS="-E -undef -traditional"
         else
           $HS_CPP_CMD  --version > conftest.txt 2>&1
           if grep "cpphs" conftest.txt >/dev/null 2>&1; then

@@ -269,7 +269,7 @@ compiler_CPP_OPTS += ${GhcCppOpts}
 define preprocessCompilerFiles
 # $0 = stage
 compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp compiler/stage$1/$$(PLATFORM_H)
-	$$(CPP) $$(RAWCPP_FLAGS) -P $$(compiler_CPP_OPTS) -Icompiler/stage$1 -x c $$< | grep -v '^#pragma GCC' > $$@
+	$$(HS_CPP) -P $$(compiler_CPP_OPTS) -Icompiler/stage$1 -x c $$< | grep -v '^#pragma GCC' > $$@
 
 compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --data-decl          < $$< > $$@

@@ -426,8 +426,13 @@ export CC
 MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
+dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
+AC_PROG_CPP
+
 # --with-hs-cpp/--with-hs-cpp-flags
 FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
+AC_SUBST([HaskellCPPCmd])
+AC_SUBST([HaskellCPPArgs])
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
@@ -595,9 +600,6 @@ FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_GCC_LINKER_OPTS_STAG
 # Stage 3 won't be supported by cross-compilation
 
 FP_GCC_EXTRA_FLAGS
-
-dnl ** figure out how to invoke cpp directly (gcc -E is no good)
-AC_PROG_CPP
 
 AC_SUBST(CONF_CC_OPTS_STAGE0)
 AC_SUBST(CONF_CC_OPTS_STAGE1)
@@ -1031,14 +1033,14 @@ echo ["\
    Using $CompilerName       : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
-   cpp       : $HaskellCPPCmd
-   cpp-flags : $HaskellCPPArgs
-   ld        : $LdCmd
-   Happy     : $HappyCmd ($HappyVersion)
-   Alex      : $AlexCmd ($AlexVersion)
-   Perl      : $PerlCmd
-   dblatex   : $DblatexCmd
-   xsltproc  : $XsltprocCmd
+   hs-cpp       : $HaskellCPPCmd
+   hs-cpp-flags : $HaskellCPPArgs
+   ld           : $LdCmd
+   Happy        : $HappyCmd ($HappyVersion)
+   Alex         : $AlexCmd ($AlexVersion)
+   Perl         : $PerlCmd
+   dblatex      : $DblatexCmd
+   xsltproc     : $XsltprocCmd
 
    Using LLVM tools
       llc   : $LlcCmd
