@@ -323,7 +323,7 @@ instance Show IOErrorType where
       ResourceVanished  -> "resource vanished"
       SystemError       -> "system error"
       TimeExpired       -> "timeout"
-      UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
+      UnsatisfiedConstraints -> "unsatisfied constraints" -- ultra-precise!
       UnsupportedOperation -> "unsupported operation"
 
 -- | Construct an 'IOError' value with a string describing the error.
