@@ -2343,14 +2343,13 @@ emptyMG = []
 --
 -- * A regular Haskell source module
 -- * A hi-boot source module
--- * An external-core source module
 --
 data ModSummary
    = ModSummary {
         ms_mod          :: Module,
           -- ^ Identity of the module
         ms_hsc_src      :: HscSource,
-          -- ^ The module source either plain Haskell, hs-boot or external core
+          -- ^ The module source either plain Haskell or hs-boot
         ms_location     :: ModLocation,
           -- ^ Location of the various files belonging to the module
         ms_hs_date      :: UTCTime,

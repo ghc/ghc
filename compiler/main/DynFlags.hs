@@ -395,7 +395,6 @@ data GeneralFlag
    | Opt_PrintBindContents
    | Opt_GenManifest
    | Opt_EmbedManifest
-   | Opt_EmitExternalCore
    | Opt_SharedImplib
    | Opt_BuildingCabalPackage
    | Opt_IgnoreDotGhci
@@ -2939,8 +2938,6 @@ fFlags = [
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
-  flagSpec' "ext-core"                        Opt_EmitExternalCore
-    (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
   flagSpec "flat-cache"                       Opt_FlatCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
