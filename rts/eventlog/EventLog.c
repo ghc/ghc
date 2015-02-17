@@ -1078,11 +1078,6 @@ void postCapMsg(Capability *cap, char *msg, va_list ap)
     postLogMsg(&capEventBuf[cap->no], EVENT_LOG_MSG, msg, ap);
 }
 
-void postUserMsg(Capability *cap, char *msg, va_list ap)
-{
-    postLogMsg(&capEventBuf[cap->no], EVENT_USER_MSG, msg, ap);
-}
-
 void postEventStartup(EventCapNo n_caps)
 {
     ACQUIRE_LOCK(&eventBufMutex);
@@ -1099,10 +1094,10 @@ void postEventStartup(EventCapNo n_caps)
     RELEASE_LOCK(&eventBufMutex);
 }
 
-void postUserMarker(Capability *cap, char *markername)
+void postUserEvent(Capability *cap, EventTypeNum type, char *msg)
 {
     EventsBuf *eb;
-    int size = strlen(markername);
+    int size = strlen(msg);
 
     eb = &capEventBuf[cap->no];
 
@@ -1115,9 +1110,9 @@ void postUserMarker(Capability *cap, char *markername)
         }
     }
 
-    postEventHeader(eb, EVENT_USER_MARKER);
+    postEventHeader(eb, type);
     postPayloadSize(eb, size);
-    postBuf(eb, (StgWord8*) markername, size);
+    postBuf(eb, (StgWord8*) msg, size);
 }
 
 void postThreadLabel(Capability    *cap,

@@ -45,11 +45,9 @@ void postEventAtTimestamp (Capability *cap, EventTimestamp ts,
 
 void postMsg(char *msg, va_list ap);
 
-void postUserMsg(Capability *cap, char *msg, va_list ap);
+void postUserEvent(Capability *cap, EventTypeNum type, char *msg);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
-
-void postUserMarker(Capability *cap, char *markername);
 
 void postEventStartup(EventCapNo n_caps);
 

@@ -1,5 +1,5 @@
-import GHC.Exts
+import Debug.Trace
 
 main = do
-  traceEvent "testing"
-  traceEvent "%s" -- see #3874
+  traceEventIO "testing"
+  traceEventIO "%s" -- see #3874
