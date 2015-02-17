@@ -20,6 +20,7 @@ draft_options
         . hpcDirOpt
         . resetHpcDirsOpt
         . outputOpt
+        . verbosityOpt
 
 draft_plugin :: Plugin
 draft_plugin = Plugin { name = "draft"
