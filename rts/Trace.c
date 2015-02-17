@@ -702,6 +702,7 @@ static void traceFormatUserMsg(Capability *cap, char *msg, ...)
         }
     }
     dtraceUserMsg(cap->no, msg);
+    va_end(ap);
 }
 
 void traceUserMsg(Capability *cap, char *msg)
@@ -778,6 +779,7 @@ void traceBegin (const char *str, ...)
 
     tracePreface();
     vdebugBelch(str,ap);
+    va_end(ap);
 }
 
 void traceEnd (void)
