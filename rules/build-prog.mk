@@ -11,11 +11,7 @@
 # -----------------------------------------------------------------------------
 
 
-# Build a program.  Invoke like this:
-#
-# utils/genapply_MODULES = Main
-# utils/genapply_HC_OPTS = -package Cabal
-# utils/genapply_dist_PROGNAME = genapply
+# Build a program.
 #
 # $(eval $(call build-prog,utils/genapply,dist-install,1))
 
