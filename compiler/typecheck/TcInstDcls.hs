@@ -18,7 +18,7 @@ import TcTyClsDecls
 import TcClassDcl( tcClassDecl2,
                    HsSigFun, lookupHsSig, mkHsSigFun,
                    findMethodBind, instantiateMethod )
-import TcPat      ( addInlinePrags )
+import TcPat      ( addInlinePrags, completeSigPolyId )
 import TcRnMonad
 import TcValidity
 import TcMType
@@ -1387,7 +1387,9 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                  rhs = HsWrap (mkWpEvVarApps [self_dict] <.> mkWpTyApps inst_tys) $
                        HsVar dm_id
 
-                 local_meth_id = sig_id local_meth_sig
+                 -- A method always has a complete type signature,
+                 -- hence it is safe to call completeSigPolyId
+                 local_meth_id = completeSigPolyId local_meth_sig
                  meth_bind = mkVarBind local_meth_id (L inst_loc rhs)
                  meth_id1 = meth_id `setInlinePragma` dm_inline_prag
                         -- Copy the inline pragma (if any) from the default
@@ -1435,7 +1437,9 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                            inst_tys sel_id
 
        ; let prags         = prag_fn (idName sel_id)
-             local_meth_id = sig_id local_meth_sig
+             -- A method always has a complete type signature, hence
+             -- it is safe to call completeSigPolyId
+             local_meth_id = completeSigPolyId local_meth_sig
              lm_bind       = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind

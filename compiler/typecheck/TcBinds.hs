@@ -544,16 +544,17 @@ tcPolyCheck :: RecFlag       -- Whether it's recursive after breaking
 --   it binds a single variable,
 --   it has a signature,
 tcPolyCheck rec_tc prag_fn
-            sig@(TcSigInfo { sig_id = poly_id, sig_tvs = tvs_w_scoped
+            sig@(TcSigInfo { sig_name = name, sig_poly_id = Just poly_id
+                           , sig_tvs = tvs_w_scoped
                            , sig_nwcs = sig_nwcs, sig_theta = theta
                            , sig_tau = tau, sig_loc = loc
                            , sig_warn_redundant = warn_redundant })
             bind
   = ASSERT( null sig_nwcs ) -- We should be in tcPolyInfer if there are wildcards
     do { ev_vars <- newEvVars theta
-       ; let ctxt      = FunSigCtxt (idName poly_id) warn_redundant
+       ; let ctxt      = FunSigCtxt name warn_redundant
              skol_info = SigSkol ctxt (mkPhiTy theta tau)
-             prag_sigs = prag_fn (idName poly_id)
+             prag_sigs = prag_fn name
              tvs = map snd tvs_w_scoped
        ; (ev_binds, (binds', [mono_info]))
             <- setSrcSpan loc $
@@ -640,11 +641,10 @@ mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
         ; poly_id <- case mb_sig of
               Nothing -> mkInferredPolyId poly_name qtvs inferred_theta mono_ty
               Just (TcPatSynInfo _) -> panic "mkExport"
-              Just sig | isPartialSig sig
-                       -> do { final_theta <- completeTheta inferred_theta sig
+              Just sig | Just id <- sig_poly_id sig
+                       -> return id
+              Just sig -> do { final_theta <- completeTheta inferred_theta sig
                              ; mkInferredPolyId poly_name qtvs final_theta mono_ty }
-                       | otherwise
-                       -> return (sig_id sig)
 
         -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
@@ -724,8 +724,7 @@ completeTheta :: TcThetaType -> TcSigInfo -> TcM TcThetaType
 completeTheta _ (TcPatSynInfo _)
   = panic "Extra-constraints wildcard not supported in a pattern signature"
 completeTheta inferred_theta
-              sig@(TcSigInfo { sig_id = poly_id
-                             , sig_extra_cts = mb_extra_cts
+              sig@(TcSigInfo { sig_extra_cts = mb_extra_cts
                              , sig_theta = annotated_theta })
   | Just loc <- mb_extra_cts
   = do { annotated_theta <- zonkTcThetaType annotated_theta
@@ -752,7 +751,7 @@ completeTheta inferred_theta
                    2 (text "with inferred constraints:")
                       <+> pprTheta inferred_diff
               , if suppress_hint then empty else pts_hint
-              , typeSigCtxt (idName poly_id) sig ]
+              , typeSigCtxt sig ]
 
 {-
 Note [Partial type signatures and generalisation]
@@ -843,13 +842,15 @@ where F is a non-injective type function.
 recoveryCode :: [Name] -> TcSigFun -> TcM (LHsBinds TcId, [Id], TopLevelFlag)
 recoveryCode binder_names sig_fn
   = do  { traceTc "tcBindsWithSigs: error recovery" (ppr binder_names)
-        ; poly_ids <- mapM mk_dummy binder_names
+        ; let poly_ids = map mk_dummy binder_names
         ; return (emptyBag, poly_ids, if all is_closed poly_ids
                                       then TopLevel else NotTopLevel) }
   where
     mk_dummy name
-        | isJust (sig_fn name) = tcLookupId name        -- Had signature; look it up
-        | otherwise            = return (mkLocalId name forall_a_a)    -- No signature
+      | Just (TcSigInfo { sig_poly_id = Just poly_id }) <- sig_fn name
+      = poly_id
+      | otherwise
+      = mkLocalId name forall_a_a
 
     is_closed poly_id = isEmptyVarSet (tyVarsOfType (idType poly_id))
 
@@ -1348,7 +1349,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
        -- Both InferGen and CheckGen gives rise to LetLclBndr
     do  { mono_name <- newLocalName name
         ; let mono_id = mkLocalId mono_name (sig_tau sig)
-        ; addErrCtxt (typeSigCtxt name sig) $
+        ; addErrCtxt (typeSigCtxt sig) $
           emitWildcardHoleConstraints (sig_nwcs sig)
         ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
 
@@ -1507,7 +1508,10 @@ tcTySigs hs_sigs
   = checkNoErrs $   -- See Note [Fail eagerly on bad signatures]
     do { (ty_sigs_s, tyvarsl) <- unzip <$> mapAndRecoverM tcTySig hs_sigs
        ; let ty_sigs = concat ty_sigs_s
-             poly_ids = [id | TcSigInfo{ sig_id = id } <- ty_sigs]
+             poly_ids = [id | TcSigInfo { sig_poly_id = Just id } <- ty_sigs]
+             -- The returned [TcId] are the ones for which we have a
+             -- *complete* type signatures.
+             -- See Note [Complete and partial type signatures]
              env = mkNameEnv [(getName sig, sig) | sig <- ty_sigs]
        ; return (poly_ids, lookupNameEnv env, concat tyvarsl) }
 
@@ -1561,12 +1565,12 @@ instTcTySigFromId id
   = do { let loc = getSrcSpan id
        ; (tvs, theta, tau) <- tcInstType (tcInstSigTyVarsLoc loc)
                                          (idType id)
-       ; return (TcSigInfo { sig_id = id, sig_loc = loc
+       ; return (TcSigInfo { sig_name = idName id
+                           , sig_poly_id = Just id, sig_loc = loc
                            , sig_tvs = [(Nothing, tv) | tv <- tvs]
                            , sig_nwcs = []
                            , sig_theta = theta, sig_tau = tau
                            , sig_extra_cts = Nothing
-                           , sig_partial = False
                            , sig_warn_redundant = False
                                -- Do not report redundant constraints for
                                -- instance methods and record selectors
@@ -1580,13 +1584,16 @@ instTcTySig :: LHsType Name -> TcType    -- HsType and corresponding TcType
             -> TcM TcSigInfo
 instTcTySig hs_ty@(L loc _) sigma_ty extra_cts nwcs name
   = do { (inst_tvs, theta, tau) <- tcInstType tcInstSigTyVars sigma_ty
-       ; return (TcSigInfo { sig_id  = mkLocalId name sigma_ty
+       ; let mb_poly_id | isNothing extra_cts && null nwcs
+                        = Just $ mkLocalId name sigma_ty  -- non-partial
+                        | otherwise = Nothing  -- partial type signature
+       ; return (TcSigInfo { sig_name = name
+                           , sig_poly_id = mb_poly_id
                            , sig_loc = loc
                            , sig_tvs = findScopedTyVars hs_ty sigma_ty inst_tvs
                            , sig_nwcs = nwcs
                            , sig_theta = theta, sig_tau = tau
                            , sig_extra_cts = extra_cts
-                           , sig_partial = isJust extra_cts || not (null nwcs)
                            , sig_warn_redundant = True
                }) }
 
@@ -1773,12 +1780,12 @@ patMonoBindsCtxt :: (OutputableBndr id, Outputable body) => LPat id -> GRHSs Nam
 patMonoBindsCtxt pat grhss
   = hang (ptext (sLit "In a pattern binding:")) 2 (pprPatBind pat grhss)
 
-typeSigCtxt :: Name -> TcSigInfo -> SDoc
-typeSigCtxt _    (TcPatSynInfo _)
+typeSigCtxt :: TcSigInfo -> SDoc
+typeSigCtxt (TcPatSynInfo _)
   = panic "Should only be called with a TcSigInfo"
-typeSigCtxt name (TcSigInfo { sig_id = _id, sig_tvs = tvs
-                            , sig_theta = theta, sig_tau = tau
-                            , sig_extra_cts = extra_cts })
+typeSigCtxt (TcSigInfo { sig_name = name, sig_tvs = tvs
+                       , sig_theta = theta, sig_tau = tau
+                       , sig_extra_cts = extra_cts })
   = sep [ text "In" <+> pprUserTypeCtxt (FunSigCtxt name False) <> colon
         , nest 2 (pprSigmaTypeExtraCts (isJust extra_cts)
                   (mkSigmaTy (map snd tvs) theta tau)) ]

@@ -19,7 +19,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import TcEnv
-import TcPat( addInlinePrags )
+import TcPat( addInlinePrags, completeSigPolyId )
 import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
@@ -233,7 +233,10 @@ tcDefMeth clas tyvars this_dict binds_in
                               (L bind_loc lm_bind)
 
         ; let export = ABE { abe_poly  = global_dm_id
-                           , abe_mono  = sig_id local_dm_sig'
+                           -- We have created a complete type signature in
+                           -- instTcTySig, hence it is safe to call
+                           -- completeSigPolyId
+                           , abe_mono  = completeSigPolyId local_dm_sig'
                            , abe_wrap  = idHsWrapper
                            , abe_prags = IsDefaultMethod }
               full_bind = AbsBinds { abs_tvs      = tyvars

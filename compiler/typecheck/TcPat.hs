@@ -10,7 +10,7 @@ TcPat: Typechecking patterns
 
 module TcPat ( tcLetPat, TcSigFun, TcPragFun
              , TcSigInfo(..), TcPatSynInfo(..)
-             , findScopedTyVars, isPartialSig
+             , findScopedTyVars, isPartialSig, completeSigPolyId
              , LetBndrSpec(..), addInlinePrags, warnPrags
              , tcPat, tcPats, newNoSigLetBndr
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
@@ -47,7 +47,6 @@ import Util
 import Outputable
 import FastString
 import Control.Monad
-
 {-
 ************************************************************************
 *                                                                      *
@@ -137,7 +136,16 @@ type TcSigFun  = Name -> Maybe TcSigInfo
 
 data TcSigInfo
   = TcSigInfo {
-        sig_id     :: TcId,         --  *Polymorphic* binder for this value...
+        sig_name    :: Name,  -- The binder name of the type signature. When
+                              -- sig_id = Just id, then sig_name = idName id.
+
+        sig_poly_id :: Maybe TcId,
+                              -- Just <=> complete type signature of
+                              -- which the polymorphic type is known.
+                              -- Nothing <=> partial type signature of
+                              -- which the type is not yet fully
+                              -- known.
+                              -- See Note [Complete and partial type signatures]
 
         sig_tvs    :: [(Maybe Name, TcTyVar)],
                            -- Instantiated type and kind variables
@@ -160,9 +168,6 @@ data TcSigInfo
                                     -- See Note [sig_tau may be polymorphic]
 
         sig_loc    :: SrcSpan,      -- The location of the signature
-
-        sig_partial :: Bool,        -- True <=> a partial type signature
-                                    -- containing wildcards
 
         sig_warn_redundant :: Bool  -- True <=> report redundant constraints
                                     --          when typechecking the value binding
@@ -204,20 +209,30 @@ findScopedTyVars hs_ty sig_ty inst_tvs
     (sig_tvs,_)  = tcSplitForAllTys sig_ty
 
 instance NamedThing TcSigInfo where
-    getName TcSigInfo{ sig_id = id } = idName id
+    getName TcSigInfo{ sig_name = name } = name
     getName (TcPatSynInfo tpsi) = patsig_name tpsi
 
+
 instance Outputable TcSigInfo where
-    ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau })
-        = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
-                                     , ppr (map fst tyvars) ]
+    ppr (TcSigInfo { sig_name = name, sig_poly_id = mb_poly_id, sig_tvs = tyvars
+                   , sig_theta = theta, sig_tau = tau })
+        = maybe (ppr name) ppr mb_poly_id <+> dcolon <+>
+          vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
+               , ppr (map fst tyvars) ]
     ppr (TcPatSynInfo tpsi) = text "TcPatSynInfo" <+> ppr tpsi
 
 instance Outputable TcPatSynInfo where
     ppr (TPSI{ patsig_name = name}) = ppr name
 
 isPartialSig :: TcSigInfo -> Bool
-isPartialSig = sig_partial
+isPartialSig (TcSigInfo { sig_poly_id = Nothing }) = True
+isPartialSig _ = False
+
+-- Helper for cases when we know for sure we have a complete type
+-- signature, e.g. class methods.
+completeSigPolyId :: TcSigInfo -> TcId
+completeSigPolyId (TcSigInfo { sig_poly_id = Just id }) = id
+completeSigPolyId _ = panic "completeSigPolyId"
 
 {-
 Note [Binding scoped type variables]
@@ -271,6 +286,20 @@ bound by C don't unify with the free variables of pat_ty, OR res_ty
 (or of course the environment).   Hence we need to keep track of the
 res_ty free vars.
 
+Note [Complete and partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type signature is partial when it contains one or more wildcards.
+The wildcard can either be:
+* A (type) wildcard occurring in sig_theta or sig_tau. These are
+  stored in sig_nwcs.
+      f :: Bool -> _
+      g :: Eq _a => _a -> _a -> Bool
+* Or an extra-constraints wildcard, stored in sig_extra_cts:
+      h :: (Num a, _) => a -> a
+
+A type signature is a complete type signature when there are no
+wildcards in the type signature, i.e. iff sig_nwcs is empty and
+sig_extra_cts is Nothing.
 
 ************************************************************************
 *                                                                      *
@@ -287,7 +316,8 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
           -- See Note [Typing patterns in pattern bindings]
   | LetGblBndr prags <- no_gen
   , Just sig <- lookup_sig bndr_name
-  = do { bndr_id <- addInlinePrags (sig_id sig) (prags bndr_name)
+  , Just poly_id <- sig_poly_id sig
+  = do { bndr_id <- addInlinePrags poly_id (prags bndr_name)
        ; traceTc "tcPatBndr(gbl,sig)" (ppr bndr_id $$ ppr (idType bndr_id))
        ; co <- unifyPatType (idType bndr_id) pat_ty
        ; return (co, bndr_id) }
