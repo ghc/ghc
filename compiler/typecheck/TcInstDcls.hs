@@ -1412,7 +1412,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     -- Check if one of the minimal complete definitions is satisfied
     checkMinimalDefinition
       = whenIsJust (isUnsatisfied methodExists (classMinimalDef clas)) $
-          warnUnsatisifiedMinimalDefinition
+          warnUnsatisfiedMinimalDefinition
       where
       methodExists meth = isJust (findMethodBind meth binds)
 
@@ -1616,8 +1616,8 @@ warnMissingMethodOrAT what name
                 (ptext (sLit "No explicit") <+> text what <+> ptext (sLit "or default declaration for")
                  <+> quotes (ppr name)) }
 
-warnUnsatisifiedMinimalDefinition :: ClassMinimalDef -> TcM ()
-warnUnsatisifiedMinimalDefinition mindef
+warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
+warnUnsatisfiedMinimalDefinition mindef
   = do { warn <- woptM Opt_WarnMissingMethods
        ; warnTc warn message
        }
