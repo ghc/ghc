@@ -1,5 +1,4 @@
-{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, RecordWildCards,
-             GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 --
@@ -26,7 +25,6 @@ import Distribution.Version
 import Distribution.Simple.Utils (fromUTF8, toUTF8)
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
-import System.Process
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
@@ -86,6 +84,15 @@ import System.Console.Terminfo as Terminfo
 # endif
 #endif
 
+-- | Short-circuit 'any' with a \"monadic predicate\".
+anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
+anyM _ [] = return False
+anyM p (x:xs) = do
+  b <- p x
+  if b
+    then return True
+    else anyM p xs
+
 -- -----------------------------------------------------------------------------
 -- Entry point
 
@@ -120,7 +127,6 @@ data Flag
   | FlagUserConfig FilePath
   | FlagForce
   | FlagForceFiles
-  | FlagAutoGHCiLibs
   | FlagMultiInstance
   | FlagExpandEnvVars
   | FlagExpandPkgroot
@@ -155,8 +161,6 @@ flags = [
          "ignore missing dependencies, directories, and libraries",
   Option [] ["force-files"] (NoArg FlagForceFiles)
          "ignore missing directories and libraries only",
-  Option ['g'] ["auto-ghci-libs"] (NoArg FlagAutoGHCiLibs)
-        "automatically build libs for GHCi (with register)",
   Option [] ["enable-multi-instance"] (NoArg FlagMultiInstance)
         "allow registering multiple instances of the same package version",
   Option [] ["expand-env-vars"] (NoArg FlagExpandEnvVars)
@@ -335,7 +339,6 @@ runit verbosity cli nonopts = do
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
         as_ipid = FlagIPId `elem` cli
-        auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
         multi_instance = FlagMultiInstance `elem` cli
         expand_env_vars= FlagExpandEnvVars `elem` cli
         mexpand_pkgroot= foldl' accumExpandPkgroot Nothing cli
@@ -405,11 +408,11 @@ runit verbosity cli nonopts = do
         initPackageDB filename verbosity cli
     ["register", filename] ->
         registerPackage filename verbosity cli
-                        auto_ghci_libs multi_instance
+                        multi_instance
                         expand_env_vars False force
     ["update", filename] ->
         registerPackage filename verbosity cli
-                        auto_ghci_libs multi_instance
+                        multi_instance
                         expand_env_vars True force
     ["unregister", pkgarg_str] -> do
         pkgarg <- readPackageArg as_ipid pkgarg_str
@@ -919,13 +922,12 @@ initPackageDB filename verbosity _flags = do
 registerPackage :: FilePath
                 -> Verbosity
                 -> [Flag]
-                -> Bool              -- auto_ghci_libs
                 -> Bool              -- multi_instance
                 -> Bool              -- expand_env_vars
                 -> Bool              -- update
                 -> Force
                 -> IO ()
-registerPackage input verbosity my_flags auto_ghci_libs multi_instance
+registerPackage input verbosity my_flags multi_instance
                 expand_env_vars update force = do
   (db_stack, Just to_modify, _flag_dbs) <- 
       getPkgDatabases verbosity True{-modify-} True{-use user-}
@@ -934,10 +936,6 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
   let
         db_to_operate_on = my_head "register" $
                            filter ((== to_modify).location) db_stack
-  --
-  when (auto_ghci_libs && verbosity >= Silent) $
-    warn "Warning: --auto-ghci-libs is deprecated and will be removed in GHC 7.4"
-  --
   s <-
     case input of
       "-" -> do
@@ -971,7 +969,7 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
   validatePackageConfig pkg_expanded verbosity truncated_stack
-                        auto_ghci_libs multi_instance update force
+                        multi_instance update force
 
   let 
      -- In the normal mode, we only allow one version of each package, so we
@@ -1441,7 +1439,7 @@ checkConsistency verbosity my_flags = do
 
       checkPackage p = do
          (_,es,ws) <- runValidate $ checkPackageConfig p verbosity db_stack
-                                                       False True True
+                                                       True True
          if null es
             then do when (not simple_output) $ do
                       _ <- reportValidateErrors [] ws "" Nothing
@@ -1554,27 +1552,25 @@ reportValidateErrors es ws prefix mb_force = do
 validatePackageConfig :: InstalledPackageInfo
                       -> Verbosity
                       -> PackageDBStack
-                      -> Bool   -- auto-ghc-libs
                       -> Bool   -- multi_instance
                       -> Bool   -- update, or check
                       -> Force
                       -> IO ()
-validatePackageConfig pkg verbosity db_stack auto_ghci_libs
+validatePackageConfig pkg verbosity db_stack
                       multi_instance update force = do
   (_,es,ws) <- runValidate $
                  checkPackageConfig pkg verbosity db_stack
-                                    auto_ghci_libs multi_instance update
+                                    multi_instance update
   ok <- reportValidateErrors es ws (display (sourcePackageId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
 checkPackageConfig :: InstalledPackageInfo
                       -> Verbosity
                       -> PackageDBStack
-                      -> Bool   -- auto-ghc-libs
                       -> Bool   -- multi_instance
                       -> Bool   -- update, or check
                       -> Validate ()
-checkPackageConfig pkg verbosity db_stack auto_ghci_libs
+checkPackageConfig pkg verbosity db_stack
                    multi_instance update = do
   checkInstalledPackageId pkg db_stack update
   checkPackageId pkg
@@ -1591,7 +1587,7 @@ checkPackageConfig pkg verbosity db_stack auto_ghci_libs
   checkDuplicateModules pkg
   checkExposedModules db_stack pkg
   checkOtherModules pkg
-  mapM_ (checkHSLib verbosity (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
+  mapM_ (checkHSLib verbosity (libraryDirs pkg)) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
   --    c_includes      :: [String],
@@ -1701,28 +1697,23 @@ checkDuplicateDepends deps
   where
        dups = [ p | (p:_:_) <- group (sort deps) ]
 
-checkHSLib :: Verbosity -> [String] -> Bool -> String -> Validate ()
-checkHSLib verbosity dirs auto_ghci_libs lib = do
-  let batch_lib_file = "lib" ++ lib ++ ".a"
-      filenames = ["lib" ++ lib ++ ".a",
+checkHSLib :: Verbosity -> [String] -> String -> Validate ()
+checkHSLib _verbosity dirs lib = do
+  let filenames = ["lib" ++ lib ++ ".a",
                    "lib" ++ lib ++ ".p_a",
                    "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".so",
                    "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".dylib",
                             lib ++ "-ghc" ++ Version.version ++ ".dll"]
-  m <- liftIO $ doesFileExistOnPath filenames dirs
-  case m of
-    Nothing -> verror ForceFiles ("cannot find any of " ++ show filenames ++
-                                  " on library path")
-    Just dir -> liftIO $ checkGHCiLib verbosity dir batch_lib_file lib auto_ghci_libs
+  b <- liftIO $ doesFileExistOnPath filenames dirs
+  when (not b) $
+    verror ForceFiles ("cannot find any of " ++ show filenames ++
+                       " on library path")
 
-doesFileExistOnPath :: [FilePath] -> [FilePath] -> IO (Maybe FilePath)
-doesFileExistOnPath filenames paths = go fullFilenames
-  where fullFilenames = [ (path, path </> filename)
+doesFileExistOnPath :: [FilePath] -> [FilePath] -> IO Bool
+doesFileExistOnPath filenames paths = anyM doesFileExist fullFilenames
+  where fullFilenames = [ path </> filename
                         | filename <- filenames
                         , path <- paths ]
-        go []             = return Nothing
-        go ((p, fp) : xs) = do b <- doesFileExist fp
-                               if b then return (Just p) else go xs
 
 -- | Perform validation checks (module file existence checks) on the
 -- @hidden-modules@ field.
@@ -1749,8 +1740,8 @@ checkModuleFile pkg modl =
       unless (modl == ModuleName.fromString "GHC.Prim") $ do
       let files = [ ModuleName.toFilePath modl <.> extension
                   | extension <- ["hi", "p_hi", "dyn_hi" ] ]
-      m <- liftIO $ doesFileExistOnPath files (importDirs pkg)
-      when (isNothing m) $
+      b <- liftIO $ doesFileExistOnPath files (importDirs pkg)
+      when (not b) $
          verror ForceFiles ("cannot find any of " ++ show files)
 
 -- | Validates that @exposed-modules@ and @hidden-modules@ do not have duplicate
@@ -1780,20 +1771,20 @@ checkOriginalModule :: String
                     -> InstalledPackageInfo
                     -> OriginalModule
                     -> Validate ()
-checkOriginalModule fieldName db_stack pkg
+checkOriginalModule field_name db_stack pkg
     (OriginalModule definingPkgId definingModule) =
   let mpkg = if definingPkgId == installedPackageId pkg
               then Just pkg
               else PackageIndex.lookupInstalledPackageId ipix definingPkgId
   in case mpkg of
       Nothing
-           -> verror ForceAll (fieldName ++ " refers to a non-existent " ++
+           -> verror ForceAll (field_name ++ " refers to a non-existent " ++
                                "defining package: " ++
                                        display definingPkgId)
 
       Just definingPkg
         | not (isIndirectDependency definingPkgId)
-           -> verror ForceAll (fieldName ++ " refers to a defining  " ++
+           -> verror ForceAll (field_name ++ " refers to a defining  " ++
                                "package that is not a direct (or indirect) " ++
                                "dependency of this package: " ++
                                        display definingPkgId)
@@ -1802,12 +1793,12 @@ checkOriginalModule fieldName db_stack pkg
         -> case find ((==definingModule).exposedName)
                      (exposedModules definingPkg) of
             Nothing ->
-              verror ForceAll (fieldName ++ " refers to a module " ++
+              verror ForceAll (field_name ++ " refers to a module " ++
                                display definingModule ++ " " ++
                                "that is not exposed in the " ++
                                "defining package " ++ display definingPkgId)
             Just (ExposedModule {exposedReexport = Just _} ) ->
-              verror ForceAll (fieldName ++ " refers to a module " ++
+              verror ForceAll (field_name ++ " refers to a module " ++
                                display definingModule ++ " " ++
                                "that is reexported but not defined in the " ++
                                "defining package " ++ display definingPkgId)
@@ -1824,72 +1815,6 @@ checkOriginalModule fieldName db_stack pkg
     (depgraph, _, graphVertex) =
       PackageIndex.dependencyGraph (PackageIndex.insert pkg ipix)
 
-
-checkGHCiLib :: Verbosity -> String -> String -> String -> Bool -> IO ()
-checkGHCiLib verbosity batch_lib_dir batch_lib_file lib auto_build
-  | auto_build = autoBuildGHCiLib verbosity batch_lib_dir batch_lib_file ghci_lib_file
-  | otherwise  = return ()
- where
-    ghci_lib_file = lib <.> "o"
-
--- automatically build the GHCi version of a batch lib,
--- using ld --whole-archive.
-
-autoBuildGHCiLib :: Verbosity -> String -> String -> String -> IO ()
-autoBuildGHCiLib verbosity dir batch_file ghci_file = do
-  let ghci_lib_file  = dir ++ '/':ghci_file
-      batch_lib_file = dir ++ '/':batch_file
-  when (verbosity >= Normal) $
-    info ("building GHCi library " ++ ghci_lib_file ++ "...")
-#if defined(darwin_HOST_OS)
-  r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"-all_load",batch_lib_file]
-#elif defined(mingw32_HOST_OS)
-  execDir <- getLibDir
-  r <- rawSystem (maybe "" (++"/gcc-lib/") execDir++"ld") ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
-#else
-  r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
-#endif
-  when (r /= ExitSuccess) $ exitWith r
-  when (verbosity >= Normal) $
-    infoLn (" done.")
-
--- -----------------------------------------------------------------------------
--- Searching for modules
-
-#if not_yet
-
-findModules :: [FilePath] -> IO [String]
-findModules paths =
-  mms <- mapM searchDir paths
-  return (concat mms)
-
-searchDir path prefix = do
-  fs <- getDirectoryEntries path `catchIO` \_ -> return []
-  searchEntries path prefix fs
-
-searchEntries path prefix [] = return []
-searchEntries path prefix (f:fs)
-  | looks_like_a_module  =  do
-        ms <- searchEntries path prefix fs
-        return (prefix `joinModule` f : ms)
-  | looks_like_a_component  =  do
-        ms <- searchDir (path </> f) (prefix `joinModule` f)
-        ms' <- searchEntries path prefix fs
-        return (ms ++ ms')
-  | otherwise
-        searchEntries path prefix fs
-
-  where
-        (base,suffix) = splitFileExt f
-        looks_like_a_module =
-                suffix `elem` haskell_suffixes &&
-                all okInModuleName base
-        looks_like_a_component =
-                null suffix && all okInModuleName base
-
-okInModuleName c
-
-#endif
 
 -- ---------------------------------------------------------------------------
 -- expanding environment variables in the package configuration
