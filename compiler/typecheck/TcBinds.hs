@@ -542,7 +542,7 @@ tcPolyCheck :: RecFlag       -- Whether it's recursive after breaking
             -> TcM (LHsBinds TcId, [TcId], TopLevelFlag)
 -- There is just one binding,
 --   it binds a single variable,
---   it has a signature,
+--   it has a complete type signature,
 tcPolyCheck rec_tc prag_fn
             sig@(TcSigInfo { sig_name = name, sig_poly_id = Just poly_id
                            , sig_tvs = tvs_w_scoped

@@ -140,12 +140,16 @@ data TcSigInfo
                               -- sig_id = Just id, then sig_name = idName id.
 
         sig_poly_id :: Maybe TcId,
-                              -- Just <=> complete type signature of
-                              -- which the polymorphic type is known.
-                              -- Nothing <=> partial type signature of
-                              -- which the type is not yet fully
-                              -- known.
-                              -- See Note [Complete and partial type signatures]
+             -- Just f <=> the type signature had no wildcards, so the precise, 
+             --            complete polymorphic type is known.  In that case,
+             --            f is the polymorphic Id, with that type
+           
+             -- Nothing <=> the type signature is partial (i.e. includes one or more
+             --             wildcards). In this case it doesn't make sense to give
+             --             the polymorphic Id, because we are going to /infer/ its
+             --             type, so we can't make the polymorphic Id ab-initio
+             --
+             -- See Note [Complete and partial type signatures]
 
         sig_tvs    :: [(Maybe Name, TcTyVar)],
                            -- Instantiated type and kind variables
@@ -154,16 +158,17 @@ data TcSigInfo
 
         sig_nwcs   :: [(Name, TcTyVar)],
                            -- Instantiated wildcard variables
+                           -- If sig_poly_id = Just f, then sig_nwcs must be empty
+
+        sig_extra_cts :: Maybe SrcSpan, 
+                           -- Just loc <=> An extra-constraints wildcard was present
+                           --              at location loc
+                           --   e.g.   f :: (Eq a, _) => a -> a
+                           -- Any extra constraints inferred during
+                           -- type-checking will be added to the sig_theta.
+                           -- If sig_poly_id = Just f, sig_extra_cts must be Nothing
 
         sig_theta  :: TcThetaType,  -- Instantiated theta
-
-        sig_extra_cts :: Maybe SrcSpan, -- Just loc <=> An extra-constraints
-                                        -- wildcard was present. Any extra
-                                        -- constraints inferred during
-                                        -- type-checking will be added to the
-                                        -- partial type signature. Stores the
-                                        -- location of the wildcard.
-
         sig_tau    :: TcSigmaType,  -- Instantiated tau
                                     -- See Note [sig_tau may be polymorphic]
 
@@ -288,8 +293,8 @@ res_ty free vars.
 
 Note [Complete and partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A type signature is partial when it contains one or more wildcards.
-The wildcard can either be:
+A type signature is partial when it contains one or more wildcards
+(= type holes).  The wildcard can either be:
 * A (type) wildcard occurring in sig_theta or sig_tau. These are
   stored in sig_nwcs.
       f :: Bool -> _
