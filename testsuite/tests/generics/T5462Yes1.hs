@@ -13,9 +13,10 @@ import GHC.Generics hiding (C, C1, D)
 import GEq1A
 import Enum
 import GFunctor
+import GShow
 
 data A = A1
-  deriving (Show, Generic, GEq, GEnum)
+  deriving (Show, Generic, GEq, GEnum, GShow)
 
 data B a = B1 | B2 a (B a)
   deriving (Show, Generic, Generic1, GEq, GEnum, GFunctor)
@@ -34,6 +35,7 @@ data E f a = E1 (f a)
 main = print (
                geq A1 A1
              , take 10 (genum :: [A])
+             , gshow A1
 
              , geq (B2 A1 B1) B1
              , gmap (++ "lo") (B2 "hel" B1)

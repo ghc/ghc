@@ -20,7 +20,7 @@ test('GenCannotDoRep1_7', normal, compile_fail, [''])
 test('GenCannotDoRep1_8', normal, compile_fail, [''])
 
 test('T5462Yes1', extra_clean(['T5462Yes1/GFunctor.hi'])
-    , multimod_compile_and_run, ['T5462Yes1', '-iGEq -iGEnum -iGFunctor -outputdir=out_T5462Yes1'])
+    , multimod_compile_and_run, ['T5462Yes1', '-iGEq -iGEnum -iGFunctor -iGShow -outputdir=out_T5462Yes1'])
 test('T5462Yes2', extra_clean(['T5462Yes2/GFunctor.hi'])
     , multimod_compile_and_run, ['T5462Yes2', '-iGFunctor -outputdir=out_T5462Yes2'])
 test('T5462No1', extra_clean(['T5462No1/GFunctor.hi'])
@@ -34,7 +34,7 @@ test('GenDerivOutput1_1', normal, compile, ['-dsuppress-uniques'])
 
 test('T7878', extra_clean(['T7878A.o'     ,'T7878A.hi'
                           ,'T7878A.o-boot','T7878A.hi-boot'
-                          ,'T7878B.o'     ,'T7878B.hi']), 
+                          ,'T7878B.o'     ,'T7878B.hi']),
               multimod_compile, ['T7878', '-v0'])
 
 test('T8468', normal, compile_fail, [''])

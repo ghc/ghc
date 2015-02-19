@@ -254,9 +254,9 @@ test('tc236', normal, compile, [''])
 test('tc237', normal, compile, [''])
 test('tc238', normal, compile, [''])
 
-test('tc239', extra_clean(['Tc239_Help.hi', 'Tc239_Help.o']), 
+test('tc239', extra_clean(['Tc239_Help.hi', 'Tc239_Help.o']),
      multimod_compile, ['tc239', '-v0'])
-     
+
 test('tc240', normal, compile, [''])
 test('tc241', normal, compile, [''])
 test('tc242', normal, compile, [''])
@@ -278,13 +278,13 @@ test('FD4', normal, compile, [''])
 test('faxen', normal, compile, [''])
 test('T1495', normal, compile, [''])
 test('T2045', normal, compile, [''])   # Needs -fhpc
-test('T2478', normal, compile, ['']) 
-test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']), 
+test('T2478', normal, compile, [''])
+test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']),
      multimod_compile, ['T2433', '-v0'])
-test('T2494', normal, compile_fail, ['']) 
-test('T2494-2', normal, compile, ['']) 
-test('T2497', normal, compile, ['']) 
-     
+test('T2494', normal, compile_fail, [''])
+test('T2494-2', normal, compile, [''])
+test('T2497', normal, compile, [''])
+
 
 # Omitting temporarily
 test('syn-perf', normal, compile, ['-fcontext-stack=30'])
@@ -332,7 +332,7 @@ test('T4498', normal, compile, [''])
 test('T4524', normal, compile, [''])
 test('T4917', normal, compile, [''])
 
-test('T4912', extra_clean(['T4912a.hi', 'T4912a.o']), 
+test('T4912', extra_clean(['T4912a.hi', 'T4912a.o']),
      multimod_compile, ['T4912', '-v0'])
 
 test('T4952', normal, compile, [''])
@@ -438,6 +438,7 @@ test('T7643', normal, compile, [''])
 test('T9834', normal, compile, [''])
 test('T9892', normal, compile, [''])
 test('T9939', normal, compile, [''])
+test('T9968', normal, compile, [''])
 test('T9973', normal, compile, [''])
 test('T9971', normal, compile, [''])
 test('T9999', normal, compile, [''])
