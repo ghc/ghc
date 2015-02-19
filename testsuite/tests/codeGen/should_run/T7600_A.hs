@@ -12,6 +12,8 @@ import Numeric
 
 import GHC.Float
 
+#include "ghcconfig.h"
+
 -- Test run
 test_run :: Float -> Double -> IO ()
 test_run float_number double_number = do
