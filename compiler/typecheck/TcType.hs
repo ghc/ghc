@@ -80,7 +80,9 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, immSuperClasses,
+  mkMinimalBySCs, transSuperClasses, transSuperClassesPred, 
+  immSuperClasses,
+  isImprovementPred,
 
   -- * Finding type instances
   tcTyFamInsts,
@@ -1346,20 +1348,31 @@ mkMinimalBySCs ptys = [ ploc |  ploc <- ptys
 transSuperClasses :: Class -> [Type] -> [PredType]
 transSuperClasses cls tys    -- Superclasses of (cls tys),
                              -- excluding (cls tys) itself
-  = concatMap trans_sc (immSuperClasses cls tys)
-  where
-    trans_sc :: PredType -> [PredType]
-    -- (trans_sc p) returns (p : p's superclasses)
-    trans_sc p = case classifyPredType p of
-                   ClassPred cls tys -> p : transSuperClasses cls tys
-                   TuplePred ps      -> concatMap trans_sc ps
-                   _                 -> [p]
+  = concatMap transSuperClassesPred (immSuperClasses cls tys)
+
+transSuperClassesPred :: PredType -> [PredType]
+-- (transSuperClassesPred p) returns (p : p's superclasses)
+transSuperClassesPred p 
+  = case classifyPredType p of
+      ClassPred cls tys -> p : transSuperClasses cls tys
+      TuplePred ps      -> concatMap transSuperClassesPred ps
+      _                 -> [p]
 
 immSuperClasses :: Class -> [Type] -> [PredType]
 immSuperClasses cls tys
   = substTheta (zipTopTvSubst tyvars tys) sc_theta
   where
     (tyvars,sc_theta,_,_) = classBigSig cls
+
+isImprovementPred :: PredType -> Bool
+-- Either it's an equality, or has some functional dependency
+isImprovementPred ty 
+  = case classifyPredType ty of
+      EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
+      EqPred ReprEq _ _  -> False
+      ClassPred cls _    -> classHasFds cls
+      TuplePred ts       -> any isImprovementPred ts
+      IrredPred {}       -> True -- Might have equalities after reduction?
 
 {-
 ************************************************************************

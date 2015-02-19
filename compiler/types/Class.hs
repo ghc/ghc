@@ -17,7 +17,7 @@ module Class (
         mkClass, classTyVars, classArity,
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
-        classAllSelIds, classSCSelId, classMinimalDef
+        classAllSelIds, classSCSelId, classMinimalDef, classHasFds
     ) where
 
 #include "HsVersions.h"
@@ -234,6 +234,9 @@ classATItems = classATStuff
 classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
 classTvsFds c
   = (classTyVars c, classFunDeps c)
+
+classHasFds :: Class -> Bool
+classHasFds (Class { classFunDeps = fds }) = not (null fds)
 
 classBigSig :: Class -> ([TyVar], [PredType], [Id], [ClassOpItem])
 classBigSig (Class {classTyVars = tyvars, classSCTheta = sc_theta,
