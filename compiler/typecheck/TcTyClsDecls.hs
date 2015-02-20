@@ -1242,21 +1242,12 @@ tcConArgs new_or_data (InfixCon bty1 bty2)
 tcConArgs new_or_data (RecCon fields)
   = mapM (tcConArg new_or_data) btys
   where
--- <<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-    btys = map (cd_fld_type . unLoc) $ unLoc fields
-{-
--- AMG TODO
-||||||| merged common ancestors
-    field_names = map (unLoc . cd_fld_name) fields
-    btys        = map cd_fld_type fields
-=======
     -- We need a one-to-one mapping from field_names to btys
     combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) (unLoc fields)
-    explode (ns,ty) = zip (map unLoc ns) (repeat ty)
+    explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
-    (field_names,btys) = unzip exploded
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
--}
+    (_,btys) = unzip exploded
+
 
 tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsSrcBang)
 tcConArg new_or_data bty
@@ -1936,10 +1927,10 @@ mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
 mkRecSelBind (tycon, fl)
   = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
   where
+    loc    = getSrcSpan sel_name
+    sel_id = mkExportedLocalId rec_details sel_name sel_ty
     lbl      = flLabel fl
     sel_name = flSelector fl
-    loc      = getSrcSpan sel_name
-    sel_id   = mkExportedLocalId rec_details sel_name sel_ty
     rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1

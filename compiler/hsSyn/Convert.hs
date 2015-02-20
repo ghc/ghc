@@ -724,7 +724,7 @@ which we don't want.
 cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLoc $ HsRecField { hsRecFieldId = v'
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = v'
                                      , hsRecFieldSel = hsRecFieldSelMissing -- AMG TODO
                                      , hsRecFieldArg = e'
                                      , hsRecPun = False}) }
@@ -943,7 +943,7 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (noLoc $ HsRecField { hsRecFieldId = s'
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = s'
                                      , hsRecFieldSel = hsRecFieldSelMissing -- AMG TODO
                                      , hsRecFieldArg = p'
                                      , hsRecPun = False}) }

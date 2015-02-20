@@ -562,17 +562,12 @@ compiler_stage2_dll0_MODULES = \
 	Pretty \
 	PrimOp \
 	RdrName \
-	RnEnv \
-	RnHsDoc \
-	RnNames \
 	Rules \
 	Serialized \
 	SrcLoc \
 	StaticFlags \
 	StringBuffer \
-	TcEnv \
 	TcEvidence \
-	TcMType \
 	TcRnTypes \
 	TcType \
 	TrieMap \
