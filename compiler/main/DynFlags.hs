@@ -3268,13 +3268,8 @@ impliedXFlags
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
 
-    -- Overloaded record fields require field disambiguation (well
-    -- duh), and flexible contexts and constraint kinds (for the Has
-    -- class encoding and desugaring of r { f :: t } syntax).
+    -- Overloaded record fields require field disambiguation
     , (Opt_OverloadedRecordFields, turnOn, Opt_DisambiguateRecordFields)
-    , (Opt_OverloadedRecordFields, turnOn, Opt_FlexibleContexts)
-    , (Opt_OverloadedRecordFields, turnOn, Opt_ConstraintKinds)
-    , (Opt_OverloadedRecordFields, turnOn, Opt_DataKinds)
   ]
 
 -- Note [Documenting optimisation flags]

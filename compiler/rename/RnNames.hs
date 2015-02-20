@@ -579,16 +579,7 @@ getLocalNonValBinders fixity_env
     new_rec_sel :: Bool -> OccName -> Located RdrName -> RnM FieldLabel
     new_rec_sel overload_ok tc (L loc fld) =
       do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
-         ; mod      <- getModule
-         ; has      <- newGlobalBinder mod (flHasDFun fl) loc
-         ; upd      <- newGlobalBinder mod (flUpdDFun fl) loc
-         ; get_ax   <- newGlobalBinder mod (flFldTyAxiom fl) loc
-         ; set_ax   <- newGlobalBinder mod (flUpdTyAxiom fl) loc
-         ; return $ fl { flSelector = sel_name
-                       , flHasDFun = has
-                       , flUpdDFun = upd
-                       , flFldTyAxiom = get_ax
-                       , flUpdTyAxiom = set_ax } }
+         ; return $ fl { flSelector = sel_name } }
       where
         lbl     = occNameFS $ rdrNameOcc fld
         fl      = mkFieldLabelOccs lbl tc overload_ok

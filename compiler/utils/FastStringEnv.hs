@@ -1,10 +1,11 @@
+{-
 %
 % (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[FastStringEnv]{@FastStringEnv@: FastString environments}
+-}
 
-\begin{code}
 module FastStringEnv (
         -- * FastString environments (maps)
         FastStringEnv,
@@ -72,4 +73,3 @@ delListFromFsEnv x y      = delListFromUFM x y
 filterFsEnv x y           = filterUFM x y
 
 lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
-\end{code}

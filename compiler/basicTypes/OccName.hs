@@ -71,7 +71,7 @@ module OccName (
         mkPDatasTyConOcc, mkPDatasDataConOcc,
         mkPReprTyConOcc,
         mkPADFunOcc,
-        mkRecFldSelOcc, mkRecFldDFunOcc, mkRecFldAxiomOcc,
+        mkRecFldSelOcc,
 
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
@@ -654,11 +654,9 @@ mkPDatasTyConOcc   = mk_simple_deriv_with tcName   "VPs:"
 mkPDataDataConOcc  = mk_simple_deriv_with dataName "VPD:"
 mkPDatasDataConOcc = mk_simple_deriv_with dataName "VPDs:"
 
--- Overloaded record field dfunids and axioms
-mkRecFldSelOcc, mkRecFldDFunOcc, mkRecFldAxiomOcc :: String -> OccName
+-- Overloaded record field selectors
+mkRecFldSelOcc :: String -> OccName
 mkRecFldSelOcc   = mk_deriv varName "$sel"
-mkRecFldDFunOcc  = mk_deriv varName "$f"
-mkRecFldAxiomOcc = mkInstTyCoOcc . mkTcOcc
 
 mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)

@@ -360,16 +360,6 @@ basicKnownKeyNames
 
         -- Fingerprint
         , fingerprintDataConName
-
-        -- Overloaded record fields
-        , recordHasClassName
-        , recordUpdClassName
-        , accessorClassName
-        , fldTyFamName
-        , updTyFamName
-        , getFieldName
-        , setFieldName
-        , fieldName
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
            IntegerGMP2   -> [integerSDataConName]
@@ -1224,18 +1214,6 @@ fingerprintDataConName :: Name
 fingerprintDataConName =
     conName gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
--- Overloaded record fields
-recordHasClassName, recordUpdClassName, accessorClassName, fldTyFamName,
-  updTyFamName, getFieldName, setFieldName, fieldName :: Name
-recordHasClassName = clsQual gHC_RECORDS (fsLit "Has")      recordHasClassNameKey
-recordUpdClassName = clsQual gHC_RECORDS (fsLit "Upd")      recordUpdClassNameKey
-accessorClassName  = clsQual gHC_RECORDS (fsLit "Accessor") accessorClassNameKey
-fldTyFamName       = tcQual  gHC_RECORDS (fsLit "FldTy")    fldTyFamNameKey
-updTyFamName       = tcQual  gHC_RECORDS (fsLit "UpdTy")    updTyFamNameKey
-getFieldName       = varQual gHC_RECORDS (fsLit "getField") getFieldNameKey
-setFieldName       = varQual gHC_RECORDS (fsLit "setField") setFieldNameKey
-fieldName          = varQual gHC_RECORDS (fsLit "field")    fieldNameKey
-
 
 {-
 ************************************************************************
@@ -1341,12 +1319,6 @@ ghciIoClassKey = mkPreludeClassUnique 44
 
 ipClassNameKey :: Unique
 ipClassNameKey = mkPreludeClassUnique 45
-
--- Overloaded record fields
-recordHasClassNameKey, recordUpdClassNameKey, accessorClassNameKey :: Unique
-recordHasClassNameKey = mkPreludeClassUnique 46
-recordUpdClassNameKey = mkPreludeClassUnique 47
-accessorClassNameKey  = mkPreludeClassUnique 48
 
 {-
 ************************************************************************

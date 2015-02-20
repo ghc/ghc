@@ -1061,9 +1061,6 @@ data ModGuts
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module
-        mg_axioms    :: ![CoAxiom Branched],
-                                         -- ^ Axioms without family instances
-                                         -- See Note [Instance scoping for OverloadedRecordFields] in TcFldInsts
         mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.hs
@@ -1266,15 +1263,12 @@ The ic_tythings field contains
     *don't* come from 'implicitTyThings', notably:
        - record selectors
        - class ops
-       - DFunIds for OverloadedRecordFields classes
     The implicitTyThings are readily obtained from the TyThings
     but record selectors etc are not
 
 It does *not* contain
-  * CoAxioms (they can be gotten from ic_instances)
-  * DFunIds (ditto), except for OverloadedRecordFields classes
-    (see Note [Instance scoping for OverloadedRecordFields] in TcFldInsts)
-
+  * DFunIds (they can be gotten from ic_instances)
+  * CoAxioms (ditto)
 
 See also Note [Interactively-bound Ids in GHCi]
 
@@ -1332,11 +1326,6 @@ data InteractiveContext
              -- time we update the context, we just take the results
              -- from the instance code that already does that.
 
-         ic_axioms     :: [CoAxiom Branched],
-             -- ^ Axioms created during this session without a type family
-             -- (see Note [Instance scoping for OverloadedRecordFields]
-             -- in TcFldInsts).
-
          ic_fix_env :: FixityEnv,
             -- ^ Fixities declared in let statements
 
@@ -1380,7 +1369,6 @@ emptyInteractiveContext dflags
        ic_mod_index  = 1,
        ic_tythings   = [],
        ic_instances  = ([],[]),
-       ic_axioms     = [],
        ic_fix_env    = emptyNameEnv,
        ic_monad      = ioTyConName,  -- IO monad by default
        ic_int_print  = printName,    -- System.IO.print by default

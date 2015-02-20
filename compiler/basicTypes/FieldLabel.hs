@@ -1,13 +1,11 @@
+{-
 %
-% (c) Adam Gundry 2013
+% (c) Adam Gundry 2013-2015
 %
 
 This module defines the representation of FieldLabels as stored in
 TyCons.  As well as a selector name, these have some extra structure
-to support the OverloadedRecordFields extension.  For every field
-label, regardless of whether the extension is enabled in the defining
-module, we generate instances of the Has and Upd classes and FldTy and
-UpdTy type families (all defined in base:GHC.Records).
+to support the OverloadedRecordFields extension.
 
 In the normal case (with NoOverloadedRecordFields), a datatype like
 
@@ -17,11 +15,7 @@ has
 
     FieldLabel { flLabel        = "foo"
                , flIsOverloaded = False
-               , flSelector     = foo
-               , flHasDFun      = $fHas:foo:T
-               , flUpdDFun      = $fUpd:foo:T
-               , flFldTyAxiom   = TFCo:FldTy:foo:T
-               , flUpdTyAxiom   = TFCo:UpdTy:foo:T }.
+               , flSelector     = foo }.
 
 In particular, the Name of the selector has the same string
 representation as the label.  If the OverloadedRecordFields extension
@@ -29,11 +23,7 @@ is enabled, however, the same declaration instead gives
 
     FieldLabel { flLabel        = "foo"
                , flIsOverloaded = True
-               , flSelector     = $sel:foo:T
-               , flHasDFun      = $fHas:foo:T
-               , flUpdDFun      = $fUpd:foo:T
-               , flFldTyAxiom   = TFCo:FldTy:foo:T
-               , flUpdTyAxiom   = TFCo:UpdTy:foo:T }.
+               , flSelector     = $sel:foo:T }.
 
 Now the name of the selector ($sel:foo:T) does not match the label of
 the field (foo).  We must be careful not to show the selector name to
@@ -47,13 +37,7 @@ Now there will be two FieldLabel values for 'foo', one in T and one in
 U.  They share the same label (FieldLabelString), but the selector and
 dfuns/axioms differ.  Each FieldLabel value is unique to its type
 constructor.
-
-We define the dfuns/axioms for every field label of every datatype,
-even if OverloadedRecordFields is disabled.  This allows other modules
-with the extension enabled to make use of the dfuns/axioms.
-
-
-\begin{code}
+-}
 
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
@@ -90,10 +74,6 @@ data FieldLbl a = FieldLabel {
       flLabel        :: FieldLabelString, -- ^ Label of the field
       flIsOverloaded :: Bool,             -- ^ Is this field overloaded?
       flSelector     :: a,                -- ^ Record selector function
-      flHasDFun      :: a,                -- ^ DFun for Has class instance
-      flUpdDFun      :: a,                -- ^ DFun for Upd class instance
-      flFldTyAxiom   :: a,                -- ^ Axiom for FldTy family instance
-      flUpdTyAxiom   :: a                 -- ^ Axiom for UpdTy family instance
     }
   deriving (Functor, Foldable, Traversable)
 
@@ -101,45 +81,24 @@ instance Outputable a => Outputable (FieldLbl a) where
     ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))
 
 instance Binary a => Binary (FieldLbl a) where
-    put_ bh (FieldLabel aa ab ac ad ae af ag) = do
+    put_ bh (FieldLabel aa ab ac) = do
         put_ bh aa
         put_ bh ab
         put_ bh ac
-        put_ bh ad
-        put_ bh ae
-        put_ bh af
-        put_ bh ag
 
     get bh = do
         aa <- get bh
         ab <- get bh
         ac <- get bh
-        ad <- get bh
-        ae <- get bh
-        af <- get bh
-        ag <- get bh
-        return (FieldLabel aa ab ac ad ae af ag)
-\end{code}
+        return (FieldLabel aa ab ac)
 
 
-Record selector OccNames are built from the underlying field name and
-the name of the type constructor, to support overloaded record fields.
-
-\begin{code}
+-- | Record selector OccNames are built from the underlying field name and
+-- the name of the type constructor, to support overloaded record fields.
 mkFieldLabelOccs :: FieldLabelString -> OccName -> Bool -> FieldLbl OccName
 mkFieldLabelOccs lbl tc is_overloaded
-  = FieldLabel lbl is_overloaded sel_occ has_occ upd_occ get_occ set_occ
+  = FieldLabel lbl is_overloaded sel_occ
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString tc
-    has_str = "Has"
-    upd_str = "Upd"
-    get_str = "FldTy"
-    set_str = "UpdTy"
-
     sel_occ | is_overloaded = mkRecFldSelOcc str
             | otherwise     = mkVarOccFS lbl
-    has_occ = mkRecFldDFunOcc (has_str ++ str)
-    upd_occ = mkRecFldDFunOcc (upd_str ++ str)
-    get_occ = mkRecFldAxiomOcc (get_str ++ str)
-    set_occ = mkRecFldAxiomOcc (set_str ++ str)
-\end{code}
