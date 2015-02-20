@@ -2125,13 +2125,13 @@ The 'deriving C' clause generates, in effect
   instance (C [a], Eq a) => C (N a) where
      f = coerce (f :: [a] -> [a])
 
-This generates a cast for each method, but allows the superclasse to
+This generates a cast for each method, but allows the superclasses to
 be worked out in the usual way.  In this case the superclass (Eq (N
 a)) will be solved by the explicit Eq (N a) instance.  We do *not*
 create the superclasses by casting the superclass dictionaries for the
 representation type.
 
-See the paper "Safe zero-cost coercions for Hsakell".
+See the paper "Safe zero-cost coercions for Haskell".
 
 
 ************************************************************************
