@@ -29,3 +29,4 @@ test('T9329', [cmm_src], compile, [''])
 test('debug', extra_clean(['debug.cmm']),
      run_command,
      ['$MAKE -s --no-print-directory debug'])
+test('T9964', normal, compile, ['-O'])
