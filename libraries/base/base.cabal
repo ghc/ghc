@@ -253,7 +253,6 @@ Library
         GHC.Ptr
         GHC.Read
         GHC.Real
-        GHC.Records
         GHC.RTS.Flags
         GHC.ST
         GHC.StaticPtr

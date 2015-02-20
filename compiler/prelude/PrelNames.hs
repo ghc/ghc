@@ -360,6 +360,7 @@ basicKnownKeyNames
 
         -- Fingerprint
         , fingerprintDataConName
+
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
            IntegerGMP2   -> [integerSDataConName]
@@ -399,7 +400,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP, gHC_RECORDS :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -454,7 +455,6 @@ cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
 gHC_IP          = mkBaseModule (fsLit "GHC.IP")
-gHC_RECORDS     = mkBaseModule (fsLit "GHC.Records")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -1214,7 +1214,6 @@ fingerprintDataConName :: Name
 fingerprintDataConName =
     conName gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1867,12 +1866,6 @@ toListClassOpKey = mkPreludeMiscIdUnique 501
 
 proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
-
--- Overloaded record fields
-getFieldNameKey, setFieldNameKey, fieldNameKey :: Unique
-getFieldNameKey = mkPreludeMiscIdUnique 503
-setFieldNameKey = mkPreludeMiscIdUnique 504
-fieldNameKey    = mkPreludeMiscIdUnique 505
 
 ---------------- Template Haskell -------------------
 --      USES IdUniques 200-499

@@ -115,7 +115,6 @@ import {-# SOURCE #-} GHC.IO (failIO)
 
 import GHC.Tuple ()     -- Note [Depend on GHC.Tuple]
 import GHC.Integer ()   -- Note [Depend on GHC.Integer]
-import GHC.Records ()   -- Note [Dependency on GHC.Records] in GHC.Records
 
 infixr 9  .
 infixr 5  ++

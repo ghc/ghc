@@ -43,7 +43,6 @@ import GHC.Num(Integer)
 import GHC.Base(String)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
-import GHC.Records(Symbol)
 import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
@@ -53,10 +52,9 @@ import Unsafe.Coerce(unsafeCoerce)
 -- | (Kind) This is the kind of type-level natural numbers.
 data Nat
 
--- The kind Symbol of type-level symbols is defined in GHC.Records,
--- because it is used there and that module must be compiled very
--- early (see Note [Dependency on GHC.Records] in GHC.Records).
--- It is re-exported by this module.
+-- | (Kind) This is the kind of type-level symbols.
+data Symbol
+
 
 --------------------------------------------------------------------------------
 
