@@ -102,7 +102,9 @@ data DerivStuff     -- Please add this auxiliary stuff
 -}
 
 genDerivedBinds :: DynFlags -> (Name -> Fixity) -> Class -> SrcSpan -> TyCon
-                -> (LHsBinds RdrName, BagDerivStuff)
+                -> ( LHsBinds RdrName  -- The method bindings of the instance declaration
+                   , BagDerivStuff)    -- Specifies extra top-level declarations needed
+                                       -- to support the instance declaration
 genDerivedBinds dflags fix_env clas loc tycon
   | Just gen_fn <- assocMaybe gen_list (getUnique clas)
   = gen_fn loc tycon
