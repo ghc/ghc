@@ -961,9 +961,9 @@ When printing export lists, we print like this:
 pprExport :: IfaceExport -> SDoc
 pprExport (Avail n)         = ppr n
 pprExport (AvailTC _ [] []) = Outputable.empty
-pprExport (AvailTC n (n':ns) fs)
-  | n==n'     = ppr n <> pp_export ns fs
-  | otherwise = ppr n <> char '|' <> pp_export (n':ns) fs
+pprExport (AvailTC n ns0 fs) = case ns0 of
+                                 (n':ns) | n==n' -> ppr n <> pp_export ns fs
+                                 _               -> ppr n <> char '|' <> pp_export ns0 fs
   where
     pp_export []    [] = Outputable.empty
     pp_export names fs = braces (hsep (map ppr names ++ map pprAvailField fs))
