@@ -27,7 +27,7 @@ instance (GEq' a, GEq' b) => GEq' (a :*: b) where
   geq' (a1 :*: b1) (a2 :*: b2) = geq' a1 a2 && geq' b1 b2
 
 
-class GEq a where 
+class GEq a where
   geq :: a -> a -> Bool
   default geq :: (Generic a, GEq' (Rep a)) => a -> a -> Bool
   geq x y = geq' (from x) (from y)

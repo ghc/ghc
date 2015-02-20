@@ -5,7 +5,7 @@
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveAnyClass         #-}
 
 module Main where
 
