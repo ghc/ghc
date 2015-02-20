@@ -9,7 +9,7 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP #-}
 
 module Inst (
-       deeplySkolemise, deeplyInstantiate, 
+       deeplySkolemise, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
        emitWanted, emitWanteds,
