@@ -748,7 +748,6 @@ getDFunHsTypeKey (HsParTy ty)           = getDFunHsTypeKey (unLoc ty)
 getDFunHsTypeKey (HsIParamTy {})        = occNameString (getOccName ipClassName)
 getDFunHsTypeKey (HsEqTy {})            = occNameString (getOccName eqTyCon)
 getDFunHsTypeKey (HsKindSig ty _)       = getDFunHsTypeKey (unLoc ty)
-getDFunHsTypeKey (HsQuasiQuoteTy {})    = "quasiQuote"
 getDFunHsTypeKey (HsSpliceTy {})        = "splice"
 getDFunHsTypeKey (HsDocTy ty _)         = getDFunHsTypeKey (unLoc ty)
 getDFunHsTypeKey (HsBangTy _ ty)        = getDFunHsTypeKey (unLoc ty)
@@ -758,7 +757,8 @@ getDFunHsTypeKey (HsExplicitListTy {})  = occNameString (getOccName listTyCon)
 getDFunHsTypeKey (HsExplicitTupleTy {}) = occNameString (getOccName unitTyCon)
 getDFunHsTypeKey (HsTyLit x)            = getDFunHsTyLitKey x
 getDFunHsTypeKey (HsWrapTy _ ty)        = getDFunHsTypeKey ty
--- AMG TODO HsWildcardTy, HsNamedWildcardTy
+getDFunHsTypeKey (HsWildcardTy {})      = "wildcard"
+getDFunHsTypeKey (HsNamedWildcardTy {}) = "wildcard"
 
 getDFunHsTyLitKey :: HsTyLit -> String
 getDFunHsTyLitKey (HsNumTy _ n) = show n

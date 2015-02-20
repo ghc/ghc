@@ -26,7 +26,6 @@ import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString
                         , modulePackageKey, packageKeyString )
-import Module -- AMG TODO
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
@@ -704,29 +703,31 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
                                                      , nlHsIntLit (toInteger n)]
 
         allSelBinds   = map (map selBinds) datasels
-        selBinds s    = mkBag [(selName_RDR, mkStringLHS s)]
+        selBinds s    = mkBag [(selName_RDR, selName_matches s)]
 
         loc           = srcLocSpan (getSrcLoc tycon)
         mkStringLHS s = [mkSimpleHsAlt nlWildPat (nlHsLit (mkHsString s))]
         datacons      = tyConDataCons tycon
-        datasels      = map (map flLabel . dataConFieldLabels) datacons
+        datasels      = map (map flSelector . dataConFieldLabels) datacons
 
         tyConName_user = case tyConFamInst_maybe tycon of
                            Just (ptycon, _) -> tyConName ptycon
                            Nothing          -> tyConName tycon
 
-        dtName_matches     = mkStringLHS . occNameFS . nameOccName
+        dtName_matches     = mkStringLHS . occNameString . nameOccName
                            $ tyConName_user
-        moduleName_matches = mkStringLHS . moduleNameFS . moduleName
+        moduleName_matches = mkStringLHS . moduleNameString . moduleName
                            . nameModule . tyConName $ tycon
         pkgName_matches    = mkStringLHS . packageKeyString . modulePackageKey
                            . nameModule . tyConName $ tycon
         isNewtype_matches  = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 
-        conName_matches     c = mkStringLHS . occNameFS . nameOccName
+        conName_matches     c = mkStringLHS . occNameString . nameOccName
                               . dataConName $ c
         conFixity_matches   c = [mkSimpleHsAlt nlWildPat (fixity c)]
         conIsRecord_matches _ = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
+
+        selName_matches     s = mkStringLHS (occNameString (nameOccName s))
 
 
 --------------------------------------------------------------------------------

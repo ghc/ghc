@@ -73,7 +73,7 @@ type FieldLabel = FieldLbl Name
 data FieldLbl a = FieldLabel {
       flLabel        :: FieldLabelString, -- ^ Label of the field
       flIsOverloaded :: Bool,             -- ^ Is this field overloaded?
-      flSelector     :: a,                -- ^ Record selector function
+      flSelector     :: a                 -- ^ Record selector function
     }
   deriving (Functor, Foldable, Traversable)
 

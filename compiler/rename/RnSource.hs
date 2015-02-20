@@ -205,7 +205,7 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
                              hs_docs   = rn_docs } ;
 
         tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_inst_decls rn_foreign_decls ;
-        other_def  = (Just (mkNameSet tcf_bndrs), emptyNameSet) ;
+        other_def  = (Just (mkNameSet $ fst tcf_bndrs), emptyNameSet) ; -- AMG TODO tcf_bndrs?
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
                               src_fvs5, src_fvs6, src_fvs7, src_fvs8,
                               src_fvs9] ;
@@ -1401,7 +1401,7 @@ rnConDecl decl@(ConDecl { con_names = names, con_qvars = tvs
 
         ; bindHsTyVars doc Nothing free_kvs new_tvs $ \new_tyvars -> do
         { (new_context, fvs1) <- rnContext doc lcxt
-        ; (new_details, fvs2) <- rnConDeclDetails doc details
+        ; (new_details, fvs2) <- rnConDeclDetails (unLoc $ head new_names) doc details -- AMG TODO ?
         ; (new_details', new_res_ty, fvs3)
                      <- rnConResult doc (map unLoc new_names) new_details res_ty
         ; return (decl { con_names = new_names, con_qvars = new_tyvars

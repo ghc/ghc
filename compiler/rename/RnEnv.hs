@@ -23,7 +23,6 @@ module RnEnv (
         lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
         greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
-        lookupFldInstAxiom, lookupFldInstDFun, fieldLabelInScope,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreRn, lookupGreRn_maybe,
         lookupGreLocalRn_maybe,

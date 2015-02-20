@@ -215,7 +215,8 @@ rnHsTyKi isType doc (HsBangTy b ty)
 rnHsTyKi _ doc ty@(HsRecTy flds)
   = do { addErr (hang (ptext (sLit "Record syntax is illegal here:"))
                     2 (ppr ty))
-       ; (flds', fvs) <- rnConDeclFields doc flds
+       ; let bogus_con = mkUnboundName (mkRdrUnqual (mkTcOcc "bogus_con"))
+       ; (flds', fvs) <- rnConDeclFields bogus_con doc flds
        ; return (HsRecTy flds', fvs) }
 
 rnHsTyKi isType doc (HsFunTy ty1 ty2)
@@ -514,19 +515,19 @@ dataKindsErr is_type thing
 *********************************************************
 -}
 
-rnConDeclFields :: Name -> HsDocContext -> [ConDeclField RdrName]
+rnConDeclFields :: Name -> HsDocContext -> [LConDeclField RdrName]
                 -> RnM ([LConDeclField Name], FreeVars)
 rnConDeclFields con doc fields = mapFvRn (rnField con doc) fields
 
 rnField :: Name -> HsDocContext -> LConDeclField RdrName
         -> RnM (LConDeclField Name, FreeVars)
 rnField con doc (L l (ConDeclField names ty haddock_doc))
-  = do { new_names <- mapM thingy names
+  = do { new_names <- mapM help names
        ; (new_ty, fvs) <- rnLHsType doc ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
        ; return (L l (ConDeclField new_names new_ty new_haddock_doc), fvs) }
   where
-    help :: (Located RdrName, x) -> (Located RdrName, Maybe Name)
+    help :: (Located RdrName, x) -> RnM (Located RdrName, Maybe Name)
     help (l_rdr_name, _) = do { flds <- lookupConstructorFields con
                               ; let lbl = occNameFS $ rdrNameOcc $ unLoc l_rdr_name
                               ; let fl = expectJust "rnField" $ find ((== lbl) . flLabel) flds

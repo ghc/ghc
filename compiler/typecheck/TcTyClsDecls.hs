@@ -1166,7 +1166,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
               do { ctxt    <- tcHsContext hs_ctxt
                  ; details <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
-                 ; field_lbls <- lookupConstructorFields (fromJust $ snd $ head names) -- AMG TODO ???
+                 ; field_lbls <- lookupConstructorFields (unLoc $ head names) -- AMG TODO ???
                  ; let btys = details -- AMG TODO
                        (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
@@ -1243,7 +1243,7 @@ tcConArgs new_or_data (RecCon fields)
   = mapM (tcConArg new_or_data) btys
   where
 -- <<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-    btys = map cd_fld_type fields
+    btys = map (cd_fld_type . unLoc) $ unLoc fields
 {-
 -- AMG TODO
 ||||||| merged common ancestors

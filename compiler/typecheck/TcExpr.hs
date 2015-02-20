@@ -1328,8 +1328,8 @@ naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
 \subsection{Record bindings}
 *                                                                      *
 ************************************************************************
+-}
 
-\begin{code}
 getFixedTyVars :: [FieldLabelString] -> [TyVar] -> [DataCon] -> TyVarSet
 -- These tyvars must not change across the updates
 getFixedTyVars upd_fld_occs tvs1 cons
@@ -1348,9 +1348,8 @@ getFixedTyVars upd_fld_occs tvs1 cons
                                             , not (flLabel fl `elem` upd_fld_occs)]
                       , (tv1,tv) <- tvs1 `zip` tvs      -- Discards existentials in tvs
                       , tv `elemVarSet` fixed_tvs ]
-\end{code}
 
-
+{-
 Note [Disambiguating record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the -XOverloadedRecordFields extension is used, the renamer may not
@@ -1389,8 +1388,8 @@ the type of the record expression, in case we are lucky enough to get
 a TyConApp straight away. However, it might be hard for programmers to
 predict whether a particular update is sufficiently obvious for the
 signature to be omitted.
+-}
 
-\begin{code}
 disambiguateRecordBinds :: LHsExpr Name -> HsRecFields Name a -> Type
                                  -> TcM (HsRecFields Name a)
 disambiguateRecordBinds record_expr rbnds res_ty
@@ -1441,24 +1440,23 @@ disambiguateRecordBinds record_expr rbnds res_ty
         -- not.  For an unambigous field, we don't need to check again
         -- that it has the correct parent, because possibleParents
         -- will have returned that single parent.
-        pickParent :: HsRecField Name arg ->
-                          Either (Located RdrName) (HsRecField Name arg)
-        pickParent fld@(HsRecField{ hsRecFieldSel = Left _ }) = Right fld
-        pickParent fld@(HsRecField{ hsRecFieldSel = Right xs })
+        pickParent :: LHsRecField Name arg ->
+                          Either (Located RdrName) (LHsRecField Name arg)
+        pickParent fld@(L _ (HsRecField{ hsRecFieldSel = Left _ })) = Right fld
+        pickParent (L l fld@HsRecField{ hsRecFieldSel = Right xs })
             = case lookup p xs of
-                  Just name -> Right (fld{ hsRecFieldSel = Left name })
+                  Just name -> Right (L l fld{ hsRecFieldSel = Left name })
                   Nothing   -> Left (hsRecFieldLbl fld)
 
     -- A type signature on the record expression must be "obvious",
     -- i.e. the outermost constructor ignoring parentheses.
     obviousSig :: HsExpr Name -> Maybe (LHsType Name)
-    obviousSig (ExprWithTySig _ ty) = Just ty
-    obviousSig (HsPar p)            = obviousSig (unLoc p)
-    obviousSig _                    = Nothing
-
-\end{code}
+    obviousSig (ExprWithTySig _ ty _) = Just ty
+    obviousSig (HsPar p)              = obviousSig (unLoc p)
+    obviousSig _                      = Nothing
 
 
+{-
 Game plan for record bindings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1. Find the TyCon for the bindings, from the first field label.

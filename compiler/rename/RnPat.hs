@@ -672,8 +672,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 getFieldIds :: [LHsRecField id arg] -> [id]
 getFieldIds flds = mapMaybe (fmap unLoc . hsRecFieldId_maybe . unLoc) flds
 
-getFieldLbls :: [HsRecField id arg] -> [RdrName]
-getFieldLbls flds = map (unLoc . hsRecFieldLbl) flds
+getFieldLbls :: [LHsRecField id arg] -> [RdrName]
+getFieldLbls flds = map (unLoc . hsRecFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,

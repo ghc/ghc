@@ -8,7 +8,6 @@ module FamInst (
         tcLookupFamInst,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
         tcInstNewTyCon_maybe, tcTopNormaliseNewTypeTF_maybe,
-        lookupRepTyCon,
         newFamInst
     ) where
 
@@ -18,10 +17,7 @@ import InstEnv( roughMatchTcs )
 import Coercion    hiding ( substTy )
 import TcEvidence
 import LoadIface
-import Type( isRecordsFam, isFldTyFam )
-import TypeRep
 import TcRnMonad
-import Unify
 import TyCon
 import CoAxiom
 import DynFlags
@@ -36,9 +32,6 @@ import Maybes
 import TcMType
 import TcType
 import Name
-import RnEnv
-import VarSet
-import PrelNames
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -209,16 +202,12 @@ then we have a coercion (ie, type instance of family instance coercion)
 which implies that :R42T was declared as 'data instance T [a]'.
 -}
 
-tcLookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> TcM (Maybe FamInstMatch)
-tcLookupFamInst _ fam tys
-  | isRecordsFam fam
-  = tcLookupRecordsFamInst fam tys
-
+tcLookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> Maybe FamInstMatch
 tcLookupFamInst fam_envs tycon tys
   | not (isOpenFamilyTyCon tycon)
-  = return Nothing
+  = Nothing
   | otherwise
-  = return $ case lookupFamInstEnv fam_envs tycon tys of
+  = case lookupFamInstEnv fam_envs tycon tys of
       match : _ -> Just match
       []        -> Nothing
 
@@ -259,45 +248,6 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
 
   | otherwise
   = Nothing
-
-
--- See Note [Instance scoping for OverloadedRecordFields] in TcFldInsts
--- and the section on "Looking up record field instances" in RnEnv
-tcLookupRecordsFamInst :: TyCon -> [Type] -> TcM (Maybe FamInstMatch)
-tcLookupRecordsFamInst fam tys
-  | Just (lbl, tc, args) <- tcSplitRecordsArgs tys
-  = do { rep_tc <- lookupRepTyCon tc args
-       ; mb_ax  <- lookupFldInstAxiom lbl tc rep_tc want_get
-       ; return $ do { ax <- mb_ax
-                     ; let fam_inst = fam_inst_for tc ax
-                     ; subst <- tcMatchTys (mkVarSet (fi_tvs fam_inst)) (fi_tys fam_inst) tys
-                     ; return $ FamInstMatch fam_inst (substTyVars subst (fi_tvs fam_inst)) } }
-  where
-    want_get = isFldTyFam fam
-
-    fam_inst_for tc axiom
-      | want_get  = mkImportedFamInst fldTyFamName
-                        [Nothing, Just (tyConName tc)] (toUnbranchedAxiom axiom)
-      | otherwise = mkImportedFamInst updTyFamName
-                        [Nothing, Just (tyConName tc), Nothing] (toUnbranchedAxiom axiom)
-
-tcLookupRecordsFamInst _ _ = return Nothing
-
-lookupRepTyCon :: TyCon -> [Type] -> TcM TyCon
--- Lookup the representation tycon given a family tycon and its
--- arguments; returns the original tycon if it is not a data family or
--- it doesn't have a matching instance.
-lookupRepTyCon tc args
-  | isDataFamilyTyCon tc
-      = do { fam_envs <- tcGetFamInstEnvs
-           ; mb_fi <- tcLookupFamInst fam_envs tc args
-           ; return $ case mb_fi of
-                        Nothing  -> tc
-                        Just fim -> tcTyConAppTyCon (fi_rhs (fim_instance fim)) }
-  | otherwise = return tc
-
-
--- TODO: the following probably belongs somewhere else
 
 -- | Get rid of top-level newtypes, potentially looking through newtype
 -- instances. Only unwraps newtypes that are in scope. This is used
