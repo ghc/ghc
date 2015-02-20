@@ -1099,7 +1099,7 @@ data DataFamInstDecl name
   deriving( Typeable )
 deriving instance (DataId name) => Data (DataFamInstDecl name)
 
-placeHolderRepTyCon :: name
+placeHolderRepTyCon :: name -- AMG TODO
 -- Used for dfid_rep_tycon in DataFamInstDecl prior to the renamer
 placeHolderRepTyCon = panic "placeHolderRepTyCon"
 

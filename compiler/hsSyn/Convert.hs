@@ -453,16 +453,9 @@ cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-<<<<<<< HEAD:compiler/hsSyn/Convert.lhs
-        ; return (ConDeclField { cd_fld_lbl = i', cd_fld_sel = error "cvt_id_arg"
-                               , cd_fld_type =  ty', cd_fld_doc = Nothing}) }
-||||||| merged common ancestors
-        ; return (ConDeclField { cd_fld_name = i', cd_fld_type =  ty', cd_fld_doc = Nothing}) }
-=======
-        ; return $ noLoc (ConDeclField { cd_fld_names = [i']
+        ; return $ noLoc (ConDeclField { cd_fld_names = [(i', Nothing)]
                                        , cd_fld_type =  ty'
                                        , cd_fld_doc = Nothing}) }
->>>>>>> origin/master:compiler/hsSyn/Convert.hs
 
 cvtDerivs :: [TH.Name] -> CvtM (Maybe (Located [LHsType RdrName]))
 cvtDerivs [] = return Nothing
@@ -731,15 +724,10 @@ which we don't want.
 cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-<<<<<<< HEAD:compiler/hsSyn/Convert.lhs
-        ; return (HsRecField { hsRecFieldLbl = v', hsRecFieldSel = hsRecFieldSelMissing
-                             , hsRecFieldArg = e', hsRecPun = False}) }
-||||||| merged common ancestors
-        ; return (HsRecField { hsRecFieldId = v', hsRecFieldArg = e', hsRecPun = False}) }
-=======
-        ; return (noLoc $ HsRecField { hsRecFieldId = v', hsRecFieldArg = e'
+        ; return (noLoc $ HsRecField { hsRecFieldId = v'
+                                     , hsRecFieldSel = hsRecFieldSelMissing -- AMG TODO
+                                     , hsRecFieldArg = e'
                                      , hsRecPun = False}) }
->>>>>>> origin/master:compiler/hsSyn/Convert.hs
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -955,15 +943,10 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-<<<<<<< HEAD:compiler/hsSyn/Convert.lhs
-        ; return (HsRecField { hsRecFieldLbl = s', hsRecFieldSel = hsRecFieldSelMissing
-                             , hsRecFieldArg = p', hsRecPun = False}) }
-||||||| merged common ancestors
-        ; return (HsRecField { hsRecFieldId = s', hsRecFieldArg = p', hsRecPun = False}) }
-=======
-        ; return (noLoc $ HsRecField { hsRecFieldId = s', hsRecFieldArg = p'
+        ; return (noLoc $ HsRecField { hsRecFieldId = s'
+                                     , hsRecFieldSel = hsRecFieldSelMissing -- AMG TODO
+                                     , hsRecFieldArg = p'
                                      , hsRecPun = False}) }
->>>>>>> origin/master:compiler/hsSyn/Convert.hs
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.

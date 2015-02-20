@@ -180,11 +180,11 @@ tcTyClGroup boot_details tyclds
 
 tcAddImplicits :: [TyThing] -> TcM TcGblEnv
 tcAddImplicits tyclss
- = do { rec_sel_binds <- mkRecSelBinds tyclss
-      ; tcExtendGlobalEnvImplicit implicit_things $
-            tcRecSelBinds rec_sel_binds }
+ = tcExtendGlobalEnvImplicit implicit_things $
+   tcRecSelBinds rec_sel_binds
  where
    implicit_things = concatMap implicitTyThings tyclss
+   rec_sel_binds   = mkRecSelBinds tyclss
 
 zipRecTyClss :: [(Name, Kind)]
              -> [TyThing]           -- Knot-tied
@@ -1166,21 +1166,11 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
               do { ctxt    <- tcHsContext hs_ctxt
                  ; details <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-                 ; field_lbls <- lookupConstructorFields (unLoc name)
-                 ; let (is_infix, btys)   = details
-                       (arg_tys, stricts) = unzip btys
-                 ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
-||||||| merged common ancestors
-                 ; let (is_infix, field_lbls, btys) = details
-                       (arg_tys, stricts)           = unzip btys
-                 ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
-=======
-                 ; let (field_lbls, btys) = details
+                 ; field_lbls <- lookupConstructorFields (fromJust $ snd $ head names) -- AMG TODO ???
+                 ; let btys = details -- AMG TODO
                        (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
 
              -- Generalise the kind variables (returning quantified TcKindVars)
              -- and quantify the type variables (substituting their kinds)
@@ -1219,11 +1209,6 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
        ; mapM buildOneDataCon names
        }
 
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-tcConArgs :: NewOrData -> HsConDeclDetails Name -> TcM (Bool, [(TcType, HsBang)])
-||||||| merged common ancestors
-tcConArgs :: NewOrData -> HsConDeclDetails Name -> TcM (Bool, [Name], [(TcType, HsBang)])
-=======
 
 tcConIsInfix :: Name
              -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
@@ -1247,39 +1232,20 @@ tcConIsInfix con details (ResTyGADT _ _)
 
 
 tcConArgs :: NewOrData -> HsConDeclDetails Name
-          -> TcM ([Name], [(TcType, HsSrcBang)])
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
+          -> TcM [(TcType, HsSrcBang)]
 tcConArgs new_or_data (PrefixCon btys)
-  = do { btys' <- mapM (tcConArg new_or_data) btys
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-       ; return (False, btys') }
-||||||| merged common ancestors
-       ; return (False, [], btys') }
-=======
-       ; return ([], btys') }
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
+  = mapM (tcConArg new_or_data) btys
 tcConArgs new_or_data (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg new_or_data bty1
        ; bty2' <- tcConArg new_or_data bty2
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-       ; return (True, [bty1', bty2']) }
-||||||| merged common ancestors
-       ; return (True, [], [bty1', bty2']) }
-=======
-       ; return ([], [bty1', bty2']) }
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
+       ; return [bty1', bty2'] }
 tcConArgs new_or_data (RecCon fields)
-  = do { btys' <- mapM (tcConArg new_or_data) btys
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-       ; return (False, btys') }
-||||||| merged common ancestors
-       ; return (False, field_names, btys') }
-=======
-       ; return (field_names, btys') }
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
+  = mapM (tcConArg new_or_data) btys
   where
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
+-- <<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
     btys = map cd_fld_type fields
+{-
+-- AMG TODO
 ||||||| merged common ancestors
     field_names = map (unLoc . cd_fld_name) fields
     btys        = map cd_fld_type fields
@@ -1290,6 +1256,7 @@ tcConArgs new_or_data (RecCon fields)
     exploded = concatMap explode combined
     (field_names,btys) = unzip exploded
 >>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
+-}
 
 tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsSrcBang)
 tcConArg new_or_data bty
@@ -1952,24 +1919,18 @@ must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 -}
 
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-\begin{code}
-mkRecSelBinds :: [TyThing] -> TcM (HsValBinds Name)
-||||||| merged common ancestors
-\begin{code}
 mkRecSelBinds :: [TyThing] -> HsValBinds Name
-=======
-mkRecSelBinds :: [TyThing] -> HsValBinds Name
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
 mkRecSelBinds tycons
-  = do { let rec_sels = map mkRecSelBind [ (tc, fl)
-                                         | ATyCon tc <- tycons
-                                         , fl <- tyConFieldLabels tc ]
-       ; let (sigs, binds) = unzip rec_sels
-       ; return $ ValBindsOut [(NonRecursive, b) | b <- binds] sigs }
+  = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
+  where
+    (sigs, binds) = unzip rec_sels
+    rec_sels = map mkRecSelBind [ (tc,fld)
+                                | ATyCon tc <- tycons
+                                , fld <- tyConFieldLabels tc ]
+
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
 mkRecSelBind (tycon, fl)
@@ -2010,20 +1971,10 @@ mkRecSelBind (tycon, fl)
                                  (L loc (HsVar field_var))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-    rec_field  = HsRecField { hsRecFieldLbl = L loc (mkVarUnqual lbl)
-                            , hsRecFieldSel = Left sel_name
-                            , hsRecFieldArg = L loc (VarPat field_var)
-                            , hsRecPun = False }
-||||||| merged common ancestors
-    rec_field  = HsRecField { hsRecFieldId = sel_lname
-                            , hsRecFieldArg = L loc (VarPat field_var)
-                            , hsRecPun = False }
-=======
-    rec_field  = noLoc (HsRecField { hsRecFieldId = sel_lname
+    rec_field  = noLoc (HsRecField { hsRecFieldLbl = L loc (mkVarUnqual lbl)
+                                   , hsRecFieldSel = Left sel_name
                                    , hsRecFieldArg = L loc (VarPat field_var)
                                    , hsRecPun = False })
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
     sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
@@ -2048,29 +1999,7 @@ mkRecSelBind (tycon, fl)
     inst_tys = substTyVars (mkTopTvSubst (dataConEqSpec con1)) (dataConUnivTyVars con1)
 
     unit_rhs = mkLHsTupleExpr []
-<<<<<<< HEAD:compiler/typecheck/TcTyClsDecls.lhs
-    msg_lit = HsStringPrim (fastStringToByteString lbl)
-\end{code}
-||||||| merged common ancestors
-    msg_lit = HsStringPrim $ unsafeMkByteString $
-              occNameString (getOccName sel_name)
-
----------------
-tyConFields :: TyCon -> [FieldLabel]
-tyConFields tc
-  | isAlgTyCon tc = nub (concatMap dataConFieldLabels (tyConDataCons tc))
-  | otherwise     = []
-\end{code}
-=======
-    msg_lit = HsStringPrim "" $ unsafeMkByteString $
-              occNameString (getOccName sel_name)
-
----------------
-tyConFields :: TyCon -> [FieldLabel]
-tyConFields tc
-  | isAlgTyCon tc = nub (concatMap dataConFieldLabels (tyConDataCons tc))
-  | otherwise     = []
->>>>>>> origin/master:compiler/typecheck/TcTyClsDecls.hs
+    msg_lit = HsStringPrim "" (fastStringToByteString lbl)
 
 {-
 Note [Polymorphic selectors]

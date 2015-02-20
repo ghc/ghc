@@ -96,25 +96,11 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
    --     Also checks for duplicates.
    local_fix_env <- makeMiniFixityEnv fix_decls ;
 
-<<<<<<< HEAD:compiler/rename/RnSource.lhs
    -- (B) See Note [Assigning names to instance declarations]
    inst_decls <- assignInstDeclNames inst_decls0 ;
    let { group = group0 { hs_instds = inst_decls } } ;
 
    -- (C) Bring top level binders (and their fixities) into scope,
-   --     *except* for the value bindings, which get brought in below.
-   --     However *do* include class ops, data constructors
-   --     and for hs-boot files *do* include the value signatures.
-   (tc_envs, tc_bndrs, flds) <- getLocalNonValBinders local_fix_env group ;
-
-||||||| merged common ancestors
-   -- (B) Bring top level binders (and their fixities) into scope,
-   --     *except* for the value bindings, which get brought in below.
-   --     However *do* include class ops, data constructors
-   --     And for hs-boot files *do* include the value signatures
-   (tc_envs, tc_bndrs) <- getLocalNonValBinders local_fix_env group ;
-=======
-   -- (B) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get done in step (D)
    --     with collectHsIdBinders. However *do* include
    --
@@ -128,8 +114,8 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
    --        * For hs-boot files, include the value signatures
    --          Again, they have no value declarations
    --
-   (tc_envs, tc_bndrs) <- getLocalNonValBinders local_fix_env group ;
->>>>>>> origin/master:compiler/rename/RnSource.hs
+   (tc_envs, tc_bndrs, flds) <- getLocalNonValBinders local_fix_env group ;
+
    setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
@@ -1415,24 +1401,12 @@ rnConDecl decl@(ConDecl { con_names = names, con_qvars = tvs
 
         ; bindHsTyVars doc Nothing free_kvs new_tvs $ \new_tyvars -> do
         { (new_context, fvs1) <- rnContext doc lcxt
-<<<<<<< HEAD:compiler/rename/RnSource.lhs
-        ; (new_details, fvs2) <- rnConDeclDetails (unLoc new_name) doc details
-        ; (new_details', new_res_ty, fvs3) <- rnConResult doc (unLoc new_name) new_details res_ty
-        ; return (decl { con_name = new_name, con_qvars = new_tyvars, con_cxt = new_context
-                       , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' },
-||||||| merged common ancestors
-        ; (new_details, fvs2) <- rnConDeclDetails doc details
-        ; (new_details', new_res_ty, fvs3) <- rnConResult doc (unLoc new_name) new_details res_ty
-        ; return (decl { con_name = new_name, con_qvars = new_tyvars, con_cxt = new_context
-                       , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' },
-=======
         ; (new_details, fvs2) <- rnConDeclDetails doc details
         ; (new_details', new_res_ty, fvs3)
                      <- rnConResult doc (map unLoc new_names) new_details res_ty
         ; return (decl { con_names = new_names, con_qvars = new_tyvars
                        , con_cxt = new_context, con_details = new_details'
                        , con_res = new_res_ty, con_doc = mb_doc' },
->>>>>>> origin/master:compiler/rename/RnSource.hs
                   fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
  where
     doc = ConDeclCtx names
@@ -1457,52 +1431,16 @@ rnConResult doc _con details (ResTyGADT ls ty)
 
            RecCon {}    -> do { unless (null arg_tys)
                                        (addErr (badRecResTy (docOfHsDocContext doc)))
-<<<<<<< HEAD:compiler/rename/RnSource.lhs
-                              ; return (details, ResTyGADT res_ty, fvs) }
-
-           PrefixCon {} | isSymOcc (getOccName con)  -- See Note [Infix GADT cons]
-                        , [ty1,ty2] <- arg_tys
-                        -> do { fix_env <- getFixityEnv
-                              ; return (if   con `elemNameEnv` fix_env
-                                        then InfixCon ty1 ty2
-                                        else PrefixCon arg_tys
-                                       , ResTyGADT res_ty, fvs) }
-                        | otherwise
-                        -> return (PrefixCon arg_tys, ResTyGADT res_ty, fvs) }
-
-rnConDeclDetails :: Name
-                 -> HsDocContext
-                 -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
-                 -> RnM (HsConDetails (LHsType Name) [ConDeclField Name], FreeVars)
-rnConDeclDetails _ doc (PrefixCon tys)
-||||||| merged common ancestors
-                              ; return (details, ResTyGADT res_ty, fvs) }
-
-           PrefixCon {} | isSymOcc (getOccName con)  -- See Note [Infix GADT cons]
-                        , [ty1,ty2] <- arg_tys
-                        -> do { fix_env <- getFixityEnv
-                              ; return (if   con `elemNameEnv` fix_env
-                                        then InfixCon ty1 ty2
-                                        else PrefixCon arg_tys
-                                       , ResTyGADT res_ty, fvs) }
-                        | otherwise
-                        -> return (PrefixCon arg_tys, ResTyGADT res_ty, fvs) }
-
-rnConDeclDetails :: HsDocContext
-                 -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
-                 -> RnM (HsConDetails (LHsType Name) [ConDeclField Name], FreeVars)
-rnConDeclDetails doc (PrefixCon tys)
-=======
                               ; return (details, ResTyGADT ls res_ty, fvs) }
 
            PrefixCon {} -> return (PrefixCon arg_tys, ResTyGADT ls res_ty, fvs)}
 
 rnConDeclDetails
-   :: HsDocContext
+   :: Name
+   -> HsDocContext
    -> HsConDetails (LHsType RdrName) (Located [LConDeclField RdrName])
    -> RnM (HsConDetails (LHsType Name) (Located [LConDeclField Name]), FreeVars)
-rnConDeclDetails doc (PrefixCon tys)
->>>>>>> origin/master:compiler/rename/RnSource.hs
+rnConDeclDetails _ doc (PrefixCon tys)
   = do { (new_tys, fvs) <- rnLHsTypes doc tys
        ; return (PrefixCon new_tys, fvs) }
 

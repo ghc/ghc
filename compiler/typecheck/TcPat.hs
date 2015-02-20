@@ -1008,30 +1008,14 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   = do  { (rpats', res) <- tcMultiple tc_field rpats penv thing_inside
         ; return (RecCon (HsRecFields rpats' dd), res) }
   where
-<<<<<<< HEAD:compiler/typecheck/TcPat.lhs
-    tc_field :: Checker (HsRecField Name (LPat Name)) (HsRecField TcId (LPat TcId))
-    tc_field (HsRecField (L loc lbl) (Left sel_name) pat pun) penv thing_inside
-      = do { sel_id <- tcLookupId sel_name
-           ; pat_ty <- setSrcSpan loc $ find_field_ty (occNameFS (rdrNameOcc lbl))
-||||||| merged common ancestors
-    tc_field :: Checker (HsRecField FieldLabel (LPat Name)) (HsRecField TcId (LPat TcId))
-    tc_field (HsRecField field_lbl pat pun) penv thing_inside
-      = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
-=======
-    tc_field :: Checker (LHsRecField FieldLabel (LPat Name))
+    tc_field :: Checker (LHsRecField Name (LPat Name))
                         (LHsRecField TcId (LPat TcId))
-    tc_field (L l (HsRecField field_lbl pat pun)) penv thing_inside
-      = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
->>>>>>> origin/master:compiler/typecheck/TcPat.hs
+    tc_field (L l (HsRecField (L loc field_lbl) (Left sel_name) pat pun)) penv thing_inside
+      = do { sel_id <- tcLookupId sel_name
+           ; pat_ty <- setSrcSpan loc $ find_field_ty (occNameFS (rdrNameOcc field_lbl))
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-<<<<<<< HEAD:compiler/typecheck/TcPat.lhs
-           ; return (HsRecField (L loc lbl) (Left sel_id) pat' pun, res) }
+           ; return (L l (HsRecField (L loc field_lbl) (Left sel_id) pat' pun), res) }
     tc_field _ _ _ = panic "tcConArgs/tc_field missing field selector name"
-||||||| merged common ancestors
-           ; return (HsRecField sel_id pat' pun, res) }
-=======
-           ; return (L l (HsRecField sel_id pat' pun), res) }
->>>>>>> origin/master:compiler/typecheck/TcPat.hs
 
     find_field_ty :: FieldLabelString -> TcM TcType
     find_field_ty lbl
