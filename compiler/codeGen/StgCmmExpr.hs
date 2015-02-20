@@ -355,30 +355,59 @@ of Bool-returning primops was that tagToEnum# was added implicitly in the
 codegen and then optimized away. Now the call to tagToEnum# is explicit
 in the source code, which allows to optimize it away at the earlier stages
 of compilation (i.e. at the Core level).
+
+Note [Scrutinising VoidRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have this STG code:
+   f = \[s : State# RealWorld] -> 
+       case s of _ -> blah
+This is very odd.  Why are we scrutinising a state token?  But it
+can arise with bizarre NOINLINE pragmas (Trac #9964)
+    crash :: IO ()
+    crash = IO (\s -> let {-# NOINLINE s' #-}
+                          s' = s
+                      in (# s', () #))
+
+Now the trouble is that 's' has VoidRep, and we do not bind void
+arguments in the environment; they don't live anywhere.  See the
+calls to nonVoidIds in various places.  So we must not look up 
+'s' in the environment.  Instead, just evaluate the RHS!  Simple.
+
+Note [Dodgy unsafeCoerce 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+    case (x :: MutVar# Int) |> co of (y :: HValue) 
+        DEFAULT -> ...
+We want to gnerate an assignment
+     y := x
+We want to allow this assignment to be generated in the case when the
+types are compatible, because this allows some slightly-dodgy but
+occasionally-useful casts to be used, such as in RtClosureInspect
+where we cast an HValue to a MutVar# so we can print out the contents
+of the MutVar#.  If instead we generate code that enters the HValue,
+then we'll get a runtime panic, because the HValue really is a
+MutVar#.  The types are compatible though, so we can just generate an
+assignment.
+
+Note [Dodgy unsafeCoerce 2]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [ticket #3132]: we might be looking at a case of a lifted Id that
+was cast to an unlifted type.  The Id will always be bottom, but we
+don't want the code generator to fall over here.  If we just emit an
+assignment here, the assignment will be type-incorrect Cmm.  Hence, we
+emit the usual enter/return code, (and because bottom must be
+untagged, it will be entered and the program will crash).  The Sequel
+is a type-correct assignment, albeit bogus.  The (dead) continuation
+loops; it would be better to invoke some kind of panic function here.
 -}
 
+cgCase (StgApp v []) _ (PrimAlt _) alts
+  | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
+  , [(DEFAULT, _, _, rhs)] <- alts
+  = cgExpr rhs
 
-  -- Note [ticket #3132]: we might be looking at a case of a lifted Id
-  -- that was cast to an unlifted type.  The Id will always be bottom,
-  -- but we don't want the code generator to fall over here.  If we
-  -- just emit an assignment here, the assignment will be
-  -- type-incorrect Cmm.  Hence, we emit the usual enter/return code,
-  -- (and because bottom must be untagged, it will be entered and the
-  -- program will crash).
-  -- The Sequel is a type-correct assignment, albeit bogus.
-  -- The (dead) continuation loops; it would be better to invoke some kind
-  -- of panic function here.
-  --
-  -- However, we also want to allow an assignment to be generated
-  -- in the case when the types are compatible, because this allows
-  -- some slightly-dodgy but occasionally-useful casts to be used,
-  -- such as in RtClosureInspect where we cast an HValue to a MutVar#
-  -- so we can print out the contents of the MutVar#.  If we generate
-  -- code that enters the HValue, then we'll get a runtime panic, because
-  -- the HValue really is a MutVar#.  The types are compatible though,
-  -- so we can just generate an assignment.
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
-  | isUnLiftedType (idType v)
+  | isUnLiftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   || reps_compatible
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags
@@ -392,7 +421,7 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
     reps_compatible = idPrimRep v == idPrimRep bndr
 
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
-  = -- fail at run-time, not compile-time
+  = -- See Note [Dodgy unsafeCoerce 2]
     do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
        ; _ <- withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
@@ -403,7 +432,9 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
        ; emit (mkBranch l)
        ; return AssignedDirectly
        }
-{-
+
+{- Note [Handle seq#]
+~~~~~~~~~~~~~~~~~~~~~
 case seq# a s of v
   (# s', a' #) -> e
 
@@ -417,7 +448,8 @@ is the same as the return convention for just 'a')
 -}
 
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
-  = -- handle seq#, same return convention as vanilla 'a'.
+  = -- Note [Handle seq#]
+    -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 
 cgCase scrut bndr alt_type alts
