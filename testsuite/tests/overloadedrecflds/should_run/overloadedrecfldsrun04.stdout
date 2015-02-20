@@ -1,0 +1,3 @@
+data Main.R = Main.MkR {Main.$sel:foo:R :: GHC.Types.Int}
+
+42

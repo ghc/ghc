@@ -27,6 +27,7 @@ import Id
 import Var
 import Name
 import NameSet
+import RdrName
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
@@ -1007,16 +1008,34 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   = do  { (rpats', res) <- tcMultiple tc_field rpats penv thing_inside
         ; return (RecCon (HsRecFields rpats' dd), res) }
   where
+<<<<<<< HEAD:compiler/typecheck/TcPat.lhs
+    tc_field :: Checker (HsRecField Name (LPat Name)) (HsRecField TcId (LPat TcId))
+    tc_field (HsRecField (L loc lbl) (Left sel_name) pat pun) penv thing_inside
+      = do { sel_id <- tcLookupId sel_name
+           ; pat_ty <- setSrcSpan loc $ find_field_ty (occNameFS (rdrNameOcc lbl))
+||||||| merged common ancestors
+    tc_field :: Checker (HsRecField FieldLabel (LPat Name)) (HsRecField TcId (LPat TcId))
+    tc_field (HsRecField field_lbl pat pun) penv thing_inside
+      = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
+=======
     tc_field :: Checker (LHsRecField FieldLabel (LPat Name))
                         (LHsRecField TcId (LPat TcId))
     tc_field (L l (HsRecField field_lbl pat pun)) penv thing_inside
       = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
+>>>>>>> origin/master:compiler/typecheck/TcPat.hs
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
+<<<<<<< HEAD:compiler/typecheck/TcPat.lhs
+           ; return (HsRecField (L loc lbl) (Left sel_id) pat' pun, res) }
+    tc_field _ _ _ = panic "tcConArgs/tc_field missing field selector name"
+||||||| merged common ancestors
+           ; return (HsRecField sel_id pat' pun, res) }
+=======
            ; return (L l (HsRecField sel_id pat' pun), res) }
+>>>>>>> origin/master:compiler/typecheck/TcPat.hs
 
-    find_field_ty :: FieldLabel -> TcM (Id, TcType)
-    find_field_ty field_lbl
-        = case [ty | (f,ty) <- field_tys, f == field_lbl] of
+    find_field_ty :: FieldLabelString -> TcM TcType
+    find_field_ty lbl
+        = case [ty | (fl, ty) <- field_tys, flLabel fl == lbl] of
 
                 -- No matching field; chances are this field label comes from some
                 -- other record type (or maybe none).  If this happens, just fail,
@@ -1024,13 +1043,12 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
                 --      f (R { foo = (a,b) }) = a+b
                 -- If foo isn't one of R's fields, we don't want to crash when
                 -- typechecking the "a+b".
-           [] -> failWith (badFieldCon con_like field_lbl)
+           [] -> failWith (badFieldCon con_like lbl)
 
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) ->
                 ASSERT( null extras )
-                do { sel_id <- tcLookupField field_lbl
-                   ; return (sel_id, pat_ty) }
+                return pat_ty
 
     field_tys :: [(FieldLabel, TcType)]
     field_tys = case con_like of
@@ -1194,7 +1212,7 @@ existentialLetPat
           text "I can't handle pattern bindings for existential or GADT data constructors.",
           text "Instead, use a case-expression, or do-notation, to unpack the constructor."]
 
-badFieldCon :: ConLike -> Name -> SDoc
+badFieldCon :: ConLike -> FieldLabelString -> SDoc
 badFieldCon con field
   = hsep [ptext (sLit "Constructor") <+> quotes (ppr con),
           ptext (sLit "does not have field"), quotes (ppr field)]

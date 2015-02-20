@@ -1,0 +1,13 @@
+:set -XOverloadedRecordFields
+data S = MkS { foo :: Int }
+data T a = MkT { foo :: Bool, bar :: a -> a }
+:type foo
+foo (MkS 42)
+foo (MkT True id)
+:set -XNoOverloadedRecordFields
+-- Should be ambiguous
+:type foo
+data U = MkU { foo :: Int }
+-- New foo should shadow the old ones
+:type foo
+foo (MkU 42)

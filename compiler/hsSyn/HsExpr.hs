@@ -294,6 +294,12 @@ data HsExpr id
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
+  -- | Overloaded record fields (TODO: API annotation?)
+  | HsOverloadedRecFld FieldLabelString
+
+  -- | Used to attach a selector id to non-overloaded fields (TODO: API annotation?)
+  | HsSingleRecFld RdrName id
+
   -- | Expression with an explicit type signature. @e :: type@
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
@@ -764,6 +770,8 @@ ppr_expr (HsArrForm op _ args)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
 ppr_expr (HsUnboundVar nm)
   = ppr nm
+ppr_expr (HsOverloadedRecFld f) = ppr f
+ppr_expr (HsSingleRecFld f _) = ppr f
 
 {-
 HsSyn records exactly where the user put parens, with HsPar.

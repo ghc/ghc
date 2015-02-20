@@ -138,7 +138,8 @@ mkBootModDetailsTc hsc_env
                   tcg_tcs       = tcs,
                   tcg_patsyns   = pat_syns,
                   tcg_insts     = insts,
-                  tcg_fam_insts = fam_insts
+                  tcg_fam_insts = fam_insts,
+                  tcg_axioms    = axioms
                 }
   = do  { let dflags = hsc_dflags hsc_env
         ; showPassIO dflags CoreTidy
@@ -305,6 +306,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_tcs       = tcs
                               , mg_insts     = cls_insts
                               , mg_fam_insts = fam_insts
+                              , mg_axioms    = axioms
                               , mg_binds     = binds
                               , mg_patsyns   = patsyns
                               , mg_rules     = imp_rules
@@ -324,6 +326,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; showPassIO dflags CoreTidy
 
         ; let { type_env = typeEnvFromEntities [] tcs fam_insts
+                               `extendTypeEnvList` map ACoAxiom axioms
 
               ; implicit_binds
                   = concatMap getClassImplicitBinds (typeEnvClasses type_env) ++

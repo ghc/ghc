@@ -1,0 +1,9 @@
+
+overloadedrecfldsfail10.hs:9:5:
+    No instance for T {x :: ...}
+      arising from a use of the record selector ‘x’
+    The field ‘x’ of ‘T’ cannot be overloaded,
+      as its type is existentially quantified
+    In the expression: x
+    In the expression: x (MkT id)
+    In an equation for ‘v’: v = x (MkT id)

@@ -31,7 +31,7 @@ module MkId (
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
-        coercionTokenId, magicDictId, coerceId,
+        coercionTokenId, magicDictId, proxyHashId, coerceId,
 
         -- Re-export error Ids
         module PrelRules

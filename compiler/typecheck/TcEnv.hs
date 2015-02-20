@@ -15,7 +15,7 @@ module TcEnv(
         tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
         tcLookupLocatedGlobal, tcLookupGlobal,
-        tcLookupField, tcLookupTyCon, tcLookupClass,
+        tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
@@ -52,7 +52,9 @@ module TcEnv(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
+        newLocalName, newDFunName, newDFunName',
+        newFamInstTyConName, newFamInstTyConName',
+        newFamInstAxiomName, newFamInstAxiomName',
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where
@@ -136,22 +138,6 @@ tcLookupGlobal name
             Succeeded thing -> return thing
             Failed msg      -> failWithTc msg
         }}}
-
-tcLookupField :: Name -> TcM Id         -- Returns the selector Id
-tcLookupField name
-  = tcLookupId name     -- Note [Record field lookup]
-
-{- Note [Record field lookup]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~
-You might think we should have tcLookupGlobal here, since record fields
-are always top level.  But consider
-        f = e { f = True }
-Then the renamer (which does not keep track of what is a record selector
-and what is not) will rename the definition thus
-        f_7 = e { f_7 = True }
-Now the type checker will find f_7 in the *local* type environment, not
-the global (imported) one. It's wrong, of course, but we want to report a tidy
-error, not in TcEnv.notFound.  -}
 
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon name = do
@@ -781,11 +767,14 @@ name, like otber top-level names, and hence must be made with newGlobalBinder.
 -}
 
 newDFunName :: Class -> [Type] -> SrcSpan -> TcM Name
-newDFunName clas tys loc
+newDFunName clas tys = newDFunName' info_string
+  where info_string = occNameString (getOccName clas) ++
+                            concatMap (occNameString.getDFunTyKey) tys
+
+newDFunName' :: String -> SrcSpan -> TcM Name
+newDFunName' info_string loc
   = do  { is_boot <- tcIsHsBootOrSig
         ; mod     <- getModule
-        ; let info_string = occNameString (getOccName clas) ++
-                            concatMap (occNameString.getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
 
@@ -798,19 +787,33 @@ newGlobalBinder.
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
 
+newFamInstTyConName' :: Located Name -> [LHsType RdrName] -> TcM Name
+newFamInstTyConName' (L loc name) tys
+  = mk_fam_inst_name' id loc info_string
+  where
+    info_string = occNameString (getOccName name)
+                      ++ concatMap (getDFunHsTypeKey . unLoc) tys
+
 newFamInstAxiomName :: SrcSpan -> Name -> [CoAxBranch] -> TcM Name
 newFamInstAxiomName loc name branches
   = mk_fam_inst_name mkInstTyCoOcc loc name (map coAxBranchLHS branches)
 
+newFamInstAxiomName' :: SrcSpan -> String -> TcM Name
+newFamInstAxiomName' loc info_string
+  = mk_fam_inst_name' mkInstTyCoOcc loc info_string
+
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss
-  = do  { mod   <- getModule
-        ; let info_string = occNameString (getOccName tc_name) ++
-                            intercalate "|" ty_strings
-        ; occ   <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
-        ; newGlobalBinder mod (adaptOcc occ) loc }
+  = mk_fam_inst_name' adaptOcc loc info_string
   where
-    ty_strings = map (concatMap (occNameString . getDFunTyKey)) tyss
+    info_string = occNameString (getOccName tc_name) ++ intercalate "|" ty_strings
+    ty_strings  = map (concatMap (occNameString . getDFunTyKey)) tyss
+
+mk_fam_inst_name' :: (OccName -> OccName) -> SrcSpan -> String -> TcM Name
+mk_fam_inst_name' adaptOcc loc info_string
+  = do  { mod <- getModule
+        ; occ <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
+        ; newGlobalBinder mod (adaptOcc occ) loc }
 
 {-
 Stable names used for foreign exports and annotations.

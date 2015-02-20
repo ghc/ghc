@@ -64,6 +64,10 @@ module Type (
         isTypeVar, isKindVar, allDistinctTyVars, isForAllTy,
         isTyVarTy, isFunTy, isDictTy, isPredTy, isVoidTy,
 
+        -- Overloaded record fields predicates
+        isHasClass, isUpdClass, isRecordsClass,
+        isFldTyFam, isUpdTyFam, isRecordsFam,
+
         -- (Lifting and boxity)
         isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
         isPrimitiveType, isStrictType,
@@ -163,11 +167,13 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, coercibleTyConKey,
                    ipClassNameKey, openTypeKindTyConKey,
-                   constraintKindTyConKey, liftedTypeKindTyConKey )
+                   constraintKindTyConKey, liftedTypeKindTyConKey,
+                   recordHasClassNameKey, recordUpdClassNameKey,
+                   fldTyFamNameKey, updTyFamNameKey )
+import Unique
 import CoAxiom
 
 -- others
-import Unique           ( Unique, hasKey )
 import BasicTypes       ( Arity, RepArity )
 import Util
 import ListSetOps       ( getNth )
@@ -1187,6 +1193,26 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
                         Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
                                               isPrimTyCon tc
                         _                  -> False
+
+
+{-
+************************************************************************
+*                                                                      *
+                 OverloadedRecordFields predicates
+*                                                                      *
+************************************************************************
+-}
+
+isHasClass, isUpdClass, isRecordsClass :: Class -> Bool
+isHasClass     cls = cls `hasKey` recordHasClassNameKey
+isUpdClass     cls = cls `hasKey` recordUpdClassNameKey
+isRecordsClass cls = isHasClass cls || isUpdClass cls
+
+isFldTyFam, isUpdTyFam, isRecordsFam :: TyCon -> Bool
+isFldTyFam   tc = tc `hasKey` fldTyFamNameKey
+isUpdTyFam   tc = tc `hasKey` updTyFamNameKey
+isRecordsFam tc = isFldTyFam tc || isUpdTyFam tc
+
 
 {-
 ************************************************************************

@@ -632,6 +632,7 @@ data ExtensionFlag
    | Opt_MultiWayIf
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
+   | Opt_OverloadedRecordFields
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
@@ -3138,6 +3139,7 @@ xFlags = [
   flagSpec' "OverlappingInstances"            Opt_OverlappingInstances
                                               setOverlappingInsts,
   flagSpec "OverloadedLists"                  Opt_OverloadedLists,
+  flagSpec "OverloadedRecordFields"           Opt_OverloadedRecordFields,
   flagSpec "OverloadedStrings"                Opt_OverloadedStrings,
   flagSpec "PackageImports"                   Opt_PackageImports,
   flagSpec "ParallelArrays"                   Opt_ParallelArrays,
@@ -3265,6 +3267,14 @@ impliedXFlags
 
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
+
+    -- Overloaded record fields require field disambiguation (well
+    -- duh), and flexible contexts and constraint kinds (for the Has
+    -- class encoding and desugaring of r { f :: t } syntax).
+    , (Opt_OverloadedRecordFields, turnOn, Opt_DisambiguateRecordFields)
+    , (Opt_OverloadedRecordFields, turnOn, Opt_FlexibleContexts)
+    , (Opt_OverloadedRecordFields, turnOn, Opt_ConstraintKinds)
+    , (Opt_OverloadedRecordFields, turnOn, Opt_DataKinds)
   ]
 
 -- Note [Documenting optimisation flags]

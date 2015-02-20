@@ -341,7 +341,9 @@ mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD (
-                  DataFamInstDecl { dfid_tycon = tc, dfid_pats = mkHsWithBndrs tparams
+                  DataFamInstDecl { dfid_tycon = tc
+                                  , dfid_rep_tycon = placeHolderRepTyCon
+                                  , dfid_pats = mkHsWithBndrs tparams
                                   , dfid_defn = defn, dfid_fvs = placeHolderNames }))) }
 
 mkTyFamInst :: SrcSpan
@@ -1476,7 +1478,7 @@ mkModuleImpExp n@(L l name) subs =
       | isVarNameSpace (rdrNameSpace name) -> IEVar       n
       | otherwise                          -> IEThingAbs  (L l nameT)
     ImpExpAll                              -> IEThingAll  (L l nameT)
-    ImpExpList xs                          -> IEThingWith (L l nameT) xs
+    ImpExpList xs                          -> IEThingWith (L l nameT) xs []
 
   where
     nameT = setRdrNameSpace name tcClsName

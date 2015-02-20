@@ -989,10 +989,11 @@ zonkRecFields env (HsRecFields flds dd)
   = do  { flds' <- mapM zonk_rbind flds
         ; return (HsRecFields flds' dd) }
   where
+    -- TODO new_id   <- zonkIdBndr env (unLoc (hsRecFieldId fld))
     zonk_rbind (L l fld)
-      = do { new_id   <- wrapLocM (zonkIdBndr env) (hsRecFieldId fld)
+      = do { new_id   <- zonkIdBndr env (unLoc (hsRecFieldId fld))
            ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
-           ; return (L l (fld { hsRecFieldId = new_id
+           ; return (L l (fld { hsRecFieldSel = Left new_id
                               , hsRecFieldArg = new_expr })) }
 
 -------------------------------------------------------------------------

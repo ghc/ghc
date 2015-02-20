@@ -14,6 +14,9 @@ module DataCon (
         StrictnessMark(..),
         ConTag,
 
+        -- ** Field labels
+        FieldLbl(..), FieldLabel, FieldLabelString,
+
         -- ** Type construction
         mkDataCon, fIRST_TAG,
         buildAlgTyCon,
@@ -27,7 +30,7 @@ module DataCon (
         dataConStupidTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys,
-        dataConFieldLabels, dataConFieldType,
+        dataConFieldLabels, dataConFieldLabel, dataConFieldType,
         dataConSrcBangs,
         dataConSourceArity, dataConRepArity, dataConRepRepArity,
         dataConIsInfix,
@@ -56,6 +59,7 @@ import Coercion
 import Kind
 import Unify
 import TyCon
+import FieldLabel
 import Class
 import Name
 import Var
@@ -70,6 +74,7 @@ import VarEnv
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
+import Data.List
 import Data.Maybe
 import Data.Char
 import Data.Word
@@ -797,12 +802,16 @@ dataConImplicitIds (MkData { dcWorkId = work, dcRep = rep})
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
 
+-- | Extract the 'FieldLabel' and type for any given field of the 'DataCon'
+dataConFieldLabel :: DataCon -> FieldLabelString -> (FieldLabel, Type)
+dataConFieldLabel con lbl
+  = case find ((== lbl) . flLabel . fst) (dcFields con `zip` dcOrigArgTys con) of
+      Just x  -> x
+      Nothing -> pprPanic "dataConFieldLabel" (ppr con <+> ppr lbl)
+
 -- | Extract the type for any given labelled field of the 'DataCon'
-dataConFieldType :: DataCon -> FieldLabel -> Type
-dataConFieldType con label
-  = case lookup label (dcFields con `zip` dcOrigArgTys con) of
-      Just ty -> ty
-      Nothing -> pprPanic "dataConFieldType" (ppr con <+> ppr label)
+dataConFieldType :: DataCon -> FieldLabelString -> Type
+dataConFieldType con lbl = snd $ dataConFieldLabel con lbl
 
 -- | The strictness markings written by the porgrammer.
 -- The list is in one-to-one correspondence with the arity of the 'DataCon'

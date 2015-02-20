@@ -82,18 +82,27 @@ finishHsVar name
       ; return (HsVar name, unitFV name) }
 
 rnExpr (HsVar v)
-  = do { mb_name <- lookupOccRn_maybe v
+  = do { mb_name <- lookupOccRn_overloaded v
        ; case mb_name of {
            Nothing -> do { if startsWithUnderscore (rdrNameOcc v)
                            then return (HsUnboundVar v, emptyFVs)
                            else do { n <- reportUnboundName v; finishHsVar n } } ;
-           Just name
+           Just (Left name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
               -> rnExpr (ExplicitList placeHolderType Nothing [])
 
               | otherwise
-              -> finishHsVar name }}
+              -> finishHsVar name ;
+           Just (Right (fld, xs)) ->
+               do { overloaded <- xoptM Opt_OverloadedRecordFields
+                  ; if overloaded
+                    then do { when (isQual v && length xs > 1) $
+                                  addErrTc $ qualifiedOverloadedRecordField v
+                            ; return (HsOverloadedRecFld fld, mkFVs (map snd xs)) }
+                    else case xs of
+                         [(_, name)] -> return (HsSingleRecFld v name, unitFV name)
+                         _           -> error "rnExpr/HsVar" } } }
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
@@ -1347,3 +1356,8 @@ badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds
   = hang (ptext (sLit "Implicit-parameter bindings illegal in") <+> what)
          2 (ppr binds)
+
+qualifiedOverloadedRecordField :: RdrName -> SDoc
+qualifiedOverloadedRecordField v
+  = hang (ptext (sLit "Overloaded record field should not be qualified:"))
+       2 (quotes (ppr v))

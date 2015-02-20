@@ -14,6 +14,7 @@ import Module           ( ModuleName )
 import HsDoc            ( HsDocString )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
 import BasicTypes       ( SourceText )
+import Avail
 
 import Outputable
 import FastString
@@ -153,8 +154,9 @@ data IE name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | IEThingWith (Located name) [Located name]
+  | IEThingWith (Located name) [Located name] (AvailFlds name)
                  -- ^ Class/Type plus some methods/constructors
+                 -- and record fields; see Note [IEThingWith]
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
         --                                   'ApiAnnotation.AnnClose',
         --                                   'ApiAnnotation.AnnComma',
@@ -171,22 +173,39 @@ data IE name
   | IEDocNamed          String           -- ^ Reference to named doc
   deriving (Eq, Data, Typeable)
 
+{-
+Note [IEThingWith]
+~~~~~~~~~~~~~~~~~~
+
+A definition like
+
+    module M ( T(MkT, x) ) where
+      data T = MkT { x :: Int }
+
+gives rise to
+
+    IEThingWith T [MkT] [("x", Nothing)]         (without OverloadedRecordFields)
+    IEThingWith T [MkT] [("x", Just $sel:x:T)]   (with    OverloadedRecordFields)
+
+See Note [Representing fields in AvailInfo] in Avail for more details.
+-}
+
 ieName :: IE name -> name
-ieName (IEVar (L _ n))         = n
-ieName (IEThingAbs  (L _ n))   = n
-ieName (IEThingWith (L _ n) _) = n
-ieName (IEThingAll  (L _ n))   = n
+ieName (IEVar (L _ n))           = n
+ieName (IEThingAbs  (L _ n))     = n
+ieName (IEThingWith (L _ n) _ _) = n
+ieName (IEThingAll  (L _ n))     = n
 ieName _ = panic "ieName failed pattern match!"
 
 ieNames :: IE a -> [a]
-ieNames (IEVar       (L _ n)   ) = [n]
-ieNames (IEThingAbs  (L _ n)   ) = [n]
-ieNames (IEThingAll  (L _ n)   ) = [n]
-ieNames (IEThingWith (L _ n) ns) = n : map unLoc ns
-ieNames (IEModuleContents _    ) = []
-ieNames (IEGroup          _ _  ) = []
-ieNames (IEDoc            _    ) = []
-ieNames (IEDocNamed       _    ) = []
+ieNames (IEVar       (L _ n)      ) = [n]
+ieNames (IEThingAbs  (L _ n)      ) = [n]
+ieNames (IEThingAll  (L _ n)      ) = [n]
+ieNames (IEThingWith (L _ n) ns fs) = n : map unLoc ns ++ availFieldsNames fs
+ieNames (IEModuleContents _       ) = []
+ieNames (IEGroup          _ _     ) = []
+ieNames (IEDoc            _       ) = []
+ieNames (IEDocNamed       _       ) = []
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
@@ -199,9 +218,10 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEVar          var)    = pprPrefixOcc (unLoc var)
     ppr (IEThingAbs     thing)  = pprImpExp (unLoc thing)
     ppr (IEThingAll      thing) = hcat [pprImpExp (unLoc thing), text "(..)"]
-    ppr (IEThingWith thing withs)
+    ppr (IEThingWith thing withs flds)
         = pprImpExp (unLoc thing) <> parens (fsep (punctuate comma
-                                            (map pprImpExp $ map unLoc withs)))
+                                            (map pprImpExp (map unLoc withs) ++
+                                                map pprAvailField flds)))
     ppr (IEModuleContents mod')
         = ptext (sLit "module") <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")

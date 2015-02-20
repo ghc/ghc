@@ -43,6 +43,8 @@ module HsTypes (
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
         isWildcardTy, isNamedWildcardTy,
 
+        getDFunHsTypeKey,
+
         -- Printing
         pprParendHsType, pprHsForAll, pprHsForAllExtra,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
@@ -52,11 +54,13 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
-import Name( Name )
-import RdrName( RdrName )
+import Name( Name, getOccName, occNameString )
+import RdrName( RdrName, rdrNameOcc )
 import DataCon( HsBang(..), HsSrcBang, HsImplBang )
 import TysPrim( funTyConName )
 import Type
+import TysWiredIn
+import PrelNames
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -511,14 +515,43 @@ type LConDeclField name = Located (ConDeclField name)
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_names :: [Located name],
-                   cd_fld_type  :: LBangType name,
-                   cd_fld_doc   :: Maybe LHsDocString }
+  = ConDeclField { cd_fld_names :: [(Located RdrName, Maybe name)],
+                                   -- ^ See Note [ConDeclField selector]
+                   cd_fld_type :: LBangType name,
+                   cd_fld_doc  :: Maybe LHsDocString }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
+
+-- AMG TODO: can't use PostRn from PlaceHolder because then can't derive Typeable?
+
+-- AMG TODO: cd_fld_names with [Located name] in master, not just one name
+-- cd_fld_name :: ConDeclField name -> Located name
+-- cd_fld_name x = L (getLoc (cd_fld_lbl x)) $ cd_fld_sel x
+
+{-
+AMG TODO update note
+
+Note [ConDeclField selector]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A ConDeclField always contains the field label as the user wrote it in
+cd_fld_lbl.  After the renamer, it will additionally contain the Name
+of the selector function in cd_fld_sel.  (Before the renamer,
+cd_fld_sel contains an error thunk.)
+
+Due to OverloadedRecordFields, the OccName of the selector function
+may have been mangled, which is why we keep the original field label
+separately.  For example, when OverloadedRecordFields is enabled
+
+    data T = MkT { x :: Int }
+
+gives
+
+    ConDeclField { cd_fld_lbl = "x", cd_fld_sel = $sel:x:T, ... }.
+-}
 
 -----------------------
 -- Combine adjacent for-alls.
@@ -700,6 +733,38 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
 
 splitHsFunType other = ([], other)
 
+-- Get some string from a type, to be used to construct a dictionary
+-- function name (like getDFunTyKey in TcType, but for HsTypes)
+getDFunHsTypeKey :: HsType RdrName -> String
+getDFunHsTypeKey (HsForAllTy _ _ _ _ t) = getDFunHsTypeKey (unLoc t)
+getDFunHsTypeKey (HsTyVar tv)           = occNameString (rdrNameOcc tv)
+getDFunHsTypeKey (HsAppTy fun _)        = getDFunHsTypeKey (unLoc fun)
+getDFunHsTypeKey (HsFunTy {})           = occNameString (getOccName funTyCon)
+getDFunHsTypeKey (HsListTy _)           = occNameString (getOccName listTyCon)
+getDFunHsTypeKey (HsPArrTy _)           = occNameString (getOccName parrTyCon)
+getDFunHsTypeKey (HsTupleTy {})         = occNameString (getOccName unitTyCon)
+getDFunHsTypeKey (HsOpTy _ (_, op) _)   = occNameString (rdrNameOcc (unLoc op))
+getDFunHsTypeKey (HsParTy ty)           = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsIParamTy {})        = occNameString (getOccName ipClassName)
+getDFunHsTypeKey (HsEqTy {})            = occNameString (getOccName eqTyCon)
+getDFunHsTypeKey (HsKindSig ty _)       = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsQuasiQuoteTy {})    = "quasiQuote"
+getDFunHsTypeKey (HsSpliceTy {})        = "splice"
+getDFunHsTypeKey (HsDocTy ty _)         = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsBangTy _ ty)        = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsRecTy {})           = "record"
+getDFunHsTypeKey (HsCoreTy {})          = "core"
+getDFunHsTypeKey (HsExplicitListTy {})  = occNameString (getOccName listTyCon)
+getDFunHsTypeKey (HsExplicitTupleTy {}) = occNameString (getOccName unitTyCon)
+getDFunHsTypeKey (HsTyLit x)            = getDFunHsTyLitKey x
+getDFunHsTypeKey (HsWrapTy _ ty)        = getDFunHsTypeKey ty
+-- AMG TODO HsWildcardTy, HsNamedWildcardTy
+
+getDFunHsTyLitKey :: HsTyLit -> String
+getDFunHsTyLitKey (HsNumTy _ n) = show n
+getDFunHsTyLitKey (HsStrTy _ n) = show n
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -772,8 +837,8 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
                                  cd_fld_doc = doc }))
         = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
-    ppr_names [n] = ppr n
-    ppr_names ns = sep (punctuate comma (map ppr ns))
+    ppr_names [(n,_)] = ppr n
+    ppr_names ns = sep (punctuate comma (map (ppr.fst) ns))
 
 {-
 Note [Printing KindedTyVars]

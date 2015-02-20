@@ -959,14 +959,14 @@ When printing export lists, we print like this:
 -}
 
 pprExport :: IfaceExport -> SDoc
-pprExport (Avail n)      = ppr n
-pprExport (AvailTC _ []) = Outputable.empty
-pprExport (AvailTC n (n':ns))
-  | n==n'     = ppr n <> pp_export ns
-  | otherwise = ppr n <> char '|' <> pp_export (n':ns)
+pprExport (Avail n)         = ppr n
+pprExport (AvailTC _ [] []) = Outputable.empty
+pprExport (AvailTC n (n':ns) fs)
+  | n==n'     = ppr n <> pp_export ns fs
+  | otherwise = ppr n <> char '|' <> pp_export (n':ns) fs
   where
-    pp_export []    = Outputable.empty
-    pp_export names = braces (hsep (map ppr names))
+    pp_export []    [] = Outputable.empty
+    pp_export names fs = braces (hsep (map ppr names ++ map pprAvailField fs))
 
 pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}

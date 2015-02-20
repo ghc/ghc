@@ -158,6 +158,7 @@ Library
         Demand
         Debug
         Exception
+        FieldLabel
         GhcMonad
         Hooks
         Id
@@ -389,6 +390,7 @@ Library
         TcDeriv
         TcEnv
         TcExpr
+        TcFldInsts
         TcForeign
         TcGenDeriv
         TcGenGenerics
@@ -438,6 +440,7 @@ Library
         FastFunctions
         FastMutInt
         FastString
+        FastStringEnv
         FastTypes
         Fingerprint
         FiniteMap

@@ -18,7 +18,10 @@ module HsPat (
 
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField(..), LHsRecField, hsRecFields,
+        HsRecFields(..), HsRecField(..), LHsRecField,
+        hsRecFieldSelMissing,
+        hsRecFieldId, hsRecFieldId_maybe,
+        hsRecFields, hsRecFieldsUnambiguous,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -45,13 +48,16 @@ import Var
 import ConLike
 import DataCon
 import TyCon
+import FieldLabel
 import Outputable
 import Type
+import RdrName
+import OccName
 import SrcLoc
 import FastString
+import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
-import Data.Maybe
 
 type InPat id  = LPat id        -- No 'Out' constructors
 type OutPat id = LPat id        -- No 'In' constructors
@@ -254,7 +260,8 @@ type LHsRecField id arg = Located (HsRecField id arg)
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 data HsRecField id arg = HsRecField {
-        hsRecFieldId  :: Located id,
+        hsRecFieldLbl :: Located RdrName,
+        hsRecFieldSel :: Either id [(id, id)], -- Note [HsRecField selector]
         hsRecFieldArg :: arg,           -- Filled in by renamer
         hsRecPun      :: Bool           -- Note [Punning]
   } deriving (Data, Typeable)
@@ -262,8 +269,8 @@ data HsRecField id arg = HsRecField {
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~
 -- If you write T { x, y = v+1 }, the HsRecFields will be
---      HsRecField x x True ...
---      HsRecField y (v+1) False ...
+--      HsRecField x x x True ...
+--      HsRecField y y (v+1) False ...
 -- That is, for "punned" field x is expanded (in the renamer)
 -- to x=x; but with a punning flag so we can detect it later
 -- (e.g. when pretty printing)
@@ -271,8 +278,58 @@ data HsRecField id arg = HsRecField {
 -- If the original field was qualified, we un-qualify it, thus
 --    T { A.x } means T { A.x = x }
 
-hsRecFields :: HsRecFields id arg -> [id]
-hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
+
+-- Note [HsRecField selector]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-- A HsRecField always contains a label (in hsRecFieldLbl), which is
+-- the thing the user wrote, but thanks to OverloadedRecordFields this
+-- may not unambiguously correspond to a Name.  The hsRecFieldSel is
+-- filled in by the renamer (RnPat.rnHsRecFields1) thus:
+--
+--  * If the field is unambiguous, it uses `Left sel_name`
+--
+--  * If the field is ambiguous, there are multiple fields with the
+--    correct label in scope, it uses `Right xs` where `xs` is a list of
+--    (parent name, selector name) pairs.
+--
+-- The typechecker (tcExpr) then disambiguates the record update.
+--
+-- For example, suppose we have:
+--
+--     data S = MkS { x :: Int }
+--     data T = MkT { x :: Int }
+--
+--     f z = (z { x = 3 }) :: S
+--
+-- After the renamer, the HsRecField corresponding to the record
+-- update will have
+--
+--     hsRecFieldLbl = "x"
+--     hsRecFieldSel = Right [(S, $sel:x:S), (T, $sel:x:T)]
+--
+-- and the typechecker will determine that $sel:x:S is meant.
+
+
+hsRecFieldSelMissing :: Either id [(id, id)]
+hsRecFieldSelMissing = error "hsRecFieldSelMissing"
+
+hsRecFields :: HsRecFields id arg -> [(FieldLabelString, Either id [(id, id)])]
+hsRecFields rbinds = map (toFld . unLoc) (rec_flds rbinds)
+  where
+    toFld x = ( occNameFS . rdrNameOcc . unLoc . hsRecFieldLbl $ x
+              , hsRecFieldSel x)
+
+hsRecFieldsUnambiguous :: HsRecFields id arg -> [(FieldLabelString, id)]
+hsRecFieldsUnambiguous = map outOfLeftField . hsRecFields
+  where outOfLeftField (l, Left x)  = (l, x)
+        outOfLeftField (_, Right _) = error "hsRecFieldsUnambigous"
+
+hsRecFieldId_maybe :: HsRecField id arg -> Maybe (Located id)
+hsRecFieldId_maybe x = either (Just . L (getLoc (hsRecFieldLbl x))) (const Nothing) (hsRecFieldSel x)
+
+hsRecFieldId :: HsRecField id arg -> Located id
+hsRecFieldId = expectJust "hsRecFieldId" . hsRecFieldId_maybe
 
 {-
 ************************************************************************
@@ -354,7 +411,7 @@ instance (OutputableBndr id, Outputable arg)
 
 instance (OutputableBndr id, Outputable arg)
       => Outputable (HsRecField id arg) where
-  ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg,
+  ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
 

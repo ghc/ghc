@@ -1,0 +1,47 @@
+[1 of 2] Compiling OverloadedRecFldsFail08_A ( OverloadedRecFldsFail08_A.hs, OverloadedRecFldsFail08_A.o )
+[2 of 2] Compiling Main             ( overloadedrecfldsfail08.hs, overloadedrecfldsfail08.o )
+
+overloadedrecfldsfail08.hs:7:5:
+    No instance for T {x :: Bool}
+      arising from a use of the record selector ‘x’
+    The field ‘x’ of ‘T’ cannot be overloaded,
+      as its type is existentially quantified
+    In the expression: x
+    In the expression: x (MkT True) :: Bool
+    In an equation for ‘a’: a = x (MkT True) :: Bool
+
+overloadedrecfldsfail08.hs:8:5:
+    No instance for U {y :: ...}
+      arising from a use of the record selector ‘y’
+    The field ‘y’ of ‘U’ cannot be overloaded,
+      as its type is universally quantified
+    In the expression: y
+    In the expression: y (MkU id)
+    In an equation for ‘b’: b = y (MkU id)
+
+overloadedrecfldsfail08.hs:9:5:
+    No instance for U {z :: ...}
+      arising from a use of the record selector ‘z’
+    The field ‘z’ of ‘U’ cannot be overloaded,
+      as its type is universally quantified
+    In the expression: z
+    In the expression: z (MkU2 (\ _ -> ()))
+    In an equation for ‘c’: c = z (MkU2 (\ _ -> ()))
+
+overloadedrecfldsfail08.hs:10:5:
+    No instance for (F Int) {foo :: ...}
+      arising from a use of the record selector ‘foo’
+    The field ‘foo’ of ‘F Int’ cannot be overloaded,
+      as its type is existentially quantified
+    In the expression: foo
+    In the expression: foo (MkFInt 42)
+    In an equation for ‘d’: d = foo (MkFInt 42)
+
+overloadedrecfldsfail08.hs:11:5:
+    No instance for (F Bool) {foo :: ...}
+      arising from a use of the record selector ‘foo’
+    The field ‘foo’ of ‘F Bool’ cannot be overloaded,
+      as its type is universally quantified
+    In the expression: foo
+    In the expression: foo (MkFBool id)
+    In an equation for ‘e’: e = foo (MkFBool id)

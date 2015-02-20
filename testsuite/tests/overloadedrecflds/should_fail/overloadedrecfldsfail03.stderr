@@ -1,0 +1,5 @@
+
+overloadedrecfldsfail03.hs:5:16:
+    Multiple declarations of ‘foo’
+    Declared at: overloadedrecfldsfail03.hs:3:1
+                 overloadedrecfldsfail03.hs:5:16
