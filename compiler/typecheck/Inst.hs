@@ -63,7 +63,7 @@ import Data.Maybe( isJust )
 {-
 ************************************************************************
 *                                                                      *
-                Creating and emittind constraints
+                Creating and emitting constraints
 *                                                                      *
 ************************************************************************
 -}
