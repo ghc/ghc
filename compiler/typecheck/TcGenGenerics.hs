@@ -11,8 +11,8 @@ The deriving code for the Generic class
 
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       GenericKind(..),
-                      MetaTyCons, genGenericMetaTyCons,
-                      gen_Generic_binds, get_gen1_constrained_tys) where
+                      MetaTyCons, genGenericMetaTyCons, mkBindsRep,
+                      tc_mkRepFamInst, get_gen1_constrained_tys) where
 
 import DynFlags
 import HsSyn
@@ -57,20 +57,72 @@ import Control.Monad (mplus,forM)
 *                                                                      *
 ************************************************************************
 
+Note [What deriving Generic/Generic1 generates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 For the generic representation we need to generate:
-\begin{itemize}
-\item A Generic instance
-\item A Rep type instance
-\item Many auxiliary datatypes and instances for them (for the meta-information)
+1) A Generic/Generic1 instance
+2) A Rep/Rep1 type instance
+3) Many auxiliary datatypes (shared for both Generic and Generic1), and
+4) Instances for them (for the meta-information)
 \end{itemize}
+
+For example, given the following datatype:
+
+  data List a = Nil | Cons a (List a)
+
+We'll generate:
+
+1) A Generic and a Generic1 instance:
+
+  instance Generic (List a) where
+    from Nil = M1 (L1 (M1 U1))
+    from (Cons g1 g2) = M1 (R1 (M1 ((:*:) (M1 (K1 g1)) (M1 (K1 g2)))))
+    to (M1 (L1 (M1 U1))) = Nil
+    to (M1 (R1 (M1 ((:*:) (M1 (K1 g1)) (M1 (K1 g2)))))) = Cons g1 g2
+
+  instance Generic1 List where
+    from1 Nil = M1 (L1 (M1 U1))
+    from1 (Cons g1 g2) = M1 (R1 (M1 ((:*:) (M1 (Par1 g1)) (M1 (Rec1 g2)))))
+    to1 (M1 (L1 (M1 U1))) = Nil
+    to1 (M1 (R1 (M1 ((:*:) (M1 g1) (M1 g2))))) = Cons (unPar1 g1) (unRec1 g2)
+
+2) A Rep and Rep1 type family instance:
+
+    type Rep (List a) =
+      D1 D1List (C1 C1_0List U1
+             :+: C1 C1_1List (S1 S1_1_0List (Rec0 a)
+                          :*: S1 S1_1_1List (Rec0 (List a))))
+
+    type Rep1 List =
+      D1 D1List (C1 C1_0List U1
+             :+: C1 C1_1List (S1 S1_1_0List Par1
+                          :*: S1 S1_1_1List (Rec1 List)))
+
+3) Auxiliary, empty datatypes:
+
+    data D1List
+    data C1_0List
+    data C1_1List
+    data S1_1_0List
+    data S1_1_1List
+
+4) Instances for these datatypes:
+
+  instance Datatype D1List where
+    datatypeName _ = "List"
+    moduleName _   = "GenDerivOutput"
+    packageName _  = "main"
+
+  instance Constructor C1_0List where
+    conName _ = "Nil"
+
+  instance Constructor C1_1List where
+    conName _     = "Cons"
+    conIsRecord _ = True
 -}
 
-gen_Generic_binds :: GenericKind -> TyCon -> MetaTyCons -> Module
-                 -> TcM (LHsBinds RdrName, FamInst)
-gen_Generic_binds gk tc metaTyCons mod = do
-  repTyInsts <- tc_mkRepFamInsts gk tc metaTyCons mod
-  return (mkBindsRep gk tc, repTyInsts)
-
+-- This function generates the empty datatypes and their instances (3 and 4)
 genGenericMetaTyCons :: TyCon -> Module -> TcM (MetaTyCons, BagDerivStuff)
 genGenericMetaTyCons tc mod =
   do  loc <- getSrcSpanM
@@ -428,9 +480,7 @@ gk2gkDC :: GenericKind_ -> DataCon -> GenericKind_DC
 gk2gkDC Gen0_   _ = Gen0_DC
 gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
-
-
--- Bindings for the Generic instance
+-- Bindings for the Generic instance (1)
 mkBindsRep :: GenericKind -> TyCon -> LHsBinds RdrName
 mkBindsRep gk tycon =
     unitBag (mkRdrFunBind (L loc from01_RDR) from_matches)
@@ -461,12 +511,13 @@ mkBindsRep gk tycon =
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepFamInsts :: GenericKind     -- Gen0 or Gen1
-               -> TyCon           -- The type to generate representation for
-               -> MetaTyCons      -- Metadata datatypes to refer to
-               -> Module          -- Used as the location of the new RepTy
-               -> TcM (FamInst)   -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon metaDts mod =
+-- This function generates the Rep/Rep type family instances (2)
+tc_mkRepFamInst :: GenericKind     -- Gen0 or Gen1
+                -> TyCon           -- The type to generate representation for
+                -> MetaTyCons      -- Metadata datatypes to refer to
+                -> Module          -- Used as the location of the new RepTy
+                -> TcM (FamInst)   -- Generated representation0 coercion
+tc_mkRepFamInst gk tycon metaDts mod =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
