@@ -1,6 +1,7 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE AutoDeriveTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -33,14 +34,17 @@ module Data.Functor.Identity (
   ) where
 
 import Control.Monad.Fix
+import Control.Monad.Zip
 import Data.Coerce
+import Data.Data (Data)
 import Data.Foldable
+import GHC.Generics (Generic, Generic1)
 
 -- | Identity functor and monad. (a non-strict monad)
 --
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
-    deriving (Eq, Ord, Traversable)
+    deriving (Eq, Ord, Data, Traversable, Generic, Generic1)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed
@@ -89,6 +93,9 @@ instance Monad Identity where
 instance MonadFix Identity where
     mfix f   = Identity (fix (runIdentity . f))
 
+instance MonadZip Identity where
+    mzipWith = coerce
+    munzip   = coerce
 
 -- | Internal (non-exported) 'Coercible' helper for 'elem'
 --
