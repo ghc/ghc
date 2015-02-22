@@ -37,7 +37,7 @@ module Demand (
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
-        evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
+        evalDmd, cleanEvalDmd, cleanEvalProdDmd, cleanEvalStateHackDmd, isStrictDmd,
         splitDmdTy, splitFVs,
         deferAfterIO,
         postProcessUnsat, postProcessDmdTypeM,
@@ -633,6 +633,9 @@ cleanEvalDmd = mkCleanDmd HeadStr Used
 
 cleanEvalProdDmd :: Arity -> CleanDemand
 cleanEvalProdDmd n = mkCleanDmd HeadStr (UProd (replicate n useTop))
+
+cleanEvalStateHackDmd :: CleanDemand
+cleanEvalStateHackDmd = mkCleanDmd HeadStr (mkUCall One Used)
 
 isSingleUsed :: JointDmd -> Bool
 isSingleUsed (JD {absd=a}) = is_used_once a

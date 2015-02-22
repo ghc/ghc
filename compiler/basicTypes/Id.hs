@@ -71,7 +71,7 @@ module Id (
         isOneShotBndr, isOneShotLambda, isProbablyOneShotLambda,
         setOneShotLambda, clearOneShotLambda,
         updOneShotInfo, setIdOneShotInfo,
-        isStateHackType,
+        isStateHackType, isStateHackFunType,
 
         -- ** Reading 'IdInfo' fields
         idArity,
@@ -674,6 +674,11 @@ isStateHackType ty
         -- Another good example is in fill_in in PrelPack.hs.  We should be able to
         -- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
+isStateHackFunType :: Type -> Bool
+isStateHackFunType ty
+  = case splitFunTy_maybe ty of
+        Just (arg_ty, _) -> isStateHackType arg_ty
+        Nothing -> False
 
 -- | Returns whether the lambda associated with the 'Id' is certainly applied at most once.
 -- You probably want to use 'isOneShotBndr' instead

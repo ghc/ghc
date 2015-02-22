@@ -619,9 +619,14 @@ dmdAnalRhs top_lvl rec_flag env id rhs
         -- See Note [NOINLINE and strictness]
 
     -- See Note [Product demands for function body]
-    body_dmd = case deepSplitProductType_maybe (ae_fam_envs env) (exprType body) of
-                 Nothing            -> cleanEvalDmd
-                 Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
+    body_dmd
+        | Just (dc, _, _, _) <- deepSplitProductType_maybe (ae_fam_envs env) (exprType body)
+        = cleanEvalProdDmd (dataConRepArity dc)
+        | isStateHackFunType $ topNormaliseType (ae_fam_envs env) (exprType body)
+        = -- pprTrace "new state hack" (ppr (exprType body)) $
+          cleanEvalStateHackDmd
+        | otherwise
+        = cleanEvalDmd
 
     -- See Note [Lazy and unleashable free variables]
     -- See Note [Aggregated demand for cardinality]
