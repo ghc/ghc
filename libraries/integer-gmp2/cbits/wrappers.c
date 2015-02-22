@@ -750,3 +750,83 @@ integer_gmp_invert_word(const mp_limb_t x0, const mp_limb_t m0)
 
   return r0;
 }
+
+
+/* Wrappers for GMP 4.x compat
+ *
+ * In GMP 5.0 the following operations were added:
+ *
+ *  mpn_sqr, mpn_and_n, mpn_ior_n, mpn_xor_n, mpn_nand_n, mpn_nior_n,
+ *  mpn_xnor_n, mpn_andn_n, mpn_iorn_n, mpn_com, mpn_neg, mpn_copyi,
+ *  mpn_copyd, mpn_zero
+ *
+ * We use some of those, but for GMP 4.x compatibility we need to
+ * emulate those (while incurring some overhead).
+ */
+#if __GNU_MP_VERSION < 5
+
+#define MPN_LOGIC_OP_WRAPPER(MPN_WRAPPER, MPZ_OP) \
+void                                                               \
+MPN_WRAPPER(mp_limb_t *rp, const mp_limb_t *s1p,                   \
+            const mp_limb_t *s2p, mp_size_t n)                     \
+{                                                                  \
+  assert(n > 0);                                                   \
+                                                                   \
+  const mpz_t s1 = CONST_MPZ_INIT(s1p, n);                         \
+  const mpz_t s2 = CONST_MPZ_INIT(s2p, n);                         \
+                                                                   \
+  mpz_t r;                                                         \
+  mpz_init (r);                                                    \
+  MPZ_OP (r, s1, s2);                                              \
+                                                                   \
+  const mp_size_t rn = r[0]._mp_size;                              \
+  memset (rp, 0, n*sizeof(mp_limb_t));                             \
+  memcpy (rp, r[0]._mp_d, mp_size_minabs(rn,n)*sizeof(mp_limb_t)); \
+                                                                   \
+  mpz_clear (r);                                                   \
+}
+
+static void
+__mpz_andn(mpz_t r, const mpz_t s1, const mpz_t s2)
+{
+  mpz_t s2c;
+  mpz_init (s2c);
+  mpz_com (s2c, s2);
+  mpz_and (r, s1, s2c);
+  mpz_clear (s2c);
+}
+
+MPN_LOGIC_OP_WRAPPER(integer_gmp_mpn_and_n,  mpz_and)
+MPN_LOGIC_OP_WRAPPER(integer_gmp_mpn_andn_n, __mpz_andn)
+MPN_LOGIC_OP_WRAPPER(integer_gmp_mpn_ior_n,  mpz_ior)
+MPN_LOGIC_OP_WRAPPER(integer_gmp_mpn_xor_n,  mpz_xor)
+
+#else /* __GNU_MP_VERSION >= 5 */
+void
+integer_gmp_mpn_and_n(mp_limb_t *rp, const mp_limb_t *s1p,
+                      const mp_limb_t *s2p, mp_size_t n)
+{
+  mpn_and_n(rp, s1p, s2p, n);
+}
+
+void
+integer_gmp_mpn_andn_n(mp_limb_t *rp, const mp_limb_t *s1p,
+                      const mp_limb_t *s2p, mp_size_t n)
+{
+  mpn_andn_n(rp, s1p, s2p, n);
+}
+
+void
+integer_gmp_mpn_ior_n(mp_limb_t *rp, const mp_limb_t *s1p,
+                      const mp_limb_t *s2p, mp_size_t n)
+{
+  mpn_ior_n(rp, s1p, s2p, n);
+}
+
+void
+integer_gmp_mpn_xor_n(mp_limb_t *rp, const mp_limb_t *s1p,
+                      const mp_limb_t *s2p, mp_size_t n)
+{
+  mpn_xor_n(rp, s1p, s2p, n);
+}
+#endif
