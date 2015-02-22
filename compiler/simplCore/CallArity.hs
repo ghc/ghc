@@ -475,7 +475,7 @@ callArityAnal arity int (Let bind e)
 -- See Note [Which variables are interesting]
 interestingBinds :: CoreBind -> [Var]
 interestingBinds = filter go . bindersOf
-  where go v = 0 < length (typeArity (idType v))
+  where go v = 0 < typeArity (idType v)
 
 addInterestingBinds :: VarSet -> CoreBind -> VarSet
 addInterestingBinds int bind

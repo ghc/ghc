@@ -95,10 +95,10 @@ exprArity e = go e
     go _                           = 0
 
     trim_arity :: Arity -> Type -> Arity
-    trim_arity arity ty = arity `min` length (typeArity ty)
+    trim_arity arity ty = arity `min` typeArity ty
 
 ---------------
-typeArity :: Type -> [OneShotInfo]
+typeArity :: Type -> Arity
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
 -- See Note [exprArity invariant]
@@ -109,8 +109,8 @@ typeArity ty
       | Just (_, ty')  <- splitForAllTy_maybe ty
       = go rec_nts ty'
 
-      | Just (arg,res) <- splitFunTy_maybe ty
-      = NoOneShotInfo : go rec_nts res
+      | Just (_,res) <- splitFunTy_maybe ty
+      = 1 + go rec_nts res
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
       , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]
@@ -127,7 +127,7 @@ typeArity ty
         -- e.g. newtype Stream m a b = Stream (m (Either b (a, Stream m a b)))
 
       | otherwise
-      = []
+      = 0
 
 ---------------
 exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
@@ -700,7 +700,7 @@ arityType env (Cast e co)
       ATop os -> ATop (take co_arity os)
       ABot n  -> ABot (n `min` co_arity)
   where
-    co_arity = length (typeArity (pSnd (coercionKind co)))
+    co_arity = typeArity (pSnd (coercionKind co))
     -- See Note [exprArity invariant] (2); must be true of
     -- arityType too, since that is how we compute the arity
     -- of variables, and they in turn affect result of exprArity
@@ -714,12 +714,12 @@ arityType _ (Var v)
   , (ds, res) <- splitStrictSig strict_sig
   , let arity = length ds
   = if isBotRes res then ABot arity
-                    else ATop (take arity one_shots)
+                    else ATop (replicate (arity `min` type_arity) noOneShotInfo)
   | otherwise
-  = ATop (take (idArity v) one_shots)
+  = ATop (replicate (idArity v `min` type_arity) noOneShotInfo)
   where
-    one_shots :: [OneShotInfo]  -- One-shot-ness derived from the type
-    one_shots = typeArity (idType v)
+    type_arity :: Arity  -- maximum Arity derived from the type
+    type_arity = typeArity (idType v)
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
