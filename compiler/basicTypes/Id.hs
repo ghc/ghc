@@ -71,7 +71,7 @@ module Id (
         isOneShotBndr, isOneShotLambda, isProbablyOneShotLambda,
         setOneShotLambda, clearOneShotLambda,
         updOneShotInfo, setIdOneShotInfo,
-        isStateHackType, stateHackOneShot, typeOneShot,
+        isStateHackType,
 
         -- ** Reading 'IdInfo' fields
         idArity,
@@ -245,8 +245,7 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
 mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty
-                         (vanillaIdInfo `setOneShotInfo` typeOneShot ty)
+mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
@@ -648,15 +647,6 @@ isOneShotBndr :: Var -> Bool
 isOneShotBndr var
   | isTyVar var = True
   | otherwise   = isOneShotLambda var
-
--- | Should we apply the state hack to values of this 'Type'?
-stateHackOneShot :: OneShotInfo
-stateHackOneShot = OneShotLam         -- Or maybe ProbOneShot?
-
-typeOneShot :: Type -> OneShotInfo
-typeOneShot ty
-   | isStateHackType ty = stateHackOneShot
-   | otherwise          = NoOneShotInfo
 
 isStateHackType :: Type -> Bool
 isStateHackType ty
