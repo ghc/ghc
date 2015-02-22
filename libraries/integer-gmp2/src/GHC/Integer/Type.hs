@@ -1575,25 +1575,25 @@ foreign import ccall unsafe "integer_gmp_mpn_lshift"
 
 -- void mpn_and_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 --                 mp_size_t n)
-foreign import ccall unsafe "gmp.h __gmpn_and_n"
+foreign import ccall unsafe "integer_gmp_mpn_and_n"
   c_mpn_and_n :: MutableByteArray# s -> ByteArray# -> ByteArray# -> GmpSize#
                  -> IO ()
 
 -- void mpn_andn_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 --                  mp_size_t n)
-foreign import ccall unsafe "gmp.h __gmpn_andn_n"
+foreign import ccall unsafe "integer_gmp_mpn_andn_n"
   c_mpn_andn_n :: MutableByteArray# s -> ByteArray# -> ByteArray# -> GmpSize#
                   -> IO ()
 
 -- void mpn_ior_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 --                 mp_size_t n)
-foreign import ccall unsafe "gmp.h __gmpn_ior_n"
+foreign import ccall unsafe "integer_gmp_mpn_ior_n"
   c_mpn_ior_n :: MutableByteArray# s -> ByteArray# -> ByteArray# -> GmpSize#
                  -> IO ()
 
 -- void mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 --                 mp_size_t n)
-foreign import ccall unsafe "gmp.h __gmpn_xor_n"
+foreign import ccall unsafe "integer_gmp_mpn_xor_n"
   c_mpn_xor_n :: MutableByteArray# s -> ByteArray# -> ByteArray# -> GmpSize#
                  -> IO ()
 
