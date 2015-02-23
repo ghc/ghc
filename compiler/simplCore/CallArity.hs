@@ -150,7 +150,7 @@ The interesting cases of the analysis:
    Return (alt₁ ∪ alt₂ ∪...)
  * App e₁ e₂ (and analogously Case scrut alts):
    We get the results from both sides. Additionally, anything called by e₁ can
-   possibly called with anything from e₂.
+   possibly be called with anything from e₂.
    Return: C(e₁) ∪ C(e₂) ∪ (fv e₁) × (fv e₂)
  * Let v = rhs in body:
    In addition to the results from the subexpressions, add all co-calls from
@@ -443,7 +443,6 @@ callArityAnal arity int (App e1 e2)
   where
     (ae1, e1') = callArityAnal (arity + 1) int e1
     (ae2, e2') = callArityAnal 0           int e2
-    -- See Note [Case and App: Which side to take?]
     final_ae = ae1 `both` ae2
 
 -- Case expression.
@@ -457,7 +456,6 @@ callArityAnal arity int (Case scrut bndr ty alts)
                         in  (ae, (dc, bndrs, e'))
     alt_ae = lubRess alt_aes
     (scrut_ae, scrut') = callArityAnal 0 int scrut
-    -- See Note [Case and App: Which side to take?]
     final_ae = scrut_ae `both` alt_ae
 
 -- For lets, use callArityBind
