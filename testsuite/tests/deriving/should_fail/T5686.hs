@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, DeriveFunctor #-}
-module Main where
+module T5686 where
 
 data U a = U (G a) deriving Functor
 

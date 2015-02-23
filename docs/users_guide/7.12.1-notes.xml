@@ -82,7 +82,8 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    <literal>Main</literal> with an explicit module header but
+                    without <literal>main</literal> is now an error (#7765).
                </para>
            </listitem>
        </itemizedlist>

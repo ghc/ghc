@@ -319,8 +319,7 @@ test('mod172', extra_clean(['Mod172_B.hi', 'Mod172_B.o', 'Mod172_C.hi', 'Mod172_
 test('mod173', extra_clean(['Mod173_Aux.hi', 'Mod173_Aux.o']),
      multimod_compile, ['mod173', '-v0'])
 
-test('mod174', normal, compile_fail, [''])
-
+# mod174 has been deleted
 # mod175 is a sub-directory
 
 test('mod176', normal, compile, ['-fwarn-unused-imports'])
@@ -343,5 +342,6 @@ test('T414', normal, compile_fail, [''])
 test('T414a', normal, compile, [''])
 test('T414b', normal, compile, [''])
 test('T3776', normal, compile, [''])
+test('T7765', normal, compile_fail, [''])
 test('T9061', normal, compile, [''])
 test('T9997', normal, compile, [''])

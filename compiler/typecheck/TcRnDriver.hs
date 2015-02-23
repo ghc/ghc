@@ -3,6 +3,8 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 \section[TcMovectle]{Typechecking a whole module}
+
+https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 -}
 
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
@@ -268,7 +270,7 @@ tcRnModuleTcRnM :: HscEnv
                 -> HsParsedModule
                 -> (Module, SrcSpan)
                 -> TcRn TcGblEnv
--- Factored out separately so that a Core plugin can
+-- Factored out separately from tcRnModule so that a Core plugin can
 -- call the type checker directly
 tcRnModuleTcRnM hsc_env hsc_src
                 (HsParsedModule {
@@ -283,7 +285,7 @@ tcRnModuleTcRnM hsc_env hsc_src
    do { let { dflags = hsc_dflags hsc_env } ;
 
         tcg_env <- tcRnSignature dflags hsc_src ;
-        setGblEnv tcg_env $ do {
+        setGblEnv tcg_env { tcg_mod_name=maybe_mod } $ do {
 
         -- Deal with imports; first add implicit prelude
         implicit_prelude <- xoptM Opt_ImplicitPrelude;
@@ -1070,23 +1072,11 @@ instMisMatch is_boot inst
 {-
 ************************************************************************
 *                                                                      *
-        Type-checking the top level of a module
+        Type-checking the top level of a module (continued)
 *                                                                      *
 ************************************************************************
-
-tcRnGroup takes a bunch of top-level source-code declarations, and
- * renames them
- * gets supporting declarations from interface files
- * typechecks them
- * zonks them
- * and augments the TcGblEnv with the results
-
-In Template Haskell it may be called repeatedly for each group of
-declarations.  It expects there to be an incoming TcGblEnv in the
-monad; it augments it and returns the new TcGblEnv.
 -}
 
-------------------------------------------------
 rnTopSrcDecls :: [Name] -> HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 -- Fails if there are any errors
 rnTopSrcDecls extra_deps group
@@ -1107,14 +1097,6 @@ rnTopSrcDecls extra_deps group
 
         return (tcg_env', rn_decls)
    }
-
-{-
-************************************************************************
-*                                                                      *
-                tcTopSrcDecls
-*                                                                      *
-************************************************************************
--}
 
 tcTopSrcDecls :: ModDetails -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls boot_details
@@ -1339,10 +1321,12 @@ check_main dflags tcg_env
     mod          = tcg_mod tcg_env
     main_mod     = mainModIs dflags
     main_fn      = getMainFun dflags
+    interactive  = ghcLink dflags == LinkInMemory
+    implicit_mod = isNothing (tcg_mod_name tcg_env)
 
-    complain_no_main | ghcLink dflags == LinkInMemory = return ()
-                     | otherwise = failWithTc noMainMsg
-        -- In interactive mode, don't worry about the absence of 'main'
+    complain_no_main = checkTc (interactive && implicit_mod) noMainMsg
+        -- In interactive mode, without an explicit module header, don't
+        -- worry about the absence of 'main'.
         -- In other modes, fail altogether, so that we don't go on
         -- and complain a second time when processing the export list.
 
@@ -1358,6 +1342,7 @@ getMainFun dflags = case mainFunIs dflags of
                       Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
                       Nothing -> main_RDR_Unqual
 
+-- If we are in module Main, check that 'main' is exported.
 checkMainExported :: TcGblEnv -> TcM ()
 checkMainExported tcg_env
   = case tcg_main tcg_env of

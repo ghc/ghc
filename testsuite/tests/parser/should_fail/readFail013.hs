@@ -1,4 +1,4 @@
-module Main where
+module ReadFail013 where
 
 -- !!! unterminated ``
 a = ``s``

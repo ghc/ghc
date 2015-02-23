@@ -10,7 +10,7 @@
 
 :shell cp Bar1.hs Bar.hs
 
-:load Main.hs
+:load FooBar.hs
 :shell sleep 1
 :shell cp Bar2.hs Bar.hs
 
