@@ -1,10 +1,10 @@
-{-# LANGUAGE OverloadedRecordFields, TypeFamilies, FlexibleInstances,
-             DataKinds, MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedRecordFields #-}
+{-# OPTIONS_GHC -fwarn-unused-binds -Werror #-}
 
-import GHC.Records
+module Main (main, T(MkT)) where
 
-data Person = MkPerson { firstName :: String, lastName :: String }
+data S = MkS { foo :: Int }
+data T = MkT { foo :: Int }
 
-type instance FldTy Person "fullName" = String
-instance Has Person "fullName" String where
-  getField _ p = firstName p ++ " " ++ lastName p
+-- This should count as a use of S(foo) but not T(foo)
+main = print ((\ MkS{foo=foo} -> foo) (MkS 3))

@@ -8,9 +8,3 @@ test('overloadedrecfldsfail05', normal, compile_fail, [''])
 test('overloadedrecfldsfail06',
      extra_clean(['OverloadedRecFldsFail06_A.hi', 'OverloadedRecFldsFail06_A.o']),
      multimod_compile_fail, ['overloadedrecfldsfail06', ''])
-test('overloadedrecfldsfail07', skip, compile_fail, [''])
-test('overloadedrecfldsfail08',
-     extra_clean(['OverloadedRecFldsFail08_A.hi', 'OverloadedRecFldsFail08_A.o']),
-     multimod_compile_fail, ['overloadedrecfldsfail08', ''])
-test('overloadedrecfldsfail09', normal, compile_fail, [''])
-test('overloadedrecfldsfail10', normal, compile_fail, [''])

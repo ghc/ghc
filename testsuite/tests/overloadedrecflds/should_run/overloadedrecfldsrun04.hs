@@ -1,6 +1,7 @@
+-- Test that OverloadedRecordFields works with TemplateHaskell
+
 {-# LANGUAGE OverloadedRecordFields, TemplateHaskell #-}
 
-import GHC.Records
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 
@@ -13,6 +14,4 @@ $(return [])
 -- ... and check that we can inspect it
 main = do  putStrLn $(do { info <- reify ''R
                          ; lift (pprint info) })
-           putStrLn $(do { insts <- reifyInstances ''Has [ConT ''R, LitT (StrTyLit "foo"), ConT ''Int]
-                         ; lift (pprint insts) })
            print (foo (MkR { foo = 42 }))

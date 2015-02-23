@@ -5,9 +5,12 @@ OverloadedRecFldsFail06_A.hs:9:15: Warning:
 
 OverloadedRecFldsFail06_A.hs:9:42: Warning:
     Defined but not used: ‘unused2’
+
+OverloadedRecFldsFail06_A.hs:9:59: Warning:
+    Defined but not used: ‘used_locally’
 [2 of 2] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 
-overloadedrecfldsfail06.hs:4:1: Warning:
+overloadedrecfldsfail06.hs:7:1: Warning:
     The import of ‘Unused(unused), V(x), U(y), MkV, Unused’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 

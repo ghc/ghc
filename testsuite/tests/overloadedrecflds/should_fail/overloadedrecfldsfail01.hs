@@ -1,3 +1,5 @@
+-- Test ambiguous updates are rejected with appropriate error messages
+
 {-# LANGUAGE OverloadedRecordFields #-}
 
 data R = MkR { w :: Bool, x :: Int, y :: Bool }

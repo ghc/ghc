@@ -1,19 +1,9 @@
-{-# LANGUAGE OverloadedRecordFields, ExistentialQuantification, RankNTypes #-}
+-- Test selectors cannot be used ambiguously
 
--- x is existential (naughty)
-data T a = forall e . MkT { x :: e }
+{-# LANGUAGE OverloadedRecordFields #-}
 
--- x and y are higher-rank
-data U = MkU { x :: forall a . a -> a }
-       | MkU2 { y :: (forall b . b) -> () }
+data R = MkR { x :: Int, y :: Bool }
+data S = MkS { x :: Int }
 
--- Should generate sensible unsolved constraint errors
-a = x (MkT True) :: Bool
-b = x (MkU id)
-c = y (MkU2 (\ _ -> ()))
-d = x ((\ x -> x) :: Int -> Int) :: Bool
-
-e :: (T Int) { foo :: t } => t
-e = x (MkT True)
-
-main = return ()
+main = do print (x (MkS 42))
+          print (y (MkR 42 42))

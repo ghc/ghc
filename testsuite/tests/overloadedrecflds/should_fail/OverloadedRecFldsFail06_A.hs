@@ -10,7 +10,7 @@ data Unused = MkUnused { unused :: Bool, unused2 :: Bool, used_locally :: Bool }
 
 u = MkU False True
 
-z r = used_locally r
+z MkU2{used_locally=used_locally} = used_locally
 
-getX r = x r
-getY r = y r
+getX MkU{x=x} = x
+getY MkV2{y=y} = y
