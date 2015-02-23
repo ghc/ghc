@@ -1108,8 +1108,8 @@ SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
     utils docs rts compiler ghc driver libraries libffi-tarballs
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
-    aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-    settings.in VERSION GIT_COMMIT_ID \
+    aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile
+    install-sh settings.in VERSION GIT_COMMIT_ID \
     boot packages ghc.mk
 
 .PHONY: VERSION
