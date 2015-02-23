@@ -1401,7 +1401,7 @@ rnConDecl decl@(ConDecl { con_names = names, con_qvars = tvs
 
         ; bindHsTyVars doc Nothing free_kvs new_tvs $ \new_tyvars -> do
         { (new_context, fvs1) <- rnContext doc lcxt
-        ; (new_details, fvs2) <- rnConDeclDetails (unLoc $ head new_names) doc details -- AMG TODO ?
+        ; (new_details, fvs2) <- rnConDeclDetails (unLoc $ head new_names) doc details
         ; (new_details', new_res_ty, fvs3)
                      <- rnConResult doc (map unLoc new_names) new_details res_ty
         ; return (decl { con_names = new_names, con_qvars = new_tyvars
@@ -1450,7 +1450,8 @@ rnConDeclDetails _ doc (InfixCon ty1 ty2)
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
 rnConDeclDetails con doc (RecCon (L l fields))
-  = do  { (new_fields, fvs) <- rnConDeclFields con doc fields
+  = do  { fls <- lookupConstructorFields con
+        ; (new_fields, fvs) <- rnConDeclFields fls doc fields
                 -- No need to check for duplicate fields
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }

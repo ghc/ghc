@@ -1166,7 +1166,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
               do { ctxt    <- tcHsContext hs_ctxt
                  ; btys    <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
-                 ; field_lbls <- lookupConstructorFields (unLoc $ head names) -- AMG TODO ???
+                 ; field_lbls <- lookupConstructorFields (unLoc $ head names)
                  ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
