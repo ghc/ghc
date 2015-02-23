@@ -775,8 +775,8 @@ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
 -- >>>>>>> origin/master:compiler/hsSyn/HsUtils.hs
 
 -------------------
-hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) ->
-                          ([Located name], [(Located RdrName, name, Located name)])
+hsLTyClDeclBinders :: Located (TyClDecl name) ->
+                          ([Located name], [(Located RdrName, PostRn name Name, Located name)])
 -- ^ Returns all the /binding/ names of the decl.
 -- The first one is guaranteed to be the name of the decl. The first component
 -- represents all binding names except fields; the second represents fields as
@@ -822,8 +822,8 @@ addPatSynBndr bind pss
   = pss
 
 -------------------
-hsLInstDeclBinders :: Eq name => LInstDecl name
-                   -> ([Located name], [(Located RdrName, name, Located name)])
+hsLInstDeclBinders :: LInstDecl name
+                   -> ([Located name], [(Located RdrName, PostRn name Name, Located name)])
 hsLInstDeclBinders (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } }))
   = foldMap (hsDataFamInstBinders . unLoc) dfis
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
@@ -832,29 +832,29 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataFamInstBinders :: Eq name => DataFamInstDecl name ->
-                            ([Located name], [(Located RdrName, name, Located name)])
+hsDataFamInstBinders :: DataFamInstDecl name ->
+                            ([Located name], [(Located RdrName, PostRn name Name, Located name)])
 hsDataFamInstBinders (DataFamInstDecl { dfid_tycon = tycon_name, dfid_defn = defn })
   = withTyCon tycon_name (hsDataDefnBinders defn)
   -- There can't be repeated symbols because only data instances have binders
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataDefnBinders :: Eq name => HsDataDefn name ->
-                         ([Located name], [(Located RdrName, name)])
+hsDataDefnBinders :: HsDataDefn name ->
+                         ([Located name], [(Located RdrName, PostRn name Name)])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
-hsConDeclsBinders :: forall name. (Eq name) => [LConDecl name] ->
-                         ([Located name], [(Located RdrName, name)])
+hsConDeclsBinders :: [LConDecl name] ->
+                         ([Located name], [(Located RdrName, PostRn name Name)])
   -- See hsLTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 hsConDeclsBinders cons = go id cons
-  where go :: ([(Located RdrName, name)] -> [(Located RdrName, name)])
-           -> [LConDecl name] -> ([Located name], [(Located RdrName, name)])
+  where go :: ([(Located RdrName, PostRn name Name)] -> [(Located RdrName, PostRn name Name)])
+           -> [LConDecl name] -> ([Located name], [(Located RdrName, PostRn name Name)])
         go _ [] = ([], [])
         go remSeen (r:rs) =
           -- don't re-mangle the location of field names, because we don't
@@ -865,9 +865,8 @@ hsConDeclsBinders cons = go id cons
 -- <<<<<<< HEAD:compiler/hsSyn/HsUtils.lhs
              L loc (ConDecl { con_names = names , con_details = RecCon flds }) ->
                (map (L loc . unLoc) names ++ ns, r' ++ fs)
-                  where r' = remSeen (concatMap (map (fmap unJust) . cd_fld_names . unLoc) (unLoc flds))
+                  where r' = remSeen (concatMap (cd_fld_names . unLoc) (unLoc flds))
                         -- AMG TODO what on earth happens here
-                        unJust (Just x) = x
                         -- cd_fld_lflds cdfld = (cd_fld_lbl x, cd_fld_sel x)
                         remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc . fst) v | v <- r']
                         (ns, fs) = go remSeen' rs

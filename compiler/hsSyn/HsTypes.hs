@@ -515,7 +515,7 @@ type LConDeclField name = Located (ConDeclField name)
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_names :: [(Located RdrName, Maybe name)],
+  = ConDeclField { cd_fld_names :: [(Located RdrName, PostRn name Name)],
                                    -- ^ See Note [ConDeclField selector]
                    cd_fld_type :: LBangType name,
                    cd_fld_doc  :: Maybe LHsDocString }
@@ -524,12 +524,6 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
       -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
-
--- AMG TODO: can't use PostRn from PlaceHolder because then can't derive Typeable?
-
--- AMG TODO: cd_fld_names with [Located name] in master, not just one name
--- cd_fld_name :: ConDeclField name -> Located name
--- cd_fld_name x = L (getLoc (cd_fld_lbl x)) $ cd_fld_sel x
 
 {-
 AMG TODO update note

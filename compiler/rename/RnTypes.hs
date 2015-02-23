@@ -527,11 +527,11 @@ rnField con doc (L l (ConDeclField names ty haddock_doc))
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
        ; return (L l (ConDeclField new_names new_ty new_haddock_doc), fvs) }
   where
-    help :: (Located RdrName, x) -> RnM (Located RdrName, Maybe Name)
+    help :: (Located RdrName, PlaceHolder) -> RnM (Located RdrName, Name)
     help (l_rdr_name, _) = do { flds <- lookupConstructorFields con
                               ; let lbl = occNameFS $ rdrNameOcc $ unLoc l_rdr_name
                               ; let fl = expectJust "rnField" $ find ((== lbl) . flLabel) flds
-                              ; return (l_rdr_name, Just (flSelector fl)) }
+                              ; return (l_rdr_name, flSelector fl) }
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnContext doc (L loc cxt)

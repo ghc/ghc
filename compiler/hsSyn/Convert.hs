@@ -453,7 +453,7 @@ cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-        ; return $ noLoc (ConDeclField { cd_fld_names = [(i', Nothing)]
+        ; return $ noLoc (ConDeclField { cd_fld_names = [(i', PlaceHolder)]
                                        , cd_fld_type =  ty'
                                        , cd_fld_doc = Nothing}) }
 

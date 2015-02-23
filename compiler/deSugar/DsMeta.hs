@@ -1864,9 +1864,9 @@ repConstr con (RecCon (L _ ips))
          ; rep2 recCName [unC con, unC arg_vtys] }
     where
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
-      rep_one_ip t (L l _, Just n) = do { MkC v  <- lookupLOcc $ L l n -- AMG TODO ?
-                                        ; MkC ty <- repBangTy  t
-                                        ; rep2 varStrictTypeName [v,ty] }
+      rep_one_ip t n = do { MkC v  <- lookupOcc (snd n)
+                          ; MkC ty <- repBangTy  t
+                          ; rep2 varStrictTypeName [v,ty] }
 
 repConstr con (InfixCon st1 st2)
     = do arg1 <- repBangTy st1
