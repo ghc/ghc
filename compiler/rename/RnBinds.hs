@@ -497,7 +497,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         -- which (a) is not that different from  _v = rhs
         --       (b) is sometimes used to give a type sig for,
         --           or an occurrence of, a variable on the RHS
-        ; whenWOptM Opt_WarnUnusedBinds $
+        ; whenWOptM Opt_WarnUnusedPatternBinds $
           when (null bndrs && not is_wild_pat) $
           addWarn $ unusedPatBindWarn bind'
 

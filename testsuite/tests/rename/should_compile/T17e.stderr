@@ -1,0 +1,7 @@
+
+T17e.hs:8:1: Warning: Defined but not used: ‘top’
+
+T17e.hs:11:11: Warning:
+    This pattern-binding binds no variables: True = True
+
+T17e.hs:17:12: Warning: Defined but not used: ‘local’

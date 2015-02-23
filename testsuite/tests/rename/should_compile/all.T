@@ -112,6 +112,12 @@ test('rn067',
 
 test('rn068', normal, compile, [''])
 
+test('T17a', normal, compile, [''])
+test('T17b', normal, compile, [''])
+test('T17c', normal, compile, [''])
+test('T17d', normal, compile, [''])
+test('T17e', normal, compile, [''])
+
 test('T1972', normal, compile, [''])
 test('T2205', normal, compile, [''])
 

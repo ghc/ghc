@@ -488,7 +488,9 @@ data WarningFlag =
    | Opt_WarnOverlappingPatterns
    | Opt_WarnTypeDefaults
    | Opt_WarnMonomorphism
-   | Opt_WarnUnusedBinds
+   | Opt_WarnUnusedTopBinds
+   | Opt_WarnUnusedLocalBinds
+   | Opt_WarnUnusedPatternBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
    | Opt_WarnContextQuantification
@@ -2676,6 +2678,8 @@ dynamic_flags = [
   , defFlag "fno-glasgow-exts"
       (NoArg (do disableGlasgowExts
                  deprecate "Use individual extensions instead"))
+  , defFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
+  , defFlag "fno-warn-unused-binds" (NoArg disableUnusedBinds)
 
         ------ Safe Haskell flags -------------------------------------------
   , defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2883,10 +2887,12 @@ fWarningFlags = [
   flagSpec "warn-unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
   flagSpec "warn-unticked-promoted-constructors"
                                          Opt_WarnUntickedPromotedConstructors,
-  flagSpec "warn-unused-binds"                Opt_WarnUnusedBinds,
   flagSpec "warn-unused-do-bind"              Opt_WarnUnusedDoBind,
   flagSpec "warn-unused-imports"              Opt_WarnUnusedImports,
+  flagSpec "warn-unused-local-binds"          Opt_WarnUnusedLocalBinds,
   flagSpec "warn-unused-matches"              Opt_WarnUnusedMatches,
+  flagSpec "warn-unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
+  flagSpec "warn-unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "warn-warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "warn-wrong-do-bind"               Opt_WarnWrongDoBind]
 
@@ -3359,7 +3365,9 @@ minusWOpts :: [WarningFlag]
 -- Things you get with -W
 minusWOpts
     = standardWarnings ++
-      [ Opt_WarnUnusedBinds,
+      [ Opt_WarnUnusedTopBinds,
+        Opt_WarnUnusedLocalBinds,
+        Opt_WarnUnusedPatternBinds,
         Opt_WarnUnusedMatches,
         Opt_WarnUnusedImports,
         Opt_WarnIncompletePatterns,
@@ -3380,6 +3388,19 @@ minusWallOpts
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors
       ]
+
+enableUnusedBinds :: DynP ()
+enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
+
+disableUnusedBinds :: DynP ()
+disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
+
+-- Things you get with -fwarn-unused-binds
+unusedBindsFlags :: [WarningFlag]
+unusedBindsFlags = [ Opt_WarnUnusedTopBinds
+                   , Opt_WarnUnusedLocalBinds
+                   , Opt_WarnUnusedPatternBinds
+                   ]
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setGeneralFlag Opt_PrintExplicitForalls

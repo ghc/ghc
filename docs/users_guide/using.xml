@@ -1872,33 +1872,71 @@ data Vec n s where
           <indexterm><primary><option>-fwarn-unused-binds</option></primary></indexterm>
           <indexterm><primary>unused binds, warning</primary></indexterm>
           <indexterm><primary>binds, unused</primary></indexterm>
-          <para>Report any function definitions (and local bindings)
-          which are unused.  More precisely:
+          <para>Report any function definitions (and local bindings) which are unused. An alias for
+            <itemizedlist>
+              <listitem><option>-fwarn-unused-top-binds</option></listitem>
+              <listitem><option>-fwarn-unused-local-binds</option></listitem>
+              <listitem><option>-fwarn-unused-pattern-binds</option></listitem>
+            </itemizedlist>
+          </para>
+        </listitem>
+      </varlistentry>
 
-          <itemizedlist>
-          <listitem><para>Warn if a binding brings into scope a variable that is not used,
+      <varlistentry>
+        <term><option>-fwarn-unused-top-binds</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-top-binds</option></primary></indexterm>
+          <indexterm><primary>unused binds, warning</primary></indexterm>
+          <indexterm><primary>binds, unused</primary></indexterm>
+          <para>Report any function definitions which are unused.</para>
+
+          <para>More precisely, warn if a binding brings into scope a variable that is not used,
           except if the variable's name starts with an underscore.  The "starts-with-underscore"
           condition provides a way to selectively disable the warning.
-        </para>
+          </para>
           <para>
-          A variable is regarded as "used" if 
+          A variable is regarded as "used" if
           <itemizedlist>
           <listitem><para>It is exported, or</para></listitem>
-          <listitem><para>It appears in the right hand side of a binding that binds at 
+          <listitem><para>It appears in the right hand side of a binding that binds at
                            least one used variable that is used</para></listitem>
           </itemizedlist>
           For example
             <programlisting>
 module A (f) where
-f = let (p,q) = rhs1 in t p  -- Warning about unused q
+f = let (p,q) = rhs1 in t p  -- No warning: q is unused, but is locally bound
 t = rhs3                     -- No warning: f is used, and hence so is t
 g = h x                      -- Warning: g unused
 h = rhs2                     -- Warning: h is only used in the right-hand side of another unused binding
 _w = True                    -- No warning: _w starts with an underscore
             </programlisting>
-          </para></listitem>
+          </para>
+        </listitem>
+      </varlistentry>
 
-          <listitem><para>
+      <varlistentry>
+        <term><option>-fwarn-unused-local-binds</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-local-binds</option></primary></indexterm>
+          <indexterm><primary>unused binds, warning</primary></indexterm>
+          <indexterm><primary>binds, unused</primary></indexterm>
+          <para>Report any local definitions which are unused. For example
+            <programlisting>
+module A (f) where
+f = let (p,q) = rhs1 in t p  -- Warning: q is unused
+g = h x                      -- No warning: g is unused, but is a top-level binding
+            </programlisting>
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-unused-pattern-binds</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-pattern-binds</option></primary></indexterm>
+          <indexterm><primary>unused binds, warning</primary></indexterm>
+          <indexterm><primary>binds, unused</primary></indexterm>
+          <para>
           Warn if a pattern binding binds no variables at all, unless it is a lone, possibly-banged, wild-card pattern.
           For example:
             <programlisting>
@@ -1911,12 +1949,9 @@ _  = rhs3        -- No warning: lone wild-card pattern
           are not very different from <literal>_v = rhs3</literal>,
           which elicits no warning; and they can be useful to add a type
           constraint, e.g. <literal>_ = x::Int</literal>. A lone
-          banged wild-card pattern is is useful as an alternative 
+          banged wild-card pattern is useful as an alternative
           (to <literal>seq</literal>) way to force evaluation.
         </para>
-        </listitem>
-          </itemizedlist>
-          </para>
         </listitem>
       </varlistentry>
 

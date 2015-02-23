@@ -1578,9 +1578,33 @@
 
           <row>
             <entry><option>-fwarn-unused-binds</option></entry>
-            <entry>warn about bindings that are unused</entry>
+            <entry>warn about bindings that are unused.
+               Alias for <option>-fwarn-unused-top-binds</option>,
+               <option>-fwarn-unused-local-binds</option> and
+               <option>-fwarn-unused-pattern-binds</option></entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-unused-binds</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-unused-top-binds</option></entry>
+            <entry>warn about top-level bindings that are unused</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-unused-top-binds</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-unused-local-binds</option></entry>
+            <entry>warn about local bindings that are unused</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-unused-local-binds</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-unused-pattern-binds</option></entry>
+            <entry>warn about pattern match bindings that are unused</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-unused-pattern-binds</option></entry>
           </row>
 
           <row>
