@@ -2127,9 +2127,14 @@ withTcPlugins hsc_env m =
      case plugins of
        [] -> m  -- Common fast case
        _  -> do (solvers,stops) <- unzip `fmap` mapM startPlugin plugins
-                res <- updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
+                -- This ensures that tcPluginStop is called even if a type
+                -- error occurs during compilation (Fix of #10078)
+                eitherRes <- tryM $ do
+                  updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
                 mapM_ runTcPluginM stops
-                return res
+                case eitherRes of
+                  Left _ -> failM
+                  Right res -> return res
   where
   startPlugin (TcPlugin start solve stop) =
     do s <- runTcPluginM start
