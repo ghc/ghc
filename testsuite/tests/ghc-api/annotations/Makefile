@@ -26,4 +26,4 @@ exampleTest:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc exampleTest
 	./exampleTest "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
-.PHONY: clean
+.PHONY: clean annotations parseTree comments exampleTest

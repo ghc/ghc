@@ -10,4 +10,4 @@ landmines: clean
 	./landmines "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 
-.PHONY: clean
+.PHONY: clean landmines

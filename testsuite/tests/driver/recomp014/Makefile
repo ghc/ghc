@@ -25,3 +25,5 @@ recomp014: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c C.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) A1.o C.o -o recomp014
 	./recomp014
+
+.PHONY: clean recomp014
