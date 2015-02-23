@@ -571,8 +571,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              ; case mb of
                                  Nothing -> do { addErr (unknownSubordinateErr doc lbl)
                                                ; return (Right []) }
-                                 Just (Left sel) -> return (Left sel)
-                                 Just (Right (_, xs)) -> return (Right xs) }
+                                 Just r  -> return r }
                       _ -> fmap Left $ lookupSubBndrOcc True parent doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
