@@ -1,6 +1,6 @@
 
 T5892a.hs:12:8: Warning:
-    Fields of ‘Node’ not initialised: Data.Tree.subForest
+    Fields of ‘Node’ not initialised: subForest
     In the expression: Node {..}
     In the expression: let rootLabel = [] in Node {..}
     In an equation for ‘foo’:
