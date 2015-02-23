@@ -1544,3 +1544,4 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /timeout/calibrate.out
 /timeout/dist/
 /timeout/install-inplace/
+/tests/driver/T7373/package.conf.d/
