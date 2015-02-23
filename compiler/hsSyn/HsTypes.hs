@@ -516,7 +516,7 @@ type LConDeclField name = Located (ConDeclField name)
       -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_names :: [(Located RdrName, PostRn name Name)],
-                                   -- ^ See Note [ConDeclField selector]
+                                   -- ^ See Note [ConDeclField names]
                    cd_fld_type :: LBangType name,
                    cd_fld_doc  :: Maybe LHsDocString }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
@@ -526,15 +526,13 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
 deriving instance (DataId name) => Data (ConDeclField name)
 
 {-
-AMG TODO update note
+Note [ConDeclField names]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Note [ConDeclField selector]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A ConDeclField always contains the field label as the user wrote it in
-cd_fld_lbl.  After the renamer, it will additionally contain the Name
-of the selector function in cd_fld_sel.  (Before the renamer,
-cd_fld_sel contains an error thunk.)
+A ConDeclField contains a list of field names: these always include
+the field label as the user wrote it in the first component of the
+pair.  After the renamer, it will additionally contain the Name of the
+selector function in the second component.
 
 Due to OverloadedRecordFields, the OccName of the selector function
 may have been mangled, which is why we keep the original field label
@@ -544,7 +542,7 @@ separately.  For example, when OverloadedRecordFields is enabled
 
 gives
 
-    ConDeclField { cd_fld_lbl = "x", cd_fld_sel = $sel:x:T, ... }.
+    ConDeclField { cd_fld_names = [("x", $sel:x:T)], ... }.
 -}
 
 -----------------------
