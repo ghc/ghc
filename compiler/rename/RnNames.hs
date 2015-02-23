@@ -1021,14 +1021,7 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 findChildren :: NameEnv [ChildName] -> Name -> [ChildName]
 findChildren env n = lookupNameEnv env n `orElse` []
 
--- AMG TODO
--- <<<<<<< HEAD:compiler/rename/RnNames.lhs
 lookupChildren :: [ChildName] -> [Located RdrName] -> [Maybe (Located ChildName)]
--- ||||||| merged common ancestors
--- lookupChildren :: [Name] -> [RdrName] -> [Maybe Name]
--- =======
--- lookupChildren :: [Name] -> [Located RdrName] -> [Maybe (Located Name)]
--- >>>>>>> origin/master:compiler/rename/RnNames.hs
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
@@ -1044,10 +1037,8 @@ lookupChildren all_kids rdr_items
       Just n -> Just (L l n)
       Nothing -> Nothing
 
---    kid_env = mkFsEnv [(occNameFS (nameOccName n), n) | n <- all_kids]
-
     kid_env = extendFsEnvList_C plusChildName emptyFsEnv
-                  [(occNameFS (childOccName n), n) | n <- all_kids]
+                      [(occNameFS (childOccName n), n) | n <- all_kids]
 
     plusChildName (OverloadedFldChild lbl xs) (OverloadedFldChild _ ys)
       = OverloadedFldChild lbl (xs ++ ys)
@@ -1062,37 +1053,6 @@ lookupChildren all_kids rdr_items
                           -- take the second because it will be the
                           -- data constructor (AvailTC invariant)
 
-
-{-
-  -- AMG TODO figure out
-  where
-<<<<<<< HEAD:compiler/rename/RnNames.lhs
-    kid_env = extendFsEnvList_C plusChildName emptyFsEnv
-                  [(occNameFS (childOccName n), n) | n <- all_kids]
-
-    plusChildName (OverloadedFldChild lbl xs) (OverloadedFldChild _ ys)
-      = OverloadedFldChild lbl (xs ++ ys)
-    plusChildName (OverloadedFldChild lbl xs) (FldChild n)
-      = OverloadedFldChild lbl (n:xs)
-    plusChildName (FldChild n) (OverloadedFldChild lbl xs)
-      = OverloadedFldChild lbl (n:xs)
-    plusChildName (FldChild m) (FldChild n)
-      = OverloadedFldChild (occNameFS (nameOccName m)) [m, n]
-    plusChildName _ y = y -- This can happen if we have both
-                          -- Example{tc} and Example{d} in all_kids;
-                          -- take the second because it will be the
-                          -- data constructor (AvailTC invariant)
-
-||||||| merged common ancestors
-    kid_env = mkFsEnv [(occNameFS (nameOccName n), n) | n <- all_kids]
-=======
-    doOne (L l r) = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc) r of
-      Just n -> Just (L l n)
-      Nothing -> Nothing
-
-    kid_env = mkFsEnv [(occNameFS (nameOccName n), n) | n <- all_kids]
->>>>>>> origin/master:compiler/rename/RnNames.hs
--}
 
 childrenNamesFlds :: [Located ChildName] -> ([Located Name], AvailFields)
 childrenNamesFlds xs = mconcat (map bisect xs)
@@ -1344,14 +1304,12 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                            (sub_rdrs ++ map noLoc (availFieldsRdrNames sub_flds))
              if any isNothing mb_names
                 then do addErr (exportItemErr ie)
-                        -- AMG TODO sort out this bit
-                        return ( IEThingWith (L l name) [] []
-                               , AvailTC name [name] [])
-                else do let kids          = catMaybes mb_names
-                            (names, flds) = childrenNamesFlds kids
-                        addUsedKids rdr $ map unLoc kids
-                        return ( IEThingWith (L l name) names flds
-                               , AvailTC name (name:map unLoc names) flds)
+                        return (IEThingWith (L l name) [] [], AvailTC name [name] [])
+                else do let names = catMaybes mb_names
+                            (non_flds, flds) = childrenNamesFlds names
+                        addUsedKids rdr (map unLoc names)
+                        return ( IEThingWith (L l name) non_flds flds
+                               , AvailTC name (name:map unLoc non_flds) flds)
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
@@ -1809,8 +1767,7 @@ printMinimalImports imports_w_usage
                                               (map noLoc (filter (/= n) ns))
                                               fs]
                                           -- Note [Overloaded field import]
-                                          -- AMG TODO review
-           _other | all_non_overloaded fs -> map IEVar (map noLoc $ ns ++ availFieldsNames fs)
+           _other | all_non_overloaded fs -> map (IEVar . noLoc) $ ns ++ availFieldsNames fs
                   | otherwise             -> [IEThingWith (noLoc n) (map noLoc (filter (/= n) ns)) fs]
         where
           fld_lbls = availFieldsLabels fs
