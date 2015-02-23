@@ -413,6 +413,7 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
 
 FP_ICONV
 FP_GMP
+FP_CURSES
 
 XCODE_VERSION()
 
