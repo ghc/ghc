@@ -40,8 +40,8 @@ import GHC.Char
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
 import GHC.Unicode( isSpace, isAlpha, isAlphaNum )
-import GHC.Real( Rational, (%), fromIntegral,
-                 toInteger, (^) )
+import GHC.Real( Rational, (%), fromIntegral, Integral,
+                 toInteger, (^), quot, even )
 import GHC.List
 import GHC.Enum( minBound, maxBound )
 import Data.Maybe
@@ -77,17 +77,17 @@ data Number = MkNumber Int              -- Base
 
 -- | @since 4.5.1.0
 numberToInteger :: Number -> Maybe Integer
-numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
-numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
+numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) iPart)
+numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 iPart)
 numberToInteger _ = Nothing
 
 -- | @since 4.7.0.0
 numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
-numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart, 0)
-numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart, 0)
+numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) iPart, 0)
+numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 iPart, 0)
 numberToFixed p (MkDecimal iPart (Just fPart) Nothing)
-    = let i = val 10 0 iPart
-          f = val 10 0 (integerTake p (fPart ++ repeat 0))
+    = let i = val 10 iPart
+          f = val 10 (integerTake p (fPart ++ repeat 0))
           -- Sigh, we really want genericTake, but that's above us in
           -- the hierarchy, so we define our own version here (actually
           -- specialised to Integer)
@@ -141,9 +141,9 @@ numberToRangedRational _ n = Just (numberToRational n)
 
 -- | @since 4.6.0.0
 numberToRational :: Number -> Rational
-numberToRational (MkNumber base iPart) = val (fromIntegral base) 0 iPart % 1
+numberToRational (MkNumber base iPart) = val (fromIntegral base) iPart % 1
 numberToRational (MkDecimal iPart mFPart mExp)
- = let i = val 10 0 iPart
+ = let i = val 10 iPart
    in case (mFPart, mExp) of
       (Nothing, Nothing)     -> i % 1
       (Nothing, Just exp)
@@ -450,14 +450,50 @@ lexDigits base =
 lexInteger :: Base -> ReadP Integer
 lexInteger base =
   do xs <- lexDigits base
-     return (val (fromIntegral base) 0 xs)
+     return (val (fromIntegral base) xs)
 
-val :: Num a => a -> a -> Digits -> a
--- val base y [d1,..,dn] = y ++ [d1,..,dn], as it were
-val _    y []     = y
-val base y (x:xs) = y' `seq` val base y' xs
- where
-  y' = y * base + fromIntegral x
+val :: Num a => a -> Digits -> a
+val = valSimple
+{-# RULES
+"val/Integer" val = valInteger
+  #-}
+{-# INLINE [1] val #-}
+
+-- The following algorithm is only linear for types whose Num operations
+-- are in constant time.
+valSimple :: (Num a, Integral d) => a -> [d] -> a
+valSimple base = go 0
+  where
+    go r [] = r
+    go r (d : ds) = r' `seq` go r' ds
+      where
+        r' = r * base + fromIntegral d
+{-# INLINE valSimple #-}
+
+-- A sub-quadratic algorithm for Integer. Pairs of adjacent radix b
+-- digits are combined into a single radix b^2 digit. This process is
+-- repeated until we are left with a single digit. This algorithm
+-- performs well only on large inputs, so we use the simple algorithm
+-- for smaller inputs.
+valInteger :: Integer -> Digits -> Integer
+valInteger b0 ds0 = go b0 (length ds0) $ map fromIntegral ds0
+  where
+    go _ _ []  = 0
+    go _ _ [d] = d
+    go b l ds
+        | l > 40 = b' `seq` go b' l' (combine b ds')
+        | otherwise = valSimple b ds
+      where
+        -- ensure that we have an even number of digits
+        -- before we call combine:
+        ds' = if even l then ds else 0 : ds
+        b' = b * b
+        l' = (l + 1) `quot` 2
+    combine b (d1 : d2 : ds) = d `seq` (d : combine b ds)
+      where
+        d = d1 * b + d2
+    combine _ []  = []
+    combine _ [_] = error "this should not happen"
 
 -- Calculate a Rational from the exponent [of 10 to multiply with],
 -- the integral part of the mantissa and the digits of the fractional
@@ -502,16 +538,21 @@ valDecDig c
 readIntP :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
 readIntP base isDigit valDigit =
   do s <- munch1 isDigit
-     return (val base 0 (map valDigit s))
+     return (val base (map valDigit s))
+{-# SPECIALISE readIntP
+        :: Integer -> (Char -> Bool) -> (Char -> Int) -> ReadP Integer #-}
 
 readIntP' :: (Eq a, Num a) => a -> ReadP a
 readIntP' base = readIntP base isDigit valDigit
  where
   isDigit  c = maybe False (const True) (valDig base c)
   valDigit c = maybe 0     id           (valDig base c)
+{-# SPECIALISE readIntP' :: Integer -> ReadP Integer #-}
 
 readOctP, readDecP, readHexP :: (Eq a, Num a) => ReadP a
 readOctP = readIntP' 8
 readDecP = readIntP' 10
 readHexP = readIntP' 16
-
+{-# SPECIALISE readOctP :: ReadP Integer #-}
+{-# SPECIALISE readDecP :: ReadP Integer #-}
+{-# SPECIALISE readHexP :: ReadP Integer #-}
