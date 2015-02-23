@@ -721,6 +721,13 @@ echo "[]" > package.conf
                     Version number 0.6.0.2 (was 0.6.0.1)
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    The <literal>hpc</literal> command supports a new
+                    flag, <literal>--verbosity=n</literal>, which
+                    controls the verbosity level of subcommands.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
