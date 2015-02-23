@@ -127,7 +127,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_vects   = vects
                         , hs_docs    = docs })
  = do { let { tv_bndrs = hsSigTvBinders valds
-            ; bndrs = tv_bndrs ++ fst (hsGroupBinders group) } ;
+            ; bndrs = tv_bndrs ++ hsGroupBinders group } ;
         ss <- mkGenSyms bndrs ;
 
         -- Bind all the names mainly to avoid repeated use of explicit strings.

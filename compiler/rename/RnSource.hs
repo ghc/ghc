@@ -205,7 +205,7 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
                              hs_docs   = rn_docs } ;
 
         tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_inst_decls rn_foreign_decls ;
-        other_def  = (Just (mkNameSet $ fst tcf_bndrs), emptyNameSet) ; -- AMG TODO tcf_bndrs?
+        other_def  = (Just (mkNameSet tcf_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
                               src_fvs5, src_fvs6, src_fvs7, src_fvs8,
                               src_fvs9] ;

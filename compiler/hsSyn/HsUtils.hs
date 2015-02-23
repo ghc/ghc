@@ -740,39 +740,22 @@ variables bound by the lazy pattern are n,m, *not* the dictionary d.
 So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
 -}
 
--- AMG TODO: what's going on with all these?
-
-hsGroupBinders :: HsGroup Name -> ([Name], [(RdrName, Name, Name)])
+hsGroupBinders :: HsGroup Name -> [Name]
 hsGroupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
                           hs_instds = inst_decls, hs_fords = foreign_decls })
--- Collect the binders of a Group
-  =  (collectHsValBinders val_decls, [])
-       `mappend` hsTyClForeignBinders tycl_decls inst_decls foreign_decls
+  =  collectHsValBinders val_decls
+  ++ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
 
--- <<<<<<< HEAD:compiler/hsSyn/HsUtils.lhs
 hsTyClForeignBinders :: [TyClGroup Name] -> [LInstDecl Name]
-                     -> [LForeignDecl Name] -> ([Name], [(RdrName, Name, Name)])
+                     -> [LForeignDecl Name] -> [Name]
 -- We need to look at instance declarations too,
 -- because their associated types may bind data constructors
 hsTyClForeignBinders tycl_decls inst_decls foreign_decls
-  = unLocs ((hsForeignDeclsBinders foreign_decls, []) `mappend`
-              foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls `mappend`
-                          foldMap hsLInstDeclBinders inst_decls)
-  where unLocs (xs, ys) = (map unLoc xs, map (\ (x, y, z) -> (unLoc x, y, unLoc z)) ys)
--- ||||||| merged common ancestors
--- hsTyClDeclsBinders :: [TyClGroup Name] -> [Located (InstDecl Name)] -> [Name]
--- hsTyClDeclsBinders tycl_decls inst_decls
---   = map unLoc (concatMap (concatMap hsLTyClDeclBinders . group_tyclds) tycl_decls ++
---                concatMap (hsInstDeclBinders . unLoc) inst_decls)
--- =======
--- hsTyClForeignBinders :: [TyClGroup Name] -> [LInstDecl Name]
---                      -> [LForeignDecl Name] -> [Name]
--- hsTyClForeignBinders tycl_decls inst_decls foreign_decls
---   = map unLoc $
---     hsForeignDeclsBinders foreign_decls ++
---     concatMap (concatMap hsLTyClDeclBinders . group_tyclds) tycl_decls ++
---     concatMap hsLInstDeclBinders inst_decls
--- >>>>>>> origin/master:compiler/hsSyn/HsUtils.hs
+  = map unLoc (hsForeignDeclsBinders foreign_decls)
+    ++ getSelectorNames (foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls
+                        `mappend` foldMap hsLInstDeclBinders inst_decls)
+  where
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (\ (_, x, _) -> x) fs
 
 -------------------
 hsLTyClDeclBinders :: Located (TyClDecl name) ->
@@ -862,35 +845,15 @@ hsConDeclsBinders cons = go id cons
           case r of
              -- remove only the first occurrence of any seen field in order to
              -- avoid circumventing detection of duplicate fields (#9156)
--- <<<<<<< HEAD:compiler/hsSyn/HsUtils.lhs
-             L loc (ConDecl { con_names = names , con_details = RecCon flds }) ->
+             L loc (ConDecl { con_names = names, con_details = RecCon flds }) ->
                (map (L loc . unLoc) names ++ ns, r' ++ fs)
-                  where r' = remSeen (concatMap (cd_fld_names . unLoc) (unLoc flds))
-                        -- AMG TODO what on earth happens here
-                        -- cd_fld_lflds cdfld = (cd_fld_lbl x, cd_fld_sel x)
+                  where r' = remSeen (concatMap (cd_fld_names . unLoc)
+                                                (unLoc flds))
                         remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc . fst) v | v <- r']
                         (ns, fs) = go remSeen' rs
              L loc (ConDecl { con_names = names }) ->
-               (map (L loc . unLoc) names ++ ns, fs)
+                (map (L loc . unLoc) names ++ ns, fs)
                   where (ns, fs) = go remSeen rs
-
--- ||||||| merged common ancestors
---              L loc (ConDecl { con_name = L _ name , con_details = RecCon flds }) ->
---                (L loc name) : r' ++ go remSeen' rs
---                   where r' = remSeen (map cd_fld_name flds)
---                         remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc) v | v <- r']
---              L loc (ConDecl { con_name = L _ name }) ->
---                 (L loc name) : go remSeen rs
--- =======
---              L loc (ConDecl { con_names = names, con_details = RecCon flds }) ->
---                (map (L loc . unLoc) names) ++ r' ++ go remSeen' rs
---                   where r' = remSeen (concatMap (cd_fld_names . unLoc)
---                                                 (unLoc flds))
---                         remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc) v | v <- r']
---              L loc (ConDecl { con_names = names }) ->
---                 (map (L loc . unLoc) names) ++ go remSeen rs
-
--- >>>>>>> origin/master:compiler/hsSyn/HsUtils.hs
 
 withTyCon :: name' -> (a, [(r, name)]) -> (a, [(r, name, name')])
 withTyCon tycon_name (xs, ys) = (xs, map (\ (r, n) -> (r, n, tycon_name)) ys)
