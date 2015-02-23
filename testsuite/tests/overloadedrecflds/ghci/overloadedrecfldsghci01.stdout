@@ -1,8 +1,8 @@
 True
-data T a = MkT {foo :: Bool, ...}
+data T a = MkT {Ghci2.foo :: Bool, ...}
   	-- Defined at <interactive>:4:18
 
-data S = MkS {foo :: Int} 	-- Defined at <interactive>:3:16
+data S = MkS {Ghci1.foo :: Int} 	-- Defined at <interactive>:3:16
 
 <interactive>:1:1:
     Ambiguous occurrence ‘foo’

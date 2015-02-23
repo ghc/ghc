@@ -61,6 +61,7 @@ import InstEnv
 
 import Control.Monad
 import System.IO.Unsafe
+import Data.List (find)
 import Data.Maybe (isJust)
 
 infixl 3 &&&
@@ -326,6 +327,15 @@ visibleIfConDecls (IfAbstractTyCon {}) = []
 visibleIfConDecls IfDataFamTyCon       = []
 visibleIfConDecls (IfDataTyCon cs _ _) = cs
 visibleIfConDecls (IfNewTyCon c   _ _) = [c]
+
+ifaceConDeclFields :: OccName -> IfaceConDecls -> [FieldLbl OccName]
+ifaceConDeclFields tc x = map (\ lbl -> mkFieldLabelOccs lbl tc is_overloaded) lbls
+  where
+    (is_overloaded, lbls) = case x of
+                              IfAbstractTyCon {}        -> (False, [])
+                              IfDataFamTyCon  {}        -> (False, [])
+                              IfDataTyCon _ is_o labels -> (is_o, labels)
+                              IfNewTyCon  _ is_o labels -> (is_o, labels)
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
@@ -617,8 +627,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     ok_con dc = showSub ss dc || any (showSub ss) (ifConFields dc)
 
     show_con dc
-      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style mk_user_con_res_ty dc
+      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls dc
       | otherwise = Nothing
+    fls = ifaceConDeclFields tycon condecls
 
     mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
     -- See Note [Result type of a data family GADT]
@@ -794,8 +805,9 @@ isVanillaIfaceConDecl (IfCon { ifConExTvs  = ex_tvs
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> (IfaceEqSpec -> ([IfaceTvBndr], SDoc))
+                -> [FieldLbl OccName]
                 -> IfaceConDecl -> SDoc
-pprIfaceConDecl ss gadt_style mk_user_con_res_ty
+pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls
         (IfCon { ifConOcc = name, ifConInfix = is_infix,
                  ifConExTvs = ex_tvs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
@@ -825,9 +837,14 @@ pprIfaceConDecl ss gadt_style mk_user_con_res_ty
     pprParendBangTy (bang, ty) = ppr_bang bang <> pprParendIfaceType ty
     pprBangTy       (bang, ty) = ppr_bang bang <> ppr ty
 
-    maybe_show_label (lbl,bty)
-      | showSub ss lbl = Just (pprPrefixIfDeclBndr ss lbl <+> dcolon <+> pprBangTy bty)
+    maybe_show_label (sel,bty)
+      | showSub ss sel = Just (pprPrefixIfDeclBndr ss lbl <+> dcolon <+> pprBangTy bty)
       | otherwise      = Nothing
+      where
+        -- IfaceConDecl contains the name of the selector function, so
+        -- we have to look up the field label (in case
+        -- OverloadedRecordFields was used for the definition)
+        lbl = maybe sel (mkVarOccFS . flLabel) $ find (\ fl -> flSelector fl == sel) fls
 
     ppr_fields [ty1, ty2]
       | is_infix && null labels
