@@ -114,8 +114,8 @@ def _reqlib( name, opts, lib ):
             p.communicate()
             r = p.wait()
         else:
-            r = os.system(config.ghc_pkg + ' describe ' + lib
-                                         + ' > /dev/null 2> /dev/null')
+            r = os.system(config.ghc_pkg + ' --no-user-package-db describe '
+                                         + lib + ' > /dev/null 2> /dev/null')
         got_it = r == 0
         have_lib[lib] = got_it
 
