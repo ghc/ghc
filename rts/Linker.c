@@ -4008,7 +4008,7 @@ lookupSymbolInDLLs ( UChar *lbl )
     void *sym;
 
     for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
-        /* debugBelch("look in %s for %s\n", o_dll->name, lbl); */
+        /* debugBelch("look in %ls for %s\n", o_dll->name, lbl); */
 
         if (lbl[0] == '_') {
             /* HACK: if the name has an initial underscore, try stripping
@@ -4401,9 +4401,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           /* ignore linker directive sections */
           && 0 != strcmp(".drectve", (char*)secname)
          ) {
-         errorBelch("Unknown PEi386 section name `%s' (while processing: %" PATH_FMT")", secname, oc->fileName);
-         stgFree(secname);
-         return 0;
+          IF_DEBUG(linker, debugBelch("Unknown PEi386 section name `%s' (while processing: %" PATH_FMT")", secname, oc->fileName));
       }
 
       if (kind != SECTIONKIND_OTHER && end >= start) {
