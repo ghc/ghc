@@ -1357,7 +1357,7 @@ gen_Data_binds dflags loc rep_tc
                nlList  labels,                            -- Field labels
            nlHsVar fixity]                                -- Fixity
 
-        labels   = map (nlHsLit . HsString "AMG TODO" . flLabel)
+        labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
                        (dataConFieldLabels dc)
         dc_occ   = getOccName dc
         is_infix = isDataSymOcc dc_occ
