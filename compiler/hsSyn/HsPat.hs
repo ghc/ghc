@@ -309,10 +309,13 @@ data HsRecField id arg = HsRecField {
 --     hsRecFieldSel = Right [(S, $sel:x:S), (T, $sel:x:T)]
 --
 -- and the typechecker will determine that $sel:x:S is meant.
-
+--
+-- AMG TODO: it would be nice if we could enforce in the types that
+-- ambiguous fields occur only in record updates, and only between the
+-- renamer and the typechecker.
 
 hsRecFieldSelMissing :: Either id [(id, id)]
-hsRecFieldSelMissing = error "hsRecFieldSelMissing"
+hsRecFieldSelMissing = Right []
 
 hsRecFields :: HsRecFields id arg -> [(FieldLabelString, Either id [(id, id)])]
 hsRecFields rbinds = map (toFld . unLoc) (rec_flds rbinds)

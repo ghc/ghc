@@ -725,7 +725,7 @@ cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
         ; return (noLoc $ HsRecField { hsRecFieldLbl = v'
-                                     , hsRecFieldSel = hsRecFieldSelMissing -- AMG TODO
+                                     , hsRecFieldSel = hsRecFieldSelMissing
                                      , hsRecFieldArg = e'
                                      , hsRecPun = False}) }
 
@@ -944,7 +944,7 @@ cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
         ; return (noLoc $ HsRecField { hsRecFieldLbl = s'
-                                     , hsRecFieldSel = hsRecFieldSelMissing -- AMG TODO
+                                     , hsRecFieldSel = hsRecFieldSelMissing
                                      , hsRecFieldArg = p'
                                      , hsRecPun = False}) }
 
