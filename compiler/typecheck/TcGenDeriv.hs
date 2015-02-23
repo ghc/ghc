@@ -1184,12 +1184,18 @@ gen_Show_binds get_fixity loc tycon
                                 | (lbl,arg) <- zipEqual "gen_Show_binds"
                                                         labels show_args ]
 
-                -- Generates (showsPrec p x) for argument x, but it also boxes
-                -- the argument first if necessary.  Note that this prints unboxed
-                -- things without any '#' decorations; could change that if need be
-             show_arg b arg_ty = nlHsApps showsPrec_RDR
-                                    [nlHsLit (HsInt "" arg_prec),
-                                    box_if_necy "Show" tycon (nlHsVar b) arg_ty]
+             show_arg :: RdrName -> Type -> LHsExpr RdrName
+             show_arg b arg_ty
+               | isUnLiftedType arg_ty
+               -- See Note [Deriving and unboxed types].
+               = nlHsApps compose_RDR [mk_shows_app boxed_arg,
+                                       mk_showString_app postfixMod]
+               | otherwise
+               = mk_showsPrec_app arg_prec arg
+                 where
+                   arg        = nlHsVar b
+                   boxed_arg  = box "Show" tycon arg arg_ty
+                   postfixMod = assoc_ty_id "Show" tycon postfixModTbl arg_ty
 
                 -- Fixity stuff
              is_infix = dataConIsInfix data_con
@@ -1209,8 +1215,17 @@ isSym :: String -> Bool
 isSym ""      = False
 isSym (c : _) = startsVarSym c || startsConSym c
 
+-- | showString :: String -> ShowS
 mk_showString_app :: String -> LHsExpr RdrName
 mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString str))
+
+-- | showsPrec :: Show a => Int -> a -> ShowS
+mk_showsPrec_app :: Integer -> LHsExpr RdrName -> LHsExpr RdrName
+mk_showsPrec_app p x = nlHsApps showsPrec_RDR [nlHsLit (HsInt "" p), x]
+
+-- | shows :: Show a => a -> ShowS
+mk_shows_app :: LHsExpr RdrName -> LHsExpr RdrName
+mk_shows_app x = nlHsApp (nlHsVar shows_RDR) x
 
 getPrec :: Bool -> (Name -> Fixity) -> Name -> Integer
 getPrec is_infix get_fixity nm
@@ -2093,15 +2108,13 @@ mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 
-box_if_necy :: String           -- The class involved
+box ::         String           -- The class involved
             -> TyCon            -- The tycon involved
             -> LHsExpr RdrName  -- The argument
             -> Type             -- The argument type
             -> LHsExpr RdrName  -- Boxed version of the arg
 -- See Note [Deriving and unboxed types]
-box_if_necy cls_str tycon arg arg_ty
-  | isUnLiftedType arg_ty = nlHsApp (nlHsVar box_con) arg
-  | otherwise             = arg
+box cls_str tycon arg arg_ty = nlHsApp (nlHsVar box_con) arg
   where
     box_con = assoc_ty_id cls_str tycon boxConTbl arg_ty
 
@@ -2131,6 +2144,17 @@ boxConTbl
     ,(doublePrimTy, getRdrName doubleDataCon)
     ]
 
+-- | A table of postfix modifiers for unboxed values.
+postfixModTbl :: [(Type, String)]
+postfixModTbl
+  = [(charPrimTy  , "#" )
+    ,(intPrimTy   , "#" )
+    ,(wordPrimTy  , "##")
+    ,(floatPrimTy , "#" )
+    ,(doublePrimTy, "##")
+    ]
+
+-- | Lookup `Type` in an association list.
 assoc_ty_id :: String           -- The class involved
             -> TyCon            -- The tycon involved
             -> [(Type,a)]       -- The table

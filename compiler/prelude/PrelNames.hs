@@ -667,11 +667,12 @@ reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
 prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
 pfail_RDR               = varQual_RDR  rEAD_PREC (fsLit "pfail")
 
-showList_RDR, showList___RDR, showsPrec_RDR, showString_RDR,
+showList_RDR, showList___RDR, showsPrec_RDR, shows_RDR, showString_RDR,
     showSpace_RDR, showParen_RDR :: RdrName
 showList_RDR            = varQual_RDR gHC_SHOW (fsLit "showList")
 showList___RDR          = varQual_RDR gHC_SHOW (fsLit "showList__")
 showsPrec_RDR           = varQual_RDR gHC_SHOW (fsLit "showsPrec")
+shows_RDR               = varQual_RDR gHC_SHOW (fsLit "shows")
 showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
