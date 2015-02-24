@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -----------------------------------------------------------------------------
 --
@@ -372,11 +373,17 @@ Now the trouble is that 's' has VoidRep, and we do not bind void
 arguments in the environment; they don't live anywhere.  See the
 calls to nonVoidIds in various places.  So we must not look up 
 's' in the environment.  Instead, just evaluate the RHS!  Simple.
+-}
 
-Note [Dodgy unsafeCoerce 1]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cgCase (StgApp v []) _ (PrimAlt _) alts
+  | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
+  , [(DEFAULT, _, _, rhs)] <- alts
+  = cgExpr rhs
+
+{- Note [Dodgy unsafeCoerce 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider 
-    case (x :: MutVar# Int) |> co of (y :: HValue) 
+    case (x :: HValue) |> co of (y :: MutVar# Int)
         DEFAULT -> ...
 We want to gnerate an assignment
      y := x
@@ -388,24 +395,7 @@ of the MutVar#.  If instead we generate code that enters the HValue,
 then we'll get a runtime panic, because the HValue really is a
 MutVar#.  The types are compatible though, so we can just generate an
 assignment.
-
-Note [Dodgy unsafeCoerce 2]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Note [ticket #3132]: we might be looking at a case of a lifted Id that
-was cast to an unlifted type.  The Id will always be bottom, but we
-don't want the code generator to fall over here.  If we just emit an
-assignment here, the assignment will be type-incorrect Cmm.  Hence, we
-emit the usual enter/return code, (and because bottom must be
-untagged, it will be entered and the program will crash).  The Sequel
-is a type-correct assignment, albeit bogus.  The (dead) continuation
-loops; it would be better to invoke some kind of panic function here.
 -}
-
-cgCase (StgApp v []) _ (PrimAlt _) alts
-  | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
-  , [(DEFAULT, _, _, rhs)] <- alts
-  = cgExpr rhs
-
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   | isUnLiftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   || reps_compatible
@@ -414,22 +404,32 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; when (not reps_compatible) $
            panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
        ; v_info <- getCgIdInfo v
-       ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr))) (idInfoToAmode v_info)
-       ; _ <- bindArgsToRegs [NonVoid bndr]
+       ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
+                    (idInfoToAmode v_info)
+       ; bindArgsToRegs [NonVoid bndr]
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = idPrimRep v == idPrimRep bndr
 
+{- Note [Dodgy unsafeCoerce 2, #3132]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In all other cases of a lifted Id being cast to an unlifted type, the
+Id should be bound to bottom, otherwise this is an unsafe use of
+unsafeCoerce.  We can generate code to enter the Id and assume that
+it will never return.  Hence, we emit the usual enter/return code, and
+because bottom must be untagged, it will be entered.  The Sequel is a
+type-correct assignment, albeit bogus.  The (dead) continuation loops;
+it would be better to invoke some kind of panic function here.
+-}
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
-  = -- See Note [Dodgy unsafeCoerce 2]
-    do { dflags <- getDynFlags
+  = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
-       ; _ <- withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
+       ; withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newLabelC
        ; emitLabel l
-       ; emit (mkBranch l)
+       ; emit (mkBranch l)  -- an infinite loop
        ; return AssignedDirectly
        }
 
