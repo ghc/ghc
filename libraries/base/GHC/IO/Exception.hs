@@ -107,7 +107,9 @@ instance Show Deadlock where
 data AllocationLimitExceeded = AllocationLimitExceeded
     deriving Typeable
 
-instance Exception AllocationLimitExceeded
+instance Exception AllocationLimitExceeded where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
 
 instance Show AllocationLimitExceeded where
     showsPrec _ AllocationLimitExceeded =
