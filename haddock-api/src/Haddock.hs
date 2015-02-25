@@ -39,6 +39,7 @@ import Haddock.Options
 import Haddock.Utils
 
 import Control.Monad hiding (forM_)
+import Control.Applicative
 import Data.Foldable (forM_)
 import Data.List (isPrefixOf)
 import Control.Exception
@@ -250,9 +251,9 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
     pkgMod           = ifaceMod (head ifaces)
-    pkgKey            = modulePackageKey pkgMod
+    pkgKey           = modulePackageKey pkgMod
     pkgStr           = Just (packageKeyString pkgKey)
-    (pkgName,pkgVer) = modulePackageInfo dflags flags pkgMod
+    pkgNameVer       = modulePackageInfo dflags flags pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
     srcMap' = maybe srcMap (\path -> Map.insert pkgKey path srcMap) srcEntity
@@ -288,12 +289,20 @@ render dflags flags qual ifaces installedIfaces srcMap = do
   -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
   -- might want to fix that if/when these two get some work on them
   when (Flag_Hoogle `elem` flags) $ do
-    let pkgNameStr | unpackFS pkgNameFS == "main" && title /= []
-                               = title
-                   | otherwise = unpackFS pkgNameFS
-          where PackageName pkgNameFS = pkgName
-    ppHoogle dflags pkgNameStr pkgVer title (fmap _doc prologue) visibleIfaces
-      odir
+    case pkgNameVer of
+      Nothing -> putStrLn . unlines $
+          [ "haddock: Unable to find a package providing module "
+            ++ moduleNameString (moduleName pkgMod) ++ ", skipping Hoogle."
+          , ""
+          , "         Perhaps try specifying the desired package explicitly"
+            ++ " using the --package-name"
+          , "         and --package-version arguments."
+          ]
+      Just (PackageName pkgNameFS, pkgVer) ->
+          let pkgNameStr | unpackFS pkgNameFS == "main" && title /= [] = title
+                         | otherwise = unpackFS pkgNameFS
+          in ppHoogle dflags pkgNameStr pkgVer title (fmap _doc prologue)
+               visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
     ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
@@ -312,12 +321,12 @@ modulePackageInfo :: DynFlags
                             -- contain the package name or version
                             -- provided by the user which we
                             -- prioritise
-                  -> Module -> (PackageName, Data.Version.Version)
+                  -> Module -> Maybe (PackageName, Data.Version.Version)
 modulePackageInfo dflags flags modu =
-  (fromMaybe (packageName pkg) (optPackageName flags),
-   fromMaybe (packageVersion pkg) (optPackageVersion flags))
+    cmdline <|> pkgDb
   where
-    pkg = getPackageDetails dflags (modulePackageKey modu)
+    cmdline = (,) <$> optPackageName flags <*> optPackageVersion flags
+    pkgDb = (\pkg -> (packageName pkg, packageVersion pkg)) <$> lookupPackage dflags (modulePackageKey modu)
 
 
 -------------------------------------------------------------------------------
