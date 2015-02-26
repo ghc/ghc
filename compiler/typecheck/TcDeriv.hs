@@ -1623,7 +1623,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- We generate the instance
         --      instance Monad (ST s) => Monad (T s) where
 
-        nt_eta_arity = length (fst (newTyConEtadRhs rep_tycon))
+        nt_eta_arity = newTyConEtadArity rep_tycon
                 -- For newtype T a b = MkT (S a a b), the TyCon machinery already
                 -- eta-reduces the representation type, so we know that
                 --      T a ~ S a a

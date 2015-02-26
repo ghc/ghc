@@ -913,7 +913,7 @@ normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
   | isTypeSynonymTyCon tc
-  , Just (tenv, rhs, ntys') <- tcExpandTyCon_maybe tc ntys
+  , Just (tenv, rhs, ntys') <- expandSynTyCon_maybe tc ntys
   , (co2, ninst_rhs) <- normaliseType env role (Type.substTy (mkTopTvSubst tenv) rhs)
   = if isReflCo co2 then (args_co,                 mkTyConApp tc ntys)
                     else (args_co `mkTransCo` co2, mkAppTys ninst_rhs ntys')

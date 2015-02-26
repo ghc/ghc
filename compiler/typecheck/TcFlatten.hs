@@ -796,7 +796,7 @@ flatten_one fmode (TyConApp tc tys)
 
   -- Expand type synonyms that mention type families
   -- on the RHS; see Note [Flattening synonyms]
-  | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
+  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
   , let expanded_ty = mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys'
   = case fe_mode fmode of
       FM_FlattenAll | anyNameEnv isTypeFamilyTyCon (tyConsOfType rhs)
