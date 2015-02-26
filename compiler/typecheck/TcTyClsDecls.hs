@@ -221,12 +221,6 @@ Kind checking is done thus:
 
    3. Kind check the data type and class decls
 
-Synonyms are treated differently to data type and classes,
-because a type synonym can be an unboxed type
-        type Foo = Int#
-and a kind variable can't unify with UnboxedTypeKind
-So we infer their kinds in dependency order
-
 We need to kind check all types in the mutually recursive group
 before we know the kind of the type variables.  For example:
 
@@ -245,9 +239,16 @@ just involve (->) and *:
         type R = Int#           -- Kind #
         type S a = Array# a     -- Kind * -> #
         type T a b = (# a,b #)  -- Kind * -> * -> (# a,b #)
-So we must infer their kinds from their right-hand sides *first* and then
-use them, whereas for the mutually recursive data types D we bring into
-scope kind bindings D -> k, where k is a kind variable, and do inference.
+and a kind variable can't unify with UnboxedTypeKind.
+
+So we must infer the kinds of type synonyms from their right-hand
+sides *first* and then use them, whereas for the mutually recursive
+data types D we bring into scope kind bindings D -> k, where k is a
+kind variable, and do inference.
+
+NB: synonyms can be mutually recursive with data type declarations though!
+   type T = D -> D
+   data D = MkD Int T
 
 Open type families
 ~~~~~~~~~~~~~~~~~~
