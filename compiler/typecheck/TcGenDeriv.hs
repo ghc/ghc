@@ -1187,7 +1187,7 @@ gen_Show_binds get_fixity loc tycon
              show_arg :: RdrName -> Type -> LHsExpr RdrName
              show_arg b arg_ty
                | isUnLiftedType arg_ty
-               -- See Note [Deriving and unboxed types].
+               -- See Note [Deriving and unboxed types] in TcDeriv
                = nlHsApps compose_RDR [mk_shows_app boxed_arg,
                                        mk_showString_app postfixMod]
                | otherwise
@@ -2113,7 +2113,7 @@ box ::         String           -- The class involved
             -> LHsExpr RdrName  -- The argument
             -> Type             -- The argument type
             -> LHsExpr RdrName  -- Boxed version of the arg
--- See Note [Deriving and unboxed types]
+-- See Note [Deriving and unboxed types] in TcDeriv
 box cls_str tycon arg arg_ty = nlHsApp (nlHsVar box_con) arg
   where
     box_con = assoc_ty_id cls_str tycon boxConTbl arg_ty
@@ -2123,7 +2123,7 @@ primOrdOps :: String    -- The class involved
            -> TyCon     -- The tycon involved
            -> Type      -- The type
            -> (RdrName, RdrName, RdrName, RdrName, RdrName)  -- (lt,le,eq,ge,gt)
--- See Note [Deriving and unboxed types]
+-- See Note [Deriving and unboxed types] in TcDeriv
 primOrdOps str tycon ty = assoc_ty_id str tycon ordOpTbl ty
 
 ordOpTbl :: [(Type, (RdrName, RdrName, RdrName, RdrName, RdrName))]
