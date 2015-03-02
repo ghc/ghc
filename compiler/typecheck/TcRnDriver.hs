@@ -1743,7 +1743,7 @@ tcRnExpr hsc_env rdr_expr
     (rn_expr, _fvs) <- rnLExpr rdr_expr ;
     failIfErrsM ;
 
-        -- Now typecheck the expression;
+        -- Now typecheck the expression, and generalise its type
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
@@ -1755,7 +1755,7 @@ tcRnExpr hsc_env rdr_expr
                                                     False {- No MR for now -}
                                                     [(fresh_it, res_ty)]
                                                     lie ;
-    -- wanted constraints from static forms
+    -- Wanted constraints from static forms
     stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;
 
     -- Ignore the dictionary bindings
@@ -1797,7 +1797,13 @@ tcRnType hsc_env normalise rdr_type
         -- Now kind-check the type
         -- It can have any rank or kind
        ; nwc_tvs <- mapM newWildcardVarMetaKind wcs
-       ; ty <- tcExtendTyVarEnv nwc_tvs $ tcHsSigType GhciCtxt rn_type
+       ; (ty, kind) <- tcExtendTyVarEnv nwc_tvs $
+                       tcLHsType rn_type
+
+       -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
+       ; kvs <- zonkTcTypeAndFV kind
+       ; kvs <- kindGeneralize kvs
+       ; ty  <- zonkTcTypeToType emptyZonkEnv ty
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
@@ -1806,20 +1812,32 @@ tcRnType hsc_env normalise rdr_type
                         -- which we discard, so the Role is irrelevant
                 else return ty ;
 
-       ; return (ty', typeKind ty) }
+       ; return (ty', mkForAllTys kvs (typeKind ty')) }
+
+{- Note [Kind-generalise in tcRnType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We switch on PolyKinds when kind-checking a user type, so that we will
+kind-generalise the type, even when PolyKinds is not otherwise on.
+This gives the right default behaviour at the GHCi prompt, where if
+you say ":k T", and T has a polymorphic kind, you'd like to see that
+polymorphism. Of course.  If T isn't kind-polymorphic you won't get
+anything unexpected, but the apparent *loss* of polymorphism, for
+types that you know are polymorphic, is quite surprising.  See Trac
+#7688 for a discussion.
+
+Note that the goal is to generalise the *kind of the type*, not
+the type itself! Example:
+  ghci> data T m a = MkT (m a)  -- T :: forall . (k -> *) -> k -> *
+  ghci> :k T
+We instantiate T to get (T kappa).  We do not want to kind-generalise
+that to forall k. T k!  Rather we want to take its kind
+   T kappa :: (kappa -> *) -> kappa -> *
+and now kind-generalise that kind, to forall k. (k->*) -> k -> *
+(It was Trac #10122 that made me realise how wrong the previous
+approach was.) -}
+
 
 {-
-Note [Kind-generalise in tcRnType]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We switch on PolyKinds when kind-checking a user type, so that we will
-kind-generalise the type.  This gives the right default behaviour at
-the GHCi prompt, where if you say ":k T", and T has a polymorphic
-kind, you'd like to see that polymorphism. Of course.  If T isn't
-kind-polymorphic you won't get anything unexpected, but the apparent
-*loss* of polymorphism, for types that you know are polymorphic, is
-quite surprising.  See Trac #7688 for a discussion.
-
-
 ************************************************************************
 *                                                                      *
                  tcRnDeclsi

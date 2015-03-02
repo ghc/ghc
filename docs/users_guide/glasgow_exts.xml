@@ -6608,50 +6608,81 @@ Note that the datatype <literal>Proxy</literal> has kind
 <literal>Typeable</literal> class has kind
 <literal>forall k. k -> Constraint</literal>.
 </para>
-</sect2>
-
-<sect2> <title>Overview</title>
 
 <para>
+Note the following specific points:
+<itemizedlist>
+<listitem><para>
 Generally speaking, with <option>-XPolyKinds</option>, GHC will infer a polymorphic
-kind for un-decorated declarations, whenever possible.  For example:
+kind for un-decorated declarations, whenever possible.  For example, in GHCi
 <programlisting>
-data T m a = MkT (m a)
--- GHC infers kind   T :: forall k. (k -> *) -> k -> *
+ghci> :set -XPolyKinds
+ghci> data T m a = MkT (m a)
+ghci> :k T
+T :: (k -> *) -> k -> *
 </programlisting>
+</para></listitem>
+
+<listitem><para>
+GHC does not usually print explicit <literal>forall</literal>s, including kind <literal>forall</literal>s. 
+You can make GHC show them explicitly with <option>-fprint-explicit-foralls</option> 
+(see <xref linkend="options-help"/>):
+<programlisting>
+ghci> :set -XPolyKinds
+ghci> :set -fprint-explicit-foralls
+ghci> data T m a = MkT (m a)
+ghci> :k T
+T :: forall (k :: BOX). (k -> *) -> k -> *
+</programlisting>
+Here the kind variable <literal>k</literal> itself has a
+kind annotation "<literal>BOX</literal>".  This is just GHC's way of
+saying "<literal>k</literal> is a kind variable".
+</para></listitem>
+
+<listitem><para>
 Just as in the world of terms, you can restrict polymorphism using a
 kind signature (sometimes called a kind annotation)
-(<option>-XPolyKinds</option> implies <option>-XKindSignatures</option>):
 <programlisting>
 data T m (a :: *) = MkT (m a)
 -- GHC now infers kind   T :: (* -> *) -> * -> *
 </programlisting>
-There is no "forall" for kind variables.  Instead, when binding a type variable,
+NB: <option>-XPolyKinds</option> implies <option>-XKindSignatures</option> (see <xref linkend="kinding"/>).
+</para></listitem>
+
+<listitem><para>
+The source language does not support an explicit <literal>forall</literal> for kind variables.  Instead, when binding a type variable,
 you can simply mention a kind
 variable in a kind annotation for that type-variable binding, thus:
 <programlisting>
 data T (m :: k -> *) a = MkT (m a)
 -- GHC now infers kind   T :: forall k. (k -> *) -> k -> *
 </programlisting>
-The kind "forall" is placed
+</para></listitem>
+
+<listitem><para>
+The (implicit) kind "forall" is placed
 just outside the outermost type-variable binding whose kind annotation mentions
 the kind variable. For example
 <programlisting>
 f1 :: (forall a m. m a -> Int) -> Int
-         -- f1 :: forall (k:BOX).
-         --       (forall (a:k) (m:k->*). m a -> Int)
+         -- f1 :: forall (k::BOX).
+         --       (forall (a::k) (m::k->*). m a -> Int)
          --       -> Int
 
 f2 :: (forall (a::k) m. m a -> Int) -> Int
-         -- f2 :: (forall (k:BOX) (a:k) (m:k->*). m a -> Int)
+         -- f2 :: (forall (k::BOX) (a::k) (m::k->*). m a -> Int)
          --       -> Int
 </programlisting>
 Here in <literal>f1</literal> there is no kind annotation mentioning the polymorphic
 kind variable, so <literal>k</literal> is generalised at the top
-level of the signature for <literal>f1</literal>,
-making the signature for <literal>f1</literal> is as polymorphic as possible.
+level of the signature for <literal>f1</literal>.
 But in the case of of <literal>f2</literal> we give a kind annotation in the <literal>forall (a:k)</literal>
 binding, and GHC therefore puts the kind <literal>forall</literal> right there too.
+This design decision makes default case (<literal>f1</literal>)
+as polymorphic as possible; remember that a <emphasis>more</emphasis> polymorhic argument type (as in <literal>f2</literal>
+makes the overall function <emphasis>less</emphasis> polymorphic, because there are fewer accepable arguments.
+</para></listitem>
+</itemizedlist>
 </para>
 <para>
 (Note: These rules are a bit indirect and clumsy.  Perhaps GHC should allow explicit kind quantification.
