@@ -6,6 +6,7 @@ module T4809_IdentityT
     , XML(..)
     ) where
 
+import Control.Applicative
 import Control.Monad        (MonadPlus)
 import Control.Monad.Trans  (MonadTrans(lift), MonadIO(liftIO))
 import T4809_XMLGenerator (XMLGenT(..), EmbedAsChild(..), Name)
@@ -19,6 +20,9 @@ data XML
 
 newtype IdentityT m a = IdentityT { runIdentityT :: m a }
     deriving (Functor, Monad, MonadIO, MonadPlus)
+
+instance Monad m => Applicative (IdentityT m) where
+instance Monad m => Alternative (IdentityT m) where
 
 instance MonadTrans IdentityT where
     lift = IdentityT
