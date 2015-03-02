@@ -1085,7 +1085,7 @@ type LDataFamInstDecl name = Located (DataFamInstDecl name)
 data DataFamInstDecl name
   = DataFamInstDecl
        { dfid_tycon     :: Located name
-       , dfid_rep_tycon :: name  -- See Note [Assigning names to instance declarations] in RnSource
+       , dfid_rep_tycon :: Maybe name  -- See Note [Assigning names to instance declarations] in RnSource
        , dfid_pats      :: HsTyPats   name       -- LHS
        , dfid_defn      :: HsDataDefn name       -- RHS
        , dfid_fvs       :: PostRn name NameSet } -- Free vars for dependency analysis
@@ -1099,9 +1099,9 @@ data DataFamInstDecl name
   deriving( Typeable )
 deriving instance (DataId name) => Data (DataFamInstDecl name)
 
-placeHolderRepTyCon :: name -- AMG TODO
--- Used for dfid_rep_tycon in DataFamInstDecl prior to the renamer
-placeHolderRepTyCon = panic "placeHolderRepTyCon"
+-- | Used for dfid_rep_tycon in DataFamInstDecl prior to the renamer
+placeHolderRepTyCon :: Maybe name
+placeHolderRepTyCon = Nothing
 
 
 ----------------- Class instances -------------

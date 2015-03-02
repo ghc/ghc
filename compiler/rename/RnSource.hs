@@ -53,7 +53,7 @@ import Data.List( partition, sortBy )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
 #endif
-import Maybes( orElse, mapMaybe )
+import Maybes( orElse, mapMaybe, expectJust )
 
 {-
 @rnSourceDecl@ `renames' declarations.
@@ -276,7 +276,7 @@ assignNamesClsInstDecl cid = do
 assignNamesDataFamInstDecl :: DataFamInstDecl RdrName -> State OccSet (DataFamInstDecl RdrName)
 assignNamesDataFamInstDecl dfid = do
     occ <- assignOccName (mkInstTyTcOcc info_string)
-    return dfid { dfid_rep_tycon = mkRdrUnqual occ }
+    return dfid { dfid_rep_tycon = Just $ mkRdrUnqual occ }
   where
     info_string = occNameString (rdrNameOcc $ unLoc $ dfid_tycon dfid)
                     ++ concatMap (getDFunHsTypeKey . unLoc) (hswb_cts (dfid_pats dfid))
@@ -669,15 +669,16 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
                   -> DataFamInstDecl RdrName
                   -> RnM (DataFamInstDecl Name, FreeVars)
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
-                                          , dfid_rep_tycon = rep_tycon
+                                          , dfid_rep_tycon = mb_rep_tycon
                                           , dfid_pats  = HsWB { hswb_cts = pats }
                                           , dfid_defn  = defn })
   = do { (tycon', pats', defn', fvs) <-
            rnFamInstDecl (TyDataCtx tycon) mb_cls tycon pats defn rnDataDefn
        ; mod <- getModule
+       ; let rep_tycon = expectJust "rnDataFamInstDecl" mb_rep_tycon
        ; rep_tycon' <- newGlobalBinder mod (rdrNameOcc rep_tycon) (getLoc tycon)
        ; return (DataFamInstDecl { dfid_tycon = tycon'
-                                 , dfid_rep_tycon = rep_tycon'
+                                 , dfid_rep_tycon = Just rep_tycon'
                                  , dfid_pats  = pats'
                                  , dfid_defn  = defn'
                                  , dfid_fvs   = fvs }, fvs) }
