@@ -514,7 +514,7 @@ then
     echo "main = putStrLn \"%function\"" > conftestghc.hs
 
     # Check whether LLVM backend is default for this platform
-    "${WithGhc}" conftestghc.hs 2>&1 >/dev/null
+    "${WithGhc}" -pgmlc="${LlcCmd}" -pgmlo="${OptCmd}" conftestghc.hs 2>&1 >/dev/null
     res=`./conftestghc`
     if test "x$res" = "x%object"
     then
@@ -531,7 +531,7 @@ then
 
     # -fllvm is not the default, but set a flag so the Makefile can check
     # -for it in the build flags later on
-    "${WithGhc}" -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
+    "${WithGhc}" -fforce-recomp -pgmlc="${LlcCmd}" -pgmlo="${OptCmd}" -fllvm conftestghc.hs 2>&1 >/dev/null
     if test $? = 0
     then
         res=`./conftestghc`

@@ -2722,6 +2722,7 @@
             <entry>Use <replaceable>cmd</replaceable> as the C compiler</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
+          </row>
             <row>
               <entry><option>-pgmlo</option> <replaceable>cmd</replaceable></entry>
               <entry>Use <replaceable>cmd</replaceable> as the LLVM optimiser</entry>
@@ -2734,7 +2735,6 @@
               <entry>dynamic</entry>
               <entry>-</entry>
             </row>
-          </row>
           <row>
             <entry><option>-pgms</option> <replaceable>cmd</replaceable></entry>
             <entry>Use <replaceable>cmd</replaceable> as the splitter</entry>
