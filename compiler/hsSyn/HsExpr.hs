@@ -294,7 +294,7 @@ data HsExpr id
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
-  -- | Used to attach a selector id to non-overloaded fields (TODO: API annotation?)
+  -- | Used to attach a selector id to non-overloaded fields
   | HsSingleRecFld RdrName id
 
   -- | Expression with an explicit type signature. @e :: type@

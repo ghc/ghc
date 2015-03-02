@@ -989,7 +989,6 @@ zonkRecFields env (HsRecFields flds dd)
   = do  { flds' <- mapM zonk_rbind flds
         ; return (HsRecFields flds' dd) }
   where
-    -- TODO new_id   <- zonkIdBndr env (unLoc (hsRecFieldId fld))
     zonk_rbind (L l fld)
       = do { new_id   <- zonkIdBndr env (unLoc (hsRecFieldId fld))
            ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
