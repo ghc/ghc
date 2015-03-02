@@ -30,6 +30,7 @@ module Literal
         , inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
         , isZeroLit
         , litFitsInChar
+        , onlyWithinBounds
 
         -- ** Coercions
         , word2IntLit, int2WordLit
@@ -358,6 +359,16 @@ litFitsInChar _           = False
 litIsLifted :: Literal -> Bool
 litIsLifted (LitInteger {}) = True
 litIsLifted _               = False
+
+-- | x `onlyWithinBounds` (l,h) is true if l <= y < h ==> x = y
+onlyWithinBounds :: Literal -> (Literal, Literal) -> Bool
+onlyWithinBounds (MachChar   x) (MachChar   l, MachChar   h) = x == l && succ x == h
+onlyWithinBounds (MachInt    x) (MachInt    l, MachInt    h) = x == l && succ x == h
+onlyWithinBounds (MachWord   x) (MachWord   l, MachWord   h) = x == l && succ x == h
+onlyWithinBounds (MachInt64  x) (MachInt64  l, MachInt64  h) = x == l && succ x == h
+onlyWithinBounds (MachWord64 x) (MachWord64 l, MachWord64 h) = x == l && succ x == h
+onlyWithinBounds _ _ = False
+
 
 {-
         Types

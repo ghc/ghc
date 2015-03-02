@@ -652,14 +652,21 @@ emitCmmLitSwitch scrut  branches deflt = do
     join_lbl <- newLabelC
     deflt_lbl <- label_code join_lbl deflt
     branches_lbls <- label_branches join_lbl branches
-    emit =<< mk_lit_switch scrut' deflt_lbl
+    emit =<< mk_lit_switch scrut' deflt_lbl noBound
                (sortBy (comparing fst) branches_lbls)
     emitLabel join_lbl
 
+-- | lower bound (inclusive), upper bound (exclusive)
+type LitBound = (Maybe Literal, Maybe Literal)
+
+noBound :: LitBound
+noBound = (Nothing, Nothing)
+
 mk_lit_switch :: CmmExpr -> BlockId
+              -> LitBound
               -> [(Literal,BlockId)]
               -> FCode CmmAGraph
-mk_lit_switch scrut deflt [(lit,blk)]
+mk_lit_switch scrut deflt bounds [(lit,blk)]
   = do
   dflags <- getDynFlags
   let
@@ -667,12 +674,19 @@ mk_lit_switch scrut deflt [(lit,blk)]
     cmm_ty  = cmmLitType dflags cmm_lit
     rep     = typeWidth cmm_ty
     ne      = if isFloatType cmm_ty then MO_F_Ne rep else MO_Ne rep
-  return (mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk)
 
-mk_lit_switch scrut deflt_blk_id branches
+  return $ if lit `onlyWithinBounds'` bounds
+           then mkBranch blk
+           else mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk
+  where
+    -- If the bounds already imply scrut == lit, then we can skip the final check (#10129)
+    l `onlyWithinBounds'` (Just lo, Just hi) = l `onlyWithinBounds` (lo, hi)
+    l `onlyWithinBounds'` _ = False
+
+mk_lit_switch scrut deflt_blk_id (lo_bound, hi_bound) branches
   = do dflags <- getDynFlags
-       lo_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
-       hi_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
+       lo_blk <- mk_lit_switch scrut deflt_blk_id bounds_lo lo_branches
+       hi_blk <- mk_lit_switch scrut deflt_blk_id bounds_hi hi_branches
        mkCmmIfThenElse (cond dflags) lo_blk hi_blk
   where
     n_branches = length branches
@@ -681,6 +695,9 @@ mk_lit_switch scrut deflt_blk_id branches
 
     (lo_branches, hi_branches) = span is_lo branches
     is_lo (t,_) = t < mid_lit
+
+    bounds_lo = (lo_bound, Just mid_lit)
+    bounds_hi = (Just mid_lit, hi_bound)
 
     cond dflags = CmmMachOp (mkLtOp dflags mid_lit)
                             [scrut, CmmLit (mkSimpleLit dflags mid_lit)]
