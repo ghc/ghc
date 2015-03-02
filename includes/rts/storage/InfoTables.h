@@ -16,23 +16,9 @@
    relative to the info pointer, so that we can generate
    position-independent code.
 
-   Note [x86-64-relative]
-   There is a complication on the x86_64 platform, where pointeres are
-   64 bits, but the tools don't support 64-bit relative relocations.
-   However, the default memory model (small) ensures that all symbols
-   have values in the lower 2Gb of the address space, so offsets all
-   fit in 32 bits.  Hence we can use 32-bit offset fields.
-
-   Somewhere between binutils-2.16.1 and binutils-2.16.91.0.6,
-   support for 64-bit PC-relative relocations was added, so maybe this
-   hackery can go away sometime.
    ------------------------------------------------------------------------- */
 
-#if x86_64_TARGET_ARCH
-#define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n
-#else
 #define OFFSET_FIELD(n) StgInt n
-#endif
 
 /* -----------------------------------------------------------------------------
    Profiling info
