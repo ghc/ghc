@@ -373,7 +373,7 @@ bSearch msg code ibuf mbuf target_to_elems = go
     go' mn mx | mn <= mx  = go mn (mn + ((mx - mn) `div` 2)) mx
               | otherwise = error $ "bSearch(" ++ msg ++ "): search crossed! " ++ show (summaryBuffer ibuf, summaryBuffer mbuf, target_to_elems, mn, mx)
 
-cpRecode :: forall from to. (Show from, Storable from)
+cpRecode :: forall from to. Storable from
          => (Ptr from -> Int -> Ptr to -> Int -> IO (Either Bool Int))
          -> (from -> IO Bool)
          -> Int -- ^ Maximum length of a complete translatable sequence in the input (e.g. 2 if the input is UTF-16, 1 if the input is a SBCS, 2 is the input is a DBCS). Must be at least 1.
