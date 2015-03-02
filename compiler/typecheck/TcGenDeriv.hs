@@ -1134,6 +1134,8 @@ gen_Show_binds get_fixity loc tycon
       | nullary_con =  -- skip the showParen junk...
          ASSERT(null bs_needed)
          ([nlWildPat, con_pat], mk_showString_app op_con_str)
+      | record_syntax =  -- skip showParen (#2530)
+         ([a_Pat, con_pat], nlHsPar (nested_compose_Expr show_thingies))
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR
