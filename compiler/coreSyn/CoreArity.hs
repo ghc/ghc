@@ -437,7 +437,7 @@ ArityType 'at', then
 
  * If at = ATop as, and n=length as,
    then expanding 'f' to (\x1..xn. f x1 .. xn) loses no sharing,
-   assuming the calls of f respect the one-shot-ness of of
+   assuming the calls of f respect the one-shot-ness of
    its definition.
 
    NB 'f' is an arbitary expression, eg (f = g e1 e2).  This 'f'

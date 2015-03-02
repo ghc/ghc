@@ -340,7 +340,7 @@ See #letrec_invariant#
 Note [CoreSyn let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The let/app invariant
-     the right hand side of of a non-recursive 'Let', and
+     the right hand side of a non-recursive 'Let', and
      the argument of an 'App',
     /may/ be of unlifted type, but only if
     the expression is ok-for-speculation.

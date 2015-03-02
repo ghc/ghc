@@ -261,7 +261,7 @@ Note [Preserve OneShotInfo]
 
 We keep the OneShotInfo because we want it to propagate into the interface.
 Not all OneShotInfo is determined by a compiler analysis; some is added by a
-call of GHC.Exts.oneShot, which is then discarded before the end of of the
+call of GHC.Exts.oneShot, which is then discarded before the end of the
 optimisation pipeline, leaving only the OneShotInfo on the lambda. Hence we
 must preserve this info in inlinings.
 
