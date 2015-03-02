@@ -2095,21 +2095,31 @@ AC_DEFUN([XCODE_VERSION],[
 AC_DEFUN([FIND_LLVM_PROG],[
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
     if test "$$1" = ""; then
+        echo -n "checking for $3-x.x... "
         save_IFS=$IFS
         IFS=":;"
+        if test "$windows" = YES; then
+            PERM=
+            MODE=
+        else
+            # Search for executables.
+            PERM="-perm"
+            MODE="/+x"
+        fi
         for p in ${PATH}; do
             if test -d "${p}"; then
-                if test "$windows" = YES; then
-                    $1=`${FindCmd} "${p}" -type f -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
-                else
-                    $1=`${FindCmd} "${p}" -type f -perm \111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm \111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
-                fi
+                $1=`${FindCmd} "${p}" -maxdepth 1 \( -type f -o -type l \) ${PERM} ${MODE} -regex ".*/$3-[[0-9]]\.[[0-9]]" | ${SortCmd} -n | tail -1`
                 if test -n "$$1"; then
                     break
                 fi
             fi
         done
         IFS=$save_IFS
+        if test -n "$$1"; then
+            echo "$$1"
+        else
+            echo "no"
+        fi
     fi
 ])
 
