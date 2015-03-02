@@ -626,14 +626,18 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
         --      lo_tag <= mid_tag < hi_tag
         --      lo_branches have tags <  mid_tag
         --      hi_branches have tags >= mid_tag
+    (lo_branches, mid_tag, hi_branches) = divideBranches branches
 
-    (mid_tag,_) = branches !! (n_branches `div` 2)
-        -- 2 branches => n_branches `div` 2 = 1
-        --            => branches !! 1 give the *second* tag
-        -- There are always at least 2 branches here
 
+divideBranches :: Ord a => [(a,b)] -> ([(a,b)], a, [(a,b)])
+divideBranches branches = (lo_branches, mid, hi_branches)
+  where
+    -- 2 branches => n_branches `div` 2 = 1
+    --            => branches !! 1 give the *second* tag
+    -- There are always at least 2 branches here
+    (mid,_) = branches !! (length branches `div` 2)
     (lo_branches, hi_branches) = span is_lo branches
-    is_lo (t,_) = t < mid_tag
+    is_lo (t,_) = t < mid
 
 --------------
 emitCmmLitSwitch :: CmmExpr                    -- Tag to switch on
@@ -681,7 +685,7 @@ mk_lit_switch scrut deflt bounds [(lit,blk)]
   where
     -- If the bounds already imply scrut == lit, then we can skip the final check (#10129)
     l `onlyWithinBounds'` (Just lo, Just hi) = l `onlyWithinBounds` (lo, hi)
-    l `onlyWithinBounds'` _ = False
+    _ `onlyWithinBounds'` _ = False
 
 mk_lit_switch scrut deflt_blk_id (lo_bound, hi_bound) branches
   = do dflags <- getDynFlags
@@ -689,12 +693,7 @@ mk_lit_switch scrut deflt_blk_id (lo_bound, hi_bound) branches
        hi_blk <- mk_lit_switch scrut deflt_blk_id bounds_hi hi_branches
        mkCmmIfThenElse (cond dflags) lo_blk hi_blk
   where
-    n_branches = length branches
-    (mid_lit,_) = branches !! (n_branches `div` 2)
-        -- See notes above re mid_tag
-
-    (lo_branches, hi_branches) = span is_lo branches
-    is_lo (t,_) = t < mid_lit
+    (lo_branches, mid_lit, hi_branches) = divideBranches branches
 
     bounds_lo = (lo_bound, Just mid_lit)
     bounds_hi = (Just mid_lit, hi_bound)
