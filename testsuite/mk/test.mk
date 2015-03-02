@@ -241,7 +241,7 @@ TESTS	     =
 TEST	     = 
 WAY =
 
-.PHONY: all boot test verbose accept fast
+.PHONY: all boot test verbose accept fast list_broken
 
 all: test
 

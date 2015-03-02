@@ -11,14 +11,28 @@ ifneq "$(MAKECMDGOALS)" "maintainer-clean"
 
 include $(TOP)/mk/boilerplate.mk
 
+.PHONY: all boot test verbose accept fast list_broken
+
 boot:
 	$(MAKE) -C $(TOP)/timeout all
 
 all:
 	$(MAKE) -C $(TOP)/tests all
 
+test:
+	$(MAKE) -C $(TOP)/tests test
+
+verbose:
+	$(MAKE) -C $(TOP)/tests verbose
+
+accept:
+	$(MAKE) -C $(TOP)/tests accept
+
 fast:
 	$(MAKE) -C $(TOP)/tests fast
+
+list_broken:
+	$(MAKE) -C $(TOP)/tests list_broken
 
 endif
 endif
