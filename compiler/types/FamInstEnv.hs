@@ -986,6 +986,24 @@ means replacing all top-level uses of type functions with fresh variables,
 taking care to preserve sharing. That is, the type (Either (F a b) (F a b)) should
 flatten to (Either c c), never (Either c d).
 
+Here is a nice example of why it's all necessary:
+
+  type family F a b where
+    F Int Bool = Char
+    F a   b    = Double
+  type family G a         -- open, no instances
+
+How do we reduce (F (G Float) (G Float))? The first equation clearly doesn't match,
+while the second equation does. But, before reducing, we must make sure that the
+target can never become (F Int Bool). Well, no matter what G Float becomes, it
+certainly won't become *both* Int and Bool, so indeed we're safe reducing
+(F (G Float) (G Float)) to Double.
+
+This is necessary not only to get more reductions, but for substitutivity. If
+we have (F x x), we can see that (F x x) can reduce to Double. So, it had better
+be the case that (F blah blah) can reduce to Double, no matter what (blah) is!
+Flattening as done below ensures this.
+
 Defined here because of module dependencies.
 -}
 
@@ -1044,10 +1062,11 @@ coreFlattenTyFamApp in_scope m fam_tc fam_args
   = case lookupTypeMap m fam_ty of
       Just tv -> (m, tv)
               -- we need fresh variables here, but this is called far from
-              -- any good source of uniques. So, we generate one from thin
-              -- air, using the arbitrary prime number 71 as a seed
-      Nothing -> let tyvar_unique = deriveUnique (getUnique fam_tc) 71
-                     tyvar_name   = mkSysTvName tyvar_unique (fsLit "fl")
+              -- any good source of uniques. So, we just use the fam_tc's unique
+              -- and trust uniqAway to avoid clashes. Recall that the in_scope set
+              -- contains *all* tyvars, even locally bound ones elsewhere in the
+              -- overall type, so this really is fresh.
+      Nothing -> let tyvar_name   = mkSysTvName (getUnique fam_tc) (fsLit "fl")
                      tv = uniqAway in_scope $ mkTyVar tyvar_name (typeKind fam_ty)
                      m' = extendTypeMap m fam_ty tv in
                  (m', tv)
