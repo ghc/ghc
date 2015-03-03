@@ -233,9 +233,10 @@ type ModuleToPkgConfAll =
 
 data PackageState = PackageState {
   -- | A mapping of 'PackageKey' to 'PackageConfig'.  This list is adjusted
-  -- so that only valid packages are here.  Currently, we also flip the
-  -- exposed/trusted bits based on package flags; however, the hope is to
-  -- stop doing that.
+  -- so that only valid packages are here.  'PackageConfig' reflects
+  -- what was stored *on disk*, except for the 'trusted' flag, which
+  -- is adjusted at runtime.  (In particular, some packages in this map
+  -- may have the 'exposed' flag be 'False'.)
   pkgIdMap              :: PackageConfigMap,
 
   -- | The packages we're going to link in eagerly.  This list
@@ -287,7 +288,9 @@ getPackageDetails dflags pid =
     expectJust "getPackageDetails" (lookupPackage dflags pid)
 
 -- | Get a list of entries from the package database.  NB: be careful with
--- this function, it may not do what you expect it to.
+-- this function, although all packages in this map are "visible", this
+-- does not imply that the exposed-modules of the package are available
+-- (they may have been thinned or renamed).
 listPackageConfigMap :: DynFlags -> [PackageConfig]
 listPackageConfigMap dflags = eltsUFM (pkgIdMap (pkgState dflags))
 
