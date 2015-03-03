@@ -6,21 +6,26 @@ annfail10.hs:9:1:
       instance (Data.Data.Data a, Data.Data.Data b) =>
                Data.Data.Data (Either a b)
         -- Defined in ‘Data.Data’
-      instance Data.Data.Data t => Data.Data.Data (Data.Proxy.Proxy t)
+      instance Data.Data.Data Data.Monoid.All -- Defined in ‘Data.Data’
+      instance forall (k :: BOX) (f :: k -> *) (a :: k).
+               (Data.Data.Data (f a), Data.Typeable.Internal.Typeable f,
+                Data.Typeable.Internal.Typeable a) =>
+               Data.Data.Data (Data.Monoid.Alt f a)
         -- Defined in ‘Data.Data’
-      instance (GHC.Types.Coercible a b, Data.Data.Data a,
-                Data.Data.Data b) =>
-               Data.Data.Data (Data.Type.Coercion.Coercion a b)
-        -- Defined in ‘Data.Data’
-      ...plus 31 others
+      ...plus 39 others
     In the annotation: {-# ANN f 1 #-}
 
 annfail10.hs:9:11:
     No instance for (Num a0) arising from the literal ‘1’
     The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
-      instance Num GHC.Int.Int16 -- Defined in ‘GHC.Int’
-      instance Num GHC.Int.Int32 -- Defined in ‘GHC.Int’
-      instance Num GHC.Int.Int64 -- Defined in ‘GHC.Int’
-      ...plus 11 others
+      instance forall (k :: BOX) (f :: k -> *) (a :: k).
+               Num (f a) =>
+               Num (Data.Monoid.Alt f a)
+        -- Defined in ‘Data.Monoid’
+      instance Num a => Num (Data.Monoid.Product a)
+        -- Defined in ‘Data.Monoid’
+      instance Num a => Num (Data.Monoid.Sum a)
+        -- Defined in ‘Data.Monoid’
+      ...plus 14 others
     In the annotation: {-# ANN f 1 #-}

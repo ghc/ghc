@@ -282,6 +282,66 @@ instance Foldable Proxy where
     sum _      = 0
     product _  = 1
 
+instance Foldable Dual where
+    foldMap            = coerce
+
+    elem               = (. getDual) #. (==)
+    foldl              = coerce
+    foldl'             = coerce
+    foldl1 _           = getDual
+    foldr f z (Dual x) = f x z
+    foldr'             = foldr
+    foldr1 _           = getDual
+    length _           = 1
+    maximum            = getDual
+    minimum            = getDual
+    null _             = False
+    product            = getDual
+    sum                = getDual
+    toList (Dual x)    = [x]
+
+instance Foldable Sum where
+    foldMap            = coerce
+
+    elem               = (. getSum) #. (==)
+    foldl              = coerce
+    foldl'             = coerce
+    foldl1 _           = getSum
+    foldr f z (Sum x)  = f x z
+    foldr'             = foldr
+    foldr1 _           = getSum
+    length _           = 1
+    maximum            = getSum
+    minimum            = getSum
+    null _             = False
+    product            = getSum
+    sum                = getSum
+    toList (Sum x)     = [x]
+
+instance Foldable Product where
+    foldMap               = coerce
+
+    elem                  = (. getProduct) #. (==)
+    foldl                 = coerce
+    foldl'                = coerce
+    foldl1 _              = getProduct
+    foldr f z (Product x) = f x z
+    foldr'                = foldr
+    foldr1 _              = getProduct
+    length _              = 1
+    maximum               = getProduct
+    minimum               = getProduct
+    null _                = False
+    product               = getProduct
+    sum                   = getProduct
+    toList (Product x)    = [x]
+
+instance Foldable First where
+    foldMap f = foldMap f . getFirst
+
+instance Foldable Last where
+    foldMap f = foldMap f . getLast
+
 -- We don't export Max and Min because, as Edward Kmett pointed out to me,
 -- there are two reasonable ways to define them. One way is to use Maybe, as we
 -- do here; the other way is to impose a Bounded constraint on the Monoid
