@@ -24,20 +24,20 @@ Roman.foo_$s$wgo =
                 (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc1 sc1) sc1) sc1) sc1)
              sc1)
           sc1 } in
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# sc 0)
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# sc 0#)
     of _ [Occ=Dead] {
       False ->
-        case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc 100)
+        case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc 100#)
         of _ [Occ=Dead] {
           False ->
-            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc 500)
+            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc 500#)
             of _ [Occ=Dead] {
-              False -> Roman.foo_$s$wgo (GHC.Prim.-# sc 1) (GHC.Prim.+# a a);
-              True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 3) a
+              False -> Roman.foo_$s$wgo (GHC.Prim.-# sc 1#) (GHC.Prim.+# a a);
+              True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 3#) a
             };
-          True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 2) sc1
+          True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 2#) sc1
         };
-      True -> 0
+      True -> 0#
     }
 end Rec }
 
@@ -64,23 +64,23 @@ Roman.$wgo =
                  ipv)
               ipv } in
         case w of _ [Occ=Dead] {
-          Nothing -> Roman.foo_$s$wgo 10 a;
+          Nothing -> Roman.foo_$s$wgo 10# a;
           Just n ->
             case n of _ [Occ=Dead] { GHC.Types.I# x2 ->
-            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# x2 0)
+            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# x2 0#)
             of _ [Occ=Dead] {
               False ->
-                case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 100)
+                case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 100#)
                 of _ [Occ=Dead] {
                   False ->
-                    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 500)
+                    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 500#)
                     of _ [Occ=Dead] {
-                      False -> Roman.foo_$s$wgo (GHC.Prim.-# x2 1) (GHC.Prim.+# a a);
-                      True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 3) a
+                      False -> Roman.foo_$s$wgo (GHC.Prim.-# x2 1#) (GHC.Prim.+# a a);
+                      True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 3#) a
                     };
-                  True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 2) ipv
+                  True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 2#) ipv
                 };
-              True -> 0
+              True -> 0#
             }
             }
         }
@@ -106,7 +106,7 @@ Roman.foo2 :: Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-Roman.foo2 = GHC.Types.I# 6
+Roman.foo2 = GHC.Types.I# 6#
 
 Roman.foo1 :: Maybe Int
 [GblId,
@@ -131,7 +131,7 @@ foo :: Int -> Int
 foo =
   \ (n :: Int) ->
     case n of _ [Occ=Dead] { GHC.Types.I# ipv ->
-    case Roman.foo_$s$wgo ipv 6 of ww { __DEFAULT -> GHC.Types.I# ww }
+    case Roman.foo_$s$wgo ipv 6# of ww { __DEFAULT -> GHC.Types.I# ww }
     }
 
 

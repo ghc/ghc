@@ -440,33 +440,66 @@ litTag (LitInteger  {})    = _ILIT(11)
 {-
         Printing
         ~~~~~~~~
-* MachX (i.e. unboxed) things are printed unadornded (e.g. 3, 'a', "foo")
-  exceptions: MachFloat gets an initial keyword prefix.
+* See Note [Printing of literals in Core]
 -}
 
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
--- The function is used on non-atomic literals
--- to wrap parens around literals that occur in
--- a context requiring an atomic thing
-pprLiteral _       (MachChar ch)    = pprHsChar ch
+pprLiteral _       (MachChar c)     = pprPrimChar c
 pprLiteral _       (MachStr s)      = pprHsBytes s
-pprLiteral _       (MachInt i)      = pprIntVal i
-pprLiteral _       (MachDouble d)   = double (fromRat d)
 pprLiteral _       (MachNullAddr)   = ptext (sLit "__NULL")
-pprLiteral add_par (LitInteger i _) = add_par (ptext (sLit "__integer") <+> integer i)
-pprLiteral add_par (MachInt64 i)    = add_par (ptext (sLit "__int64") <+> integer i)
-pprLiteral add_par (MachWord w)     = add_par (ptext (sLit "__word") <+> integer w)
-pprLiteral add_par (MachWord64 w)   = add_par (ptext (sLit "__word64") <+> integer w)
-pprLiteral add_par (MachFloat f)    = add_par (ptext (sLit "__float") <+> float (fromRat f))
+pprLiteral _       (MachInt i)      = pprPrimInt i
+pprLiteral _       (MachInt64 i)    = pprPrimInt64 i
+pprLiteral _       (MachWord w)     = pprPrimWord w
+pprLiteral _       (MachWord64 w)   = pprPrimWord64 w
+pprLiteral _       (MachFloat f)    = float (fromRat f) <> primFloatSuffix
+pprLiteral _       (MachDouble d)   = double (fromRat d) <> primDoubleSuffix
+pprLiteral add_par (LitInteger i _) = pprIntegerVal add_par i
 pprLiteral add_par (MachLabel l mb fod) = add_par (ptext (sLit "__label") <+> b <+> ppr fod)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 
-pprIntVal :: Integer -> SDoc
--- ^ Print negative integers with parens to be sure it's unambiguous
-pprIntVal i | i < 0     = parens (integer i)
-            | otherwise = integer i
+pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
+-- See Note [Printing of literals in Core].
+pprIntegerVal add_par i | i < 0     = add_par (integer i)
+                        | otherwise = integer i
+
+{-
+Note [Printing of literals in Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function `add_par` is used to wrap parenthesis around negative integers
+(`LitInteger`) and labels (`MachLabel`), if they occur in a context requiring
+an atomic thing (for example function application).
+
+Although not all Core literals would be valid Haskell, we are trying to stay
+as close as possible to Haskell syntax in the printing of Core, to make it
+easier for a Haskell user to read Core.
+
+To that end:
+  * We do print parenthesis around negative `LitInteger`, because we print
+  `LitInteger` using plain number literals (no prefix or suffix), and plain
+  number literals in Haskell require parenthesis in contexts like function
+  application (i.e. `1 - -1` is not valid Haskell).
+
+  * We don't print parenthesis around other (negative) literals, because they
+  aren't needed in GHC/Haskell either (i.e. `1# -# -1#` is accepted by GHC's
+  parser).
+
+Literal         Output             Output if context requires
+                                   an atom (if different)
+-------         -------            ----------------------
+MachChar        'a'#
+MachStr         "aaa"#
+MachNullAddr    "__NULL"
+MachInt         -1#
+MachInt64       -1L#
+MachWord         1##
+MachWord64       1L##
+MachFloat       -1.0#
+MachDouble      -1.0##
+LitInteger      -1                 (-1)
+MachLabel       "__label" ...      ("__label" ...)
+-}
 
 {-
 ************************************************************************

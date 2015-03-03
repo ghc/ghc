@@ -8,8 +8,8 @@ $wxs :: GHC.Prim.Int# -> ()
 $wxs =
   \ (ww :: GHC.Prim.Int#) ->
     case ww of ds1 {
-      __DEFAULT -> $wxs (GHC.Prim.-# ds1 1);
-      1 -> GHC.Tuple.()
+      __DEFAULT -> $wxs (GHC.Prim.-# ds1 1#);
+      1# -> GHC.Tuple.()
     }
 end Rec }
 
@@ -18,7 +18,8 @@ foo [InlPrag=NOINLINE] :: Int -> ()
 foo =
   \ (n :: Int) ->
     case n of _ [Occ=Dead] { GHC.Types.I# y ->
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0 y) of _ [Occ=Dead] {
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# y)
+    of _ [Occ=Dead] {
       False -> GHC.Tuple.();
       True -> $wxs y
     }

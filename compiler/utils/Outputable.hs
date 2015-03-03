@@ -47,6 +47,10 @@ module Outputable (
 
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
+
+        primFloatSuffix, primDoubleSuffix,
+        pprPrimChar, pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64,
+
         pprFastFilePath,
 
         -- * Controlling the style in which output is printed
@@ -808,7 +812,7 @@ pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: 
 pprHsString :: FastString -> SDoc
 pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
 
--- | Special combinator for showing string literals.
+-- | Special combinator for showing bytestring literals.
 pprHsBytes :: ByteString -> SDoc
 pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                 in vcat (map text (showMultiLineString escaped)) <> char '#'
@@ -817,6 +821,27 @@ pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                      in if isAscii c
                         then [c]
                         else '\\' : show w
+
+-- Postfix modifiers for unboxed literals.
+-- See Note [Printing of literals in Core] in `basicTypes/Literal.hs`.
+primCharSuffix, primFloatSuffix, primIntSuffix :: SDoc
+primDoubleSuffix, primWordSuffix, primInt64Suffix, primWord64Suffix :: SDoc
+primCharSuffix   = char '#'
+primFloatSuffix  = char '#'
+primIntSuffix    = char '#'
+primDoubleSuffix = text "##"
+primWordSuffix   = text "##"
+primInt64Suffix  = text "L#"
+primWord64Suffix = text "L##"
+
+-- | Special combinator for showing unboxed literals.
+pprPrimChar :: Char -> SDoc
+pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
+pprPrimChar c   = pprHsChar c <> primCharSuffix
+pprPrimInt i    = integer i   <> primIntSuffix
+pprPrimWord w   = integer w   <> primWordSuffix
+pprPrimInt64 i  = integer i   <> primInt64Suffix
+pprPrimWord64 w = integer w   <> primWord64Suffix
 
 ---------------------
 -- Put a name in parens if it's an operator

@@ -151,20 +151,19 @@ instance Ord OverLitVal where
   compare (HsIsString _ _)    (HsFractional _)    = GT
 
 instance Outputable HsLit where
-        -- Use "show" because it puts in appropriate escapes
     ppr (HsChar _ c)       = pprHsChar c
-    ppr (HsCharPrim _ c)   = pprHsChar c <> char '#'
+    ppr (HsCharPrim _ c)   = pprPrimChar c
     ppr (HsString _ s)     = pprHsString s
-    ppr (HsStringPrim _ s) = pprHsBytes s <> char '#'
+    ppr (HsStringPrim _ s) = pprHsBytes s
     ppr (HsInt _ i)        = integer i
     ppr (HsInteger _ i _)  = integer i
     ppr (HsRat f _)        = ppr f
-    ppr (HsFloatPrim f)    = ppr f <> char '#'
-    ppr (HsDoublePrim d)   = ppr d <> text "##"
-    ppr (HsIntPrim _ i)    = integer i  <> char '#'
-    ppr (HsWordPrim _ w)   = integer w  <> text "##"
-    ppr (HsInt64Prim _ i)  = integer i  <> text "L#"
-    ppr (HsWord64Prim _ w) = integer w  <> text "L##"
+    ppr (HsFloatPrim f)    = ppr f <> primFloatSuffix
+    ppr (HsDoublePrim d)   = ppr d <> primDoubleSuffix
+    ppr (HsIntPrim _ i)    = pprPrimInt i
+    ppr (HsWordPrim _ w)   = pprPrimWord w
+    ppr (HsInt64Prim _ i)  = pprPrimInt64 i
+    ppr (HsWord64Prim _ w) = pprPrimWord64 w
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndr id => Outputable (HsOverLit id) where

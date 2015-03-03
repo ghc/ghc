@@ -562,13 +562,13 @@ Consider this code:
 This optimises to:
 Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
     case w1_sCT of _ {
-      [] -> __word 0;
+      [] -> 0##;
       : x_aAW xs_aAX ->
         case x_aAW of _ {
           GHC.Types.False ->
             case w_sCS of wild2_Xh {
               __DEFAULT -> Shift.$wgo (GHC.Prim.+# wild2_Xh 1) xs_aAX;
-              9223372036854775807 -> __word 0  };
+              9223372036854775807 -> 0## };
           GHC.Types.True ->
             case GHC.Prim.>=# w_sCS 64 of _ {
               GHC.Types.False ->
@@ -576,17 +576,17 @@ Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
                   __DEFAULT ->
                     case Shift.$wgo (GHC.Prim.+# wild3_Xh 1) xs_aAX of ww_sCW { __DEFAULT ->
                       GHC.Prim.or# (GHC.Prim.narrow32Word#
-                                      (GHC.Prim.uncheckedShiftL# (__word 1) wild3_Xh))
+                                      (GHC.Prim.uncheckedShiftL# 1## wild3_Xh))
                                    ww_sCW
                      };
                   9223372036854775807 ->
                     GHC.Prim.narrow32Word#
-!!!!-->                  (GHC.Prim.uncheckedShiftL# (__word 1) 9223372036854775807)
+!!!!-->                  (GHC.Prim.uncheckedShiftL# 1## 9223372036854775807)
                 };
               GHC.Types.True ->
                 case w_sCS of wild3_Xh {
                   __DEFAULT -> Shift.$wgo (GHC.Prim.+# wild3_Xh 1) xs_aAX;
-                  9223372036854775807 -> __word 0
+                  9223372036854775807 -> 0##
                 } } } }
 
 Note the massive shift on line "!!!!".  It can't happen, because we've checked

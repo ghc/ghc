@@ -10,10 +10,10 @@ T4908.f_$s$wf =
     case sc of ds {
       __DEFAULT ->
         case sc2 of ds1 {
-          __DEFAULT -> T4908.f_$s$wf (-# ds 1) sc1 ds1;
-          0 -> GHC.Types.True
+          __DEFAULT -> T4908.f_$s$wf (-# ds 1#) sc1 ds1;
+          0# -> GHC.Types.True
         };
-      0 -> GHC.Types.True
+      0# -> GHC.Types.True
     }
 end Rec }
 
@@ -31,12 +31,12 @@ T4908.$wf =
         case w of _ [Occ=Dead] { (a, b) ->
         case b of _ [Occ=Dead] { I# ds1 ->
         case ds1 of ds2 {
-          __DEFAULT -> T4908.f_$s$wf (-# ds 1) a ds2;
-          0 -> GHC.Types.True
+          __DEFAULT -> T4908.f_$s$wf (-# ds 1#) a ds2;
+          0# -> GHC.Types.True
         }
         }
         };
-      0 -> GHC.Types.True
+      0# -> GHC.Types.True
     }
 
 f [InlPrag=INLINE[0]] :: Int -> (Int, Int) -> Bool

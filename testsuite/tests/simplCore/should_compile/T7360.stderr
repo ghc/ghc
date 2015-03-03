@@ -39,7 +39,7 @@ T7360.fun3 :: Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun3 = GHC.Types.I# 0
+T7360.fun3 = GHC.Types.I# 0#
 
 fun2 :: forall a. [a] -> ((), Int)
 [GblId,
@@ -53,7 +53,7 @@ fun2 :: forall a. [a] -> ((), Int)
                   case x of wild {
                     [] -> T7360.fun3;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0 of ww2 { __DEFAULT ->
+                      case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
                       GHC.Types.I# ww2
                       }
                   })}]
@@ -63,7 +63,7 @@ fun2 =
      case x of wild {
        [] -> T7360.fun3;
        : ds ds1 ->
-         case GHC.List.$wlenAcc @ a wild 0 of ww2 { __DEFAULT ->
+         case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
          GHC.Types.I# ww2
          }
      })
