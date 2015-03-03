@@ -163,7 +163,7 @@ type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 data OneShotInfo
   = NoOneShotInfo -- ^ No information
   | ProbOneShot   -- ^ The lambda is probably applied at most once
-                  -- See Note [Computing one-shot info, and ProbOneShot] in OccurAnl
+                  -- See Note [Computing one-shot info, and ProbOneShot] in Demand
   | OneShotLam    -- ^ The lambda is applied at most once.
   deriving (Eq)
 

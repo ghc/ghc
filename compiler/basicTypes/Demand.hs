@@ -1618,9 +1618,8 @@ argOneShots one_shot_info (JD { absd = usg })
     go (UCall Many u) = NoOneShotInfo : go u
     go _              = []
 
-{-
-Note [Computing one-shot info, and ProbOneShot]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Computing one-shot info, and ProbOneShot]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a call
     f (\pqr. e1) (\xyz. e2) e3
 where f has usage signature

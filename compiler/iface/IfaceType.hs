@@ -87,8 +87,8 @@ type IfaceIdBndr  = (IfLclName, IfaceType)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 
-data IfaceOneShot    -- see Note [Preserve OneShotInfo]
-  = IfaceNoOneShot
+data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
+  = IfaceNoOneShot   -- and Note [The oneShot function] in MkId
   | IfaceOneShot
 
 type IfaceLamBndr
