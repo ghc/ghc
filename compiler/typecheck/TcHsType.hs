@@ -8,7 +8,7 @@
 {-# LANGUAGE CPP #-}
 
 module TcHsType (
-        tcHsSigType, tcHsSigTypeNC, tcHsDeriv, tcHsVectInst,
+        tcHsSigType, tcHsDeriv, tcHsVectInst,
         tcHsInstHead,
         UserTypeCtxt(..),
 
@@ -21,7 +21,7 @@ module TcHsType (
                 -- No kind generalisation, no checkValidType
         kcHsTyVarBndrs, tcHsTyVarBndrs,
         tcHsLiftedType, tcHsOpenType,
-        tcLHsType, tcCheckLHsType,
+        tcLHsType, tcCheckLHsType, tcCheckLHsTypeAndGen,
         tcHsContext, tcInferApps, tcHsArgTys,
 
         kindGeneralize, checkKind,
@@ -155,17 +155,13 @@ the TyCon being defined.
 ************************************************************************
 -}
 
-tcHsSigType, tcHsSigTypeNC :: UserTypeCtxt -> LHsType Name -> TcM Type
+tcHsSigType :: UserTypeCtxt -> LHsType Name -> TcM Type
   -- NB: it's important that the foralls that come from the top-level
   --     HsForAllTy in hs_ty occur *first* in the returned type.
   --     See Note [Scoped] with TcSigInfo
-tcHsSigType ctxt hs_ty
-  = addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
-    tcHsSigTypeNC ctxt hs_ty
-
-tcHsSigTypeNC ctxt (L loc hs_ty)
-  = setSrcSpan loc $    -- The "In the type..." context
-                        -- comes from the caller; hence "NC"
+tcHsSigType ctxt (L loc hs_ty)
+  = setSrcSpan loc $
+    addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
     do  { kind <- case expectedKindInCtxt ctxt of
                     Nothing -> newMetaKindVar
                     Just k  -> return k
@@ -182,7 +178,7 @@ tcHsSigTypeNC ctxt (L loc hs_ty)
 
 -----------------
 tcHsInstHead :: UserTypeCtxt -> LHsType Name -> TcM ([TyVar], ThetaType, Class, [Type])
--- Like tcHsSigTypeNC, but for an instance head.
+-- Like tcHsSigType, but for an instance head.
 tcHsInstHead user_ctxt lhs_ty@(L loc hs_ty)
   = setSrcSpan loc $    -- The "In the type..." context comes from the caller
     do { inst_ty <- tc_inst_head hs_ty
@@ -203,7 +199,7 @@ tc_inst_head hs_ty
 
 -----------------
 tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type], Kind)
--- Like tcHsSigTypeNC, but for the ...deriving( C t1 ty2 ) clause
+-- Like tcHsSigType, but for the ...deriving( C t1 ty2 ) clause
 -- Returns the C, [ty1, ty2, and the kind of C's *next* argument
 -- E.g.    class C (a::*) (b::k->k)
 --         data T a b = ... deriving( C Int )
@@ -247,9 +243,8 @@ tcHsVectInst ty
 -}
 
 tcClassSigType :: LHsType Name -> TcM Type
-tcClassSigType lhs_ty@(L _ hs_ty)
-  = addTypeCtxt lhs_ty $
-    do { ty <- tcCheckHsTypeAndGen hs_ty liftedTypeKind
+tcClassSigType lhs_ty
+  = do { ty <- tcCheckLHsTypeAndGen lhs_ty liftedTypeKind
        ; zonkSigType ty }
 
 tcHsConArgType :: NewOrData ->  LHsType Name -> TcM Type
@@ -294,10 +289,18 @@ tcLHsType :: LHsType Name -> TcM (TcType, TcKind)
 tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type ty)
 
 ---------------------------
-tcCheckHsTypeAndGen :: HsType Name -> Kind -> TcM Type
--- Input type is HsType, not LhsType; the caller adds the context
+tcCheckLHsTypeAndGen :: LHsType Name -> Kind -> TcM Type
 -- Typecheck a type signature, and kind-generalise it
 -- The result is not necessarily zonked, and has not been checked for validity
+tcCheckLHsTypeAndGen lhs_ty kind
+  = do { ty  <- tcCheckLHsType lhs_ty kind
+       ; kvs <- zonkTcTypeAndFV ty
+       ; kvs <- kindGeneralize kvs
+       ; return (mkForAllTys kvs ty) }
+
+tcCheckHsTypeAndGen :: HsType Name -> Kind -> TcM Type
+-- Input type is HsType, not LHsType; the caller adds the context
+-- Otherwise same as tcCheckLHsTypeAndGen
 tcCheckHsTypeAndGen hs_ty kind
   = do { ty  <- tc_hs_type hs_ty (EK kind expectedKindMsg)
        ; traceTc "tcCheckHsTypeAndGen" (ppr hs_ty)
