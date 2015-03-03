@@ -7,8 +7,6 @@
  *
  * --------------------------------------------------------------------------*/
 
-#define _WIN32_WINNT 0x0501
-
 #include "Rts.h"
 #include <windows.h>
 #if defined(THREADED_RTS)

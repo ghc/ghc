@@ -177,6 +177,13 @@ endif
 
 rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
+# If we're compiling on windows, enforce that we only support XP+
+# Adding this here means it doesn't have to be done in individual .c files
+# and also centralizes the versioning.
+ifeq "$$(TargetOS_CPP)" "mingw32"
+rts_dist_$1_CC_OPTS += -DWINVER=0x0501
+endif
+
 ifneq "$$(UseSystemLibFFI)" "YES"
 rts_dist_FFI_SO = rts/dist/build/lib$$(LIBFFI_NAME)$$(soext)
 else
@@ -313,13 +320,6 @@ endif
 
 #-----------------------------------------------------------------------------
 # Flags for compiling specific files
-
-# If RtsMain.c is built with optimisation then the SEH exception stuff on
-# Windows gets confused.
-# This has to be in HC rather than CC opts, as otherwise there's a
-# -optc-O2 that comes after it.
-rts/RtsMain_HC_OPTS += -optc-O0
-
 rts/RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 rts/RtsUtils_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 rts/Trace_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"

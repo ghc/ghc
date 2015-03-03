@@ -7,8 +7,7 @@ test('testblockalloc',
 # only GHCi triggers the bug, but we run the test all ways for completeness.
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
-     [when(opsys('mingw32'), expect_broken(6079)),
-      # LLVM Optimiser considers dereference of a null pointer
+     [# LLVM Optimiser considers dereference of a null pointer
       # undefined and marks the code as unreachable which means
       # that later optimisations remove it altogether.
       omit_ways(['optllvm']),
@@ -21,17 +20,24 @@ test('derefnull',
       # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
       when(platform('i386-apple-darwin'), exit_code(138)),
       when(platform('powerpc-apple-darwin'), exit_code(138)),
-      when(opsys('mingw32'), exit_code(1))],
+      when(opsys('mingw32'), exit_code(1)),
+      # since these test are supposed to crash the
+      # profile report will be empty always.
+      # so disable the check for profiling
+      when(opsys('mingw32'), omit_ways(prof_ways))],
      compile_and_run, [''])
 test('divbyzero',
-     [when(opsys('mingw32'), expect_broken(6079)),
-      # SIGFPE on Linux
+     [# SIGFPE on Linux
       exit_code(136),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
       when(opsys('linux'), ignore_output),
-      when(opsys('mingw32'), exit_code(1))],
+      when(opsys('mingw32'), exit_code(1)),
+      # since these test are supposed to crash the
+      # profile report will be empty always.
+      # so disable the check for profiling
+      when(opsys('mingw32'), omit_ways(prof_ways))],
      compile_and_run, [''])
 
 test('outofmem', when(opsys('darwin'), skip), 
