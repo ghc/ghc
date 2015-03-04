@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes, MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-} -- c3 is ambiguous!
 
 -- Tests a bug spotted by Claus in which the type
 -- of c3 was wrongly displayed in GHCi as

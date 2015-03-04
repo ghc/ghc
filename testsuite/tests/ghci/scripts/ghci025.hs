@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes, MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-} -- c3 is ambiguous!
 
 module T where
 
