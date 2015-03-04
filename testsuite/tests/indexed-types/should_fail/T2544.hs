@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeOperators, TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+    -- The type of 'empty' is indeed ambiguous
 
 module T2544 where
 

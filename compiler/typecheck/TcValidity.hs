@@ -56,6 +56,122 @@ import Data.List        ( (\\) )
           Checking for ambiguity
 *                                                                      *
 ************************************************************************
+
+Note [The ambiguity check for type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+checkAmbiguity is a check on *user-supplied type signatures*.  It is
+*purely* there to report functions that cannot possibly be called.  So for
+example we want to reject:
+   f :: C a => Int
+The idea is there can be no legal calls to 'f' because every call will
+give rise to an ambiguous constraint.  We could soundly omit the
+ambiguity check on type signatures entirely, at the expense of
+delaying ambiguity errors to call sites.  Indeed, the flag
+-XAllowAmbiguousTypes switches off the ambiguity check.
+
+What about things like this:
+   class D a b | a -> b where ..
+   h :: D Int b => Int
+The Int may well fix 'b' at the call site, so that signature should
+not be rejected.  Moreover, using *visible* fundeps is too
+conservative.  Consider
+   class X a b where ...
+   class D a b | a -> b where ...
+   instance D a b => X [a] b where...
+   h :: X a b => a -> a
+Here h's type looks ambiguous in 'b', but here's a legal call:
+   ...(h [True])...
+That gives rise to a (X [Bool] beta) constraint, and using the
+instance means we need (D Bool beta) and that fixes 'beta' via D's
+fundep!
+
+Behind all these special cases there is a simple guiding principle.
+Consider
+
+  f :: <type>
+  f = ...blah...
+
+  g :: <type>
+  g = f
+
+You would think that the definition of g would surely typecheck!
+After all f has exactly the same type, and g=f. But in fact f's type
+is instantiated and the instantiated constraints are solved against
+the originals, so in the case an ambiguous type it won't work.
+Consider our earlier example f :: C a => Int.  Then in g's definition,
+we'll instantiate to (C alpha) and try to deduce (C alpha) from (C a),
+and fail.
+
+So in fact we use this as our *definition* of ambiguity.  We use a
+very similar test for *inferred* types, to ensure that they are
+unambiguous. See Note [Impedence matching] in TcBinds.
+
+This test is very conveniently implemented by calling
+    tcSubType <type> <type>
+This neatly takes account of the functional dependecy stuff above,
+and implicit parameter (see Note [Implicit parameters and ambiguity]).
+And this is what checkAmbiguity does.
+
+What about this, though?
+   g :: C [a] => Int
+Is every call to 'g' ambiguous?  After all, we might have
+   intance C [a] where ...
+at the call site.  So maybe that type is ok!  Indeed even f's
+quintessentially ambiguous type might, just possibly be callable:
+with -XFlexibleInstances we could have
+  instance C a where ...
+and now a call could be legal after all!  Well, we'll reject this
+unless the instance is available *here*.
+
+Note [When to call checkAmbiguity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We call checkAmbiguity 
+   (a) on user-specified type signatures
+   (b) in checkValidType
+
+Conncerning (b), you might wonder about nested foralls.  What about
+    f :: (forall a. Eq a => Int) -> Int
+The nested forall is ambiguous.  Originally we called checkAmbiguity
+in the forall case of check_type, but that had a bad consequence:
+we got two error messages about (Eq b) in a nested forall like this:
+    g :: forall a. Eq a => forall b. Eq b => a -> a
+To avoid this, we call checkAmbiguity once, at the top, in checkValidType.
+
+In fact, because of the co/contra-variance implemented in tcSubType, 
+this *does* catch function f above. too.
+
+Concerning (a) the ambiguity check is only used for *user* types, not
+for types coming from inteface files.  The latter can legitimately
+have ambiguous types. Example
+
+   class S a where s :: a -> (Int,Int)
+   instance S Char where s _ = (1,1)
+   f:: S a => [a] -> Int -> (Int,Int)
+   f (_::[a]) x = (a*x,b)
+        where (a,b) = s (undefined::a)
+
+Here the worker for f gets the type
+        fw :: forall a. S a => Int -> (# Int, Int #)
+
+
+Note [Implicit parameters and ambiguity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only a *class* predicate can give rise to ambiguity
+An *implicit parameter* cannot.  For example:
+        foo :: (?x :: [a]) => Int
+        foo = length ?x
+is fine.  The call site will suppply a particular 'x'
+
+Furthermore, the type variables fixed by an implicit parameter
+propagate to the others.  E.g.
+        foo :: (Show a, ?x::[a]) => Int
+        foo = show (?x++?x)
+The type of foo looks ambiguous.  But it isn't, because at a call site
+we might have
+        let ?x = 5::Int in foo
+and all is well.  In effect, implicit parameters are, well, parameters,
+so we can take their type variables into account as part of the
+"tau-tvs" stuff.  This is done in the function 'FunDeps.grow'.
 -}
 
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
@@ -179,6 +295,9 @@ checkValidType ctxt ty
         -- the kind of an ill-formed type such as (a~Int)
        ; check_kind ctxt ty
 
+       -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
+       ; checkAmbiguity ctxt ty
+
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
@@ -273,8 +392,7 @@ check_type ctxt rank ty
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
         ; check_valid_theta ctxt theta
-        ; check_type ctxt rank tau      -- Allow foralls to right of arrow
-        ; checkAmbiguity ctxt ty }
+        ; check_type ctxt rank tau }      -- Allow foralls to right of arrow
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
 
@@ -644,103 +762,6 @@ Flexibility check:
 
   The dictionary gets type [C * (D *)]. IA0_TODO it should be
   generalized actually.
-
-Note [The ambiguity check for type signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-checkAmbiguity is a check on user-supplied type signatures.  It is
-*purely* there to report functions that cannot possibly be called.  So for
-example we want to reject:
-   f :: C a => Int
-The idea is there can be no legal calls to 'f' because every call will
-give rise to an ambiguous constraint.  We could soundly omit the
-ambiguity check on type signatures entirely, at the expense of
-delaying ambiguity errors to call sites.  Indeed, the flag
--XAllowAmbiguousTypes switches off the ambiguity check.
-
-What about things like this:
-   class D a b | a -> b where ..
-   h :: D Int b => Int
-The Int may well fix 'b' at the call site, so that signature should
-not be rejected.  Moreover, using *visible* fundeps is too
-conservative.  Consider
-   class X a b where ...
-   class D a b | a -> b where ...
-   instance D a b => X [a] b where...
-   h :: X a b => a -> a
-Here h's type looks ambiguous in 'b', but here's a legal call:
-   ...(h [True])...
-That gives rise to a (X [Bool] beta) constraint, and using the
-instance means we need (D Bool beta) and that fixes 'beta' via D's
-fundep!
-
-Behind all these special cases there is a simple guiding principle.
-Consider
-
-  f :: <type>
-  f = ...blah...
-
-  g :: <type>
-  g = f
-
-You would think that the definition of g would surely typecheck!
-After all f has exactly the same type, and g=f. But in fact f's type
-is instantiated and the instantiated constraints are solved against
-the originals, so in the case an ambiguous type it won't work.
-Consider our earlier example f :: C a => Int.  Then in g's definition,
-we'll instantiate to (C alpha) and try to deduce (C alpha) from (C a),
-and fail.
-
-So in fact we use this as our *definition* of ambiguity.  We use a
-very similar test for *inferred* types, to ensure that they are
-unambiguous. See Note [Impedence matching] in TcBinds.
-
-This test is very conveniently implemented by calling
-    tcSubType <type> <type>
-This neatly takes account of the functional dependecy stuff above,
-and implicit parameter (see Note [Implicit parameters and ambiguity]).
-
-What about this, though?
-   g :: C [a] => Int
-Is every call to 'g' ambiguous?  After all, we might have
-   intance C [a] where ...
-at the call site.  So maybe that type is ok!  Indeed even f's
-quintessentially ambiguous type might, just possibly be callable:
-with -XFlexibleInstances we could have
-  instance C a where ...
-and now a call could be legal after all!  Well, we'll reject this
-unless the instance is available *here*.
-
-Side note: the ambiguity check is only used for *user* types, not for
-types coming from inteface files.  The latter can legitimately have
-ambiguous types. Example
-
-   class S a where s :: a -> (Int,Int)
-   instance S Char where s _ = (1,1)
-   f:: S a => [a] -> Int -> (Int,Int)
-   f (_::[a]) x = (a*x,b)
-        where (a,b) = s (undefined::a)
-
-Here the worker for f gets the type
-        fw :: forall a. S a => Int -> (# Int, Int #)
-
-Note [Implicit parameters and ambiguity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Only a *class* predicate can give rise to ambiguity
-An *implicit parameter* cannot.  For example:
-        foo :: (?x :: [a]) => Int
-        foo = length ?x
-is fine.  The call site will suppply a particular 'x'
-
-Furthermore, the type variables fixed by an implicit parameter
-propagate to the others.  E.g.
-        foo :: (Show a, ?x::[a]) => Int
-        foo = show (?x++?x)
-The type of foo looks ambiguous.  But it isn't, because at a call site
-we might have
-        let ?x = 5::Int in foo
-and all is well.  In effect, implicit parameters are, well, parameters,
-so we can take their type variables into account as part of the
-"tau-tvs" stuff.  This is done in the function 'FunDeps.grow'.
 -}
 
 checkThetaCtxt :: UserTypeCtxt -> ThetaType -> SDoc

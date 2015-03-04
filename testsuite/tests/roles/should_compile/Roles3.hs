@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}  -- meth3, meth4 are ambiguous
 
 module Roles3 where
 

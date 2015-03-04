@@ -4442,14 +4442,15 @@ class type variable, thus:
     elem     :: Eq a => a -> s a -> Bool
 </programlisting>
 The type of <literal>elem</literal> is illegal in Haskell 98, because it
-contains the constraint <literal>Eq a</literal>, constrains only the
+contains the constraint <literal>Eq a</literal>, which constrains only the
 class type variable (in this case <literal>a</literal>).
-GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
 </para>
-
-
+<para>
+GHC lifts this restriction with language extension <option>-XConstrainedClassMethods</option>.
+The restriction is a pretty stupid one in the first place, 
+so <option>-XConstrainedClassMethods</option> is implied by <option>-XMultiParamTypeClasses</option>.
+</para>
 </sect3>
-
 
 <sect3 id="class-default-signatures">
 <title>Default method signatures</title>

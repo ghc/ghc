@@ -4,6 +4,8 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}  
+  -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
 
 -- | @since 4.6.0.0
 module GHC.IP (IP(..)) where

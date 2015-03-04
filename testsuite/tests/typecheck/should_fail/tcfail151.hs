@@ -2,7 +2,7 @@
 module ShouldFail where
 
 class (Show a, Eq a, Monad m) => Name m a where 
-    hashName :: a -> Int 
+    hashName :: a -> m Int 
     newName :: m a 
  
 data Name a => Exp a = MkExp a
