@@ -388,7 +388,6 @@ data GeneralFlag
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_HaddockOptions
-   | Opt_Hpc_No_Auto
    | Opt_BreakOnException
    | Opt_BreakOnError
    | Opt_PrintEvldWithShow
@@ -2954,7 +2953,6 @@ fFlags = [
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
   flagSpec "helpful-errors"                   Opt_HelpfulErrors,
   flagSpec "hpc"                              Opt_Hpc,
-  flagSpec "hpc-no-auto"                      Opt_Hpc_No_Auto,
   flagSpec "ignore-asserts"                   Opt_IgnoreAsserts,
   flagSpec "ignore-interface-pragmas"         Opt_IgnoreInterfacePragmas,
   flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
