@@ -859,6 +859,7 @@ findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = inc
   where isSurelyApart SurelyApart = True
         isSurelyApart _           = False
 
+        -- See Note [Flattening] below
         flattened_target = flattenTys in_scope target_tys
         in_scope = mkInScopeSet (unionVarSets $
                                  map (tyVarsOfTypes . coAxBranchLHS) incomps)
@@ -978,13 +979,14 @@ normaliseType _  role ty@(TyVarTy _)
 
 Note [Flattening]
 ~~~~~~~~~~~~~~~~~
-
-As described in
+As described in "Closed type families with overlapping equations"
 http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/axioms-extended.pdf
-we sometimes need to flatten core types before unifying them. Flattening
-means replacing all top-level uses of type functions with fresh variables,
-taking care to preserve sharing. That is, the type (Either (F a b) (F a b)) should
-flatten to (Either c c), never (Either c d).
+we need to flatten core types before unifying them, when checking for "surely-apart"
+against earlier equations of a closed type family.
+Flattening means replacing all top-level uses of type functions with
+fresh variables, *taking care to preserve sharing*. That is, the type
+(Either (F a b) (F a b)) should flatten to (Either c c), never (Either
+c d).
 
 Here is a nice example of why it's all necessary:
 
@@ -999,12 +1001,13 @@ target can never become (F Int Bool). Well, no matter what G Float becomes, it
 certainly won't become *both* Int and Bool, so indeed we're safe reducing
 (F (G Float) (G Float)) to Double.
 
-This is necessary not only to get more reductions, but for substitutivity. If
-we have (F x x), we can see that (F x x) can reduce to Double. So, it had better
-be the case that (F blah blah) can reduce to Double, no matter what (blah) is!
-Flattening as done below ensures this.
+This is necessary not only to get more reductions (which we might be
+willing to give up on), but for substitutivity. If we have (F x x), we
+can see that (F x x) can reduce to Double. So, it had better be the
+case that (F blah blah) can reduce to Double, no matter what (blah)
+is!  Flattening as done below ensures this.
 
-Defined here because of module dependencies.
+flattenTys is defined here because of module dependencies.
 -}
 
 type FlattenMap = TypeMap TyVar
