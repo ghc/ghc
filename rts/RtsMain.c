@@ -8,7 +8,6 @@
 
 #define COMPILING_RTS_MAIN
 
-#include "Excn.h"
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -16,6 +15,7 @@
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Task.h"
+#include "Excn.h"
 
 #ifdef DEBUG
 # include "Printer.h"   /* for printing        */
