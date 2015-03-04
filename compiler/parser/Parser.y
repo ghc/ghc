@@ -86,162 +86,285 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataC
 
 }
 
-{-
------------------------------------------------------------------------------
-14 Dec 2014
+{- Last updated: 03 Mar 2015
 
 Conflicts: 48 shift/reduce
            1  reduce/reduce
 
------------------------------------------------------------------------------
-20 Nov 2014
+If you modify this parser and add a conflict, please update this comment.
+You can learn more about the conflicts by passing 'happy' the -i flag:
 
-Conflicts: 60 shift/reduce
-           12 reduce/reduce
+    happy -agc --strict compiler/parser/Parser.y -idetailed-info
 
------------------------------------------------------------------------------
-25 June 2014
+How is this section formatted? Look up the state the conflict is
+reported at, and copy the list of applicable rules (at the top).  Mark
+*** for the rule that is the conflicting reduction (that is, the
+interpretation which is NOT taken).  NB: Happy doesn't print a rule in a
+state if it is empty, but you should include it in the list (you can
+look these up in the Grammar section of the info file).
 
-Conflicts: 47 shift/reduce
-           1 reduce/reduce
+Obviously the state numbers are not stable across modifications to the parser,
+the idea is to reproduce enough information on each conflict so you can figure
+out what happened if the states were renumbered.  Try not to gratuitously move
+productions around in this file.  It's probably less important to keep
+the rule annotations up-to-date.
 
------------------------------------------------------------------------------
-12 October 2012
+-------------------------------------------------------------------------------
 
-Conflicts: 43 shift/reduce
-           1 reduce/reduce
+state 0 contains 1 shift/reduce conflicts.
 
------------------------------------------------------------------------------
-24 February 2006
+    Conflicts: DOCNEXT (empty missing_module_keyword reduces)
 
-Conflicts: 33 shift/reduce
-           1 reduce/reduce
+Ambiguity when the source file starts with "-- | doc". We need another
+token of lookahead to determine if a top declaration or the 'module' keyword
+follows. Shift parses as if the 'module' keyword follows.
 
-The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
-would think the two should never occur in the same context.
+-------------------------------------------------------------------------------
 
-  -=chak
+state 49 contains 10 shift/reduce conflicts.
 
------------------------------------------------------------------------------
-31 December 2006
+        context -> btype . '~' btype                        (rule 279)
+        context -> btype .                                  (rule 280)
+    *** type -> btype .                                     (rule 281)
+        type -> btype . qtyconop type                       (rule 282)
+        type -> btype . tyvarop type                        (rule 283)
+        type -> btype . '->' ctype                          (rule 284)
+        type -> btype . '~' btype                           (rule 285)
+        type -> btype . SIMPLEQUOTE qconop type             (rule 286)
+        type -> btype . SIMPLEQUOTE varop type              (rule 287)
+        btype -> btype . atype                              (rule 299)
 
-Conflicts: 34 shift/reduce
-           1 reduce/reduce
+    Conflicts: '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
-The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
-would think the two should never occur in the same context.
+Example of ambiguity: 'e :: a `b` c';  does this mean
+    (e::a) `b` c, or
+    (e :: (a `b` c))
 
-  -=chak
-
------------------------------------------------------------------------------
-6 December 2006
-
-Conflicts: 32 shift/reduce
-           1 reduce/reduce
-
-The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
-would think the two should never occur in the same context.
-
-  -=chak
-
------------------------------------------------------------------------------
-26 July 2006
-
-Conflicts: 37 shift/reduce
-           1 reduce/reduce
-
-The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
-would think the two should never occur in the same context.
-
-  -=chak
-
------------------------------------------------------------------------------
-Conflicts: 38 shift/reduce (1.25)
-
-10 for abiguity in 'if x then y else z + 1'             [State 178]
-        (shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
-        10 because op might be: : - ! * . `x` VARSYM CONSYM QVARSYM QCONSYM
-
-1 for ambiguity in 'if x then y else z :: T'            [State 178]
-        (shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
-
-4 for ambiguity in 'if x then y else z -< e'            [State 178]
-        (shift parses as 'if x then y else (z -< T)', as per longest-parse rule)
-        There are four such operators: -<, >-, -<<, >>-
-
-
-2 for ambiguity in 'case v of { x :: T -> T ... } '     [States 11, 253]
-        Which of these two is intended?
+The case for '->' involves view patterns rather than type operators:
+    'case v of { x :: T -> T ... } '
+    Which of these two is intended?
           case v of
             (x::T) -> T         -- Rhs is T
     or
           case v of
             (x::T -> T) -> ..   -- Rhs is ...
 
-10 for ambiguity in 'e :: a `b` c'.  Does this mean     [States 11, 253]
-        (e::a) `b` c, or
-        (e :: (a `b` c))
-    As well as `b` we can have !, VARSYM, QCONSYM, and CONSYM, hence 5 cases
-    Same duplication between states 11 and 253 as the previous case
+-------------------------------------------------------------------------------
 
-1 for ambiguity in 'let ?x ...'                         [State 329]
-        the parser can't tell whether the ?x is the lhs of a normal binding or
-        an implicit binding.  Fortunately resolving as shift gives it the only
-        sensible meaning, namely the lhs of an implicit binding.
+state 118 contains 15 shift/reduce conflicts.
 
-1 for ambiguity in '{-# RULES "name" [ ... #-}          [State 382]
-        we don't know whether the '[' starts the activation or not: it
-        might be the start of the declaration with the activation being
-        empty.  --SDM 1/4/2002
+        exp -> infixexp . '::' sigtype                      (rule 414)
+        exp -> infixexp . '-<' exp                          (rule 415)
+        exp -> infixexp . '>-' exp                          (rule 416)
+        exp -> infixexp . '-<<' exp                         (rule 417)
+        exp -> infixexp . '>>-' exp                         (rule 418)
+    *** exp -> infixexp .                                   (rule 419)
+        infixexp -> infixexp . qop exp10                    (rule 421)
 
-1 for ambiguity in '{-# RULES "name" forall = ... #-}'  [State 474]
-        since 'forall' is a valid variable name, we don't know whether
-        to treat a forall on the input as the beginning of a quantifier
-        or the beginning of the rule itself.  Resolving to shift means
-        it's always treated as a quantifier, hence the above is disallowed.
-        This saves explicitly defining a grammar for the rule lhs that
-        doesn't include 'forall'.
+    Conflicts: ':' '::' '-' '!' '*' '-<' '>-' '-<<' '>>-'
+               '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
-1 for ambiguity when the source file starts with "-- | doc". We need another
-  token of lookahead to determine if a top declaration or the 'module' keyword
-  follows. Shift parses as if the 'module' keyword follows.
+Examples of ambiguity:
+    'if x then y else z -< e'
+    'if x then y else z :: T'
+    'if x then y else z + 1' (NB: '+' is in VARSYM)
 
--- ---------------------------------------------------------------------------
--- Adding location info
+Shift parses as (per longest-parse rule):
+    'if x then y else (z -< T)'
+    'if x then y else (z :: T)'
+    'if x then y else (z + 1)'
 
-This is done using the three functions below, sL0, sL1
-and sLL.  Note that these functions were mechanically
-converted from the three macros that used to exist before,
-namely L0, L1 and LL.
+-------------------------------------------------------------------------------
 
-They each add a SrcSpan to their argument.
+state 276 contains 1 shift/reduce conflicts.
 
-   sL0  adds 'noSrcSpan', used for empty productions
-     -- This doesn't seem to work anymore -=chak
+        rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 214)
 
-   sL1  for a production with a single token on the lhs.  Grabs the SrcSpan
-        from that token.
+    Conflict: '[' (empty rule_activation reduces)
 
-   sLL  for a production with >1 token on the lhs.  Makes up a SrcSpan from
-        the first and last tokens.
+We don't know whether the '[' starts the activation or not: it
+might be the start of the declaration with the activation being
+empty.  --SDM 1/4/2002
 
-These suffice for the majority of cases.  However, we must be
-especially careful with empty productions: sLL won't work if the first
-or last token on the lhs can represent an empty span.  In these cases,
-we have to calculate the span using more of the tokens from the lhs, eg.
+Example ambiguity:
+    '{-# RULE [0] f = ... #-}'
 
-        | 'newtype' tycl_hdr '=' newconstr deriving
-                { L (comb3 $1 $4 $5)
-                    (mkTyData NewType (unLoc $2) $4 (unLoc $5)) }
+We parse this as having a [0] rule activation for rewriting 'f', rather
+a rule instructing how to rewrite the expression '[0] f'.
 
-We provide comb3 and comb4 functions which are useful in such cases.
+-------------------------------------------------------------------------------
 
-Be careful: there's no checking that you actually got this right, the
-only symptom will be that the SrcSpans of your syntax will be
-incorrect.
+state 285 contains 10 shift/reduce conflicts.
+
+    *** type -> btype .                                     (rule 281)
+        type -> btype . qtyconop type                       (rule 282)
+        type -> btype . tyvarop type                        (rule 283)
+        type -> btype . '->' ctype                          (rule 284)
+        type -> btype . '~' btype                           (rule 285)
+        type -> btype . SIMPLEQUOTE qconop type             (rule 286)
+        type -> btype . SIMPLEQUOTE varop type              (rule 287)
+        btype -> btype . atype                              (rule 299)
+
+    Conflicts: [elided]
+
+Same as State 49, but minus the context productions.
+
+-------------------------------------------------------------------------------
+
+state 320 contains 1 shift/reduce conflicts.
+
+        tup_exprs -> commas . tup_tail                      (rule 502)
+        sysdcon -> '(' commas . ')'                         (rule 610)
+        commas -> commas . ','                              (rule 724)
+
+    Conflict: ')' (empty tup_tail reduces)
+
+A tuple section with NO free variables '(,,)' is indistinguishable
+from the Haskell98 data constructor for a tuple.  Shift resolves in
+favor of sysdcon, which is good because a tuple section will get rejected
+if -XTupleSections is not specified.
+
+-------------------------------------------------------------------------------
+
+state 372 contains 1 shift/reduce conflicts.
+
+        tup_exprs -> commas . tup_tail                      (rule 502)
+        sysdcon -> '(#' commas . '#)'                       (rule 612)
+        commas -> commas . ','                              (rule 724)
+
+    Conflict: '#)' (empty tup_tail reduces)
+
+Same as State 320 for unboxed tuples.
+
+-------------------------------------------------------------------------------
+
+state 400 contains 1 shift/reduce conflicts.
+
+        exp10 -> 'let' binds . 'in' exp                     (rule 423)
+        exp10 -> 'let' binds . 'in' error                   (rule 438)
+        exp10 -> 'let' binds . error                        (rule 439)
+    *** qual -> 'let' binds .                               (rule 576)
+
+    Conflict: error
+
+TODO: Why?
+
+-------------------------------------------------------------------------------
+
+state 432 contains 1 shift/reduce conflicts.
+
+        atype -> SIMPLEQUOTE '[' . comma_types0 ']'         (rule 318)
+        sysdcon -> '[' . ']'                                (rule 613)
+
+    Conflict: ']' (empty comma_types0 reudes)
+
+TODO: Why?
+
+-------------------------------------------------------------------------------
+
+state 461 contains 1 shift/reduce conflicts.
+
+    *** strict_mark -> '{-# NOUNPACK' '#-}' .               (rule 268)
+        strict_mark -> '{-# NOUNPACK' '#-}' . '!'           (rule 270)
+
+    Conflict: '!'
+
+TODO: Why?
+
+-------------------------------------------------------------------------------
+
+state 462 contains 1 shift/reduce conflicts.
+
+    *** strict_mark -> '{-# UNPACK' '#-}' .                 (rule 267)
+        strict_mark -> '{-# UNPACK' '#-}' . '!'             (rule 269)
+
+    Conflict: '!'
+
+Same as State 462
+
+-------------------------------------------------------------------------------
+
+state 493 contains 1 shift/reduce conflicts.
+
+        context -> btype '~' btype .                        (rule 279)
+    *** type -> btype '~' btype .                           (rule 285)
+        btype -> btype . atype                              (rule 299)
+
+    Conflict: '!'
+
+TODO: Why?
+
+-------------------------------------------------------------------------------
+
+state 628 contains 1 shift/reduce conflicts.
+
+    *** aexp2 -> ipvar .                                    (rule 462)
+        dbind -> ipvar . '=' exp                            (rule 587)
+
+    Conflict: '='
+
+Example ambiguity: 'let ?x ...'
+
+The parser can't tell whether the ?x is the lhs of a normal binding or
+an implicit binding.  Fortunately, resolving as shift gives it the only
+sensible meaning, namely the lhs of an implicit binding.
+
+-------------------------------------------------------------------------------
+
+state 695 contains 1 shift/reduce conflicts.
+
+        rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 214)
+
+    Conflict: 'forall' (empty rule_forall reduces)
+
+Example ambiguity: '{-# RULES "name" forall = ... #-}'
+
+'forall' is a valid variable name---we don't know whether
+to treat a forall on the input as the beginning of a quantifier
+or the beginning of the rule itself.  Resolving to shift means
+it's always treated as a quantifier, hence the above is disallowed.
+This saves explicitly defining a grammar for the rule lhs that
+doesn't include 'forall'.
+
+-------------------------------------------------------------------------------
+
+state 768 contains 1 shift/reduce conflicts.
+
+    *** type -> btype '~' btype .                           (rule 285)
+        btype -> btype . atype                              (rule 299)
+
+    Conflict: '!'
+
+TODO: Why?
+
+-------------------------------------------------------------------------------
+
+state 951 contains 1 shift/reduce conflicts.
+
+        transformqual -> 'then' 'group' . 'using' exp       (rule 525)
+        transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 526)
+    *** special_id -> 'group' .                             (rule 700)
+
+    Conflict: 'by'
+
+TODO: Why?
+
+-------------------------------------------------------------------------------
+
+state 1228 contains 1 reduce/reduce conflicts.
+
+    *** tyconsym -> CONSYM .                                (rule 640)
+        consym -> CONSYM .                                  (rule 710)
+
+    Conflict: ')'
+
+TODO: Why?  (NB: This one has been around for a while; it's quite puzzling
+    because we really shouldn't get confused between tyconsym and consym.
+    Trace the state machine, maybe?)
 
 -- -----------------------------------------------------------------------------
 -- API Annotations
+--
 
 A lot of the productions are now cluttered with calls to
 aa,am,ams,amms etc.
@@ -3054,6 +3177,8 @@ comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
 sL :: SrcSpan -> a -> Located a
 sL span a = span `seq` a `seq` L span a
 
+-- See Note [Adding location info] for how these utility functions are used
+
 -- replaced last 3 CPP macros in this file
 {-# INLINE sL0 #-}
 sL0 = L noSrcSpan       -- #define L0   L noSrcSpan
@@ -3063,6 +3188,42 @@ sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sLL #-}
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
+
+{- Note [Adding location info]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is done using the three functions below, sL0, sL1
+and sLL.  Note that these functions were mechanically
+converted from the three macros that used to exist before,
+namely L0, L1 and LL.
+
+They each add a SrcSpan to their argument.
+
+   sL0  adds 'noSrcSpan', used for empty productions
+     -- This doesn't seem to work anymore -=chak
+
+   sL1  for a production with a single token on the lhs.  Grabs the SrcSpan
+        from that token.
+
+   sLL  for a production with >1 token on the lhs.  Makes up a SrcSpan from
+        the first and last tokens.
+
+These suffice for the majority of cases.  However, we must be
+especially careful with empty productions: sLL won't work if the first
+or last token on the lhs can represent an empty span.  In these cases,
+we have to calculate the span using more of the tokens from the lhs, eg.
+
+        | 'newtype' tycl_hdr '=' newconstr deriving
+                { L (comb3 $1 $4 $5)
+                    (mkTyData NewType (unLoc $2) $4 (unLoc $5)) }
+
+We provide comb3 and comb4 functions which are useful in such cases.
+
+Be careful: there's no checking that you actually got this right, the
+only symptom will be that the SrcSpans of your syntax will be
+incorrect.
+
+-}
 
 -- Make a source location for the file.  We're a bit lazy here and just
 -- make a point SrcSpan at line 1, column 0.  Strictly speaking we should
