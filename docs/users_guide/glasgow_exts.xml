@@ -6692,6 +6692,66 @@ very convenient, and it is not clear what the syntax for explicit quantification
 </para>
 </sect2>
 
+<sect2> <title>Principles of kind inference</title>
+
+<para>
+Generally speaking, when <option>-XPolyKinds</option> is on, GHC tries to infer the most
+general kind for a declaration.  For example:
+<programlisting>
+data T f a = MkT (f a)   -- GHC infers:  
+                         -- T :: forall k. (k->*) -> k -> *
+</programlisting>
+In this case the definition has a right-hand side to inform kind inference.
+But that is not always the case.  Consider
+<programlisting>
+type family F a
+</programlisting>
+Type family declararations have no right-hand side, but GHC must still infer a kind
+for <literal>F</literal>.  Since there are no constraints, it could infer 
+<literal>F :: forall k1 k2. k1 -> k2</literal>, but that seems <emphasis>too</emphasis> 
+polymorphic.  So GHC defaults those entirely-unconstrained kind variables to <literal>*</literal> and 
+we get <literal>F :: * -> *</literal>.  You can still declare <literal>F</literal> to be
+kind-polymorphic using kind signatures:
+<programlisting>
+type family F1 a               -- F1 :: * -> *
+type family F2 (a :: k)        -- F2 :: forall k. k -> *
+type family F3 a :: k          -- F3 :: forall k. * -> k
+type family F4 (a :: k1) :: k  -- F4 :: forall k1 k2. k1 -> k2
+</programlisting>
+</para>
+<para>
+The general principle is this:
+<itemizedlist>
+<listitem><para>
+<emphasis>When there is a right-hand side, GHC
+infers the most polymorphic kind consistent with the right-hand side.</emphasis>
+Examples: ordinary data type and GADT declarations, class declarations.
+In the case of a class declaration the role of "right hand side" is played
+by the class moethod signatures.
+</para></listitem>
+<listitem><para>
+<emphasis>When there is no right hand side, GHC defaults argument and result kinds to <literal>*</literal>,
+except when directed otherwise by a kind signature</emphasis>.  
+Examples: data and type family declarations.
+</para></listitem>
+</itemizedlist>
+This rule has occasionally-surprising consequences 
+(see <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10132">Trac 10132</ulink>).
+<programlisting>
+class C a where    -- Class declarations are generalised
+                   -- so C :: forall k. k -> Constraint
+  data D1 a        -- No right hand side for these two family 
+  type F1 a        -- declarations, but the class forces (a :: k)
+                   -- so   D1, F1 :: D1 :: forall k. k -> *
+
+data D2 a   -- No right-hand side so D2 :: * -> *
+type F2 a   -- No right-hand side so F2 :: * -> *
+</programlisting>
+The kind-polymorphism from the class declaration makes <literal>D1</literal> 
+kind-polymorphic, but not so <literal>D2</literal>; and similarly <literal>F1</literal>, <literal>F1</literal>.
+</para>
+</sect2>
+
 <sect2 id="complete-kind-signatures"> <title>Polymorphic kind recursion and complete kind signatures</title>
 
 <para>
