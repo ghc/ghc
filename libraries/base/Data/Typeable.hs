@@ -61,13 +61,17 @@ module Data.Typeable
         
         -- * Type representations
         TypeRep,        -- abstract, instance of: Eq, Show, Typeable
+        typeRepHash,
+        rnfTypeRep,
         showsTypeRep,
 
         TyCon,          -- abstract, instance of: Eq, Show, Typeable
+        tyConHash,
         tyConString,
         tyConPackage,
         tyConModule,
         tyConName,
+        rnfTyCon,
 
         -- * Construction of type representations
         -- mkTyCon,        -- :: String  -> TyCon
