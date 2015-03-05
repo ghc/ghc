@@ -42,8 +42,11 @@ module Data.Typeable.Internal (
     splitTyConApp,
     funResultTy,
     typeRepArgs,
+    typeRepHash,
+    rnfTypeRep,
     showsTypeRep,
     tyConString,
+    rnfTyCon,
     listTc, funTc
   ) where
 
@@ -93,7 +96,7 @@ instance Ord TypeRep where
 -- | An abstract representation of a type constructor.  'TyCon' objects can
 -- be built using 'mkTyCon'.
 data TyCon = TyCon {
-   tyConHash    :: {-# UNPACK #-} !Fingerprint,
+   tyConHash    :: {-# UNPACK #-} !Fingerprint, -- ^ @since 4.8.0.0
    tyConPackage :: String, -- ^ @since 4.5.0.0
    tyConModule  :: String, -- ^ @since 4.5.0.0
    tyConName    :: String  -- ^ @since 4.5.0.0
@@ -190,6 +193,12 @@ typeRepArgs (TypeRep _ _ args) = args
 {-# DEPRECATED tyConString "renamed to 'tyConName'; 'tyConModule' and 'tyConPackage' are also available." #-} -- deprecated in 7.4
 tyConString :: TyCon   -> String
 tyConString = tyConName
+
+-- | Observe the 'Fingerprint' of a type representation
+--
+-- @since 4.8.0.0
+typeRepHash :: TypeRep -> Fingerprint
+typeRepHash (TypeRep fpr _ _) = fpr
 
 -------------------------------------------------------------
 --
@@ -300,6 +309,24 @@ instance Show TyCon where
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon (TyCon _ _ _ ('(':',':_)) = True
 isTupleTyCon _                         = False
+
+-- | Helper to fully evaluate 'TypeRep' for use as @NFData(rnf)@ implementation
+--
+-- @since 4.8.0.0
+rnfTypeRep :: TypeRep -> ()
+rnfTypeRep (TypeRep _ tyc tyrs) = rnfTyCon tyc `seq` go tyrs
+  where
+    go [] = ()
+    go (x:xs) = rnfTypeRep x `seq` go xs
+
+-- | Helper to fully evaluate 'TyCon' for use as @NFData(rnf)@ implementation
+--
+-- @since 4.8.0.0
+rnfTyCon :: TyCon -> ()
+rnfTyCon (TyCon _ tcp tcm tcn) = go tcp `seq` go tcm `seq` go tcn
+  where
+    go [] = ()
+    go (x:xs) = x `seq` go xs
 
 -- Some (Show.TypeRep) helpers:
 
