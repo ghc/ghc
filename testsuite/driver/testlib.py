@@ -1314,11 +1314,11 @@ def simple_run( name, way, prog, args ):
         stdin_comes_from = ' <' + use_stdin
 
     if opts.combined_output:
-        redirection = ' >' + run_stdout \
-                    + ' 2>&1'
+        redirection        = ' > {} 2>&1'.format(run_stdout)
+        redirection_append = ' >> {} 2>&1'.format(run_stdout)
     else:
-        redirection = ' >' + run_stdout \
-                    + ' 2>' + run_stderr
+        redirection        = ' > {} 2> {}'.format(run_stdout, run_stderr)
+        redirection_append = ' >> {} 2>> {}'.format(run_stdout, run_stderr)
 
     cmd = prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
@@ -1326,7 +1326,7 @@ def simple_run( name, way, prog, args ):
         + redirection
 
     if opts.cmd_wrapper != None:
-        cmd = opts.cmd_wrapper(cmd);
+        cmd = opts.cmd_wrapper(cmd) + redirection_append
 
     cmd = 'cd ' + opts.testdir + ' && ' + cmd
 
@@ -1426,16 +1426,23 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
 
+    if getTestOpts().combined_output:
+        redirection        = ' > {} 2>&1'.format(outname)
+        redirection_append = ' >> {} 2>&1'.format(outname)
+    else:
+        redirection        = ' > {} 2> {}'.format(outname, errname)
+        redirection_append = ' >> {} 2>> {}'.format(outname, errname)
+
     cmd = "'" + config.compiler + "' " \
           + ' '.join(flags) + ' ' \
           + srcname + ' ' \
           + ' '.join(config.way_flags(name)[way]) + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
-          + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
+          + '<' + scriptname + redirection
 
     if getTestOpts().cmd_wrapper != None:
-        cmd = getTestOpts().cmd_wrapper(cmd);
+        cmd = getTestOpts().cmd_wrapper(cmd) + redirection_append;
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
@@ -1830,6 +1837,9 @@ def runCmd( cmd ):
     return r << 8
 
 def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
+    # Format cmd using config. Example: cmd='{hpc} report A.tix'
+    cmd = cmd.format(**config.__dict__)
+
     if_verbose( 3, cmd )
     r = 0
     if config.os == 'mingw32':
