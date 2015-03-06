@@ -198,7 +198,7 @@ tyConString = tyConName
 --
 -- @since 4.8.0.0
 typeRepHash :: TypeRep -> Fingerprint
-typeRepHash (TypeRep fpr _ _) = fpr
+typeRepHash (TypeRep fpr _ _ _) = fpr
 
 -------------------------------------------------------------
 --
@@ -298,7 +298,7 @@ isTupleTyCon _                         = False
 --
 -- @since 4.8.0.0
 rnfTypeRep :: TypeRep -> ()
-rnfTypeRep (TypeRep _ tyc tyrs) = rnfTyCon tyc `seq` go tyrs
+rnfTypeRep (TypeRep _ tyc krs tyrs) = rnfTyCon tyc `seq` go krs `seq` go tyrs
   where
     go [] = ()
     go (x:xs) = rnfTypeRep x `seq` go xs
