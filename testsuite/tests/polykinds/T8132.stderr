@@ -1,5 +1,3 @@
 
 T8132.hs:6:10:
-    Typeable instances can only be derived
-      Try ‘deriving instance Typeable K’
-      (requires StandaloneDeriving)
+    Class `Typeable` does not support user-specified instances.
