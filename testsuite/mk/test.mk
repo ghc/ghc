@@ -196,20 +196,24 @@ RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config=$(CONFIG) \
 	-e 'config.confdir="$(CONFIGDIR)"' \
-	-e 'config.compiler="$(TEST_HC)"' \
-	-e 'config.ghc_pkg="$(GHC_PKG)"' \
-	-e 'config.hp2ps="$(HP2PS_ABS)"' \
-	-e 'config.hpc="$(HPC)"' \
-	-e 'config.gs="$(GS)"' \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \
 	-e 'default_testopts.cleanup="$(CLEANUP)"' \
 	-e 'config.timeout=int($(TIMEOUT)) or config.timeout' \
-	-e 'config.timeout_prog="$(TIMEOUT_PROGRAM)"' \
 	-e 'config.exeext="$(exeext)"' \
 	-e 'config.top="$(TOP_ABS)"'
+
+# Put an extra pair of quotes around program paths,
+# so we don't have to in .T scripts or driver/testlib.py.
+RUNTEST_OPTS +=  \
+	-e 'config.compiler="\"$(TEST_HC)\""' \
+	-e 'config.ghc_pkg="\"$(GHC_PKG)\""' \
+	-e 'config.hp2ps="\"$(HP2PS_ABS)\""' \
+	-e 'config.hpc="\"$(HPC)\""' \
+	-e 'config.gs="\"$(GS)\""' \
+	-e 'config.timeout_prog="\"$(TIMEOUT_PROGRAM)\""'
 
 ifneq "$(OUTPUT_SUMMARY)" ""
 RUNTEST_OPTS +=  \
