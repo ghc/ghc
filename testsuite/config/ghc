@@ -165,12 +165,12 @@ llvm_ways     = [x[0] for x in config.way_flags('dummy_name').items()
 
 def get_compiler_info():
 # This should really not go through the shell
-    h = os.popen('"' + config.compiler + '" --info', 'r')
+    h = os.popen(config.compiler + ' --info', 'r')
     s = h.read()
     s = re.sub('[\r\n]', '', s)
     h.close()
     compilerInfoDict = dict(eval(s))
-    h = os.popen('"' + config.compiler + '" +RTS --info', 'r')
+    h = os.popen(config.compiler + ' +RTS --info', 'r')
     s = h.read()
     s = re.sub('[\r\n]', '', s)
     h.close()
