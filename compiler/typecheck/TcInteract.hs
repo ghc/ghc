@@ -1889,7 +1889,7 @@ matchTypeableClass clas k t loc
 
   -- Emit a `Typeable` constraint for the given type.
   subGoal ty = do let goal = mkClassPred clas [ typeKind ty, ty ]
-                  (ev,_) <- newWantedEvVar loc goal
+                  ev <- newWantedEvVarNC loc goal
                   return ev
 
 
