@@ -17,13 +17,6 @@ module Digraph(
 
         -- For backwards compatability with the simpler version of Digraph
         stronglyConnCompFromEdgedVertices, stronglyConnCompFromEdgedVerticesR,
-
-        -- No friendly interface yet, not used but exported to avoid warnings
-        tabulate, preArr,
-        components, undirected,
-        back, cross, forward,
-        path,
-        bcc, do_label, bicomps, collect
     ) where
 
 #include "HsVersions.h"
@@ -35,6 +28,11 @@ module Digraph(
 --   by David King and John Launchbury
 --
 -- Also included is some additional code for printing tree structures ...
+--
+-- If you ever find yourself in need of algorithms for classifying edges,
+-- or finding connected/biconnected components, consult the history; Sigbjorn
+-- Finne contributed some implementations in 1997, although we've since
+-- removed them since they were not used anywhere in GHC.
 ------------------------------------------------------------------------------
 
 
@@ -55,6 +53,10 @@ import Data.Ord
 import Data.Array.ST
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+
+import qualified Data.Graph as G
+import Data.Graph hiding (Graph, Edge, transposeG, reachable)
+import Data.Tree
 
 {-
 ************************************************************************
@@ -209,32 +211,6 @@ findCycle graph
 {-
 ************************************************************************
 *                                                                      *
-*      SCC
-*                                                                      *
-************************************************************************
--}
-
-data SCC vertex = AcyclicSCC vertex
-                | CyclicSCC  [vertex]
-
-instance Functor SCC where
-    fmap f (AcyclicSCC v) = AcyclicSCC (f v)
-    fmap f (CyclicSCC vs) = CyclicSCC (fmap f vs)
-
-flattenSCCs :: [SCC a] -> [a]
-flattenSCCs = concatMap flattenSCC
-
-flattenSCC :: SCC a -> [a]
-flattenSCC (AcyclicSCC v) = [v]
-flattenSCC (CyclicSCC vs) = vs
-
-instance Outputable a => Outputable (SCC a) where
-   ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
-   ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
-
-{-
-************************************************************************
-*                                                                      *
 *      Strongly Connected Component wrappers for Graph
 *                                                                      *
 ************************************************************************
@@ -290,7 +266,7 @@ topologicalSortG graph = map (gr_vertex_to_node graph) result
 
 dfsTopSortG :: Graph node -> [[node]]
 dfsTopSortG graph =
-  map (map (gr_vertex_to_node graph) . flattenTree) $ dfs g (topSort g)
+  map (map (gr_vertex_to_node graph) . flatten) $ dfs g (topSort g)
   where
     g = gr_int_graph graph
 
@@ -316,7 +292,9 @@ edgesG graph = map (\(v1, v2) -> Edge (v2n v1) (v2n v2)) $ edges (gr_int_graph g
   where v2n = gr_vertex_to_node graph
 
 transposeG :: Graph node -> Graph node
-transposeG graph = Graph (transpose (gr_int_graph graph)) (gr_vertex_to_node graph) (gr_node_to_vertex graph)
+transposeG graph = Graph (G.transposeG (gr_int_graph graph))
+                         (gr_vertex_to_node graph)
+                         (gr_node_to_vertex graph)
 
 outdegreeG :: Graph node -> node -> Maybe Int
 outdegreeG = degreeG outdegree
@@ -324,7 +302,7 @@ outdegreeG = degreeG outdegree
 indegreeG :: Graph node -> node -> Maybe Int
 indegreeG = degreeG indegree
 
-degreeG :: (IntGraph -> Table Int) -> Graph node -> node -> Maybe Int
+degreeG :: (G.Graph -> Table Int) -> Graph node -> node -> Maybe Int
 degreeG degree graph node = let table = degree (gr_int_graph graph)
                             in fmap ((!) table) $ gr_node_to_vertex graph node
 
@@ -336,7 +314,8 @@ emptyG :: Graph node -> Bool
 emptyG g = graphEmpty (gr_int_graph g)
 
 componentsG :: Graph node -> [[node]]
-componentsG graph = map (map (gr_vertex_to_node graph) . flattenTree) $ components (gr_int_graph graph)
+componentsG graph = map (map (gr_vertex_to_node graph) . flatten)
+                  $ components (gr_int_graph graph)
 
 {-
 ************************************************************************
@@ -355,6 +334,10 @@ instance Outputable node => Outputable (Graph node) where
 instance Outputable node => Outputable (Edge node) where
     ppr (Edge from to) = ppr from <+> text "->" <+> ppr to
 
+graphEmpty :: G.Graph -> Bool
+graphEmpty g = lo > hi
+  where (lo, hi) = bounds g
+
 {-
 ************************************************************************
 *                                                                      *
@@ -363,253 +346,31 @@ instance Outputable node => Outputable (Edge node) where
 ************************************************************************
 -}
 
-type Vertex  = Int
-type Table a = Array Vertex a
-type IntGraph   = Table [Vertex]
-type Bounds  = (Vertex, Vertex)
-type IntEdge    = (Vertex, Vertex)
-
-vertices :: IntGraph -> [Vertex]
-vertices  = indices
-
-edges    :: IntGraph -> [IntEdge]
-edges g   = [ (v, w) | v <- vertices g, w <- g!v ]
-
-mapT    :: (Vertex -> a -> b) -> Table a -> Table b
-mapT f t = array (bounds t) [ (v, f v (t ! v)) | v <- indices t ]
-
-buildG :: Bounds -> [IntEdge] -> IntGraph
-buildG bounds edges = accumArray (flip (:)) [] bounds edges
-
-transpose  :: IntGraph -> IntGraph
-transpose g = buildG (bounds g) (reverseE g)
-
-reverseE    :: IntGraph -> [IntEdge]
-reverseE g   = [ (w, v) | (v, w) <- edges g ]
-
-outdegree :: IntGraph -> Table Int
-outdegree  = mapT numEdges
-             where numEdges _ ws = length ws
-
-indegree :: IntGraph -> Table Int
-indegree  = outdegree . transpose
-
-graphEmpty :: IntGraph -> Bool
-graphEmpty g = lo > hi
-  where (lo, hi) = bounds g
+type IntGraph = G.Graph
 
 {-
-************************************************************************
-*                                                                      *
-*      Trees and forests
-*                                                                      *
-************************************************************************
--}
-
-data Tree a   = Node a (Forest a)
-type Forest a = [Tree a]
-
-mapTree              :: (a -> b) -> (Tree a -> Tree b)
-mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
-
-flattenTree :: Tree a -> [a]
-flattenTree (Node x ts) = x : concatMap flattenTree ts
-
-instance Show a => Show (Tree a) where
-  showsPrec _ t s = showTree t ++ s
-
-showTree :: Show a => Tree a -> String
-showTree  = drawTree . mapTree show
-
-drawTree        :: Tree String -> String
-drawTree         = unlines . draw
-
-draw :: Tree String -> [String]
-draw (Node x ts) = grp this (space (length this)) (stLoop ts)
- where this          = s1 ++ x ++ " "
-
-       space n       = replicate n ' '
-
-       stLoop []     = [""]
-       stLoop [t]    = grp s2 "  " (draw t)
-       stLoop (t:ts) = grp s3 s4 (draw t) ++ [s4] ++ rsLoop ts
-
-       rsLoop []     = []
-       rsLoop [t]    = grp s5 "  " (draw t)
-       rsLoop (t:ts) = grp s6 s4 (draw t) ++ [s4] ++ rsLoop ts
-
-       grp fst rst   = zipWith (++) (fst:repeat rst)
-
-       [s1,s2,s3,s4,s5,s6] = ["- ", "--", "-+", " |", " `", " +"]
-
-{-
-************************************************************************
-*                                                                      *
-*      Depth first search
-*                                                                      *
-************************************************************************
--}
-
-type Set s    = STArray s Vertex Bool
-
-mkEmpty      :: Bounds -> ST s (Set s)
-mkEmpty bnds  = newArray bnds False
-
-contains     :: Set s -> Vertex -> ST s Bool
-contains m v  = readArray m v
-
-include      :: Set s -> Vertex -> ST s ()
-include m v   = writeArray m v True
-
-dff          :: IntGraph -> Forest Vertex
-dff g         = dfs g (vertices g)
-
-dfs          :: IntGraph -> [Vertex] -> Forest Vertex
-dfs g vs      = prune (bounds g) (map (generate g) vs)
-
-generate     :: IntGraph -> Vertex -> Tree Vertex
-generate g v  = Node v (map (generate g) (g!v))
-
-prune        :: Bounds -> Forest Vertex -> Forest Vertex
-prune bnds ts = runST (mkEmpty bnds  >>= \m ->
-                       chop m ts)
-
-chop         :: Set s -> Forest Vertex -> ST s (Forest Vertex)
-chop _ []     = return []
-chop m (Node v ts : us)
-              = contains m v >>= \visited ->
-                if visited then
-                  chop m us
-                else
-                  include m v >>= \_  ->
-                  chop m ts   >>= \as ->
-                  chop m us   >>= \bs ->
-                  return (Node v as : bs)
-
-{-
-************************************************************************
-*                                                                      *
-*      Algorithms
-*                                                                      *
-************************************************************************
-
 ------------------------------------------------------------
--- Algorithm 1: depth first search numbering
+-- Depth first search numbering
 ------------------------------------------------------------
 -}
 
-preorder            :: Tree a -> [a]
-preorder (Node a ts) = a : preorderF ts
-
+-- Data.Tree has flatten for Tree, but nothing for Forest
 preorderF           :: Forest a -> [a]
-preorderF ts         = concat (map preorder ts)
-
-tabulate        :: Bounds -> [Vertex] -> Table Int
-tabulate bnds vs = array bnds (zip vs [1..])
-
-preArr          :: Bounds -> Forest Vertex -> Table Int
-preArr bnds      = tabulate bnds . preorderF
+preorderF ts         = concat (map flatten ts)
 
 {-
 ------------------------------------------------------------
--- Algorithm 2: topological sorting
+-- Finding reachable vertices
 ------------------------------------------------------------
 -}
 
-postorder :: Tree a -> [a] -> [a]
-postorder (Node a ts) = postorderF ts . (a :)
-
-postorderF   :: Forest a -> [a] -> [a]
-postorderF ts = foldr (.) id $ map postorder ts
-
-postOrd :: IntGraph -> [Vertex]
-postOrd g = postorderF (dff g) []
-
-topSort :: IntGraph -> [Vertex]
-topSort = reverse . postOrd
-
-{-
-------------------------------------------------------------
--- Algorithm 3: connected components
-------------------------------------------------------------
--}
-
-components   :: IntGraph -> Forest Vertex
-components    = dff . undirected
-
-undirected   :: IntGraph -> IntGraph
-undirected g  = buildG (bounds g) (edges g ++ reverseE g)
-
-{-
-------------------------------------------------------------
--- Algorithm 4: strongly connected components
-------------------------------------------------------------
--}
-
-scc  :: IntGraph -> Forest Vertex
-scc g = dfs g (reverse (postOrd (transpose g)))
-
-{-
-------------------------------------------------------------
--- Algorithm 5: Classifying edges
-------------------------------------------------------------
--}
-
-back              :: IntGraph -> Table Int -> IntGraph
-back g post        = mapT select g
- where select v ws = [ w | w <- ws, post!v < post!w ]
-
-cross             :: IntGraph -> Table Int -> Table Int -> IntGraph
-cross g pre post   = mapT select g
- where select v ws = [ w | w <- ws, post!v > post!w, pre!v > pre!w ]
-
-forward           :: IntGraph -> IntGraph -> Table Int -> IntGraph
-forward g tree pre = mapT select g
- where select v ws = [ w | w <- ws, pre!v < pre!w ] \\ tree!v
-
-{-
-------------------------------------------------------------
--- Algorithm 6: Finding reachable vertices
-------------------------------------------------------------
--}
-
+-- This generalizes reachable which was found in Data.Graph
 reachable    :: IntGraph -> [Vertex] -> [Vertex]
 reachable g vs = preorderF (dfs g vs)
 
-path         :: IntGraph -> Vertex -> Vertex -> Bool
-path g v w    = w `elem` (reachable g [v])
-
 {-
 ------------------------------------------------------------
--- Algorithm 7: Biconnected components
-------------------------------------------------------------
--}
-
-bcc :: IntGraph -> Forest [Vertex]
-bcc g = (concat . map bicomps . map (do_label g dnum)) forest
- where forest = dff g
-       dnum   = preArr (bounds g) forest
-
-do_label :: IntGraph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
-do_label g dnum (Node v ts) = Node (v,dnum!v,lv) us
- where us = map (do_label g dnum) ts
-       lv = minimum ([dnum!v] ++ [dnum!w | w <- g!v]
-                     ++ [lu | Node (_,_,lu) _ <- us])
-
-bicomps :: Tree (Vertex, Int, Int) -> Forest [Vertex]
-bicomps (Node (v,_,_) ts)
-      = [ Node (v:vs) us | (_,Node vs us) <- map collect ts]
-
-collect :: Tree (Vertex, Int, Int) -> (Int, Tree [Vertex])
-collect (Node (v,dv,lv) ts) = (lv, Node (v:vs) cs)
- where collected = map collect ts
-       vs = concat [ ws | (lw, Node ws _)  <- collected, lw<dv]
-       cs = concat [ if lw<dv then us else [Node (v:ws) us]
-                        | (lw, Node ws us) <- collected ]
-
-{-
-------------------------------------------------------------
--- Algorithm 8: Total ordering on groups of vertices
+-- Total ordering on groups of vertices
 ------------------------------------------------------------
 
 The plan here is to extract a list of groups of elements of the graph
@@ -624,6 +385,17 @@ and their associated edges from the graph.
 
 This probably isn't very efficient and certainly isn't very clever.
 -}
+
+type Set s    = STArray s Vertex Bool
+
+mkEmpty      :: Bounds -> ST s (Set s)
+mkEmpty bnds  = newArray bnds False
+
+contains     :: Set s -> Vertex -> ST s Bool
+contains m v  = readArray m v
+
+include      :: Set s -> Vertex -> ST s ()
+include m v   = writeArray m v True
 
 vertexGroups :: IntGraph -> [[Vertex]]
 vertexGroups g = runST (mkEmpty (bounds g) >>= \provided -> vertexGroupsS provided g next_vertices)
