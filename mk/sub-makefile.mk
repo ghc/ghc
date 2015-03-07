@@ -59,4 +59,4 @@ help : sub-help
 sub-help :
 	@echo "You are in subdirectory \"$(dir)\"."
 	@echo "Useful targets in this directory:"
-	@cat $(TOP)/SUBMAKEHELP
+	@sed '1,/Using `make` in subdirectories/d' $(TOP)/MAKEHELP.md
