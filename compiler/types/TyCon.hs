@@ -85,6 +85,7 @@ module TyCon(
         PrimRep(..), PrimElemRep(..),
         tyConPrimRep, isVoidRep, isGcPtrRep,
         primRepSizeW, primElemRepSizeB,
+        primRepIsFloat,
 
         -- * Recursion breaking
         RecTcChecker, initRecTc, checkRecTc
@@ -979,6 +980,14 @@ primElemRepSizeB Word32ElemRep = 4
 primElemRepSizeB Word64ElemRep = 8
 primElemRepSizeB FloatElemRep  = 4
 primElemRepSizeB DoubleElemRep = 8
+
+-- | Return if Rep stands for floating type,
+-- returns Nothing for vector types.
+primRepIsFloat :: PrimRep -> Maybe Bool
+primRepIsFloat  FloatRep     = Just True
+primRepIsFloat  DoubleRep    = Just True
+primRepIsFloat  (VecRep _ _) = Nothing
+primRepIsFloat  _            = Just False
 
 {-
 ************************************************************************

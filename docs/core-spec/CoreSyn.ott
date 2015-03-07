@@ -278,6 +278,7 @@ terminals :: 'terminals_' ::=
   | vars_of      ::   :: vars_of          {{ tex \textsf{vars\_of } }}
   | not          ::   :: not              {{ tex \neg }}
   | isUnLiftedTyCon :: :: isUnLiftenTyCon {{ tex \textsf{isUnLiftedTyCon} }}
+  | compatibleUnBoxedTys :: :: compatibleUnBoxedTys {{ tex \textsf{compatibleUnBoxedTys} }}
   | false        ::   :: false            {{ tex \textsf{false} }}
   | true         ::   :: true             {{ tex \textsf{true} }}
   | \/           ::   :: or               {{ tex \vee }}
@@ -333,6 +334,7 @@ formula :: 'formula_' ::=
   | no_duplicates </ bindingi // i />  ::   :: no_duplicates_binding
   | not formula                        ::   :: not
   | isUnLiftedTyCon T                  ::   :: isUnLiftedTyCon
+  | compatibleUnBoxedTys t1 t2         ::   :: compatibleUnBoxedTys
   | formula1 /\ formula2               ::   :: and
   | formula1 \/ formula2               ::   :: or
   | ( formula )                        ::   :: parens

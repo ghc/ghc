@@ -162,7 +162,7 @@ main = do
         getSessionDynFlags >>= setSessionDynFlags . flip gopt_set Opt_SuppressUniques
         dflags <- getSessionDynFlags
         liftIO $ forM_ exprs $ \(n,e) -> do
-            case lintExpr [f,scrut] e of
+            case lintExpr dflags [f,scrut] e of
                 Just msg -> putMsg dflags (msg $$ text "in" <+> text n)
                 Nothing -> return ()
             putMsg dflags (text n <> char ':')

@@ -196,6 +196,18 @@ a list of coercions. This is elided in this presentation, as we simply identify
 axiom rules by their names $[[M]]$. See also \coderef{typecheck/TcTypeNats.lhs}{mkBinAxiom}
 and \coderef{typecheck/TcTypeNats.lhs}{mkAxiom1}.
 
+In \ottdrulename{Co\_UnivCo}, function $ \textsf{compatibleUnBoxedTys} $ stands for following checks:
+\begin{itemize}
+    \item both types are unboxed;
+    \item types should have same size;
+    \item both types should be either integral or floating;
+    \item coercion between vector types are not allowed;
+    \item unboxed tuples should have same length and each element should be coercible to
+    appropriate element of the target tuple;
+\end{itemize}
+For function implementation see \coderef{coreSyn/CoreLint.lhs}{checkTypes}.
+For futher discussion see \url{https://ghc.haskell.org/trac/ghc/wiki/BadUnsafeCoercions}.
+
 \subsection{Type constructors}
 
 Type constructors in GHC contain \emph{lots} of information. We leave most of it out

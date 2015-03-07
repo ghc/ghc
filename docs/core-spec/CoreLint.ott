@@ -207,9 +207,11 @@ k /= BOX
 ----------------------- :: CoVarCoRepr
 G |-co z_(s ~R#k t) : s ~Rep k t
 
-G |-ty t1 : k
------------------------------ :: UnivCo
-G |-co t1 ==>!_R t2 : t1 ~R k t2
+G |-ty t1 : k1
+G |-ty t2 : k2
+R <= Phant \/ not (k1 <: OpenKind) \/ not (k2 <: OpenKind) \/ compatibleUnBoxedTys t1 t2
+------------------------------------------------------------------------ :: UnivCo
+G |-co t1 ==>!_R t2 : t1 ~R k2 t2
 
 G |-co g : t1 ~R k t2
 ------------------------- :: SymCo
