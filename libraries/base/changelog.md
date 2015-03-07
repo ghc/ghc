@@ -141,6 +141,8 @@
   * Add/expose `rnfTypeRep`, `rnfTyCon`, `TypeRepHash`, and
     `TyConHash` helpers to `Data.Typeable`.
 
+  * Define proper `MINIMAL` pragma for `class Ix`. (#10142)
+
 ## 4.7.0.2  *Dec 2014*
 
   * Bundled with GHC 7.8.4
