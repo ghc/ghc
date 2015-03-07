@@ -247,6 +247,7 @@ Library
         GHC.MVar
         GHC.Natural
         GHC.Num
+        GHC.OldList
         GHC.PArr
         GHC.Pack
         GHC.Profiling

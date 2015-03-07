@@ -60,6 +60,10 @@
     and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
     definitions. (#9586)
 
+  * New (unofficial) module `GHC.OldList` containing only list-specialised
+    versions of the functions from `Data.List` (in other words, `GHC.OldList`
+    corresponds to `base-4.7.0.2`'s `Data.List`)
+
   * Replace the `Control.Monad`-exported functions
 
     ```
