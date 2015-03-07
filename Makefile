@@ -31,7 +31,7 @@ default : all
 # For help, type 'make help'
 .PHONY: help
 help:
-	@cat MAKEHELP
+	@cat MAKEHELP.md
 
 ifneq "$(filter maintainer-clean distclean clean help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
