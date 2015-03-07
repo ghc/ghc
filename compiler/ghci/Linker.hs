@@ -846,7 +846,10 @@ dynLoadObjs dflags pls objs = do
                       buildTag = mkBuildTag [WayDyn],
                       outputFile = Just soFile
                   }
-    linkDynLib dflags2 objs []
+    -- link all "loaded packages" so symbols in those can be resolved
+    -- Note: We are loading packages with local scope, so to see the
+    -- symbols in this link we must link all loaded packages again.
+    linkDynLib dflags2 objs (pkgs_loaded pls)
     consIORef (filesToNotIntermediateClean dflags) soFile
     m <- loadDLL soFile
     case m of
