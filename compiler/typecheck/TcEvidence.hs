@@ -49,8 +49,8 @@ import Name
 import Util
 import Bag
 import Pair
-import Control.Applicative
 #if __GLASGOW_HASKELL__ < 709
+import Control.Applicative
 import Data.Traversable (traverse, sequenceA)
 #endif
 import qualified Data.Data as Data

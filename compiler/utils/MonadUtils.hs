@@ -34,6 +34,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
+import Prelude -- avoid redundant import warning due to AMP
 
 -------------------------------------------------------------------------------
 -- Lift combinators

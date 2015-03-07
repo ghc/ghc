@@ -1,1 +1,1 @@
-import Control.Applicative ( (<$>) )
+import Control.Applicative ( (<**>) )

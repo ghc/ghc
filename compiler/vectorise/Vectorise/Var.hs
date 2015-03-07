@@ -24,7 +24,7 @@ import VarEnv
 import Id
 import FastString
 import Control.Applicative
-
+import Prelude -- avoid redundant import warning due to AMP
 
 -- Binders ----------------------------------------------------------------------------------------
 

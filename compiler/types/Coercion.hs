@@ -101,8 +101,8 @@ import Unique
 import Pair
 import SrcLoc
 import PrelNames        ( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
-import Control.Applicative hiding ( empty )
 #if __GLASGOW_HASKELL__ < 709
+import Control.Applicative hiding ( empty )
 import Data.Traversable (traverse, sequenceA)
 #endif
 import FastString
