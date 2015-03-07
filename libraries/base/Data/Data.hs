@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds, StandaloneDeriving,
-             AutoDeriveTypeable, TypeOperators, GADTs, FlexibleInstances #-}
+             TypeOperators, GADTs, FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 

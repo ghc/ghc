@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE MagicHash, AutoDeriveTypeable #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,12 +26,11 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import GHC.Base
 import GHC.Num
-import Data.Typeable
 import Data.IORef
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
 -- compared for equality and ordering and hashed into 'Int'.
-newtype Unique = Unique Integer deriving (Eq,Ord,Typeable)
+newtype Unique = Unique Integer deriving (Eq,Ord)
 
 uniqSource :: IORef Integer
 uniqSource = unsafePerformIO (newIORef 0)

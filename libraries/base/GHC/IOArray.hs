@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, AutoDeriveTypeable, RoleAnnotations #-}
+{-# LANGUAGE NoImplicitPrelude, RoleAnnotations #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -27,7 +27,6 @@ module GHC.IOArray (
 import GHC.Base
 import GHC.IO
 import GHC.Arr
-import Data.Typeable.Internal
 
 -- ---------------------------------------------------------------------------
 -- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.
@@ -39,7 +38,7 @@ import Data.Typeable.Internal
 --
 --
 
-newtype IOArray i e = IOArray (STArray RealWorld i e) deriving( Typeable )
+newtype IOArray i e = IOArray (STArray RealWorld i e)
 
 -- index type should have a nominal role due to Ix class. See also #9220.
 type role IOArray nominal representational

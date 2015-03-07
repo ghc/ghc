@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples,
-             AutoDeriveTypeable #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -280,7 +279,7 @@ data ConsoleEvent
     -- these are sent to Services only.
  | Logoff
  | Shutdown
- deriving (Eq, Ord, Enum, Show, Read, Typeable)
+ deriving (Eq, Ord, Enum, Show, Read)
 
 start_console_handler :: Word32 -> IO ()
 start_console_handler r =

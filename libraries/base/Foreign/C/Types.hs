@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, GeneralizedNewtypeDeriving,
-             AutoDeriveTypeable, StandaloneDeriving #-}
+             StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
@@ -73,7 +73,6 @@ import Foreign.Storable
 import Data.Bits        ( Bits(..), FiniteBits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
-import Data.Typeable
 
 import GHC.Base
 import GHC.Float

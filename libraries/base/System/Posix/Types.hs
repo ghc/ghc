@@ -4,7 +4,7 @@
            , MagicHash
            , GeneralizedNewtypeDeriving
   #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -92,7 +92,6 @@ module System.Posix.Types (
 
 import Foreign
 import Foreign.C
-import Data.Typeable
 -- import Data.Bits
 
 import GHC.Base

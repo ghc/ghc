@@ -1,5 +1,4 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -44,7 +43,6 @@ import Data.Int         ( Int )
 import Data.List
 import Data.Ord
 import Data.String      ( String )
-import Data.Typeable    ( Typeable )
 import GHC.Read
 import GHC.Show
 import Text.ParserCombinators.ReadP
@@ -93,7 +91,7 @@ data Version =
                 -- The interpretation of the list of tags is entirely dependent
                 -- on the entity that this version applies to.
         }
-  deriving (Read,Show,Typeable)
+  deriving (Read,Show)
 {-# DEPRECATED versionTags "See GHC ticket #2496" #-}
 -- TODO. Remove all references to versionTags in GHC 7.12 release.
 

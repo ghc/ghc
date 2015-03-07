@@ -5,7 +5,7 @@
            , UnboxedTuples
   #-}
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,7 +46,6 @@ module GHC.ForeignPtr
 
 import Foreign.Storable
 import Data.Foldable    ( sequence_ )
-import Data.Typeable
 
 import GHC.Show
 import GHC.Base
@@ -71,7 +70,6 @@ import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 -- class 'Storable'.
 --
 data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
-                    deriving Typeable
         -- we cache the Addr# in the ForeignPtr object, but attach
         -- the finalizer to the IORef (or the MutableByteArray# in
         -- the case of a MallocPtr).  The aim of the representation

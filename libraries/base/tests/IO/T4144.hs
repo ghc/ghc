@@ -33,7 +33,6 @@ data BSIODevice
     = BSIODevice
        ByteString
        (MVar Int) -- Position
- deriving Typeable
 
 newBsDevice :: ByteString -> IO BSIODevice
 newBsDevice bs = BSIODevice bs <$> newMVar 0

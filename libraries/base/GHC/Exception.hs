@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude
            , ExistentialQuantification
            , MagicHash
-           , DeriveDataTypeable
   #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -40,7 +39,6 @@ When an exception of type @e@ is thrown, behind the scenes it is
 encapsulated in a @SomeException@.
 -}
 data SomeException = forall e . Exception e => SomeException e
-    deriving Typeable
 
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
@@ -161,7 +159,7 @@ throw e = raise# (toException e)
 -- |This is thrown when the user calls 'error'. The @String@ is the
 -- argument given to 'error'.
 newtype ErrorCall = ErrorCall String
-    deriving (Eq, Ord, Typeable)
+    deriving (Eq, Ord)
 
 instance Exception ErrorCall
 
@@ -179,7 +177,7 @@ data ArithException
   | DivideByZero
   | Denormal
   | RatioZeroDenominator -- ^ @since 4.6.0.0
-  deriving (Eq, Ord, Typeable)
+  deriving (Eq, Ord)
 
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException
 divZeroException        = toException DivideByZero

@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -29,14 +29,13 @@ import Control.Exception   (Exception(..), handleJust, bracket,
                             uninterruptibleMask_,
                             asyncExceptionToException,
                             asyncExceptionFromException)
-import Data.Typeable
 import Data.Unique         (Unique, newUnique)
 
 -- An internal type that is thrown as a dynamic exception to
 -- interrupt the running IO computation when the timeout has
 -- expired.
 
-newtype Timeout = Timeout Unique deriving (Eq, Typeable)
+newtype Timeout = Timeout Unique deriving (Eq)
 
 instance Show Timeout where
     show _ = "<<timeout>>"

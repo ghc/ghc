@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, TypeOperators, UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
@@ -31,7 +31,6 @@ import GHC.Base
 import GHC.Show
 import GHC.Read
 
-import Data.Typeable
 import Data.Type.Equality
 
 -- $setup
@@ -123,7 +122,7 @@ Left "parse error"
 
 -}
 data  Either a b  =  Left a | Right b
-  deriving (Eq, Ord, Read, Show, Typeable)
+  deriving (Eq, Ord, Read, Show)
 
 instance Functor (Either a) where
     fmap _ (Left x) = Left x

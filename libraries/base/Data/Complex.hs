@@ -1,5 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -34,7 +34,6 @@ module Data.Complex
 
         )  where
 
-import Data.Typeable
 import Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
@@ -52,7 +51,7 @@ infix  6  :+
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
-        deriving (Eq, Show, Read, Data, Typeable)
+        deriving (Eq, Show, Read, Data)
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex

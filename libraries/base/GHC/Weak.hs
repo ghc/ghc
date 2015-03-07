@@ -3,7 +3,6 @@
            , BangPatterns
            , MagicHash
            , UnboxedTuples
-           , DeriveDataTypeable
            , StandaloneDeriving
   #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -31,7 +30,6 @@ module GHC.Weak (
     ) where
 
 import GHC.Base
-import Data.Typeable
 
 {-|
 A weak pointer object with a key and a value.  The value has type @v@.
@@ -91,7 +89,7 @@ finalizer to the box itself fails when the outer box is optimised away
 by the compiler.
 
 -}
-data Weak v = Weak (Weak# v) deriving Typeable
+data Weak v = Weak (Weak# v)
 
 -- | Establishes a weak pointer to @k@, with value @v@ and a finalizer.
 --

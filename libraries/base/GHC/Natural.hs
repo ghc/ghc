@@ -1,4 +1,3 @@
-{-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

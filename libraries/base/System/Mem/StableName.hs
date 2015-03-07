@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MagicHash #-}
 #if !defined(__PARALLEL_HASKELL__)
 {-# LANGUAGE UnboxedTuples #-}
@@ -38,8 +38,6 @@ module System.Mem.StableName (
   eqStableName
   ) where
 
-import Data.Typeable
-
 import GHC.IO           ( IO(..) )
 import GHC.Base         ( Int(..), StableName#, makeStableName#
                         , eqStableName#, stableNameToInt# )
@@ -76,7 +74,6 @@ import GHC.Base         ( Int(..), StableName#, makeStableName#
 -}
 
 data StableName a = StableName (StableName# a)
-                    deriving Typeable
 
 -- | Makes a 'StableName' for an arbitrary object.  The object passed as
 -- the first argument is not evaluated by 'makeStableName'.

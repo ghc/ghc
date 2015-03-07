@@ -1,4 +1,3 @@
-{-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE EmptyCase #-}

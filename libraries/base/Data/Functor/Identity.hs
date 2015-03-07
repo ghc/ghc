@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE Trustworthy #-}

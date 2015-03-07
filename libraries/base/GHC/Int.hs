@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples,
-             StandaloneDeriving, AutoDeriveTypeable, NegativeLiterals #-}
+             StandaloneDeriving, NegativeLiterals #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -39,8 +39,6 @@ import GHC.Read
 import GHC.Arr
 import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
-import Data.Typeable
-
 
 ------------------------------------------------------------------------
 -- type Int8
@@ -49,7 +47,7 @@ import Data.Typeable
 -- Int8 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Eq, Ord, Typeable)
+data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Eq, Ord)
 -- ^ 8-bit signed integer type
 
 instance Show Int8 where
@@ -210,7 +208,7 @@ instance FiniteBits Int8 where
 -- Int16 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Eq, Ord, Typeable)
+data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Eq, Ord)
 -- ^ 16-bit signed integer type
 
 instance Show Int16 where
@@ -376,7 +374,7 @@ instance FiniteBits Int16 where
 -- from its logical range.
 #endif
 
-data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Eq, Ord, Typeable)
+data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Eq, Ord)
 -- ^ 32-bit signed integer type
 
 instance Show Int32 where
@@ -553,7 +551,7 @@ instance Ix Int32 where
 
 #if WORD_SIZE_IN_BITS < 64
 
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64# deriving( Typeable )
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- ^ 64-bit signed integer type
 
 instance Eq Int64 where
@@ -728,7 +726,7 @@ a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Eq, Ord, Typeable)
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Eq, Ord)
 -- ^ 64-bit signed integer type
 
 instance Show Int64 where
