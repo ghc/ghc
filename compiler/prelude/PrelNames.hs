@@ -213,7 +213,15 @@ basicKnownKeyNames
         alternativeClassName,
         foldableClassName,
         traversableClassName,
-        typeableClassName,              -- derivable
+
+        -- Typeable
+        typeableClassName,
+        typeRepTyConName,
+        mkTyConName,
+        mkPolyTyConAppName,
+        mkAppTyName,
+        typeLitTypeRepName,
+
 
         -- Numeric stuff
         negateName, minusName, geName, eqName,
@@ -1032,9 +1040,21 @@ rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDo
 ixClassName :: Name
 ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
 
--- Class Typeable
-typeableClassName :: Name
-typeableClassName     = clsQual tYPEABLE_INTERNAL    (fsLit "Typeable")  typeableClassKey
+-- Class Typeable, and functions for constructing `Typeable` dictionaries
+typeableClassName
+  , typeRepTyConName
+  , mkTyConName
+  , mkPolyTyConAppName
+  , mkAppTyName
+  , typeLitTypeRepName
+  :: Name
+typeableClassName     = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
+typeRepTyConName      = tcQual  tYPEABLE_INTERNAL (fsLit "TypeRep")        typeRepTyConKey
+mkTyConName           = varQual tYPEABLE_INTERNAL (fsLit "mkTyCon")        mkTyConKey
+mkPolyTyConAppName    = varQual tYPEABLE_INTERNAL (fsLit "mkPolyTyConApp") mkPolyTyConAppKey
+mkAppTyName           = varQual tYPEABLE_INTERNAL (fsLit "mkAppTy")        mkAppTyKey
+typeLitTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeLitTypeRep") typeLitTypeRepKey
+
 
 
 -- Class Data
@@ -1541,6 +1561,10 @@ staticPtrInfoTyConKey = mkPreludeTyConUnique 181
 callStackTyConKey :: Unique
 callStackTyConKey = mkPreludeTyConUnique 182
 
+-- Typeables
+typeRepTyConKey :: Unique
+typeRepTyConKey = mkPreludeTyConUnique 183
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1871,6 +1895,18 @@ proxyHashKey = mkPreludeMiscIdUnique 502
 ---------------- Template Haskell -------------------
 --      USES IdUniques 200-499
 -----------------------------------------------------
+
+-- Used to make `Typeable` dictionaries
+mkTyConKey
+  , mkPolyTyConAppKey
+  , mkAppTyKey
+  , typeLitTypeRepKey
+  :: Unique
+mkTyConKey        = mkPreludeMiscIdUnique 503
+mkPolyTyConAppKey = mkPreludeMiscIdUnique 504
+mkAppTyKey        = mkPreludeMiscIdUnique 505
+typeLitTypeRepKey = mkPreludeMiscIdUnique 506
+
 
 {-
 ************************************************************************

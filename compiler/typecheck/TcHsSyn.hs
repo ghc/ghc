@@ -1246,6 +1246,20 @@ zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
 zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms
                                        ; return (EvTupleMk tms') }
 zonkEvTerm _   (EvLit l)          = return (EvLit l)
+
+zonkEvTerm env (EvTypeable ev) =
+  fmap EvTypeable $
+  case ev of
+    EvTypeableTyCon tc ks ts -> EvTypeableTyCon tc ks `fmap` mapM zonk ts
+    EvTypeableTyApp t1 t2    -> do e1 <- zonk t1
+                                   e2 <- zonk t2
+                                   return (EvTypeableTyApp e1 e2)
+    EvTypeableTyLit t        -> EvTypeableTyLit `fmap` zonkTcTypeToType env t
+  where
+  zonk (ev,t) = do ev' <- zonkEvTerm env ev
+                   t'  <- zonkTcTypeToType env t
+                   return (ev',t')
+
 zonkEvTerm env (EvCallStack cs)
   = case cs of
       EvCsEmpty -> return (EvCallStack cs)

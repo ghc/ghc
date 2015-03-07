@@ -54,7 +54,6 @@ import Class
 import TypeRep
 import VarSet
 import VarEnv
-import Module
 import State
 import Util
 import Var
@@ -66,7 +65,6 @@ import Lexeme
 import FastString
 import Pair
 import Bag
-import Fingerprint
 import TcEnv (InstInfo)
 import StaticFlags( opt_PprStyle_Debug )
 
@@ -121,7 +119,6 @@ genDerivedBinds dflags fix_env clas loc tycon
   where
     gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
     gen_list = [ (eqClassKey,          gen_Eq_binds)
-               , (typeableClassKey,    gen_Typeable_binds dflags)
                , (ordClassKey,         gen_Ord_binds)
                , (enumClassKey,        gen_Enum_binds)
                , (boundedClassKey,     gen_Bounded_binds)
@@ -1248,55 +1245,6 @@ getPrecedence get_fixity nm
           -- NB: the Report says that associativity is not taken
           --     into account for either Read or Show; hence we
           --     ignore associativity here
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Typeable (new)}
-*                                                                      *
-************************************************************************
-
-From the data type
-
-        data T a b = ....
-
-we generate
-
-        instance Typeable2 T where
-                typeOf2 _ = mkTyConApp (mkTyCon <hash-high> <hash-low>
-                                                <pkg> <module> "T") []
-
-We are passed the Typeable2 class as well as T
--}
-
-gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon
-                   -> (LHsBinds RdrName, BagDerivStuff)
-gen_Typeable_binds dflags loc tycon
-  = ( unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
-                (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
-    , emptyBag )
-  where
-    tycon_name = tyConName tycon
-    modl       = nameModule tycon_name
-    pkg        = modulePackageKey modl
-
-    modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageKeyFS pkg
-    name_fs    = occNameFS (nameOccName tycon_name)
-
-    tycon_rep = nlHsApps mkTyCon_RDR
-                    (map nlHsLit [int64 high,
-                                  int64 low,
-                                  HsString "" pkg_fs,
-                                  HsString "" modl_fs,
-                                  HsString "" name_fs])
-
-    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
-    Fingerprint high low = fingerprintString hashThis
-
-    int64
-      | wORD_SIZE dflags == 4 = HsWord64Prim "" . fromIntegral
-      | otherwise             = HsWordPrim "" . fromIntegral
 
 {-
 ************************************************************************

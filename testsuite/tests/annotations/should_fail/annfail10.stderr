@@ -7,9 +7,8 @@ annfail10.hs:9:1:
                Data.Data.Data (Either a b)
         -- Defined in ‘Data.Data’
       instance Data.Data.Data Data.Monoid.All -- Defined in ‘Data.Data’
-      instance forall (k :: BOX) (f :: k -> *) (a :: k).
-               (Data.Data.Data (f a), Data.Typeable.Internal.Typeable f,
-                Data.Typeable.Internal.Typeable a) =>
+      instance (Data.Data.Data (f a), Data.Data.Data a,
+                Data.Typeable.Internal.Typeable f) =>
                Data.Data.Data (Data.Monoid.Alt f a)
         -- Defined in ‘Data.Data’
       ...plus 39 others

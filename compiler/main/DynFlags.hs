@@ -518,6 +518,7 @@ data WarningFlag =
    | Opt_WarnPartialTypeSignatures
    | Opt_WarnMissingExportedSigs
    | Opt_WarnUntickedPromotedConstructors
+   | Opt_WarnDerivingTypeable
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2845,6 +2846,7 @@ fWarningFlags = [
   flagSpec "warn-auto-orphans"                Opt_WarnAutoOrphans,
   flagSpec "warn-deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "warn-deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "warn-deriving-typeable"           Opt_WarnDerivingTypeable,
   flagSpec "warn-dodgy-exports"               Opt_WarnDodgyExports,
   flagSpec "warn-dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
   flagSpec "warn-dodgy-imports"               Opt_WarnDodgyImports,

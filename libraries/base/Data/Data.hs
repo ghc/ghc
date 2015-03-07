@@ -1504,7 +1504,7 @@ altConstr = mkConstr altDataType "Alt" ["getAlt"] Prefix
 altDataType :: DataType
 altDataType = mkDataType "Alt" [altConstr]
 
-instance (Data (f a), Typeable f, Typeable a) => Data (Alt f a) where
+instance (Data (f a), Data a, Typeable f) => Data (Alt f a) where
   gfoldl f z (Alt x) = (z Alt `f` x)
   gunfold k z _ = k (z Alt)
   toConstr (Alt _) = altConstr
