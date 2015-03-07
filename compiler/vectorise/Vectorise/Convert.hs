@@ -16,7 +16,7 @@ import FastString
 import Outputable
 
 import Control.Applicative
-
+import Prelude -- avoid redundant import warning due to AMP
 
 -- |Convert a vectorised expression such that it computes the non-vectorised equivalent of its
 -- value.

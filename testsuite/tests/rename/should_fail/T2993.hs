@@ -4,5 +4,5 @@
 
 module T2993 where
 
-foo b a = a <$> b . b
+foo b a = a <**> b . b
 

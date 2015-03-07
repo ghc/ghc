@@ -91,7 +91,9 @@ import Maybes
 import Util
 import ApiAnnotation
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
+#endif
 import Control.Monad
 
 import Text.ParserCombinators.ReadP as ReadP

@@ -10,8 +10,8 @@ module Pair ( Pair(..), unPair, toPair, swap ) where
 #include "HsVersions.h"
 
 import Outputable
-import Control.Applicative
 #if __GLASGOW_HASKELL__ < 709
+import Control.Applicative
 import Data.Foldable
 import Data.Monoid
 import Data.Traversable
