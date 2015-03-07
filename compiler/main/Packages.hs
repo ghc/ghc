@@ -502,10 +502,8 @@ applyPackageFlag dflags unusable (pkgs, vm) flag =
          Right (p:_,_) -> return (pkgs, vm')
           where
            n = fsPackageName p
-           vm' = addToUFM_C edit vm_cleared (packageConfigId p)
-                            (b, map convRn rns, n)
+           vm' = addToUFM_C edit vm_cleared (packageConfigId p) (b, rns, n)
            edit (b, rns, n) (b', rns', _) = (b || b', rns ++ rns', n)
-           convRn (a,b) = (mkModuleName a, mkModuleName b)
            -- ToDo: ATM, -hide-all-packages implicitly triggers change in
            -- behavior, maybe eventually make it toggleable with a separate
            -- flag
@@ -611,8 +609,8 @@ pprFlag flag = case flag of
         ppr_rns (ModRenaming b rns) =
             if b then text "with" else Outputable.empty <+>
             char '(' <> hsep (punctuate comma (map ppr_rn rns)) <> char ')'
-        ppr_rn (orig, new) | orig == new = text orig
-                           | otherwise = text orig <+> text "as" <+> text new
+        ppr_rn (orig, new) | orig == new = ppr orig
+                           | otherwise = ppr orig <+> text "as" <+> ppr new
 
 -- -----------------------------------------------------------------------------
 -- Wired-in packages
