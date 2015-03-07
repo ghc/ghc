@@ -353,3 +353,4 @@ test('T9497d', normal, compile_fail, ['-fdefer-type-errors -fno-defer-typed-hole
 test('T8044', normal, compile_fail, [''])
 test('T4921', normal, compile_fail, [''])
 test('T9605', normal, compile_fail, [''])
+test('T9999', normal, compile_fail, [''])

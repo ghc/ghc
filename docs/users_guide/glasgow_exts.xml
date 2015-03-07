@@ -4062,44 +4062,49 @@ can be mentioned in the <literal>deriving</literal> clause.
 </para></listitem>
 
 <listitem><para>
-Only derived instances of <literal>Typeable</literal> are allowed;
-i.e. handwritten instances are forbidden.  This ensures that the
-programmer cannot subert the type system by writing bogus instances.
+GHC has a custom solver for discharging constraints that involve
+class <literal>Typeable</literal>, and handwritten instances are forbidden.
+This ensures that the programmer cannot subert the type system by
+writing bogus instances.
 </para></listitem>
 
 <listitem><para>
-With <option>-XDeriveDataTypeable</option>
-GHC allows you to derive instances of <literal>Typeable</literal> for data types or newtypes,
-using a <literal>deriving</literal> clause, or using
-a standalone deriving declaration (<xref linkend="stand-alone-deriving"/>).
+Derived instances of <literal>Typeable</literal> are ignored,
+and may be reported as an error in a later version of the compiler.
 </para></listitem>
 
 <listitem><para>
-With <option>-XDataKinds</option>, deriving <literal>Typeable</literal> for a data
-type (whether via a deriving clause or standalone deriving)
-also derives <literal>Typeable</literal> for the promoted data constructors (<xref linkend="promotion"/>).
+The rules for solving `Typeable` constraints are as follows:
+<itemizedlist>
+<listitem><para>A concrete type constructor applied to some types.
+<programlisting>
+instance (Typeable t1, .., Typeable t_n) =>
+  Typeable (T t1 .. t_n)
+</programlisting>
+This rule works for any concrete type constructor, including type
+constructors with polymorhic kinds.   The only restriction is that
+if the type constructor has a polymorhic kind, then it has to be applied
+to all of its kinds parameters, and these kinds need to be concrete
+(i.e., they cannot mention kind variables).
 </para></listitem>
 
 <listitem><para>
-However, using standalone deriving, you can <emphasis>also</emphasis> derive
-a <literal>Typeable</literal> instance for a data family.
-You may not add a <literal>deriving(Typeable)</literal> clause to a
-<literal>data instance</literal> declaration; instead you must use a
-standalone deriving declaration for the data family.
+<programlisting>A type variable applied to some types.
+instance (Typeable f, Typeable t1, .., Typeable t_n) =>
+  Typeable (f t1 .. t_n)
+</programlisting>
 </para></listitem>
 
 <listitem><para>
-Using standalone deriving, you can <emphasis>also</emphasis> derive
-a <literal>Typeable</literal> instance for a type class.
+<programlisting>A concrete type literal.
+instance Typeable 0       -- Type natural literals
+instance Typeable "Hello" -- Type-level symbols
+</programlisting>
+</para></listitem>
+</itemizedlist>
 </para></listitem>
 
-<listitem><para>
-The flag <option>-XAutoDeriveTypeable</option> triggers the generation
-of derived <literal>Typeable</literal> instances for every datatype, data family,
-and type class declaration in the module it is used, unless a manually-specified one is
-already provided.
-This flag implies <option>-XDeriveDataTypeable</option>.
-</para></listitem>
+
 </itemizedlist>
 
 </para>

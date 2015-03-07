@@ -752,7 +752,8 @@
           </row>
           <row>
             <entry><option>-XAutoDeriveTypeable</option></entry>
-            <entry>Automatically <link linkend="deriving-typeable">derive Typeable instances for every datatype and type class declaration</link>.
+            <entry>As of GHC 7.10, this option is not needed, and should
+                   not be used.  Automatically <link linkend="deriving-typeable">derive Typeable instances for every datatype and type class declaration</link>.
             Implies <option>-XDeriveDataTypeable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoAutoDeriveTypeable</option></entry>
@@ -814,7 +815,7 @@
           </row>
           <row>
             <entry><option>-XDeriveDataTypeable</option></entry>
-            <entry>Enable <link linkend="deriving-typeable">deriving for the Data and Typeable classes</link>.
+            <entry>Enable <link linkend="deriving-typeable">deriving for the Data class</link>.
               Implied by <option>-XAutoDeriveTypeable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveDataTypeable</option></entry>
@@ -1683,6 +1684,20 @@
             <entry>dynamic</entry>
             <entry><option>-fno-warn-partial-type-signatures</option></entry>
           </row>
+
+          <row>
+            <entry><option>-fwarn-deriving-typeable</option></entry>
+            <entry>
+              warn when encountering a request to derive an instance of
+              class <literal>Typeable</literal>. As of GHC 7.10, such
+              declarations are unnecessary and are ignored by the compiler
+              because GHC has a custom solver for discharging this type of
+              constraint.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-deriving-typeable</option></entry>
+          </row>
+
 
         </tbody>
       </tgroup>

@@ -43,7 +43,7 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, genericClassNames )
+import PrelNames  ( typeableClassName, genericClassNames )
 import Bag
 import BasicTypes
 import DynFlags
@@ -371,7 +371,6 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             -- round)
 
             -- Do class and family instance declarations
-       ; env <- getGblEnv
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
        ; let (local_infos_s, fam_insts_s) = unzip stuff
              fam_insts    = concat fam_insts_s
@@ -379,7 +378,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              -- Handwritten instances of the poly-kinded Typeable class are
              -- forbidden, so we handle those separately
              (typeable_instances, local_infos)
-                = partition (bad_typeable_instance env) local_infos'
+                = partition bad_typeable_instance local_infos'
 
        ; addClsInsts local_infos $
          addFamInsts fam_insts   $
@@ -423,14 +422,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     }}
   where
     -- Separate the Typeable instances from the rest
-    bad_typeable_instance env i
-      =       -- Class name is Typeable
-         typeableClassName == is_cls_nm (iSpec i)
-              -- but not those that come from Data.Typeable.Internal
-      && tcg_mod env /= tYPEABLE_INTERNAL
-              -- nor those from an .hs-boot or .hsig file
-              -- (deriving can't be used there)
-      && not (isHsBootOrSig (tcg_src env))
+    bad_typeable_instance i
+      = typeableClassName == is_cls_nm (iSpec i)
+
 
     overlapCheck ty = case overlapMode (is_flag $ iSpec ty) of
                         NoOverlap _ -> False
@@ -441,18 +435,21 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
-    typeable_err i
-      = setSrcSpan (getSrcSpan ispec) $
-        addErrTc $ hang (ptext (sLit "Typeable instances can only be derived"))
-                      2 (vcat [ ptext (sLit "Try") <+> quotes (ptext (sLit "deriving instance Typeable")
-                                                <+> pp_tc)
-                              , ptext (sLit "(requires StandaloneDeriving)") ])
-      where
-        ispec = iSpec i
-        pp_tc | [_kind, ty] <- is_tys ispec
-              , Just (tc,_) <- tcSplitTyConApp_maybe ty
-              = ppr tc
-              | otherwise = ptext (sLit "<tycon>")
+    -- Report an error or a warning for a `Typeable` instances.
+    -- If we are workikng on an .hs-boot file, we just report a warning,
+    -- and ignore the instance.  We do this, to give users a chance to fix
+    -- their code.
+    typeable_err i =
+      setSrcSpan (getSrcSpan (iSpec i)) $
+        do env <- getGblEnv
+           if isHsBootOrSig (tcg_src env)
+             then
+               do warn <- woptM Opt_WarnDerivingTypeable
+                  when warn $ addWarnTc $ vcat
+                    [ ptext (sLit "`Typeable` instances in .hs-boot files are ignored.")
+                    , ptext (sLit "This warning will become an error in future versions of the compiler.")
+                    ]
+             else addErrTc $ ptext (sLit "Class `Typeable` does not support user-specified instances.")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -991,12 +988,6 @@ method in an instance declaration.  Here is an artificial example:
        instance Ord Age where
          compare :: a -> a -> Bool
          compare = error "You can't compare Ages"
-
-The instance signature can be *more* polymorphic than the instantiated
-class method (in this case: Age -> Age -> Bool), but it cannot be less
-polymorphic.  Moreover, if a signature is given, the implementation
-code should match the signature, and type variables bound in the
-singature should scope over the method body.
 
 We achieve this by building a TcSigInfo for the method, whether or not
 there is an instance method signature, and using that to typecheck

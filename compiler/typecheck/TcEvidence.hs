@@ -15,6 +15,7 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds,
   EvTerm(..), mkEvCast, evVarsOfTerm,
   EvLit(..), evTermCoercion,
+  EvTypeable(..),
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -704,8 +705,23 @@ data EvTerm
   | EvLit EvLit       -- Dictionary for KnownNat and KnownSymbol classes.
                       -- Note [KnownNat & KnownSymbol and EvLit]
 
-  deriving( Data.Data, Data.Typeable)
+  | EvTypeable EvTypeable   -- Dictionary for `Typeable`
 
+  deriving( Data.Data, Data.Typeable )
+
+-- | Instructions on how to make a 'Typeable' dictionary.
+data EvTypeable
+  = EvTypeableTyCon TyCon [Kind] [(EvTerm, Type)]
+    -- ^ Dicitionary for concrete type constructors.
+
+  | EvTypeableTyApp (EvTerm,Type) (EvTerm,Type)
+    -- ^ Dictionary for type applications;  this is used when we have
+    -- a type expression starting with a type variable (e.g., @Typeable (f a)@)
+
+  | EvTypeableTyLit Type
+    -- ^ Dictionary for a type literal.
+
+  deriving ( Data.Data, Data.Typeable )
 
 data EvLit
   = EvNum Integer
@@ -835,9 +851,17 @@ evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo c
 evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
+evVarsOfTerm (EvTypeable ev)      = evVarsOfTypeable ev
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
+
+evVarsOfTypeable :: EvTypeable -> VarSet
+evVarsOfTypeable ev =
+  case ev of
+    EvTypeableTyCon _ _ es -> evVarsOfTerms (map fst es)
+    EvTypeableTyApp e1 e2  -> evVarsOfTerms (map fst [e1,e2])
+    EvTypeableTyLit _      -> emptyVarSet
 
 {-
 ************************************************************************
@@ -900,7 +924,16 @@ instance Outputable EvTerm where
   ppr (EvLit l)          = ppr l
   ppr (EvDelayedError ty msg) =     ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
+  ppr (EvTypeable ev)    = ppr ev
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
   ppr (EvStr s) = text (show s)
+
+instance Outputable EvTypeable where
+  ppr ev =
+    case ev of
+      EvTypeableTyCon tc ks ts -> parens (ppr tc <+> sep (map ppr ks) <+>
+                                                     sep (map (ppr . fst) ts))
+      EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
+      EvTypeableTyLit x        -> ppr x

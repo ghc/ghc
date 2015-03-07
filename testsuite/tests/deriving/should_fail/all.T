@@ -17,7 +17,7 @@ test('drvfail016',
      run_command,
      ['$MAKE --no-print-directory -s drvfail016'])
 test('T2394', normal, compile_fail, [''])
-test('T2604', normal, compile_fail, [''])
+# T2604 was removed as it was out of date re: fixing #9858
 test('T2701', normal, compile_fail, [''])
 test('T2851', normal, compile_fail, [''])
 test('T2721', normal, compile_fail, [''])
@@ -38,14 +38,14 @@ test('T1133A',
      extra_clean(['T1133A.o-boot', 'T1133A.hi-boot']),
      run_command,
      ['$MAKE --no-print-directory -s T1133A'])
-test('T5863a', normal, compile_fail, [''])
+# 5863a was removed as it was out of date re: fixing #9858
 test('T7959', normal, compile_fail, [''])
 
 test('T1496', normal, compile_fail, [''])
 test('T4846', normal, compile_fail, [''])
 test('T7148', normal, compile_fail, [''])
 test('T7148a', normal, compile_fail, [''])
-test('T7800', normal, multimod_compile_fail, ['T7800',''])
+# T7800 was removed as it was out of date re: fixing #9858
 test('T5498', normal, compile_fail, [''])
 test('T6147', normal, compile_fail, [''])
 test('T8851', normal, compile_fail, [''])
