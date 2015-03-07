@@ -70,7 +70,7 @@ module Prelude (
     Monoid(mempty, mappend, mconcat),
 
     -- ** Monads and functors
-    Functor(fmap), (<$>),
+    Functor(fmap, (<$)), (<$>),
     Applicative(pure, (<*>), (*>), (<*)),
     Monad((>>=), (>>), return, fail),
     mapM_, sequence_, (=<<),

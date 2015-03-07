@@ -19,7 +19,7 @@ data FOO = FOO
 type instance Def FOO = EQU () ()
 
 foo :: FOO
-foo = equ_refl <$ def
+foo = equ_refl Simple15.<$ def
 -- This works:
 -- foo = def $ equ_refl
 
