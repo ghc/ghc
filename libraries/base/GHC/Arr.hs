@@ -71,9 +71,9 @@ default ()
 --
 -- * @'rangeSize' (l,u) == 'length' ('range' (l,u))@ @ @
 --
--- Minimal complete instance: 'range', 'index' and 'inRange'.
---
 class (Ord a) => Ix a where
+    {-# MINIMAL range, (index | unsafeIndex), inRange #-}
+
     -- | The list of values in the subrange defined by a bounding pair.
     range               :: (a,a) -> [a]
     -- | The position of a subscript in the subrange.
