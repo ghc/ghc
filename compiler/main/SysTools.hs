@@ -469,13 +469,14 @@ askCc dflags args = do
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
   runSomethingWith dflags "gcc" p args2 $ \real_args ->
-    readCreateProcess (proc p real_args){ env = mb_env }
+    readCreateProcessWithExitCode' (proc p real_args){ env = mb_env }
 
--- Version of System.Process.readProcessWithExitCode that takes an environment
-readCreateProcess
+-- Similar to System.Process.readCreateProcessWithExitCode, but stderr is
+-- inherited from the parent process, and output to stderr is not captured.
+readCreateProcessWithExitCode'
     :: CreateProcess
     -> IO (ExitCode, String)    -- ^ stdout
-readCreateProcess proc = do
+readCreateProcessWithExitCode' proc = do
     (_, Just outh, _, pid) <-
         createProcess proc{ std_out = CreatePipe }
 
