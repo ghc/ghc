@@ -955,7 +955,7 @@ def ghci_script( name, way, script, override_flags = None ):
     # actually testing the recompilation behaviour in the GHCi tests.
     flags = ' '.join(get_compiler_flags(override_flags, noforce=True))
 
-    way_flags = '--interactive -v0 -ignore-dot-ghci'
+    way_flags = ' '.join(config.way_flags(name)['ghci'])
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
