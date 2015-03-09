@@ -68,6 +68,7 @@ data Control = W {
     , wakeupReadFd   :: {-# UNPACK #-} !Fd
     , wakeupWriteFd  :: {-# UNPACK #-} !Fd
 #endif
+    , didRegisterWakeupFd :: !Bool
     } deriving (Show)
 
 #if defined(HAVE_EVENTFD)
@@ -108,13 +109,19 @@ newControl shouldRegister = allocaArray 2 $ \fds -> do
            , wakeupReadFd   = fromIntegral wake_rd
            , wakeupWriteFd  = fromIntegral wake_wr
 #endif
+           , didRegisterWakeupFd = shouldRegister
            }
 
 -- | Close the control structure used by the IO manager thread.
+-- N.B. If this Control is the Control whose wakeup file was registered with
+-- the RTS, then *BEFORE* the wakeup file is closed, we must call
+-- c_setIOManagerWakeupFd (-1), so that the RTS does not try to use the wakeup
+-- file after it has been closed.
 closeControl :: Control -> IO ()
 closeControl w = do
   _ <- c_close . fromIntegral . controlReadFd $ w
   _ <- c_close . fromIntegral . controlWriteFd $ w
+  when (didRegisterWakeupFd w) $ c_setIOManagerWakeupFd (-1)
 #if defined(HAVE_EVENTFD)
   _ <- c_close . fromIntegral . controlEventFd $ w
 #else
