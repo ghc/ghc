@@ -1104,20 +1104,40 @@ isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
 
-data PackageArg = PackageArg String
-                | PackageIdArg String
-                | PackageKeyArg String
+-- | We accept flags which make packages visible, but how they select
+-- the package varies; this data type reflects what selection criterion
+-- is used.
+data PackageArg =
+      PackageArg String    -- ^ @-package@, by 'PackageName'
+    | PackageIdArg String  -- ^ @-package-id@, by 'SourcePackageId'
+    | PackageKeyArg String -- ^ @-package-key@, by 'InstalledPackageId'
   deriving (Eq, Show)
 
-data ModRenaming = ModRenaming Bool [(ModuleName, ModuleName)]
-  deriving (Eq)
+-- | Represents the renaming that may be associated with an exposed
+-- package, e.g. the @rns@ part of @-package "foo (rns)"@.
+--
+-- Here are some example parsings of the package flags (where
+-- a string literal is punned to be a 'ModuleName':
+--
+--      * @-package foo@ is @ModRenaming True []@
+--      * @-package foo ()@ is @ModRenaming False []@
+--      * @-package foo (A)@ is @ModRenaming False [("A", "A")]@
+--      * @-package foo (A as B)@ is @ModRenaming False [("A", "B")]@
+--      * @-package foo with (A as B)@ is @ModRenaming True [("A", "B")]@
+data ModRenaming = ModRenaming {
+    modRenamingWithImplicit :: Bool, -- ^ Bring all exposed modules into scope?
+    modRenamings :: [(ModuleName, ModuleName)] -- ^ Bring module @m@ into scope
+                                               --   under name @n@.
+  } deriving (Eq)
 
+-- | Flags for manipulating packages.
 data PackageFlag
-  = ExposePackage   PackageArg ModRenaming
-  | HidePackage     String
-  | IgnorePackage   String
-  | TrustPackage    String
-  | DistrustPackage String
+  = ExposePackage   PackageArg ModRenaming -- ^ @-package@, @-package-id@
+                                           -- and @-package-key@
+  | HidePackage     String -- ^ @-hide-package@
+  | IgnorePackage   String -- ^ @-ignore-package@
+  | TrustPackage    String -- ^ @-trust-package@
+  | DistrustPackage String -- ^ @-distrust-package@
   deriving (Eq)
 
 defaultHscTarget :: Platform -> HscTarget
