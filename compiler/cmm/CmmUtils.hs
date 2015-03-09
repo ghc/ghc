@@ -205,13 +205,6 @@ cmmOffsetExpr :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 cmmOffsetExpr dflags e (CmmLit (CmmInt n _)) = cmmOffset dflags e (fromInteger n)
 cmmOffsetExpr dflags e byte_off = CmmMachOp (MO_Add (cmmExprWidth dflags e)) [e, byte_off]
 
--- NB. Do *not* inspect the value of the offset in these smart constructors!!!
--- because the offset is sometimes involved in a loop in the code generator
--- (we don't know the real Hp offset until we've generated code for the entire
--- basic block, for example).  So we cannot eliminate zero offsets at this
--- stage; they're eliminated later instead (either during printing or
--- a later optimisation step on Cmm).
---
 cmmOffset :: DynFlags -> CmmExpr -> Int -> CmmExpr
 cmmOffset _ e                 0        = e
 cmmOffset _ (CmmReg reg)      byte_off = cmmRegOff reg byte_off
