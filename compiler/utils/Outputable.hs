@@ -105,6 +105,7 @@ import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
 import Text.Printf
+import Data.Graph (SCC(..))
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -768,6 +769,10 @@ instance (Outputable elt) => Outputable (IM.IntMap elt) where
 
 instance Outputable Fingerprint where
     ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
+
+instance Outputable a => Outputable (SCC a) where
+   ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
+   ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
 
 {-
 ************************************************************************
