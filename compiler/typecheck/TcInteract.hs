@@ -1858,7 +1858,7 @@ matchTypeableClass clas k t loc
       Nothing    -> return NoInstance      -- Not concrete kinds
       Just kReps ->
         do tCts <- mapM subGoal ts
-           mkEv tCts (EvTypeableTyCon tc kReps (map ctEvTerm tCts `zip` ts))
+           mkEv tCts (EvTypeableTyCon tc kReps (map getEv tCts `zip` ts))
     where
     (ks,ts)    = span isKind ks_ts
 
@@ -1876,7 +1876,7 @@ matchTypeableClass clas k t loc
     | otherwise =
       do ct1 <- subGoal f
          ct2 <- subGoal tk
-         mkEv [ct1,ct2] (EvTypeableTyApp (ctEvTerm ct1,f) (ctEvTerm ct2,tk))
+         mkEv [ct1,ct2] (EvTypeableTyApp (getEv ct1,f) (getEv ct2,tk))
 
 
   -- Representation for concrete kinds.  We just use the kind itself,
@@ -1886,13 +1886,12 @@ matchTypeableClass clas k t loc
                   mapM_ kindRep ks
                   return ki
 
+  getEv (ct,_fresh) = ctEvTerm ct
 
   -- Emit a `Typeable` constraint for the given type.
   subGoal ty = do let goal = mkClassPred clas [ typeKind ty, ty ]
-                  ev <- newWantedEvVarNC loc goal
-                  return ev
+                  newWantedEvVar loc goal
 
-
-  mkEv subs ev = return (GenInst subs (EvTypeable ev))
+  mkEv subs ev = return (GenInst [ c | (c,Fresh) <- subs ] (EvTypeable ev))
 
 
