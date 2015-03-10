@@ -489,22 +489,34 @@ def _check_stdout( name, opts, f ):
 # ----
 
 def normalise_slashes( name, opts ):
-    opts.extra_normaliser = normalise_slashes_
+    _normalise_fun(name, opts, normalise_slashes_)
 
 def normalise_exe( name, opts ):
-    opts.extra_normaliser = normalise_exe_
+    _normalise_fun(name, opts, normalise_exe_)
 
 def normalise_fun( *fs ):
     return lambda name, opts: _normalise_fun(name, opts, fs)
 
 def _normalise_fun( name, opts, *fs ):
-    opts.extra_normaliser = join_normalisers(fs)
+    opts.extra_normaliser = join_normalisers(opts.extra_normaliser, fs)
 
 def normalise_errmsg_fun( *fs ):
     return lambda name, opts: _normalise_errmsg_fun(name, opts, fs)
 
 def _normalise_errmsg_fun( name, opts, *fs ):
-    opts.extra_errmsg_normaliser = join_normalisers(fs)
+    opts.extra_errmsg_normaliser =  join_normalisers(opts.extra_errmsg_normaliser, fs)
+
+def normalise_version_( *pkgs ):
+    def normalise_version__( str ):
+        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + ')-[0-9.]+',
+                      '\\1-<VERSION>', str)
+    return normalise_version__
+
+def normalise_version( *pkgs ):
+    def normalise_version__( name, opts ):
+        _normalise_fun(name, opts, normalise_version_(*pkgs))
+        _normalise_errmsg_fun(name, opts, normalise_version_(*pkgs))
+    return normalise_version__
 
 def join_normalisers(*a):
     """

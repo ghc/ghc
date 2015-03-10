@@ -7,9 +7,6 @@ def f( name, opts ):
 
 setTestOpts(f)
 
-def normaliseBytestringPackage(str):
-    return re.sub('bytestring-[0-9]+(\.[0-9]+)*', 'bytestring-<VERSION>', str)
-
 test('CheckA', normal, compile, [''])
 test('CheckB',
      extra_clean(['CheckB_Aux.hi', 'CheckB_Aux.o']),
@@ -62,7 +59,7 @@ test('Check08',
 
 # check -distrust-all-packages flag works
 test('Check09',
-     normalise_errmsg_fun(normaliseBytestringPackage),
+     normalise_version("bytestring"),
      compile_fail,
      ['-fpackage-trust -distrust-all-packages'])
 
