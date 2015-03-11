@@ -61,12 +61,12 @@ module Data.Typeable
         
         -- * Type representations
         TypeRep,        -- abstract, instance of: Eq, Show, Typeable
-        typeRepHash,
+        typeRepFingerprint,
         rnfTypeRep,
         showsTypeRep,
 
         TyCon,          -- abstract, instance of: Eq, Show, Typeable
-        tyConHash,
+        tyConFingerprint,
         tyConString,
         tyConPackage,
         tyConModule,

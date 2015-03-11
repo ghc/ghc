@@ -142,8 +142,8 @@
 
   * Restore invariant in `Data (Ratio a)` instance (#10011)
 
-  * Add/expose `rnfTypeRep`, `rnfTyCon`, `TypeRepHash`, and
-    `TyConHash` helpers to `Data.Typeable`.
+  * Add/expose `rnfTypeRep`, `rnfTyCon`, `typeRepFingerprint`, and
+    `tyConFingerprint` helpers to `Data.Typeable`.
 
   * Define proper `MINIMAL` pragma for `class Ix`. (#10142)
 
