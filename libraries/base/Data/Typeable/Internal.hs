@@ -45,7 +45,7 @@ module Data.Typeable.Internal (
     splitPolyTyConApp,
     funResultTy,
     typeRepArgs,
-    typeRepHash,
+    typeRepFingerprint,
     rnfTypeRep,
     showsTypeRep,
     tyConString,
@@ -84,7 +84,7 @@ instance Ord TypeRep where
 -- | An abstract representation of a type constructor.  'TyCon' objects can
 -- be built using 'mkTyCon'.
 data TyCon = TyCon {
-   tyConHash    :: {-# UNPACK #-} !Fingerprint, -- ^ @since 4.8.0.0
+   tyConFingerprint :: {-# UNPACK #-} !Fingerprint, -- ^ @since 4.8.0.0
    tyConPackage :: String, -- ^ @since 4.5.0.0
    tyConModule  :: String, -- ^ @since 4.5.0.0
    tyConName    :: String  -- ^ @since 4.5.0.0
@@ -197,8 +197,8 @@ tyConString = tyConName
 -- | Observe the 'Fingerprint' of a type representation
 --
 -- @since 4.8.0.0
-typeRepHash :: TypeRep -> Fingerprint
-typeRepHash (TypeRep fpr _ _ _) = fpr
+typeRepFingerprint :: TypeRep -> Fingerprint
+typeRepFingerprint (TypeRep fpr _ _ _) = fpr
 
 -------------------------------------------------------------
 --
@@ -338,7 +338,7 @@ typeLitTypeRep nm = rep
     where
     rep = mkTyConApp tc []
     tc = TyCon
-           { tyConHash     = fingerprintString (mk pack modu nm)
+           { tyConFingerprint = fingerprintString (mk pack modu nm)
            , tyConPackage  = pack
            , tyConModule   = modu
            , tyConName     = nm
