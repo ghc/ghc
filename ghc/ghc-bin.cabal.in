@@ -32,7 +32,7 @@ Executable ghc
                    bytestring >= 0.9 && < 0.11,
                    directory  >= 1   && < 1.3,
                    process    >= 1   && < 1.3,
-                   filepath   >= 1   && < 1.4,
+                   filepath   >= 1   && < 1.5,
                    ghc
     if os(windows)
         Build-Depends: Win32
