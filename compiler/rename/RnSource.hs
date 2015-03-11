@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module RnSource (
-        rnSrcDecls, addTcgDUs, rnTyClDecls, findSplice
+        rnSrcDecls, addTcgDUs, findSplice
     ) where
 
 #include "HsVersions.h"
@@ -47,10 +47,10 @@ import Util             ( mapSnd )
 
 import Control.Monad
 import Data.List( partition, sortBy )
+import Maybes( orElse, mapMaybe )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
 #endif
-import Maybes( orElse, mapMaybe )
 
 {-
 @rnSourceDecl@ `renames' declarations.
@@ -71,7 +71,7 @@ Checks the @(..)@ etc constraints in the export list.
 
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
-rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+rnSrcDecls :: Maybe FreeVars -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                                        hs_splcds  = splice_decls,
@@ -905,51 +905,64 @@ Note [Extra dependencies from .hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following case:
 
+A.hs-boot
   module A where
-    import B
-    data A1 = A1 B1
+    data A1
 
+B.hs
   module B where
     import {-# SOURCE #-} A
     type DisguisedA1 = A1
     data B1 = B1 DisguisedA1
 
-We do not follow type synonyms when building the dependencies for each datatype,
-so we will not find out that B1 really depends on A1 (which means it depends on
-itself). To handle this problem, at the moment we add dependencies to everything
-that comes from an .hs-boot file. But we don't add those dependencies to
-everything. Imagine module B above had another datatype declaration:
+A.hs
+  module A where
+    import B
+    data A2 = A2 A1
+    data A1 = A1 B1
 
-  data B2 = B2 Int
+Here A1 is really recursive (via B1), but we won't see that easily when
+doing dependency analysis when compiling A.hs
 
-Even though B2 has a dependency (on Int), all its dependencies are from things
+To handle this problem, we add a dependency
+  - from every local declaration
+  - to everything that comes from this module's .hs-boot file.
+In this case, we'll add and edges
+  - from A2 to A1 (but that edge is there already)
+  - from A1 to A1 (which is new)
+
+Well, not quite *every* declaration. Imagine module A
+above had another datatype declaration:
+
+  data A3 = A3 Int
+
+Even though A3 has a dependency (on Int), all its dependencies are from things
 that live on other packages. Since we don't have mutual dependencies across
-packages, it is safe not to add the dependencies on the .hs-boot stuff to B2.
+packages, it is safe not to add the dependencies on the .hs-boot stuff to A2.
+
+Hence function Name.thisPackageImport.
 
 See also Note [Grouping of type and class declarations] in TcTyClsDecls.
 -}
 
-isInPackage :: PackageKey -> Name -> Bool
-isInPackage pkgId nm = case nameModule_maybe nm of
-                         Nothing -> False
-                         Just m  -> pkgId == modulePackageKey m
--- We use nameModule_maybe because we might be in a TH splice, in which case
--- there is no module name. In that case we cannot have mutual dependencies,
--- so it's fine to return False here.
 
-rnTyClDecls :: [Name] -> [TyClGroup RdrName]
+rnTyClDecls :: Maybe FreeVars -> [TyClGroup RdrName]
             -> RnM ([TyClGroup Name], FreeVars)
 -- Rename the declarations and do depedency analysis on them
 rnTyClDecls extra_deps tycl_ds
   = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
        ; role_annot_env <- rnRoleAnnots (concatMap group_roles tycl_ds)
-       ; thisPkg  <- fmap thisPackage getDynFlags
+       ; this_mod  <- getModule
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
-             add_boot_deps fvs | any (isInPackage thisPkg) (nameSetElems fvs)
-                               = fvs `plusFV` mkFVs extra_deps
-                               | otherwise
-                               = fvs
+             add_boot_deps fvs
+               | Just extra <- extra_deps
+               , has_local_imports fvs = fvs `plusFV` extra
+               | otherwise             = fvs
+
+             has_local_imports fvs
+                 = foldNameSet ((||) . nameIsHomePackageImport this_mod)
+                               False fvs
 
              ds_w_fvs' = mapSnd add_boot_deps ds_w_fvs
 

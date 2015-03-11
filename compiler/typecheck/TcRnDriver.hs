@@ -318,19 +318,13 @@ tcRnModuleTcRnM hsc_env hsc_src
                 -- look for a hi-boot file
         boot_iface <- tcHiBootIface hsc_src this_mod ;
 
-        let { exports_occs =
-                 maybe emptyBag
-                       (listToBag . map (rdrNameOcc . ieName . unLoc) . unLoc)
-                       export_ies
-            } ;
-
                 -- Rename and type check the declarations
         traceRn (text "rn1a") ;
         tcg_env <- if isHsBootOrSig hsc_src then
                         tcRnHsBootDecls hsc_src local_decls
                    else
                         {-# SCC "tcRnSrcDecls" #-}
-                        tcRnSrcDecls boot_iface exports_occs local_decls ;
+                        tcRnSrcDecls boot_iface export_ies local_decls ;
         setGblEnv tcg_env               $ do {
 
                 -- Process the export list
@@ -465,7 +459,10 @@ tcRnImports hsc_env import_decls
 ************************************************************************
 -}
 
-tcRnSrcDecls :: ModDetails -> Bag OccName -> [LHsDecl RdrName] -> TcM TcGblEnv
+tcRnSrcDecls :: ModDetails 
+             -> Maybe (Located [LIE RdrName])   -- Exports
+             -> [LHsDecl RdrName]               -- Declarations
+             -> TcM TcGblEnv
         -- Returns the variables free in the decls
         -- Reason: solely to report unused imports and bindings
 tcRnSrcDecls boot_iface exports decls
@@ -541,7 +538,10 @@ tc_rn_src_decls boot_details ds
 
         -- The extra_deps are needed while renaming type and class declarations
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
-      ; let { extra_deps = map tyConName (typeEnvTyCons (md_types boot_details)) }
+      ; let { tycons = typeEnvTyCons (md_types boot_details)
+            ; extra_deps | null tycons = Nothing
+                         | otherwise   = Just (mkFVs (map tyConName tycons)) }
+
         -- Deal with decls up to, but not including, the first splice
       ; (tcg_env, rn_decls) <- rnTopSrcDecls extra_deps first_group
                 -- rnTopSrcDecls fails if there are any errors
@@ -639,7 +639,7 @@ tcRnHsBootDecls hsc_src decls
                    hs_ruleds = rule_decls,
                    hs_vects  = vect_decls,
                    hs_annds  = _,
-                   hs_valds  = val_binds }) <- rnTopSrcDecls [] first_group
+                   hs_valds  = val_binds }) <- rnTopSrcDecls Nothing first_group
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
         ; (gbl_env, lie) <- captureConstraints $ setGblEnv tcg_env $ do {
@@ -1077,7 +1077,7 @@ instMisMatch is_boot inst
 ************************************************************************
 -}
 
-rnTopSrcDecls :: [Name] -> HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
+rnTopSrcDecls :: Maybe FreeVars -> HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 -- Fails if there are any errors
 rnTopSrcDecls extra_deps group
  = do { -- Rename the source decls
@@ -1875,7 +1875,7 @@ tcRnDeclsi hsc_env local_decls =
         all_ev_binds = cur_ev_binds `unionBags` new_ev_binds
 
     (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects')
-        <- zonkTopDecls all_ev_binds binds emptyBag sig_ns rules vects
+        <- zonkTopDecls all_ev_binds binds Nothing sig_ns rules vects
                         imp_specs fords
 
     let --global_ids = map globaliseAndTidyId bind_ids
