@@ -565,6 +565,11 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
+    arm*linux*)
+        # On arm/linux and arm/android, tell gcc to link using the gold linker.
+        # Forcing LD to be ld.gold is done in configre.ac.
+        $3="$$3 -fuse-ld=gold"
+        ;;
     esac
 
     # If gcc knows about the stack protector, turn it off.
