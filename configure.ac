@@ -438,7 +438,18 @@ AC_SUBST([HaskellCPPArgs])
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
-LdCmd="$LD"
+case $target in
+arm*linux*)
+	# Arm requires use of the binutils ld.gold linker.
+	# This case should catch at least arm-unknown-linux-gnueabihf and
+	# arm-linux-androideabi.
+	FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
+	LdCmd="$LD_GOLD"
+	;;
+*)
+	LdCmd="$LD"
+	;;
+esac
 AC_SUBST([LdCmd])
 
 dnl ** Which nm to use?
