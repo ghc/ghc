@@ -32,8 +32,13 @@ module HsUtils(
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   toHsType, toHsKind,
 
+  -- * Constructing general big tuples
+  -- $big_tuples
+  mkChunkified, chunkify,
+
   -- Bindings
-  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind, mkPatSynBind,
+  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
+  mkPatSynBind,
 
   -- Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString,
@@ -42,6 +47,7 @@ module HsUtils(
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConPat,
   nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
   nlWildPatName, nlWildPatId, nlTuplePat, mkParPat,
+  mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
   mkHsAppTy, userHsTyVarBndrs,
@@ -99,6 +105,7 @@ import FastString
 import Util
 import Bag
 import Outputable
+import Constants
 
 import Data.Either
 import Data.Function
@@ -254,7 +261,7 @@ mkTransformByStmt  ss u b = emptyTransStmt { trS_form = ThenForm,  trS_stmts = s
 mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u }
 mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
 
-mkLastStmt body     = LastStmt body noSyntaxExpr
+mkLastStmt body     = LastStmt body False noSyntaxExpr
 mkBodyStmt body     = BodyStmt body noSyntaxExpr noSyntaxExpr placeHolderType
 mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr
 
@@ -424,6 +431,66 @@ nlTuplePat pats box = noLoc (TuplePat pats box [])
 
 missingTupArg :: HsTupArg RdrName
 missingTupArg = Missing placeHolderType
+
+mkLHsPatTup :: [LPat id] -> LPat id
+mkLHsPatTup []     = noLoc $ TuplePat [] Boxed []
+mkLHsPatTup [lpat] = lpat
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat lpats Boxed []
+
+-- The Big equivalents for the source tuple expressions
+mkBigLHsVarTup :: [id] -> LHsExpr id
+mkBigLHsVarTup ids = mkBigLHsTup (map nlHsVar ids)
+
+mkBigLHsTup :: [LHsExpr id] -> LHsExpr id
+mkBigLHsTup = mkChunkified mkLHsTupleExpr
+
+-- The Big equivalents for the source tuple patterns
+mkBigLHsVarPatTup :: [id] -> LPat id
+mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
+
+mkBigLHsPatTup :: [LPat id] -> LPat id
+mkBigLHsPatTup = mkChunkified mkLHsPatTup
+
+-- $big_tuples
+-- #big_tuples#
+--
+-- GHCs built in tuples can only go up to 'mAX_TUPLE_SIZE' in arity, but
+-- we might concievably want to build such a massive tuple as part of the
+-- output of a desugaring stage (notably that for list comprehensions).
+--
+-- We call tuples above this size \"big tuples\", and emulate them by
+-- creating and pattern matching on >nested< tuples that are expressible
+-- by GHC.
+--
+-- Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
+-- than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
+-- construction to be big.
+--
+-- If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkTupleSelector'
+-- and 'mkTupleCase' functions to do all your work with tuples you should be
+-- fine, and not have to worry about the arity limitation at all.
+
+-- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decompositon
+mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
+             -> [a]             -- ^ Possible \"big\" list of things to construct from
+             -> a               -- ^ Constructed thing made possible by recursive decomposition
+mkChunkified small_tuple as = mk_big_tuple (chunkify as)
+  where
+        -- Each sub-list is short enough to fit in a tuple
+    mk_big_tuple [as] = small_tuple as
+    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
+
+chunkify :: [a] -> [[a]]
+-- ^ Split a list into lists that are small enough to have a corresponding
+-- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
+-- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
+chunkify xs
+  | n_xs <= mAX_TUPLE_SIZE = [xs]
+  | otherwise              = split xs
+  where
+    n_xs     = length xs
+    split [] = []
+    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
 
 {-
 ************************************************************************
@@ -670,6 +737,7 @@ collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
                                         $ [s | ParStmtBlock ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
+collectStmtBinders ApplicativeStmt{} = []
 
 
 ----------------- Patterns --------------------------
@@ -877,7 +945,11 @@ lStmtsImplicits = hs_lstmts
     hs_lstmts :: [LStmtLR Name idR (Located (body idR))] -> NameSet
     hs_lstmts = foldr (\stmt rest -> unionNameSet (hs_stmt (unLoc stmt)) rest) emptyNameSet
 
+    hs_stmt :: StmtLR Name idR (Located (body idR)) -> NameSet
     hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
+    hs_stmt (ApplicativeStmt args _ _) = unionNameSets (map do_arg args)
+      where do_arg (_, ApplicativeArgOne pat _) = lPatImplicits pat
+            do_arg (_, ApplicativeArgMany stmts _ _) = hs_lstmts stmts
     hs_stmt (LetStmt binds)      = hs_local_binds binds
     hs_stmt (BodyStmt {})        = emptyNameSet
     hs_stmt (LastStmt {})        = emptyNameSet

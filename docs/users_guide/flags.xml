@@ -793,6 +793,14 @@
             <entry>6.8.1</entry>
           </row>
           <row>
+            <entry><option>-XApplicativeDo</option></entry>
+            <entry>Enable <link linkend="applicative-do">Applicative
+            do-notation desugaring</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoApplicativeDo</option></entry>
+            <entry>7.12.1</entry>
+          </row>
+          <row>
             <entry><option>-XAutoDeriveTypeable</option></entry>
             <entry>As of GHC 7.10, this option is not needed, and should
                    not be used.  Automatically <link linkend="deriving-typeable">derive Typeable instances for every datatype and type class declaration</link>.

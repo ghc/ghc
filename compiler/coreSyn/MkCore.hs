@@ -22,10 +22,6 @@ module MkCore (
         -- * Constructing equality evidence boxes
         mkEqBox,
 
-        -- * Constructing general big tuples
-        -- $big_tuples
-        mkChunkified,
-
         -- * Constructing small tuples
         mkCoreVarTup, mkCoreVarTupTy, mkCoreTup,
 
@@ -67,6 +63,7 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
+import HsUtils          ( mkChunkified, chunkify )
 import TcType           ( mkSigmaTy )
 import Type
 import Coercion
@@ -82,7 +79,6 @@ import UniqSupply
 import BasicTypes
 import Util
 import Pair
-import Constants
 import DynFlags
 
 import Data.Char        ( ord )
@@ -318,47 +314,6 @@ mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ p
 *                                                                      *
 ************************************************************************
 -}
-
--- $big_tuples
--- #big_tuples#
---
--- GHCs built in tuples can only go up to 'mAX_TUPLE_SIZE' in arity, but
--- we might concievably want to build such a massive tuple as part of the
--- output of a desugaring stage (notably that for list comprehensions).
---
--- We call tuples above this size \"big tuples\", and emulate them by
--- creating and pattern matching on >nested< tuples that are expressible
--- by GHC.
---
--- Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
--- than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
--- construction to be big.
---
--- If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkTupleSelector'
--- and 'mkTupleCase' functions to do all your work with tuples you should be
--- fine, and not have to worry about the arity limitation at all.
-
--- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decompositon
-mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
-             -> [a]             -- ^ Possible \"big\" list of things to construct from
-             -> a               -- ^ Constructed thing made possible by recursive decomposition
-mkChunkified small_tuple as = mk_big_tuple (chunkify as)
-  where
-        -- Each sub-list is short enough to fit in a tuple
-    mk_big_tuple [as] = small_tuple as
-    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
-
-chunkify :: [a] -> [[a]]
--- ^ Split a list into lists that are small enough to have a corresponding
--- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
--- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
-chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = [xs]
-  | otherwise              = split xs
-  where
-    n_xs     = length xs
-    split [] = []
-    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
 
 {-
 Creating tuples and their types for Core expressions

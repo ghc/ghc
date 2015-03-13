@@ -602,6 +602,7 @@ data ExtensionFlag
    | Opt_PolyKinds                -- Kind polymorphism
    | Opt_DataKinds                -- Datatype promotion
    | Opt_InstanceSigs
+   | Opt_ApplicativeDo
 
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
@@ -3158,6 +3159,7 @@ xFlags = [
   flagSpec' "IncoherentInstances"             Opt_IncoherentInstances
                                               setIncoherentInsts,
   flagSpec "InstanceSigs"                     Opt_InstanceSigs,
+  flagSpec "ApplicativeDo"                    Opt_ApplicativeDo,
   flagSpec "InterruptibleFFI"                 Opt_InterruptibleFFI,
   flagSpec "JavaScriptFFI"                    Opt_JavaScriptFFI,
   flagSpec "KindSignatures"                   Opt_KindSignatures,

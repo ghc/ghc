@@ -1505,7 +1505,179 @@ Here are some other important points in using the recursive-do notation:
 </itemizedlist>
 </para>
 </sect3>
+</sect2>
 
+<sect2 id="applicative-do">
+  <title>Applicative do-notation</title>
+  <indexterm><primary>Applicative do-notation</primary>
+  </indexterm>
+  <indexterm><primary>do-notation</primary><secondary>Applicative</secondary>
+  </indexterm>
+
+  <para>
+    The language option
+    <option>-XApplicativeDo</option><indexterm><primary><option>-XApplicativeDo</option></primary></indexterm>
+    enables an alternative translation for the do-notation, which
+    uses the operators <literal>&lt;&dollar;&gt;</literal>,
+    <literal>&lt;*&gt;</literal>, along with
+    <literal>join</literal>, as far as possible.  There are two main
+    reasons for wanting to do this:
+  </para>
+
+  <itemizedlist>
+    <listitem>
+      <para>
+        We can use do-notation with types that are an instance of
+        <literal>Applicative</literal> and
+        <literal>Functor</literal>, but not
+        <literal>Monad</literal>.
+      </para>
+    </listitem>
+    <listitem>
+      <para>
+        In some monads, using the applicative operators is more
+          efficient than monadic bind.  For example, it may enable
+          more parallelism.
+      </para>
+    </listitem>
+  </itemizedlist>
+
+   <para>
+     Applicative do-notation desugaring preserves the original
+     semantics, provided that the <literal>Applicative</literal>
+     instance satisfies <literal>&lt;*&gt; = ap</literal> and
+     <literal>pure = return</literal> (these are true of all the
+     common monadic types).  Thus, you can normally turn on
+     <option>-XApplicativeDo</option> without fear of breaking your
+     program.  There is one pitfall to watch out for; see <xref
+     linkend="applicative-do-pitfall" />.
+   </para>
+
+  <para>
+    There are no syntactic changes with
+    <option>-XApplicativeDo</option>.  The only way it shows up at
+    the source level is that you can have a <literal>do</literal>
+    expression that doesn't require a <literal>Monad</literal>
+    constraint.  For example, in GHCi:
+  </para>
+
+<programlisting>
+Prelude&gt; :set -XApplicativeDo
+Prelude&gt; :t \m -&gt; do { x &lt;- m; return (not x) }
+\m -&gt; do { x &lt;- m; return (not x) }
+  :: Functor f =&gt; f Bool -&gt; f Bool
+</programlisting>
+
+  <para>
+    This example only requires <literal>Functor</literal>, because it
+    is translated into <literal>(\x -&gt; not x) &lt;$&gt; m</literal>.  A
+    more complex example requires <literal>Applicative</literal>:
+
+<programlisting>
+Prelude&gt; :t \m -&gt; do { x &lt;- m 'a'; y &lt;- m 'b'; return (x || y) }
+\m -&gt; do { x &lt;- m 'a'; y &lt;- m 'b'; return (x || y) }
+  :: Applicative f =&gt; (Char -&gt; f Bool) -&gt; f Bool
+</programlisting>
+  </para>
+
+  <para>
+     Here GHC has translated the expression into
+
+<programlisting>
+(\x y -&gt; x || y) &lt;$&gt; m 'a' &lt;*&gt; m 'b'
+</programlisting>
+
+     It is possible to see the actual translation by using
+     <option>-ddump-ds</option>, but be warned, the output is quite
+     verbose.
+   </para>
+
+   <para>
+     Note that if the expression can't be translated into uses of
+     <literal>&lt;&dollar;&gt;</literal>, <literal>&lt;*&gt;</literal>
+     only, then it will incur a <literal>Monad</literal> constraint as
+     usual.  This happens when there is a dependency on a value
+     produced by an earlier statement in the do-block:
+
+<programlisting>
+Prelude&gt; :t \m -&gt; do { x &lt;- m True; y &lt;- m x; return (x || y) }
+\m -&gt; do { x &lt;- m True; y &lt;- m x; return (x || y) }
+  :: Monad m =&gt; (Bool -&gt; m Bool) -&gt; m Bool
+</programlisting>
+
+     Here, <literal>m x</literal> depends on the value of
+     <literal>x</literal> produced by the first statement, so the
+     expression cannot be translated using <literal>&lt;*&gt;</literal>.
+   </para>
+
+   <para>In general, the rule for when a <literal>do</literal>
+   statement incurs a <literal>Monad</literal> constraint is as
+   follows.  If the do-expression has the following form:
+
+<programlisting>
+do p1 &lt;- E1; ...; pn &lt;- En; return E
+</programlisting>
+
+   where none of the variables defined by <literal>p1...pn</literal>
+   are mentioned in <literal>E1...En</literal>, then the expression
+   will only require <literal>Applicative</literal>.  Otherwise, the
+   expression will require <literal>Monad</literal>.
+  </para>
+
+   <sect3 id="applicative-do-pitfall">
+     <title>Things to watch out for</title>
+
+     <para>
+       Your code should just work as before when
+       <option>-XApplicativeDo</option> is enabled, provided you use
+       conventional <literal>Applicative</literal> instances.  However, if
+       you define a <literal>Functor</literal> or
+       <literal>Applicative</literal> instance using do-notation, then
+       it will likely get turned into an infinite loop by GHC.  For
+       example, if you do this:
+
+<programlisting>
+instance Functor MyType where
+  fmap f m = do x &lt;- m; return (f x)
+</programlisting>
+
+       Then applicative desugaring will turn it into
+
+<programlisting>
+instance Functor MyType where
+  fmap f m = fmap (\x -&gt; f x) m
+</programlisting>
+
+      And the program will loop at runtime.  Similarly, an
+      <literal>Applicative</literal> instance like this
+
+<programlisting>
+instance Applicative MyType where
+  pure = return
+  x &lt;*&gt; y = do f &lt;- x; a &lt;- y; return (f a)
+</programlisting>
+      will result in an infinte loop when <literal>&lt;*&gt;</literal>
+      is called.
+     </para>
+
+     <para>Just as you wouldn't define a <literal>Monad</literal>
+     instance using the do-notation, you shouldn't define
+     <literal>Functor</literal> or <literal>Applicative</literal>
+     instance using do-notation (when using
+     <literal>ApplicativeDo</literal>) either. The correct way to
+     define these instances in terms of <literal>Monad</literal> is to
+     use the <literal>Monad</literal> operations directly, e.g.
+
+<programlisting>
+instance Functor MyType where
+  fmap f m = m &gt;&gt;= return . f
+
+instance Applicative MyType where
+  pure = return
+  (&lt;*&gt;) = ap
+</programlisting>
+     </para>
+   </sect3>
 
 </sect2>
 

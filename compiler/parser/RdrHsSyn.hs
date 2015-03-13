@@ -1119,8 +1119,8 @@ checkCmdLStmt :: ExprLStmt RdrName -> P (CmdLStmt RdrName)
 checkCmdLStmt = locMap checkCmdStmt
 
 checkCmdStmt :: SrcSpan -> ExprStmt RdrName -> P (CmdStmt RdrName)
-checkCmdStmt _ (LastStmt e r) =
-    checkCommand e >>= (\c -> return $ LastStmt c r)
+checkCmdStmt _ (LastStmt e s r) =
+    checkCommand e >>= (\c -> return $ LastStmt c s r)
 checkCmdStmt _ (BindStmt pat e b f) =
     checkCommand e >>= (\c -> return $ BindStmt pat c b f)
 checkCmdStmt _ (BodyStmt e t g ty) =
