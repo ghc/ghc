@@ -568,6 +568,7 @@ define set_stage_HSC2HS_OPTS
 # $1 = stage
 SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --cflag=,$$(filter-out -O,$$(SRC_CC_OPTS) $$(CONF_CC_OPTS_STAGE$1)))
 SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --cflag=,$$(CONF_CPP_OPTS_STAGE$1))
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --lflag=,$$(CONF_GCC_LINKER_OPTS_STAGE$1))
 endef
 $(eval $(call set_stage_HSC2HS_OPTS,0))
 $(eval $(call set_stage_HSC2HS_OPTS,1))
