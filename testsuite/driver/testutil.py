@@ -15,3 +15,6 @@ def version_gt(x, y):
 def version_ge(x, y):
     return version_to_ints(x) >= version_to_ints(y)
 
+def strip_quotes(s):
+    # Don't wrap commands to subprocess.call/Popen in quotes.
+    return s.strip('\'"')
