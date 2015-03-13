@@ -2283,7 +2283,3 @@ def getStdout(cmd):
         return stdout
     else:
         raise Exception("Need subprocess to get stdout, but don't have it")
-
-def strip_quotes(s):
-    # Don't wrap commands to subprocess.call/Popen in quotes.
-    return s.strip('\'"')
