@@ -1828,6 +1828,9 @@ def rawSystemWithTimeout(cmd_and_args):
 # Then, when using the native Python, os.system will invoke the cmd shell
 
 def runCmd( cmd ):
+    # Format cmd using config. Example: cmd='{hpc} report A.tix'
+    cmd = cmd.format(**config.__dict__)
+
     if_verbose( 3, cmd )
     r = 0
     if config.os == 'mingw32':
