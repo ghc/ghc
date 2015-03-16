@@ -178,6 +178,7 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
+import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Exception (throwIO)
 
@@ -2087,8 +2088,10 @@ parseDynamicFlagsFull :: MonadIO m
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let ((leftover, errs, warns), dflags1)
           = runCmdLine (processArgs activeFlags args) dflags0
-  when (not (null errs)) $ liftIO $
-      throwGhcExceptionIO $ errorsToGhcException errs
+
+  -- See Note [Handling errors when parsing commandline flags]
+  unless (null errs) $ liftIO $ throwGhcExceptionIO $
+      errorsToGhcException . map (showPpr dflags0 . getLoc &&& unLoc) $ errs
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
@@ -4159,7 +4162,8 @@ makeDynFlagsConsistent dflags
 -- to show SDocs when tracing, but we don't always have DynFlags
 -- available.
 --
--- Do not use it if you can help it. You may get the wrong value!
+-- Do not use it if you can help it. You may get the wrong value, or this
+-- panic!
 
 GLOBAL_VAR(v_unsafeGlobalDynFlags, panic "v_unsafeGlobalDynFlags: not initialised", DynFlags)
 

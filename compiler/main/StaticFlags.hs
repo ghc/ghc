@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TupleSections #-}
 {-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -82,7 +82,10 @@ parseStaticFlagsFull flagsAvailable args = do
   when ready $ throwGhcExceptionIO (ProgramError "Too late for parseStaticFlags: call it before runGhc or runGhcT")
 
   (leftover, errs, warns) <- processArgs flagsAvailable args
-  when (not (null errs)) $ throwGhcExceptionIO $ errorsToGhcException errs
+
+  -- See Note [Handling errors when parsing commandline flags]
+  unless (null errs) $ throwGhcExceptionIO $
+      errorsToGhcException . map (("on the commandline", ) . unLoc) $ errs
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True

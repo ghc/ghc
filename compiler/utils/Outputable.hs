@@ -40,7 +40,7 @@ module Outputable (
         -- * Converting 'SDoc' into strings and outputing it
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
-        showSDoc, showSDocSimple, showSDocOneLine,
+        showSDoc, showSDocUnsafe, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
         showSDocUnqual, showPpr,
         renderWithStyle,
@@ -401,8 +401,10 @@ mkCodeStyle = PprCode
 showSDoc :: DynFlags -> SDoc -> String
 showSDoc dflags sdoc = renderWithStyle dflags sdoc defaultUserStyle
 
-showSDocSimple :: SDoc -> String
-showSDocSimple sdoc = showSDoc unsafeGlobalDynFlags sdoc
+-- showSDocUnsafe is unsafe, because `unsafeGlobalDynFlags` might not be
+-- initialised yet.
+showSDocUnsafe :: SDoc -> String
+showSDocUnsafe sdoc = showSDoc unsafeGlobalDynFlags sdoc
 
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)

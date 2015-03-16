@@ -410,3 +410,5 @@ test('write_interface_make', normal, run_command, ['$MAKE -s --no-print-director
 
 test('T9776', normal, compile_fail, ['-frule-check'])
 
+test('T9963', exit_code(1), run_command,
+     ['{compiler} --interactive --print-libdir'])
