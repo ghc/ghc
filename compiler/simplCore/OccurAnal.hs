@@ -68,7 +68,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
   where
     init_env = initOccEnv active_rule
     (final_usage, occ_anald_binds) = go init_env binds
-    (_, occ_anald_glommed_binds)   = occAnalRecBind init_env imp_rules_edges
+    (_, occ_anald_glommed_binds)   = occAnalRecBind init_env imp_rule_edges
                                                     (flattenBinds occ_anald_binds)
                                                     initial_uds
           -- It's crucial to re-analyse the glommed-together bindings
@@ -84,7 +84,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
     -- reflected in 'vectors' — see Note [Vectorisation declarations and occurrences].)
 
     -- Note [Preventing loops due to imported functions rules]
-    imp_rules_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
+    imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
                             [ mapVarEnv (const maps_to) (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
                             | imp_rule <- imp_rules
                             , let maps_to = exprFreeIds (ru_rhs imp_rule)
@@ -98,7 +98,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
         = (final_usage, bind' ++ binds')
         where
            (bs_usage, binds')   = go env binds
-           (final_usage, bind') = occAnalBind env imp_rules_edges bind bs_usage
+           (final_usage, bind') = occAnalBind env imp_rule_edges bind bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurrence info returned
@@ -126,22 +126,27 @@ Bindings
 ~~~~~~~~
 -}
 
+type ImpRuleEdges = IdEnv IdSet     -- Mapping from FVs of imported RULE LHSs to RHS FVs
+
+noImpRuleEdges :: ImpRuleEdges
+noImpRuleEdges = emptyVarEnv
+
 occAnalBind :: OccEnv           -- The incoming OccEnv
-            -> IdEnv IdSet      -- Mapping from FVs of imported RULE LHSs to RHS FVs
+            -> ImpRuleEdges
             -> CoreBind
             -> UsageDetails             -- Usage details of scope
             -> (UsageDetails,           -- Of the whole let(rec)
                 [CoreBind])
 
-occAnalBind env imp_rules_edges (NonRec binder rhs) body_usage
-  = occAnalNonRecBind env imp_rules_edges binder rhs body_usage
-occAnalBind env imp_rules_edges (Rec pairs) body_usage
-  = occAnalRecBind env imp_rules_edges pairs body_usage
+occAnalBind env top_env (NonRec binder rhs) body_usage
+  = occAnalNonRecBind env top_env binder rhs body_usage
+occAnalBind env top_env (Rec pairs) body_usage
+  = occAnalRecBind env top_env pairs body_usage
 
 -----------------
-occAnalNonRecBind :: OccEnv -> IdEnv IdSet -> Var -> CoreExpr
+occAnalNonRecBind :: OccEnv -> ImpRuleEdges -> Var -> CoreExpr
                   -> UsageDetails -> (UsageDetails, [CoreBind])
-occAnalNonRecBind env imp_rules_edges binder rhs body_usage
+occAnalNonRecBind env imp_rule_edges binder rhs body_usage
   | isTyVar binder      -- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
@@ -154,15 +159,18 @@ occAnalNonRecBind env imp_rules_edges binder rhs body_usage
     (body_usage', tagged_binder) = tagBinder body_usage binder
     (rhs_usage1, rhs')           = occAnalNonRecRhs env tagged_binder rhs
     rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
+
     rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
        -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
-    rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $ lookupVarEnv imp_rules_edges binder
+
+    rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $
+                 lookupVarEnv imp_rule_edges binder
        -- See Note [Preventing loops due to imported functions rules]
 
 -----------------
-occAnalRecBind :: OccEnv -> IdEnv IdSet -> [(Var,CoreExpr)]
+occAnalRecBind :: OccEnv -> ImpRuleEdges -> [(Var,CoreExpr)]
                -> UsageDetails -> (UsageDetails, [CoreBind])
-occAnalRecBind env imp_rules_edges pairs body_usage
+occAnalRecBind env imp_rule_edges pairs body_usage
   = foldr occAnalRec (body_usage, []) sccs
         -- For a recursive group, we
         --      * occ-analyse all the RHSs
@@ -175,7 +183,7 @@ occAnalRecBind env imp_rules_edges pairs body_usage
     sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompFromEdgedVerticesR nodes
 
     nodes :: [Node Details]
-    nodes = {-# SCC "occAnalBind.assoc" #-} map (makeNode env imp_rules_edges bndr_set) pairs
+    nodes = {-# SCC "occAnalBind.assoc" #-} map (makeNode env imp_rule_edges bndr_set) pairs
 
 {-
 Note [Dead code]
@@ -385,10 +393,10 @@ That's why we compute
 
     A normal "strong" loop breaker has IAmLoopBreaker False.  So
 
-                                Inline  postInlineUnconditionally
-        IAmLoopBreaker False    no      no
-        IAmLoopBreaker True     yes     no
-        other                   yes     yes
+                                    Inline  postInlineUnconditionally
+   strong   IAmLoopBreaker False    no      no
+   weak     IAmLoopBreaker True     yes     no
+            other                   yes     yes
 
     The **sole** reason for this kind of loop breaker is so that
     postInlineUnconditionally does not fire.  Ugh.  (Typically it'll
@@ -668,8 +676,8 @@ instance Outputable Details where
                   , ptext (sLit "rule =") <+> ppr (nd_active_rule_fvs nd)
              ])
 
-makeNode :: OccEnv -> IdEnv IdSet -> VarSet -> (Var, CoreExpr) -> Node Details
-makeNode env imp_rules_edges bndr_set (bndr, rhs)
+makeNode :: OccEnv -> ImpRuleEdges -> VarSet -> (Var, CoreExpr) -> Node Details
+makeNode env imp_rule_edges bndr_set (bndr, rhs)
   = (details, varUnique bndr, keysUFM node_fvs)
   where
     details = ND { nd_bndr = bndr
@@ -693,7 +701,7 @@ makeNode env imp_rules_edges bndr_set (bndr, rhs)
     is_active = occ_rule_act env :: Activation -> Bool
     rules = filterOut isBuiltinRule (idCoreRules bndr)
     rules_w_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
-    rules_w_fvs = maybe id (\ids -> ((AlwaysActive, ids):)) (lookupVarEnv imp_rules_edges bndr)
+    rules_w_fvs = maybe id (\ids -> ((AlwaysActive, ids):)) (lookupVarEnv imp_rule_edges bndr)
                    -- See Note [Preventing loops due to imported functions rules]
                   [ (ru_act rule, fvs)
                   | rule <- rules
@@ -761,7 +769,8 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
 
     tag_node :: Node Details -> Node Details
     tag_node (details@ND { nd_bndr = bndr }, k, ks)
-      = (details { nd_bndr = setBinderOcc total_uds bndr }, k, ks)
+      | let bndr1 = setBinderOcc total_uds bndr
+      = (details { nd_bndr = bndr1 }, k, ks)
 
     ---------------------------
     -- Now reconstruct the cycle
@@ -1099,10 +1108,11 @@ occAnalNonRecRhs env bndr rhs
     not_stable = not (isStableUnfolding (idUnfolding bndr))
 
 addIdOccs :: UsageDetails -> VarSet -> UsageDetails
-addIdOccs usage id_set = foldVarSet add usage id_set
-  where
-    add v u | isId v    = addOneOcc u v NoOccInfo
-            | otherwise = u
+addIdOccs usage id_set = foldVarSet addIdOcc usage id_set
+
+addIdOcc :: Id -> UsageDetails -> UsageDetails
+addIdOcc v u | isId v    = addOneOcc u v NoOccInfo
+             | otherwise = u
         -- Give a non-committal binder info (i.e NoOccInfo) because
         --   a) Many copies of the specialised thing can appear
         --   b) We don't want to substitute a BIG expression inside a RULE
@@ -1285,8 +1295,8 @@ occAnal env (Case scrut bndr ty alts)
         = occAnal (vanillaCtxt env) scrut    -- No need for rhsCtxt
 
 occAnal env (Let bind body)
-  = case occAnal env body                                of { (body_usage, body') ->
-    case occAnalBind env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
+  = case occAnal env body                               of { (body_usage, body') ->
+    case occAnalBind env noImpRuleEdges bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
 
 occAnalArgs :: OccEnv -> [CoreExpr] -> [OneShots] -> (UsageDetails, [CoreExpr])
@@ -1487,7 +1497,7 @@ initOccEnv :: (Activation -> Bool) -> OccEnv
 initOccEnv active_rule
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
-           , occ_gbl_scrut = emptyVarSet --  PE emptyVarEnv emptyVarSet
+           , occ_gbl_scrut = emptyVarSet
            , occ_rule_act  = active_rule
            , occ_binder_swap = True }
 
