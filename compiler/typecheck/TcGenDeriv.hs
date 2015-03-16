@@ -2274,8 +2274,10 @@ mkAuxBinderName parent occ_fun
     uniq_parent_occ = mkOccName (occNameSpace parent_occ) uniq_string
 
     uniq_string
-      | opt_PprStyle_Debug = showSDocSimple (ppr parent_occ <> underscore <> ppr parent_uniq)
-      | otherwise          = show parent_uniq
+      | opt_PprStyle_Debug
+      = showSDocUnsafe (ppr parent_occ <> underscore <> ppr parent_uniq)
+      | otherwise
+      = show parent_uniq
       -- The debug thing is just to generate longer, but perhaps more perspicuous, names
 
     parent_uniq = nameUnique parent
