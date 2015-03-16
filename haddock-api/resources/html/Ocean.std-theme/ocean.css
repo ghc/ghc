@@ -318,6 +318,7 @@ div#style-menu-holder {
   height: 80%;
   top: 10%;
   padding: 0;
+  max-width: 75%;
 }
 
 #synopsis .caption {
