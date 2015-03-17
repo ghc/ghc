@@ -22,7 +22,7 @@ module SimplMonad (
 import Id               ( Id, mkSysLocal )
 import Type             ( Type )
 import FamInstEnv       ( FamInstEnv )
-import Rules            ( RuleBase )
+import CoreSyn          ( RuleBase )
 import UniqSupply
 import DynFlags
 import CoreMonad
