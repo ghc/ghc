@@ -1,8 +1,13 @@
+test('T10138', ignore_output, run_command,
+     # Using --hpcdir with an absolute path should work (exit code 0).
+     ['{hpc} report T10138.tix --hpcdir="`pwd`/.hpc.T10138"'])
+
+# Run tests below only for the hpc way.
+#
 # Do not explicitly specify '-fhpc' in extra_hc_opts, unless also setting
 # '-hpcdir' to a different value for each test. Only the `hpc` way does this
 # automatically. This way the tests in this directory can be run concurrently
 # (Main.mix might overlap otherwise).
-
 setTestOpts([only_compiler_types(['ghc']),
              only_ways(['hpc']),
              ])

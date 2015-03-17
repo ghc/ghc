@@ -13,6 +13,7 @@ import HpcFlags
 import HpcUtils
 
 import System.Directory
+import System.FilePath
 import System.IO (localeEncoding)
 import Data.List
 import Data.Maybe(fromJust)
@@ -78,9 +79,9 @@ markup_main flags (prog:modNames) = do
         let mods' = sortBy cmp mods
 
         unless (verbosity flags < Normal) $
-            putStrLn $ "Writing: " ++ (filename ++ ".html")
+            putStrLn $ "Writing: " ++ (filename <.> "html")
 
-        writeFileUsing (dest_dir ++ "/" ++ filename ++ ".html") $
+        writeFileUsing (dest_dir </> filename <.> "html") $
             "<html>" ++
             "<head>" ++
             charEncodingTag ++
@@ -224,10 +225,10 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   let content' = markup tabStop info content
   let addLine n xs = "<span class=\"lineno\">" ++ padLeft 5 ' ' (show n) ++ " </span>" ++ xs
   let addLines = unlines . map (uncurry addLine) . zip [1 :: Int ..] . lines
-  let fileName = modName0 ++ ".hs.html"
+  let fileName = modName0 <.> "hs" <.> "html"
   unless (verbosity flags < Normal) $
             putStrLn $ "Writing: " ++ fileName
-  writeFileUsing (dest_dir ++ "/" ++ fileName) $
+  writeFileUsing (dest_dir </> fileName) $
             unlines ["<html>",
                      "<head>",
                      charEncodingTag,
