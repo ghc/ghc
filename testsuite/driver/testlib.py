@@ -2257,17 +2257,17 @@ def printFailingTestInfosSummary(file, testInfos):
                           ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
     file.write('\n')
 
-def getStdout(cmd):
+def getStdout(cmd_and_args):
     if have_subprocess:
-        p = subprocess.Popen(strip_quotes(cmd),
+        p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
         r = p.wait()
         if r != 0:
-            raise Exception("Command failed: " + str(cmd))
+            raise Exception("Command failed: " + str(cmd_and_args))
         if stderr != '':
-            raise Exception("stderr from command: " + str(cmd))
+            raise Exception("stderr from command: " + str(cmd_and_args))
         return stdout
     else:
         raise Exception("Need subprocess to get stdout, but don't have it")
