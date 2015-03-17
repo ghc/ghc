@@ -1,5 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## FUTURE VERSION  *TBA*
+
+  * `Alt` now has `MonadZip` and `MonadFix` instances.
+
 ## 4.8.0.0  *TBA*
 
   * Bundled with GHC 7.10.1
