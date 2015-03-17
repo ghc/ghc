@@ -17,7 +17,8 @@
 
 module Control.Monad.Zip where
 
-import Control.Monad (liftM)
+import Control.Monad (liftM, liftM2)
+import Data.Monoid
 
 -- | `MonadZip` type class. Minimal definition: `mzip` or `mzipWith`
 --
@@ -53,3 +54,24 @@ instance MonadZip [] where
     mzipWith = zipWith
     munzip   = unzip
 
+instance MonadZip Dual where
+    -- Cannot use coerce, it's unsafe
+    mzipWith = liftM2
+
+instance MonadZip Sum where
+    mzipWith = liftM2
+
+instance MonadZip Product where
+    mzipWith = liftM2
+
+instance MonadZip Maybe where
+    mzipWith = liftM2
+
+instance MonadZip First where
+    mzipWith = liftM2
+
+instance MonadZip Last where
+    mzipWith = liftM2
+
+instance MonadZip f => MonadZip (Alt f) where
+    mzipWith f (Alt ma) (Alt mb) = Alt (mzipWith f ma mb)

@@ -26,7 +26,8 @@ module Control.Monad.Fix (
 import Data.Either
 import Data.Function ( fix )
 import Data.Maybe
-import Data.Monoid ( Dual(..), Sum(..), Product(..), First(..), Last(..) )
+import Data.Monoid ( Dual(..), Sum(..), Product(..)
+                   , First(..), Last(..), Alt(..) )
 import GHC.Base ( Monad, error, (.) )
 import GHC.List ( head, tail )
 import GHC.ST
@@ -99,3 +100,6 @@ instance MonadFix First where
 
 instance MonadFix Last where
     mfix f   = Last (mfix (getLast . f))
+
+instance MonadFix f => MonadFix (Alt f) where
+    mfix f   = Alt (mfix (getAlt . f))
