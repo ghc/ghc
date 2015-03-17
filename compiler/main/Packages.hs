@@ -13,6 +13,7 @@ module Packages (
         getPackageConfRefs,
         resolvePackageConfig,
         readPackageConfig,
+        listPackageConfigMap,
 
         -- * Querying the package config
         lookupPackage,
