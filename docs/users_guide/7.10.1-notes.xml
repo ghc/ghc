@@ -193,7 +193,16 @@
                     <option>-XTypeFamilies</option>, <option>-XGADTs</option> or
                     <option>-XFlexibleContexts</option>).
                 </para>
-           </listitem>
+            </listitem>
+	    <listitem>
+	      <para>
+		The solvers for both type family reductions and
+		<literal>Coercible</literal> instances have been improved.
+		This should lead to faster compilation of type-family-heavy
+		code and more <literal>Coercible</literal> instances to be
+		found. However, some bugs remain: see 'Known Bugs' below.
+	      </para>
+	   </listitem>
            <listitem>
                 <para>
                     <option>-fwarn-tabs</option> warning flag is turned on by
@@ -886,7 +895,23 @@ echo "[]" > package.conf
                 GHCi fails to appropriately load
                 <literal>.dyn_o</literal> files (issue #8736).
            </para>
-       </listitem>
+	</listitem>
+	<listitem>
+	  <para>
+	  Not all cases of non-terminating type-level computation (with both
+	  recursive type families and recursive newtypes) are caught. This
+	  means that GHC might hang, but it should do so only when the program
+	  is ill-typed (due to non-terminating type-level features). The bugs
+	  are reported as <ulink
+	  href="https://ghc.haskell.org/trac/ghc/ticket/7788">#7788</ulink>
+	  and <ulink
+	  href="https://ghc.haskell.org/trac/ghc/ticket/10139">#10139</ulink>.
+	  There also remain certain obscure scenarios where the solver for
+	  <literal>Coercible</literal> instances is known to be still
+	  incomplete. See comments in <ulink
+	  href="https://ghc.haskell.org/trac/ghc/ticket/10079">#10079</ulink>.
+	  </para>
+	</listitem>
    </itemizedlist>
   </sect2>
 </sect1>
