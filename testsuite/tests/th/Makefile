@@ -15,9 +15,11 @@ T7445:
 HC_OPTS = -XTemplateHaskell -package template-haskell
 
 TH_spliceE5_prof::
-	$(RM) TH_spliceE5_prof*.o TH_spliceE5_prof*.hi TH_spliceE5_prof*.p.o 
+	$(RM) TH_spliceE5_prof*.o TH_spliceE5_prof*.hi TH_spliceE5_prof*.dyn_o TH_spliceE5_prof*.dyn_hi TH_spliceE5_prof
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) $(ghcThWayFlags) --make -v0 TH_spliceE5_prof.hs -c
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -auto-all -osuf p.o -o $@
+	# Using `-osuf .p.o` should work. Note the dot before the `p` (#9760), and
+	# the dot between the `p` and the `o` (#5554).
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -auto-all -osuf .p.o -o $@
 	./$@
 
 # With -fexternal-interpreter, we don't have to build the non-profiled

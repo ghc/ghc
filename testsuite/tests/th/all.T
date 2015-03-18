@@ -47,6 +47,8 @@ test('TH_spliceE5_prof',
      [req_profiling,
       omit_ways(['ghci']),
       extra_clean(['TH_spliceE5_prof_Lib.p.o', 'TH_spliceE5_prof_Lib.hi',
+                   'TH_spliceE5_prof_Lib.dyn_o', 'TH_spliceE5_prof_Lib.dyn_hi',
+                   'TH_spliceE5_prof.dyn_o', 'TH_spliceE5_prof.dyn_hi',
                    'TH_spliceE5_prof_Lib.o','TH_spliceE5_prof.p.o'])],
      run_command,
      ['$MAKE -s --no-print-directory TH_spliceE5_prof'])
