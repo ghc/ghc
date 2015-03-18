@@ -24,7 +24,7 @@ module Foreign.C.Types
           -- $ctypes
 
           -- ** Integral types
-          -- | These types are are represented as @newtype@s of
+          -- | These types are represented as @newtype@s of
           -- types in "Data.Int" and "Data.Word", and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
@@ -53,7 +53,7 @@ module Foreign.C.Types
         --
 
           -- ** Floating types
-          -- | These types are are represented as @newtype@s of
+          -- | These types are represented as @newtype@s of
           -- 'Prelude.Float' and 'Prelude.Double', and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',

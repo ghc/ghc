@@ -449,7 +449,7 @@ isImplicitId id
         PrimOpId {}      -> True
         DataConWorkId {} -> True
         DataConWrapId {} -> True
-                -- These are are implied by their type or class decl;
+                -- These are implied by their type or class decl;
                 -- remember that all type and class decls appear in the interface file.
                 -- The dfun id is not an implicit Id; it must *not* be omitted, because
                 -- it carries version info for the instance decl

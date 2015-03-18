@@ -458,7 +458,7 @@ kcLTyClDecl (L loc decl)
 kcTyClDecl :: TyClDecl Name -> TcM ()
 -- This function is used solely for its side effect on kind variables
 -- NB kind signatures on the type variables and
---    result kind signature have aready been dealt with
+--    result kind signature have already been dealt with
 --    by getInitialKind, so we can ignore them here.
 
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = defn })

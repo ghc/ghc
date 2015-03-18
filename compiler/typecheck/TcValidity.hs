@@ -227,7 +227,7 @@ to a Type, performing kind checking, and then check various things that should
 be true about it.  We don't want to perform these checks at the same time
 as the initial translation because (a) they are unnecessary for interface-file
 types and (b) when checking a mutually recursive group of type and class decls,
-we can't "look" at the tycons/classes yet.  Also, the checks are are rather
+we can't "look" at the tycons/classes yet.  Also, the checks are rather
 diverse, and used to really mess up the other code.
 
 One thing we check for is 'rank'.
