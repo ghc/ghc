@@ -404,7 +404,6 @@ data GeneralFlag
    | Opt_DeferTypeErrors
    | Opt_DeferTypedHoles
    | Opt_Parallel
-   | Opt_GranMacros
    | Opt_PIC
    | Opt_SccProfilingOn
    | Opt_Ticky
@@ -1195,7 +1194,6 @@ data Way
   | WayProf
   | WayEventLog
   | WayPar
-  | WayGran
   | WayNDP
   | WayDyn
   deriving (Eq, Ord, Show)
@@ -1233,7 +1231,6 @@ wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
 wayTag WayPar      = "mp"
-wayTag WayGran     = "mg"
 wayTag WayNDP      = "ndp"
 
 wayRTSOnly :: Way -> Bool
@@ -1244,7 +1241,6 @@ wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
 wayRTSOnly WayPar      = False
-wayRTSOnly WayGran     = False
 wayRTSOnly WayNDP      = False
 
 wayDesc :: Way -> String
@@ -1255,7 +1251,6 @@ wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
 wayDesc WayPar      = "Parallel"
-wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
 -- Turn these flags on when enabling this way
@@ -1274,7 +1269,6 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC]
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
 wayGeneralFlags _ WayPar      = [Opt_Parallel]
-wayGeneralFlags _ WayGran     = [Opt_GranMacros]
 wayGeneralFlags _ WayNDP      = []
 
 -- Turn these flags off when enabling this way
@@ -1290,7 +1284,6 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 wayUnsetGeneralFlags _ WayPar      = []
-wayUnsetGeneralFlags _ WayGran     = []
 wayUnsetGeneralFlags _ WayNDP      = []
 
 wayExtras :: Platform -> Way -> DynFlags -> DynFlags
@@ -1301,7 +1294,6 @@ wayExtras _ WayDyn      dflags = dflags
 wayExtras _ WayProf     dflags = dflags
 wayExtras _ WayEventLog dflags = dflags
 wayExtras _ WayPar      dflags = exposePackage' "concurrent" dflags
-wayExtras _ WayGran     dflags = exposePackage' "concurrent" dflags
 wayExtras _ WayNDP      dflags = setExtensionFlag' Opt_ParallelArrays
                                $ setGeneralFlag' Opt_Vectorise dflags
 
@@ -1316,7 +1308,6 @@ wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
 wayOptc _ WayEventLog   = ["-DTRACING"]
 wayOptc _ WayPar        = ["-DPAR", "-w"]
-wayOptc _ WayGran       = ["-DGRAN"]
 wayOptc _ WayNDP        = []
 
 wayOptl :: Platform -> Way -> [String]
@@ -1338,7 +1329,6 @@ wayOptl _ WayEventLog   = []
 wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
                            "-lpvm3",
                            "-lgpvm3"]
-wayOptl _ WayGran       = []
 wayOptl _ WayNDP        = []
 
 wayOptP :: Platform -> Way -> [String]
@@ -1349,7 +1339,6 @@ wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
 wayOptP _ WayEventLog = ["-DTRACING"]
 wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
-wayOptP _ WayGran     = ["-D__GRANSIM__"]
 wayOptP _ WayNDP      = []
 
 whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
@@ -2274,7 +2263,6 @@ dynamic_flags = [
   , defGhcFlag "prof"           (NoArg (addWay WayProf))
   , defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
   , defGhcFlag "parallel"       (NoArg (addWay WayPar))
-  , defGhcFlag "gransim"        (NoArg (addWay WayGran))
   , defGhcFlag "smp"
       (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
   , defGhcFlag "debug"          (NoArg (addWay WayDebug))

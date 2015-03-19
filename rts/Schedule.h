@@ -96,8 +96,6 @@ extern volatile StgWord recent_activity;
 
 /* Thread queues.
  * Locks required  : sched_mutex
- *
- * In GranSim we have one run/blocked_queue per PE.
  */
 extern  StgTSO *blackhole_queue;
 #if !defined(THREADED_RTS)

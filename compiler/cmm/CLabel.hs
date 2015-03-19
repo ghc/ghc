@@ -903,15 +903,6 @@ labelDynamic dflags this_pkg this_mod lbl =
    _                 -> False
   where os = platformOS (targetPlatform dflags)
 
-{-
-OLD?: These GRAN functions are needed for spitting out GRAN_FETCH() at the
-right places. It is used to detect when the abstractC statement of an
-CCodeBlock actually contains the code for a slow entry point.  -- HWL
-
-We need at least @Eq@ for @CLabels@, because we want to avoid
-duplicate declarations in generating C (see @labelSeenTE@ in
-@PprAbsC@).
--}
 
 -----------------------------------------------------------------------------
 -- Printing out CLabels.

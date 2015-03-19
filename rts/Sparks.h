@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 2000-2009
  *
- * Sparking support for GRAN, PAR and THREADED_RTS versions of the RTS.
+ * Sparking support for PAR and THREADED_RTS versions of the RTS.
  * 
  * ---------------------------------------------------------------------------*/
 

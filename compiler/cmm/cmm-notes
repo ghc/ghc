@@ -109,7 +109,6 @@ StgCmmCon.hs
 StgCmmEnv.hs
 StgCmmExpr.hs
 StgCmmForeign.hs
-StgCmmGran.hs
 StgCmmHeap.hs
 StgCmmHpc.hs
 StgCmmLayout.hs

@@ -53,8 +53,6 @@ static StgThreadID next_thread_id = 1;
 
    createGenThread() and createIOThread() (in SchedAPI.h) are
    convenient packaged versions of this function.
-
-   currently pri (priority) is only used in a GRAN setup -- HWL
    ------------------------------------------------------------------------ */
 StgTSO *
 createThread(Capability *cap, W_ size)
