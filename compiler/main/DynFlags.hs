@@ -2732,9 +2732,7 @@ package_flags = [
       (NoArg $ do removeUserPkgConf
                   deprecate "Use -no-user-package-db instead")
 
-  , defGhcFlag "package-name"      (HasArg $ \name -> do
-                                      upd (setPackageKey name)
-                                      deprecate "Use -this-package-key instead")
+  , defGhcFlag "package-name"       (hasArg setPackageKey)
   , defGhcFlag "this-package-key"   (hasArg setPackageKey)
   , defFlag "package-id"            (HasArg exposePackageId)
   , defFlag "package"               (HasArg exposePackage)
