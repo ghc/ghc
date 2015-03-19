@@ -1046,6 +1046,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/numeric/should_run/T7689
 /tests/numeric/should_run/T8726
 /tests/numeric/should_run/T9810
+/tests/numeric/should_run/T10011
 /tests/numeric/should_run/add2
 /tests/numeric/should_run/arith001
 /tests/numeric/should_run/arith002
