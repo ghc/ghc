@@ -2121,23 +2121,19 @@ constraint solving.
 matchTypeableClass :: Class -> Kind -> Type -> CtLoc -> TcS LookupInstResult
 matchTypeableClass clas k t loc
   | isForAllTy k                               = return NoInstance
-  | Just (tc, ks_tys) <- splitTyConApp_maybe t = doTyConApp tc ks_tys
+  | Just (tc, ks) <- splitTyConApp_maybe t
+  , all isKind ks                              = doTyCon tc ks
   | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
-  | Just _            <- isNumLitTy t          = mkEv [] (EvTypeableTyLit t)
-  | Just _            <- isStrLitTy t          = mkEv [] (EvTypeableTyLit t)
+  | Just _            <- isNumLitTy t          = mkSimpEv (EvTypeableTyLit t)
+  | Just _            <- isStrLitTy t          = mkSimpEv (EvTypeableTyLit t)
   | otherwise                                  = return NoInstance
 
   where
-  -- Representation for type constructor applied to some kinds and some types.
-  doTyConApp tc ks_ts =
+  -- Representation for type constructor applied to some kinds
+  doTyCon tc ks =
     case mapM kindRep ks of
-      Nothing    -> return NoInstance      -- Not concrete kinds
-      Just kReps ->
-        do tCts <- mapM subGoal ts
-           mkEv tCts (EvTypeableTyCon tc kReps (map ctEvTerm tCts `zip` ts))
-    where
-    (ks,ts)    = span isKind ks_ts
-
+      Nothing    -> return NoInstance
+      Just kReps -> mkSimpEv (EvTypeableTyCon tc kReps [])
 
   {- Representation for an application of a type to a type-or-kind.
   This may happen when the type expression starts with a type variable.
@@ -2152,7 +2148,9 @@ matchTypeableClass clas k t loc
     | otherwise =
       do ct1 <- subGoal f
          ct2 <- subGoal tk
-         mkEv [ct1,ct2] (EvTypeableTyApp (ctEvTerm ct1,f) (ctEvTerm ct2,tk))
+         let realSubs = [ c | (c,Fresh) <- [ct1,ct2] ]
+         return $ GenInst realSubs
+                $ EvTypeable $ EvTypeableTyApp (getEv ct1,f) (getEv ct2,tk)
 
 
   -- Representation for concrete kinds.  We just use the kind itself,
@@ -2162,11 +2160,10 @@ matchTypeableClass clas k t loc
                   mapM_ kindRep ks
                   return ki
 
+  getEv (ct,_fresh) = ctEvTerm ct
 
   -- Emit a `Typeable` constraint for the given type.
   subGoal ty = do let goal = mkClassPred clas [ typeKind ty, ty ]
-                  ev <- newWantedEvVarNC loc goal
-                  return ev
+                  newWantedEvVar loc goal
 
-
-  mkEv subs ev = return (GenInst subs (EvTypeable ev))
+  mkSimpEv ev = return (GenInst [] (EvTypeable ev))
