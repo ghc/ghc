@@ -894,7 +894,7 @@ dsEvTypeable ev =
      (ty, rep) <-
         case ev of
 
-          EvTypeableTyCon tc ks ts ->
+          EvTypeableTyCon tc ks ->
             do ctr       <- dsLookupGlobalId mkPolyTyConAppName
                mkTyCon   <- dsLookupGlobalId mkTyConName
                dflags    <- getDynFlags
@@ -913,10 +913,9 @@ dsEvTypeable ev =
                tcRep     <- tyConRep dflags mkTyCon tc
 
                kReps     <- mapM kindRep ks
-               tReps     <- mapM (getRep tyCl) ts
 
-               return ( mkTyConApp tc (ks ++ map snd ts)
-                      , mkRep tcRep kReps tReps
+               return ( mkTyConApp tc ks
+                      , mkRep tcRep kReps []
                       )
 
           EvTypeableTyApp t1 t2 ->

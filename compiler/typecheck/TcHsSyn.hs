@@ -1256,7 +1256,7 @@ zonkEvTerm _   (EvLit l)          = return (EvLit l)
 zonkEvTerm env (EvTypeable ev) =
   fmap EvTypeable $
   case ev of
-    EvTypeableTyCon tc ks ts -> EvTypeableTyCon tc ks `fmap` mapM zonk ts
+    EvTypeableTyCon tc ks    -> return (EvTypeableTyCon tc ks)
     EvTypeableTyApp t1 t2    -> do e1 <- zonk t1
                                    e2 <- zonk t2
                                    return (EvTypeableTyApp e1 e2)
