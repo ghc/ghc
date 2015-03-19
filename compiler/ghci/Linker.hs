@@ -58,6 +58,7 @@ import Control.Monad
 
 import Data.IORef
 import Data.List
+import Data.Maybe
 import Control.Concurrent.MVar
 
 import System.FilePath
@@ -314,7 +315,7 @@ linkCmdLineLibs' dflags@(DynFlags { ldInputs     = cmdline_ld_inputs
                   else ([],[])
 
           -- Finally do (c),(d),(e)
-        ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
+        ; let cmdline_lib_specs = catMaybes classified_ld_inputs
                                ++ libspecs
                                ++ map Framework frameworks
         ; if null cmdline_lib_specs then return pls
@@ -368,7 +369,7 @@ classifyLdInput dflags f
     where platform = targetPlatform dflags
 
 preloadLib :: DynFlags -> [String] -> [String] -> PersistentLinkerState
-           -> LibrarySpec -> IO (PersistentLinkerState)
+           -> LibrarySpec -> IO PersistentLinkerState
 preloadLib dflags lib_paths framework_paths pls lib_spec
   = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
        case lib_spec of
@@ -428,7 +429,7 @@ preloadLib dflags lib_paths framework_paths pls lib_spec
                     ++ sys_errmsg ++ ")\nWhilst trying to load:  "
                     ++ showLS spec ++ "\nAdditional directories searched:"
                     ++ (if null paths then " (none)" else
-                        (concat (intersperse "\n" (map ("   "++) paths)))))
+                        intercalate "\n" (map ("   "++) paths)))
 
     -- Not interested in the paths in the static case.
     preload_static _paths name
@@ -1173,9 +1174,7 @@ load_dyn dll = do r <- loadDLL dll
 
 loadFrameworks :: Platform -> PackageConfig -> IO ()
 loadFrameworks platform pkg
-    = if platformUsesFrameworks platform
-      then mapM_ load frameworks
-      else return ()
+    = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
     fw_dirs    = Packages.frameworkDirs pkg
     frameworks = Packages.frameworks pkg
@@ -1235,10 +1234,7 @@ locateLib dflags is_hs dirs lib
 
      assumeDll   = return (DLL lib)
      infixr `orElse`
-     f `orElse` g = do m <- f
-                       case m of
-                           Just x -> return x
-                           Nothing -> g
+     f `orElse` g = f >>= maybe g return
 
      platform = targetPlatform dflags
      arch = platformArch platform
