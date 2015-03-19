@@ -39,7 +39,6 @@ module GHC.Conc.Windows
        ) where
 
 import Data.Bits (shiftR)
-import Data.Typeable
 import GHC.Base
 import GHC.Conc.Sync
 import GHC.Enum (Enum)
