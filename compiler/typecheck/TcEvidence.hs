@@ -711,7 +711,7 @@ data EvTerm
 
 -- | Instructions on how to make a 'Typeable' dictionary.
 data EvTypeable
-  = EvTypeableTyCon TyCon [Kind] [(EvTerm, Type)]
+  = EvTypeableTyCon TyCon [Kind]
     -- ^ Dicitionary for concrete type constructors.
 
   | EvTypeableTyApp (EvTerm,Type) (EvTerm,Type)
@@ -859,7 +859,7 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ _ es -> evVarsOfTerms (map fst es)
+    EvTypeableTyCon _ _    -> emptyVarSet
     EvTypeableTyApp e1 e2  -> evVarsOfTerms (map fst [e1,e2])
     EvTypeableTyLit _      -> emptyVarSet
 
@@ -933,7 +933,6 @@ instance Outputable EvLit where
 instance Outputable EvTypeable where
   ppr ev =
     case ev of
-      EvTypeableTyCon tc ks ts -> parens (ppr tc <+> sep (map ppr ks) <+>
-                                                     sep (map (ppr . fst) ts))
+      EvTypeableTyCon tc ks    -> parens (ppr tc <+> sep (map ppr ks))
       EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
       EvTypeableTyLit x        -> ppr x

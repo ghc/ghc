@@ -2133,7 +2133,7 @@ matchTypeableClass clas k t loc
   doTyCon tc ks =
     case mapM kindRep ks of
       Nothing    -> return NoInstance
-      Just kReps -> mkSimpEv (EvTypeableTyCon tc kReps [])
+      Just kReps -> mkSimpEv (EvTypeableTyCon tc kReps)
 
   {- Representation for an application of a type to a type-or-kind.
   This may happen when the type expression starts with a type variable.
