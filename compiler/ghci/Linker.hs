@@ -62,7 +62,7 @@ import Control.Concurrent.MVar
 
 import System.FilePath
 import System.IO
-import System.Directory hiding (findFile)
+import System.Directory
 
 import Exception
 
@@ -1214,23 +1214,23 @@ locateLib dflags is_hs dirs lib
     -- we search for .so libraries first.
   = findHSDll `orElse` findDynObject `orElse` assumeDll
    where
-     mk_obj_path      dir = dir </> (lib <.> "o")
-     mk_dyn_obj_path  dir = dir </> (lib <.> "dyn_o")
-     mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
+     obj_file     = lib <.> "o"
+     dyn_obj_file = lib <.> "dyn_o"
+     arch_file    = "lib" ++ lib <.> "a"
 
      hs_dyn_lib_name = lib ++ '-':programName dflags ++ projectVersion dflags
-     mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
+     hs_dyn_lib_file = mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
-     mk_dyn_lib_path dir = case (arch, os) of
-                             (ArchX86_64, OSSolaris2) -> dir </> ("64/" ++ so_name)
-                             _ -> dir </> so_name
+     dyn_lib_file = case (arch, os) of
+                             (ArchX86_64, OSSolaris2) -> "64" </> so_name
+                             _ -> so_name
 
-     findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
-     findDynObject  = liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
-     findArchive    = liftM (fmap Archive) $ findFile mk_arch_path       dirs
-     findHSDll      = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
-     findDll        = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path    dirs
+     findObject     = liftM (fmap Object)  $ findFile dirs obj_file
+     findDynObject  = liftM (fmap Object)  $ findFile dirs dyn_obj_file
+     findArchive    = liftM (fmap Archive) $ findFile dirs arch_file
+     findHSDll      = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
+     findDll        = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
      tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
 
      assumeDll   = return (DLL lib)
@@ -1266,16 +1266,16 @@ loadFramework extraPaths rootname
    = do { either_dir <- tryIO getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
                                   Left _ -> []
-                                  Right dir -> [dir ++ "/Library/Frameworks"]
+                                  Right dir -> [dir </> "Library/Frameworks"]
               ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
-        ; mb_fwk <- findFile mk_fwk ps
+        ; mb_fwk <- findFile ps fwk_file
         ; case mb_fwk of
             Just fwk_path -> loadDLL fwk_path
             Nothing       -> return (Just "not found") }
                 -- Tried all our known library paths, but dlopen()
                 -- has no built-in paths for frameworks: give up
    where
-     mk_fwk dir = dir </> (rootname ++ ".framework/" ++ rootname)
+     fwk_file = rootname <.> "framework" </> rootname
         -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 
@@ -1284,16 +1284,6 @@ loadFramework extraPaths rootname
                 Helper functions
 
   ********************************************************************* -}
-
-findFile :: (FilePath -> FilePath)      -- Maps a directory path to a file path
-         -> [FilePath]                  -- Directories to look in
-         -> IO (Maybe FilePath)         -- The first file path to match
-findFile _            [] = return Nothing
-findFile mk_file_path (dir : dirs)
-  = do let file_path = mk_file_path dir
-       b <- doesFileExist file_path
-       if b then return (Just file_path)
-            else findFile mk_file_path dirs
 
 maybePutStr :: DynFlags -> String -> IO ()
 maybePutStr dflags s
