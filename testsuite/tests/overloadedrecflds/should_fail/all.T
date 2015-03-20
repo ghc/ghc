@@ -8,3 +8,4 @@ test('overloadedrecfldsfail05', normal, compile_fail, [''])
 test('overloadedrecfldsfail06',
      extra_clean(['OverloadedRecFldsFail06_A.hi', 'OverloadedRecFldsFail06_A.o']),
      multimod_compile_fail, ['overloadedrecfldsfail06', ''])
+test('overloadedrecfldsfail07', normal, compile_fail, [''])
