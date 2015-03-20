@@ -1,2 +1,2 @@
-data Main.R = Main.MkR {Main.foo :: GHC.Types.Int}
+data Main.R = Main.MkR {Main.$sel:foo:R :: GHC.Types.Int}
 42
