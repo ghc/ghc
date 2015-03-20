@@ -9,8 +9,8 @@ T3717.$wfoo [InlPrag=[0], Occ=LoopBreaker]
 T3717.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
     case ww of ds {
-      __DEFAULT -> T3717.$wfoo (GHC.Prim.-# ds 1);
-      0 -> 0
+      __DEFAULT -> T3717.$wfoo (GHC.Prim.-# ds 1#);
+      0# -> 0#
     }
 end Rec }
 

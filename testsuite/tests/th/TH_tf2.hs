@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}  -- 'bar' is ambiguous
 
 module TH_tf2 where
 

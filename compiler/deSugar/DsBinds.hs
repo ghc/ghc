@@ -39,7 +39,9 @@ import UniqSupply
 import Digraph
 
 import PrelNames
-import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
+import TysPrim ( mkProxyPrimTy )
+import TyCon      ( isTupleTyCon, tyConDataCons_maybe
+                  , tyConName, isPromotedTyCon, isPromotedDataCon )
 import TcEvidence
 import TcType
 import Type
@@ -47,6 +49,7 @@ import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, tupleCon, mkListTy
                   , mkBoxedTupleTy, stringTy )
 import Id
+import MkId(proxyHashId)
 import Class
 import DataCon  ( dataConTyCon, dataConWorkId )
 import Name
@@ -71,6 +74,7 @@ import Util
 import Control.Monad( when )
 import MonadUtils
 import Control.Monad(liftM)
+import Fingerprint(Fingerprint(..), fingerprintString)
 
 {-
 ************************************************************************
@@ -878,6 +882,127 @@ dsEvTerm (EvLit l) =
     EvStr s -> mkStringExprFS s
 
 dsEvTerm (EvCallStack cs) = dsEvCallStack cs
+
+dsEvTerm (EvTypeable ev) = dsEvTypeable ev
+
+dsEvTypeable :: EvTypeable -> DsM CoreExpr
+dsEvTypeable ev =
+  do tyCl      <- dsLookupTyCon typeableClassName
+     typeRepTc <- dsLookupTyCon typeRepTyConName
+     let tyRepType = mkTyConApp typeRepTc []
+
+     (ty, rep) <-
+        case ev of
+
+          EvTypeableTyCon tc ks ->
+            do ctr       <- dsLookupGlobalId mkPolyTyConAppName
+               mkTyCon   <- dsLookupGlobalId mkTyConName
+               dflags    <- getDynFlags
+               let mkRep cRep kReps tReps =
+                     mkApps (Var ctr) [ cRep, mkListExpr tyRepType kReps
+                                            , mkListExpr tyRepType tReps ]
+
+               let kindRep k =
+                     case splitTyConApp_maybe k of
+                       Nothing -> panic "dsEvTypeable: not a kind constructor"
+                       Just (kc,ks) ->
+                         do kcRep <- tyConRep dflags mkTyCon kc
+                            reps  <- mapM kindRep ks
+                            return (mkRep kcRep [] reps)
+
+               tcRep     <- tyConRep dflags mkTyCon tc
+
+               kReps     <- mapM kindRep ks
+
+               return ( mkTyConApp tc ks
+                      , mkRep tcRep kReps []
+                      )
+
+          EvTypeableTyApp t1 t2 ->
+            do e1  <- getRep tyCl t1
+               e2  <- getRep tyCl t2
+               ctr <- dsLookupGlobalId mkAppTyName
+
+               return ( mkAppTy (snd t1) (snd t2)
+                      , mkApps (Var ctr) [ e1, e2 ]
+                      )
+
+          EvTypeableTyLit ty ->
+            do str <- case (isNumLitTy ty, isStrLitTy ty) of
+                        (Just n, _) -> return (show n)
+                        (_, Just n) -> return (show n)
+                        _ -> panic "dsEvTypeable: malformed TyLit evidence"
+               ctr <- dsLookupGlobalId typeLitTypeRepName
+               tag <- mkStringExpr str
+               return (ty, mkApps (Var ctr) [ tag ])
+
+     -- TyRep -> Typeable t
+     -- see also: Note [Memoising typeOf]
+     repName <- newSysLocalDs tyRepType
+     let proxyT = mkProxyPrimTy (typeKind ty) ty
+         method = bindNonRec repName rep
+                $ mkLams [mkWildValBinder proxyT] (Var repName)
+
+     -- package up the method as `Typeable` dictionary
+     return $ mkCast method $ mkSymCo $ getTypeableCo tyCl ty
+
+  where
+  -- co: method -> Typeable k t
+  getTypeableCo tc t =
+    case instNewTyCon_maybe tc [typeKind t, t] of
+      Just (_,co) -> co
+      _           -> panic "Class `Typeable` is not a `newtype`."
+
+  -- Typeable t -> TyRep
+  getRep tc (ev,t) =
+    do typeableExpr <- dsEvTerm ev
+       let co     = getTypeableCo tc t
+           method = mkCast typeableExpr co
+           proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
+       return (mkApps method [proxy])
+
+  -- This part could be cached
+  tyConRep dflags mkTyCon tc =
+    do pkgStr  <- mkStringExprFS pkg_fs
+       modStr  <- mkStringExprFS modl_fs
+       nameStr <- mkStringExprFS name_fs
+       return (mkApps (Var mkTyCon) [ int64 high, int64 low
+                                    , pkgStr, modStr, nameStr
+                                    ])
+    where
+    tycon_name                = tyConName tc
+    modl                      = nameModule tycon_name
+    pkg                       = modulePackageKey modl
+
+    modl_fs                   = moduleNameFS (moduleName modl)
+    pkg_fs                    = packageKeyFS pkg
+    name_fs                   = occNameFS (nameOccName tycon_name)
+    hash_name_fs
+      | isPromotedTyCon tc    = appendFS (mkFastString "$k") name_fs
+      | isPromotedDataCon tc  = appendFS (mkFastString "$c") name_fs
+      | otherwise             = name_fs
+
+    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, hash_name_fs]
+    Fingerprint high low = fingerprintString hashThis
+
+    int64
+      | wORD_SIZE dflags == 4 = mkWord64LitWord64
+      | otherwise             = mkWordLit dflags . fromIntegral
+
+
+
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+See #3245, #9203
+
+IMPORTANT: we don't want to recalculate the TypeRep once per call with
+the proxy argument.  This is what went wrong in #3245 and #9203. So we
+help GHC by manually keeping the 'rep' *outside* the lambda.
+-}
+
+
+
+
 
 dsEvCallStack :: EvCallStack -> DsM CoreExpr
 -- See Note [Overview of implicit CallStacks] in TcEvidence.hs

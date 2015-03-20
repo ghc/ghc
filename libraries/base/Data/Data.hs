@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds, StandaloneDeriving,
-             AutoDeriveTypeable, TypeOperators, GADTs, FlexibleInstances #-}
+             TypeOperators, GADTs, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -109,10 +110,11 @@ module Data.Data (
 import Data.Either
 import Data.Eq
 import Data.Maybe
+import Data.Monoid
 import Data.Ord
 import Data.Typeable
 import Data.Version( Version(..) )
-import GHC.Base
+import GHC.Base hiding (Any)
 import GHC.List
 import GHC.Num
 import GHC.Read
@@ -1398,3 +1400,112 @@ instance Data Version where
                     1 -> k (k (z Version))
                     _ -> error "Data.Data.gunfold(Version)"
   dataTypeOf _  = versionDataType
+
+-----------------------------------------------------------------------
+-- instances for Data.Monoid wrappers
+
+dualConstr :: Constr
+dualConstr = mkConstr dualDataType "Dual" ["getDual"] Prefix
+
+dualDataType :: DataType
+dualDataType = mkDataType "Data.Monoid.Dual" [dualConstr]
+
+instance Data a => Data (Dual a) where
+  gfoldl f z (Dual x) = z Dual `f` x
+  gunfold k z _ = k (z Dual)
+  toConstr (Dual _) = dualConstr
+  dataTypeOf _ = dualDataType
+  dataCast1 f = gcast1 f
+
+allConstr :: Constr
+allConstr = mkConstr allDataType "All" ["getAll"] Prefix
+
+allDataType :: DataType
+allDataType = mkDataType "All" [allConstr]
+
+instance Data All where
+  gfoldl f z (All x) = (z All `f` x)
+  gunfold k z _ = k (z All)
+  toConstr (All _) = allConstr
+  dataTypeOf _ = allDataType
+
+anyConstr :: Constr
+anyConstr = mkConstr anyDataType "Any" ["getAny"] Prefix
+
+anyDataType :: DataType
+anyDataType = mkDataType "Any" [anyConstr]
+
+instance Data Any where
+  gfoldl f z (Any x) = (z Any `f` x)
+  gunfold k z _ = k (z Any)
+  toConstr (Any _) = anyConstr
+  dataTypeOf _ = anyDataType
+
+
+sumConstr :: Constr
+sumConstr = mkConstr sumDataType "Sum" ["getSum"] Prefix
+
+sumDataType :: DataType
+sumDataType = mkDataType "Data.Monoid.Sum" [sumConstr]
+
+instance Data a => Data (Sum a) where
+  gfoldl f z (Sum x) = z Sum `f` x
+  gunfold k z _ = k (z Sum)
+  toConstr (Sum _) = sumConstr
+  dataTypeOf _ = sumDataType
+  dataCast1 f = gcast1 f
+
+
+productConstr :: Constr
+productConstr = mkConstr productDataType "Product" ["getProduct"] Prefix
+
+productDataType :: DataType
+productDataType = mkDataType "Data.Monoid.Product" [productConstr]
+
+instance Data a => Data (Product a) where
+  gfoldl f z (Product x) = z Product `f` x
+  gunfold k z _ = k (z Product)
+  toConstr (Product _) = productConstr
+  dataTypeOf _ = productDataType
+  dataCast1 f = gcast1 f
+
+
+firstConstr :: Constr
+firstConstr = mkConstr firstDataType "First" ["getFirst"] Prefix
+
+firstDataType :: DataType
+firstDataType = mkDataType "Data.Monoid.First" [firstConstr]
+
+instance Data a => Data (First a) where
+  gfoldl f z (First x) = (z First `f` x)
+  gunfold k z _ = k (z First)
+  toConstr (First _) = firstConstr
+  dataTypeOf _ = firstDataType
+  dataCast1 f = gcast1 f
+
+
+lastConstr :: Constr
+lastConstr = mkConstr lastDataType "Last" ["getLast"] Prefix
+
+lastDataType :: DataType
+lastDataType = mkDataType "Data.Monoid.Last" [lastConstr]
+
+instance Data a => Data (Last a) where
+  gfoldl f z (Last x) = (z Last `f` x)
+  gunfold k z _ = k (z Last)
+  toConstr (Last _) = lastConstr
+  dataTypeOf _ = lastDataType
+  dataCast1 f = gcast1 f
+
+
+altConstr :: Constr
+altConstr = mkConstr altDataType "Alt" ["getAlt"] Prefix
+
+altDataType :: DataType
+altDataType = mkDataType "Alt" [altConstr]
+
+instance (Data (f a), Data a, Typeable f) => Data (Alt f a) where
+  gfoldl f z (Alt x) = (z Alt `f` x)
+  gunfold k z _ = k (z Alt)
+  toConstr (Alt _) = altConstr
+  dataTypeOf _ = altDataType

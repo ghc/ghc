@@ -981,7 +981,7 @@ not incoherent, but we still want this to compile. Hence the
 "all-but-one-logic".
 
 The implementation is in insert_overlapping, where we remove matching
-incoherent instances as long as there are are others.
+incoherent instances as long as there are others.
 
 
 

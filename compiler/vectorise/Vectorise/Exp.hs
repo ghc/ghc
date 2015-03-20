@@ -44,7 +44,9 @@ import Outputable
 import FastString
 import DynFlags
 import Util
+#if __GLASGOW_HASKELL__ < 709
 import MonadUtils
+#endif
 
 import Control.Monad
 import Data.Maybe

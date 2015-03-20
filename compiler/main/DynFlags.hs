@@ -178,6 +178,7 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
+import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Exception (throwIO)
 
@@ -388,7 +389,6 @@ data GeneralFlag
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_HaddockOptions
-   | Opt_Hpc_No_Auto
    | Opt_BreakOnException
    | Opt_BreakOnError
    | Opt_PrintEvldWithShow
@@ -404,7 +404,6 @@ data GeneralFlag
    | Opt_DeferTypeErrors
    | Opt_DeferTypedHoles
    | Opt_Parallel
-   | Opt_GranMacros
    | Opt_PIC
    | Opt_SccProfilingOn
    | Opt_Ticky
@@ -488,7 +487,9 @@ data WarningFlag =
    | Opt_WarnOverlappingPatterns
    | Opt_WarnTypeDefaults
    | Opt_WarnMonomorphism
-   | Opt_WarnUnusedBinds
+   | Opt_WarnUnusedTopBinds
+   | Opt_WarnUnusedLocalBinds
+   | Opt_WarnUnusedPatternBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
    | Opt_WarnContextQuantification
@@ -517,6 +518,7 @@ data WarningFlag =
    | Opt_WarnPartialTypeSignatures
    | Opt_WarnMissingExportedSigs
    | Opt_WarnUntickedPromotedConstructors
+   | Opt_WarnDerivingTypeable
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -1103,21 +1105,41 @@ isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
 
-data PackageArg = PackageArg String
-                | PackageIdArg String
-                | PackageKeyArg String
+-- | We accept flags which make packages visible, but how they select
+-- the package varies; this data type reflects what selection criterion
+-- is used.
+data PackageArg =
+      PackageArg String    -- ^ @-package@, by 'PackageName'
+    | PackageIdArg String  -- ^ @-package-id@, by 'SourcePackageId'
+    | PackageKeyArg String -- ^ @-package-key@, by 'InstalledPackageId'
   deriving (Eq, Show)
 
-data ModRenaming = ModRenaming Bool [(String, String)]
-  deriving (Eq, Show)
+-- | Represents the renaming that may be associated with an exposed
+-- package, e.g. the @rns@ part of @-package "foo (rns)"@.
+--
+-- Here are some example parsings of the package flags (where
+-- a string literal is punned to be a 'ModuleName':
+--
+--      * @-package foo@ is @ModRenaming True []@
+--      * @-package foo ()@ is @ModRenaming False []@
+--      * @-package foo (A)@ is @ModRenaming False [("A", "A")]@
+--      * @-package foo (A as B)@ is @ModRenaming False [("A", "B")]@
+--      * @-package foo with (A as B)@ is @ModRenaming True [("A", "B")]@
+data ModRenaming = ModRenaming {
+    modRenamingWithImplicit :: Bool, -- ^ Bring all exposed modules into scope?
+    modRenamings :: [(ModuleName, ModuleName)] -- ^ Bring module @m@ into scope
+                                               --   under name @n@.
+  } deriving (Eq)
 
+-- | Flags for manipulating packages.
 data PackageFlag
-  = ExposePackage   PackageArg ModRenaming
-  | HidePackage     String
-  | IgnorePackage   String
-  | TrustPackage    String
-  | DistrustPackage String
-  deriving (Eq, Show)
+  = ExposePackage   PackageArg ModRenaming -- ^ @-package@, @-package-id@
+                                           -- and @-package-key@
+  | HidePackage     String -- ^ @-hide-package@
+  | IgnorePackage   String -- ^ @-ignore-package@
+  | TrustPackage    String -- ^ @-trust-package@
+  | DistrustPackage String -- ^ @-distrust-package@
+  deriving (Eq)
 
 defaultHscTarget :: Platform -> HscTarget
 defaultHscTarget = defaultObjectTarget
@@ -1173,7 +1195,6 @@ data Way
   | WayProf
   | WayEventLog
   | WayPar
-  | WayGran
   | WayNDP
   | WayDyn
   deriving (Eq, Ord, Show)
@@ -1211,7 +1232,6 @@ wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
 wayTag WayPar      = "mp"
-wayTag WayGran     = "mg"
 wayTag WayNDP      = "ndp"
 
 wayRTSOnly :: Way -> Bool
@@ -1222,7 +1242,6 @@ wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
 wayRTSOnly WayPar      = False
-wayRTSOnly WayGran     = False
 wayRTSOnly WayNDP      = False
 
 wayDesc :: Way -> String
@@ -1233,7 +1252,6 @@ wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
 wayDesc WayPar      = "Parallel"
-wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
 -- Turn these flags on when enabling this way
@@ -1252,7 +1270,6 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC]
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
 wayGeneralFlags _ WayPar      = [Opt_Parallel]
-wayGeneralFlags _ WayGran     = [Opt_GranMacros]
 wayGeneralFlags _ WayNDP      = []
 
 -- Turn these flags off when enabling this way
@@ -1268,7 +1285,6 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 wayUnsetGeneralFlags _ WayPar      = []
-wayUnsetGeneralFlags _ WayGran     = []
 wayUnsetGeneralFlags _ WayNDP      = []
 
 wayExtras :: Platform -> Way -> DynFlags -> DynFlags
@@ -1279,7 +1295,6 @@ wayExtras _ WayDyn      dflags = dflags
 wayExtras _ WayProf     dflags = dflags
 wayExtras _ WayEventLog dflags = dflags
 wayExtras _ WayPar      dflags = exposePackage' "concurrent" dflags
-wayExtras _ WayGran     dflags = exposePackage' "concurrent" dflags
 wayExtras _ WayNDP      dflags = setExtensionFlag' Opt_ParallelArrays
                                $ setGeneralFlag' Opt_Vectorise dflags
 
@@ -1294,7 +1309,6 @@ wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
 wayOptc _ WayEventLog   = ["-DTRACING"]
 wayOptc _ WayPar        = ["-DPAR", "-w"]
-wayOptc _ WayGran       = ["-DGRAN"]
 wayOptc _ WayNDP        = []
 
 wayOptl :: Platform -> Way -> [String]
@@ -1316,7 +1330,6 @@ wayOptl _ WayEventLog   = []
 wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
                            "-lpvm3",
                            "-lgpvm3"]
-wayOptl _ WayGran       = []
 wayOptl _ WayNDP        = []
 
 wayOptP :: Platform -> Way -> [String]
@@ -1327,7 +1340,6 @@ wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
 wayOptP _ WayEventLog = ["-DTRACING"]
 wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
-wayOptP _ WayGran     = ["-D__GRANSIM__"]
 wayOptP _ WayNDP      = []
 
 whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
@@ -1927,12 +1939,12 @@ parseSigOf str = case filter ((=="").snd) (readP_to_S parse str) of
             -- ToDo: deprecate this 'is' syntax?
             tok $ ((string "is" >> return ()) +++ (R.char '=' >> return ()))
             m <- tok $ parseModule
-            return (mkModuleName n, m)
+            return (n, m)
         parseModule = do
             pk <- munch1 (\c -> isAlphaNum c || c `elem` "-_")
             _ <- R.char ':'
             m <- parseModuleName
-            return (mkModule (stringToPackageKey pk) (mkModuleName m))
+            return (mkModule (stringToPackageKey pk) m)
         tok m = skipSpaces >> m
 
 setSigOf :: String -> DynFlags -> DynFlags
@@ -2087,8 +2099,10 @@ parseDynamicFlagsFull :: MonadIO m
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let ((leftover, errs, warns), dflags1)
           = runCmdLine (processArgs activeFlags args) dflags0
-  when (not (null errs)) $ liftIO $
-      throwGhcExceptionIO $ errorsToGhcException errs
+
+  -- See Note [Handling errors when parsing commandline flags]
+  unless (null errs) $ liftIO $ throwGhcExceptionIO $
+      errorsToGhcException . map (showPpr dflags0 . getLoc &&& unLoc) $ errs
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
@@ -2250,7 +2264,6 @@ dynamic_flags = [
   , defGhcFlag "prof"           (NoArg (addWay WayProf))
   , defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
   , defGhcFlag "parallel"       (NoArg (addWay WayPar))
-  , defGhcFlag "gransim"        (NoArg (addWay WayGran))
   , defGhcFlag "smp"
       (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
   , defGhcFlag "debug"          (NoArg (addWay WayDebug))
@@ -2677,6 +2690,8 @@ dynamic_flags = [
   , defFlag "fno-glasgow-exts"
       (NoArg (do disableGlasgowExts
                  deprecate "Use individual extensions instead"))
+  , defFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
+  , defFlag "fno-warn-unused-binds" (NoArg disableUnusedBinds)
 
         ------ Safe Haskell flags -------------------------------------------
   , defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2843,6 +2858,7 @@ fWarningFlags = [
   flagSpec "warn-auto-orphans"                Opt_WarnAutoOrphans,
   flagSpec "warn-deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "warn-deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "warn-deriving-typeable"           Opt_WarnDerivingTypeable,
   flagSpec "warn-dodgy-exports"               Opt_WarnDodgyExports,
   flagSpec "warn-dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
   flagSpec "warn-dodgy-imports"               Opt_WarnDodgyImports,
@@ -2884,10 +2900,12 @@ fWarningFlags = [
   flagSpec "warn-unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
   flagSpec "warn-unticked-promoted-constructors"
                                          Opt_WarnUntickedPromotedConstructors,
-  flagSpec "warn-unused-binds"                Opt_WarnUnusedBinds,
   flagSpec "warn-unused-do-bind"              Opt_WarnUnusedDoBind,
   flagSpec "warn-unused-imports"              Opt_WarnUnusedImports,
+  flagSpec "warn-unused-local-binds"          Opt_WarnUnusedLocalBinds,
   flagSpec "warn-unused-matches"              Opt_WarnUnusedMatches,
+  flagSpec "warn-unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
+  flagSpec "warn-unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "warn-warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "warn-wrong-do-bind"               Opt_WarnWrongDoBind]
 
@@ -2949,7 +2967,6 @@ fFlags = [
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
   flagSpec "helpful-errors"                   Opt_HelpfulErrors,
   flagSpec "hpc"                              Opt_Hpc,
-  flagSpec "hpc-no-auto"                      Opt_Hpc_No_Auto,
   flagSpec "ignore-asserts"                   Opt_IgnoreAsserts,
   flagSpec "ignore-interface-pragmas"         Opt_IgnoreInterfacePragmas,
   flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
@@ -3230,6 +3247,7 @@ impliedXFlags
     , (Opt_ExistentialQuantification, turnOn, Opt_ExplicitForAll)
     , (Opt_FlexibleInstances,         turnOn, Opt_TypeSynonymInstances)
     , (Opt_FunctionalDependencies,    turnOn, Opt_MultiParamTypeClasses)
+    , (Opt_MultiParamTypeClasses,     turnOn, Opt_ConstrainedClassMethods)  -- c.f. Trac #7854
 
     , (Opt_RebindableSyntax, turnOff, Opt_ImplicitPrelude)      -- NB: turn off!
 
@@ -3364,7 +3382,9 @@ minusWOpts :: [WarningFlag]
 -- Things you get with -W
 minusWOpts
     = standardWarnings ++
-      [ Opt_WarnUnusedBinds,
+      [ Opt_WarnUnusedTopBinds,
+        Opt_WarnUnusedLocalBinds,
+        Opt_WarnUnusedPatternBinds,
         Opt_WarnUnusedMatches,
         Opt_WarnUnusedImports,
         Opt_WarnIncompletePatterns,
@@ -3385,6 +3405,19 @@ minusWallOpts
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors
       ]
+
+enableUnusedBinds :: DynP ()
+enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
+
+disableUnusedBinds :: DynP ()
+disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
+
+-- Things you get with -fwarn-unused-binds
+unusedBindsFlags :: [WarningFlag]
+unusedBindsFlags = [ Opt_WarnUnusedTopBinds
+                   , Opt_WarnUnusedLocalBinds
+                   , Opt_WarnUnusedPatternBinds
+                   ]
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setGeneralFlag Opt_PrintExplicitForalls
@@ -3666,8 +3699,9 @@ removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extra
 clearPkgConf :: DynP ()
 clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
-parseModuleName :: ReadP String
-parseModuleName = munch1 (\c -> isAlphaNum c || c `elem` ".")
+parseModuleName :: ReadP ModuleName
+parseModuleName = fmap mkModuleName
+                $ munch1 (\c -> isAlphaNum c || c `elem` ".")
 
 parsePackageFlag :: (String -> PackageArg) -- type of argument
                  -> String                 -- string to parse
@@ -4162,7 +4196,8 @@ makeDynFlagsConsistent dflags
 -- to show SDocs when tracing, but we don't always have DynFlags
 -- available.
 --
--- Do not use it if you can help it. You may get the wrong value!
+-- Do not use it if you can help it. You may get the wrong value, or this
+-- panic!
 
 GLOBAL_VAR(v_unsafeGlobalDynFlags, panic "v_unsafeGlobalDynFlags: not initialised", DynFlags)
 

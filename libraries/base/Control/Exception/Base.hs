@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -104,7 +104,6 @@ import GHC.Show
 -- import GHC.Exception hiding ( Exception )
 import GHC.Conc.Sync
 
-import Data.Dynamic
 import Data.Either
 
 -----------------------------------------------------------------------------
@@ -297,7 +296,7 @@ bracketOnError before after thing =
 
 -- |A pattern match failed. The @String@ gives information about the
 -- source location of the pattern.
-data PatternMatchFail = PatternMatchFail String deriving Typeable
+data PatternMatchFail = PatternMatchFail String
 
 instance Show PatternMatchFail where
     showsPrec _ (PatternMatchFail err) = showString err
@@ -311,7 +310,7 @@ instance Exception PatternMatchFail
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record selector.
-data RecSelError = RecSelError String deriving Typeable
+data RecSelError = RecSelError String
 
 instance Show RecSelError where
     showsPrec _ (RecSelError err) = showString err
@@ -323,7 +322,7 @@ instance Exception RecSelError
 -- |An uninitialised record field was used. The @String@ gives
 -- information about the source location where the record was
 -- constructed.
-data RecConError = RecConError String deriving Typeable
+data RecConError = RecConError String
 
 instance Show RecConError where
     showsPrec _ (RecConError err) = showString err
@@ -337,7 +336,7 @@ instance Exception RecConError
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record update.
-data RecUpdError = RecUpdError String deriving Typeable
+data RecUpdError = RecUpdError String
 
 instance Show RecUpdError where
     showsPrec _ (RecUpdError err) = showString err
@@ -349,7 +348,7 @@ instance Exception RecUpdError
 -- |A class method without a definition (neither a default definition,
 -- nor a definition in the appropriate instance) was called. The
 -- @String@ gives information about which method it was.
-data NoMethodError = NoMethodError String deriving Typeable
+data NoMethodError = NoMethodError String
 
 instance Show NoMethodError where
     showsPrec _ (NoMethodError err) = showString err
@@ -362,7 +361,7 @@ instance Exception NoMethodError
 -- guaranteed not to terminate. Note that there is no guarantee that
 -- the runtime system will notice whether any given computation is
 -- guaranteed to terminate or not.
-data NonTermination = NonTermination deriving Typeable
+data NonTermination = NonTermination
 
 instance Show NonTermination where
     showsPrec _ NonTermination = showString "<<loop>>"
@@ -373,7 +372,7 @@ instance Exception NonTermination
 
 -- |Thrown when the program attempts to call @atomically@, from the @stm@
 -- package, inside another call to @atomically@.
-data NestedAtomically = NestedAtomically deriving Typeable
+data NestedAtomically = NestedAtomically
 
 instance Show NestedAtomically where
     showsPrec _ NestedAtomically = showString "Control.Concurrent.STM.atomically was nested"

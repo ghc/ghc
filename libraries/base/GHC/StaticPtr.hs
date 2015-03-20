@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable        #-}
 {-# LANGUAGE MagicHash                 #-}
 {-# LANGUAGE UnboxedTuples             #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -41,7 +40,6 @@ module GHC.StaticPtr
   , staticPtrKeys
   ) where
 
-import Data.Typeable       (Typeable)
 import Foreign.C.Types     (CInt(..))
 import Foreign.Marshal     (allocaArray, peekArray, withArray)
 import Foreign.Ptr         (castPtr)
@@ -52,7 +50,6 @@ import GHC.Fingerprint     (Fingerprint(..))
 
 -- | A reference to a value of type 'a'.
 data StaticPtr a = StaticPtr StaticKey StaticPtrInfo a
-  deriving Typeable
 
 -- | Dereferences a static pointer.
 deRefStaticPtr :: StaticPtr a -> a
@@ -96,7 +93,7 @@ data StaticPtrInfo = StaticPtrInfo
       -- @(Line, Column)@ pair.
     , spInfoSrcLoc     :: (Int, Int)
     }
-  deriving (Show, Typeable)
+  deriving (Show)
 
 -- | 'StaticPtrInfo' of the given 'StaticPtr'.
 staticPtrInfo :: StaticPtr a -> StaticPtrInfo

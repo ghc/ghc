@@ -50,6 +50,7 @@ import Control.Applicative ( Const(..) )
 import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
+import Data.Monoid ( Dual(..), Sum(..), Product(..), First(..), Last(..) )
 import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
@@ -204,6 +205,21 @@ instance Traversable Proxy where
 
 instance Traversable (Const m) where
     traverse _ (Const m) = pure $ Const m
+
+instance Traversable Dual where
+    traverse f (Dual x) = Dual <$> f x
+
+instance Traversable Sum where
+    traverse f (Sum x) = Sum <$> f x
+
+instance Traversable Product where
+    traverse f (Product x) = Product <$> f x
+
+instance Traversable First where
+    traverse f (First x) = First <$> traverse f x
+
+instance Traversable Last where
+    traverse f (Last x) = Last <$> traverse f x
 
 -- general functions
 

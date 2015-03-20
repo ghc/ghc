@@ -445,6 +445,7 @@ compiler_stage1_MUNGED_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion
 define compiler_PACKAGE_MAGIC
 compiler_stage1_VERSION = $(compiler_stage1_MUNGED_VERSION)
 compiler_stage1_PACKAGE_KEY = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_PACKAGE_KEY))
+compiler_stage1_LIB_NAME = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_LIB_NAME))
 endef
 
 # NB: the PACKAGE_KEY munging has no effect for new-style package keys

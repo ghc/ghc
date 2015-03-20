@@ -1,6 +1,12 @@
 
-tcfail116.hs:5:1:
-    The class method ‘bug’
-    mentions none of the type or kind variables of the class ‘Foo a’
-    When checking the class method: bug :: ()
+tcfail116.hs:6:5:
+    Could not deduce (Foo a0)
+    from the context: Foo a
+      bound by the type signature for: bug :: Foo a => ()
+      at tcfail116.hs:6:5-13
+    The type variable ‘a0’ is ambiguous
+    In the ambiguity check for the type signature for ‘bug’:
+      bug :: forall a. Foo a => ()
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    When checking the class method: bug :: forall a. Foo a => ()
     In the class declaration for ‘Foo’

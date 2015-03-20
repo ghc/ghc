@@ -121,6 +121,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_mod            = mod,
                 tcg_src            = hsc_src,
                 tcg_sig_of         = getSigOf dflags (moduleName mod),
+                tcg_mod_name       = Nothing,
                 tcg_impl_rdr_env   = Nothing,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
@@ -465,7 +466,7 @@ instance MonadUnique (IOEnv (Env gbl lcl)) where
 {-
 ************************************************************************
 *                                                                      *
-                Debugging
+                Accessing input/output
 *                                                                      *
 ************************************************************************
 -}
@@ -764,7 +765,7 @@ reportWarning err
        ; writeTcRef errs_var (warns `snocBag` warn, errs) }
 
 try_m :: TcRn r -> TcRn (Either IOEnvFailure r)
--- Does try_m, with a debug-trace on failure
+-- Does tryM, with a debug-trace on failure
 try_m thing
   = do { mb_r <- tryM thing ;
          case mb_r of

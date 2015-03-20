@@ -25,7 +25,7 @@ import BasicTypes  (Arity)
 import FastString
 import Control.Monad
 import Control.Applicative
-
+import Prelude -- avoid redundant import warning due to AMP
 
 -- Inline ---------------------------------------------------------------------
 

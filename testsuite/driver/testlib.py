@@ -106,7 +106,8 @@ def _reqlib( name, opts, lib ):
         if have_subprocess:
             # By preference we use subprocess, as the alternative uses
             # /dev/null which mingw doesn't have.
-            p = subprocess.Popen([config.ghc_pkg, '--no-user-package-db', 'describe', lib],
+            cmd = strip_quotes(config.ghc_pkg)
+            p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             # read from stdout and stderr to avoid blocking due to
@@ -114,8 +115,8 @@ def _reqlib( name, opts, lib ):
             p.communicate()
             r = p.wait()
         else:
-            r = os.system(config.ghc_pkg + ' describe ' + lib
-                                         + ' > /dev/null 2> /dev/null')
+            r = os.system(config.ghc_pkg + ' --no-user-package-db describe '
+                                         + lib + ' > /dev/null 2> /dev/null')
         got_it = r == 0
         have_lib[lib] = got_it
 
@@ -489,22 +490,34 @@ def _check_stdout( name, opts, f ):
 # ----
 
 def normalise_slashes( name, opts ):
-    opts.extra_normaliser = normalise_slashes_
+    _normalise_fun(name, opts, normalise_slashes_)
 
 def normalise_exe( name, opts ):
-    opts.extra_normaliser = normalise_exe_
+    _normalise_fun(name, opts, normalise_exe_)
 
 def normalise_fun( *fs ):
     return lambda name, opts: _normalise_fun(name, opts, fs)
 
 def _normalise_fun( name, opts, *fs ):
-    opts.extra_normaliser = join_normalisers(fs)
+    opts.extra_normaliser = join_normalisers(opts.extra_normaliser, fs)
 
 def normalise_errmsg_fun( *fs ):
     return lambda name, opts: _normalise_errmsg_fun(name, opts, fs)
 
 def _normalise_errmsg_fun( name, opts, *fs ):
-    opts.extra_errmsg_normaliser = join_normalisers(fs)
+    opts.extra_errmsg_normaliser =  join_normalisers(opts.extra_errmsg_normaliser, fs)
+
+def normalise_version_( *pkgs ):
+    def normalise_version__( str ):
+        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + ')-[0-9.]+',
+                      '\\1-<VERSION>', str)
+    return normalise_version__
+
+def normalise_version( *pkgs ):
+    def normalise_version__( name, opts ):
+        _normalise_fun(name, opts, normalise_version_(*pkgs))
+        _normalise_errmsg_fun(name, opts, normalise_version_(*pkgs))
+    return normalise_version__
 
 def join_normalisers(*a):
     """
@@ -938,26 +951,16 @@ def ghci_script_override_default_flags(overrides):
     return apply
 
 def ghci_script( name, way, script, override_flags = None ):
-    # Use overriden default flags when given
-    if override_flags is not None:
-        default_flags = override_flags
-    else:
-        default_flags = getTestOpts().compiler_always_flags
-
     # filter out -fforce-recomp from compiler_always_flags, because we're
     # actually testing the recompilation behaviour in the GHCi tests.
-    flags = [f for f in default_flags if f != '-fforce-recomp']
-    flags.append(getTestOpts().extra_hc_opts)
-    if getTestOpts().outputdir != None:
-        flags.extend(["-outputdir", getTestOpts().outputdir])
+    flags = ' '.join(get_compiler_flags(override_flags, noforce=True))
+
+    way_flags = ' '.join(config.way_flags(name)['ghci'])
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
-    cmd = "HC='" + config.compiler + "' " + \
-          "HC_OPTS='" + ' '.join(flags) + "' " + \
-          "'" + config.compiler + "'" + \
-          ' --interactive -v0 -ignore-dot-ghci ' + \
-          ' '.join(flags)
+    cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {flags} {way_flags}'
+          ).format(flags=flags, way_flags=way_flags)
 
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -1231,24 +1234,13 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    if override_flags is not None:
-        comp_flags = copy.copy(override_flags)
-    else:
-        comp_flags = copy.copy(getTestOpts().compiler_always_flags)
+    flags = ' '.join(get_compiler_flags(override_flags, noforce) +
+                     config.way_flags(name)[way])
 
-    if noforce:
-        comp_flags = [f for f in comp_flags if f != '-fforce-recomp']
-    if getTestOpts().outputdir != None:
-        comp_flags.extend(["-outputdir", getTestOpts().outputdir])
-
-    cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
-          + config.compiler + "' " \
-          + ' '.join(comp_flags) + ' ' \
-          + to_do + ' ' + srcname + ' ' \
-          + ' '.join(config.way_flags(name)[way]) + ' ' \
-          + extra_hc_opts + ' ' \
-          + opts.extra_hc_opts + ' ' \
-          + '>' + errname + ' 2>&1'
+    cmd = ('cd {opts.testdir} && {cmd_prefix} '
+           '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts} '
+           '> {errname} 2>&1'
+          ).format(**locals())
 
     result = runCmdFor(name, cmd)
 
@@ -1314,11 +1306,11 @@ def simple_run( name, way, prog, args ):
         stdin_comes_from = ' <' + use_stdin
 
     if opts.combined_output:
-        redirection = ' >' + run_stdout \
-                    + ' 2>&1'
+        redirection        = ' > {} 2>&1'.format(run_stdout)
+        redirection_append = ' >> {} 2>&1'.format(run_stdout)
     else:
-        redirection = ' >' + run_stdout \
-                    + ' 2>' + run_stderr
+        redirection        = ' > {} 2> {}'.format(run_stdout, run_stderr)
+        redirection_append = ' >> {} 2>> {}'.format(run_stdout, run_stderr)
 
     cmd = prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
@@ -1326,7 +1318,7 @@ def simple_run( name, way, prog, args ):
         + redirection
 
     if opts.cmd_wrapper != None:
-        cmd = opts.cmd_wrapper(cmd);
+        cmd = opts.cmd_wrapper(cmd) + redirection_append
 
     cmd = 'cd ' + opts.testdir + ' && ' + cmd
 
@@ -1422,20 +1414,22 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     script.close()
 
-    flags = copy.copy(getTestOpts().compiler_always_flags)
-    if getTestOpts().outputdir != None:
-        flags.extend(["-outputdir", getTestOpts().outputdir])
+    flags = ' '.join(get_compiler_flags(override_flags=None, noforce=False) +
+                     config.way_flags(name)[way])
 
-    cmd = "'" + config.compiler + "' " \
-          + ' '.join(flags) + ' ' \
-          + srcname + ' ' \
-          + ' '.join(config.way_flags(name)[way]) + ' ' \
-          + extra_hc_opts + ' ' \
-          + getTestOpts().extra_hc_opts + ' ' \
-          + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
+    if getTestOpts().combined_output:
+        redirection        = ' > {} 2>&1'.format(outname)
+        redirection_append = ' >> {} 2>&1'.format(outname)
+    else:
+        redirection        = ' > {} 2> {}'.format(outname, errname)
+        redirection_append = ' >> {} 2>> {}'.format(outname, errname)
+
+    cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts} '
+           '< {scriptname} {redirection}'
+          ).format(**locals())
 
     if getTestOpts().cmd_wrapper != None:
-        cmd = getTestOpts().cmd_wrapper(cmd);
+        cmd = getTestOpts().cmd_wrapper(cmd) + redirection_append;
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
@@ -1489,6 +1483,23 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
 
 # -----------------------------------------------------------------------------
 # Utils
+def get_compiler_flags(override_flags, noforce):
+    opts = getTestOpts()
+
+    if override_flags is not None:
+        flags = copy.copy(override_flags)
+    else:
+        flags = copy.copy(opts.compiler_always_flags)
+
+    if noforce:
+        flags = [f for f in flags if f != '-fforce-recomp']
+
+    flags.append(opts.extra_hc_opts)
+
+    if opts.outputdir != None:
+        flags.extend(["-outputdir", opts.outputdir])
+
+    return flags
 
 def check_stdout_ok( name ):
    if getTestOpts().with_namebase == None:
@@ -1562,7 +1573,7 @@ def write_file(file, str):
 def check_hp_ok(name):
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = "cd " + getTestOpts().testdir + " && '" + config.hp2ps + "' " + name
+    hp2psCmd = "cd " + getTestOpts().testdir + " && {hp2ps} " + name
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
@@ -1774,11 +1785,11 @@ def rawSystem(cmd_and_args):
 
     # However, subprocess is new in python 2.4, so fall back to
     # using spawnv if we don't have it
-
+    cmd = cmd_and_args[0]
     if have_subprocess:
-        return subprocess.call(cmd_and_args)
+        return subprocess.call([strip_quotes(cmd)] + cmd_and_args[1:])
     else:
-        return os.spawnv(os.P_WAIT, cmd_and_args[0], cmd_and_args)
+        return os.spawnv(os.P_WAIT, cmd, cmd_and_args)
 
 # When running under native msys Python, any invocations of non-msys binaries,
 # including timeout.exe, will have their arguments munged according to some
@@ -1817,6 +1828,9 @@ def rawSystemWithTimeout(cmd_and_args):
 # Then, when using the native Python, os.system will invoke the cmd shell
 
 def runCmd( cmd ):
+    # Format cmd using config. Example: cmd='{hpc} report A.tix'
+    cmd = cmd.format(**config.__dict__)
+
     if_verbose( 3, cmd )
     r = 0
     if config.os == 'mingw32':
@@ -1830,6 +1844,9 @@ def runCmd( cmd ):
     return r << 8
 
 def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
+    # Format cmd using config. Example: cmd='{hpc} report A.tix'
+    cmd = cmd.format(**config.__dict__)
+
     if_verbose( 3, cmd )
     r = 0
     if config.os == 'mingw32':
@@ -2255,17 +2272,17 @@ def printFailingTestInfosSummary(file, testInfos):
                           ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
     file.write('\n')
 
-def getStdout(cmd):
+def getStdout(cmd_and_args):
     if have_subprocess:
-        p = subprocess.Popen(cmd,
+        p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
         r = p.wait()
         if r != 0:
-            raise Exception("Command failed: " + str(cmd))
+            raise Exception("Command failed: " + str(cmd_and_args))
         if stderr != '':
-            raise Exception("stderr from command: " + str(cmd))
+            raise Exception("stderr from command: " + str(cmd_and_args))
         return stdout
     else:
         raise Exception("Need subprocess to get stdout, but don't have it")

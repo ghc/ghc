@@ -35,6 +35,7 @@ test('T5041', normal, compile_and_run, [''])
 test('T5628', exit_code(1), compile_and_run, [''])
 test('T5712', normal, compile_and_run, [''])
 test('T7931', normal, compile_and_run, [''])
-test('T8280', normal, compile_and_run, [''])
+# T8280 is superseded by T10104
 test('T9576', exit_code(1), compile_and_run, [''])
 test('T9830', extra_clean(['T9830a.hi', 'T9830a.o']), multimod_compile_and_run, ['T9830','-v0'])
+test('T10104', normal, compile_and_run, [''])

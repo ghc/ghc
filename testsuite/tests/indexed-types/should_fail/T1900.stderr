@@ -1,12 +1,13 @@
 
-T1900.hs:13:10:
+T1900.hs:7:3:
     Couldn't match type ‘Depend s0’ with ‘Depend s’
     NB: ‘Depend’ is a type function, and may not be injective
     The type variable ‘s0’ is ambiguous
-    Expected type: Depend s -> Bool
-      Actual type: Depend s0 -> Bool
-    In the ambiguity check for the type signature for ‘check’:
-      check :: forall s. Bug s => Depend s -> Bool
+    Expected type: Depend s -> Depend s
+      Actual type: Depend s0 -> Depend s0
+    In the ambiguity check for the type signature for ‘trans’:
+      trans :: forall s. Bug s => Depend s -> Depend s
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    In the type signature for ‘check’:
-      check :: (Bug s) => Depend s -> Bool
+    When checking the class method:
+      trans :: forall s. Bug s => Depend s -> Depend s
+    In the class declaration for ‘Bug’

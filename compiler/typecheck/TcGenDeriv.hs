@@ -54,17 +54,17 @@ import Class
 import TypeRep
 import VarSet
 import VarEnv
-import Module
 import State
 import Util
 import Var
+#if __GLASGOW_HASKELL__ < 709
 import MonadUtils
+#endif
 import Outputable
 import Lexeme
 import FastString
 import Pair
 import Bag
-import Fingerprint
 import TcEnv (InstInfo)
 import StaticFlags( opt_PprStyle_Debug )
 
@@ -102,7 +102,9 @@ data DerivStuff     -- Please add this auxiliary stuff
 -}
 
 genDerivedBinds :: DynFlags -> (Name -> Fixity) -> Class -> SrcSpan -> TyCon
-                -> (LHsBinds RdrName, BagDerivStuff)
+                -> ( LHsBinds RdrName  -- The method bindings of the instance declaration
+                   , BagDerivStuff)    -- Specifies extra top-level declarations needed
+                                       -- to support the instance declaration
 genDerivedBinds dflags fix_env clas loc tycon
   | Just gen_fn <- assocMaybe gen_list (getUnique clas)
   = gen_fn loc tycon
@@ -117,7 +119,6 @@ genDerivedBinds dflags fix_env clas loc tycon
   where
     gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
     gen_list = [ (eqClassKey,          gen_Eq_binds)
-               , (typeableClassKey,    gen_Typeable_binds dflags)
                , (ordClassKey,         gen_Ord_binds)
                , (enumClassKey,        gen_Enum_binds)
                , (boundedClassKey,     gen_Bounded_binds)
@@ -1132,6 +1133,8 @@ gen_Show_binds get_fixity loc tycon
       | nullary_con =  -- skip the showParen junk...
          ASSERT(null bs_needed)
          ([nlWildPat, con_pat], mk_showString_app op_con_str)
+      | record_syntax =  -- skip showParen (#2530)
+         ([a_Pat, con_pat], nlHsPar (nested_compose_Expr show_thingies))
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR
@@ -1181,12 +1184,18 @@ gen_Show_binds get_fixity loc tycon
                                 | (lbl,arg) <- zipEqual "gen_Show_binds"
                                                         labels show_args ]
 
-                -- Generates (showsPrec p x) for argument x, but it also boxes
-                -- the argument first if necessary.  Note that this prints unboxed
-                -- things without any '#' decorations; could change that if need be
-             show_arg b arg_ty = nlHsApps showsPrec_RDR
-                                    [nlHsLit (HsInt "" arg_prec),
-                                    box_if_necy "Show" tycon (nlHsVar b) arg_ty]
+             show_arg :: RdrName -> Type -> LHsExpr RdrName
+             show_arg b arg_ty
+               | isUnLiftedType arg_ty
+               -- See Note [Deriving and unboxed types] in TcDeriv
+               = nlHsApps compose_RDR [mk_shows_app boxed_arg,
+                                       mk_showString_app postfixMod]
+               | otherwise
+               = mk_showsPrec_app arg_prec arg
+                 where
+                   arg        = nlHsVar b
+                   boxed_arg  = box "Show" tycon arg arg_ty
+                   postfixMod = assoc_ty_id "Show" tycon postfixModTbl arg_ty
 
                 -- Fixity stuff
              is_infix = dataConIsInfix data_con
@@ -1206,8 +1215,17 @@ isSym :: String -> Bool
 isSym ""      = False
 isSym (c : _) = startsVarSym c || startsConSym c
 
+-- | showString :: String -> ShowS
 mk_showString_app :: String -> LHsExpr RdrName
 mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString str))
+
+-- | showsPrec :: Show a => Int -> a -> ShowS
+mk_showsPrec_app :: Integer -> LHsExpr RdrName -> LHsExpr RdrName
+mk_showsPrec_app p x = nlHsApps showsPrec_RDR [nlHsLit (HsInt "" p), x]
+
+-- | shows :: Show a => a -> ShowS
+mk_shows_app :: LHsExpr RdrName -> LHsExpr RdrName
+mk_shows_app x = nlHsApp (nlHsVar shows_RDR) x
 
 getPrec :: Bool -> (Name -> Fixity) -> Name -> Integer
 getPrec is_infix get_fixity nm
@@ -1226,55 +1244,6 @@ getPrecedence get_fixity nm
           -- NB: the Report says that associativity is not taken
           --     into account for either Read or Show; hence we
           --     ignore associativity here
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Typeable (new)}
-*                                                                      *
-************************************************************************
-
-From the data type
-
-        data T a b = ....
-
-we generate
-
-        instance Typeable2 T where
-                typeOf2 _ = mkTyConApp (mkTyCon <hash-high> <hash-low>
-                                                <pkg> <module> "T") []
-
-We are passed the Typeable2 class as well as T
--}
-
-gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon
-                   -> (LHsBinds RdrName, BagDerivStuff)
-gen_Typeable_binds dflags loc tycon
-  = ( unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
-                (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
-    , emptyBag )
-  where
-    tycon_name = tyConName tycon
-    modl       = nameModule tycon_name
-    pkg        = modulePackageKey modl
-
-    modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageKeyFS pkg
-    name_fs    = occNameFS (nameOccName tycon_name)
-
-    tycon_rep = nlHsApps mkTyCon_RDR
-                    (map nlHsLit [int64 high,
-                                  int64 low,
-                                  HsString "" pkg_fs,
-                                  HsString "" modl_fs,
-                                  HsString "" name_fs])
-
-    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
-    Fingerprint high low = fingerprintString hashThis
-
-    int64
-      | wORD_SIZE dflags == 4 = HsWord64Prim "" . fromIntegral
-      | otherwise             = HsWordPrim "" . fromIntegral
 
 {-
 ************************************************************************
@@ -2090,15 +2059,13 @@ mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 
-box_if_necy :: String           -- The class involved
+box ::         String           -- The class involved
             -> TyCon            -- The tycon involved
             -> LHsExpr RdrName  -- The argument
             -> Type             -- The argument type
             -> LHsExpr RdrName  -- Boxed version of the arg
--- See Note [Deriving and unboxed types]
-box_if_necy cls_str tycon arg arg_ty
-  | isUnLiftedType arg_ty = nlHsApp (nlHsVar box_con) arg
-  | otherwise             = arg
+-- See Note [Deriving and unboxed types] in TcDeriv
+box cls_str tycon arg arg_ty = nlHsApp (nlHsVar box_con) arg
   where
     box_con = assoc_ty_id cls_str tycon boxConTbl arg_ty
 
@@ -2107,7 +2074,7 @@ primOrdOps :: String    -- The class involved
            -> TyCon     -- The tycon involved
            -> Type      -- The type
            -> (RdrName, RdrName, RdrName, RdrName, RdrName)  -- (lt,le,eq,ge,gt)
--- See Note [Deriving and unboxed types]
+-- See Note [Deriving and unboxed types] in TcDeriv
 primOrdOps str tycon ty = assoc_ty_id str tycon ordOpTbl ty
 
 ordOpTbl :: [(Type, (RdrName, RdrName, RdrName, RdrName, RdrName))]
@@ -2128,6 +2095,17 @@ boxConTbl
     ,(doublePrimTy, getRdrName doubleDataCon)
     ]
 
+-- | A table of postfix modifiers for unboxed values.
+postfixModTbl :: [(Type, String)]
+postfixModTbl
+  = [(charPrimTy  , "#" )
+    ,(intPrimTy   , "#" )
+    ,(wordPrimTy  , "##")
+    ,(floatPrimTy , "#" )
+    ,(doublePrimTy, "##")
+    ]
+
+-- | Lookup `Type` in an association list.
 assoc_ty_id :: String           -- The class involved
             -> TyCon            -- The tycon involved
             -> [(Type,a)]       -- The table
@@ -2295,8 +2273,10 @@ mkAuxBinderName parent occ_fun
     uniq_parent_occ = mkOccName (occNameSpace parent_occ) uniq_string
 
     uniq_string
-      | opt_PprStyle_Debug = showSDocSimple (ppr parent_occ <> underscore <> ppr parent_uniq)
-      | otherwise          = show parent_uniq
+      | opt_PprStyle_Debug
+      = showSDocUnsafe (ppr parent_occ <> underscore <> ppr parent_uniq)
+      | otherwise
+      = show parent_uniq
       -- The debug thing is just to generate longer, but perhaps more perspicuous, names
 
     parent_uniq = nameUnique parent

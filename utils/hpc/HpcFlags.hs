@@ -8,6 +8,7 @@ import Data.Char
 import Trace.Hpc.Tix
 import Trace.Hpc.Mix
 import System.Exit
+import System.FilePath
 
 data Flags = Flags
   { outputFile          :: String
@@ -154,7 +155,7 @@ unionModuleOpt = noArg "union"
 -------------------------------------------------------------------------------
 
 readMixWithFlags :: Flags -> Either String TixModule -> IO Mix
-readMixWithFlags flags modu = readMix [ dir ++  "/" ++ hpcDir
+readMixWithFlags flags modu = readMix [ dir </> hpcDir
                                       | dir <- srcDirs flags
                                       , hpcDir <- hpcDirs flags
                                       ] modu

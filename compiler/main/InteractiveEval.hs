@@ -169,10 +169,10 @@ runStmtWithLocation source linenumber expr step =
     breakMVar  <- liftIO $ newEmptyMVar  -- wait on this when we hit a breakpoint
     statusMVar <- liftIO $ newEmptyMVar  -- wait on this when a computation is running
 
-    -- Turn off -fwarn-unused-bindings when running a statement, to hide
+    -- Turn off -fwarn-unused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
     let ic       = hsc_IC hsc_env -- use the interactive dflags
-        idflags' = ic_dflags ic `wopt_unset` Opt_WarnUnusedBinds
+        idflags' = ic_dflags ic `wopt_unset` Opt_WarnUnusedLocalBinds
         hsc_env' = hsc_env{ hsc_IC = ic{ ic_dflags = idflags' } }
 
     -- compile to value (IO [HValue]), don't run

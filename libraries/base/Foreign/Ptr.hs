@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, GeneralizedNewtypeDeriving,
-             AutoDeriveTypeable, StandaloneDeriving #-}
+             StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -58,7 +58,6 @@ import GHC.Show
 import GHC.Enum
 
 import Data.Bits
-import Data.Typeable
 import Foreign.Storable ( Storable(..) )
 
 -- | Release the storage associated with the given 'FunPtr', which

@@ -25,13 +25,14 @@ install show:
 
 else
 
+.PHONY: default
 default : all
 	@:
 
 # For help, type 'make help'
 .PHONY: help
 help:
-	@cat MAKEHELP
+	@cat MAKEHELP.md
 
 ifneq "$(filter maintainer-clean distclean clean help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
@@ -52,7 +53,7 @@ endif
 endif
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show echo help test fulltest,$(MAKECMDGOALS))
+REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show echo help test fulltest fast fasttest,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -65,7 +66,7 @@ REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framewor
 
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
-.PHONY: $(REALGOALS)
+.PHONY: $(REALGOALS) all
 $(REALGOALS) all: mk/config.mk.old mk/project.mk.old compiler/ghc.cabal.old
 ifneq "$(OMIT_PHASE_0)" "YES"
 	@echo "===--- building phase 0"
@@ -111,11 +112,10 @@ endif
 
 endif
 
-.PHONY: test
-test:
+.PHONY: fasttest fast
+fasttest fast:
 	$(MAKE) -C testsuite/tests CLEANUP=1 OUTPUT_SUMMARY=../../testsuite_summary.txt fast
 
-.PHONY: fulltest
-fulltest:
+.PHONY: fulltest test
+fulltest test:
 	$(MAKE) -C testsuite/tests CLEANUP=1 OUTPUT_SUMMARY=../../testsuite_summary.txt
-

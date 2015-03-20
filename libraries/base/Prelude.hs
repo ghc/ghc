@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -70,7 +70,7 @@ module Prelude (
     Monoid(mempty, mappend, mconcat),
 
     -- ** Monads and functors
-    Functor(fmap),
+    Functor(fmap, (<$)), (<$>),
     Applicative(pure, (<*>), (*>), (<*)),
     Monad((>>=), (>>), return, fail),
     mapM_, sequence_, (=<<),
@@ -158,6 +158,7 @@ import System.IO.Error
 import Data.List
 import Data.Either
 import Data.Foldable    ( Foldable(..) )
+import Data.Functor     ( (<$>) )
 import Data.Maybe
 import Data.Traversable ( Traversable(..) )
 import Data.Tuple

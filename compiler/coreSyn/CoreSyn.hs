@@ -71,7 +71,7 @@ module CoreSyn (
         deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
 
         -- * Core rule data types
-        CoreRule(..),   -- CoreSubst, CoreTidy, CoreFVs, PprCore only
+        CoreRule(..), RuleBase,
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
 
         -- ** Operations on 'CoreRule's
@@ -91,6 +91,7 @@ import Var
 import Type
 import Coercion
 import Name
+import NameEnv( NameEnv )
 import Literal
 import DataCon
 import Module
@@ -340,7 +341,7 @@ See #letrec_invariant#
 Note [CoreSyn let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The let/app invariant
-     the right hand side of of a non-recursive 'Let', and
+     the right hand side of a non-recursive 'Let', and
      the argument of an 'App',
     /may/ be of unlifted type, but only if
     the expression is ok-for-speculation.
@@ -707,6 +708,11 @@ tickishContains t1 t2
 The CoreRule type and its friends are dealt with mainly in CoreRules,
 but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
 -}
+
+-- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
+type RuleBase = NameEnv [CoreRule]
+        -- The rules are unordered;
+        -- we sort out any overlaps on lookup
 
 -- | A 'CoreRule' is:
 --

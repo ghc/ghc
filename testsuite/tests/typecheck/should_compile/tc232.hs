@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 -- This one foxed the constraint solver (Lint error)
 -- See Trac #1494
@@ -7,6 +8,13 @@ module ShouldCompile where
 import Control.Monad.State
 
 newtype L m r = L (StateT Int m r)
+
+instance Functor (L m) where
+  fmap = undefined
+
+instance Applicative (L m) where
+  pure  = undefined
+  (<*>) = undefined
 
 instance Monad m => Monad (L m) where
   (>>=)  = undefined

@@ -47,6 +47,12 @@ The code is very regular and boilerplate-like, but there is
 some neat handling of *binders*.  In effect they are deBruijn
 numbered on the fly.
 
+The regular pattern for handling TrieMaps on data structures was first
+described (to my knowledge) in Connelly and Morris's 1995 paper "A
+generalization of the Trie Data Structure"; there is also an accessible
+description of the idea in Okasaki's book "Purely Functional Data
+Structures", Section 10.3.2
+
 ************************************************************************
 *                                                                      *
                    The TrieMap class

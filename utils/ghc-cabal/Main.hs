@@ -6,6 +6,7 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
 import Distribution.PackageDescription.Parse
+import Distribution.Package
 import Distribution.System
 import Distribution.Simple
 import Distribution.Simple.Configure
@@ -438,6 +439,8 @@ generate directory distdir dll0Modules config_args
           allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 variablePrefix ++ "_PACKAGE_KEY = " ++ display (pkgKey lbi),
+                -- copied from mkComponentsLocalBuildInfo
+                variablePrefix ++ "_LIB_NAME = " ++ packageKeyLibraryName (package pd) (pkgKey lbi),
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,

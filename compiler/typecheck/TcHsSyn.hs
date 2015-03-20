@@ -36,6 +36,7 @@ import TcRnMonad
 import PrelNames
 import TypeRep     -- We can see the representation of types
 import TcType
+import RdrName ( RdrName, rdrNameOcc )
 import TcMType ( defaultKindVarToStar, zonkQuantifiedTyVar, writeMetaTyVar )
 import TcEvidence
 import Coercion
@@ -298,7 +299,9 @@ zonkTopLExpr :: LHsExpr TcId -> TcM (LHsExpr Id)
 zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind
-             -> LHsBinds TcId -> Bag OccName -> NameSet
+             -> LHsBinds TcId 
+             -> Maybe (Located [LIE RdrName]) 
+             -> NameSet
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
              -> TcM ([Id],
                      Bag EvBind,
@@ -307,15 +310,18 @@ zonkTopDecls :: Bag EvBind
                      [LTcSpecPrag],
                      [LRuleDecl    Id],
                      [LVectDecl    Id])
-zonkTopDecls ev_binds binds exports sig_ns rules vects imp_specs fords
+zonkTopDecls ev_binds binds export_ies sig_ns rules vects imp_specs fords
   = do  { (env1, ev_binds') <- zonkEvBinds emptyZonkEnv ev_binds
 
          -- Warn about missing signatures
          -- Do this only when we we have a type to offer
         ; warn_missing_sigs <- woptM Opt_WarnMissingSigs
         ; warn_only_exported <- woptM Opt_WarnMissingExportedSigs
-        ; let sig_warn
-                | warn_only_exported = topSigWarnIfExported exports sig_ns
+        ; let export_occs  = maybe emptyBag
+                                   (listToBag . map (rdrNameOcc . ieName . unLoc) . unLoc)
+                                   export_ies
+              sig_warn
+                | warn_only_exported = topSigWarnIfExported export_occs sig_ns
                 | warn_missing_sigs  = topSigWarn sig_ns
                 | otherwise          = noSigWarn
 
@@ -1246,6 +1252,20 @@ zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
 zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms
                                        ; return (EvTupleMk tms') }
 zonkEvTerm _   (EvLit l)          = return (EvLit l)
+
+zonkEvTerm env (EvTypeable ev) =
+  fmap EvTypeable $
+  case ev of
+    EvTypeableTyCon tc ks    -> return (EvTypeableTyCon tc ks)
+    EvTypeableTyApp t1 t2    -> do e1 <- zonk t1
+                                   e2 <- zonk t2
+                                   return (EvTypeableTyApp e1 e2)
+    EvTypeableTyLit t        -> EvTypeableTyLit `fmap` zonkTcTypeToType env t
+  where
+  zonk (ev,t) = do ev' <- zonkEvTerm env ev
+                   t'  <- zonkTcTypeToType env t
+                   return (ev',t')
+
 zonkEvTerm env (EvCallStack cs)
   = case cs of
       EvCsEmpty -> return (EvCallStack cs)

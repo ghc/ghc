@@ -60,7 +60,6 @@ Flag integer-gmp2
 Library
     default-language: Haskell2010
     other-extensions:
-        AutoDeriveTypeable
         BangPatterns
         CApiFFI
         CPP
@@ -99,7 +98,7 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts == 1.0.*, ghc-prim >= 0.3.1 && < 0.4
+    build-depends: rts == 1.0.*, ghc-prim == 0.4.*
     if flag(integer-simple)
         build-depends: integer-simple >= 0.1.1 && < 0.2
 
@@ -247,6 +246,7 @@ Library
         GHC.MVar
         GHC.Natural
         GHC.Num
+        GHC.OldList
         GHC.PArr
         GHC.Pack
         GHC.Profiling

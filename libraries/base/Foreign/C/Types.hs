@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, GeneralizedNewtypeDeriving,
-             AutoDeriveTypeable, StandaloneDeriving #-}
+             StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
@@ -24,7 +24,7 @@ module Foreign.C.Types
           -- $ctypes
 
           -- ** Integral types
-          -- | These types are are represented as @newtype@s of
+          -- | These types are represented as @newtype@s of
           -- types in "Data.Int" and "Data.Word", and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
@@ -53,7 +53,7 @@ module Foreign.C.Types
         --
 
           -- ** Floating types
-          -- | These types are are represented as @newtype@s of
+          -- | These types are represented as @newtype@s of
           -- 'Prelude.Float' and 'Prelude.Double', and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
@@ -73,7 +73,6 @@ import Foreign.Storable
 import Data.Bits        ( Bits(..), FiniteBits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
-import Data.Typeable
 
 import GHC.Base
 import GHC.Float

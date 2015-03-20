@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -----------------------------------------------------------------------------
 --
@@ -355,55 +356,85 @@ of Bool-returning primops was that tagToEnum# was added implicitly in the
 codegen and then optimized away. Now the call to tagToEnum# is explicit
 in the source code, which allows to optimize it away at the earlier stages
 of compilation (i.e. at the Core level).
+
+Note [Scrutinising VoidRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have this STG code:
+   f = \[s : State# RealWorld] -> 
+       case s of _ -> blah
+This is very odd.  Why are we scrutinising a state token?  But it
+can arise with bizarre NOINLINE pragmas (Trac #9964)
+    crash :: IO ()
+    crash = IO (\s -> let {-# NOINLINE s' #-}
+                          s' = s
+                      in (# s', () #))
+
+Now the trouble is that 's' has VoidRep, and we do not bind void
+arguments in the environment; they don't live anywhere.  See the
+calls to nonVoidIds in various places.  So we must not look up 
+'s' in the environment.  Instead, just evaluate the RHS!  Simple.
 -}
 
+cgCase (StgApp v []) _ (PrimAlt _) alts
+  | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
+  , [(DEFAULT, _, _, rhs)] <- alts
+  = cgExpr rhs
 
-  -- Note [ticket #3132]: we might be looking at a case of a lifted Id
-  -- that was cast to an unlifted type.  The Id will always be bottom,
-  -- but we don't want the code generator to fall over here.  If we
-  -- just emit an assignment here, the assignment will be
-  -- type-incorrect Cmm.  Hence, we emit the usual enter/return code,
-  -- (and because bottom must be untagged, it will be entered and the
-  -- program will crash).
-  -- The Sequel is a type-correct assignment, albeit bogus.
-  -- The (dead) continuation loops; it would be better to invoke some kind
-  -- of panic function here.
-  --
-  -- However, we also want to allow an assignment to be generated
-  -- in the case when the types are compatible, because this allows
-  -- some slightly-dodgy but occasionally-useful casts to be used,
-  -- such as in RtClosureInspect where we cast an HValue to a MutVar#
-  -- so we can print out the contents of the MutVar#.  If we generate
-  -- code that enters the HValue, then we'll get a runtime panic, because
-  -- the HValue really is a MutVar#.  The types are compatible though,
-  -- so we can just generate an assignment.
+{- Note [Dodgy unsafeCoerce 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+    case (x :: HValue) |> co of (y :: MutVar# Int)
+        DEFAULT -> ...
+We want to gnerate an assignment
+     y := x
+We want to allow this assignment to be generated in the case when the
+types are compatible, because this allows some slightly-dodgy but
+occasionally-useful casts to be used, such as in RtClosureInspect
+where we cast an HValue to a MutVar# so we can print out the contents
+of the MutVar#.  If instead we generate code that enters the HValue,
+then we'll get a runtime panic, because the HValue really is a
+MutVar#.  The types are compatible though, so we can just generate an
+assignment.
+-}
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
-  | isUnLiftedType (idType v)
+  | isUnLiftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   || reps_compatible
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags
        ; when (not reps_compatible) $
            panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
        ; v_info <- getCgIdInfo v
-       ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr))) (idInfoToAmode v_info)
-       ; _ <- bindArgsToRegs [NonVoid bndr]
+       ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
+                    (idInfoToAmode v_info)
+       ; bindArgsToRegs [NonVoid bndr]
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = idPrimRep v == idPrimRep bndr
 
+{- Note [Dodgy unsafeCoerce 2, #3132]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In all other cases of a lifted Id being cast to an unlifted type, the
+Id should be bound to bottom, otherwise this is an unsafe use of
+unsafeCoerce.  We can generate code to enter the Id and assume that
+it will never return.  Hence, we emit the usual enter/return code, and
+because bottom must be untagged, it will be entered.  The Sequel is a
+type-correct assignment, albeit bogus.  The (dead) continuation loops;
+it would be better to invoke some kind of panic function here.
+-}
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
-  = -- fail at run-time, not compile-time
-    do { dflags <- getDynFlags
+  = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
-       ; _ <- withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
+       ; withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newLabelC
        ; emitLabel l
-       ; emit (mkBranch l)
+       ; emit (mkBranch l)  -- an infinite loop
        ; return AssignedDirectly
        }
-{-
+
+{- Note [Handle seq#]
+~~~~~~~~~~~~~~~~~~~~~
 case seq# a s of v
   (# s', a' #) -> e
 
@@ -417,7 +448,8 @@ is the same as the return convention for just 'a')
 -}
 
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
-  = -- handle seq#, same return convention as vanilla 'a'.
+  = -- Note [Handle seq#]
+    -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 
 cgCase scrut bndr alt_type alts

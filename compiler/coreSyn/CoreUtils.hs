@@ -907,8 +907,8 @@ exprIsCheap' good_app other_expr        -- Applications and variables
          -- good plan
 
     go (Var f) args
-       | good_app f (length args)
-       = go_pap args
+       | good_app f (length args)  -- Typically holds of data constructor applications
+       = go_pap args               -- E.g. good_app = isCheapApp below
 
        | otherwise
         = case idDetails f of

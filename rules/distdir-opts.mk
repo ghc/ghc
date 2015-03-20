@@ -65,7 +65,6 @@ $1_$2_DIST_LD_LIB_DIRS := $$(subst $$(space)',$$(space)-L',$$(space)$$($1_$2_DEP
 endif
 
 $1_$2_DIST_LD_OPTS = \
- $$(CONF_GCC_LINKER_OPTS_STAGE$3) \
  $$(SRC_LD_OPTS) \
  $$($1_LD_OPTS) \
  $$($1_$2_LD_OPTS) \

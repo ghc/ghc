@@ -19,16 +19,18 @@ foo :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: Int) ->
                  case n of _ [Occ=Dead] { GHC.Types.I# x ->
-                 case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x 5) of _ [Occ=Dead] {
-                   False -> GHC.Types.I# (GHC.Prim.+# x 5);
+                 case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x 5#)
+                 of _ [Occ=Dead] {
+                   False -> GHC.Types.I# (GHC.Prim.+# x 5#);
                    True -> T4930.foo1
                  }
                  }}]
 foo =
   \ (n :: Int) ->
     case n of _ [Occ=Dead] { GHC.Types.I# x ->
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x 5) of _ [Occ=Dead] {
-      False -> GHC.Types.I# (GHC.Prim.+# x 5);
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x 5#)
+    of _ [Occ=Dead] {
+      False -> GHC.Types.I# (GHC.Prim.+# x 5#);
       True -> T4930.foo1
     }
     }

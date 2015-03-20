@@ -50,7 +50,7 @@ endif
 # for a feature it may not generate warning-free C code, and thus may
 # think that the feature doesn't exist if -Werror is on.
 $1_$2_CONFIGURE_CFLAGS = $$(filter-out -Werror,$$(SRC_CC_OPTS)) $$(CONF_CC_OPTS_STAGE$3) $$($1_CC_OPTS) $$($1_$2_CC_OPTS) $$(SRC_CC_WARNING_OPTS)
-$1_$2_CONFIGURE_LDFLAGS = $$(SRC_LD_OPTS) $$(CONF_GCC_LINKER_OPTS_STAGE$3) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)
+$1_$2_CONFIGURE_LDFLAGS = $$(SRC_LD_OPTS) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)
 $1_$2_CONFIGURE_CPPFLAGS = $$(SRC_CPP_OPTS) $$(CONF_CPP_OPTS_STAGE$3) $$($1_CPP_OPTS) $$($1_$2_CPP_OPTS)
 
 $1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$($1_$2_CONFIGURE_CFLAGS)"
@@ -75,6 +75,14 @@ endif
 
 ifneq "$$(GMP_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
+endif
+
+ifneq "$$(CURSES_INCLUDE_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-includes="$$(CURSES_INCLUDE_DIRS)"
+endif
+
+ifneq "$$(CURSES_LIB_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
 endif
 
 ifeq "$$(CrossCompiling)" "YES"

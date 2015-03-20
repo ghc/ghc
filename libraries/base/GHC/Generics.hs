@@ -29,7 +29,7 @@ module GHC.Generics  (
 --
 -- |
 --
--- Datatype-generic functions are are based on the idea of converting values of
+-- Datatype-generic functions are based on the idea of converting values of
 -- a datatype @T@ into corresponding values of a (nearly) isomorphic type @'Rep' T@.
 -- The type @'Rep' T@ is
 -- built from a limited set of type constructors, all provided by this module. A

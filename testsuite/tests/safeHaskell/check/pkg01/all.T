@@ -2,15 +2,6 @@
 def f( name, opts ):
   opts.only_ways = ['normal']
 
-def normaliseArrayPackage(str):
-    return re.sub('array-[0-9]+(\.[0-9]+)*', 'array-<VERSION>', str)
-
-def normaliseBytestringPackage(str):
-    return re.sub('bytestring-[0-9]+(\.[0-9]+)*', 'bytestring-<VERSION>', str)
-
-def normaliseIntegerPackage(str):
-    return re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
-
 def ignoreLdOutput(str):
     return re.sub('Creating library file: pdb.safePkg01/dist.build.libHSsafePkg01-1.0-ghc[0-9.]*.dll.a\n', '', str)
 
@@ -38,10 +29,8 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 test('safePkg01',
      [clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.safePkg01'),
       normalise_errmsg_fun(ignoreLdOutput),
-      normalise_fun(
-        normaliseArrayPackage,
-        normaliseIntegerPackage,
-        normaliseBytestringPackage)],
+      normalise_version("array", "integer-gmp", "integer-simple", "bytestring"),
+     ],
      run_command,
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
@@ -102,19 +91,19 @@ test('ImpSafeOnly06',
 test('ImpSafeOnly07',
      [pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly07 ' + make_args),
       clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.ImpSafeOnly07'),
-      normalise_errmsg_fun(normaliseBytestringPackage)],
+      normalise_version("bytestring")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly07/local.db -trust safePkg01 -distrust bytestring'])
 test('ImpSafeOnly08',
      [pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly08 ' + make_args),
       clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.ImpSafeOnly08'),
-      normalise_errmsg_fun(normaliseBytestringPackage)],
+      normalise_version("bytestring")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly08/local.db -trust safePkg01'])
 test('ImpSafeOnly09',
      [pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly09 ' + make_args),
       clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.ImpSafeOnly09'),
-      normalise_errmsg_fun(normaliseBytestringPackage)],
+      normalise_version("bytestring")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly09/local.db -trust safePkg01'])
 

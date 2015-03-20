@@ -49,7 +49,7 @@ module SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
-        showUserSpan, pprUserRealSpan,
+        pprUserRealSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -484,9 +484,6 @@ instance Outputable SrcSpan where
 --           case span of
 --           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
 --           RealSrcSpan s -> ppr s
-
-showUserSpan :: Bool -> SrcSpan -> String
-showUserSpan show_path span = showSDocSimple (pprUserSpan show_path span)
 
 pprUserSpan :: Bool -> SrcSpan -> SDoc
 pprUserSpan _         (UnhelpfulSpan s) = ftext s

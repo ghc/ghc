@@ -1800,7 +1800,7 @@ mapFvRnCPS f (x:xs) cont = f x             $ \ x' ->
 
 warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
-    = whenWOptM Opt_WarnUnusedBinds
+    = whenWOptM Opt_WarnUnusedTopBinds
     $ do env <- getGblEnv
          let isBoot = tcg_src env == HsBootFile
          let noParent gre = case gre_par gre of
@@ -1817,7 +1817,7 @@ warnUnusedTopBinds gres
          warnUnusedGREs gres'
 
 warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> FreeVars -> RnM ()
-warnUnusedLocalBinds = check_unused Opt_WarnUnusedBinds
+warnUnusedLocalBinds = check_unused Opt_WarnUnusedLocalBinds
 warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
 
 check_unused :: WarningFlag -> [Name] -> FreeVars -> RnM ()

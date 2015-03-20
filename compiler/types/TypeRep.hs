@@ -639,7 +639,7 @@ pprSigmaTypeExtraCts :: Bool -> Type -> SDoc
 pprSigmaTypeExtraCts = ppr_sigma_type False
 
 pprUserForAll :: [TyVar] -> SDoc
--- Print a user-level forall; see Note [WHen to print foralls]
+-- Print a user-level forall; see Note [When to print foralls]
 pprUserForAll tvs
   = sdocWithDynFlags $ \dflags ->
     ppWhen (any tv_has_kind_var tvs || gopt Opt_PrintExplicitForalls dflags) $

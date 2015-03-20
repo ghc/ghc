@@ -27,7 +27,7 @@ module TcRnTypes(
         TcGblEnv(..), TcLclEnv(..),
         IfGblEnv(..), IfLclEnv(..),
 
-        -- Ranamer types
+        -- Renamer types
         ErrCtxt, RecFieldEnv,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         WhereFrom(..), mkModDeps,
@@ -335,6 +335,8 @@ data TcGblEnv
           -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
         tcg_sig_of  :: Maybe Module,
           -- ^ Are we being compiled as a signature of an implementation?
+        tcg_mod_name :: Maybe (Located ModuleName),
+          -- ^ @Nothing@: \"module X where\" is omitted
         tcg_impl_rdr_env :: Maybe GlobalRdrEnv,
           -- ^ Environment used only during -sig-of for resolving top level
           -- bindings.  See Note [Signature parameters in TcGblEnv and DynFlags]
@@ -432,6 +434,8 @@ data TcGblEnv
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
         tcg_rn_exports :: Maybe [Located (IE Name)],
+                -- Nothing <=> no explicit export list
+
         tcg_rn_imports :: [LImportDecl Name],
                 -- Keep the renamed imports regardless.  They are not
                 -- voluminous and are needed if you want to report unused imports

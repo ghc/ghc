@@ -19,7 +19,7 @@ import qualified Data.List as L
 import qualified GHC.List as L
 #endif
 
-data BadElementException = BadFirst | BadLast deriving (Show, Typeable, Eq)
+data BadElementException = BadFirst | BadLast deriving (Show, Eq)
 instance Exception BadElementException
 
 newtype ForceDefault f a = ForceDefault (f a)

@@ -565,6 +565,11 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
+    arm*linux*)
+        # On arm/linux and arm/android, tell gcc to link using the gold linker.
+        # Forcing LD to be ld.gold is done in configre.ac.
+        $3="$$3 -fuse-ld=gold"
+        ;;
     esac
 
     # If gcc knows about the stack protector, turn it off.
@@ -1826,6 +1831,28 @@ AC_DEFUN([FP_GMP],
   AC_SUBST(GMP_LIB_DIRS)
 ])# FP_GMP
 
+# FP_CURSES
+# -------------
+AC_DEFUN([FP_CURSES],
+[
+  dnl--------------------------------------------------------------------
+  dnl * Deal with arguments telling us curses is somewhere odd
+  dnl--------------------------------------------------------------------
+
+  AC_ARG_WITH([curses-includes],
+    [AC_HELP_STRING([--with-curses-includes],
+      [directory containing curses headers])],
+      [CURSES_INCLUDE_DIRS=$withval])
+
+  AC_ARG_WITH([curses-libraries],
+    [AC_HELP_STRING([--with-curses-libraries],
+      [directory containing curses libraries])],
+      [CURSES_LIB_DIRS=$withval])
+
+  AC_SUBST(CURSES_INCLUDE_DIRS)
+  AC_SUBST(CURSES_LIB_DIRS)
+])# FP_CURSES
+
 # --------------------------------------------------------------
 # Calculate absolute path to build tree
 # --------------------------------------------------------------
@@ -2073,21 +2100,31 @@ AC_DEFUN([XCODE_VERSION],[
 AC_DEFUN([FIND_LLVM_PROG],[
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
     if test "$$1" = ""; then
+        echo -n "checking for $3-x.x... "
         save_IFS=$IFS
         IFS=":;"
+        if test "$windows" = YES; then
+            PERM=
+            MODE=
+        else
+            # Search for executables.
+            PERM="-perm"
+            MODE="/+x"
+        fi
         for p in ${PATH}; do
             if test -d "${p}"; then
-                if test "$windows" = YES; then
-                    $1=`${FindCmd} "${p}" -type f -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
-                else
-                    $1=`${FindCmd} "${p}" -type f -perm \111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm \111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
-                fi
+                $1=`${FindCmd} "${p}" -maxdepth 1 \( -type f -o -type l \) ${PERM} ${MODE} -regex ".*/$3-[[0-9]]\.[[0-9]]" | ${SortCmd} -n | tail -1`
                 if test -n "$$1"; then
                     break
                 fi
             fi
         done
         IFS=$save_IFS
+        if test -n "$$1"; then
+            echo "$$1"
+        else
+            echo "no"
+        fi
     fi
 ])
 

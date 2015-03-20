@@ -419,7 +419,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/deriving/should_run/T5628
 /tests/deriving/should_run/T5712
 /tests/deriving/should_run/T7931
-/tests/deriving/should_run/T8280
+/tests/deriving/should_run/T10104
 /tests/deriving/should_run/drvrun-foldable1
 /tests/deriving/should_run/drvrun-functor1
 /tests/deriving/should_run/drvrun001
@@ -1045,6 +1045,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/numeric/should_run/T7689
 /tests/numeric/should_run/T8726
 /tests/numeric/should_run/T9810
+/tests/numeric/should_run/T10011
 /tests/numeric/should_run/add2
 /tests/numeric/should_run/arith001
 /tests/numeric/should_run/arith002
@@ -1544,3 +1545,4 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /timeout/calibrate.out
 /timeout/dist/
 /timeout/install-inplace/
+/tests/driver/T7373/package.conf.d/

@@ -245,29 +245,25 @@ infixr 3 `mkFunTy`      -- Associates to the right
 
 {-# INLINE coreView #-}
 coreView :: Type -> Maybe Type
--- ^ In Core, we \"look through\" non-recursive newtypes and 'PredTypes': this
--- function tries to obtain a different view of the supplied type given this
---
--- Strips off the /top layer only/ of a type to give
--- its underlying representation type.
+-- ^ This function Strips off the /top layer only/ of a type synonym
+-- application (if any) its underlying representation type.
 -- Returns Nothing if there is nothing to look through.
 --
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
-coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys
+coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
               = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
-coreView _                 = Nothing
+coreView _ = Nothing
 
 -----------------------------------------------
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
--- ^ Similar to 'coreView', but for the type checker, which just looks through synonyms
-tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
-                         = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
-tcView _                 = Nothing
+-- ^ Historical only; 'tcView' and 'coreView' used to differ, but don't any more
+tcView = coreView
+  -- ToDo: get rid of tcView altogether
   -- You might think that tcView belows in TcType rather than Type, but unfortunately
   -- it is needed by Unify, which is turn imported by Coercion (for MatchEnv and matchList).
   -- So we will leave it here to avoid module loops.
@@ -281,7 +277,7 @@ expandTypeSynonyms ty
   = go ty
   where
     go (TyConApp tc tys)
-      | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
+      | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
       = go (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
       | otherwise
       = TyConApp tc (map go tys)

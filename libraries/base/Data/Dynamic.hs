@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -68,7 +68,6 @@ import GHC.Exception
   of the object\'s type; useful for debugging.
 -}
 data Dynamic = Dynamic TypeRep Obj
-               deriving Typeable
 
 instance Show Dynamic where
    -- the instance just prints the type representation.

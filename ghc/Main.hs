@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
@@ -315,7 +315,7 @@ checkOptions mode dflags srcs objs = do
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
          && isInterpretiveMode mode) $
       do throwGhcException (UsageError
-                   "--interactive can't be used with -prof or -unreg.")
+                   "--interactive can't be used with -prof.")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
@@ -517,8 +517,11 @@ parseModeFlags args = do
       mode = case mModeFlag of
              Nothing     -> doMakeMode
              Just (m, _) -> m
-      errs = errs1 ++ map (mkGeneralLocated "on the commandline") errs2
-  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
+
+  -- See Note [Handling errors when parsing commandline flags]
+  unless (null errs1 && null errs2) $ throwGhcException $ errorsToGhcException $
+      map (("on the commandline", )) $ map unLoc errs1 ++ errs2
+
   return (mode, flags' ++ leftover, warns)
 
 type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])

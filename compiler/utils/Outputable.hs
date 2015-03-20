@@ -40,13 +40,17 @@ module Outputable (
         -- * Converting 'SDoc' into strings and outputing it
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
-        showSDoc, showSDocSimple, showSDocOneLine,
+        showSDoc, showSDocUnsafe, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
         showSDocUnqual, showPpr,
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
+
+        primFloatSuffix, primDoubleSuffix,
+        pprPrimChar, pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64,
+
         pprFastFilePath,
 
         -- * Controlling the style in which output is printed
@@ -101,6 +105,7 @@ import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
 import Text.Printf
+import Data.Graph (SCC(..))
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -401,8 +406,10 @@ mkCodeStyle = PprCode
 showSDoc :: DynFlags -> SDoc -> String
 showSDoc dflags sdoc = renderWithStyle dflags sdoc defaultUserStyle
 
-showSDocSimple :: SDoc -> String
-showSDocSimple sdoc = showSDoc unsafeGlobalDynFlags sdoc
+-- showSDocUnsafe is unsafe, because `unsafeGlobalDynFlags` might not be
+-- initialised yet.
+showSDocUnsafe :: SDoc -> String
+showSDocUnsafe sdoc = showSDoc unsafeGlobalDynFlags sdoc
 
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
@@ -765,6 +772,10 @@ instance (Outputable elt) => Outputable (IM.IntMap elt) where
 instance Outputable Fingerprint where
     ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
 
+instance Outputable a => Outputable (SCC a) where
+   ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
+   ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
+
 {-
 ************************************************************************
 *                                                                      *
@@ -808,7 +819,7 @@ pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: 
 pprHsString :: FastString -> SDoc
 pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
 
--- | Special combinator for showing string literals.
+-- | Special combinator for showing bytestring literals.
 pprHsBytes :: ByteString -> SDoc
 pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                 in vcat (map text (showMultiLineString escaped)) <> char '#'
@@ -817,6 +828,27 @@ pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                      in if isAscii c
                         then [c]
                         else '\\' : show w
+
+-- Postfix modifiers for unboxed literals.
+-- See Note [Printing of literals in Core] in `basicTypes/Literal.hs`.
+primCharSuffix, primFloatSuffix, primIntSuffix :: SDoc
+primDoubleSuffix, primWordSuffix, primInt64Suffix, primWord64Suffix :: SDoc
+primCharSuffix   = char '#'
+primFloatSuffix  = char '#'
+primIntSuffix    = char '#'
+primDoubleSuffix = text "##"
+primWordSuffix   = text "##"
+primInt64Suffix  = text "L#"
+primWord64Suffix = text "L##"
+
+-- | Special combinator for showing unboxed literals.
+pprPrimChar :: Char -> SDoc
+pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
+pprPrimChar c   = pprHsChar c <> primCharSuffix
+pprPrimInt i    = integer i   <> primIntSuffix
+pprPrimWord w   = integer w   <> primWordSuffix
+pprPrimInt64 i  = integer i   <> primInt64Suffix
+pprPrimWord64 w = integer w   <> primWord64Suffix
 
 ---------------------
 -- Put a name in parens if it's an operator

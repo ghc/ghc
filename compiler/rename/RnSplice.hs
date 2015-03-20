@@ -453,9 +453,7 @@ rn_bracket _ (DecBrL decls)
                           -- The emptyDUs is so that we just collect uses for this
                           -- group alone in the call to rnSrcDecls below
        ; (tcg_env, group') <- setGblEnv new_gbl_env $
-                              rnSrcDecls [] group
-   -- The empty list is for extra dependencies coming from .hs-boot files
-   -- See Note [Extra dependencies from .hs-boot files] in RnSource
+                              rnSrcDecls Nothing group
 
               -- Discard the tcg_env; it contains only extra info about fixity
         ; traceRn (text "rn_bracket dec" <+> (ppr (tcg_dus tcg_env) $$

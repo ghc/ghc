@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
@@ -75,6 +74,17 @@ instance Monoid a => Monoid (Dual a) where
         mempty = Dual mempty
         Dual x `mappend` Dual y = Dual (y `mappend` x)
 
+instance Functor Dual where
+    fmap     = coerce
+
+instance Applicative Dual where
+    pure     = Dual
+    (<*>)    = coerce
+
+instance Monad Dual where
+    return   = Dual
+    m >>= k  = k (getDual m)
+
 -- | The monoid of endomorphisms under composition.
 newtype Endo a = Endo { appEndo :: a -> a }
                deriving (Generic)
@@ -108,6 +118,17 @@ instance Num a => Monoid (Sum a) where
         mappend = coerce ((+) :: a -> a -> a)
 --        Sum x `mappend` Sum y = Sum (x + y)
 
+instance Functor Sum where
+    fmap     = coerce
+
+instance Applicative Sum where
+    pure     = Sum
+    (<*>)    = coerce
+
+instance Monad Sum where
+    return   = Sum
+    m >>= k  = k (getSum m)
+
 -- | Monoid under multiplication.
 newtype Product a = Product { getProduct :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
@@ -116,6 +137,17 @@ instance Num a => Monoid (Product a) where
         mempty = Product 1
         mappend = coerce ((*) :: a -> a -> a)
 --        Product x `mappend` Product y = Product (x * y)
+
+instance Functor Product where
+    fmap     = coerce
+
+instance Applicative Product where
+    pure     = Product
+    (<*>)    = coerce
+
+instance Monad Product where
+    return   = Product
+    m >>= k  = k (getProduct m)
 
 -- $MaybeExamples
 -- To implement @find@ or @findLast@ on any 'Foldable':

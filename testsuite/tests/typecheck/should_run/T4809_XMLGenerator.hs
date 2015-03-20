@@ -18,6 +18,8 @@
 -----------------------------------------------------------------------------
 module T4809_XMLGenerator where
 
+import Control.Applicative
+import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Cont  (MonadCont)
 import Control.Monad.Error (MonadError)
@@ -34,6 +36,12 @@ import Control.Monad (MonadPlus(..),liftM)
 newtype XMLGenT m a = XMLGenT (m a)
   deriving (Monad, Functor, MonadIO, MonadPlus, MonadWriter w, MonadReader r,
             MonadState s, MonadRWS r w s, MonadCont, MonadError e)
+
+instance Monad m => Applicative (XMLGenT m) where
+  pure  = return
+  (<*>) = ap
+
+instance Monad m => Alternative (XMLGenT m) where
 
 -- | un-lift.
 unXMLGenT :: XMLGenT m a -> m a

@@ -738,14 +738,15 @@ uType origin orig_ty1 orig_ty2
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
     go ty1@(TyConApp tc1 _) ty2
-      | isTypeFamilyTyCon tc1 = uType_defer origin ty1 ty2
+      | isTypeFamilyTyCon tc1 = defer ty1 ty2
     go ty1 ty2@(TyConApp tc2 _)
-      | isTypeFamilyTyCon tc2 = uType_defer origin ty1 ty2
+      | isTypeFamilyTyCon tc2 = defer ty1 ty2
 
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, length tys1 == length tys2
-      = do { cos <- zipWithM (uType origin) tys1 tys2
+      = ASSERT( isDecomposableTyCon tc1 )
+        do { cos <- zipWithM (uType origin) tys1 tys2
            ; return $ mkTcTyConAppCo Nominal tc1 cos }
 
     go (LitTy m) ty@(LitTy n)
@@ -770,7 +771,12 @@ uType origin orig_ty1 orig_ty2
 
         -- Anything else fails
         -- E.g. unifying for-all types, which is relative unusual
-    go ty1 ty2 = uType_defer origin ty1 ty2 -- failWithMisMatch origin
+    go ty1 ty2 = defer ty1 ty2
+
+    ------------------
+    defer ty1 ty2   -- See Note [Check for equality before deferring]
+      | ty1 `tcEqType` ty2 = return (mkTcNomReflCo ty1)
+      | otherwise          = uType_defer origin ty1 ty2
 
     ------------------
     go_app s1 t1 s2 t2
@@ -778,7 +784,17 @@ uType origin orig_ty1 orig_ty2
            ; co_t <- uType origin t1 t2
            ; return $ mkTcAppCo co_s co_t }
 
-{-
+{- Note [Check for equality before deferring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Particularly in ambiguity checks we can get equalities like (ty ~ ty).
+If ty involves a type function we may defer, which isn't very sensible.
+An egregious example of this was in test T9872a, which has a type signature
+       Proxy :: Proxy (Solutions Cubes)
+Doing the ambiguity check on this signature generates the equality
+   Solutions Cubes ~ Solutions Cubes
+and currently the constraint solver normalises both sides at vast cost.
+This little short-cut in 'defer' helps quite a bit.
+
 Note [Care with type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note: type applications need a bit of care!

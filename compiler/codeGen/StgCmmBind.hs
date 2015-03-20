@@ -451,10 +451,7 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
 
 * If there is *at least one* argument, then this closure is in
   normal form, so there is no need to set up an update frame.
-
-  The Macros for GrAnSim are produced at the beginning of the
-  argSatisfactionCheck (by calling fetchAndReschedule).
-  There info if Node points to closure is available. -- HWL -}
+-}
 
 closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
   | arity == 0 -- No args i.e. thunk

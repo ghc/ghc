@@ -1,5 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## FUTURE VERSION  *TBA*
+
+  * `Alt` now has `MonadZip` and `MonadFix` instances.
+
 ## 4.8.0.0  *TBA*
 
   * Bundled with GHC 7.10.1
@@ -59,6 +63,10 @@
     counterparts.  In other words, unqualified imports of `Data.List`
     and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
     definitions. (#9586)
+
+  * New (unofficial) module `GHC.OldList` containing only list-specialised
+    versions of the functions from `Data.List` (in other words, `GHC.OldList`
+    corresponds to `base-4.7.0.2`'s `Data.List`)
 
   * Replace the `Control.Monad`-exported functions
 
@@ -137,6 +145,11 @@
   * Add `callocArray` and `callocArray0` to `Foreign.Marshal.Array`. (#9859)
 
   * Restore invariant in `Data (Ratio a)` instance (#10011)
+
+  * Add/expose `rnfTypeRep`, `rnfTyCon`, `typeRepFingerprint`, and
+    `tyConFingerprint` helpers to `Data.Typeable`.
+
+  * Define proper `MINIMAL` pragma for `class Ix`. (#10142)
 
 ## 4.7.0.2  *Dec 2014*
 

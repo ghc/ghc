@@ -23,13 +23,13 @@ $(call hs-objs,$1,$2,$3)
 # The .a/.so library file, indexed by two different sets of vars:
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
-$1_$2_$3_LIB_NAME = libHS$$($1_$2_PACKAGE_KEY)$$($3_libsuf)
+$1_$2_$3_LIB_NAME = libHS$$($1_$2_LIB_NAME)$$($3_libsuf)
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_NAME)
 $$($1_$2_PACKAGE_KEY)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
 ifeq "$$(HostOS_CPP)" "mingw32"
 ifneq "$$($1_$2_dll0_HS_OBJS)" ""
-$1_$2_$3_LIB0_ROOT = HS$$($1_$2_PACKAGE_KEY)-0$$($3_libsuf)
+$1_$2_$3_LIB0_ROOT = HS$$($1_$2_LIB_NAME)-0$$($3_libsuf)
 $1_$2_$3_LIB0_NAME = lib$$($1_$2_$3_LIB0_ROOT)
 $1_$2_$3_LIB0 = $1/$2/build/$$($1_$2_$3_LIB0_NAME)
 endif
@@ -136,7 +136,7 @@ ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_GHCI_LIB = $$($1_$2_dyn_LIB)
 else
 ifeq "$3" "v"
-$1_$2_GHCI_LIB = $1/$2/build/HS$$($1_$2_PACKAGE_KEY).$$($3_osuf)
+$1_$2_GHCI_LIB = $1/$2/build/HS$$($1_$2_LIB_NAME).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't put bootstrapping packages in the bindist
 ifneq "$4" "0"

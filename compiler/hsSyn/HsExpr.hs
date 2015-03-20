@@ -695,7 +695,7 @@ ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd aexp rbinds _ _ _)
-  = hang (pprParendExpr aexp) 2 (ppr rbinds)
+  = hang (pprLExpr aexp) 2 (ppr rbinds)
 
 ppr_expr (ExprWithTySig expr sig _)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -807,6 +807,8 @@ hsExprNeedsParens (HsIPVar {})        = False
 hsExprNeedsParens (ExplicitTuple {})  = False
 hsExprNeedsParens (ExplicitList {})   = False
 hsExprNeedsParens (ExplicitPArr {})   = False
+hsExprNeedsParens (RecordCon {})      = False
+hsExprNeedsParens (RecordUpd {})      = False
 hsExprNeedsParens (HsPar {})          = False
 hsExprNeedsParens (HsBracket {})      = False
 hsExprNeedsParens (HsRnBracketOut {}) = False

@@ -47,8 +47,6 @@ import Data.Foldable ( Foldable(..) )
 import Data.Traversable ( Traversable(..) )
 import Data.Monoid ( mappend )
 import Control.Applicative hiding (empty)
-#else
-import Control.Applicative ((<$>))
 #endif
 
 {-

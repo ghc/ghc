@@ -5,7 +5,6 @@
            , MagicHash
            , UnboxedTuples
            , UnliftedFFITypes
-           , DeriveDataTypeable
            , StandaloneDeriving
            , RankNTypes
   #-}
@@ -98,12 +97,10 @@ module GHC.Conc.Sync
 import Foreign
 import Foreign.C
 
-#ifdef mingw32_HOST_OS
-import Data.Typeable
-#endif
-
 #ifndef mingw32_HOST_OS
 import Data.Dynamic
+#else
+import Data.Typeable
 #endif
 import Data.Maybe
 
@@ -128,7 +125,7 @@ infixr 0 `par`, `pseq`
 -- 'ThreadId', 'par', and 'fork'
 -----------------------------------------------------------------------------
 
-data ThreadId = ThreadId ThreadId# deriving( Typeable )
+data ThreadId = ThreadId ThreadId#
 -- ToDo: data ThreadId = ThreadId (Weak ThreadId#)
 -- But since ThreadId# is unlifted, the Weak type must use open
 -- type variables.
@@ -622,7 +619,6 @@ mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
 
 -- |A monad supporting atomic memory transactions.
 newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #))
-                deriving Typeable
 
 unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
 unSTM (STM a) = a
@@ -772,7 +768,6 @@ always i = alwaysSucceeds ( do v <- i
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
-              deriving Typeable
 
 instance Eq (TVar a) where
         (TVar tvar1#) == (TVar tvar2#) = isTrue# (sameTVar# tvar1# tvar2#)

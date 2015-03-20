@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns
-           , AutoDeriveTypeable
   #-}
 {-# OPTIONS_GHC -fno-warn-identities #-}
 -- Whether there are identities depends on the platform
@@ -35,7 +34,6 @@ import GHC.Num
 import GHC.Real
 import GHC.Show
 import GHC.Enum
-import Data.Typeable
 
 import GHC.IO
 import GHC.IO.IOMode
@@ -84,7 +82,6 @@ data FD = FD {
   fdIsNonBlocking :: {-# UNPACK #-} !Int
 #endif
  }
- deriving Typeable
 
 #ifdef mingw32_HOST_OS
 fdIsSocket :: FD -> Bool

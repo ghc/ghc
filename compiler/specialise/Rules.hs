@@ -9,9 +9,6 @@
 -- | Functions for collecting together and applying rewrite rules to a module.
 -- The 'CoreRule' datatype itself is declared elsewhere.
 module Rules (
-        -- * RuleBase
-        RuleBase,
-
         -- ** Constructing
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
         unionRuleBase, pprRuleBase,
@@ -315,10 +312,7 @@ but that isn't quite right:
 ************************************************************************
 -}
 
--- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
-type RuleBase = NameEnv [CoreRule]
-        -- The rules are are unordered;
-        -- we sort out any overlaps on lookup
+-- RuleBase itself is defined in CoreSyn, along with CoreRule
 
 emptyRuleBase :: RuleBase
 emptyRuleBase = emptyNameEnv

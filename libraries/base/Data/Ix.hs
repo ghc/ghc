@@ -56,8 +56,8 @@ module Data.Ix
     -- >        inRange (Yellow,Blue) Red    ==  False
     -- 
     -- * For single-constructor datatypes, the derived instance declarations
-    -- are as shown for tuples in Figure 1
-    -- <http://www.haskell.org/onlinelibrary/ix.html#prelude-index>.
+    -- are as shown for tuples in chapter 19, section 2 of the Haskell 2010 report:
+    -- <https://www.haskell.org/onlinereport/haskell2010/haskellch19.html>.
 
     ) where
 

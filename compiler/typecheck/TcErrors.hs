@@ -240,7 +240,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
 
 warnRedundantConstraints :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [EvVar] -> TcM ()
 warnRedundantConstraints ctxt env info ev_vars
- | null ev_vars
+ | null redundant_evs
  = return ()
 
  | SigSkol {} <- info
@@ -257,8 +257,32 @@ warnRedundantConstraints ctxt env info ev_vars
  = do { msg <- mkErrorMsg ctxt env doc
       ; reportWarning msg }
  where
-   doc = ptext (sLit "Redundant constraint") <> plural ev_vars <> colon
-         <+> pprEvVarTheta ev_vars
+   doc = ptext (sLit "Redundant constraint") <> plural redundant_evs <> colon
+         <+> pprEvVarTheta redundant_evs
+
+   redundant_evs = case info of -- See Note [Redundant constraints in instance decls]
+                     InstSkol -> filterOut improving ev_vars
+                     _        -> ev_vars
+
+   improving ev_var = any isImprovementPred $
+                      transSuperClassesPred (idType ev_var)
+
+{- Note [Redundant constraints in instance decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For instance declarations, we don't report unused givens if
+they can give rise to improvement.  Example (Trac #10100):
+    class Add a b ab | a b -> ab, a ab -> b
+    instance Add Zero b b
+    instance Add a b ab => Add (Succ a) b (Succ ab)
+The context (Add a b ab) for the instance is clearly unused in terms
+of evidence, since the dictionary has no feilds.  But it is still
+needed!  With the context, a wanted constraint
+   Add (Succ Zero) beta (Succ Zero)
+we will reduce to (Add Zero beta Zero), and thence we get beta := Zero.
+But without the context we won't find beta := Zero.
+
+This only matters in instance declarations..
+-}
 
 reportWanteds :: ReportErrCtxt -> WantedConstraints -> TcM ()
 reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })

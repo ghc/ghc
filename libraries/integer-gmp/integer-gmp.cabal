@@ -73,7 +73,7 @@ Library
     c-sources: cbits/cbits.c
     include-dirs: include
 
-    build-depends: ghc-prim >= 0.3.1 && < 0.4
+    build-depends: ghc-prim == 0.4.*
 
     -- We need to set the package key to integer-gmp
     -- (without a version number) as it's magic.

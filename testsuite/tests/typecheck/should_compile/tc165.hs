@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstrainedClassMethods #-}
 {-# OPTIONS_GHC -dcore-lint #-}
 
 -- Fails GHC 5.04.2 with -dcore-lint

@@ -419,3 +419,6 @@ test('T9938B',
      [ extra_clean(['T9938B.hi', 'T9938B.o', 'T9938B']) ],
      run_command,
      ['$MAKE -s --no-print-directory T9938B'])
+
+test('T9963', exit_code(1), run_command,
+     ['{compiler} --interactive --print-libdir'])

@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
 
 -----------------------------------------------------------------------------
 -- |

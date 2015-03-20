@@ -58,11 +58,12 @@ import Control.Monad
 
 import Data.IORef
 import Data.List
+import Data.Maybe
 import Control.Concurrent.MVar
 
 import System.FilePath
 import System.IO
-import System.Directory hiding (findFile)
+import System.Directory
 
 import Exception
 
@@ -314,7 +315,7 @@ linkCmdLineLibs' dflags@(DynFlags { ldInputs     = cmdline_ld_inputs
                   else ([],[])
 
           -- Finally do (c),(d),(e)
-        ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
+        ; let cmdline_lib_specs = catMaybes classified_ld_inputs
                                ++ libspecs
                                ++ map Framework frameworks
         ; if null cmdline_lib_specs then return pls
@@ -368,7 +369,7 @@ classifyLdInput dflags f
     where platform = targetPlatform dflags
 
 preloadLib :: DynFlags -> [String] -> [String] -> PersistentLinkerState
-           -> LibrarySpec -> IO (PersistentLinkerState)
+           -> LibrarySpec -> IO PersistentLinkerState
 preloadLib dflags lib_paths framework_paths pls lib_spec
   = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
        case lib_spec of
@@ -428,7 +429,7 @@ preloadLib dflags lib_paths framework_paths pls lib_spec
                     ++ sys_errmsg ++ ")\nWhilst trying to load:  "
                     ++ showLS spec ++ "\nAdditional directories searched:"
                     ++ (if null paths then " (none)" else
-                        (concat (intersperse "\n" (map ("   "++) paths)))))
+                        intercalate "\n" (map ("   "++) paths)))
 
     -- Not interested in the paths in the static case.
     preload_static _paths name
@@ -846,7 +847,10 @@ dynLoadObjs dflags pls objs = do
                       buildTag = mkBuildTag [WayDyn],
                       outputFile = Just soFile
                   }
-    linkDynLib dflags2 objs []
+    -- link all "loaded packages" so symbols in those can be resolved
+    -- Note: We are loading packages with local scope, so to see the
+    -- symbols in this link we must link all loaded packages again.
+    linkDynLib dflags2 objs (pkgs_loaded pls)
     consIORef (filesToNotIntermediateClean dflags) soFile
     m <- loadDLL soFile
     case m of
@@ -1170,9 +1174,7 @@ load_dyn dll = do r <- loadDLL dll
 
 loadFrameworks :: Platform -> PackageConfig -> IO ()
 loadFrameworks platform pkg
-    = if platformUsesFrameworks platform
-      then mapM_ load frameworks
-      else return ()
+    = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
     fw_dirs    = Packages.frameworkDirs pkg
     frameworks = Packages.frameworks pkg
@@ -1211,31 +1213,28 @@ locateLib dflags is_hs dirs lib
     -- we search for .so libraries first.
   = findHSDll `orElse` findDynObject `orElse` assumeDll
    where
-     mk_obj_path      dir = dir </> (lib <.> "o")
-     mk_dyn_obj_path  dir = dir </> (lib <.> "dyn_o")
-     mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
+     obj_file     = lib <.> "o"
+     dyn_obj_file = lib <.> "dyn_o"
+     arch_file    = "lib" ++ lib <.> "a"
 
      hs_dyn_lib_name = lib ++ '-':programName dflags ++ projectVersion dflags
-     mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
+     hs_dyn_lib_file = mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
-     mk_dyn_lib_path dir = case (arch, os) of
-                             (ArchX86_64, OSSolaris2) -> dir </> ("64/" ++ so_name)
-                             _ -> dir </> so_name
+     dyn_lib_file = case (arch, os) of
+                             (ArchX86_64, OSSolaris2) -> "64" </> so_name
+                             _ -> so_name
 
-     findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
-     findDynObject  = liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
-     findArchive    = liftM (fmap Archive) $ findFile mk_arch_path       dirs
-     findHSDll      = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
-     findDll        = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path    dirs
+     findObject     = liftM (fmap Object)  $ findFile dirs obj_file
+     findDynObject  = liftM (fmap Object)  $ findFile dirs dyn_obj_file
+     findArchive    = liftM (fmap Archive) $ findFile dirs arch_file
+     findHSDll      = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
+     findDll        = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
      tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
 
      assumeDll   = return (DLL lib)
      infixr `orElse`
-     f `orElse` g = do m <- f
-                       case m of
-                           Just x -> return x
-                           Nothing -> g
+     f `orElse` g = f >>= maybe g return
 
      platform = targetPlatform dflags
      arch = platformArch platform
@@ -1263,16 +1262,16 @@ loadFramework extraPaths rootname
    = do { either_dir <- tryIO getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
                                   Left _ -> []
-                                  Right dir -> [dir ++ "/Library/Frameworks"]
+                                  Right dir -> [dir </> "Library/Frameworks"]
               ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
-        ; mb_fwk <- findFile mk_fwk ps
+        ; mb_fwk <- findFile ps fwk_file
         ; case mb_fwk of
             Just fwk_path -> loadDLL fwk_path
             Nothing       -> return (Just "not found") }
                 -- Tried all our known library paths, but dlopen()
                 -- has no built-in paths for frameworks: give up
    where
-     mk_fwk dir = dir </> (rootname ++ ".framework/" ++ rootname)
+     fwk_file = rootname <.> "framework" </> rootname
         -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 
@@ -1281,16 +1280,6 @@ loadFramework extraPaths rootname
                 Helper functions
 
   ********************************************************************* -}
-
-findFile :: (FilePath -> FilePath)      -- Maps a directory path to a file path
-         -> [FilePath]                  -- Directories to look in
-         -> IO (Maybe FilePath)         -- The first file path to match
-findFile _            [] = return Nothing
-findFile mk_file_path (dir : dirs)
-  = do let file_path = mk_file_path dir
-       b <- doesFileExist file_path
-       if b then return (Just file_path)
-            else findFile mk_file_path dirs
 
 maybePutStr :: DynFlags -> String -> IO ()
 maybePutStr dflags s

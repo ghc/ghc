@@ -1,2 +1,2 @@
 import Control.Applicative
-main = show <$> pure 1 >>= print
+main = (pure 1 >>= print) <**> pure show

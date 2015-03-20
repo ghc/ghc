@@ -229,11 +229,11 @@ SLOW)
         BINDIST="BINDIST=YES"
         ;;
 NORMAL)
-        MAKE_TEST_TARGET=test
+        MAKE_TEST_TARGET=fasttest
         BINDIST="BINDIST=YES"
         ;;
 FAST)
-        MAKE_TEST_TARGET=test
+        MAKE_TEST_TARGET=fasttest
         BINDIST="BINDIST=NO"
         ;;
 esac

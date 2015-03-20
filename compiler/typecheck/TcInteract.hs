@@ -14,6 +14,7 @@ import TcCanonical
 import TcFlatten
 import VarSet
 import Type
+import Kind (isKind)
 import Unify
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
 import CoAxiom(sfInteractTop, sfInteractInert)
@@ -21,7 +22,7 @@ import CoAxiom(sfInteractTop, sfInteractInert)
 import Var
 import TcType
 import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
-                   callStackTyConKey )
+                   callStackTyConKey, typeableClassName )
 import Id( idType )
 import Class
 import TyCon
@@ -1327,6 +1328,7 @@ doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
 --------------------
 doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
+-- Note [Short cut for top-level reaction]
 doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
                                      , cc_tyargs = args , cc_fsk = fsk })
   = ASSERT(isTypeFamilyTyCon fam_tc) -- No associated data families
@@ -1394,6 +1396,7 @@ doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
 
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
                   -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
+-- See Note [Top-level reductions for type functions]
 shortCutReduction old_ev fsk ax_co fam_tc tc_args
   | isGiven old_ev
   = ASSERT( ctEvEqRel old_ev == NomEq )
@@ -1424,7 +1427,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                -- new_ev :: G xis ~ fsk
                -- old_ev :: F args ~ fsk := ax_co ; sym (G cos) ; new_ev
 
-       ; new_ev <- newWantedEvVarNC deeper_loc 
+       ; new_ev <- newWantedEvVarNC deeper_loc
                                     (mkTcEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk))
        ; setWantedEvBind (ctEvId old_ev)
                    (EvCoercion (ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal fam_tc cos)
@@ -1453,7 +1456,58 @@ dischargeFmv evar fmv co xi
        ; n_kicked <- kickOutRewritable Given NomEq fmv
        ; traceTcS "dischargeFuv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
 
-{-
+{- Note [Top-level reductions for type functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+c.f. Note [The flattening story] in TcFlatten
+
+Suppose we have a CFunEqCan  F tys ~ fmv/fsk, and a matching axiom.
+Here is what we do, in four cases:
+
+* Wanteds: general firing rule
+    (work item) [W]        x : F tys ~ fmv
+    instantiate axiom: ax_co : F tys ~ rhs
+
+   Then:
+      Discharge   fmv := alpha
+      Discharge   x := ax_co ; sym x2
+      New wanted  [W] x2 : alpha ~ rhs  (Non-canonical)
+   This is *the* way that fmv's get unified; even though they are
+   "untouchable".
+
+   NB: it can be the case that fmv appears in the (instantiated) rhs.
+   In that case the new Non-canonical wanted will be loopy, but that's
+   ok.  But it's good reason NOT to claim that it is canonical!
+
+* Wanteds: short cut firing rule
+  Applies when the RHS of the axiom is another type-function application
+      (work item)        [W] x : F tys ~ fmv
+      instantiate axiom: ax_co : F tys ~ G rhs_tys
+
+  It would be a waste to create yet another fmv for (G rhs_tys).
+  Instead (shortCutReduction):
+      - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
+      - Add G rhs_xis ~ fmv to flat cache  (note: the same old fmv)
+      - New canonical wanted   [W] x2 : G rhs_xis ~ fmv  (CFunEqCan)
+      - Discharge x := ax_co ; G cos ; x2
+
+* Givens: general firing rule
+      (work item)        [G] g : F tys ~ fsk
+      instantiate axiom: ax_co : F tys ~ rhs
+
+   Now add non-canonical given (since rhs is not flat)
+      [G] (sym g ; ax_co) : fsk ~ rhs  (Non-canonical)
+
+* Givens: short cut firing rule
+  Applies when the RHS of the axiom is another type-function application
+      (work item)        [G] g : F tys ~ fsk
+      instantiate axiom: ax_co : F tys ~ G rhs_tys
+
+  It would be a waste to create yet another fsk for (G rhs_tys).
+  Instead (shortCutReduction):
+     - Flatten rhs_tys: flat_cos : tys ~ flat_tys
+     - Add new Canonical given
+          [G] (sym (G flat_cos) ; co ; g) : G flat_tys ~ fsk   (CFunEqCan)
+
 Note [Cached solved FunEqs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When trying to solve, say (FunExpensive big-type ~ ty), it's important
@@ -1638,6 +1692,9 @@ matchClassInst _ clas [ ty ] _
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
 
+matchClassInst _ clas [k,t] loc
+  | className clas == typeableClassName = matchTypeableClass clas k t loc
+
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
         ; tclvl <- getTcLevel
@@ -1780,3 +1837,58 @@ isCallStackIP loc cls ty
     = ctLocSpan loc
 isCallStackIP _ _ _
   = Nothing
+
+
+
+-- | Assumes that we've checked that this is the 'Typeable' class,
+-- and it was applied to the correc arugment.
+matchTypeableClass :: Class -> Kind -> Type -> CtLoc -> TcS LookupInstResult
+matchTypeableClass clas k t loc
+  | isForAllTy k                               = return NoInstance
+  | Just (tc, ks) <- splitTyConApp_maybe t
+  , all isKind ks                              = doTyCon tc ks
+  | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
+  | Just _            <- isNumLitTy t          = mkSimpEv (EvTypeableTyLit t)
+  | Just _            <- isStrLitTy t          = mkSimpEv (EvTypeableTyLit t)
+  | otherwise                                  = return NoInstance
+
+  where
+  -- Representation for type constructor applied to some kinds
+  doTyCon tc ks =
+    case mapM kindRep ks of
+      Nothing    -> return NoInstance
+      Just kReps -> mkSimpEv (EvTypeableTyCon tc kReps)
+
+  {- Representation for an application of a type to a type-or-kind.
+  This may happen when the type expression starts with a type variable.
+  Example (ignoring kind parameter):
+    Typeable (f Int Char)                      -->
+    (Typeable (f Int), Typeable Char)          -->
+    (Typeable f, Typeable Int, Typeable Char)  --> (after some simp. steps)
+    Typeable f
+  -}
+  doTyApp f tk
+    | isKind tk = return NoInstance -- We can't solve until we know the ctr.
+    | otherwise =
+      do ct1 <- subGoal f
+         ct2 <- subGoal tk
+         let realSubs = [ c | (c,Fresh) <- [ct1,ct2] ]
+         return $ GenInst realSubs
+                $ EvTypeable $ EvTypeableTyApp (getEv ct1,f) (getEv ct2,tk)
+
+
+  -- Representation for concrete kinds.  We just use the kind itself,
+  -- but first check to make sure that it is "simple" (i.e., made entirely
+  -- out of kind constructors).
+  kindRep ki = do (_,ks) <- splitTyConApp_maybe ki
+                  mapM_ kindRep ks
+                  return ki
+
+  getEv (ct,_fresh) = ctEvTerm ct
+
+  -- Emit a `Typeable` constraint for the given type.
+  subGoal ty = do let goal = mkClassPred clas [ typeKind ty, ty ]
+                  newWantedEvVar loc goal
+
+  mkSimpEv ev = return (GenInst [] (EvTypeable ev))
+

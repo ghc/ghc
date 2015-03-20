@@ -101,8 +101,8 @@ import Unique
 import Pair
 import SrcLoc
 import PrelNames        ( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
-import Control.Applicative hiding ( empty )
 #if __GLASGOW_HASKELL__ < 709
+import Control.Applicative hiding ( empty )
 import Data.Traversable (traverse, sequenceA)
 #endif
 import FastString
@@ -981,7 +981,7 @@ mkAppCos co1 cos = foldl mkAppCo co1 cos
 mkTyConAppCo :: Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
                -- Expand type synonyms
-  | Just (tv_co_prs, rhs_ty, leftover_cos) <- tcExpandTyCon_maybe tc cos
+  | Just (tv_co_prs, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos
   = mkAppCos (liftCoSubst r tv_co_prs rhs_ty) leftover_cos
 
   | Just tys <- traverse isReflCo_maybe cos

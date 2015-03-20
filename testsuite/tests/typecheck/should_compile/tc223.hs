@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-deprecations #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 module Foo where
 

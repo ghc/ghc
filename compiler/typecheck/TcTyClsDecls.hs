@@ -28,7 +28,6 @@ import TcRnMonad
 import TcEnv
 import TcValidity
 import TcHsSyn
-import TcSimplify( growThetaTyVars )
 import TcBinds( tcRecSelBinds )
 import TcTyDecls
 import TcClassDcl
@@ -223,12 +222,6 @@ Kind checking is done thus:
 
    3. Kind check the data type and class decls
 
-Synonyms are treated differently to data type and classes,
-because a type synonym can be an unboxed type
-        type Foo = Int#
-and a kind variable can't unify with UnboxedTypeKind
-So we infer their kinds in dependency order
-
 We need to kind check all types in the mutually recursive group
 before we know the kind of the type variables.  For example:
 
@@ -247,9 +240,16 @@ just involve (->) and *:
         type R = Int#           -- Kind #
         type S a = Array# a     -- Kind * -> #
         type T a b = (# a,b #)  -- Kind * -> * -> (# a,b #)
-So we must infer their kinds from their right-hand sides *first* and then
-use them, whereas for the mutually recursive data types D we bring into
-scope kind bindings D -> k, where k is a kind variable, and do inference.
+and a kind variable can't unify with UnboxedTypeKind.
+
+So we must infer the kinds of type synonyms from their right-hand
+sides *first* and then use them, whereas for the mutually recursive
+data types D we bring into scope kind bindings D -> k, where k is a
+kind variable, and do inference.
+
+NB: synonyms can be mutually recursive with data type declarations though!
+   type T = D -> D
+   data D = MkD Int T
 
 Open type families
 ~~~~~~~~~~~~~~~~~~
@@ -460,7 +460,7 @@ kcLTyClDecl (L loc decl)
 kcTyClDecl :: TyClDecl Name -> TcM ()
 -- This function is used solely for its side effect on kind variables
 -- NB kind signatures on the type variables and
---    result kind signature have aready been dealt with
+--    result kind signature have already been dealt with
 --    by getInitialKind, so we can ignore them here.
 
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = defn })
@@ -1666,30 +1666,25 @@ checkValidClass cls
           mapM_ (check_op constrained_class_methods) op_stuff
 
         -- Check the associated type defaults are well-formed and instantiated
-        ; mapM_ check_at_defs at_stuff  }
+        ; mapM_ check_at at_stuff  }
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
     cls_arity = count isTypeVar tyvars    -- Ignore kind variables
     cls_tv_set = mkVarSet tyvars
 
     check_op constrained_class_methods (sel_id, dm)
-      = addErrCtxt (classOpCtxt sel_id tau) $ do
-        { checkValidTheta ctxt (tail theta)
-                -- The 'tail' removes the initial (C a) from the
-                -- class itself, leaving just the method type
-
-        ; traceTc "class op type" (ppr op_ty <+> ppr tau)
-        ; checkValidType ctxt tau
-
-                -- Check that the method type mentions a class variable
-                -- But actually check that the variables *reachable from*
-                -- the method type include a class variable.
+      = setSrcSpan (getSrcSpan sel_id) $
+        addErrCtxt (classOpCtxt sel_id op_ty) $ do
+        { traceTc "class op type" (ppr op_ty)
+        ; checkValidType ctxt op_ty
+                -- This implements the ambiguity check, among other things
                 -- Example: tc223
                 --   class Error e => Game b mv e | b -> mv e where
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
-        ; check_mentions (growThetaTyVars theta (tyVarsOfType tau))
-                         (ptext (sLit "class method") <+> quotes (ppr sel_id))
+
+        ; unless constrained_class_methods $
+          mapM_ check_constraint (tail (theta1 ++ theta2)) 
 
         ; case dm of
             GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
@@ -1701,28 +1696,20 @@ checkValidClass cls
           op_name = idName sel_id
           op_ty   = idType sel_id
           (_,theta1,tau1) = tcSplitSigmaTy op_ty
-          (_,theta2,tau2) = tcSplitSigmaTy tau1
-          (theta,tau) | constrained_class_methods = (theta1 ++ theta2, tau2)
-                      | otherwise = (theta1, mkPhiTy (tail theta1) tau1)
-                -- Ugh!  The function might have a type like
-                --      op :: forall a. C a => forall b. (Eq b, Eq a) => tau2
-                -- With -XConstrainedClassMethods, we want to allow this, even though the inner
-                -- forall has an (Eq a) constraint.  Whereas in general, each constraint
-                -- in the context of a for-all must mention at least one quantified
-                -- type variable.  What a mess!
+          (_,theta2,_)    = tcSplitSigmaTy tau1
 
-    check_at_defs (ATI fam_tc _)
-      = check_mentions (mkVarSet (tyConTyVars fam_tc))
-                       (ptext (sLit "associated type") <+> quotes (ppr fam_tc))
+          check_constraint :: TcPredType -> TcM ()
+          check_constraint pred
+            = when (tyVarsOfType pred `subVarSet` cls_tv_set)
+                   (addErrTc (badMethPred sel_id pred))
 
-    check_mentions :: TyVarSet -> SDoc -> TcM ()
-       -- Check that the thing (method or associated type) mentions at least
-       -- one of the class type variables
-       -- The check is disabled for nullary type classes,
-       -- since there is no possible ambiguity (Trac #10020)
-    check_mentions thing_tvs thing_doc
-      = checkTc (cls_arity == 0 || thing_tvs `intersectsVarSet` cls_tv_set)
-                (noClassTyVarErr cls thing_doc)
+    check_at (ATI fam_tc _)
+      | cls_arity > 0   -- Check that the associated type mentions at least
+                        -- one of the class type variables
+      = checkTc (any (`elemVarSet` cls_tv_set) (tyConTyVars fam_tc))
+                (noClassTyVarErr cls fam_tc)
+      | otherwise       -- The check is disabled for nullary type classes,
+      = return ()       -- since there is no possible ambiguity (Trac #10020)
 
 checkFamFlag :: Name -> TcM ()
 -- Check that we don't use families without -XTypeFamilies
@@ -2151,10 +2138,17 @@ classFunDepsErr cls
   = vcat [ptext (sLit "Fundeps in class") <+> quotes (ppr cls),
           parens (ptext (sLit "Use FunctionalDependencies to allow fundeps"))]
 
-noClassTyVarErr :: Class -> SDoc -> SDoc
-noClassTyVarErr clas what
-  = sep [ptext (sLit "The") <+> what,
-         ptext (sLit "mentions none of the type or kind variables of the class") <+>
+badMethPred :: Id -> TcPredType -> SDoc
+badMethPred sel_id pred
+  = vcat [ hang (ptext (sLit "Constraint") <+> quotes (ppr pred) 
+                 <+> ptext (sLit "in the type of") <+> quotes (ppr sel_id))
+              2 (ptext (sLit "constrains only the class type variables"))
+         , ptext (sLit "Use ConstrainedClassMethods to allow it") ]
+
+noClassTyVarErr :: Class -> TyCon -> SDoc
+noClassTyVarErr clas fam_tc
+  = sep [ ptext (sLit "The associated type") <+> quotes (ppr fam_tc)
+        , ptext (sLit "mentions none of the type or kind variables of the class") <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()

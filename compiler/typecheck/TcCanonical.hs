@@ -364,21 +364,11 @@ newSCWorkFromFlavored flavor cls xis
 
   | otherwise -- Wanted case, just add those SC that can lead to improvement.
   = do { let sc_rec_theta = transSuperClasses cls xis
-             impr_theta   = filter is_improvement_pty sc_rec_theta
+             impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
        ; mapM_ (emitNewDerived loc) impr_theta }
 
-is_improvement_pty :: PredType -> Bool
--- Either it's an equality, or has some functional dependency
-is_improvement_pty ty = go (classifyPredType ty)
-  where
-    go (EqPred NomEq t1 t2) = not (t1 `tcEqType` t2)
-    go (EqPred ReprEq _ _)  = False
-    go (ClassPred cls _tys) = not $ null fundeps
-                            where (_,fundeps) = classTvsFds cls
-    go (TuplePred ts)       = any is_improvement_pty ts
-    go (IrredPred {})       = True -- Might have equalities after reduction?
 
 {-
 ************************************************************************
@@ -546,7 +536,7 @@ can_eq_fam_nc :: CtEvidence -> EqRel -> SwapFlag
               -> TcS (StopOrContinue Ct)
 -- Canonicalise a non-canonical equality of form (F tys ~ ty)
 --   or the swapped version thereof
--- Flatten both sides and go round again
+-- Flatten the LHS and go round again
 can_eq_fam_nc ev eq_rel swapped fn tys rhs ps_rhs
   = do { (xi_lhs, co_lhs) <- flattenFamApp FM_FlattenAll ev fn tys
        ; rewriteEqEvidence ev eq_rel swapped xi_lhs rhs co_lhs

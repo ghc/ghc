@@ -4062,44 +4062,49 @@ can be mentioned in the <literal>deriving</literal> clause.
 </para></listitem>
 
 <listitem><para>
-Only derived instances of <literal>Typeable</literal> are allowed;
-i.e. handwritten instances are forbidden.  This ensures that the
-programmer cannot subert the type system by writing bogus instances.
+GHC has a custom solver for discharging constraints that involve
+class <literal>Typeable</literal>, and handwritten instances are forbidden.
+This ensures that the programmer cannot subert the type system by
+writing bogus instances.
 </para></listitem>
 
 <listitem><para>
-With <option>-XDeriveDataTypeable</option>
-GHC allows you to derive instances of <literal>Typeable</literal> for data types or newtypes,
-using a <literal>deriving</literal> clause, or using
-a standalone deriving declaration (<xref linkend="stand-alone-deriving"/>).
+Derived instances of <literal>Typeable</literal> are ignored,
+and may be reported as an error in a later version of the compiler.
 </para></listitem>
 
 <listitem><para>
-With <option>-XDataKinds</option>, deriving <literal>Typeable</literal> for a data
-type (whether via a deriving clause or standalone deriving)
-also derives <literal>Typeable</literal> for the promoted data constructors (<xref linkend="promotion"/>).
+The rules for solving `Typeable` constraints are as follows:
+<itemizedlist>
+<listitem><para>A concrete type constructor applied to some types.
+<programlisting>
+instance (Typeable t1, .., Typeable t_n) =>
+  Typeable (T t1 .. t_n)
+</programlisting>
+This rule works for any concrete type constructor, including type
+constructors with polymorhic kinds.   The only restriction is that
+if the type constructor has a polymorhic kind, then it has to be applied
+to all of its kinds parameters, and these kinds need to be concrete
+(i.e., they cannot mention kind variables).
 </para></listitem>
 
 <listitem><para>
-However, using standalone deriving, you can <emphasis>also</emphasis> derive
-a <literal>Typeable</literal> instance for a data family.
-You may not add a <literal>deriving(Typeable)</literal> clause to a
-<literal>data instance</literal> declaration; instead you must use a
-standalone deriving declaration for the data family.
+<programlisting>A type variable applied to some types.
+instance (Typeable f, Typeable t1, .., Typeable t_n) =>
+  Typeable (f t1 .. t_n)
+</programlisting>
 </para></listitem>
 
 <listitem><para>
-Using standalone deriving, you can <emphasis>also</emphasis> derive
-a <literal>Typeable</literal> instance for a type class.
+<programlisting>A concrete type literal.
+instance Typeable 0       -- Type natural literals
+instance Typeable "Hello" -- Type-level symbols
+</programlisting>
+</para></listitem>
+</itemizedlist>
 </para></listitem>
 
-<listitem><para>
-The flag <option>-XAutoDeriveTypeable</option> triggers the generation
-of derived <literal>Typeable</literal> instances for every datatype, data family,
-and type class declaration in the module it is used, unless a manually-specified one is
-already provided.
-This flag implies <option>-XDeriveDataTypeable</option>.
-</para></listitem>
+
 </itemizedlist>
 
 </para>
@@ -4442,14 +4447,15 @@ class type variable, thus:
     elem     :: Eq a => a -> s a -> Bool
 </programlisting>
 The type of <literal>elem</literal> is illegal in Haskell 98, because it
-contains the constraint <literal>Eq a</literal>, constrains only the
+contains the constraint <literal>Eq a</literal>, which constrains only the
 class type variable (in this case <literal>a</literal>).
-GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
 </para>
-
-
+<para>
+GHC lifts this restriction with language extension <option>-XConstrainedClassMethods</option>.
+The restriction is a pretty stupid one in the first place, 
+so <option>-XConstrainedClassMethods</option> is implied by <option>-XMultiParamTypeClasses</option>.
+</para>
 </sect3>
-
 
 <sect3 id="class-default-signatures">
 <title>Default method signatures</title>
@@ -6608,55 +6614,146 @@ Note that the datatype <literal>Proxy</literal> has kind
 <literal>Typeable</literal> class has kind
 <literal>forall k. k -> Constraint</literal>.
 </para>
-</sect2>
-
-<sect2> <title>Overview</title>
 
 <para>
+Note the following specific points:
+<itemizedlist>
+<listitem><para>
 Generally speaking, with <option>-XPolyKinds</option>, GHC will infer a polymorphic
-kind for un-decorated declarations, whenever possible.  For example:
+kind for un-decorated declarations, whenever possible.  For example, in GHCi
 <programlisting>
-data T m a = MkT (m a)
--- GHC infers kind   T :: forall k. (k -> *) -> k -> *
+ghci> :set -XPolyKinds
+ghci> data T m a = MkT (m a)
+ghci> :k T
+T :: (k -> *) -> k -> *
 </programlisting>
+</para></listitem>
+
+<listitem><para>
+GHC does not usually print explicit <literal>forall</literal>s, including kind <literal>forall</literal>s. 
+You can make GHC show them explicitly with <option>-fprint-explicit-foralls</option> 
+(see <xref linkend="options-help"/>):
+<programlisting>
+ghci> :set -XPolyKinds
+ghci> :set -fprint-explicit-foralls
+ghci> data T m a = MkT (m a)
+ghci> :k T
+T :: forall (k :: BOX). (k -> *) -> k -> *
+</programlisting>
+Here the kind variable <literal>k</literal> itself has a
+kind annotation "<literal>BOX</literal>".  This is just GHC's way of
+saying "<literal>k</literal> is a kind variable".
+</para></listitem>
+
+<listitem><para>
 Just as in the world of terms, you can restrict polymorphism using a
 kind signature (sometimes called a kind annotation)
-(<option>-XPolyKinds</option> implies <option>-XKindSignatures</option>):
 <programlisting>
 data T m (a :: *) = MkT (m a)
 -- GHC now infers kind   T :: (* -> *) -> * -> *
 </programlisting>
-There is no "forall" for kind variables.  Instead, when binding a type variable,
+NB: <option>-XPolyKinds</option> implies <option>-XKindSignatures</option> (see <xref linkend="kinding"/>).
+</para></listitem>
+
+<listitem><para>
+The source language does not support an explicit <literal>forall</literal> for kind variables.  Instead, when binding a type variable,
 you can simply mention a kind
 variable in a kind annotation for that type-variable binding, thus:
 <programlisting>
 data T (m :: k -> *) a = MkT (m a)
 -- GHC now infers kind   T :: forall k. (k -> *) -> k -> *
 </programlisting>
-The kind "forall" is placed
+</para></listitem>
+
+<listitem><para>
+The (implicit) kind "forall" is placed
 just outside the outermost type-variable binding whose kind annotation mentions
 the kind variable. For example
 <programlisting>
 f1 :: (forall a m. m a -> Int) -> Int
-         -- f1 :: forall (k:BOX).
-         --       (forall (a:k) (m:k->*). m a -> Int)
+         -- f1 :: forall (k::BOX).
+         --       (forall (a::k) (m::k->*). m a -> Int)
          --       -> Int
 
 f2 :: (forall (a::k) m. m a -> Int) -> Int
-         -- f2 :: (forall (k:BOX) (a:k) (m:k->*). m a -> Int)
+         -- f2 :: (forall (k::BOX) (a::k) (m::k->*). m a -> Int)
          --       -> Int
 </programlisting>
 Here in <literal>f1</literal> there is no kind annotation mentioning the polymorphic
 kind variable, so <literal>k</literal> is generalised at the top
-level of the signature for <literal>f1</literal>,
-making the signature for <literal>f1</literal> is as polymorphic as possible.
+level of the signature for <literal>f1</literal>.
 But in the case of of <literal>f2</literal> we give a kind annotation in the <literal>forall (a:k)</literal>
 binding, and GHC therefore puts the kind <literal>forall</literal> right there too.
+This design decision makes default case (<literal>f1</literal>)
+as polymorphic as possible; remember that a <emphasis>more</emphasis> polymorphic argument type (as in <literal>f2</literal>
+makes the overall function <emphasis>less</emphasis> polymorphic, because there are fewer acceptable arguments.
+</para></listitem>
+</itemizedlist>
 </para>
 <para>
 (Note: These rules are a bit indirect and clumsy.  Perhaps GHC should allow explicit kind quantification.
 But the implicit quantification (e.g. in the declaration for data type T above) is certainly
 very convenient, and it is not clear what the syntax for explicit quantification should be.)
+</para>
+</sect2>
+
+<sect2> <title>Principles of kind inference</title>
+
+<para>
+Generally speaking, when <option>-XPolyKinds</option> is on, GHC tries to infer the most
+general kind for a declaration.  For example:
+<programlisting>
+data T f a = MkT (f a)   -- GHC infers:  
+                         -- T :: forall k. (k->*) -> k -> *
+</programlisting>
+In this case the definition has a right-hand side to inform kind inference.
+But that is not always the case.  Consider
+<programlisting>
+type family F a
+</programlisting>
+Type family declararations have no right-hand side, but GHC must still infer a kind
+for <literal>F</literal>.  Since there are no constraints, it could infer 
+<literal>F :: forall k1 k2. k1 -> k2</literal>, but that seems <emphasis>too</emphasis> 
+polymorphic.  So GHC defaults those entirely-unconstrained kind variables to <literal>*</literal> and 
+we get <literal>F :: * -> *</literal>.  You can still declare <literal>F</literal> to be
+kind-polymorphic using kind signatures:
+<programlisting>
+type family F1 a               -- F1 :: * -> *
+type family F2 (a :: k)        -- F2 :: forall k. k -> *
+type family F3 a :: k          -- F3 :: forall k. * -> k
+type family F4 (a :: k1) :: k  -- F4 :: forall k1 k2. k1 -> k2
+</programlisting>
+</para>
+<para>
+The general principle is this:
+<itemizedlist>
+<listitem><para>
+<emphasis>When there is a right-hand side, GHC
+infers the most polymorphic kind consistent with the right-hand side.</emphasis>
+Examples: ordinary data type and GADT declarations, class declarations.
+In the case of a class declaration the role of "right hand side" is played
+by the class method signatures.
+</para></listitem>
+<listitem><para>
+<emphasis>When there is no right hand side, GHC defaults argument and result kinds to <literal>*</literal>,
+except when directed otherwise by a kind signature</emphasis>.  
+Examples: data and type family declarations.
+</para></listitem>
+</itemizedlist>
+This rule has occasionally-surprising consequences 
+(see <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10132">Trac 10132</ulink>).
+<programlisting>
+class C a where    -- Class declarations are generalised
+                   -- so C :: forall k. k -> Constraint
+  data D1 a        -- No right hand side for these two family 
+  type F1 a        -- declarations, but the class forces (a :: k)
+                   -- so   D1, F1 :: forall k. k -> *
+
+data D2 a   -- No right-hand side so D2 :: * -> *
+type F2 a   -- No right-hand side so F2 :: * -> *
+</programlisting>
+The kind-polymorphism from the class declaration makes <literal>D1</literal> 
+kind-polymorphic, but not so <literal>D2</literal>; and similarly <literal>F1</literal>, <literal>F1</literal>.
 </para>
 </sect2>
 

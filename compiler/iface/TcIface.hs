@@ -1210,7 +1210,8 @@ tcPragExpr name expr
                 -- Check for type consistency in the unfolding
     whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
-        case lintUnfolding noSrcLoc in_scope core_expr' of
+        dflags   <- getDynFlags
+        case lintUnfolding dflags noSrcLoc in_scope core_expr' of
           Nothing       -> return ()
           Just fail_msg -> do { mod <- getIfModule
                               ; pprPanic "Iface Lint failure"

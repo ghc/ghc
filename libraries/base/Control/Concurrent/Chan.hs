@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,7 +37,6 @@ module Control.Concurrent.Chan
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import Control.Concurrent.MVar
 import Control.Exception (mask_)
-import Data.Typeable
 
 #define _UPK_(x) {-# UNPACK #-} !(x)
 
@@ -49,7 +48,7 @@ import Data.Typeable
 data Chan a
  = Chan _UPK_(MVar (Stream a))
         _UPK_(MVar (Stream a)) -- Invariant: the Stream a is always an empty MVar
-   deriving (Eq,Typeable)
+   deriving (Eq)
 
 type Stream a = MVar (ChItem a)
 

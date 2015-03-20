@@ -981,7 +981,7 @@ StrictAnal.addStrictnessInfoToTopId
 callSiteInline :: DynFlags
                -> Id                    -- The Id
                -> Bool                  -- True <=> unfolding is active
-               -> Bool                  -- True if there are are no arguments at all (incl type args)
+               -> Bool                  -- True if there are no arguments at all (incl type args)
                -> [ArgSummary]          -- One for each value arg; True if it is interesting
                -> CallCtxt              -- True <=> continuation is interesting
                -> Maybe CoreExpr        -- Unfolding, if any

@@ -1,2 +1,2 @@
-module Main where
+module GHCi022 where
 'a' '

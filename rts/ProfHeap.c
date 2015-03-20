@@ -356,11 +356,9 @@ void endProfiling( void )
 static void
 printSample(rtsBool beginSample, StgDouble sampleValue)
 {
-    StgDouble fractionalPart, integralPart;
-    fractionalPart = modf(sampleValue, &integralPart);
-    fprintf(hp_file, "%s %" FMT_Word64 ".%02" FMT_Word64 "\n",
+    fprintf(hp_file, "%s %f\n",
             (beginSample ? "BEGIN_SAMPLE" : "END_SAMPLE"),
-            (StgWord64)integralPart, (StgWord64)(fractionalPart * 100));
+            sampleValue);
     if (!beginSample) {
         fflush(hp_file);
     }

@@ -2,12 +2,13 @@
              TypeFamilies #-}
 
 module T9200 where
+import Data.Proxy
 
 ------
 -- test CUSK on classes
 
 class C (f :: k) (a :: k2) where
-  c_meth :: D a => ()
+  c_meth :: D a => Proxy f -> Proxy a -> ()
   
 class C () a => D a
 

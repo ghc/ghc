@@ -10,7 +10,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
-        FinderCache, FindResult(..), ModLocationCache,
+        FinderCache, FindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
@@ -140,8 +140,7 @@ import Avail
 import Module
 import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
 import FamInstEnv
-import Rules            ( RuleBase )
-import CoreSyn          ( CoreProgram )
+import CoreSyn          ( CoreProgram, RuleBase )
 import Name
 import NameEnv
 import NameSet
@@ -388,9 +387,6 @@ data HscEnv
 
         hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
                 -- ^ The cached result of performing finding in the file system
-        hsc_MLC  :: {-# UNPACK #-} !(IORef ModLocationCache),
-                -- ^ This caches the location of modules, so we don't have to
-                -- search the filesystem multiple times. See also 'hsc_FC'.
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
@@ -673,7 +669,7 @@ prepareAnnotations hsc_env mb_guts = do
 ************************************************************************
 -}
 
--- | The 'FinderCache' maps home module names to the result of
+-- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
@@ -681,7 +677,7 @@ prepareAnnotations hsc_env mb_guts = do
 -- Although the @FinderCache@ range is 'FindResult' for convenience,
 -- in fact it will only ever contain 'Found' or 'NotFound' entries.
 --
-type FinderCache = ModuleNameEnv FindResult
+type FinderCache = ModuleEnv FindResult
 
 -- | The result of searching for an imported module.
 data FindResult
@@ -708,11 +704,6 @@ data FindResult
 
       , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
       }
-
--- | Cache that remembers where we found a particular module.  Contains both
--- home modules and package modules.  On @:load@, only home modules are
--- purged from this cache.
-type ModLocationCache = ModuleEnv ModLocation
 
 {-
 ************************************************************************

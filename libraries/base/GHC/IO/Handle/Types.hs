@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , ExistentialQuantification
-           , AutoDeriveTypeable
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -109,8 +108,6 @@ data Handle
         !(MVar Handle__)                -- The read side
         !(MVar Handle__)                -- The write side
 
-  deriving Typeable
-
 -- NOTES:
 --    * A 'FileHandle' is seekable.  A 'DuplexHandle' may or may not be
 --      seekable.
@@ -138,7 +135,6 @@ data Handle__
       haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a
                                              -- duplex handle.
     }
-    deriving Typeable
 
 -- we keep a few spare buffers around in a handle to avoid allocating
 -- a new one for each hPutStr.  These buffers are *guaranteed* to be the

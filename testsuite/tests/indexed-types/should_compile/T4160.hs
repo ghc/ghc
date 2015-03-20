@@ -1,4 +1,7 @@
 {-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+    -- The type of sizeT is indeed ambiguous
+
 module Foo where
 
 data P f g r = f r :*: g r

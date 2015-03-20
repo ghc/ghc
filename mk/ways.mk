@@ -22,10 +22,10 @@
 #
 # The ways currently defined.
 #
-ALL_WAYS=v p t l s mp mg debug dyn thr thr_l p_dyn debug_dyn thr_dyn thr_p_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p l_dyn thr_l_dyn
+ALL_WAYS=v p t l s mp debug dyn thr thr_l p_dyn debug_dyn thr_dyn thr_p_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p l_dyn thr_l_dyn
 
 #
-# The following ways currently have treated specially, p t mg,
+# The following ways currently are treated specially,
 # as the driver script treats these guys specially and needs to carefully be told
 # about the options for these. Hence, we hide the required command line options
 # for these in the driver, as this is the only place they are needed.
@@ -47,10 +47,6 @@ WAY_l_HC_OPTS= -static -eventlog
 # Way `mp': 
 WAY_mp_NAME=parallel
 WAY_mp_HC_OPTS= -static -parallel
-
-# Way `mg': 
-WAY_mg_NAME=GranSim
-WAY_mg_HC_OPTS= -static -gransim
 
 #
 # These ways apply to the RTS only:

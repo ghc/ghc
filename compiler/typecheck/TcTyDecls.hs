@@ -409,7 +409,7 @@ calcRecFlags boot_details is_boot mrole_env tyclss
         --     for vanilla-ness of data constructors; and that depends
         --     on empty existential type variables; and that is figured
         --     out by tcResultType; which uses tcMatchTy; which uses
-        --     coreView; which calls coreExpandTyCon_maybe; which uses
+        --     coreView; which calls expandSynTyCon_maybe; which uses
         --     the recursiveness of the TyCon.  Result... a black hole.
         -- YUK YUK YUK
 

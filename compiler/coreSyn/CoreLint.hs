@@ -89,6 +89,7 @@ We check for
         (b) Out-of-scope type variables
         (c) Out-of-scope local variables
         (d) Ill-kinded types
+        (e) Incorrect unsafe coercions
 
 If we have done specialisation the we check that there are
         (a) No top-level bindings of primitive (unboxed type)
@@ -121,6 +122,25 @@ to the type of the binding variable.  lintBinders does this.
 For Ids, the type-substituted Id is added to the in_scope set (which
 itself is part of the TvSubst we are carrying down), and when we
 find an occurrence of an Id, we fetch it from the in-scope set.
+
+Note [Bad unsafe coercion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For discussion see https://ghc.haskell.org/trac/ghc/wiki/BadUnsafeCoercions
+Linter introduces additional rules that checks improper coercion between
+different types, called bad coercions. Following coercions are forbidden:
+
+  (a) coercions between boxed and unboxed values;
+  (b) coercions between unlifted values of the different sizes, here
+      active size is checked, i.e. size of the actual value but not
+      the space allocated for value;
+  (c) coercions between floating and integral boxed values, this check
+      is not yet supported for unboxed tuples, as no semantics were
+      specified for that;
+  (d) coercions from / to vector type
+  (e) If types are unboxed tuples then tuple (# A_1,..,A_n #) can be
+      coerced to (# B_1,..,B_m #) if n=m and for each pair A_i, B_i rules
+      (a-e) holds.
 
 ************************************************************************
 *                                                                      *
@@ -230,7 +250,7 @@ lintPassResult hsc_env pass binds
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
   | otherwise
-  = do { let (warns, errs) = lintCoreBindings pass (interactiveInScope hsc_env) binds
+  = do { let (warns, errs) = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
        ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults dflags pass warns errs binds  }
   where
@@ -272,7 +292,7 @@ lintInteractiveExpr :: String -> HscEnv -> CoreExpr -> IO ()
 lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr (interactiveInScope hsc_env) expr
+  | Just err <- lintExpr dflags (interactiveInScope hsc_env) expr
   = do { display_lint_err err
        ; Err.ghcExit dflags 1 }
   | otherwise
@@ -316,12 +336,12 @@ interactiveInScope hsc_env
               --   f :: [t] -> [t]
               -- where t is a RuntimeUnk (see TcType)
 
-lintCoreBindings :: CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
+lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings pass local_in_scope binds
-  = initL flags $
+lintCoreBindings dflags pass local_in_scope binds
+  = initL dflags flags $
     addLoc TopLevelBindings        $
     addInScopeVars local_in_scope  $
     addInScopeVars binders         $
@@ -378,29 +398,31 @@ We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
 -}
 
-lintUnfolding :: SrcLoc
+lintUnfolding :: DynFlags
+              -> SrcLoc
               -> [Var]          -- Treat these as in scope
               -> CoreExpr
               -> Maybe MsgDoc   -- Nothing => OK
 
-lintUnfolding locn vars expr
+lintUnfolding dflags locn vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    (_warns, errs) = initL defaultLintFlags linter
+    (_warns, errs) = initL dflags defaultLintFlags linter
     linter = addLoc (ImportedUnfolding locn) $
              addInScopeVars vars             $
              lintCoreExpr expr
 
-lintExpr :: [Var]               -- Treat these as in scope
+lintExpr :: DynFlags
+         -> [Var]               -- Treat these as in scope
          -> CoreExpr
          -> Maybe MsgDoc        -- Nothing => OK
 
-lintExpr vars expr
+lintExpr dflags vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    (_warns, errs) = initL defaultLintFlags linter
+    (_warns, errs) = initL dflags defaultLintFlags linter
     linter = addLoc TopLevelBindings $
              addInScopeVars vars     $
              lintCoreExpr expr
@@ -1124,13 +1146,48 @@ lintCoercion (CoVarCo cv)
                                      2 (ppr cv)) }
        ; return (k, s, t, r) }
 
+-- See Note [Bad unsafe coercion]
 lintCoercion (UnivCo _prov r ty1 ty2)
   = do { k1 <- lintType ty1
-       ; _k2 <- lintType ty2
+       ; k2 <- lintType ty2
 --       ; unless (k1 `eqKind` k2) $
 --         failWithL (hang (ptext (sLit "Unsafe coercion changes kind"))
 --                       2 (ppr co))
+       ; when (r /= Phantom && isSubOpenTypeKind k1 && isSubOpenTypeKind k2)
+              (checkTypes ty1 ty2)
        ; return (k1, ty1, ty2, r) }
+   where
+     report s = hang (text $ "Unsafe coercion between " ++ s)
+                     2 (vcat [ text "From:" <+> ppr ty1
+                             , text "  To:" <+> ppr ty2])
+     isUnBoxed :: PrimRep -> Bool
+     isUnBoxed PtrRep = False
+     isUnBoxed _      = True
+     checkTypes t1 t2
+       = case (repType t1, repType t2) of
+           (UnaryRep _, UnaryRep _) ->
+              validateCoercion (typePrimRep t1)
+                               (typePrimRep t2)
+           (UbxTupleRep rep1, UbxTupleRep rep2) -> do
+              checkWarnL (length rep1 == length rep2)
+                         (report "unboxed tuples of different length")
+              zipWithM_ checkTypes rep1 rep2
+           _  -> addWarnL (report "unboxed tuple and ordinary type")
+     validateCoercion :: PrimRep -> PrimRep -> LintM ()
+     validateCoercion rep1 rep2
+       = do { dflags <- getDynFlags
+            ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
+                         (report "unboxed and boxed value")
+            ; checkWarnL (TyCon.primRepSizeW dflags rep1
+                           == TyCon.primRepSizeW dflags rep2)
+                         (report "unboxed values of different size")
+            ; let fl = liftM2 (==) (TyCon.primRepIsFloat rep1)
+                                   (TyCon.primRepIsFloat rep2)
+            ; case fl of
+                Nothing    -> addWarnL (report "vector types")
+                Just False -> addWarnL (report "float and integral values")
+                _          -> return ()
+            }
 
 lintCoercion (SymCo co)
   = do { (k, ty1, ty2, r) <- lintCoercion co
@@ -1288,8 +1345,10 @@ data LintEnv
   = LE { le_flags :: LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
        , le_subst :: TvSubst         -- Current type substitution; we also use this
-    }                                -- to keep track of all the variables in scope,
+                                     -- to keep track of all the variables in scope,
                                      -- both Ids and TyVars
+       , le_dynflags :: DynFlags     -- DynamicFlags
+       }
 
 data LintFlags
   = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
@@ -1344,6 +1403,9 @@ instance Monad LintM where
                            Just r -> unLintM (k r) env errs'
                            Nothing -> (Nothing, errs'))
 
+instance HasDynFlags LintM where
+  getDynFlags = LintM (\ e errs -> (Just (le_dynflags e), errs))
+
 data LintLocInfo
   = RhsOf Id            -- The variable bound
   | LambdaBodyOf Id     -- The lambda-binder
@@ -1356,12 +1418,12 @@ data LintLocInfo
   | InType Type         -- Inside a type
   | InCo   Coercion     -- Inside a coercion
 
-initL :: LintFlags -> LintM a -> WarnsAndErrs    -- Errors and warnings
-initL flags m
+initL :: DynFlags -> LintFlags -> LintM a -> WarnsAndErrs    -- Errors and warnings
+initL dflags flags m
   = case unLintM m env (emptyBag, emptyBag) of
       (_, errs) -> errs
   where
-    env = LE { le_flags = flags, le_subst = emptyTvSubst, le_loc = [] }
+    env = LE { le_flags = flags, le_subst = emptyTvSubst, le_loc = [], le_dynflags = dflags }
 
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)
@@ -1369,6 +1431,10 @@ getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)
 checkL :: Bool -> MsgDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
+
+checkWarnL :: Bool -> MsgDoc -> LintM ()
+checkWarnL True   _  = return ()
+checkWarnL False msg = addWarnL msg
 
 failWithL :: MsgDoc -> LintM a
 failWithL msg = LintM $ \ env (warns,errs) ->
