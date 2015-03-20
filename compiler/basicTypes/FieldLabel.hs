@@ -39,7 +39,7 @@ dfuns/axioms differ.  Each FieldLabel value is unique to its type
 constructor.
 -}
 
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 module FieldLabel ( FieldLabelString
                   , FieldLabelEnv
@@ -53,11 +53,12 @@ import Name
 
 import Binary
 import FastString
-import FastStringEnv
 import Outputable
 
-import Data.Foldable
-import Data.Traversable
+#if __GLASGOW_HASKELL__ < 709
+import Data.Foldable ( Foldable )
+import Data.Traversable ( Traversable )
+#endif
 
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)

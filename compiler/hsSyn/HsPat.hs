@@ -48,7 +48,6 @@ import Var
 import ConLike
 import DataCon
 import TyCon
-import FieldLabel
 import Outputable
 import Type
 import RdrName

@@ -58,7 +58,6 @@ import Name             hiding ( varName )
 import NameSet
 import Avail
 import RdrName
-import TcRnMonad
 import VarSet
 import VarEnv
 import ByteCodeInstr

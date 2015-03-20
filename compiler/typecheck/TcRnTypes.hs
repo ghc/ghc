@@ -106,7 +106,6 @@ import Type
 import CoAxiom  ( Role )
 import Class    ( Class )
 import TyCon    ( TyCon )
-import CoAxiom
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, FieldLabel, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )

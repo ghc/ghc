@@ -112,7 +112,6 @@ import CoAxiom
 import PrelNames
 import Maybes
 import Outputable
-import FastString
 import FastStringEnv
 import FieldLabel
 import Constants

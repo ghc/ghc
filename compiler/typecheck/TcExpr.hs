@@ -50,8 +50,6 @@ import Var
 import VarSet
 import VarEnv
 import TysWiredIn
-import TysPrim
-import MkId
 import TysPrim( intPrimTy, addrPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames

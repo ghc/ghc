@@ -53,8 +53,6 @@ import RdrName
 import HscTypes
 import TcEnv
 import TcRnMonad
-import Id
-import Var
 import Name
 import NameSet
 import NameEnv
@@ -63,7 +61,6 @@ import Module
 import ConLike
 import DataCon
 import TyCon
-import CoAxiom
 import PrelNames        ( mkUnboundName, isUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils         ( MsgDoc )
 import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence, defaultFixity )

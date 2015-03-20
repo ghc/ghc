@@ -101,10 +101,13 @@ import Bag
 import Outputable
 
 import Data.Either
-import Data.Foldable ( foldMap )
 import Data.Function
 import Data.List
+
+#if __GLASGOW_HASKELL__ < 709
+import Data.Foldable ( foldMap )
 import Data.Monoid ( mempty, mappend )
+#endif
 
 {-
 ************************************************************************

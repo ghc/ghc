@@ -23,7 +23,6 @@ import TcEnv
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import LoadIface        ( loadSrcInterface )
-import IfaceEnv
 import TcRnMonad
 import PrelNames
 import Module
@@ -47,12 +46,15 @@ import ListSetOps
 import Control.Monad
 import Data.Map         ( Map )
 import qualified Data.Map as Map
-import Data.Monoid      ( mconcat )
 import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy )
 import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
+
+#if __GLASGOW_HASKELL__ < 709
+import Data.Monoid      ( mconcat )
+#endif
 
 {-
 ************************************************************************
