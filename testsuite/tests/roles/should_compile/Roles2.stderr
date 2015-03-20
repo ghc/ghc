@@ -5,8 +5,8 @@ TYPE CONSTRUCTORS
   data T2 a = K2 (FunPtr a)
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,
-                     integer-gmp-0.5.1.0]
+Dependent packages: [base-4.8.0.0, ghc-prim-0.4.0.0,
+                     integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
 
