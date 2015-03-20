@@ -567,7 +567,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record updates] in TcExpr
                       NoParent | overload_ok ->
-                          do { mb <- lookupOccRn_overloaded lbl
+                          do { mb <- lookupOccRn_overloaded overload_ok lbl
                              ; case mb of
                                  Nothing -> do { addErr (unknownSubordinateErr doc lbl)
                                                ; return (Right []) }

@@ -14,7 +14,7 @@ module RnEnv (
         lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
-        lookupOccRn_overloaded, lookupGlobalOccRn_overloaded,
+        lookupOccRn_overloaded,
         reportUnboundName,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
@@ -825,29 +825,34 @@ lookupGlobalOccRn_maybe rdr_name
                 Just gre -> return (Just (gre_name gre)) }
 
 
--- The following are possible results of lookupOccRn_overloaded:
---   Nothing         -> name not in scope (no error reported)
---   Just (Left x)   -> name uniquely refers to x, or there is a name clash (reported)
---   Just (Right xs) -> ambiguous between the fields xs;
---                      fields are represented as (parent, selector) pairs
-
-lookupOccRn_overloaded  :: RdrName -> RnM (Maybe (Either Name [(Name, Name)]))
-lookupOccRn_overloaded rdr_name
+-- | Like 'lookupOccRn_maybe', but with a more informative result if
+-- the 'RdrName' happens to be a record selector:
+--
+--   * Nothing         -> name not in scope (no error reported)
+--   * Just (Left x)   -> name uniquely refers to x,
+--                        or there is a name clash (reported)
+--   * Just (Right xs) -> name refers to one or more (parent, record selector)
+--                        pairs; if overload_ok was False, this list will be
+--                        a singleton.
+lookupOccRn_overloaded  :: Bool -> RdrName -> RnM (Maybe (Either Name [(Name, Name)]))
+lookupOccRn_overloaded overload_ok rdr_name
   = do { local_env <- getLocalRdrEnv
        ; case lookupLocalRdrEnv local_env rdr_name of {
           Just name -> return (Just (Left name)) ;
           Nothing   -> do
-       { mb_name <- lookupGlobalOccRn_overloaded rdr_name
+       { mb_name <- lookupGlobalOccRn_overloaded overload_ok rdr_name
        ; case mb_name of {
            Just name -> return (Just name) ;
            Nothing   -> do
-       { dflags  <- getDynFlags
-       ; is_ghci <- getIsGHCi   -- This test is not expensive,
-                                -- and only happens for failed lookups
-       ; lookupQualifiedNameGHCi_overloaded dflags is_ghci rdr_name } } } } }
+       { ns <- lookupQualifiedNameGHCi rdr_name
+                      -- This test is not expensive,
+                      -- and only happens for failed lookups
+       ; case ns of
+           (n:_) -> return $ Just $ Left n  -- Unlikely to be more than one...?
+           []    -> return Nothing  } } } } }
 
-lookupGlobalOccRn_overloaded :: RdrName -> RnM (Maybe (Either Name [(Name, Name)]))
-lookupGlobalOccRn_overloaded rdr_name
+lookupGlobalOccRn_overloaded :: Bool -> RdrName -> RnM (Maybe (Either Name [(Name, Name)]))
+lookupGlobalOccRn_overloaded overload_ok rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
   = do { n' <- lookupExactOcc n; return (Just (Left n')) }
 
@@ -857,10 +862,13 @@ lookupGlobalOccRn_overloaded rdr_name
 
   | otherwise
   = do  { env <- getGlobalRdrEnv
-        ; overload_ok <- xoptM Opt_OverloadedRecordFields
         ; case lookupGRE_RdrName rdr_name env of
                 []    -> return Nothing
-                [gre]    -> do { addUsedRdrName True gre rdr_name
+                [gre] | isOverloadedRecFldGRE gre
+                         -> do { addUsedRdrName True gre rdr_name
+                               ; return (Just (Right [greBits gre])) }
+                      | otherwise
+                         -> do { addUsedRdrName True gre rdr_name
                                ; return (Just (Left (gre_name gre))) }
                 gres  | all isRecFldGRE gres && overload_ok
                          -> do { mapM_ (\ gre -> addUsedRdrName True gre rdr_name) gres
@@ -1073,52 +1081,6 @@ lookupQualifiedNameGHCi rdr_name
       = return []
 
     doc = ptext (sLit "Need to find") <+> ppr rdr_name
-
--- Overloaded counterpart to lookupQualifiedNameGHCi: a qualified name
--- should never be overloaded, so when we check for overloaded field
--- matches, generate name clash errors if we find more than one.
-lookupQualifiedNameGHCi_overloaded :: DynFlags -> Bool -> RdrName
-                                   -> RnM (Maybe (Either Name [(Name, Name)]))
-lookupQualifiedNameGHCi_overloaded dflags is_ghci rdr_name
-  | Just (mod,occ) <- isQual_maybe rdr_name
-  , is_ghci
-  , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
-  , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
-  = -- We want to behave as we would for a source file import here,
-    -- and respect hiddenness of modules/packages, hence loadSrcInterface.
-    do { res <- loadSrcInterface_maybe doc mod False Nothing
-       ; case res of
-           Succeeded ifaces
-             | (n:ns) <- [ name
-                         | iface <- ifaces -- AMG TODO check
-                         , avail <- mi_exports iface
-                         , name  <- availNames avail
-                         , nameOccName name == occ ]
-             -> ASSERT(null ns) return (Just (Left n))
-
-             | xs@((p, _, sel):ys) <- [ (availName avail, lbl, sel)
-                                      | iface <- ifaces
-                                      , avail <- mi_exports iface
-                                      , (lbl, sel) <- availOverloadedFlds avail
-                                      , lbl == occNameFS occ ]
-             -> do { when (not (null ys)) $
-                         addNameClashErrRn rdr_name (map (toFakeGRE mod) xs)
-                   ; return (Just (Right [(p, sel)])) }
-
-           _ -> -- Either we couldn't load the interface, or
-                -- we could but we didn't find the name in it
-                do { traceRn (text "lookupQualifiedNameGHCI_overloaded" <+> ppr rdr_name)
-                   ; return Nothing } }
-  | otherwise
-  = return Nothing
-  where
-    doc = ptext (sLit "Need to find") <+> ppr rdr_name
-
-    -- Make up a fake GRE solely for error-reporting purposes.
-    toFakeGRE mod (p, lbl, sel) = GRE { gre_name = sel
-                                      , gre_par  = FldParent p (Just lbl)
-                                      , gre_prov = Imported [imp_spec] }
-      where imp_spec = ImpSpec (ImpDeclSpec mod mod True noSrcSpan) ImpAll
 
 {-
 Note [Looking up signature names]

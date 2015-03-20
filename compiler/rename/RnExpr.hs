@@ -82,18 +82,21 @@ finishHsVar name
       ; return (HsVar name, unitFV name) }
 
 rnExpr (HsVar v)
-  = do { mb_name <- lookupOccRn_maybe v
+  = do { mb_name <- lookupOccRn_overloaded False v
        ; case mb_name of {
            Nothing -> do { if startsWithUnderscore (rdrNameOcc v)
                            then return (HsUnboundVar v, emptyFVs)
                            else do { n <- reportUnboundName v; finishHsVar n } } ;
-           Just name
+           Just (Left name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
               -> rnExpr (ExplicitList placeHolderType Nothing [])
 
               | otherwise
-              -> finishHsVar name }}
+              -> finishHsVar name ;
+           Just (Right ((_, sel_name):ns)) -> ASSERT( null ns )
+                                              return (HsSingleRecFld v sel_name, unitFV sel_name) ;
+           Just (Right [])                 -> error "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
