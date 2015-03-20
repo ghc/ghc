@@ -813,6 +813,7 @@ hsExprNeedsParens (HsRnBracketOut {}) = False
 hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
+hsExprNeedsParens (HsSingleRecFld{})  = False
 hsExprNeedsParens _ = True
 
 
@@ -825,6 +826,7 @@ isAtomicHsExpr (HsIPVar {})   = True
 isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)   = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)      = isAtomicHsExpr (unLoc e)
+isAtomicHsExpr (HsSingleRecFld{}) = True
 isAtomicHsExpr _              = False
 
 {-
