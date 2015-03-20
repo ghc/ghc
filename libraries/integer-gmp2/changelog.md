@@ -1,6 +1,6 @@
 # Changelog for [`integer-gmp` package](http://hackage.haskell.org/package/integer-gmp)
 
-## 1.0.0.0  **TBA**
+## 1.0.0.0  *Mar 2015*
 
   * Bundled with GHC 7.10.1
 
