@@ -1,5 +1,4 @@
 -- (c) The University of Glasgow 2006
-
 {-# LANGUAGE CPP, FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 
@@ -19,6 +18,7 @@ module TcEnv(
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
+        lookupGlobal,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnv2,
@@ -98,6 +98,23 @@ import Maybes( MaybeErr(..) )
 import Data.IORef
 import Data.List
 
+
+{- *********************************************************************
+*                                                                      *
+            An IO interface to looking up globals
+*                                                                      *
+********************************************************************* -}
+
+lookupGlobal :: HscEnv -> Name -> IO TyThing
+-- An IO version, used outside the typechecker
+-- It's more complicated than it looks, because it may
+-- need to suck in an interface file
+lookupGlobal hsc_env name
+  = initTcForLookup hsc_env (tcLookupGlobal name)
+    -- This initTcForLookup stuff is massive overkill
+    -- but that's how it is right now, and at least
+    -- this function localises it
+
 {-
 ************************************************************************
 *                                                                      *
@@ -109,6 +126,7 @@ Using the Located versions (eg. tcLookupLocatedGlobal) is preferred,
 unless you know that the SrcSpan in the monad is already set to the
 span of the Name.
 -}
+
 
 tcLookupLocatedGlobal :: Located Name -> TcM TyThing
 -- c.f. IfaceEnvEnv.tcIfaceGlobal
