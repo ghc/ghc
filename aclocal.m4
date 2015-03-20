@@ -2096,37 +2096,42 @@ AC_DEFUN([XCODE_VERSION],[
 # $1 = the variable to set
 # $2 = the with option name
 # $3 = the command to look for
+# $4 = the version of the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
+	# Test for program with version name.
+    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3-$4])
     if test "$$1" = ""; then
-        echo -n "checking for $3-x.x... "
-        save_IFS=$IFS
-        IFS=":;"
-        if test "$windows" = YES; then
-            PERM=
-            MODE=
+		# Test for program without version name.
+		FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
+		AC_MSG_CHECKING([$$1 is version $4])
+		if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
+            AC_MSG_RESULT(yes)
         else
-            # Search for executables.
-            PERM="-perm"
-            MODE="/+x"
-        fi
-        for p in ${PATH}; do
-            if test -d "${p}"; then
-                $1=`${FindCmd} "${p}" -maxdepth 1 \( -type f -o -type l \) ${PERM} ${MODE} -regex ".*/$3-[[0-9]]\.[[0-9]]" | ${SortCmd} -n | tail -1`
-                if test -n "$$1"; then
-                    break
-                fi
-            fi
-        done
-        IFS=$save_IFS
-        if test -n "$$1"; then
-            echo "$$1"
-        else
-            echo "no"
-        fi
+			AC_MSG_RESULT(no)
+			$1=""
+		fi
     fi
 ])
+
+# FIND_GHC_BOOTSTRAP_PROG()
+# --------------------------------
+# Parse the bootstrap GHC's compier settings file for the location of things
+# like the `llc` and `opt` commands.
+#
+# $1 = the variable to set
+# $2 = The bootstrap compiler.
+# $3 = The string to grep for to find the correct line.
+#
+AC_DEFUN([FIND_GHC_BOOTSTRAP_PROG],[
+	BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
+	if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
+		AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
+	else
+		$1=$BootstrapTmpCmd
+	fi
+])
+
 
 # FIND_GCC()
 # --------------------------------

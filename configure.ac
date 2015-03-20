@@ -483,15 +483,21 @@ cygwin32|mingw32)
     ;;
 esac
 
+# Here is where we re-target which specific version of the LLVM
+# tools we are looking for. In the past, GHC supported a number of
+# versions of LLVM simultaneously, but that stopped working around
+# 3.5/3.6 release of LLVM.
+llvm_version=3.6
+
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([LLC], [llc], [llc])
+FIND_LLVM_PROG([LLC], [llc], [llc], [$llvm_version])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([OPT], [opt], [opt])
+FIND_LLVM_PROG([OPT], [opt], [opt], [$llvm_version])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
@@ -513,13 +519,24 @@ dnl whether -fllvm is the stage 0 compiler's default. If so we
 dnl fail. If not, we check whether -fllvm is affected explicitly and
 dnl if so set a flag. The build system will later check this flag
 dnl after the desired build flags are known.
-if test -n "$LlcCmd" && test -n "$OptCmd"
+
+dnl This problem is further complicated by the fact that the llvm
+dnl version used by the bootstrap compiler may be different from the
+dnl version we arre trying to compile GHC against. Therefore, we need
+dnl to find the boostrap compiler's `settings` file then check to see
+dnl if the `opt` and `llc` command strings are non-empty and if these
+dnl programs exist. Only if they exist to we test for bug #9439.
+
+FIND_GHC_BOOTSTRAP_PROG([BootstrapLlcCmd], [${WithGhc}], "LLVM llc command")
+FIND_GHC_BOOTSTRAP_PROG([BootstrapOptCmd], [${WithGhc}], "LLVM opt command")
+
+if test -n "$BootstrapLlcCmd" && test -n "$BootstrapOptCmd"
 then
     AC_MSG_CHECKING(whether bootstrap compiler is affected by bug 9439)
     echo "main = putStrLn \"%function\"" > conftestghc.hs
 
     # Check whether LLVM backend is default for this platform
-    "${WithGhc}" -pgmlc="${LlcCmd}" -pgmlo="${OptCmd}" conftestghc.hs 2>&1 >/dev/null
+    "${WithGhc}" -pgmlc="${BootstrapLlcCmd}" -pgmlo="${BootstrapOptCmd}" conftestghc.hs 2>&1 >/dev/null
     res=`./conftestghc`
     if test "x$res" = "x%object"
     then
@@ -536,7 +553,7 @@ then
 
     # -fllvm is not the default, but set a flag so the Makefile can check
     # -for it in the build flags later on
-    "${WithGhc}" -fforce-recomp -pgmlc="${LlcCmd}" -pgmlo="${OptCmd}" -fllvm conftestghc.hs 2>&1 >/dev/null
+    "${WithGhc}" -fforce-recomp -pgmlc="${BootstrapLlcCmd}" -pgmlo="${BootstrapOptCmd}" -fllvm conftestghc.hs 2>&1 >/dev/null
     if test $? = 0
     then
         res=`./conftestghc`
