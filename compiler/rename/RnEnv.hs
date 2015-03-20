@@ -482,7 +482,11 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-            [gre] -> do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
+            [gre] | isOverloadedRecFldGRE gre ->
+                     do { addUsedSelector (gre_name gre)
+                        ; return (gre_name gre) }
+                  | otherwise ->
+                     do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
                           -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
             []    -> do { addErr (unknownSubordinateErr doc rdr_name)
