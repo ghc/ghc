@@ -191,6 +191,7 @@ checkWiredInTyCon tc
   = return ()
   | otherwise
   = do  { mod <- getModule
+        ; traceIf (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
         ; ASSERT( isExternalName tc_name )
           when (mod /= nameModule tc_name)
                (initIfaceTcRn (loadWiredInHomeIface tc_name))
@@ -360,7 +361,7 @@ loadInterfaceForModule doc m
 
 -- | An 'IfM' function to load the home interface for a wired-in thing,
 -- so that we're sure that we see its instance declarations and rules
--- See Note [Loading instances for wired-in things] in TcIface
+-- See Note [Loading instances for wired-in things]
 loadWiredInHomeIface :: Name -> IfM lcl ()
 loadWiredInHomeIface name
   = ASSERT( isWiredInName name )

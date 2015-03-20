@@ -308,9 +308,8 @@ mkTemplateLocals = mkTemplateLocalsNum 1
 mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
-{-
-Note [Exported LocalIds]
-~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Exported LocalIds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use mkExportedLocalId for things like
  - Dictionary functions (DFunId)
  - Wrapper and matcher Ids for pattern synonyms
@@ -324,7 +323,7 @@ code by the occurrence analyser.  (But "exported" here does not mean
 "brought into lexical scope by an import declaration". Indeed these
 things are always internal Ids that the user never sees.)
 
-It's very important that they are *LocalIds*, not GlobalIs, for lots
+It's very important that they are *LocalIds*, not GlobalIds, for lots
 of reasons:
 
  * We want to treat them as free variables for the purpose of

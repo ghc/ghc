@@ -274,6 +274,7 @@ mkCharExpr c = mkConApp charDataCon [mkCharLit c]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @String@
 mkStringExpr   :: MonadThings m => String     -> m CoreExpr  -- Result :: String
+
 -- | Create a 'CoreExpr' which will evaluate to a string morally equivalent to the given @FastString@
 mkStringExprFS :: MonadThings m => FastString -> m CoreExpr  -- Result :: String
 
