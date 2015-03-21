@@ -637,6 +637,9 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; alt_ty   <- lintInTy alt_ty
      ; var_ty   <- lintInTy (idType var)
 
+     ; checkL (not (null alts && exprIsHNF scrut))
+          (ptext (sLit "No alternatives for a case scrutinee in head-normal form:") <+> ppr scrut)
+
      ; case tyConAppTyCon_maybe (idType var) of
          Just tycon
               | debugIsOn &&
