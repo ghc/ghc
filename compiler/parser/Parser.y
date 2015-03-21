@@ -28,7 +28,7 @@
 --       filename = "\<interactive\>"
 --       location = mkRealSrcLoc (mkFastString filename) 1 1
 --       buffer = stringToStringBuffer str
---       parseState = mkPState flags buffer location in
+--       parseState = mkPState flags buffer location
 -- @
 module Parser (parseModule, parseImport, parseStatement,
                parseDeclaration, parseExpression, parseTypeSignature,
@@ -1684,7 +1684,7 @@ atype :: { LHsType RdrName }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
         -- if you had written '[ty, ty, ty]
-        -- (One means a list type, zero means the list type constructor, 
+        -- (One means a list type, zero means the list type constructor,
         -- so you have to quote those.)
         | '[' ctype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
