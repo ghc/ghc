@@ -281,3 +281,16 @@ test('linker_error3',
        ignore_output ],
      run_command,
      ['$MAKE -s --no-print-directory linker_error3'])
+
+test('T9839_01', [ no_stdin, ignore_output],
+                run_command,
+                ['{compiler} -e 1 +RTS -T-s 2>&1 | \
+                  grep "flag -T given an argument when none was expected: -T-s"'])
+
+test('T9839_02', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -Pax')],
+                compile_and_run,
+                [''])
+
+test('T9839_03', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -Px')],
+                compile_and_run,
+                [''])
