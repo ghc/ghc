@@ -637,8 +637,12 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; alt_ty   <- lintInTy alt_ty
      ; var_ty   <- lintInTy (idType var)
 
-     ; checkL (not (null alts && exprIsHNF scrut))
+     ; when (null alts) $
+     do { checkL (not (exprIsHNF scrut))
           (ptext (sLit "No alternatives for a case scrutinee in head-normal form:") <+> ppr scrut)
+        ; checkL (exprIsBottom scrut || isEmptyTy (exprType scrut))
+          (ptext (sLit "No alternatives for a case scrutinee not known to diverge for sure:") <+> ppr scrut)
+        }
 
      ; case tyConAppTyCon_maybe (idType var) of
          Just tycon

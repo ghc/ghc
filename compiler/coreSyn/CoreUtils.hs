@@ -42,6 +42,7 @@ module CoreUtils (
         -- * Manipulating data constructors and types
         applyTypeToArgs, applyTypeToArg,
         dataConRepInstPat, dataConRepFSInstPat,
+        isEmptyTy,
 
         -- * Working with ticks
         stripTicksTop, stripTicksTopE, stripTicksTopT,
@@ -2098,3 +2099,22 @@ rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
         = case isDataConWorkId_maybe f of
             Just dc -> n_val_args == dataConRepArity dc
             Nothing -> False
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Type utilities}
+*                                                                      *
+************************************************************************
+-}
+
+-- | True if the type has no non-bottom elements
+isEmptyTy :: Type -> Bool
+isEmptyTy ty
+    -- Data types with no constructors are empty
+    | Just (tc, inst_tys) <- splitTyConApp_maybe ty
+    , Just dcs <- tyConDataCons_maybe tc
+    , all (dataConCannotMatch inst_tys) dcs
+    = True
+    | otherwise
+    = False
