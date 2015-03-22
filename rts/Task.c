@@ -27,7 +27,7 @@
 // Locks required: all_tasks_mutex.
 Task *all_tasks = NULL;
 
-nat taskCount;
+nat taskCount; // current number of bound tasks + total number of worker tasks.
 nat workerCount;
 nat currentWorkerCount;
 nat peakWorkerCount;
