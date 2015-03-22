@@ -56,6 +56,8 @@ import Util
 import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
 import UniqSupply
+import CoreArity ( typeArity )
+import Demand ( splitStrictSig, isBotRes )
 
 import HscTypes
 import DynFlags
@@ -486,6 +488,24 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
       --       ; checkL (case dmdTy of
       --                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
       --           (mkArityMsg binder)
+
+       -- Check that the binder's arity is within the bounds imposed by
+       -- the type and the strictness signature. See Note [exprArity invariant]
+       -- and Note [Trimming arity]
+       ; checkL (idArity binder <= length (typeArity (idType binder)))
+           (ptext (sLit "idArity") <+> ppr (idArity binder) <+>
+           ptext (sLit "exceeds typeArity") <+>
+           ppr (length (typeArity (idType binder))) <> colon <+>
+           ppr binder)
+
+       ; case splitStrictSig (idStrictness binder) of
+           (demands, result_info) | isBotRes result_info ->
+             checkL (idArity binder <= length demands)
+               (ptext (sLit "idArity") <+> ppr (idArity binder) <+>
+               ptext (sLit "exceeds arity imposed by the strictness signature") <+>
+               ppr (idStrictness binder) <> colon <+>
+               ppr binder)
+           _ -> return ()
 
        ; lintIdUnfolding binder binder_ty (idUnfolding binder) }
 
