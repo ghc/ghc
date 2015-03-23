@@ -1306,11 +1306,11 @@ def simple_run( name, way, prog, args ):
         stdin_comes_from = ' <' + use_stdin
 
     if opts.combined_output:
-        redirection        = ' > {} 2>&1'.format(run_stdout)
-        redirection_append = ' >> {} 2>&1'.format(run_stdout)
+        redirection        = ' > {0} 2>&1'.format(run_stdout)
+        redirection_append = ' >> {0} 2>&1'.format(run_stdout)
     else:
-        redirection        = ' > {} 2> {}'.format(run_stdout, run_stderr)
-        redirection_append = ' >> {} 2>> {}'.format(run_stdout, run_stderr)
+        redirection        = ' > {0} 2> {1}'.format(run_stdout, run_stderr)
+        redirection_append = ' >> {0} 2>> {1}'.format(run_stdout, run_stderr)
 
     cmd = prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
@@ -1418,11 +1418,11 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
                      config.way_flags(name)[way])
 
     if getTestOpts().combined_output:
-        redirection        = ' > {} 2>&1'.format(outname)
-        redirection_append = ' >> {} 2>&1'.format(outname)
+        redirection        = ' > {0} 2>&1'.format(outname)
+        redirection_append = ' >> {0} 2>&1'.format(outname)
     else:
-        redirection        = ' > {} 2> {}'.format(outname, errname)
-        redirection_append = ' >> {} 2>> {}'.format(outname, errname)
+        redirection        = ' > {0} 2> {1}'.format(outname, errname)
+        redirection_append = ' >> {0} 2>> {1}'.format(outname, errname)
 
     cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts} '
            '< {scriptname} {redirection}'
