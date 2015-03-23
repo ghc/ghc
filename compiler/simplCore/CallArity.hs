@@ -377,7 +377,7 @@ the case for Core!
 
  2. Eta-expanding a right hand side might invalidate existing annotations. In
     particular, if an id has a strictness annotation of <...><...>b, then
-    passing one argument to it will definitely bottom out, so the simplifier
+    passing two arguments to it will definitely bottom out, so the simplifier
     will throw away additional parameters. This conflicts with Call Arity! So
     we ensure that we never eta-expand such a value beyond the number of
     arguments mentioned in the strictness signature.
