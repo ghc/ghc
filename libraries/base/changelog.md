@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.8.0.0  *TBA*
+## 4.8.0.0  *Mar 2015*
 
   * Bundled with GHC 7.10.1
 
