@@ -694,6 +694,10 @@ expensive.
 -}
 
 exprIsBottom :: CoreExpr -> Bool
+-- If the type only contains no elements besides bottom, then this expressions,
+-- well, bottom.
+exprIsBottom e | isEmptyTy (exprType e) = True
+-- Otherwise see if this is a bottoming id applied to enough arguments
 exprIsBottom e
   = go 0 e
   where
