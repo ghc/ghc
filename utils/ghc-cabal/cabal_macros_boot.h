@@ -1,6 +1,12 @@
 /* defines a few MIN_VERSION_...() macros used by some of the bootstrap packages */
 
-#if __GLASGOW_HASKELL__ >= 709
+#if __GLASGOW_HASKELL__ >= 711
+/* package base-4.8.1.0 */
+# define MIN_VERSION_base(major1,major2,minor) (\
+  (major1) <  4 || \
+  (major1) == 4 && (major2) <  8 || \
+  (major1) == 4 && (major2) == 8 && (minor) <= 1)
+#elif __GLASGOW_HASKELL__ >= 709
 /* package base-4.8.0.0 */
 # define MIN_VERSION_base(major1,major2,minor) (\
   (major1) <  4 || \
