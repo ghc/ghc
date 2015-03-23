@@ -702,6 +702,7 @@ exprIsBottom e
     go n (Tick _ e)              = go n e
     go n (Cast e _)              = go n e
     go n (Let _ e)               = go n e
+    go n (Lam v e) | isTyVar v   = go n e
     go _ _                       = False
 
 {-
