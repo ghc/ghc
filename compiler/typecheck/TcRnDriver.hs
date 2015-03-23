@@ -1900,44 +1900,9 @@ tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 tcRnDeclsi :: HscEnv
            -> [LHsDecl RdrName]
            -> IO (Messages, Maybe TcGblEnv)
-
-tcRnDeclsi hsc_env local_decls =
-  runTcInteractive hsc_env $ do
-
-    ((tcg_env, tclcl_env), lie) <- captureConstraints $
-                                   tc_rn_src_decls local_decls
-    setEnvs (tcg_env, tclcl_env) $ do
-
-    -- wanted constraints from static forms
-    stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef
-
-    new_ev_binds <- simplifyTop (andWC stWC lie)
-
-    failIfErrsM
-    let TcGblEnv { tcg_type_env  = type_env,
-                   tcg_binds     = binds,
-                   tcg_sigs      = sig_ns,
-                   tcg_ev_binds  = cur_ev_binds,
-                   tcg_imp_specs = imp_specs,
-                   tcg_rules     = rules,
-                   tcg_vects     = vects,
-                   tcg_fords     = fords } = tcg_env
-        all_ev_binds = cur_ev_binds `unionBags` new_ev_binds
-
-    (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects')
-        <- zonkTopDecls all_ev_binds binds Nothing sig_ns rules vects
-                        imp_specs fords
-
-    let final_type_env = extendTypeEnvWithIds type_env bind_ids
-        tcg_env' = tcg_env { tcg_binds     = binds',
-                             tcg_ev_binds  = ev_binds',
-                             tcg_imp_specs = imp_specs',
-                             tcg_rules     = rules',
-                             tcg_vects     = vects',
-                             tcg_fords     = fords' }
-
-    setGlobalTypeEnv tcg_env' final_type_env
-
+tcRnDeclsi hsc_env local_decls
+  = runTcInteractive hsc_env $
+    tcRnSrcDecls False Nothing local_decls
 
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id
