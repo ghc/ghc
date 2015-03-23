@@ -706,8 +706,14 @@
         </thead>
         <tbody>
           <row>
+            <entry><option>-freduction-depth=</option><replaceable>n</replaceable></entry>
+	    <entry>set the <link linkend="undecidable-instances">limit for type simplification</link>. Default is 200.</entry>
+	    <entry>dynamic</entry>
+	    <entry></entry>
+	  </row>
+	  <row>
             <entry><option>-fcontext-stack=</option><replaceable>n</replaceable></entry>
-            <entry>set the <link linkend="undecidable-instances">limit for type-class context reduction</link>. Default is 100.</entry>
+            <entry>Deprecated. Use <option>-freduction-depth=</option><replaceable>n</replaceable> instead.</entry>
             <entry>dynamic</entry>
             <entry></entry>
           </row>
@@ -731,7 +737,7 @@
           </row>
           <row>
             <entry><option>-ftype-function-depth=</option><replaceable>n</replaceable></entry>
-            <entry>set the <link linkend="type-families">limit for type function reductions</link>. Default is 200.</entry>
+            <entry>Deprecated. Use <option>-freduction-depth=</option><replaceable>n</replaceable> instead.</entry>
             <entry>dynamic</entry>
             <entry></entry>
           </row>

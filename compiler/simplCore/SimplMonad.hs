@@ -30,6 +30,7 @@ import Outputable
 import FastString
 import MonadUtils
 import ErrUtils
+import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( when, liftM, ap )
 
 {-
@@ -52,11 +53,10 @@ newtype SimplM result
   -- we only need IO here for dump output
 
 data SimplTopEnv
-  = STE { st_flags :: DynFlags
-        , st_max_ticks :: Int  -- Max #ticks in this simplifier run
-                               -- Zero means infinity!
-        , st_rules :: RuleBase
-        , st_fams  :: (FamInstEnv, FamInstEnv) }
+  = STE { st_flags     :: DynFlags
+        , st_max_ticks :: IntWithInf  -- Max #ticks in this simplifier run
+        , st_rules     :: RuleBase
+        , st_fams      :: (FamInstEnv, FamInstEnv) }
 
 initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
@@ -73,14 +73,15 @@ initSmpl dflags rules fam_envs us size m
               , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs }
 
-computeMaxTicks :: DynFlags -> Int -> Int
+computeMaxTicks :: DynFlags -> Int -> IntWithInf
 -- Compute the max simplifier ticks as
 --     (base-size + pgm-size) * magic-multiplier * tick-factor/100
 -- where
 --    magic-multiplier is a constant that gives reasonable results
 --    base-size is a constant to deal with size-zero programs
 computeMaxTicks dflags size
-  = fromInteger ((toInteger (size + base_size)
+  = treatZeroAsInf $
+    fromInteger ((toInteger (size + base_size)
                   * toInteger (tick_factor * magic_multiplier))
           `div` 100)
   where
@@ -195,7 +196,7 @@ tick t = SM (\st_env us sc -> let sc' = doSimplTick (st_flags st_env) t sc
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
 checkedTick t
-  = SM (\st_env us sc -> if st_max_ticks st_env <= simplCountN sc
+  = SM (\st_env us sc -> if st_max_ticks st_env <= mkIntWithInf (simplCountN sc)
                          then pprPanic "Simplifier ticks exhausted" (msg sc)
                          else let sc' = doSimplTick (st_flags st_env) t sc
                               in sc' `seq` return ((), us, sc'))

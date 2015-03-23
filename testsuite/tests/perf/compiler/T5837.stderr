@@ -1,7 +1,7 @@
 
 T5837.hs:8:6:
-    Type function application stack overflow; size = 51
-    Use -ftype-function-depth=N to increase stack size to N
+    Reduction stack overflow; size = 51
+    When simplifying the following type:
       TF
         (TF
            (TF
@@ -27,33 +27,7 @@ T5837.hs:8:6:
                                                                        (TF
                                                                           (TF
                                                                              (TF
-                                                                                (TF
-                                                                                   (TF
-                                                                                      (TF
-                                                                                         (TF
-                                                                                            (TF
-                                                                                               (TF
-                                                                                                  (TF
-                                                                                                     (TF
-                                                                                                        (TF
-                                                                                                           (TF
-                                                                                                              (TF
-                                                                                                                 (TF
-                                                                                                                    (TF
-                                                                                                                       (TF
-                                                                                                                          (TF
-                                                                                                                             (TF
-                                                                                                                                (TF
-                                                                                                                                   (TF
-                                                                                                                                      (TF
-                                                                                                                                         (TF
-                                                                                                                                            (TF
-                                                                                                                                               (TF
-                                                                                                                                                  (TF
-                                                                                                                                                     (TF
-                                                                                                                                                        (TF
-                                                                                                                                                           (TF
-                                                                                                                                                              a))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                                                a))))))))))))))))))))))))
       ~ (TF
            (TF
               (TF
@@ -80,33 +54,7 @@ T5837.hs:8:6:
                                                                              (TF
                                                                                 (TF
                                                                                    (TF
-                                                                                      (TF
-                                                                                         (TF
-                                                                                            (TF
-                                                                                               (TF
-                                                                                                  (TF
-                                                                                                     (TF
-                                                                                                        (TF
-                                                                                                           (TF
-                                                                                                              (TF
-                                                                                                                 (TF
-                                                                                                                    (TF
-                                                                                                                       (TF
-                                                                                                                          (TF
-                                                                                                                             (TF
-                                                                                                                                (TF
-                                                                                                                                   (TF
-                                                                                                                                      (TF
-                                                                                                                                         (TF
-                                                                                                                                            (TF
-                                                                                                                                               (TF
-                                                                                                                                                  (TF
-                                                                                                                                                     (TF
-                                                                                                                                                        (TF
-                                                                                                                                                           (TF
-                                                                                                                                                              (TF
-                                                                                                                                                                 (TF
-                                                                                                                                                                    a))))))))))))))))))))))))))))))))))))))))))))))))))),
+                                                                                      a))))))))))))))))))))))))),
          TF
            (TF
               (TF
@@ -133,33 +81,11 @@ T5837.hs:8:6:
                                                                              (TF
                                                                                 (TF
                                                                                    (TF
-                                                                                      (TF
-                                                                                         (TF
-                                                                                            (TF
-                                                                                               (TF
-                                                                                                  (TF
-                                                                                                     (TF
-                                                                                                        (TF
-                                                                                                           (TF
-                                                                                                              (TF
-                                                                                                                 (TF
-                                                                                                                    (TF
-                                                                                                                       (TF
-                                                                                                                          (TF
-                                                                                                                             (TF
-                                                                                                                                (TF
-                                                                                                                                   (TF
-                                                                                                                                      (TF
-                                                                                                                                         (TF
-                                                                                                                                            (TF
-                                                                                                                                               (TF
-                                                                                                                                                  (TF
-                                                                                                                                                     (TF
-                                                                                                                                                        (TF
-                                                                                                                                                           (TF
-                                                                                                                                                              (TF
-                                                                                                                                                                 (TF
-                                                                                                                                                                    Int))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                                                      Int))))))))))))))))))))))))))
+    Use -freduction-depth=0 to disable this check
+    (any upper bound you could choose might fail unpredictably with
+     minor updates to GHC, so disabling the check is recommended if
+     you're sure that type checking should terminate)
     In the ambiguity check for the type signature for ‘t’:
       t :: forall a. (a ~ TF (a, Int)) => Int
     In the type signature for ‘t’: t :: (a ~ TF (a, Int)) => Int

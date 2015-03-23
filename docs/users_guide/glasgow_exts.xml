@@ -5080,7 +5080,13 @@ both the Paterson Conditions and the Coverage Condition
 Termination is still ensured by having a
 fixed-depth recursion stack.  If you exceed the stack depth you get a
 sort of backtrace, and the opportunity to increase the stack depth
-with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
+with <option>-freduction-depth=</option><emphasis>N</emphasis>.
+However, if you should exceed the default reduction depth limit,
+it is probably best just to disable depth checking, with
+<option>-freduction-depth=0</option>. The exact depth your program
+requires depends on minutiae of your code, and it may change between
+minor GHC releases. The safest bet for released code -- if you're sure
+that it should compile in finite time -- is just to disable the check.
 </para>
 
 <para>

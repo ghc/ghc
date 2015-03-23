@@ -1212,7 +1212,7 @@ tcTagToEnum loc fun_name arg res_ty
         ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
               rep_ty = mkTyConApp rep_tc rep_args
 
-        ; return (mkHsWrapCoR (mkTcSymCo coi) $ HsApp fun' arg') }
+        ; return (mkHsWrapCoR (mkTcSymCo $ TcCoercion coi) $ HsApp fun' arg') }
                   -- coi is a Representational coercion
   where
     doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")

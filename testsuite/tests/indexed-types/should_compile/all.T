@@ -252,3 +252,5 @@ test('T9582', normal, compile, [''])
 test('T9090', normal, compile, [''])
 test('T10020', normal, compile, [''])
 test('T10079', normal, compile, [''])
+test('T10139', normal, compile, [''])
+

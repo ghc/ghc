@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fcontext-stack=1000 #-} 
+{-# OPTIONS_GHC -freduction-depth=1000 #-} 
 {-# LANGUAGE 
      FlexibleContexts, FlexibleInstances, FunctionalDependencies, 
      MultiParamTypeClasses, TypeSynonymInstances, 

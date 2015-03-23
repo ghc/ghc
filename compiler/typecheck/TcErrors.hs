@@ -1678,21 +1678,23 @@ are created by in RtClosureInspect.zonkRTTIType.
 ************************************************************************
 -}
 
-solverDepthErrorTcS :: SubGoalCounter -> CtEvidence -> TcM a
-solverDepthErrorTcS cnt ev
+solverDepthErrorTcS :: CtLoc -> TcType -> TcM a
+solverDepthErrorTcS loc ty
   = setCtLoc loc $
-    do { pred <- zonkTcType (ctEvPred ev)
+    do { ty <- zonkTcType ty
        ; env0 <- tcInitTidyEnv
-       ; let tidy_env  = tidyFreeTyVars env0 (tyVarsOfType pred)
-             tidy_pred = tidyType tidy_env pred
-       ; failWithTcM (tidy_env, hang (msg cnt) 2 (ppr tidy_pred)) }
+       ; let tidy_env     = tidyFreeTyVars env0 (tyVarsOfType ty)
+             tidy_ty      = tidyType tidy_env ty
+             msg
+               = vcat [ text "Reduction stack overflow; size =" <+> ppr depth
+                      , hang (text "When simplifying the following type:")
+                           2 (ppr tidy_ty)
+                      , note ]
+       ; failWithTcM (tidy_env, msg) }
   where
-    loc   = ctEvLoc ev
     depth = ctLocDepth loc
-    value = subGoalCounterValue cnt depth
-    msg CountConstraints =
-        vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int value
-             , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
-    msg CountTyFunApps =
-        vcat [ ptext (sLit "Type function application stack overflow; size =") <+> int value
-             , ptext (sLit "Use -ftype-function-depth=N to increase stack size to N") ]
+    note = vcat
+      [ text "Use -freduction-depth=0 to disable this check"
+      , text "(any upper bound you could choose might fail unpredictably with"
+      , text " minor updates to GHC, so disabling the check is recommended if"
+      , text " you're sure that type checking should terminate)" ]

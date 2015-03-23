@@ -1070,7 +1070,7 @@ instance Outputable EvBind where
      = sep [ pp_gw <+> ppr v
            , nest 2 $ equals <+> ppr e ]
      where
-       pp_gw = brackets (if is_given then ptext (sLit "[G]") else ptext (sLit "[W]"))
+       pp_gw = brackets (if is_given then char 'G' else char 'W')
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where

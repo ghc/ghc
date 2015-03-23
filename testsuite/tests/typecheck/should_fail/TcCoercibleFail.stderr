@@ -1,12 +1,12 @@
 
 TcCoercibleFail.hs:11:8:
-    Couldn't match representation of type ‘()’ with that of ‘Int’
+    Couldn't match representation of type ‘Int’ with that of ‘()’
     In the expression: coerce
     In the expression: coerce $ one :: ()
     In an equation for ‘foo1’: foo1 = coerce $ one :: ()
 
 TcCoercibleFail.hs:14:8:
-    Couldn't match representation of type ‘m Age’ with that of ‘m Int’
+    Couldn't match representation of type ‘m Int’ with that of ‘m Age’
     NB: We cannot know what roles the parameters to ‘m’ have;
       we must assume that the role is nominal
     Relevant bindings include
@@ -26,7 +26,7 @@ TcCoercibleFail.hs:16:8:
     In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
 TcCoercibleFail.hs:18:8:
-    Couldn't match representation of type ‘Down Int’ with that of ‘Int’
+    Couldn't match representation of type ‘Int’ with that of ‘Down Int’
     Relevant role signatures: type role Down representational
     The data constructor ‘Data.Ord.Down’
       of newtype ‘Down’ is not in scope
@@ -35,28 +35,33 @@ TcCoercibleFail.hs:18:8:
     In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
 
 TcCoercibleFail.hs:21:8:
-    Couldn't match representation of type ‘()’ with that of ‘Void’
+    Couldn't match representation of type ‘Void’ with that of ‘()’
     In the expression: coerce :: Void -> ()
     In an equation for ‘foo5’: foo5 = coerce :: Void -> ()
 
 TcCoercibleFail.hs:24:9:
-    Couldn't match representation of type ‘()’
-                             with that of ‘VoidBad ()’
+    Couldn't match representation of type ‘VoidBad ()’
+                             with that of ‘()’
     Relevant role signatures: type role VoidBad phantom
     In the expression: coerce :: (VoidBad ()) -> ()
     In an equation for ‘foo5'’: foo5' = coerce :: (VoidBad ()) -> ()
 
 TcCoercibleFail.hs:28:8:
-    Context reduction stack overflow; size = 101
-    Use -fcontext-stack=N to increase stack size to N
-      Coercible (Fix (Either Int)) (Fix (Either Age))
+    Reduction stack overflow; size = 201
+    When simplifying the following type:
+      Coercible (Either Int (Fix (Either Int))) (Fix (Either Age))
+    Use -freduction-depth=0 to disable this check
+    (any upper bound you could choose might fail unpredictably with
+     minor updates to GHC, so disabling the check is recommended if
+     you're sure that type checking should terminate)
     In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
     In an equation for ‘foo6’:
         foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
 
 TcCoercibleFail.hs:29:8:
-    Couldn't match representation of type ‘()’
-                             with that of ‘Either Int (Fix (Either Int))’
+    Couldn't match representation of type ‘Either
+                                             Int (Fix (Either Int))’
+                             with that of ‘()’
     arising from trying to show that the representations of
       ‘Fix (Either Int)’ and
       ‘()’ are the same

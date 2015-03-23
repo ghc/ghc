@@ -1,8 +1,8 @@
 
 T4179.hs:26:16:
-    Couldn't match type ‘A3 (x (A2 (FCon x) -> A3 (FCon x)))’
-                  with ‘A3 (FCon x)’
-    NB: ‘A3’ is a type function, and may not be injective
+    Couldn't match type ‘A2 (x (A2 (FCon x) -> A3 (FCon x)))’
+                   with ‘A2 (FCon x)’
+    NB: ‘A2’ is a type function, and may not be injective
     Expected type: x (A2 (FCon x) -> A3 (FCon x))
                    -> A2 (FCon x) -> A3 (FCon x)
       Actual type: x (A2 (FCon x) -> A3 (FCon x))

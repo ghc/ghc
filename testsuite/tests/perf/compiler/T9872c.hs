@@ -4,7 +4,7 @@
  - See:  http://stackoverflow.com/questions/26538595
  -}
 
-{-# OPTIONS_GHC -ftype-function-depth=400 #-}
+{-# OPTIONS_GHC -freduction-depth=400 #-}
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}

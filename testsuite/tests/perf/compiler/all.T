@@ -191,7 +191,7 @@ test('T4801',
 #            # 2014-10-13: 48 stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-apple-darwin'), 464872776, 5),
+          [(platform('x86_64-apple-darwin'), 434058304, 5),
                            # expected value: 510938976 (amd64/OS X):
 
            (wordsize(32), 203962148, 10),
@@ -329,7 +329,7 @@ test('T5030',
            # 2014-12-10:  227205560 constraint solver got worse again; more agressive solving
            #                        of family-applications leads to less sharing, I think
 
-           (wordsize(64), 449042120, 10)]),
+           (wordsize(64), 403932600, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
@@ -345,11 +345,12 @@ test('T5030',
              # 2014-12-08 340969128  constraint solver perf improvements (esp kick-out)
              # 2014-12-10 449042120  constraint solver got worse again; more agressive solving
              #                          of family-applications leads to less sharing, I think
+             # 2015-03-17 403932600  tweak to solver algorithm
 
        only_ways(['normal'])
       ],
      compile,
-     ['-fcontext-stack=300'])
+     ['-freduction-depth=300'])
 
 test('T5631',
      [compiler_stats_num_field('bytes allocated',
@@ -490,7 +491,7 @@ test('T5837',
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
              # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
  
-           (wordsize(64), 231155640, 10)])
+           (wordsize(64), 53424304, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -504,8 +505,9 @@ test('T5837',
              # 2014-12-08 234790312 Constraint solver perf improvements (esp kick-out)
              # 2014-12-16 231155640 Mac  Flattener parameterized over roles;
              #                           some optimization
+             # 2015-03-17 53424304  Mac  Better depth checking; fails earlier
       ],
-      compile_fail,['-ftype-function-depth=50'])
+      compile_fail,['-freduction-depth=50'])
 
 test('T6048',
      [ only_ways(['optasm']),
@@ -611,10 +613,11 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 687562440, 5),
+          [(wordsize(64), 726679784, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
+          # 2015-03-17    726679784   tweak to solver; probably flattens more
            (wordsize(32), 328810212, 5)
           ]),
       ],

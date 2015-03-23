@@ -1,6 +1,6 @@
 
 TcCoercibleFail3.hs:12:7:
-    Couldn't match representation of type ‘NT2’ with that of ‘NT1’
+    Couldn't match representation of type ‘NT1’ with that of ‘NT2’
     arising from trying to show that the representations of
       ‘T NT1’ and
       ‘T NT2’ are the same

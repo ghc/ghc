@@ -1,6 +1,6 @@
 
 T4846.hs:29:1:
-    Couldn't match type ‘BOOL’ with ‘Bool’
+    Couldn't match type ‘Bool’ with ‘BOOL’
     arising from trying to show that the representations of
       ‘Expr Bool’ and
       ‘Expr BOOL’ are the same
@@ -9,7 +9,7 @@ T4846.hs:29:1:
         GHC.Prim.coerce (mkExpr :: Expr Bool) :: Expr BOOL
     In an equation for ‘mkExpr’:
         mkExpr = GHC.Prim.coerce (mkExpr :: Expr Bool) :: Expr BOOL
-    When typechecking the code for  ‘mkExpr’
+    When typechecking the code for ‘mkExpr’
       in a derived instance for ‘B BOOL’:
       To see the code I am typechecking, use -ddump-deriv
     In the instance declaration for ‘B BOOL’

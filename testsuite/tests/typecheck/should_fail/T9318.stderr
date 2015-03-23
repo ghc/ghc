@@ -1,6 +1,6 @@
 
 T9318.hs:12:5:
-    Couldn't match type ‘Bool’ with ‘Char’
+    Couldn't match type ‘Char’ with ‘Bool’
     Expected type: F Int
       Actual type: Char
     In the pattern: 'x'

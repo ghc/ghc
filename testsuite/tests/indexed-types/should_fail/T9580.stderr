@@ -2,8 +2,8 @@
 [2 of 2] Compiling T9580            ( T9580.hs, T9580.o )
 
 T9580.hs:7:9:
-    Couldn't match representation of type ‘Double’
-                             with that of ‘Dimensional Int Double’
+    Couldn't match representation of type ‘Dimensional Int Double’
+                             with that of ‘Double’
     Relevant role signatures: type role Dimensional nominal nominal
     The data constructor ‘T9580a.Quantity'’
       of newtype ‘Dimensional Int v’ is not in scope

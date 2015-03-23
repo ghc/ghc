@@ -224,13 +224,13 @@ tcInstNewTyCon_maybe tc tys = fmap (second TcCoercion) $
 -- | Like 'tcLookupDataFamInst_maybe', but returns the arguments back if
 -- there is no data family to unwrap.
 tcLookupDataFamInst :: FamInstEnvs -> TyCon -> [TcType]
-                    -> (TyCon, [TcType], TcCoercion)
+                    -> (TyCon, [TcType], Coercion)
 tcLookupDataFamInst fam_inst_envs tc tc_args
   | Just (rep_tc, rep_args, co)
       <- tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
-  = (rep_tc, rep_args, TcCoercion co)
+  = (rep_tc, rep_args, co)
   | otherwise
-  = (tc, tc_args, mkTcRepReflCo (mkTyConApp tc tc_args))
+  = (tc, tc_args, mkReflCo Representational (mkTyConApp tc tc_args))
 
 tcLookupDataFamInst_maybe :: FamInstEnvs -> TyCon -> [TcType]
                           -> Maybe (TyCon, [TcType], Coercion)
