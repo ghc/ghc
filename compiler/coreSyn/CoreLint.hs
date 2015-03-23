@@ -657,6 +657,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; alt_ty   <- lintInTy alt_ty
      ; var_ty   <- lintInTy (idType var)
 
+     -- See Note [No alternatives lint check]
      ; when (null alts) $
      do { checkL (not (exprIsHNF scrut))
           (ptext (sLit "No alternatives for a case scrutinee in head-normal form:") <+> ppr scrut)
@@ -714,6 +715,18 @@ instantiations between kind coercions and type coercions. We lint the
 kind coercions and produce the following substitution which is to be
 applied in the type variables:
   k_ag   ~~>   * -> *
+
+Note [No alternatives lint check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Case expressions with no alternatives are odd beasts, and worth looking at
+in the linter.
+
+Certainly, it would be terribly wrong if the scrutinee was already in head
+normal form. That is the first check.
+
+Furthermore, we should be able to see why GHC believes the scrutinee is
+diverging for sure. That is the second check. see #10180.
 
 ************************************************************************
 *                                                                      *

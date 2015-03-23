@@ -2108,7 +2108,10 @@ rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
 ************************************************************************
 -}
 
--- | True if the type has no non-bottom elements
+-- | True if the type has no non-bottom elements, e.g. when it is an empty
+-- datatype, or a GADT with non-satisfiable type parameters, e.g. Int :~: Bool.
+--
+-- See Note [No alternatives lint check] for one use of this function.
 isEmptyTy :: Type -> Bool
 isEmptyTy ty
     -- Data types with no constructors are empty
