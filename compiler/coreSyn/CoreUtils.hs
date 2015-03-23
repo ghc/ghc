@@ -2114,7 +2114,9 @@ rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
 -- See Note [No alternatives lint check] for one use of this function.
 isEmptyTy :: Type -> Bool
 isEmptyTy ty
-    -- Data types with no constructors are empty
+    -- Data types where, given the particular type parameters, no data
+    -- constructor matches, are empty.
+    -- This includes data types with no constructors, e.g. Data.Void.Void.
     | Just (tc, inst_tys) <- splitTyConApp_maybe ty
     , Just dcs <- tyConDataCons_maybe tc
     , all (dataConCannotMatch inst_tys) dcs
