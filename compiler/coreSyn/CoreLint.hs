@@ -728,6 +728,15 @@ normal form. That is the first check.
 Furthermore, we should be able to see why GHC believes the scrutinee is
 diverging for sure. That is the second check. see #10180.
 
+In principle, the first check is redundant: exprIsBottom == True will always
+imply exprIsHNF == False.
+But the first check is reliable: If exprIsHNF == True, then there definitely is
+a problem (exprIsHNF errs on the right side).
+If the second check triggers then it may be the case that the compiler got
+smarter elsewhere, and the empty case is correct, but that exprIsBottom is
+unable to see it. Therefore, this check is not fully reliable, and we keep
+both around.
+
 ************************************************************************
 *                                                                      *
 \subsection[lintCoreArgs]{lintCoreArgs}
