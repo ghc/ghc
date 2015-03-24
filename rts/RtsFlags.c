@@ -267,6 +267,7 @@ usage_text[] = {
 "  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
 "  -A<size> Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
+"  -O<size> Sets the minimum size of the old generation (default 1M)",
 "  -M<size> Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
 "  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
 "  -m<n>    Minimum % of heap which must be available (default 3%)",
@@ -969,6 +970,14 @@ error = rtsTrue;
                       RtsFlags.GcFlags.heapSizeSuggestion =
                           (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
                   }
+                  break;
+
+              case 'O':
+                  OPTION_UNSAFE;
+                  RtsFlags.GcFlags.minOldGenSize =
+                      (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE,
+                                       HS_WORD_MAX)
+                            / BLOCK_SIZE);
                   break;
 
               case 'I': /* idle GC delay */

@@ -385,6 +385,21 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
       </varlistentry>
 
       <varlistentry>
+	<term>
+          <option>-O</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-O</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>old generation, size</primary></indexterm>
+        </term>
+	<listitem>
+          <para>&lsqb;Default: 1m&rsqb; Set the minimum size of the
+          old generation.  The old generation is collected whenever it
+          grows to this size or the value of the <option>-F</option> option
+          multiplied by the size of the live data at the previous major
+          collection, whichever is larger.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term>
           <option>-n</option><replaceable>size</replaceable>
           <indexterm><primary><option>-n</option></primary><secondary>RTS option</secondary></indexterm>
