@@ -718,24 +718,23 @@ applied in the type variables:
 
 Note [No alternatives lint check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Case expressions with no alternatives are odd beasts, and worth looking at
-in the linter.
+in the linter (cf Trac #10180).  We check two things:
 
-Certainly, it would be terribly wrong if the scrutinee was already in head
-normal form. That is the first check.
+* exprIsHNF is false: certainly, it would be terribly wrong if the
+  scrutinee was already in head normal form.
 
-Furthermore, we should be able to see why GHC believes the scrutinee is
-diverging for sure. That is the second check. see #10180.
+* exprIsBottom is true: we should be able to see why GHC believes the
+  scrutinee is diverging for sure.
 
-In principle, the first check is redundant: exprIsBottom == True will always
-imply exprIsHNF == False.
-But the first check is reliable: If exprIsHNF == True, then there definitely is
-a problem (exprIsHNF errs on the right side).
-If the second check triggers then it may be the case that the compiler got
-smarter elsewhere, and the empty case is correct, but that exprIsBottom is
-unable to see it. Therefore, this check is not fully reliable, and we keep
-both around.
+In principle, the first check is redundant: exprIsBottom == True will
+always imply exprIsHNF == False.  But the first check is reliable: If
+exprIsHNF == True, then there definitely is a problem (exprIsHNF errs
+on the right side).  If the second check triggers then it may be the
+case that the compiler got smarter elsewhere, and the empty case is
+correct, but that exprIsBottom is unable to see it. In particular, the
+empty-type check in exprIsBottom is an approximation. Therefore, this
+check is not fully reliable, and we keep both around.
 
 ************************************************************************
 *                                                                      *

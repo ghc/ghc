@@ -694,11 +694,11 @@ expensive.
 -}
 
 exprIsBottom :: CoreExpr -> Bool
--- If the type only contains no elements besides bottom, then this expressions,
--- well, bottom.
-exprIsBottom e | isEmptyTy (exprType e) = True
--- Otherwise see if this is a bottoming id applied to enough arguments
+-- See Note [Bottoming expressions]
 exprIsBottom e
+  | isEmptyTy (exprType e)
+  = True
+  | otherwise
   = go 0 e
   where
     go n (Var v) = isBottomingId v &&  n >= idArity v
@@ -710,7 +710,36 @@ exprIsBottom e
     go n (Lam v e) | isTyVar v   = go n e
     go _ _                       = False
 
-{-
+{- Note [Bottoming expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A bottoming expression is guaranteed to diverge, or raise an
+exception.  We can test for it in two different ways, and exprIsBottom
+checks for both of these situations:
+
+* Visibly-bottom computations.  For example
+      (error Int "Hello")
+  is visibly bottom.  The strictness analyser also finds out if
+  a function diverges or raises an exception, and puts that info
+  in its strictness signature.
+
+* Empty types.  If a type is empty, its only inhabitant is bottom.
+  For example:
+      data T
+      f :: T -> Bool
+      f = \(x:t). case x of Bool {}
+  Since T has no data constructors, the case alternatives are of course
+  empty.  However note that 'x' is not bound to a visibly-bottom value;
+  it's the *type* that tells us it's going to diverge.
+
+A GADT may also be empty even though it has constructors:
+        data T a where
+          T1 :: a -> T Bool
+          T2 :: T Int
+        ...(case (x::T Char) of {})...
+Here (T Char) is uninhabited.  A more realistic case is (Int ~ Bool),
+which is likewise uninhabited.
+
+
 ************************************************************************
 *                                                                      *
              exprIsDupable
@@ -2114,8 +2143,9 @@ rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
 
 -- | True if the type has no non-bottom elements, e.g. when it is an empty
 -- datatype, or a GADT with non-satisfiable type parameters, e.g. Int :~: Bool.
+-- See Note [Bottoming expressions]
 --
--- See Note [No alternatives lint check] for one use of this function.
+-- See Note [No alternatives lint check] for another use of this function.
 isEmptyTy :: Type -> Bool
 isEmptyTy ty
     -- Data types where, given the particular type parameters, no data
