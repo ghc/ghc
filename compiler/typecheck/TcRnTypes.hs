@@ -33,7 +33,8 @@ module TcRnTypes(
         WhereFrom(..), mkModDeps,
 
         -- Typechecker types
-        TcTypeEnv, TcIdBinder(..), TcTyThing(..), PromotionErr(..),
+        TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
+        TcTyThing(..), PromotionErr(..),
         pprTcTyThingCategory, pprPECategory,
 
         -- Desugaring types
@@ -629,8 +630,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
-        tcl_bndrs :: [TcIdBinder],   -- Stack of locally-bound Ids, innermost on top
-                                     -- Used only for error reporting
+        tcl_bndrs :: TcIdBinderStack,   -- Used for reporting relevant bindings
 
         tcl_tidy :: TidyEnv,      -- Used for tidying types; contains all
                                   -- in-scope type variables (but not term variables)
@@ -656,13 +656,6 @@ type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
    -- Nota bene: a ThLevel of 'outerLevel' is *not* the same as being
    -- bound at top level!  See Note [Template Haskell levels] in TcSplice
 
-data TcIdBinder
-  = TcIdBndr
-       TcId
-       TopLevelFlag    -- Tells whether the bindind is syntactically top-level
-                       -- (The monomorphic Ids for a recursive group count
-                       --  as not-top-level for this purpose.)
-
 {- Note [Given Insts]
    ~~~~~~~~~~~~~~~~~~
 Because of GADTs, we have to pass inwards the Insts provided by type signatures
@@ -684,6 +677,24 @@ type TcRef a     = IORef a
 -- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
 type TcId        = Id
 type TcIdSet     = IdSet
+
+---------------------------
+-- The TcIdBinderStack
+---------------------------
+
+type TcIdBinderStack = [TcIdBinder]
+   -- This is a stack of locally-bound ids, innermost on top
+   -- Used ony in error reporting (relevantBindings in TcError)
+
+data TcIdBinder
+  = TcIdBndr
+       TcId
+       TopLevelFlag    -- Tells whether the bindind is syntactically top-level
+                       -- (The monomorphic Ids for a recursive group count
+                       --  as not-top-level for this purpose.)
+
+instance Outputable TcIdBinder where
+   ppr (TcIdBndr id top_lvl) = ppr id <> brackets (ppr top_lvl)
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -847,9 +858,8 @@ pprPECategory FamDataConPE = ptext (sLit "Data constructor")
 pprPECategory RecDataConPE = ptext (sLit "Data constructor")
 pprPECategory NoDataKinds  = ptext (sLit "Data constructor")
 
-{-
-Note [Bindings with closed types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Bindings with closed types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   f x = let g ys = map not ys
@@ -861,10 +871,9 @@ have no free type variables, and it is the type variables in the
 environment that makes things tricky for OutsideIn generalisation.
 
 Definition:
-
    A variable is "closed", and has tct_closed set to TopLevel,
-      iff
-   a) all its free variables are imported, or are themselves closed
+iff
+   a) all its free variables are imported, or are let-bound with closed types
    b) generalisation is not restricted by the monomorphism restriction
 
 Under OutsideIn we are free to generalise a closed let-binding.
@@ -874,7 +883,7 @@ anyway -- the MR can make a top-level binding with a free type
 variable.)
 
 Note that:
-  * A top-level binding may not be closed, if it suffer from the MR
+  * A top-level binding may not be closed, if it suffers from the MR
 
   * A nested binding may be closed (eg 'g' in the example we started with)
     Indeed, that's the point; whether a function is defined at top level
@@ -1825,7 +1834,7 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
-  --    binder stack:     tcl_bndrs :: [TcIdBinders]
+  --    binder stack:     tcl_bndrs :: TcIdBinderStack
   --    level:            tcl_tclvl :: TcLevel
 
 mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc

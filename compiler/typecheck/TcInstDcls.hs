@@ -787,7 +787,7 @@ tcInstDecls2 tycl_decls inst_decls
         ; let dm_ids = collectHsBindsBinders dm_binds
               -- Add the default method Ids (again)
               -- See Note [Default methods and instances]
-        ; inst_binds_s <- tcExtendLetEnv TopLevel TopLevel dm_ids $
+        ; inst_binds_s <- tcExtendLetEnv TopLevel dm_ids $
                           mapM tcInstDecl2 inst_decls
 
           -- Done
@@ -1447,7 +1447,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
 
        ; global_meth_id <- addInlinePrags global_meth_id prags
        ; spec_prags     <- tcSpecPrags global_meth_id prags
-       ; (meth_implic, (tc_bind, _, _))
+       ; (meth_implic, (tc_bind, _))
                <- checkInstConstraints $ \ _ev_binds ->
                   tcPolyCheck NonRecursive no_prag_fn local_meth_sig
                               (L bind_loc lm_bind)

@@ -227,7 +227,7 @@ tcDefMeth clas tyvars this_dict binds_in
 
        ; local_dm_sig <- instTcTySig hs_ty local_dm_ty Nothing [] local_dm_name
        ; let local_dm_sig' = local_dm_sig { sig_warn_redundant = warn_redundant }
-        ; (ev_binds, (tc_bind, _, _))
+        ; (ev_binds, (tc_bind, _))
                <- checkConstraints (ClsSkol clas) tyvars [this_dict] $
                   tcPolyCheck NonRecursive no_prag_fn local_dm_sig'
                               (L bind_loc lm_bind)

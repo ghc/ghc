@@ -1,6 +1,6 @@
 
 ExtraConstraintsWildcardNotPresent.hs:6:1:
     No instance for (Show a)
-    When checking that ‘show'’ has the specified type
+    When checking that ‘show'’ has the inferred type
       show' :: forall a. a -> String
     Probable cause: the inferred type is ambiguous
