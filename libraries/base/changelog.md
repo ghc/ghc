@@ -17,6 +17,8 @@
   * `Dual`, `Product`, and `Sum` now have `Functor`, `Applicative`, and
     `Monad` instances
 
+  * `(,) a` now has a `Monad` instance
+
   * Redundant typeclass constraints have been removed:
      - `Data.Ratio.{denominator,numerator}` have no `Integral` constraint anymore
      - **TODO**

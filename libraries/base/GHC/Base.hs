@@ -308,6 +308,9 @@ instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u `mappend` v, f x)
 
+instance Monoid a => Monad ((,) a) where
+    return x = (mempty, x)
+    (u, a) >>= k = case k a of (v, b) -> (u `mappend` v, b)
 
 {- | The 'Functor' class is used for types that can be mapped over.
 Instances of 'Functor' should satisfy the following laws:
