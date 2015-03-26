@@ -1586,6 +1586,7 @@ if test "$RELEASE" = "NO"; then
         dnl less likely to go wrong.
         PACKAGE_VERSION=${PACKAGE_VERSION}.`date +%Y%m%d`
     fi
+fi
 
     AC_MSG_CHECKING([for GHC Git commit id])
     if test -d .git; then
@@ -1603,7 +1604,6 @@ if test "$RELEASE" = "NO"; then
         PACKAGE_GIT_COMMIT_ID="0000000000000000000000000000000000000000"
     fi
 
-fi
 
 # Some renamings
 AC_SUBST([ProjectName], [$PACKAGE_NAME])
