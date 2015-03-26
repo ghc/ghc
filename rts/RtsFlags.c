@@ -267,6 +267,7 @@ usage_text[] = {
 "  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
 "  -A<size> Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
+"  -n<size> Allocation area chunk size (0 = disabled, default: 0)",
 "  -O<size> Sets the minimum size of the old generation (default 1M)",
 "  -M<size> Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
 "  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
