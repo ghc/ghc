@@ -36,7 +36,6 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import Data.Char             ( toUpper )
-import Data.Functor          ( (<$>) )
 import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )

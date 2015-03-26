@@ -16,7 +16,6 @@
 module Haddock.GhcUtils where
 
 
-import Control.Applicative  ( (<$>) )
 import Control.Arrow
 import Data.Function
 

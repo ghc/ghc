@@ -19,8 +19,6 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docElement, docSection, docSection_,
 ) where
 
-import Control.Applicative ((<$>))
-
 import Data.List
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils

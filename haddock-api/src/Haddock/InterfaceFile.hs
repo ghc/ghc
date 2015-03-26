@@ -25,7 +25,6 @@ import Haddock.Utils hiding (out)
 
 import Control.Monad
 import Data.Array
-import Data.Functor ((<$>))
 import Data.IORef
 import Data.List
 import qualified Data.Map as Map

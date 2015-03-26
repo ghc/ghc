@@ -27,7 +27,6 @@ import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Doc (combineDocumentation)
 
-import           Control.Applicative
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
