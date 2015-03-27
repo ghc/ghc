@@ -95,13 +95,15 @@ dropComment (x:xs) = x : dropComment xs
 dropComment [] = []
 
 
-out :: Outputable a => DynFlags -> a -> String
-out dflags = f . unwords . map (dropWhile isSpace) . lines . showSDocUnqual dflags . ppr
+outWith :: Outputable a => (SDoc -> String) -> a -> [Char]
+outWith p = f . unwords . map (dropWhile isSpace) . lines . p . ppr
     where
         f xs | " <document comment>" `isPrefixOf` xs = f $ drop 19 xs
         f (x:xs) = x : f xs
         f [] = []
 
+out :: Outputable a => DynFlags -> a -> String
+out dflags = outWith $ showSDocUnqual dflags
 
 operator :: String -> String
 operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x:xs ++ ")"
@@ -156,8 +158,8 @@ ppClass dflags x = out dflags x{tcdSigs=[]} :
 
 
 ppInstance :: DynFlags -> ClsInst -> [String]
-ppInstance dflags x = [dropComment $ out dflags x]
-
+ppInstance dflags x =
+  [dropComment $ outWith (showSDocForUser dflags alwaysQualify) x]
 
 ppSynonym :: DynFlags -> TyClDecl Name -> [String]
 ppSynonym dflags x = [out dflags x]
