@@ -109,6 +109,8 @@ operator :: String -> String
 operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x:xs ++ ")"
 operator x = x
 
+commaSeparate :: Outputable a => DynFlags -> [a] -> String
+commaSeparate dflags = showSDocUnqual dflags . interpp'SP
 
 ---------------------------------------------------------------------
 -- How to print each export
@@ -121,30 +123,38 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
     where
         f (TyClD d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD d@SynDecl{})   = ppSynonym dflags d
-        f (TyClD d@ClassDecl{}) = ppClass dflags d
+        f (TyClD d@ClassDecl{}) = ppClass dflags d subdocs
         f (ForD (ForeignImport name typ _ _)) = ppSig dflags $ TypeSig [name] typ []
         f (ForD (ForeignExport name typ _ _)) = ppSig dflags $ TypeSig [name] typ []
         f (SigD sig) = ppSig dflags sig
         f _ = []
 ppExport _ _ = []
 
-
-ppSig :: DynFlags -> Sig Name -> [String]
-ppSig dflags (TypeSig names sig _)
-    = [operator prettyNames ++ " :: " ++ outHsType dflags typ]
+ppSigWithDoc :: DynFlags -> Sig Name -> [(Name, DocForDecl Name)] -> [String]
+ppSigWithDoc dflags (TypeSig names sig _) subdocs
+    = concatMap mkDocSig names
     where
-        prettyNames = intercalate ", " $ map (out dflags) names
+        mkDocSig n = concatMap (ppDocumentation dflags) (getDoc n)
+                     ++ [mkSig n]
+        mkSig n = operator (out dflags n) ++ " :: " ++ outHsType dflags typ
+
+        getDoc :: Located Name -> [Documentation Name]
+        getDoc n = maybe [] (return . fst) (lookup (unL n) subdocs)
+
         typ = case unL sig of
                    HsForAllTy Explicit a b c d  -> HsForAllTy Implicit a b c d
                    HsForAllTy Qualified a b c d -> HsForAllTy Implicit a b c d
                    x -> x
-ppSig _ _ = []
+ppSigWithDoc _ _ _ = []
+
+ppSig :: DynFlags -> Sig Name -> [String]
+ppSig dflags x  = ppSigWithDoc dflags x []
 
 
 -- note: does not yet output documentation for class methods
-ppClass :: DynFlags -> TyClDecl Name -> [String]
-ppClass dflags x = out dflags x{tcdSigs=[]} :
-            concatMap (ppSig dflags . addContext . unL) (tcdSigs x)
+ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
+ppClass dflags x subdocs = out dflags x{tcdSigs=[]} :
+            concatMap (flip (ppSigWithDoc dflags) subdocs . addContext . unL) (tcdSigs x)
     where
         addContext (TypeSig name (L l sig) nwcs) = TypeSig name (L l $ f sig) nwcs
         addContext (MinimalSig src sig) = MinimalSig src sig
@@ -203,7 +213,7 @@ ppCtor dflags dat subdocs con
 
         -- We print the constructors as comma-separated list. See GHC
         -- docs for con_names on why it is a list to begin with.
-        name = showSDocUnqual dflags . interpp'SP . map unL $ con_names con
+        name = commaSeparate dflags . map unL $ con_names con
 
         resType = case con_res con of
             ResTyH98 -> apps $ map (reL . HsTyVar) $
