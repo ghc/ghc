@@ -15,7 +15,8 @@ module Haddock.Backends.Hoogle (
     ppHoogle
   ) where
 
-
+import BasicTypes (OverlapFlag(..), OverlapMode(..))
+import InstEnv (ClsInst(..))
 import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
@@ -169,7 +170,15 @@ ppClass dflags x subdocs = out dflags x{tcdSigs=[]} :
 
 ppInstance :: DynFlags -> ClsInst -> [String]
 ppInstance dflags x =
-  [dropComment $ outWith (showSDocForUser dflags alwaysQualify) x]
+  [dropComment $ outWith (showSDocForUser dflags alwaysQualify) cls]
+  where
+    -- As per #168, we don't want safety information about the class
+    -- in Hoogle output. The easiest way to achieve this is to set the
+    -- safety information to a state where the Outputable instance
+    -- produces no output which means no overlap and unsafe (or [safe]
+    -- is generated).
+    cls = x { is_flag = OverlapFlag { overlapMode = NoOverlap mempty
+                                    , isSafeOverlap = False } }
 
 ppSynonym :: DynFlags -> TyClDecl Name -> [String]
 ppSynonym dflags x = [out dflags x]

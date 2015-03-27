@@ -41,6 +41,8 @@ Changes in version 2.16.0
 
  * Output method documentation in Hoogle backend (#259)
 
+ * Don't print instance safety information in Hoogle (#168)
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
