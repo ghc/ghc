@@ -1068,7 +1068,7 @@ runPhase (RealPhase Cmm) input_fn dflags
 -- way too many hacks, and I can't say I've ever used it anyway.
 
 runPhase (RealPhase cc_phase) input_fn dflags
-   | any (cc_phase `eqPhase`) [Cc, Ccpp, HCc, Cobjc, Cobjcpp]
+   | any (cc_phase `eqPhase`) [Cc, Ccplusplus, HCc, Cobjc, Cobjcplusplus]
    = do
         let platform = targetPlatform dflags
             hcc = cc_phase `eqPhase` HCc
@@ -1137,9 +1137,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
 
         ghcVersionH <- liftIO $ getGhcVersionPathName dflags
 
-        let gcc_lang_opt | cc_phase `eqPhase` Ccpp    = "c++"
+        let gcc_lang_opt | cc_phase `eqPhase` Ccplusplus    = "c++"
                          | cc_phase `eqPhase` Cobjc   = "objective-c"
-                         | cc_phase `eqPhase` Cobjcpp = "objective-c++"
+                         | cc_phase `eqPhase` Cobjcplusplus = "objective-c++"
                          | otherwise                  = "c"
         liftIO $ SysTools.runCc dflags (
                 -- force the C compiler to interpret this file as C when
@@ -1176,7 +1176,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
                            else [])
 
                        -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
-                       ++ (if (cc_phase /= Ccpp && cc_phase /= Cobjcpp)
+                       ++ (if (cc_phase /= Ccplusplus &&
+                               cc_phase /= Cobjcplusplus)
                              then ["-Wimplicit"]
                              else [])
 
