@@ -567,12 +567,10 @@ gen_wrappers (Info _ entries)
 
         dodgy spec
            = name spec `elem` 
-             [-- C code generator can't handle these
-              "seq#", 
-              "tagToEnum#",
-              -- not interested in parallel support
-              "par#", "parGlobal#", "parLocal#", "parAt#", 
-              "parAtAbs#", "parAtRel#", "parAtForNow#" 
+             [-- tagToEnum# is really magical, and can't have
+              -- a wrapper since its implementation depends on
+              -- the type of its result
+              "tagToEnum#"
              ]
 
         is_llvm_only :: Entry -> Bool
