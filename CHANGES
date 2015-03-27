@@ -32,6 +32,9 @@ Changes in version 2.16.0
 
  * Deal better with long synopsis lines (#151)
 
+ * Don't default to type constructors for out-of-scope names (#253 and
+   #375)
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
