@@ -1,6 +1,6 @@
 
 Roles10.hs:16:12:
-    Couldn't match representation of type ‘Char’ with that of ‘Bool’
+    Couldn't match representation of type ‘Bool’ with that of ‘Char’
     arising from the coercion of the method ‘meth’
       from type ‘Int -> F Int’ to type ‘Age -> F Age’
     Relevant role signatures: type role F nominal

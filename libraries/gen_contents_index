@@ -75,7 +75,9 @@ fi
 # Now create the combined contents and index pages
 if [ -n "$VERBOSE" ]
 then
-    echo $HADDOCK_ARGS
+    echo $HADDOCK --gen-index --gen-contents -o . \
+             -t "Haskell Hierarchical Libraries" \
+             $HADDOCK_ARGS
 fi
 $HADDOCK --gen-index --gen-contents -o . \
          -t "Haskell Hierarchical Libraries" \

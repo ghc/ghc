@@ -56,6 +56,8 @@ import Util
 import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
 import UniqSupply
+import CoreArity ( typeArity )
+import Demand ( splitStrictSig, isBotRes )
 
 import HscTypes
 import DynFlags
@@ -487,6 +489,24 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
       --                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
       --           (mkArityMsg binder)
 
+       -- Check that the binder's arity is within the bounds imposed by
+       -- the type and the strictness signature. See Note [exprArity invariant]
+       -- and Note [Trimming arity]
+       ; checkL (idArity binder <= length (typeArity (idType binder)))
+           (ptext (sLit "idArity") <+> ppr (idArity binder) <+>
+           ptext (sLit "exceeds typeArity") <+>
+           ppr (length (typeArity (idType binder))) <> colon <+>
+           ppr binder)
+
+       ; case splitStrictSig (idStrictness binder) of
+           (demands, result_info) | isBotRes result_info ->
+             checkL (idArity binder <= length demands)
+               (ptext (sLit "idArity") <+> ppr (idArity binder) <+>
+               ptext (sLit "exceeds arity imposed by the strictness signature") <+>
+               ppr (idStrictness binder) <> colon <+>
+               ppr binder)
+           _ -> return ()
+
        ; lintIdUnfolding binder binder_ty (idUnfolding binder) }
 
         -- We should check the unfolding, if any, but this is tricky because
@@ -637,6 +657,14 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; alt_ty   <- lintInTy alt_ty
      ; var_ty   <- lintInTy (idType var)
 
+     -- See Note [No alternatives lint check]
+     ; when (null alts) $
+     do { checkL (not (exprIsHNF scrut))
+          (ptext (sLit "No alternatives for a case scrutinee in head-normal form:") <+> ppr scrut)
+        ; checkL (exprIsBottom scrut)
+          (ptext (sLit "No alternatives for a case scrutinee not known to diverge for sure:") <+> ppr scrut)
+        }
+
      ; case tyConAppTyCon_maybe (idType var) of
          Just tycon
               | debugIsOn &&
@@ -687,6 +715,26 @@ instantiations between kind coercions and type coercions. We lint the
 kind coercions and produce the following substitution which is to be
 applied in the type variables:
   k_ag   ~~>   * -> *
+
+Note [No alternatives lint check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case expressions with no alternatives are odd beasts, and worth looking at
+in the linter (cf Trac #10180).  We check two things:
+
+* exprIsHNF is false: certainly, it would be terribly wrong if the
+  scrutinee was already in head normal form.
+
+* exprIsBottom is true: we should be able to see why GHC believes the
+  scrutinee is diverging for sure.
+
+In principle, the first check is redundant: exprIsBottom == True will
+always imply exprIsHNF == False.  But the first check is reliable: If
+exprIsHNF == True, then there definitely is a problem (exprIsHNF errs
+on the right side).  If the second check triggers then it may be the
+case that the compiler got smarter elsewhere, and the empty case is
+correct, but that exprIsBottom is unable to see it. In particular, the
+empty-type check in exprIsBottom is an approximation. Therefore, this
+check is not fully reliable, and we keep both around.
 
 ************************************************************************
 *                                                                      *

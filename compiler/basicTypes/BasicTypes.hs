@@ -86,7 +86,9 @@ module BasicTypes(
 
         HValue(..),
 
-        SourceText
+        SourceText,
+
+        IntWithInf, infinity, treatZeroAsInf, mkIntWithInf
    ) where
 
 import FastString
@@ -1113,3 +1115,68 @@ instance Outputable FractionalLit where
   ppr = text . fl_text
 
 newtype HValue = HValue Any
+
+{-
+************************************************************************
+*                                                                      *
+    IntWithInf
+*                                                                      *
+************************************************************************
+
+Represents an integer or positive infinity
+
+-}
+
+-- | An integer or infinity
+data IntWithInf = Int {-# UNPACK #-} !Int
+                | Infinity
+  deriving Eq
+
+-- | A representation of infinity
+infinity :: IntWithInf
+infinity = Infinity
+
+instance Ord IntWithInf where
+  compare Infinity Infinity = EQ
+  compare (Int _)  Infinity = LT
+  compare Infinity (Int _)  = GT
+  compare (Int a)  (Int b)  = a `compare` b
+
+instance Outputable IntWithInf where
+  ppr Infinity = char '∞'
+  ppr (Int n)  = int n
+
+instance Num IntWithInf where
+  (+) = plusWithInf
+  (*) = mulWithInf
+
+  abs Infinity = Infinity
+  abs (Int n)  = Int (abs n)
+
+  signum Infinity = Int 1
+  signum (Int n)  = Int (signum n)
+
+  fromInteger = Int . fromInteger
+
+  (-) = panic "subtracting IntWithInfs"
+
+-- | Add two 'IntWithInf's
+plusWithInf :: IntWithInf -> IntWithInf -> IntWithInf
+plusWithInf Infinity _        = Infinity
+plusWithInf _        Infinity = Infinity
+plusWithInf (Int a)  (Int b)  = Int (a + b)
+
+-- | Multiply two 'IntWithInf's
+mulWithInf :: IntWithInf -> IntWithInf -> IntWithInf
+mulWithInf Infinity _        = Infinity
+mulWithInf _        Infinity = Infinity
+mulWithInf (Int a)  (Int b)  = Int (a * b)
+
+-- | Turn a positive number into an 'IntWithInf', where 0 represents infinity
+treatZeroAsInf :: Int -> IntWithInf
+treatZeroAsInf 0 = Infinity
+treatZeroAsInf n = Int n
+
+-- | Inject any integer into an 'IntWithInf'
+mkIntWithInf :: Int -> IntWithInf
+mkIntWithInf = Int

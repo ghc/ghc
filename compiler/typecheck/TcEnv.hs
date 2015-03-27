@@ -23,8 +23,8 @@ module TcEnv(
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnv2,
         tcExtendTyVarEnv, tcExtendTyVarEnv2,
-        tcExtendLetEnv,
-        tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, tcExtendIdEnv3,
+        tcExtendLetEnv, tcExtendLetEnvIds,
+        tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendIdBndrs, tcExtendGhciIdEnv,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
@@ -45,7 +45,7 @@ module TcEnv(
         tcGetDefaultTys,
 
         -- Global type variables
-        tcGetGlobalTyVars, zapLclTypeEnv,
+        tcGetGlobalTyVars,
 
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel,
@@ -356,8 +356,7 @@ tcExtendTyVarEnv tvs thing_inside
 
 tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside
-  = do { stage <- getStage
-       ; tc_extend_local_env (NotTopLevel, thLevel stage)
+  = do { tc_extend_local_env NotTopLevel
                     [(name, ATyVar name tv) | (name, tv) <- binds] $
          do { env <- getLclEnv
             ; let env' = env { tcl_tidy = add_tidy_tvs (tcl_tidy env) }
@@ -421,71 +420,68 @@ Note especially that
        will be found in the global envt
 -}
 
+isClosedLetBndr :: Id -> TopLevelFlag
+-- See Note [Bindings with closed types] in TcRnTypes
+-- Note that we decided if a let-bound variable is closed by
+-- looking at its type, which is slightly more liberal, and a whole
+-- lot easier to implement, than looking at its free variables
+isClosedLetBndr id
+  | isEmptyVarSet (tyVarsOfType (idType id)) = TopLevel
+  | otherwise                                = NotTopLevel
+
 tcExtendGhciIdEnv :: [TyThing] -> TcM a -> TcM a
 -- Used to bind Ids for GHCi identifiers bound earlier in the user interaction
 -- See Note [Initialising the type environment for GHCi]
 tcExtendGhciIdEnv ids thing_inside
-  = do { lcl_env <- tcExtendLocalTypeEnv tc_ty_things emptyVarSet
+  = do { lcl_env <- tcExtendLocalTypeEnv tc_ty_things
        ; setLclEnv lcl_env thing_inside }
   where
     tc_ty_things =  [ (name, ATcId { tct_id     = id
-                                   , tct_closed = is_top id })
+                                   , tct_closed = isClosedLetBndr id })
                     | AnId id <- ids
                     , let name = idName id
                     , isInternalName name ]
-    is_top id | isEmptyVarSet (tyVarsOfType (idType id)) = TopLevel
-              | otherwise                                = NotTopLevel
 
-tcExtendLetEnv :: TopLevelFlag -> TopLevelFlag -> [TcId] -> TcM a -> TcM a
+tcExtendLetEnv :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
-tcExtendLetEnv top_lvl closed ids thing_inside
-  = do  { stage <- getStage
-        ; tc_extend_local_env (top_lvl, thLevel stage)
-                              [ (idName id, ATcId { tct_id = id
-                                                  , tct_closed = closed })
-                              | id <- ids] $
-          tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] thing_inside }
+-- Adds to the TcIdBinderStack too
+tcExtendLetEnv top_lvl ids thing_inside
+  = tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] $
+    tcExtendLetEnvIds top_lvl [(idName id, id) | id <- ids] thing_inside
+
+tcExtendLetEnvIds :: TopLevelFlag -> [(Name,TcId)] -> TcM a -> TcM a
+-- Used for both top-level value bindings and and nested let/where-bindings
+-- Does not extend the TcIdBinderStack
+tcExtendLetEnvIds top_lvl pairs thing_inside
+  = tc_extend_local_env top_lvl [ (name, ATcId { tct_id = id
+                                               , tct_closed = isClosedLetBndr id })
+                                | (name,id) <- pairs ] $
+    thing_inside
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
+-- For lambda-bound and case-bound Ids
+-- Extends the the TcIdBinderStack as well
 tcExtendIdEnv ids thing_inside
-  = tcExtendIdEnv2 [(idName id, id) | id <- ids] $
-    tcExtendIdBndrs [TcIdBndr id NotTopLevel | id <- ids]
-    thing_inside
+  = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
 
 tcExtendIdEnv1 :: Name -> TcId -> TcM a -> TcM a
+-- Exactly like tcExtendIdEnv2, but for a single (name,id) pair
 tcExtendIdEnv1 name id thing_inside
-  = tcExtendIdEnv2 [(name,id)] $
-    tcExtendIdBndrs [TcIdBndr id NotTopLevel]
-    thing_inside
+  = tcExtendIdEnv2 [(name,id)] thing_inside
 
 tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
--- Do *not* extend the tcl_bndrs stack
--- The tct_closed flag really doesn't matter
--- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
 tcExtendIdEnv2 names_w_ids thing_inside
-  = tcExtendIdEnv3 names_w_ids emptyVarSet thing_inside
-
--- | 'tcExtendIdEnv2', but don't bind the 'TcId's in the 'TyVarSet' argument.
-tcExtendIdEnv3 :: [(Name,TcId)] -> TyVarSet -> TcM a -> TcM a
--- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
-tcExtendIdEnv3 names_w_ids not_actually_free thing_inside
-  = do  { stage <- getStage
-        ; tc_extend_local_env2 (NotTopLevel, thLevel stage)
+  = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel
+                    | (_,mono_id) <- names_w_ids ] $
+    do  { tc_extend_local_env NotTopLevel
                               [ (name, ATcId { tct_id = id
                                              , tct_closed = NotTopLevel })
-                              | (name,id) <- names_w_ids] not_actually_free $
+                              | (name,id) <- names_w_ids] $
           thing_inside }
 
-tcExtendIdBndrs :: [TcIdBinder] -> TcM a -> TcM a
-tcExtendIdBndrs bndrs = updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
-
-tc_extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcM a -> TcM a
-tc_extend_local_env thlvl extra_env thing_inside =
-  tc_extend_local_env2 thlvl extra_env emptyVarSet thing_inside
-
-tc_extend_local_env2 :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)]
-                     -> TyVarSet -> TcM a -> TcM a
-tc_extend_local_env2 thlvl extra_env not_actually_free thing_inside
+tc_extend_local_env :: TopLevelFlag -> [(Name, TcTyThing)]
+                    -> TcM a -> TcM a
+tc_extend_local_env top_lvl extra_env thing_inside
 -- Precondition: the argument list extra_env has TcTyThings
 --               that ATcId or ATyVar, but nothing else
 --
@@ -500,8 +496,9 @@ tc_extend_local_env2 thlvl extra_env not_actually_free thing_inside
 -- that are bound together with extra_env and should not be regarded
 -- as free in the types of extra_env.
   = do  { traceTc "env2" (ppr extra_env)
-        ; env1 <- tcExtendLocalTypeEnv extra_env not_actually_free
-        ; let env2 = extend_local_env thlvl extra_env env1
+        ; env1 <- tcExtendLocalTypeEnv extra_env
+        ; stage <- getStage
+        ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
         ; setLclEnv env2 thing_inside }
   where
     extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
@@ -517,8 +514,8 @@ tc_extend_local_env2 thlvl extra_env not_actually_free thing_inside
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, ATcId {}) <- pairs] }
 
-tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TyVarSet -> TcM TcLclEnv
-tcExtendLocalTypeEnv tc_ty_things not_actually_free
+tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TcM TcLclEnv
+tcExtendLocalTypeEnv tc_ty_things
   | isEmptyVarSet extra_tvs
   = do { lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) <- getLclEnv
        ; return (lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things } ) }
@@ -529,7 +526,7 @@ tcExtendLocalTypeEnv tc_ty_things not_actually_free
        ; return (lcl_env { tcl_tyvars = new_g_var
                          , tcl_env = extendNameEnvList lcl_type_env tc_ty_things } ) }
   where
-    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things `minusVarSet` not_actually_free
+    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things
 
     get_tvs (_, ATcId { tct_id = id, tct_closed = closed }) tvs
       = case closed of
@@ -556,13 +553,15 @@ tcExtendLocalTypeEnv tc_ty_things not_actually_free
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
-zapLclTypeEnv :: TcM a -> TcM a
-zapLclTypeEnv thing_inside
-  = do { tvs_var <- newTcRef emptyVarSet
-       ; let upd env = env { tcl_env = emptyNameEnv
-                           , tcl_rdr = emptyLocalRdrEnv
-                           , tcl_tyvars = tvs_var }
-       ; updLclEnv upd thing_inside }
+-------------------------------------------------------------
+-- Extending the TcIdBinderStack, used only for error messages
+
+tcExtendIdBndrs :: [TcIdBinder] -> TcM a -> TcM a
+tcExtendIdBndrs bndrs thing_inside
+  = do { traceTc "tcExtendIdBndrs" (ppr bndrs)
+       ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
+                   thing_inside }
+
 
 {-
 ************************************************************************

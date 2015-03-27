@@ -4,7 +4,7 @@
  - See:  The Monad Read, Issue #8 - http://www.haskell.org/wikiupload/d/dd/TMR-Issue8.pdf
  -}
 
-{-# OPTIONS_GHC -ftype-function-depth=400 #-}
+{-# OPTIONS_GHC -freduction-depth=400 #-}
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}

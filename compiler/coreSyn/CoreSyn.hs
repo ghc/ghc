@@ -379,25 +379,20 @@ See #type_let#
 
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The alternatives of a case expression should be exhaustive.  A case expression
-can have empty alternatives if (and only if) the scrutinee is bound to raise
-an exception or diverge.  So:
-   Case (error Int "Hello") b Bool []
-is fine, and has type Bool.  This is one reason we need a type on
-the case expression: if the alternatives are empty we can't get the type
-from the alternatives!  I'll write this
-   case (error Int "Hello") of Bool {}
-with the return type just before the alternatives.
+The alternatives of a case expression should be exhaustive.
 
-Here's another example:
+A case expression can have empty alternatives if (and only if) the
+scrutinee is bound to raise an exception or diverge. When do we know
+this?  See Note [Bottoming expressions] in CoreUtils.
+
+The possiblity of empty alternatives is one reason we need a type on
+the case expression: if the alternatives are empty we can't get the
+type from the alternatives!
+
+In the case of empty types (see Note [Bottoming expressions]), say
   data T
-  f :: T -> Bool
-  f = \(x:t). case x of Bool {}
-Since T has no data constructors, the case alternatives are of course
-empty.  However note that 'x' is not bound to a visibly-bottom value;
-it's the *type* that tells us it's going to diverge.  Its a bit of a
-degnerate situation but we do NOT want to replace
-   case x of Bool {}   -->   error Bool "Inaccessible case"
+we do NOT want to replace
+   case (x::T) of Bool {}   -->   error Bool "Inaccessible case"
 because x might raise an exception, and *that*'s what we want to see!
 (Trac #6067 is an example.) To preserve semantics we'd have to say
    x `seq` error Bool "Inaccessible case"

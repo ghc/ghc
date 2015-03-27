@@ -9,7 +9,6 @@ module TcSMonad (
     extendWorkListCts, appendWorkList, selectWorkItem,
     workListSize,
     updWorkListTcS, updWorkListTcS_return,
-    runFlatten, emitFlatWork,
 
     -- The TcS monad
     TcS, runTcS, runTcSWithEvBinds,
@@ -29,7 +28,7 @@ module TcSMonad (
     setWantedTyBind, reportUnifications,
     setEvBind, setWantedEvBind, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
-    newDerived, emitNewDerived,
+    newDerived, emitNewDerived, checkReductionDepth,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getTcLevel,
@@ -44,7 +43,7 @@ module TcSMonad (
     splitInertCans, removeInertCts,
     prepareInertsForImplications,
     addInertCan, insertInertItemTcS, insertFunEq,
-    emitInsoluble, emitWorkNC,
+    emitInsoluble, emitWorkNC, emitWorkCt,
     EqualCtList,
 
     -- Inert CDictCans
@@ -108,6 +107,7 @@ import Type
 import TcEvidence
 import Class
 import TyCon
+import TcErrors   ( solverDepthErrorTcS )
 
 import Name
 import RdrName (RdrName, GlobalRdrEnv)
@@ -159,55 +159,6 @@ equalities (wl_eqs) from the rest of the canonical constraints,
 so that it's easier to deal with them first, but the separation
 is not strictly necessary. Notice that non-canonical constraints
 are also parts of the worklist.
-
-Note [The flattening work list]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The "flattening work list", held in the tcs_flat_work field of TcSEnv,
-is a list of CFunEqCans generated during flattening.  The key idea
-is this.  Consider flattening (Eq (F (G Int) (H Bool)):
-  * The flattener recursively calls itself on sub-terms before building
-    the main term, so it will encounter the terms in order
-              G Int
-              H Bool
-              F (G Int) (H Bool)
-    flattening to sub-goals
-              w1: G Int ~ fuv0
-              w2: H Bool ~ fuv1
-              w3: F fuv0 fuv1 ~ fuv2
-
-  * Processing w3 first is BAD, because we can't reduce i t,so it'll
-    get put into the inert set, and later kicked out when w1, w2 are
-    solved.  In Trac #9872 this led to inert sets containing hundreds
-    of suspended calls.
-
-  * So we want to process w1, w2 first.
-
-  * So you might think that we should just use a FIFO deque for the work-list,
-    so that putting adding goals in order w1,w2,w3 would mean we processed
-    w1 first.
-
-  * BUT suppose we have 'type instance G Int = H Char'.  Then processing
-    w1 leads to a new goal
-                w4: H Char ~ fuv0
-    We do NOT want to put that on the far end of a deque!  Instead we want
-    to put it at the *front* of the work-list so that we continue to work
-    on it.
-
-So the work-list structure is this:
-
-  * The wl_funeqs is a LIFO stack; we push new goals (such as w4) on
-    top (extendWorkListFunEq), and take new work from the top
-    (selectWorkItem).
-
-  * When flattening, emitFlatWork pushes new flattening goals (like
-    w1,w2,w3) onto the flattening work list, tcs_flat_work, another
-    push-down stack.
-
-  * When we finish flattening, we *reverse* the tcs_flat_work stack
-    onto the wl_funeqs stack (which brings w1 to the top).
-
-The function runFlatten initialised the tcs_flat_work stack, and reverses
-it onto wl_fun_eqs at the end.
 
 -}
 
@@ -298,35 +249,6 @@ instance Outputable WorkList where
           , ppUnless (isEmptyBag implics) $
             ptext (sLit "Implics =") <+> vcat (map ppr (bagToList implics))
           ])
-
-emitFlatWork :: Ct -> TcS ()
--- See Note [The flattening work list]
-emitFlatWork ct
-  = TcS $ \env ->
-    do { let flat_ref = tcs_flat_work env
-       ; TcM.updTcRef flat_ref (ct :) }
-
-runFlatten :: TcS a -> TcS a
--- Run thing_inside (which does flattening), and put all
--- the work it generates onto the main work list
--- See Note [The flattening work list]
-runFlatten (TcS thing_inside)
-  = TcS $ \env ->
-    do { let flat_ref = tcs_flat_work env
-       ; old_flats <- TcM.updTcRefX flat_ref (\_ -> [])
-       ; res <- thing_inside env
-       ; new_flats <- TcM.updTcRefX flat_ref (\_ -> old_flats)
-       ; TcM.updTcRef (tcs_worklist env) (add_flats new_flats)
-       ; return res }
-  where
-    add_flats new_flats wl
-      = wl { wl_funeqs = add_funeqs new_flats (wl_funeqs wl) }
-
-    add_funeqs []     wl = wl
-    add_funeqs (f:fs) wl = add_funeqs fs (f:wl)
-      -- add_funeqs fs ws = reverse fs ++ ws
-      -- e.g. add_funeqs [f1,f2,f3] [w1,w2,w3,w4]
-      --        = [f3,f2,f1,w1,w2,w3,w4]
 
 {-
 ************************************************************************
@@ -975,30 +897,28 @@ lookupFlatCache fam_tc tys
     lookup_flats flat_cache = findFunEq flat_cache fam_tc tys
 
 
-lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
+lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
-lookupInInerts loc pty
+lookupInInerts pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
-       ; return (lookupSolvedDict inerts loc cls tys `mplus`
-                 lookupInertDict (inert_cans inerts) loc cls tys) }
+       ; return (lookupSolvedDict inerts cls tys `mplus`
+                 lookupInertDict (inert_cans inerts) cls tys) }
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
-lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
-lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
+lookupInertDict :: InertCans -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict (IC { inert_dicts = dicts }) cls tys
   = case findDict dicts cls tys of
-      Just ct | let ev = ctEvidence ct
-              , ctEvCheckDepth cls loc ev
-              -> Just ev
+      Just ct -> Just (ctEvidence ct)
       _       -> Nothing
 
-lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
+lookupSolvedDict :: InertSet -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
-lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
+lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
   = case findDict solved cls tys of
-      Just ev | ctEvCheckDepth cls loc ev -> Just ev
-      _                                   -> Nothing
+      Just ev -> Just ev
+      _       -> Nothing
 
 {-
 ************************************************************************
@@ -1214,9 +1134,7 @@ data TcSEnv
 
       -- The main work-list and the flattening worklist
       -- See Note [Work list priorities] and
-      --     Note [The flattening work list]
-      tcs_worklist  :: IORef WorkList, -- Current worklist
-      tcs_flat_work :: IORef [Ct]      -- Flattening worklist
+      tcs_worklist  :: IORef WorkList -- Current worklist
     }
 
 ---------------
@@ -1316,14 +1234,12 @@ runTcSWithEvBinds ev_binds_var tcs
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
        ; wl_var <- TcM.newTcRef emptyWorkList
-       ; fw_var <- TcM.newTcRef (panic "Flat work list")
 
        ; let env = TcSEnv { tcs_ev_binds  = ev_binds_var
                           , tcs_unified   = unified_var
                           , tcs_count     = step_count
                           , tcs_inerts    = inert_var
-                          , tcs_worklist  = wl_var
-                          , tcs_flat_work = fw_var }
+                          , tcs_worklist  = wl_var }
 
              -- Run the computation
        ; res <- unTcS tcs env
@@ -1372,13 +1288,11 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                                    -- See Note [Do not inherit the flat cache]
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
-       ; new_fw_var    <- TcM.newTcRef (panic "Flat work list")
        ; let nest_env = TcSEnv { tcs_ev_binds    = ref
                                , tcs_unified     = unified_var
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = new_wl_var
-                               , tcs_flat_work   = new_fw_var }
+                               , tcs_worklist    = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
 
@@ -1493,6 +1407,11 @@ emitWorkNC evs
   | otherwise
   = do { traceTcS "Emitting fresh work" (vcat (map ppr evs))
        ; updWorkListTcS (extendWorkListCts (map mkNonCanonical evs)) }
+
+emitWorkCt :: Ct -> TcS ()
+emitWorkCt ct
+  = do { traceTcS "Emitting fresh (canonical) work" (ppr ct)
+       ; updWorkListTcS (extendWorkListCt ct) }
 
 emitInsoluble :: Ct -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts.
@@ -1680,7 +1599,8 @@ newFlattenSkolem :: CtFlavour -> CtLoc
                  -> TcType         -- F xis
                  -> TcS (CtEvidence, TcTyVar)    -- [W] x:: F xis ~ fsk
 newFlattenSkolem Given loc fam_ty
-  =  do { fsk <- wrapTcS $
+  =  do { checkReductionDepth loc fam_ty
+        ; fsk <- wrapTcS $
                  do { uniq <- TcM.newUnique
                     ; let name = TcM.mkTcTyVarName uniq (fsLit "fsk")
                     ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
@@ -1690,7 +1610,8 @@ newFlattenSkolem Given loc fam_ty
         ; return (ev, fsk) }
 
 newFlattenSkolem _ loc fam_ty  -- Make a wanted
-  = do { fuv <- wrapTcS $
+  = do { checkReductionDepth loc fam_ty
+       ; fuv <- wrapTcS $
                  do { uniq <- TcM.newUnique
                     ; ref  <- TcM.newMutVar Flexi
                     ; let details = MetaTv { mtv_info  = FlatMetaTv
@@ -1789,7 +1710,8 @@ newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 --               See Note [Do not create Given kind equalities]
 newGivenEvVar loc (pred, rhs)
   = ASSERT2( not (isKindEquality pred), ppr pred $$ pprCtOrigin (ctLocOrigin loc) )
-    do { new_ev <- newEvVar pred
+    do { checkReductionDepth loc pred
+       ; new_ev <- newEvVar pred
        ; setEvBind (mkGivenEvBind new_ev rhs)
        ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev, ctev_loc = loc }) }
 
@@ -1842,13 +1764,14 @@ TcCanonical), and will do no harm.
 newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc pty
-  = do { new_ev <- newEvVar pty
+  = do { checkReductionDepth loc pty
+       ; new_ev <- newEvVar pty
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
 -- For anything except ClassPred, this is the same as newWantedEvVarNC
 newWantedEvVar loc pty
-  = do { mb_ct <- lookupInInerts loc pty
+  = do { mb_ct <- lookupInInerts pty
        ; case mb_ct of
             Just ctev | not (isDerived ctev)
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
@@ -1870,11 +1793,21 @@ newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Returns Nothing    if cached,
 --         Just pred  if not cached
 newDerived loc pred
-  = do { mb_ct <- lookupInInerts loc pred
+  = do { checkReductionDepth loc pred
+       ; mb_ct <- lookupInInerts pred
        ; return (case mb_ct of
                     Just {} -> Nothing
                     Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }
 
+-- | Checks if the depth of the given location is too much. Fails if
+-- it's too big, with an appropriate error message.
+checkReductionDepth :: CtLoc -> TcType   -- ^ type being reduced
+                    -> TcS ()
+checkReductionDepth loc ty
+  = do { dflags <- getDynFlags
+       ; when (subGoalDepthExceeded dflags (ctLocDepth loc)) $
+         wrapErrTcS $
+         solverDepthErrorTcS loc ty }
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
 matchFam tycon args = wrapTcS $ matchFamTcM tycon args

@@ -16,7 +16,7 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use an TcRef (= IORef) to store them.
 -}
 
-{-# LANGUAGE CPP, ExistentialQuantification #-}
+{-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving #-}
 
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
@@ -33,7 +33,8 @@ module TcRnTypes(
         WhereFrom(..), mkModDeps,
 
         -- Typechecker types
-        TcTypeEnv, TcIdBinder(..), TcTyThing(..), PromotionErr(..),
+        TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
+        TcTyThing(..), PromotionErr(..),
         pprTcTyThingCategory, pprPECategory,
 
         -- Desugaring types
@@ -57,16 +58,15 @@ module TcRnTypes(
         ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvEqRel,
-        ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
+        ctEvTerm, ctEvCoercion, ctEvId,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         dropDerivedWC, insolubleImplic, trulyInsoluble,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
-        SubGoalCounter(..),
-        SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
-        bumpSubGoalDepth, subGoalCounterValue, subGoalDepthExceeded,
+        SubGoalDepth, initialSubGoalDepth,
+        bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv, setCtLocSpan,
@@ -109,7 +109,6 @@ import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, FieldLabel, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
-import TysWiredIn ( coercibleClass )
 import TcType
 import Annotations
 import InstEnv
@@ -637,8 +636,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
-        tcl_bndrs :: [TcIdBinder],   -- Stack of locally-bound Ids, innermost on top
-                                     -- Used only for error reporting
+        tcl_bndrs :: TcIdBinderStack,   -- Used for reporting relevant bindings
 
         tcl_tidy :: TidyEnv,      -- Used for tidying types; contains all
                                   -- in-scope type variables (but not term variables)
@@ -664,13 +662,6 @@ type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
    -- Nota bene: a ThLevel of 'outerLevel' is *not* the same as being
    -- bound at top level!  See Note [Template Haskell levels] in TcSplice
 
-data TcIdBinder
-  = TcIdBndr
-       TcId
-       TopLevelFlag    -- Tells whether the bindind is syntactically top-level
-                       -- (The monomorphic Ids for a recursive group count
-                       --  as not-top-level for this purpose.)
-
 {- Note [Given Insts]
    ~~~~~~~~~~~~~~~~~~
 Because of GADTs, we have to pass inwards the Insts provided by type signatures
@@ -692,6 +683,24 @@ type TcRef a     = IORef a
 -- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
 type TcId        = Id
 type TcIdSet     = IdSet
+
+---------------------------
+-- The TcIdBinderStack
+---------------------------
+
+type TcIdBinderStack = [TcIdBinder]
+   -- This is a stack of locally-bound ids, innermost on top
+   -- Used ony in error reporting (relevantBindings in TcError)
+
+data TcIdBinder
+  = TcIdBndr
+       TcId
+       TopLevelFlag    -- Tells whether the bindind is syntactically top-level
+                       -- (The monomorphic Ids for a recursive group count
+                       --  as not-top-level for this purpose.)
+
+instance Outputable TcIdBinder where
+   ppr (TcIdBndr id top_lvl) = ppr id <> brackets (ppr top_lvl)
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -855,9 +864,8 @@ pprPECategory FamDataConPE = ptext (sLit "Data constructor")
 pprPECategory RecDataConPE = ptext (sLit "Data constructor")
 pprPECategory NoDataKinds  = ptext (sLit "Data constructor")
 
-{-
-Note [Bindings with closed types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Bindings with closed types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   f x = let g ys = map not ys
@@ -869,10 +877,9 @@ have no free type variables, and it is the type variables in the
 environment that makes things tricky for OutsideIn generalisation.
 
 Definition:
-
    A variable is "closed", and has tct_closed set to TopLevel,
-      iff
-   a) all its free variables are imported, or are themselves closed
+iff
+   a) all its free variables are imported, or are let-bound with closed types
    b) generalisation is not restricted by the monomorphism restriction
 
 Under OutsideIn we are free to generalise a closed let-binding.
@@ -882,7 +889,7 @@ anyway -- the MR can make a top-level binding with a free type
 variable.)
 
 Note that:
-  * A top-level binding may not be closed, if it suffer from the MR
+  * A top-level binding may not be closed, if it suffers from the MR
 
   * A nested binding may be closed (eg 'g' in the example we started with)
     Indeed, that's the point; whether a function is defined at top level
@@ -1753,31 +1760,30 @@ ctEvFlavour (CtDerived {}) = Derived
 
 Note [SubGoalDepth]
 ~~~~~~~~~~~~~~~~~~~
-The 'SubGoalCounter' takes care of stopping the constraint solver from looping.
-Because of the different use-cases of regular constaints and type function
-applications, there are two independent counters. Therefore, this datatype is
-abstract. See Note [WorkList]
+The 'SubGoalDepth' takes care of stopping the constraint solver from looping.
 
-Each counter starts at zero and increases.
+The counter starts at zero and increases. It includes dictionary constraints,
+equality simplification, and type family reduction. (Why combine these? Because
+it's actually quite easy to mistake one for another, in sufficiently involved
+scenarios, like ConstraintKinds.)
 
-* The "dictionary constraint counter" counts the depth of type class
-  instance declarations.  Example:
+The flag -fcontext-stack=n (not very well named!) fixes the maximium
+level.
+
+* The counter includes the depth of type class instance declarations.  Example:
      [W] d{7} : Eq [Int]
   That is d's dictionary-constraint depth is 7.  If we use the instance
      $dfEqList :: Eq a => Eq [a]
   to simplify it, we get
      d{7} = $dfEqList d'{8}
-  where d'{8} : Eq Int, and d' has dictionary-constraint depth 8.
+  where d'{8} : Eq Int, and d' has depth 8.
 
   For civilised (decidable) instance declarations, each increase of
   depth removes a type constructor from the type, so the depth never
   gets big; i.e. is bounded by the structural depth of the type.
 
-  The flag -fcontext-stack=n (not very well named!) fixes the maximium
-  level.
-
-* The "type function reduction counter" does the same thing when resolving
-* qualities involving type functions. Example:
+* The counter also increments when resolving
+equalities involving type functions. Example:
   Assume we have a wanted at depth 7:
     [W] d{7} : F () ~ a
   If thre is an type function equation "F () = Int", this would be rewritten to
@@ -1785,79 +1791,37 @@ Each counter starts at zero and increases.
   and remembered as having depth 8.
 
   Again, without UndecidableInstances, this counter is bounded, but without it
-  can resolve things ad infinitum. Hence there is a maximum level. But we use a
-  different maximum, as we expect possibly many more type function reductions
-  in sensible programs than type class constraints.
+  can resolve things ad infinitum. Hence there is a maximum level.
 
-  The flag -ftype-function-depth=n fixes the maximium level.
+* Lastly, every time an equality is rewritten, the counter increases. Again,
+  rewriting an equality constraint normally makes progress, but it's possible
+  the "progress" is just the reduction of an infinitely-reducing type family.
+  Hence we need to track the rewrites.
+
+When compiling a program requires a greater depth, then GHC recommends turning
+off this check entirely by setting -freduction-depth=0. This is because the
+exact number that works is highly variable, and is likely to change even between
+minor releases. Because this check is solely to prevent infinite compilation
+times, it seems safe to disable it when a user has ascertained that their program
+doesn't loop at the type level.
+
 -}
 
-data SubGoalCounter = CountConstraints | CountTyFunApps
-
-data SubGoalDepth  -- See Note [SubGoalDepth]
-   = SubGoalDepth
-         {-# UNPACK #-} !Int      -- Dictionary constraints
-         {-# UNPACK #-} !Int      -- Type function reductions
-  deriving (Eq, Ord)
-
-instance Outputable SubGoalDepth where
- ppr (SubGoalDepth c f) =  angleBrackets $
-        char 'C' <> colon <> int c <> comma <>
-        char 'F' <> colon <> int f
+-- | See Note [SubGoalDepth]
+newtype SubGoalDepth = SubGoalDepth Int
+  deriving (Eq, Ord, Outputable)
 
 initialSubGoalDepth :: SubGoalDepth
-initialSubGoalDepth = SubGoalDepth 0 0
+initialSubGoalDepth = SubGoalDepth 0
 
-maxSubGoalDepth :: DynFlags -> SubGoalDepth
-maxSubGoalDepth dflags = SubGoalDepth (ctxtStkDepth dflags) (tyFunStkDepth dflags)
+bumpSubGoalDepth :: SubGoalDepth -> SubGoalDepth
+bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n + 1)
 
-bumpSubGoalDepth :: SubGoalCounter -> SubGoalDepth -> SubGoalDepth
-bumpSubGoalDepth CountConstraints (SubGoalDepth c f) = SubGoalDepth (c+1) f
-bumpSubGoalDepth CountTyFunApps   (SubGoalDepth c f) = SubGoalDepth c (f+1)
-
-subGoalCounterValue :: SubGoalCounter -> SubGoalDepth -> Int
-subGoalCounterValue CountConstraints (SubGoalDepth c _) = c
-subGoalCounterValue CountTyFunApps   (SubGoalDepth _ f) = f
-
-subGoalDepthExceeded :: SubGoalDepth -> SubGoalDepth -> Maybe SubGoalCounter
-subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
-  | c > mc    = Just CountConstraints
-  | f > mf    = Just CountTyFunApps
-  | otherwise = Nothing
-
--- | Checks whether the evidence can be used to solve a goal with the given minimum depth
--- See Note [Preventing recursive dictionaries]
-ctEvCheckDepth :: Class -> CtLoc -> CtEvidence -> Bool
-ctEvCheckDepth cls target ev
-  | isWanted ev
-  , cls == coercibleClass  -- The restriction applies only to Coercible
-  = ctLocDepth target <= ctLocDepth (ctEvLoc ev)
-  | otherwise = True
+subGoalDepthExceeded :: DynFlags -> SubGoalDepth -> Bool
+subGoalDepthExceeded dflags (SubGoalDepth d)
+  = mkIntWithInf d > reductionDepth dflags
 
 {-
-Note [Preventing recursive dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-NB: this will go away when we start treating Coercible as an equality.
-
-We have some classes where it is not very useful to build recursive
-dictionaries (Coercible, at the moment). So we need the constraint solver to
-prevent that. We conservatively ensure this property using the subgoal depth of
-the constraints: When solving a Coercible constraint at depth d, we do not
-consider evidence from a depth <= d as suitable.
-
-Therefore we need to record the minimum depth allowed to solve a CtWanted. This
-is done in the SubGoalDepth field of CtWanted. Most code now uses mkCtWanted,
-which initializes it to initialSubGoalDepth (i.e. 0); but when requesting a
-Coercible instance (requestCoercible in TcInteract), we bump the current depth
-by one and use that.
-
-There are two spots where wanted contraints attempted to be solved
-using existing constraints: lookupInertDict and lookupSolvedDict in
-TcSMonad.  Both use ctEvCheckDepth to make the check. That function
-ensures that a Given constraint can always be used to solve a goal
-(i.e. they are at depth infinity, for our purposes)
-
-
 ************************************************************************
 *                                                                      *
             CtLoc
@@ -1876,7 +1840,7 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
-  --    binder stack:     tcl_bndrs :: [TcIdBinders]
+  --    binder stack:     tcl_bndrs :: TcIdBinderStack
   --    level:            tcl_tclvl :: TcLevel
 
 mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
@@ -1903,8 +1867,8 @@ ctLocSpan (CtLoc { ctl_env = lcl}) = tcl_loc lcl
 setCtLocSpan :: CtLoc -> RealSrcSpan -> CtLoc
 setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (lcl { tcl_loc = loc })
 
-bumpCtLocDepth :: SubGoalCounter -> CtLoc -> CtLoc
-bumpCtLocDepth cnt loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth cnt d }
+bumpCtLocDepth :: CtLoc -> CtLoc
+bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }
 
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }

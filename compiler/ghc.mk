@@ -729,11 +729,12 @@ endif
 # Note [munge-stage1-package-config]
 # Strip the date/patchlevel from the version of stage1.  See Note
 # [fiddle-stage1-version] above.
+# NB: The sed expression for hs-libraries is a bit weird to be POSIX-compliant.
 ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
 compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
 	sed -e 's/^\(version: .*\)\.$(ProjectPatchLevel)$$/\1/' \
 	    -e 's/^\(id: .*\)\.$(ProjectPatchLevel)$$/\1/' \
-	    -e 's/^\(hs-libraries: HSghc-.*\)\.$(ProjectPatchLevel)$$/\1/' \
+	    -e 's/^\(hs-libraries: HSghc-.*\)\.$(ProjectPatchLevel)\(-[A-Za-z0-9][A-Za-z0-9]*\)*$$/\1\2/' \
 	  < $< > $@
 	"$(compiler_stage1_GHC_PKG)" update --force $(compiler_stage1_GHC_PKG_OPTS) $@
 

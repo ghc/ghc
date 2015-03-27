@@ -44,6 +44,7 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
+import BasicTypes       ( IntWithInf, infinity )
 import FastString
 
 import Control.Monad
@@ -1315,37 +1316,15 @@ sizePred on them), or we might get an infinite loop if that PredType
 is irreducible. See Trac #5581.
 -}
 
-data TypeSize = TS Int | TSBig   -- TSBig behaves like positive infinity
-                                 -- Used when we encounter a type function
-
-instance Num TypeSize where
-  fromInteger n = TS (fromInteger n)
-  TS a + TS b = TS (a+b)
-  _    + _    = TSBig
-  negate = panic "TypeSize:negate"
-  abs    = panic "TypeSize:abs"
-  signum = panic "TypeSize:signum"
-  (*)    = panic "TypeSize:*"
-  (-)    = panic "TypeSize:-"
-
-instance Eq TypeSize where
-  TS a  == TS b  = a==b
-  TSBig == TSBig = True
-  _     == _     = False
-
-instance Ord TypeSize where
-  TS a  `compare` TS b  = a `compare` b
-  TS _  `compare` TSBig = LT
-  TSBig `compare` TS _  = GT
-  TSBig `compare` TSBig = EQ
+type TypeSize = IntWithInf
 
 sizeType :: Type -> TypeSize
 -- Size of a type: the number of variables and constructors
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
 sizeType (TyVarTy {})      = 1
 sizeType (TyConApp tc tys)
-  | isTypeFamilyTyCon tc   = TSBig  -- Type-family applications can
-                                    -- expand to any arbitrary size
+  | isTypeFamilyTyCon tc   = infinity  -- Type-family applications can
+                                       -- expand to any arbitrary size
   | otherwise              = sizeTypes tys + 1
 sizeType (LitTy {})        = 1
 sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1

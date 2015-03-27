@@ -15,7 +15,7 @@ data HsDoc id
 gfoldl' :: (forall a b . c (a -> b) -> a -> c b) -> (forall g . g -> c g) -> a -> c a
 gfoldl' k z hsDoc = case hsDoc of
 			  DocEmpty                  -> z DocEmpty
-			  (DocParagraph hsDoc)      -> z DocParagraph `k` hsDoc
+--			  (DocParagraph hsDoc)      -> z DocParagraph `k` hsDoc
 
 
 

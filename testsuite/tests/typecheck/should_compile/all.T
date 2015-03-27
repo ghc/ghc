@@ -287,7 +287,7 @@ test('T2497', normal, compile, [''])
      
 
 # Omitting temporarily
-test('syn-perf', normal, compile, ['-fcontext-stack=30'])
+test('syn-perf', normal, compile, ['-freduction-depth=30'])
 test('syn-perf2', normal, compile, [''])
 
 test('LoopOfTheDay1', normal, compile, [''])
@@ -441,6 +441,9 @@ test('T9939', normal, compile, [''])
 test('T9973', normal, compile, [''])
 test('T9971', normal, compile, [''])
 test('T10031', normal, compile, [''])
+test('T10184', expect_broken(10184), compile, [''])
 test('T10072', normal, compile_fail, [''])
 test('T10100', normal, compile, [''])
 test('T10156', normal, compile, [''])
+test('T10177', normal, compile, [''])
+test('T10185', expect_broken(10185), compile, [''])

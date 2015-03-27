@@ -1,10 +1,36 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## FUTURE VERSION  *TBA*
+## 4.8.1.0  *TBA*
 
-  * `Alt` now has `MonadZip` and `MonadFix` instances.
+  * Bundled with GHC 7.12.1
 
-## 4.8.0.0  *TBA*
+  * `Alt`, `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Data`,
+    `MonadZip`, and `MonadFix` instances
+
+  * `Maybe` now has a `MonadZip` instance
+
+  * `All` and `Any` now have `Data` instances
+
+  * `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Foldable` and
+    `Traversable` instances
+
+  * `Dual`, `Product`, and `Sum` now have `Functor`, `Applicative`, and
+    `Monad` instances
+
+  * `(,) a` now has a `Monad` instance
+
+  * Redundant typeclass constraints have been removed:
+     - `Data.Ratio.{denominator,numerator}` have no `Integral` constraint anymore
+     - **TODO**
+
+  * New module `GHC.SrcLoc`
+
+  * New `GHC.Generics.packageName` operation
+
+  * New `GHC.Stack.CallStack` data type
+
+
+## 4.8.0.0  *Mar 2015*
 
   * Bundled with GHC 7.10.1
 

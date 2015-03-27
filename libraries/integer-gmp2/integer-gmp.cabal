@@ -19,6 +19,7 @@ extra-source-files:
     configure.ac
     gmp/config.mk.in
     include/HsIntegerGmp.h.in
+    install-sh
     integer-gmp.buildinfo.in
 
 extra-tmp-files:

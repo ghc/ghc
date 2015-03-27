@@ -1,6 +1,6 @@
 
 Defaulting1MROff.hs:6:1:
     No instance for (Num w_)
-    When checking that ‘alpha’ has the specified type
+    When checking that ‘alpha’ has the inferred type
       alpha :: forall w_. w_
     Probable cause: the inferred type is ambiguous

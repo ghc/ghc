@@ -10,7 +10,8 @@ TcPat: Typechecking patterns
 
 module TcPat ( tcLetPat, TcSigFun, TcPragFun
              , TcSigInfo(..), TcPatSynInfo(..)
-             , findScopedTyVars, isPartialSig, completeSigPolyId
+             , findScopedTyVars, isPartialSig
+             , completeSigPolyId, completeSigPolyId_maybe
              , LetBndrSpec(..), addInlinePrags, warnPrags
              , tcPat, tcPats, newNoSigLetBndr
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
@@ -141,10 +142,10 @@ data TcSigInfo
                               -- sig_id = Just id, then sig_name = idName id.
 
         sig_poly_id :: Maybe TcId,
-             -- Just f <=> the type signature had no wildcards, so the precise, 
+             -- Just f <=> the type signature had no wildcards, so the precise,
              --            complete polymorphic type is known.  In that case,
              --            f is the polymorphic Id, with that type
-           
+
              -- Nothing <=> the type signature is partial (i.e. includes one or more
              --             wildcards). In this case it doesn't make sense to give
              --             the polymorphic Id, because we are going to /infer/ its
@@ -161,7 +162,7 @@ data TcSigInfo
                            -- Instantiated wildcard variables
                            -- If sig_poly_id = Just f, then sig_nwcs must be empty
 
-        sig_extra_cts :: Maybe SrcSpan, 
+        sig_extra_cts :: Maybe SrcSpan,
                            -- Just loc <=> An extra-constraints wildcard was present
                            --              at location loc
                            --   e.g.   f :: (Eq a, _) => a -> a
@@ -239,6 +240,10 @@ isPartialSig _ = False
 completeSigPolyId :: TcSigInfo -> TcId
 completeSigPolyId (TcSigInfo { sig_poly_id = Just id }) = id
 completeSigPolyId _ = panic "completeSigPolyId"
+
+completeSigPolyId_maybe :: TcSigInfo -> Maybe TcId
+completeSigPolyId_maybe (TcSigInfo { sig_poly_id = mb_id }) = mb_id
+completeSigPolyId_maybe (TcPatSynInfo {})                   = Nothing
 
 {-
 Note [Binding scoped type variables]

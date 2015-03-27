@@ -1,6 +1,6 @@
 
 T7967.hs:31:26:
-    Couldn't match type ‘'[]’ with ‘h0 : t0’
+    Couldn't match type ‘h0 : t0’ with ‘'[]’
     Expected type: Index n l
       Actual type: Index 'Zero (h0 : t0)
     In the expression: IZero

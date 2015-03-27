@@ -372,7 +372,7 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
        ; sig <- instTcTySigFromId builder_id
                 -- See Note [Redundant constraints for builder]
 
-       ; (builder_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
+       ; (builder_binds, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds }
   where

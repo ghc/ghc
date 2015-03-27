@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -freduction-depth=0 #-}   -- this should terminate!
 
 module T9872d where
 -- Code from Jan Stolarek, labelled "exp-tyfams.hs" on Trac #9872,

@@ -1,6 +1,6 @@
 
 NoMatchErr.hs:19:7:
-    Couldn't match type ‘Memo d’ with ‘Memo d0’
+    Couldn't match type ‘Memo d0’ with ‘Memo d’
     NB: ‘Memo’ is a type function, and may not be injective
     The type variable ‘d0’ is ambiguous
     Expected type: Memo d a -> Memo d a

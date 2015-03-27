@@ -168,6 +168,7 @@ import Maybes
 import MonadUtils
 import qualified Pretty
 import SrcLoc
+import BasicTypes       ( IntWithInf, treatZeroAsInf )
 import FastString
 import Outputable
 #ifdef GHCI
@@ -693,8 +694,7 @@ data DynFlags = DynFlags {
   importPaths           :: [FilePath],
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
-  ctxtStkDepth          :: Int,         -- ^ Typechecker context stack depth
-  tyFunStkDepth         :: Int,         -- ^ Typechecker type function stack depth
+  reductionDepth        :: IntWithInf,   -- ^ Typechecker maximum stack depth
 
   thisPackage           :: PackageKey,   -- ^ name of package currently being compiled
 
@@ -1195,7 +1195,6 @@ data Way
   | WayProf
   | WayEventLog
   | WayPar
-  | WayNDP
   | WayDyn
   deriving (Eq, Ord, Show)
 
@@ -1216,7 +1215,6 @@ allowed_combination way = and [ x `allowedWith` y
         WayDebug `allowedWith` _                = True
 
         (WayCustom {}) `allowedWith` _          = True
-        WayProf `allowedWith` WayNDP            = True
         WayThreaded `allowedWith` WayProf       = True
         WayThreaded `allowedWith` WayEventLog   = True
         _ `allowedWith` _                       = False
@@ -1232,7 +1230,6 @@ wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
 wayTag WayPar      = "mp"
-wayTag WayNDP      = "ndp"
 
 wayRTSOnly :: Way -> Bool
 wayRTSOnly (WayCustom {}) = False
@@ -1242,7 +1239,6 @@ wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
 wayRTSOnly WayPar      = False
-wayRTSOnly WayNDP      = False
 
 wayDesc :: Way -> String
 wayDesc (WayCustom xs) = xs
@@ -1252,7 +1248,6 @@ wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
 wayDesc WayPar      = "Parallel"
-wayDesc WayNDP      = "Nested data parallelism"
 
 -- Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -1270,7 +1265,6 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC]
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
 wayGeneralFlags _ WayPar      = [Opt_Parallel]
-wayGeneralFlags _ WayNDP      = []
 
 -- Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -1285,7 +1279,6 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 wayUnsetGeneralFlags _ WayPar      = []
-wayUnsetGeneralFlags _ WayNDP      = []
 
 wayExtras :: Platform -> Way -> DynFlags -> DynFlags
 wayExtras _ (WayCustom {}) dflags = dflags
@@ -1295,8 +1288,6 @@ wayExtras _ WayDyn      dflags = dflags
 wayExtras _ WayProf     dflags = dflags
 wayExtras _ WayEventLog dflags = dflags
 wayExtras _ WayPar      dflags = exposePackage' "concurrent" dflags
-wayExtras _ WayNDP      dflags = setExtensionFlag' Opt_ParallelArrays
-                               $ setGeneralFlag' Opt_Vectorise dflags
 
 wayOptc :: Platform -> Way -> [String]
 wayOptc _ (WayCustom {}) = []
@@ -1309,7 +1300,6 @@ wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
 wayOptc _ WayEventLog   = ["-DTRACING"]
 wayOptc _ WayPar        = ["-DPAR", "-w"]
-wayOptc _ WayNDP        = []
 
 wayOptl :: Platform -> Way -> [String]
 wayOptl _ (WayCustom {}) = []
@@ -1330,7 +1320,6 @@ wayOptl _ WayEventLog   = []
 wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
                            "-lpvm3",
                            "-lgpvm3"]
-wayOptl _ WayNDP        = []
 
 wayOptP :: Platform -> Way -> [String]
 wayOptP _ (WayCustom {}) = []
@@ -1340,7 +1329,6 @@ wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
 wayOptP _ WayEventLog = ["-DTRACING"]
 wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
-wayOptP _ WayNDP      = []
 
 whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
 whenGeneratingDynamicToo dflags f = ifGeneratingDynamicToo dflags f (return ())
@@ -1452,8 +1440,7 @@ defaultDynFlags mySettings =
         importPaths             = ["."],
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
-        ctxtStkDepth            = mAX_CONTEXT_REDUCTION_DEPTH,
-        tyFunStkDepth           = mAX_TYPE_FUNCTION_REDUCTION_DEPTH,
+        reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
 
         thisPackage             = mainPackageKey,
 
@@ -2267,7 +2254,6 @@ dynamic_flags = [
   , defGhcFlag "smp"
       (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
   , defGhcFlag "debug"          (NoArg (addWay WayDebug))
-  , defGhcFlag "ndp"            (NoArg (addWay WayNDP))
   , defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
 
   , defGhcFlag "ticky"
@@ -2611,10 +2597,16 @@ dynamic_flags = [
       (noArg (\d -> d{ liberateCaseThreshold = Nothing }))
   , defFlag "frule-check"
       (sepArg (\s d -> d{ ruleCheck = Just s }))
+  , defFlag "freduction-depth"
+      (intSuffix (\n d -> d{ reductionDepth = treatZeroAsInf n }))
   , defFlag "fcontext-stack"
-      (intSuffix (\n d -> d{ ctxtStkDepth = n }))
+      (intSuffixM (\n d ->
+       do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"
+          ; return $ d{ reductionDepth = treatZeroAsInf n } }))
   , defFlag "ftype-function-depth"
-      (intSuffix (\n d -> d{ tyFunStkDepth = n }))
+      (intSuffixM (\n d ->
+       do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"
+          ; return $ d{ reductionDepth = treatZeroAsInf n } }))
   , defFlag "fstrictness-before"
       (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , defFlag "ffloat-lam-args"
@@ -3570,6 +3562,9 @@ sepArg fn = SepArg (upd . fn)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
+
+intSuffixM :: (Int -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
+intSuffixM fn = IntSuffix (\n -> updM (fn n))
 
 floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 floatSuffix fn = FloatSuffix (\n -> upd (fn n))

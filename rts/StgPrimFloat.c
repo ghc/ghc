@@ -182,9 +182,9 @@ __decodeDouble_Int64 (StgInt64 *const mantissa, const StgDouble dbl)
     I_ exp = 0;
 
     __decodeDouble_2Int (&man_sign, &man_high, &man_low, &exp, dbl);
-
-    *mantissa = ((((StgInt64)man_high << 32) | (StgInt64)man_low)
-                 * (StgInt64)man_sign);
+    ASSIGN_Int64((W_*)mantissa, ((((StgInt64)man_high << 32)
+                                  | (StgInt64)man_low)
+                                 * (StgInt64)man_sign));
     return exp;
 #endif
 }
