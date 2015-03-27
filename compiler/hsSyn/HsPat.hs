@@ -309,9 +309,9 @@ data HsRecField id arg = HsRecField {
 --
 -- and the typechecker will determine that $sel:x:S is meant.
 --
--- AMG TODO: it would be nice if we could enforce in the types that
--- ambiguous fields occur only in record updates, and only between the
--- renamer and the typechecker.
+-- It would be nice if we could enforce in the types that ambiguous
+-- fields occur only in record updates, and only between the renamer
+-- and the typechecker, but this is not yet implemented.
 
 hsRecFieldSelMissing :: Either id [(id, id)]
 hsRecFieldSelMissing = Right []
