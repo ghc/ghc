@@ -402,7 +402,7 @@ pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
 pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
 pprConArgs (RecCon rpats)   = ppr rpats
 
-instance (OutputableBndr id, Outputable arg)
+instance (Outputable arg)
       => Outputable (HsRecFields id arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
@@ -411,7 +411,7 @@ instance (OutputableBndr id, Outputable arg)
         where
           dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
 
-instance (OutputableBndr id, Outputable arg)
+instance (Outputable arg)
       => Outputable (HsRecField id arg) where
   ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
