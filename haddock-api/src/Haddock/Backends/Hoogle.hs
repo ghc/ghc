@@ -198,7 +198,10 @@ ppCtor dflags dat subdocs con
         apps = foldl1 (\x y -> reL $ HsAppTy x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (makeExplicit $ unL $ funs flds)
-        name = out dflags $ map unL $ con_names con
+
+        -- We print the constructors as comma-separated list. See GHC
+        -- docs for con_names on why it is a list to begin with.
+        name = showSDocUnqual dflags . interpp'SP . map unL $ con_names con
 
         resType = case con_res con of
             ResTyH98 -> apps $ map (reL . HsTyVar) $
