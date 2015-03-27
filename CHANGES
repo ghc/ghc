@@ -37,6 +37,8 @@ Changes in version 2.16.0
 
  * Fix Hoogle display of constructors (#361)
 
+ * Fully qualify names in Hoogle instances output (#263)
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
