@@ -2421,55 +2421,6 @@ primop NumSparks "numSparks#" GenPrimOp
    has_side_effects = True
    out_of_line = True
 
--- HWL: The first 4 Int# in all par... annotations denote:
---   name, granularity info, size of result, degree of parallelism
---      Same  structure as _seq_ i.e. returns Int#
--- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
---   `the processor containing the expression v'; it is not evaluated
-
-primop  ParGlobalOp  "parGlobal#"  GenPrimOp
-   a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
-   with
-   has_side_effects = True
-
-primop  ParLocalOp  "parLocal#"  GenPrimOp
-   a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
-   with
-   has_side_effects = True
-
-primop  ParAtOp  "parAt#"  GenPrimOp
-   b -> a -> Int# -> Int# -> Int# -> Int# -> c -> Int#
-   with
-   has_side_effects = True
-
-primop  ParAtAbsOp  "parAtAbs#"  GenPrimOp
-   a -> Int# -> Int# -> Int# -> Int# -> Int# -> b -> Int#
-   with
-   has_side_effects = True
-
-primop  ParAtRelOp  "parAtRel#" GenPrimOp
-   a -> Int# -> Int# -> Int# -> Int# -> Int# -> b -> Int#
-   with
-   has_side_effects = True
-
-primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
-   b -> a -> Int# -> Int# -> Int# -> Int# -> c -> Int#
-   with
-   has_side_effects = True
-
--- copyable# and noFollow# are yet to be implemented (for GpH)
---
---primop  CopyableOp  "copyable#" GenPrimOp
---   a -> Int#
---   with
---   has_side_effects = True
---
---primop  NoFollowOp "noFollow#" GenPrimOp
---   a -> Int#
---   with
---   has_side_effects = True
-
-
 ------------------------------------------------------------------------
 section "Tag to enum stuff"
         {Convert back and forth between values of enumerated types

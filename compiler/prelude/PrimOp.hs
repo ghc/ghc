@@ -278,12 +278,6 @@ Invariants:
             stable name.
 
 
--- HWL: The first 4 Int# in all par... annotations denote:
---   name, granularity info, size of result, degree of parallelism
---      Same  structure as _seq_ i.e. returns Int#
--- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
---   `the processor containing the expression v'; it is not evaluated
-
 These primops are pretty weird.
 
         dataToTag# :: a -> Int    (arg must be an evaluated data type)
