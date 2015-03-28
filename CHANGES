@@ -11,6 +11,7 @@ Changes in version 2.16.1
 
  * Don't print instance safety information in Hoogle (#168)
 
+ * Expand response files in arguments (#285)
 
 Changes in version 2.16.0
 
