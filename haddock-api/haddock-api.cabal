@@ -48,7 +48,7 @@ library
     , ghc >= 7.10 && < 7.10.2
 
     , ghc-paths
-    , haddock-library == 1.2.0.*
+    , haddock-library == 1.2.*
 
   hs-source-dirs:
       src
