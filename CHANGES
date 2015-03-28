@@ -1,3 +1,17 @@
+Changes in version 2.16.1
+
+ * Don't default to type constructors for out-of-scope names (#253 and
+   #375)
+
+ * Fix Hoogle display of constructors (#361)
+
+ * Fully qualify names in Hoogle instances output (#263)
+
+ * Output method documentation in Hoogle backend (#259)
+
+ * Don't print instance safety information in Hoogle (#168)
+
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
@@ -31,17 +45,6 @@ Changes in version 2.16.0
  * Fix code blocks in presence of Windows line endings
 
  * Deal better with long synopsis lines (#151)
-
- * Don't default to type constructors for out-of-scope names (#253 and
-   #375)
-
- * Fix Hoogle display of constructors (#361)
-
- * Fully qualify names in Hoogle instances output (#263)
-
- * Output method documentation in Hoogle backend (#259)
-
- * Don't print instance safety information in Hoogle (#168)
 
 Changes in version 2.15.0
 

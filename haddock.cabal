@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.16.0
+version:              2.16.1
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
