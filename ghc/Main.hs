@@ -653,7 +653,7 @@ doMake srcs  = do
         haskellish (f,Nothing) =
           looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
-          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcplusplus, CmmCpp, Cmm
+          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm
                           , StopLn]
 
     hsc_env <- GHC.getSession

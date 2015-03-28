@@ -111,10 +111,10 @@ data Phase
         | Cpp   HscSource
         | HsPp  HscSource
         | Hsc   HscSource
-        | Ccplusplus    -- Compile C++
+        | Ccxx          -- Compile C++
         | Cc            -- Compile C
         | Cobjc         -- Compile Objective-C
-        | Cobjcplusplus -- Compile Objective-C++
+        | Cobjcxx       -- Compile Objective-C++
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
         | Splitter      -- Assembly file splitter (part of '-split-objs')
         | SplitAs       -- Assembler for split assembly files (part of '-split-objs')
@@ -161,9 +161,9 @@ eqPhase CmmCpp      CmmCpp     = True
 eqPhase Cmm         Cmm        = True
 eqPhase MergeStub   MergeStub  = True
 eqPhase StopLn      StopLn     = True
-eqPhase Ccplusplus     Ccplusplus     = True
-eqPhase Cobjcplusplus  Cobjcplusplus  = True
-eqPhase _              _              = False
+eqPhase Ccxx        Ccxx       = True
+eqPhase Cobjcxx     Cobjcxx    = True
+eqPhase _           _          = False
 
 -- Partial ordering on phases: we want to know which phases will occur before
 -- which others.  This is used for sanity checking, to ensure that the
@@ -189,10 +189,10 @@ nextPhase dflags p
       LlvmMangle -> As False
       SplitAs    -> MergeStub
       As _       -> MergeStub
-      Ccplusplus -> As False
+      Ccxx       -> As False
       Cc         -> As False
       Cobjc      -> As False
-      Cobjcplusplus -> As False
+      Cobjcxx    -> As False
       CmmCpp     -> Cmm
       Cmm        -> maybeHCc
       HCc        -> As False
@@ -215,13 +215,13 @@ startPhase "hscpp"    = HsPp  HsSrcFile
 startPhase "hspp"     = Hsc   HsSrcFile
 startPhase "hc"       = HCc
 startPhase "c"        = Cc
-startPhase "cpp"      = Ccplusplus
+startPhase "cpp"      = Ccxx
 startPhase "C"        = Cc
 startPhase "m"        = Cobjc
-startPhase "M"        = Cobjcplusplus
-startPhase "mm"       = Cobjcplusplus
-startPhase "cc"       = Ccplusplus
-startPhase "cxx"      = Ccplusplus
+startPhase "M"        = Cobjcxx
+startPhase "mm"       = Cobjcxx
+startPhase "cc"       = Ccxx
+startPhase "cxx"      = Ccxx
 startPhase "split_s"  = Splitter
 startPhase "s"        = As False
 startPhase "S"        = As True
@@ -247,9 +247,9 @@ phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
         --     because runPipeline uses the StopBefore phase to pick the
         --     output filename.  That could be fixed, but watch out.
 phaseInputExt HCc                 = "hc"
-phaseInputExt Ccplusplus          = "cpp"
+phaseInputExt Ccxx                = "cpp"
 phaseInputExt Cobjc               = "m"
-phaseInputExt Cobjcplusplus       = "mm"
+phaseInputExt Cobjcxx             = "mm"
 phaseInputExt Cc                  = "c"
 phaseInputExt Splitter            = "split_s"
 phaseInputExt (As True)           = "S"
