@@ -323,7 +323,7 @@ chooseDumpFile dflags flag
                          Just d  -> d </> f
                          Nothing ->       f
 
--- | Build a nice file name from name of a GeneralFlag constructor
+-- | Build a nice file name from name of a 'DumpFlag' constructor
 beautifyDumpName :: DumpFlag -> String
 beautifyDumpName Opt_D_th_dec_file = "th.hs"
 beautifyDumpName flag
