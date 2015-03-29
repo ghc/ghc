@@ -178,7 +178,7 @@ tcRnSignature dflags hsc_src
                 , tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
                 })
             } ;
-            Nothing
+          Nothing
              | HsigFile <- hsc_src
              , HscNothing <- hscTarget dflags -> do
                 { return tcg_env
