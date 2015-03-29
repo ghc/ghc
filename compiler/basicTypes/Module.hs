@@ -383,7 +383,6 @@ integerPackageKey     = fsToPackageKey (fsLit n)
   where
     n = case cIntegerLibraryType of
         IntegerGMP    -> "integer-gmp"
-        IntegerGMP2   -> "integer-gmp"
         IntegerSimple -> "integer-simple"
 basePackageKey        = fsToPackageKey (fsLit "base")
 rtsPackageKey         = fsToPackageKey (fsLit "rts")

@@ -1,6 +1,14 @@
 #ifndef _HS_INTEGER_GMP_H_
 #define _HS_INTEGER_GMP_H_
 
-#define HAVE_SECURE_POWM @HaveSecurePowm@
+/* Whether GMP is embedded into integer-gmp */
+#define GHC_GMP_INTREE     @UseIntreeGmp@
+
+/* The following values denote the GMP version used during GHC build-time */
+#define GHC_GMP_VERSION_MJ @GhcGmpVerMj@
+#define GHC_GMP_VERSION_MI @GhcGmpVerMi@
+#define GHC_GMP_VERSION_PL @GhcGmpVerPl@
+#define GHC_GMP_VERSION \
+    (@GhcGmpVerMj@ * 10000 + @GhcGmpVerMi@ * 100 + @GhcGmpVerPl@)
 
 #endif /* _HS_INTEGER_GMP_H_ */

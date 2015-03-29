@@ -20,6 +20,7 @@ GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc-patched.tar.bz2,
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
+  libraries/integer-gmp/include/ghc-gmp.h \
   libraries/integer-gmp/gmp/config.mk \
   libraries/integer-gmp/gmp/libgmp.a \
   libraries/integer-gmp/gmp/gmp.h \
@@ -49,9 +50,6 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp/gmp/config.mk
 endif
 
-libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += -Ilibraries/integer-gmp/mkGmpDerivedConstants/dist
-libraries/integer-gmp_dist-install_EXTRA_HC_OPTS += -Ilibraries/integer-gmp/mkGmpDerivedConstants/dist
-
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
 gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 
@@ -78,27 +76,27 @@ HaveFrameworkGMP = NO
 endif
 endif
 
-$(libraries/integer-gmp_dist-install_depfile_c_asm): $$(GmpDerivedConstants_HEADER)
-
+UseIntreeGmp = NO
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
-$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h
+UseIntreeGmp = YES
+endif
+endif
+
+ifeq "$(UseIntreeGmp)" "YES"
+$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h libraries/integer-gmp/include/ghc-gmp.h
+
+libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/gmp.h
+	$(CP) $< $@
 
 gmp_CC_OPTS += -Ilibraries/integer-gmp/gmp
-gmp_CC_OPTS += -Ilibraries/integer-gmp/mkGmpDerivedConstants/dist
 
 libraries/integer-gmp_dist-install_EXTRA_OBJS += libraries/integer-gmp/gmp/objs/*.o
+else
+$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/include/ghc-gmp.h
 
-#INSTALL_LIBS += libraries/integer-gmp/gmp/libgmp.a
-#INSTALL_HEADERS += libraries/integer-gmp/gmp/gmp.h
-#
-#$(eval $(call all-target,gmp_dynamic,libraries/integer-gmp/gmp/libgmp.a))
-#
-#ifeq "$(BUILD_SHARED)" "yes"
-#$(eval $(call all-target,gmp_dynamic,libraries/integer-gmp/gmp/libgmp.dll.a libraries/integer-gmp/gmp/libgmp-3.dll))
-#endif
-
-endif
+libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/ghc-gmp.h
+	$(CP) $< $@
 endif
 
 libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
@@ -111,30 +109,12 @@ else
 CCX = $(CC_STAGE1)
 endif
 
-# 2007-09-26
-#     set -o igncr 
-# is not a valid command on non-Cygwin-systems.
-# Let it fail silently instead of aborting the build.
-#
-# 2007-07-05
-# We do
-#     set -o igncr; export SHELLOPTS
-# here as otherwise checking the size of limbs
-# makes the build fall over on Cygwin. See the thread
-# http://www.cygwin.com/ml/cygwin/2006-12/msg00011.html
-# for more details.
-
-# 2007-07-05
-# Passing
-#     as_ln_s='cp -p'
-# isn't sufficient to stop cygwin using symlinks the mingw gcc can't
-# follow, as it isn't used consistently. Instead we put an ln.bat in
-# path that always fails.
-
 libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(RM) -rf libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild libraries/integer-gmp/gmp/objs
 	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp/gmp && $(TAR_CMD) -xf - ; }
 	mv libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
+	cd libraries/integer-gmp/gmp && $(PATCH_CMD) -p0 < gmpsrc.patch
+	cat libraries/integer-gmp/gmp/tarball/gmp-5.0.4.patch | { cd libraries/integer-gmp/gmp/gmpbuild && $(PATCH_CMD) -p1 ; }
 	chmod +x libraries/integer-gmp/gmp/ln
 
 	# Their cmd invocation only works on msys. On cygwin it starts
@@ -156,42 +136,4 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	cd libraries/integer-gmp/gmp/objs && $(AR_STAGE1) x ../libgmp.a
 	$(RANLIB_CMD) libraries/integer-gmp/gmp/libgmp.a
 
-# XXX TODO:
-#stamp.gmp.shared:
-#	$(RM) -rf $(GMP_DIR) gmpbuild-shared
-#	$(TAR_CMD) -zxf $(GMP_TARBALL)
-#	mv $(GMP_DIR) gmpbuild-shared
-#	chmod +x ln
-#	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
-#	    PATH=`pwd`:$$PATH; \
-#	    export PATH; \
-#	    cd gmpbuild-shared && \
-#	    CC=$(CC_STAGE1) $(SHELL) ./configure \
-#	          --enable-shared=yes --disable-static \
-#	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
-#	"$(TOUCH_CMD)" $@
-#
-#gmp.h: stamp.gmp.static
-#	$(CP) gmpbuild/gmp.h .
-#
-#libgmp.a: stamp.gmp.static
-#
-#libgmp-3.dll: stamp.gmp.shared
-#	$(MAKE) -C gmpbuild-shared MAKEFLAGS=
-#	$(CP) gmpbuild-shared/.libs/libgmp-3.dll .
-#
-#libgmp.dll.a: libgmp-3.dll
-#	$(CP) gmpbuild-shared/.libs/libgmp.dll.a .
-
-## GMP takes a long time to build, but changes rarely.  Hence we don't
-## bother cleaning it before validating, because that adds a
-## significant overhead to validation.
-#ifeq "$(Validating)" "NO"
-#clean distclean maintainer-clean ::
-#	$(RM) -f stamp.gmp.static stamp.gmp.shared
-#	$(RM) -rf gmpbuild
-#	$(RM) -rf gmpbuild-shared
-#endif
-
 endif
-
