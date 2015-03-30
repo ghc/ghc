@@ -1340,10 +1340,24 @@ since GADTs are not kind indexed.
 Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 
+Note [Abort when superclass cycle is detected]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must avoid doing the ambiguity check when there are already errors accumulated.
+This is because one of the errors may be a superclass cycle, and superclass cycles
+cause canonicalization to loop. Here is a representative example:
+
+  class D a => C a where
+    meth :: D a => ()
+  class C a => D a
+
+This fixes Trac #9415.
+
 \begin{code}
 checkClassCycleErrs :: Class -> TcM ()
 checkClassCycleErrs cls
-  = unless (null cls_cycles) $ mapM_ recClsErr cls_cycles
+  = unless (null cls_cycles) $
+    do { mapM_ recClsErr cls_cycles
+       ; failM }  -- See Note [Abort when superclass cycle is detected]
   where cls_cycles = calcClassCycles cls
 
 checkValidTyCl :: TyThing -> TcM ()
@@ -1589,6 +1603,7 @@ checkValidClass cls
         ; checkValidTheta (ClassSCCtxt (className cls)) theta
 
           -- Now check for cyclic superclasses
+          -- If there are superclass cycles, checkClassCycleErrs bails.
         ; checkClassCycleErrs cls
 
         -- Check the class operations
@@ -1655,7 +1670,7 @@ checkFamFlag tc_name
   = do { idx_tys <- xoptM Opt_TypeFamilies
        ; checkTc idx_tys err_msg }
   where
-    err_msg = hang (ptext (sLit "Illegal family declaraion for") <+> quotes (ppr tc_name))
+    err_msg = hang (ptext (sLit "Illegal family declaration for") <+> quotes (ppr tc_name))
                  2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
 \end{code}
 

@@ -14,12 +14,12 @@
 #ifndef SMP_H
 #define SMP_H
 
-#if defined(THREADED_RTS)
-
 #if arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
 void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
 #endif
+
+#if defined(THREADED_RTS)
 
 /* ----------------------------------------------------------------------------
    Atomic operations

@@ -49,6 +49,7 @@ test('T2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
 test('testwsdeque', [unless(in_tree_compiler(), skip),
+                    req_smp, # needs atomic 'cas'
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, ['-I../../../rts'])
 
@@ -176,6 +177,7 @@ test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
 
 test('T7815', [ multi_cpu_race,
                 extra_run_opts('50000 +RTS -N2 -RTS'),
+                req_smp,
                 only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
 
 # ignore_output because it contains a unique:

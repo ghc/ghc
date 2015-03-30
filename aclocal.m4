@@ -470,18 +470,18 @@ AC_DEFUN([FP_SETTINGS],
         SettingsWindresCommand="/bin/false"
         SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
-        if test -z "$LlcCmd"
-        then
-          SettingsLlcCommand="llc"
-        else
-          SettingsLlcCommand="$LlcCmd"
-        fi
-        if test -z "$OptCmd"
-        then
-          SettingsOptCommand="opt"
-        else
-          SettingsOptCommand="$OptCmd"
-        fi
+    fi
+    if test -z "$LlcCmd"
+    then
+      SettingsLlcCommand="llc"
+    else
+      SettingsLlcCommand="$LlcCmd"
+    fi
+    if test -z "$OptCmd"
+    then
+      SettingsOptCommand="opt"
+    else
+      SettingsOptCommand="$OptCmd"
     fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"

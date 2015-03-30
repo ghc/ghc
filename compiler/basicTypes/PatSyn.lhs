@@ -16,7 +16,7 @@ module PatSyn (
         patSynWrapper, patSynMatcher,
         patSynExTyVars, patSynSig,
         patSynInstArgTys, patSynInstResTy,
-        tidyPatSynIds, patSynIds
+        tidyPatSynIds
     ) where
 
 #include "HsVersions.h"
@@ -265,12 +265,6 @@ patSynWrapper = psWrapper
 
 patSynMatcher :: PatSyn -> Id
 patSynMatcher = psMatcher
-
-patSynIds :: PatSyn -> [Id]
-patSynIds (MkPatSyn { psMatcher = match_id, psWrapper = mb_wrap_id })
-  = case mb_wrap_id of
-      Nothing      -> [match_id]
-      Just wrap_id -> [match_id, wrap_id]
 
 tidyPatSynIds :: (Id -> Id) -> PatSyn -> PatSyn
 tidyPatSynIds tidy_fn ps@(MkPatSyn { psMatcher = match_id, psWrapper = mb_wrap_id })

@@ -1090,6 +1090,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(__word_encodeFloat)                                 \
       SymI_HasProto(stg_atomicallyzh)                                   \
       SymI_HasProto(barf)                                               \
+      SymI_HasProto(deRefStablePtr)                                     \
       SymI_HasProto(debugBelch)                                         \
       SymI_HasProto(errorBelch)                                         \
       SymI_HasProto(sysErrorBelch)                                      \

@@ -704,7 +704,7 @@ showOptions = putStr (unlines availableOptions)
     where
       availableOptions     = map ((:) '-') $
                              getFlagNames mode_flags   ++
-                             getFlagNames flagsDynamic ++
+                             getFlagNames flagsAll ++
                              (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
                              flagsStaticNames
       getFlagNames opts         = map getFlagName opts

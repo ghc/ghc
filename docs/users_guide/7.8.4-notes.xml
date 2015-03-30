@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-8-4">
+  <title>Release notes for version 7.8.4</title>
+
+  <para>
+    The 7.8.4 release is a bugfix release. The major bugfixes relative
+    to 7.8.3 are listed below.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+	    A critical bug in the LLVM backend which would cause the
+	    compiler to generate incorrect code has been fixed (issue
+	    #9439).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    Several bugs in the code generator have been fixed for
+	    unregisterised platforms, such as 64bit PowerPC (issue
+	    #8819 and #8849).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug that could cause GHC's constructor specialization
+	    pass (enabled by default at <literal>-O2</literal>, or via
+	    <literal>-fspec-constr</literal>) to loop forever and
+	    consume large amounts of memory has been fixed (issue
+	    #8960).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug that would cause GHC to fail when attempting to
+	    determine GCC's version information in non-english locales
+	    has been fixed (issue #8825).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A minor bug that allowed GHC to seemingly import (but not
+	    use) private data constructors has been fixed (issue
+	    #9006).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug in the register allocator which would cause GHC to
+	    crash during compilation has been fixed (issue #9303).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug that caused the compiler to panic on some input C--
+	    code has been fixed (issue #9329).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A few various minor deadlocks in the runtime system when
+	    using <literal>forkProcess</literal> have been fixed.
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug which made blocked STM transactions
+	    non-interruptible has been fixed (issue #9379).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug in the compiler which broke pattern synonym imports
+	    across modules in Haddock has been fixed (issue #9417).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A minor bug in the code generator in which the
+	    <literal>popCnt16#</literal> did not zero-extend its
+	    result has been fixed (issue #9435).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug which caused the compiler to panic on pattern
+	    synonyms inside a class declaration has been fixed (issue
+	    #9705).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug in the typechecker revolving around un-saturated
+	    type family applications has been fixed (issue #9433).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            Several bugs have been fixed causing problems with
+            building GHC on ARM (issues #8951, #9620, #9336, and
+            #9552).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the typechecker that could cause an infinite loop
+            when using superclasses in a cycle has been fixed (issue #9415).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug causing corruption in signal handling with the
+            single-threaded runtime system has been fixed (issue
+            #9817).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that could cause compiled programs to crash due to
+            use of overlapping type families has been fixed (issue
+            #9371).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the inliner that caused certain expressions
+            within unboxed tuples to not be properly evaluated has
+            been fixed (issue #9390).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that caused the compiler to not always properly
+            detect LLVM tools (particularly on Windows) has been fixed
+            (issue #7143).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that prevented GHC from deriving
+            <literal>Generic1</literal> instances for data families
+            has been fixed (#9563).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug that caused type inference to infer the incorrect
+            type in the presence of certain type families and
+            constraints has been fixed (issue #9316).
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>

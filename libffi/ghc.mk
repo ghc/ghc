@@ -69,6 +69,13 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	mv libffi/build/Makefile.in libffi/build/Makefile.in.orig
 	sed "s/-MD/-MMD/" < libffi/build/Makefile.in.orig > libffi/build/Makefile.in
 
+	# We attempt to specify the installation directory below with --libdir,
+	# but libffi installs into 'toolexeclibdir' instead, which may differ
+	# on systems where gcc has multilib support. Force libffi to use libdir.
+	# (https://sourceware.org/ml/libffi-discuss/2014/msg00016.html)
+	mv libffi/build/Makefile.in libffi/build/Makefile.in.orig
+	sed 's:@toolexeclibdir@:$$(libdir):g' < libffi/build/Makefile.in.orig > libffi/build/Makefile.in
+
 	# Their cmd invocation only works on msys. On cygwin it starts
 	# a cmd interactive shell. The replacement works in both environments.
 	mv libffi/build/ltmain.sh libffi/build/ltmain.sh.orig

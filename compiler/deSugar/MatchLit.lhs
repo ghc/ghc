@@ -90,7 +90,7 @@ dsLit (HsInt i)        = do dflags <- getDynFlags
 dsLit (HsRat r ty) = do
    num   <- mkIntegerExpr (numerator (fl_value r))
    denom <- mkIntegerExpr (denominator (fl_value r))
-   return (mkConApp ratio_data_con [Type integer_ty, num, denom])
+   return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty)
         = case tcSplitTyConApp ty of

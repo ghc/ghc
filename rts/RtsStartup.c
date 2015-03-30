@@ -214,7 +214,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
 #ifndef mingw32_HOST_OS
-    getStablePtr((StgPtr)runHandlers_closure);
+    getStablePtr((StgPtr)runHandlersPtr_closure);
 #endif
 
     /* initialise the shared Typeable store */
