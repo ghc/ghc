@@ -84,6 +84,9 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataC
                           unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 
+-- compiler/utils
+import Util             ( looksLikePackageName )
+
 }
 
 {- Last updated: 03 Mar 2015
@@ -774,8 +777,13 @@ maybe_safe :: { ([AddAnn],Bool) }
         | {- empty -}                           { ([],False) }
 
 maybe_pkg :: { ([AddAnn],Maybe FastString) }
-        : STRING                                { ([mj AnnPackageName $1]
-                                                  ,Just (getSTRING $1)) }
+        : STRING  {% let pkgFS = getSTRING $1 in
+                     if looksLikePackageName (unpackFS pkgFS)
+                        then return ([mj AnnPackageName $1], Just pkgFS)
+                        else parseErrorSDoc (getLoc $1) $ vcat [
+                             text "parse error" <> colon <+> quotes (ppr pkgFS),
+                             text "Version number or non-alphanumeric" <+>
+                             text "character in package name"] }
         | {- empty -}                           { ([],Nothing) }
 
 optqualified :: { ([AddAnn],Bool) }
