@@ -597,8 +597,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
              isHaskellishFile = isHaskell start_phase
 
-             env = PipeEnv{ pe_isHaskellishFile = isHaskellishFile,
-                            stop_phase,
+             env = PipeEnv{ stop_phase,
                             src_filename = input_fn,
                             src_basename = basename,
                             src_suffix = suffix',
