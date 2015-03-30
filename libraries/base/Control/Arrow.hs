@@ -93,16 +93,14 @@ class Category a => Arrow a where
     -- | Send the first component of the input through the argument
     --   arrow, and copy the rest unchanged to the output.
     first :: a b c -> a (b,d) (c,d)
+    first = (*** id)
 
     -- | A mirror image of 'first'.
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     second :: a b c -> a (d,b) (d,c)
-    second f = arr swap >>> first f >>> arr swap
-      where
-        swap :: (x,y) -> (y,x)
-        swap ~(x,y) = (y,x)
+    second = (id ***)
 
     -- | Split the input between the two argument arrows and combine
     --   their output.  Note that this is in general not a functor.
@@ -110,7 +108,8 @@ class Category a => Arrow a where
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     (***) :: a b c -> a b' c' -> a (b,b') (c,c')
-    f *** g = first f >>> second g
+    f *** g = first f >>> arr swap >>> first g >>> arr swap
+      where swap ~(x,y) = (y,x)
 
     -- | Fanout: send the input to both argument arrows and combine
     --   their output.
@@ -141,8 +140,6 @@ class Category a => Arrow a where
 
 instance Arrow (->) where
     arr f = f
-    first f = f *** id
-    second f = id *** f
 --  (f *** g) ~(x,y) = (f x, g y)
 --  sorry, although the above defn is fully H'98, nhc98 can't parse it.
     (***) f g ~(x,y) = (f x, g y)
