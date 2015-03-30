@@ -243,6 +243,7 @@ data DumpFlag
    -- enabled if you run -ddump-cmm
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
+   | Opt_D_dump_cmm_switch
    | Opt_D_dump_cmm_proc
    | Opt_D_dump_cmm_sink
    | Opt_D_dump_cmm_sp
@@ -2441,6 +2442,7 @@ dynamic_flags = [
   , defGhcFlag "ddump-cmm-raw"           (setDumpFlag Opt_D_dump_cmm_raw)
   , defGhcFlag "ddump-cmm-cfg"           (setDumpFlag Opt_D_dump_cmm_cfg)
   , defGhcFlag "ddump-cmm-cbe"           (setDumpFlag Opt_D_dump_cmm_cbe)
+  , defGhcFlag "ddump-cmm-switch"        (setDumpFlag Opt_D_dump_cmm_switch)
   , defGhcFlag "ddump-cmm-proc"          (setDumpFlag Opt_D_dump_cmm_proc)
   , defGhcFlag "ddump-cmm-sink"          (setDumpFlag Opt_D_dump_cmm_sink)
   , defGhcFlag "ddump-cmm-sp"            (setDumpFlag Opt_D_dump_cmm_sp)

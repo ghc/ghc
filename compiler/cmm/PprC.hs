@@ -33,6 +33,7 @@ import Cmm hiding (pprBBlock)
 import PprCmm ()
 import Hoopl
 import CmmUtils
+import CmmSwitch
 
 -- Utils
 import CPrim
@@ -299,21 +300,12 @@ pprCondBranch expr yes no
 --
 -- we find the fall-through cases
 --
--- N.B. we remove Nothing's from the list of branches, as they are
--- 'undefined'. However, they may be defined one day, so we better
--- document this behaviour.
---
-pprSwitch :: DynFlags -> CmmExpr -> [ Maybe BlockId ] -> SDoc
-pprSwitch dflags e maybe_ids
-  = let pairs  = [ (ix, ident) | (ix,Just ident) <- zip [0..] maybe_ids ]
-        pairs2 = [ (map fst as, snd (head as)) | as <- groupBy sndEq pairs ]
-    in
-        (hang (ptext (sLit "switch") <+> parens ( pprExpr e ) <+> lbrace)
-                4 (vcat ( map caseify pairs2 )))
-        $$ rbrace
-
+pprSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> SDoc
+pprSwitch dflags e ids
+  = (hang (ptext (sLit "switch") <+> parens ( pprExpr e ) <+> lbrace)
+                4 (vcat ( map caseify pairs ) $$ def)) $$ rbrace
   where
-    sndEq (_,x) (_,y) = x == y
+    (pairs, mbdef) = switchTargetsFallThrough ids
 
     -- fall through case
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
@@ -326,7 +318,10 @@ pprSwitch dflags e maybe_ids
                 hsep [ ptext (sLit "case") , pprHexVal ix (wordWidth dflags) <> colon ,
                        ptext (sLit "goto") , (pprBlockId ident) <> semi ]
 
-    caseify (_     , _    ) = panic "pprSwtich: swtich with no cases!"
+    caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
+
+    def | Just l <- mbdef = ptext (sLit "default: goto") <+> pprBlockId l <> semi
+        | otherwise       = empty
 
 -- ---------------------------------------------------------------------
 -- Expressions.

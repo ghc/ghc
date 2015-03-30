@@ -391,7 +391,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 441932632, 10)]),
+           (wordsize(64), 719814352, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -406,6 +406,10 @@ test('T783',
             #   (general round of updates)
             # 2014-08-29: 441932632  (amd64/Linux)
             #   (better specialisation, raft of core-to-core optimisations)
+            # 2014-08-29: 719814352  (amd64/Linux)
+	    #   (changed order of cmm block causes analyses to allocate much more,
+	    #    but the changed order is slighly better in terms of runtime, and
+	    #    this test seems to be an extreme outlier.)
       extra_hc_opts('-static')
       ],
       compile,[''])

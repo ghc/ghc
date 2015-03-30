@@ -23,6 +23,7 @@ module CmmNode (
 
 import CodeGen.Platform
 import CmmExpr
+import CmmSwitch
 import DynFlags
 import FastString
 import ForeignCall
@@ -89,11 +90,10 @@ data CmmNode e x where
       cml_true, cml_false :: ULabel
   } -> CmmNode O C
 
-  CmmSwitch :: CmmExpr -> [Maybe Label] -> CmmNode O C -- Table branch
-      -- The scrutinee is zero-based;
-      --      zero -> first block
-      --      one  -> second block etc
-      -- Undefined outside range, and when there's a Nothing
+  CmmSwitch
+    :: CmmExpr       -- Scrutinee, of some integral type
+    -> SwitchTargets -- Cases. See [Note SwitchTargets]
+    -> CmmNode O C
 
   CmmCall :: {                -- A native call or tail call
       cml_target :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
@@ -228,7 +228,7 @@ instance NonLocal CmmNode where
 
   successors (CmmBranch l) = [l]
   successors (CmmCondBranch {cml_true=t, cml_false=f}) = [f, t] -- meets layout constraint
-  successors (CmmSwitch _ ls) = catMaybes ls
+  successors (CmmSwitch _ ids) = switchTargetsToList ids
   successors (CmmCall {cml_cont=l}) = maybeToList l
   successors (CmmForeignCall {succ=l}) = [l]
 
@@ -464,7 +464,7 @@ mapExp f   (CmmStore addr e)                     = CmmStore (f addr) (f e)
 mapExp f   (CmmUnsafeForeignCall tgt fs as)      = CmmUnsafeForeignCall (mapForeignTarget f tgt) fs (map f as)
 mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi)               = CmmCondBranch (f e) ti fi
-mapExp f   (CmmSwitch e tbl)                     = CmmSwitch (f e) tbl
+mapExp f   (CmmSwitch e ids)                     = CmmSwitch (f e) ids
 mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
 mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl
 
@@ -560,7 +560,7 @@ foldExpDeep f = foldExp (wrapRecExpf f)
 mapSuccessors :: (Label -> Label) -> CmmNode O C -> CmmNode O C
 mapSuccessors f (CmmBranch bid)        = CmmBranch (f bid)
 mapSuccessors f (CmmCondBranch p y n)  = CmmCondBranch p (f y) (f n)
-mapSuccessors f (CmmSwitch e arms)     = CmmSwitch e (map (fmap f) arms)
+mapSuccessors f (CmmSwitch e ids)      = CmmSwitch e (mapSwitchTargets f ids)
 mapSuccessors _ n = n
 
 -- -----------------------------------------------------------------------------

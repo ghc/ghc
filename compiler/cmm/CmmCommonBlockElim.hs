@@ -8,6 +8,7 @@ where
 import BlockId
 import Cmm
 import CmmUtils
+import CmmSwitch (eqSwitchTargetWith)
 import CmmContFlowOpt
 import Prelude hiding (iterate, succ, unzip, zip)
 
@@ -203,12 +204,9 @@ eqLastWith eqBid (CmmCondBranch c1 t1 f1) (CmmCondBranch c2 t2 f2) =
   c1 == c2 && eqBid t1 t2 && eqBid f1 f2
 eqLastWith eqBid (CmmCall t1 c1 g1 a1 r1 u1) (CmmCall t2 c2 g2 a2 r2 u2) =
   t1 == t2 && eqMaybeWith eqBid c1 c2 && a1 == a2 && r1 == r2 && u1 == u2 && g1 == g2
-eqLastWith eqBid (CmmSwitch e1 bs1) (CmmSwitch e2 bs2) =
-  e1 == e2 && eqListWith (eqMaybeWith eqBid) bs1 bs2
+eqLastWith eqBid (CmmSwitch e1 ids1) (CmmSwitch e2 ids2) =
+  e1 == e2 && eqSwitchTargetWith eqBid ids1 ids2
 eqLastWith _ _ _ = False
-
-eqListWith :: (a -> b -> Bool) -> [a] -> [b] -> Bool
-eqListWith eltEq es es' = all (uncurry eltEq) (List.zip es es')
 
 eqMaybeWith :: (a -> b -> Bool) -> Maybe a -> Maybe b -> Bool
 eqMaybeWith eltEq (Just e) (Just e') = eltEq e e'

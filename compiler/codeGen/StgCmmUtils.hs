@@ -51,6 +51,7 @@ import MkGraph
 import CodeGen.Platform
 import CLabel
 import CmmUtils
+import CmmSwitch
 
 import ForeignCall
 import IdInfo
@@ -60,7 +61,6 @@ import SMRep
 import Module
 import Literal
 import Digraph
-import ListSetOps
 import Util
 import Unique
 import DynFlags
@@ -68,11 +68,11 @@ import FastString
 import Outputable
 
 import qualified Data.ByteString as BS
+import qualified Data.Map as M
 import Data.Char
 import Data.List
 import Data.Ord
 import Data.Word
-import Data.Maybe
 
 
 -------------------------------------------------------------------------
@@ -86,14 +86,6 @@ cgLit (MachStr s) = newByteStringCLit (BS.unpack s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit   = do dflags <- getDynFlags
                        return (mkSimpleLit dflags other_lit)
-
-mkLtOp :: DynFlags -> Literal -> MachOp
--- On signed literals we must do a signed comparison
-mkLtOp dflags (MachInt _)    = MO_S_Lt (wordWidth dflags)
-mkLtOp _      (MachFloat _)  = MO_F_Lt W32
-mkLtOp _      (MachDouble _) = MO_F_Lt W64
-mkLtOp dflags lit            = MO_U_Lt (typeWidth (cmmLitType dflags (mkSimpleLit dflags lit)))
-                                -- ToDo: seems terribly indirect!
 
 mkSimpleLit :: DynFlags -> Literal -> CmmLit
 mkSimpleLit dflags (MachChar   c)    = CmmInt (fromIntegral (ord c)) (wordWidth dflags)
@@ -460,174 +452,52 @@ emitSwitch :: CmmExpr                      -- Tag to switch on
                                            -- behaviour outside this range is
                                            -- undefined
            -> FCode ()
-emitSwitch tag_expr branches mb_deflt lo_tag hi_tag
-  = do  { dflags <- getDynFlags
-        ; mkCmmSwitch (via_C dflags) tag_expr branches mb_deflt lo_tag hi_tag }
-  where
-    via_C dflags | HscC <- hscTarget dflags = True
-                 | otherwise                = False
-
-
-mkCmmSwitch :: Bool                         -- True <=> never generate a
-                                            -- conditional tree
-            -> CmmExpr                      -- Tag to switch on
-            -> [(ConTagZ, CmmAGraphScoped)] -- Tagged branches
-            -> Maybe CmmAGraphScoped        -- Default branch (if any)
-            -> ConTagZ -> ConTagZ           -- Min and Max possible values;
-                                            -- behaviour outside this range is
-                                            -- undefined
-            -> FCode ()
 
 -- First, two rather common cases in which there is no work to do
-mkCmmSwitch _ _ []         (Just code) _ _ = emit (fst code)
-mkCmmSwitch _ _ [(_,code)] Nothing     _ _ = emit (fst code)
+emitSwitch _ []         (Just code) _ _ = emit (fst code)
+emitSwitch _ [(_,code)] Nothing     _ _ = emit (fst code)
 
 -- Right, off we go
-mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag = do
+emitSwitch tag_expr branches mb_deflt lo_tag hi_tag = do
     join_lbl      <- newLabelC
     mb_deflt_lbl  <- label_default join_lbl mb_deflt
     branches_lbls <- label_branches join_lbl branches
     tag_expr'     <- assignTemp' tag_expr
 
-    emit =<< mk_switch tag_expr' (sortBy (comparing fst) branches_lbls)
-                mb_deflt_lbl lo_tag hi_tag via_C
+    -- Sort the branches before calling mk_discrete_switch
+    let branches_lbls' = [ (fromIntegral i, l) | (i,l) <- sortBy (comparing fst) branches_lbls ]
+    let range = (fromIntegral lo_tag, fromIntegral hi_tag)
 
-          -- Sort the branches before calling mk_switch
+    emit $ mk_discrete_switch False tag_expr' branches_lbls' mb_deflt_lbl range
 
     emitLabel join_lbl
 
-mk_switch :: CmmExpr -> [(ConTagZ, BlockId)]
+mk_discrete_switch :: Bool -- ^ Use signed comparisons
+          -> CmmExpr
+          -> [(Integer, BlockId)]
           -> Maybe BlockId
-          -> ConTagZ -> ConTagZ -> Bool
-          -> FCode CmmAGraph
+          -> (Integer, Integer)
+          -> CmmAGraph
 
 -- SINGLETON TAG RANGE: no case analysis to do
-mk_switch _tag_expr [(tag, lbl)] _ lo_tag hi_tag _via_C
+mk_discrete_switch _ _tag_expr [(tag, lbl)] _ (lo_tag, hi_tag)
   | lo_tag == hi_tag
   = ASSERT( tag == lo_tag )
-    return (mkBranch lbl)
+    mkBranch lbl
 
 -- SINGLETON BRANCH, NO DEFAULT: no case analysis to do
-mk_switch _tag_expr [(_tag,lbl)] Nothing _ _ _
-  = return (mkBranch lbl)
+mk_discrete_switch _ _tag_expr [(_tag,lbl)] Nothing _
+  = mkBranch lbl
         -- The simplifier might have eliminated a case
         --       so we may have e.g. case xs of
         --                               [] -> e
         -- In that situation we can be sure the (:) case
         -- can't happen, so no need to test
 
--- SINGLETON BRANCH: one equality check to do
-mk_switch tag_expr [(tag,lbl)] (Just deflt) _ _ _
-  = do dflags <- getDynFlags
-       let cond =  cmmNeWord dflags tag_expr (mkIntExpr dflags tag)
-            -- We have lo_tag < hi_tag, but there's only one branch,
-            -- so there must be a default
-       return (mkCbranch cond deflt lbl)
-
--- ToDo: we might want to check for the two branch case, where one of
--- the branches is the tag 0, because comparing '== 0' is likely to be
--- more efficient than other kinds of comparison.
-
--- DENSE TAG RANGE: use a switch statment.
---
--- We also use a switch uncoditionally when compiling via C, because
--- this will get emitted as a C switch statement and the C compiler
--- should do a good job of optimising it.  Also, older GCC versions
--- (2.95 in particular) have problems compiling the complicated
--- if-trees generated by this code, so compiling to a switch every
--- time works around that problem.
---
-mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
-  | use_switch  -- Use a switch
-  = do let
-        find_branch :: ConTagZ -> Maybe BlockId
-        find_branch i = case (assocMaybe branches i) of
-                          Just lbl -> Just lbl
-                          Nothing  -> mb_deflt
-
-        -- NB. we have eliminated impossible branches at
-        -- either end of the range (see below), so the first
-        -- tag of a real branch is real_lo_tag (not lo_tag).
-        arms :: [Maybe BlockId]
-        arms = [ find_branch i | i <- [real_lo_tag..real_hi_tag]]
-       dflags <- getDynFlags
-       return (mkSwitch (cmmOffset dflags tag_expr (- real_lo_tag)) arms)
-
-  -- if we can knock off a bunch of default cases with one if, then do so
-  | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
-  = do dflags <- getDynFlags
-       stmts <- mk_switch tag_expr branches mb_deflt
-                        lowest_branch hi_tag via_C
-       mkCmmIfThenElse
-        (cmmULtWord dflags tag_expr (mkIntExpr dflags lowest_branch))
-        (mkBranch deflt)
-        stmts
-
-  | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
-  = do dflags <- getDynFlags
-       stmts <- mk_switch tag_expr branches mb_deflt
-                        lo_tag highest_branch via_C
-       mkCmmIfThenElse
-        (cmmUGtWord dflags tag_expr (mkIntExpr dflags highest_branch))
-        (mkBranch deflt)
-        stmts
-
-  | otherwise   -- Use an if-tree
-  = do dflags <- getDynFlags
-       lo_stmts <- mk_switch tag_expr lo_branches mb_deflt
-                             lo_tag (mid_tag-1) via_C
-       hi_stmts <- mk_switch tag_expr hi_branches mb_deflt
-                             mid_tag hi_tag via_C
-       mkCmmIfThenElse
-        (cmmUGeWord dflags tag_expr (mkIntExpr dflags mid_tag))
-        hi_stmts
-        lo_stmts
-        -- we test (e >= mid_tag) rather than (e < mid_tag), because
-        -- the former works better when e is a comparison, and there
-        -- are two tags 0 & 1 (mid_tag == 1).  In this case, the code
-        -- generator can reduce the condition to e itself without
-        -- having to reverse the sense of the comparison: comparisons
-        -- can't always be easily reversed (eg. floating
-        -- pt. comparisons).
-  where
-    use_switch   = {- pprTrace "mk_switch" (
-                        ppr tag_expr <+> text "n_tags:" <+> int n_tags <+>
-                        text "branches:" <+> ppr (map fst branches) <+>
-                        text "n_branches:" <+> int n_branches <+>
-                        text "lo_tag:" <+> int lo_tag <+>
-                        text "hi_tag:" <+> int hi_tag <+>
-                        text "real_lo_tag:" <+> int real_lo_tag <+>
-                        text "real_hi_tag:" <+> int real_hi_tag) $ -}
-                   ASSERT( n_branches > 1 && n_tags > 1 )
-                   n_tags > 2 && (via_C || (dense && big_enough))
-                 -- up to 4 branches we use a decision tree, otherwise
-                 -- a switch (== jump table in the NCG).  This seems to be
-                 -- optimal, and corresponds with what gcc does.
-    big_enough   = n_branches > 4
-    dense        = n_branches > (n_tags `div` 2)
-    n_branches   = length branches
-
-    -- ignore default slots at each end of the range if there's
-    -- no default branch defined.
-    lowest_branch  = fst (head branches)
-    highest_branch = fst (last branches)
-
-    real_lo_tag
-        | isNothing mb_deflt = lowest_branch
-        | otherwise          = lo_tag
-
-    real_hi_tag
-        | isNothing mb_deflt = highest_branch
-        | otherwise          = hi_tag
-
-    n_tags = real_hi_tag - real_lo_tag + 1
-
-        -- INVARIANT: Provided hi_tag > lo_tag (which is true)
-        --      lo_tag <= mid_tag < hi_tag
-        --      lo_branches have tags <  mid_tag
-        --      hi_branches have tags >= mid_tag
-    (lo_branches, mid_tag, hi_branches) = divideBranches branches
-
+-- SOMETHING MORE COMPLICATED: defer to CmmImplementSwitchPlans
+-- See Note [Cmm Switches, the general plan] in CmmSwitch
+mk_discrete_switch signed tag_expr branches mb_deflt range
+  = mkSwitch tag_expr $ mkSwitchTargets signed range mb_deflt (M.fromList branches)
 
 divideBranches :: Ord a => [(a,b)] -> ([(a,b)], a, [(a,b)])
 divideBranches branches = (lo_branches, mid, hi_branches)
@@ -644,20 +514,34 @@ emitCmmLitSwitch :: CmmExpr                    -- Tag to switch on
                -> [(Literal, CmmAGraphScoped)] -- Tagged branches
                -> CmmAGraphScoped              -- Default branch (always)
                -> FCode ()                     -- Emit the code
--- Used for general literals, whose size might not be a word,
--- where there is always a default case, and where we don't know
--- the range of values for certain.  For simplicity we always generate a tree.
---
--- ToDo: for integers we could do better here, perhaps by generalising
--- mk_switch and using that.  --SDM 15/09/2004
 emitCmmLitSwitch _scrut []       deflt = emit $ fst deflt
 emitCmmLitSwitch scrut  branches deflt = do
     scrut' <- assignTemp' scrut
     join_lbl <- newLabelC
     deflt_lbl <- label_code join_lbl deflt
     branches_lbls <- label_branches join_lbl branches
-    emit =<< mk_lit_switch scrut' deflt_lbl noBound
-               (sortBy (comparing fst) branches_lbls)
+
+    dflags <- getDynFlags
+    let cmm_ty = cmmExprType dflags scrut
+        rep = typeWidth cmm_ty
+
+    -- We find the necessary type information in the literals in the branches
+    let signed = case head branches of
+                    (MachInt _, _) ->   True
+                    (MachInt64 _, _) -> True
+                    _ -> False
+
+    let range | signed    = (tARGET_MIN_INT dflags, tARGET_MAX_INT dflags)
+              | otherwise = (0, tARGET_MAX_WORD dflags)
+
+    if isFloatType cmm_ty
+    then emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
+    else emit $ mk_discrete_switch
+        signed
+        scrut'
+        [(litValue lit,l) | (lit,l) <- branches_lbls]
+        (Just deflt_lbl)
+        range
     emitLabel join_lbl
 
 -- | lower bound (inclusive), upper bound (exclusive)
@@ -666,31 +550,23 @@ type LitBound = (Maybe Literal, Maybe Literal)
 noBound :: LitBound
 noBound = (Nothing, Nothing)
 
-mk_lit_switch :: CmmExpr -> BlockId
+mk_float_switch :: Width -> CmmExpr -> BlockId
               -> LitBound
               -> [(Literal,BlockId)]
               -> FCode CmmAGraph
-mk_lit_switch scrut deflt bounds [(lit,blk)]
-  = do
-  dflags <- getDynFlags
-  let
-    cmm_lit = mkSimpleLit dflags lit
-    cmm_ty  = cmmLitType dflags cmm_lit
-    rep     = typeWidth cmm_ty
-    ne      = if isFloatType cmm_ty then MO_F_Ne rep else MO_Ne rep
-
-  return $ if lit `onlyWithinBounds'` bounds
-           then mkBranch blk
-           else mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk
-  where
-    -- If the bounds already imply scrut == lit, then we can skip the final check (#10129)
-    l `onlyWithinBounds'` (Just lo, Just hi) = l `onlyWithinBounds` (lo, hi)
-    _ `onlyWithinBounds'` _ = False
-
-mk_lit_switch scrut deflt_blk_id (lo_bound, hi_bound) branches
+mk_float_switch rep scrut deflt _bounds [(lit,blk)]
   = do dflags <- getDynFlags
-       lo_blk <- mk_lit_switch scrut deflt_blk_id bounds_lo lo_branches
-       hi_blk <- mk_lit_switch scrut deflt_blk_id bounds_hi hi_branches
+       return $ mkCbranch (cond dflags) deflt blk
+  where
+    cond dflags = CmmMachOp ne [scrut, CmmLit cmm_lit]
+      where
+        cmm_lit = mkSimpleLit dflags lit
+        ne      = MO_F_Ne rep
+
+mk_float_switch rep scrut deflt_blk_id (lo_bound, hi_bound) branches
+  = do dflags <- getDynFlags
+       lo_blk <- mk_float_switch rep scrut deflt_blk_id bounds_lo lo_branches
+       hi_blk <- mk_float_switch rep scrut deflt_blk_id bounds_hi hi_branches
        mkCmmIfThenElse (cond dflags) lo_blk hi_blk
   where
     (lo_branches, mid_lit, hi_branches) = divideBranches branches
@@ -698,8 +574,10 @@ mk_lit_switch scrut deflt_blk_id (lo_bound, hi_bound) branches
     bounds_lo = (lo_bound, Just mid_lit)
     bounds_hi = (Just mid_lit, hi_bound)
 
-    cond dflags = CmmMachOp (mkLtOp dflags mid_lit)
-                            [scrut, CmmLit (mkSimpleLit dflags mid_lit)]
+    cond dflags = CmmMachOp lt [scrut, CmmLit cmm_lit]
+      where
+        cmm_lit = mkSimpleLit dflags mid_lit
+        lt      = MO_F_Lt rep
 
 
 --------------
