@@ -74,6 +74,10 @@ GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
 # Only use -fasm by default on platforms that support it.
 GhcFAsm = $(if $(filter $(GhcWithNativeCodeGen),YES),-fasm,)
 
+# Uncomment the following to force `integer-gmp` to use the in-tree GMP 5.0.4
+# (other sometimes useful configure-options: `--with-gmp-{includes,libraries}`)
+#libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
+
 # ----------- A Performance/Distribution build --------------------------------
 
 ifeq "$(BuildFlavour)" "perf"
