@@ -606,14 +606,13 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- We want to catch cases of "you can't get there from here" before
          -- we start the pipeline, because otherwise it will just run off the
          -- end.
-         --
-         -- There is a partial ordering on phases, where A < B iff A occurs
-         -- before B in a normal compilation pipeline.
-
          let happensBefore' = happensBefore dflags
          case start_phase of
              RealPhase start_phase' ->
-                 when (not (start_phase' `happensBefore'` stop_phase)) $
+                 -- See Note [Partial ordering on phases]
+                 -- Not the same as: (stop_phase `happensBefore` start_phase')
+                 when (not (start_phase' `happensBefore'` stop_phase ||
+                            start_phase' `eqPhase` stop_phase)) $
                        throwGhcExceptionIO (UsageError
                                    ("cannot compile this file to desired target: "
                                       ++ input_fn))
@@ -663,6 +662,7 @@ pipeLoop :: PhasePlus -> FilePath -> CompPipeline (DynFlags, FilePath)
 pipeLoop phase input_fn = do
   env <- getPipeEnv
   dflags <- getDynFlags
+  -- See Note [Partial ordering on phases]
   let happensBefore' = happensBefore dflags
       stopPhase = stop_phase env
   case phase of
