@@ -1671,7 +1671,10 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
                 r = os.system( 'diff -u ' + expected_file_for_diff + \
                                       ' ' + actual_file )
 
-        if config.accept:
+        if config.accept and getTestOpts().expect == 'fail':
+            if_verbose(1, 'Test is expected to fail. Not accepting new output.')
+            return 0
+        elif config.accept:
             if_verbose(1, 'Accepting new output.')
             write_file(expected_file, actual_raw)
             return 1
