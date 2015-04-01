@@ -89,8 +89,13 @@ GhcStage1HcOpts = -O $(GhcFAsm)
 GhcStage2HcOpts = -O2 $(GhcFAsm)
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
-GhcLibWays     += p
+#SplitObjs
+#HADDOCK_DOCS
+#BUILD_DOCBOOK_HTML
+#BUILD_DOCBOOK_PS
+#BUILD_DOCBOOK_PDF
 
+GhcLibWays += p
 ifeq "$(PlatformSupportsSharedLibs)" "YES"
 GhcLibWays += dyn
 endif
@@ -106,6 +111,12 @@ GhcStage1HcOpts = -O -fllvm
 GhcStage2HcOpts = -O2 -fllvm
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
+#SplitObjs
+#HADDOCK_DOCS
+#BUILD_DOCBOOK_HTML
+#BUILD_DOCBOOK_PS
+#BUILD_DOCBOOK_PDF
+
 GhcLibWays     += p
 
 endif
@@ -114,20 +125,21 @@ endif
 
 ifeq "$(BuildFlavour)" "perf-cross"
 
-SRC_HC_OPTS     = -O -H64m -fllvm
-GhcStage1HcOpts = -O2
-GhcStage2HcOpts = -O2 -fllvm
-GhcHcOpts       = -Rghc-timing
-GhcLibHcOpts    = -O2
-GhcLibWays     += p
-INTEGER_LIBRARY    = integer-simple
-Stage1Only         = YES
-
+SRC_HC_OPTS        = -O -H64m -fllvm
+GhcStage1HcOpts    = -O2
+GhcStage2HcOpts    = -O2 -fllvm
+GhcHcOpts          = -Rghc-timing
+GhcLibHcOpts       = -O2
+#SplitObjs
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 
+GhcLibWays        += p
+
+INTEGER_LIBRARY      = integer-simple
+Stage1Only           = YES
 DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
 
@@ -194,9 +206,9 @@ HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
-INTEGER_LIBRARY    = integer-simple
-Stage1Only         = YES
 
+INTEGER_LIBRARY      = integer-simple
+Stage1Only           = YES
 DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
 
@@ -210,15 +222,14 @@ SRC_HC_OPTS        = -H64m -O0 $(GhcFAsm)
 GhcStage1HcOpts    = -O $(GhcFAsm)
 GhcStage2HcOpts    = -O $(GhcFAsm)
 GhcLibHcOpts       = -O $(GhcFAsm)
-
-GhcLibWays         += p
-GhcProfiled        = YES
-
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
+
+GhcLibWays        += p
+GhcProfiled        = YES
 
 endif
 
@@ -227,14 +238,15 @@ endif
 ifeq "$(BuildFlavour)" "devel1"
 
 SRC_HC_OPTS        = -H64m -O $(GhcFAsm)
-GhcLibHcOpts       = -O -dcore-lint
 GhcStage1HcOpts    = -Rghc-timing -O0 -DDEBUG
 GhcStage2HcOpts    = -Rghc-timing -O $(GhcFAsm)
+GhcLibHcOpts       = -O -dcore-lint
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
+
 LAX_DEPENDENCIES   = YES
 
 endif
@@ -244,14 +256,15 @@ endif
 ifeq "$(BuildFlavour)" "devel2"
 
 SRC_HC_OPTS        = -H64m -O $(GhcFAsm)
-GhcLibHcOpts       = -O -dcore-lint
 GhcStage1HcOpts    = -Rghc-timing -O $(GhcFAsm)
 GhcStage2HcOpts    = -Rghc-timing -O0 -DDEBUG
+GhcLibHcOpts       = -O -dcore-lint
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
+
 LAX_DEPENDENCIES   = YES
 
 endif
@@ -297,13 +310,13 @@ GhcStage1HcOpts    = -O $(GhcFAsm)
 GhcStage2HcOpts    = -O0 $(GhcFAsm)
 GhcLibHcOpts       = -O2 $(GhcFAsm)
 SplitObjs          = NO
-INTEGER_LIBRARY    = integer-simple
-Stage1Only         = YES
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 
+INTEGER_LIBRARY      = integer-simple
+Stage1Only           = YES
 DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
 
