@@ -87,7 +87,6 @@ ifeq "$(BuildFlavour)" "perf"
 SRC_HC_OPTS     = -O -H64m
 GhcStage1HcOpts = -O $(GhcFAsm)
 GhcStage2HcOpts = -O2 $(GhcFAsm)
-GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
 #SplitObjs
 #HADDOCK_DOCS
@@ -109,7 +108,6 @@ ifeq "$(BuildFlavour)" "perf-llvm"
 SRC_HC_OPTS     = -O -H64m -fllvm
 GhcStage1HcOpts = -O -fllvm
 GhcStage2HcOpts = -O2 -fllvm
-GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
 #SplitObjs
 #HADDOCK_DOCS
@@ -128,7 +126,6 @@ ifeq "$(BuildFlavour)" "perf-cross"
 SRC_HC_OPTS        = -O -H64m -fllvm
 GhcStage1HcOpts    = -O2
 GhcStage2HcOpts    = -O2 -fllvm
-GhcHcOpts          = -Rghc-timing
 GhcLibHcOpts       = -O2
 #SplitObjs
 HADDOCK_DOCS       = NO
@@ -238,8 +235,8 @@ endif
 ifeq "$(BuildFlavour)" "devel1"
 
 SRC_HC_OPTS        = -H64m -O $(GhcFAsm)
-GhcStage1HcOpts    = -Rghc-timing -O0 -DDEBUG
-GhcStage2HcOpts    = -Rghc-timing -O $(GhcFAsm)
+GhcStage1HcOpts    = -O0 -DDEBUG
+GhcStage2HcOpts    = -O $(GhcFAsm)
 GhcLibHcOpts       = -O -dcore-lint
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
@@ -256,8 +253,8 @@ endif
 ifeq "$(BuildFlavour)" "devel2"
 
 SRC_HC_OPTS        = -H64m -O $(GhcFAsm)
-GhcStage1HcOpts    = -Rghc-timing -O $(GhcFAsm)
-GhcStage2HcOpts    = -Rghc-timing -O0 -DDEBUG
+GhcStage1HcOpts    = -O $(GhcFAsm)
+GhcStage2HcOpts    = -O0 -DDEBUG
 GhcLibHcOpts       = -O -dcore-lint
 SplitObjs          = NO
 HADDOCK_DOCS       = NO

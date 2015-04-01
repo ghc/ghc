@@ -172,7 +172,6 @@ echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
 if [ $be_quiet -eq 1 ]; then
     echo "V=0"              >> mk/are-validating.mk # Less gunk
-    echo "GhcHcOpts="       >> mk/are-validating.mk # Remove -Rghc-timing
 fi
 
 if [ $use_dph -eq 1 ]; then
