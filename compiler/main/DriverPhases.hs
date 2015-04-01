@@ -279,11 +279,14 @@ phaseInputExt StopLn              = "o"
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
     haskellish_user_src_suffixes, haskellish_sig_suffixes
  :: [String]
+-- When a file with an extension in the haskellish_src_suffixes group is
+-- loaded in --make mode, its imports will be loaded too.
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
-                               [ "hspp", "hscpp", "cmm", "cmmcpp" ]
+                               [ "hspp", "hscpp" ]
 haskellish_suffixes          = haskellish_src_suffixes ++
-                               [ "hc" ]
+                               [ "hc", "cmm", "cmmcpp" ]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "lm_s", "m", "M", "mm" ]
+
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes =
   haskellish_sig_suffixes ++ [ "hs", "lhs", "hs-boot", "lhs-boot" ]
