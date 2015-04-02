@@ -203,7 +203,7 @@ haskell :-
 
 -- everywhere: skip whitespace
 $white_no_nl+ ;
-$tab+         { warn Opt_WarnTabs (text "Tab character") }
+$tab          { warnTab }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out
 -- pragmas, "{-#", so that we don't accidentally treat them as comments.
@@ -1655,6 +1655,11 @@ warn option warning srcspan _buf _len = do
     addWarning option (RealSrcSpan srcspan) warning
     lexToken
 
+warnTab :: Action
+warnTab srcspan _buf _len = do
+    addTabWarning srcspan
+    lexToken
+
 warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
     addWarning option (RealSrcSpan srcspan) warning
@@ -1680,6 +1685,8 @@ data PState = PState {
         buffer     :: StringBuffer,
         dflags     :: DynFlags,
         messages   :: Messages,
+        tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
+        tab_count  :: !Int,              -- number of tab warnings in the file
         last_tk    :: Maybe Token,
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
@@ -2083,6 +2090,8 @@ mkPState flags buf loc =
       buffer        = buf,
       dflags        = flags,
       messages      = emptyMessages,
+      tab_first     = Nothing,
+      tab_count     = 0,
       last_tk       = Nothing,
       last_loc      = mkRealSrcSpan loc loc,
       last_len      = 0,
@@ -2146,8 +2155,34 @@ addWarning option srcspan warning
            ws' = if wopt option d then ws `snocBag` warning' else ws
        in POk s{messages=(ws', es)} ()
 
+addTabWarning :: RealSrcSpan -> P ()
+addTabWarning srcspan
+ = P $ \s@PState{tab_first=tf, tab_count=tc, dflags=d} ->
+       let tf' = if isJust tf then tf else Just srcspan
+           tc' = tc + 1
+           s' = if wopt Opt_WarnTabs d
+                then s{tab_first = tf', tab_count = tc'}
+                else s
+       in POk s' ()
+addTabWarning _
+  = P $ \s -> POk s ()
+
+mkTabWarning :: PState -> Maybe ErrMsg
+mkTabWarning PState{tab_first=tf, tab_count=tc, dflags=d} =
+  let middle = if tc == 1
+        then text ""
+        else text ", and in" <+> speakNOf (tc - 1) (text "further location")
+      message = text "Tab character found here"
+                <> middle
+                <> text "."
+                $+$ text "Please use spaces instead."
+  in fmap (\s -> mkWarnMsg d (RealSrcSpan s) alwaysQualify message) tf
+
 getMessages :: PState -> Messages
-getMessages PState{messages=ms} = ms
+getMessages p@PState{messages=(ws,es)} =
+  let tabwarning = mkTabWarning p
+      ws' = maybe ws (`consBag` ws) tabwarning
+  in (ws', es)
 
 getContext :: P [LayoutContext]
 getContext = P $ \s@PState{context=ctx} -> POk s ctx
