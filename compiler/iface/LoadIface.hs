@@ -46,6 +46,7 @@ import PrelNames
 import PrelInfo
 import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
 import MkId     ( seqId )
+import TysPrim  ( funTyConName )
 import Rules
 import TyCon
 import Annotations
@@ -871,6 +872,7 @@ ghcPrimIface
     }
   where
     fixities = (getOccName seqId, Fixity 0 InfixR)  -- seq is infixr 0
+             : (occName funTyConName, funTyFixity)  -- trac #10145
              : mapMaybe mkFixity allThePrimOps
     mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
 
