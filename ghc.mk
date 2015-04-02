@@ -148,9 +148,12 @@ endif
 endif
 
 include mk/ways.mk
+include mk/warnings.mk
 
 # (Optional) build-specific configuration
 include mk/custom-settings.mk
+SRC_CC_OPTS     += $(WERROR)
+SRC_HC_OPTS     += $(WERROR)
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
@@ -694,17 +697,15 @@ stage1_libs : $(ALL_STAGE1_LIBS)
 # ----------------------------------------------
 # Per-package compiler flags
 #
-# If you want to add per-package compiler flags, this
-# is the place to do it.  Do it like this for package <pkg>
-#
-#   libraries/<pkg>_dist-boot_HC_OPTS += -Wwarn
-#   libraries/<pkg>_dist-install_HC_OPTS += -Wwarn
+# If you want to add per-package compiler flags, see `mk/warnings.mk`.
 
-# Add $(GhcLibHcOpts) to all package builds
+# Add $(GhcLib(Extra)HcOpts) to all package builds
 $(foreach pkg,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
+$(foreach pkg,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_EXTRA_HC_OPTS += $$(GhcLibExtraHcOpts)))
 
-# Add $(GhcBootLibHcOpts) to all stage0 package builds
+# Add $(GhcBootLib(Extra)HcOpts) to all stage0 package builds
 $(foreach pkg,$(PACKAGES_STAGE0),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
+$(foreach pkg,$(PACKAGES_STAGE0),$(eval libraries/$(pkg)_dist-boot_EXTRA_HC_OPTS += $$(GhcBootLibExtraHcOpts)))
 
 # -----------------------------------------------------------------------------
 # Bootstrapping libraries

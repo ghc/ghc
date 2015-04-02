@@ -57,6 +57,9 @@
 # Please use V = 1 when reporting GHC bugs.
 V = 1
 
+# Should all enabled warnings (see mk/warnings.mk) be turned into errors?
+#WERROR=-Werror
+
 # After stage 1 and the libraries have been built, you can uncomment this line:
 
 #stage=2
