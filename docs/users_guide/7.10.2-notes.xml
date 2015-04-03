@@ -13,7 +13,21 @@
     <itemizedlist>
        <listitem>
           <para>
-            Lorem ipsum... (issue #ABCDE).
+            A bug which caused GHC to generate bad DWARF unwinding
+            information has been fixed (issue #10236).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which caused GHC's <literal>libffi.so</literal>
+            library to be built with executable stacks on some
+            platforms has been fixed (issue #10208).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bus error on SPARC machines caused by misaligned data
+            accesses in the RTS has been fixed.
           </para>
        </listitem>
     </itemizedlist>
