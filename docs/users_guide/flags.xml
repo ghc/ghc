@@ -2960,12 +2960,6 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-ddump-cpranal</option></entry>
-            <entry>Dump output from CPR analysis</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-ddump-cse</option></entry>
             <entry>Dump CSE output</entry>
             <entry>dynamic</entry>
@@ -2980,12 +2974,6 @@
           <row>
             <entry><option>-ddump-ds</option></entry>
             <entry>Dump desugarer output</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-ddump-flatC</option></entry>
-            <entry>Dump &ldquo;flat&rdquo; C</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
