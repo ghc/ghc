@@ -1755,8 +1755,6 @@ f "2"    = 2
           <indexterm><primary>tabs, warning</primary></indexterm>
           <para>Have the compiler warn if there are tabs in your source
           file.</para>
-
-          <para>This warning is off by default.</para>
         </listitem>
       </varlistentry>
 
