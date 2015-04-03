@@ -1041,7 +1041,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
-    if not compare_outputs('stderr',
+    if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg,
                                             normalise_whitespace),
@@ -1071,7 +1071,8 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
     actual_asm_file = qualify(name, 's')
 
-    if not compare_outputs('asm', join_normalisers(normalise_errmsg, normalise_asm), \
+    if not compare_outputs(way, 'asm',
+                           join_normalisers(normalise_errmsg, normalise_asm),
                            expected_asm_file, actual_asm_file):
         return failBecause('asm mismatch')
 
@@ -1339,8 +1340,8 @@ def simple_run( name, way, prog, args ):
     check_prof = my_rts_flags.find("-p") != -1
 
     if not opts.ignore_output:
-        bad_stderr = not opts.combined_output and not check_stderr_ok(name)
-        bad_stdout = not check_stdout_ok(name)
+        bad_stderr = not opts.combined_output and not check_stderr_ok(name, way)
+        bad_stdout = not check_stdout_ok(name, way)
         if bad_stderr:
             return failBecause('bad stderr')
         if bad_stdout:
@@ -1348,7 +1349,7 @@ def simple_run( name, way, prog, args ):
         # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
         if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
             return failBecause('bad heap profile')
-        if check_prof and not check_prof_ok(name):
+        if check_prof and not check_prof_ok(name, way):
             return failBecause('bad profile')
 
     return checkStats(name, way, stats_file, opts.stats_range_fields)
@@ -1455,8 +1456,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if getTestOpts().ignore_output or (check_stderr_ok(name) and
-                                       check_stdout_ok(name)):
+    if getTestOpts().ignore_output or (check_stderr_ok(name, way) and
+                                       check_stdout_ok(name, way)):
         return passed()
     else:
         return failBecause('bad stdout or stderr')
@@ -1501,7 +1502,7 @@ def get_compiler_flags(override_flags, noforce):
 
     return flags
 
-def check_stdout_ok( name ):
+def check_stdout_ok(name, way):
    if getTestOpts().with_namebase == None:
        namebase = name
    else:
@@ -1522,15 +1523,14 @@ def check_stdout_ok( name ):
    if check_stdout:
       return check_stdout(actual_stdout_file, extra_norm)
 
-   return compare_outputs('stdout', \
-                          extra_norm, \
+   return compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
    print('Stdout:')
    print(read_no_crs(qualify(name, 'run.stdout')))
 
-def check_stderr_ok( name ):
+def check_stderr_ok(name, way):
    if getTestOpts().with_namebase == None:
        namebase = name
    else:
@@ -1545,7 +1545,7 @@ def check_stderr_ok( name ):
       else:
          return normalise_errmsg(str)
 
-   return compare_outputs('stderr', \
+   return compare_outputs(way, 'stderr',
                           join_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
@@ -1595,7 +1595,7 @@ def check_hp_ok(name):
         print("hp2ps error when processing heap profile for " + name)
         return(False)
 
-def check_prof_ok(name):
+def check_prof_ok(name, way):
 
     prof_file = qualify(name,'prof')
 
@@ -1619,14 +1619,14 @@ def check_prof_ok(name):
     if not os.path.exists(expected_prof_file):
         return True
     else:
-        return compare_outputs('prof', \
+        return compare_outputs(way, 'prof',
                                join_normalisers(normalise_whitespace,normalise_prof), \
                                expected_prof_file, prof_file)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
 # otherwise.
-def compare_outputs( kind, normaliser, expected_file, actual_file ):
+def compare_outputs(way, kind, normaliser, expected_file, actual_file):
     if os.path.exists(expected_file):
         expected_raw = read_no_crs(expected_file)
         # print "norm:", normaliser(expected_raw)
@@ -1671,7 +1671,8 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
                 r = os.system( 'diff -u ' + expected_file_for_diff + \
                                       ' ' + actual_file )
 
-        if config.accept and getTestOpts().expect == 'fail':
+        if config.accept and (getTestOpts().expect == 'fail' or
+                              way in getTestOpts().expect_fail_for):
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
             return 0
         elif config.accept:
