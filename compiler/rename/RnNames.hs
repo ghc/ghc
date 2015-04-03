@@ -136,9 +136,10 @@ trust network' to get everything working. Due to this invasive nature of going
 with yes we have gone with no for now.
 -}
 
--- | Process Import Decls
--- Do the non SOURCE ones first, so that we get a helpful warning for SOURCE
--- ones that are unnecessary
+-- | Process Import Decls.  See 'rnImportDecl' for a description of what
+-- the return types represent.
+-- Note: Do the non SOURCE ones first, so that we get a helpful warning
+-- for SOURCE ones that are unnecessary
 rnImports :: [LImportDecl RdrName]
           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImports imports = do
@@ -163,6 +164,21 @@ rnImports imports = do
           imp_avails1 `plusImportAvails` imp_avails2,
           hpc_usage1 || hpc_usage2 )
 
+-- | Given a located import declaration @decl@ from @this_mod@,
+-- calculate the following pieces of information:
+--
+--  1. An updated 'LImportDecl', where all unresolved 'RdrName' in
+--     the entity lists have been resolved into 'Name's,
+--
+--  2. A 'GlobalRdrEnv' representing the new identifiers that were
+--     brought into scope (taking into account module qualification
+--     and hiding),
+--
+--  3. 'ImportAvails' summarizing the identifiers that were imported
+--     by this declaration, and
+--
+--  4. A boolean 'AnyHpcUsage' which is true if the imported module
+--     used HPC.
 rnImportDecl  :: Module -> LImportDecl RdrName
               -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
