@@ -244,7 +244,8 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 # with the non-threaded one.
 test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
 
-test('T10017', [ only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
+test('T10017', [ when(opsys('mingw32'), skip)
+               , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  # this needs runtime infrastructure to do in ghci:
