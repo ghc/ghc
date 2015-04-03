@@ -717,6 +717,10 @@ We cache the LinkerInfo inside DynFlags, since clients may link
 multiple times. The definition of LinkerInfo is there to avoid a
 circular dependency.
 
+-}
+
+{- Note [ELF needed shared libs]
+
 Some distributions change the link editor's default handling of
 ELF DT_NEEDED tags to include only those shared objects that are
 needed to resolve undefined symbols. For Template Haskell we need
@@ -724,8 +728,10 @@ the last temporary shared library also if it is not needed for the
 currently linked temporary shared library. We specify --no-as-needed
 to override the default. This flag exists in GNU ld and GNU gold.
 
--}
+The flag is only needed on ELF systems. On Windows (PE) and Mac OS X
+(Mach-O) the flag is not needed.
 
+-}
 
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
@@ -763,10 +769,13 @@ getLinkerInfo' dflags = do
           -- Set DT_NEEDED for all shared libraries. Trac #10110.
           return (GnuLD $ map Option ["-Wl,--hash-size=31",
                                       "-Wl,--reduce-memory-overheads",
+                                      -- ELF specific flag
+                                      -- see Note [ELF needed shared libs]
                                       "-Wl,--no-as-needed"])
 
         | any ("GNU gold" `isPrefixOf`) stdo =
           -- GNU gold only needs --no-as-needed. Trac #10110.
+          -- ELF specific flag, see Note [ELF needed shared libs]
           return (GnuGold [Option "-Wl,--no-as-needed"])
 
          -- Unknown linker.
