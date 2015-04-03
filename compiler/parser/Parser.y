@@ -89,10 +89,10 @@ import Util             ( looksLikePackageName )
 
 }
 
-{- Last updated: 03 Mar 2015
+{- Last updated: 30 Mar 2015
 
-Conflicts: 48 shift/reduce
-           1  reduce/reduce
+Conflicts: 50 shift/reduce
+           2  reduce/reduce
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -124,7 +124,7 @@ follows. Shift parses as if the 'module' keyword follows.
 
 -------------------------------------------------------------------------------
 
-state 49 contains 10 shift/reduce conflicts.
+state 49 contains 11 shift/reduce conflicts.
 
         context -> btype . '~' btype                        (rule 279)
         context -> btype .                                  (rule 280)
@@ -137,7 +137,7 @@ state 49 contains 10 shift/reduce conflicts.
         type -> btype . SIMPLEQUOTE varop type              (rule 287)
         btype -> btype . atype                              (rule 299)
 
-    Conflicts: '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
+    Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
 Example of ambiguity: 'e :: a `b` c';  does this mean
     (e::a) `b` c, or
@@ -197,7 +197,7 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 285 contains 10 shift/reduce conflicts.
+state 285 contains 11 shift/reduce conflicts.
 
     *** type -> btype .                                     (rule 281)
         type -> btype . qtyconop type                       (rule 282)
@@ -208,7 +208,7 @@ state 285 contains 10 shift/reduce conflicts.
         type -> btype . SIMPLEQUOTE varop type              (rule 287)
         btype -> btype . atype                              (rule 299)
 
-    Conflicts: [elided]
+    Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
 Same as State 49, but minus the context productions.
 
@@ -218,7 +218,7 @@ state 320 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail                      (rule 502)
         sysdcon -> '(' commas . ')'                         (rule 610)
-        commas -> commas . ','                              (rule 724)
+        commas -> commas . ','                              (rule 725)
 
     Conflict: ')' (empty tup_tail reduces)
 
@@ -265,7 +265,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 461 contains 1 shift/reduce conflicts.
+state 462 contains 1 shift/reduce conflicts.
 
     *** strict_mark -> '{-# NOUNPACK' '#-}' .               (rule 268)
         strict_mark -> '{-# NOUNPACK' '#-}' . '!'           (rule 270)
@@ -276,7 +276,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 462 contains 1 shift/reduce conflicts.
+state 463 contains 1 shift/reduce conflicts.
 
     *** strict_mark -> '{-# UNPACK' '#-}' .                 (rule 267)
         strict_mark -> '{-# UNPACK' '#-}' . '!'             (rule 269)
@@ -287,7 +287,7 @@ Same as State 462
 
 -------------------------------------------------------------------------------
 
-state 493 contains 1 shift/reduce conflicts.
+state 494 contains 1 shift/reduce conflicts.
 
         context -> btype '~' btype .                        (rule 279)
     *** type -> btype '~' btype .                           (rule 285)
@@ -299,7 +299,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 628 contains 1 shift/reduce conflicts.
+state 629 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .                                    (rule 462)
         dbind -> ipvar . '=' exp                            (rule 587)
@@ -314,7 +314,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 695 contains 1 shift/reduce conflicts.
+state 696 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 214)
 
@@ -331,7 +331,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 768 contains 1 shift/reduce conflicts.
+state 769 contains 1 shift/reduce conflicts.
 
     *** type -> btype '~' btype .                           (rule 285)
         btype -> btype . atype                              (rule 299)
@@ -342,11 +342,11 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 951 contains 1 shift/reduce conflicts.
+state 952 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp       (rule 525)
         transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 526)
-    *** special_id -> 'group' .                             (rule 700)
+    *** special_id -> 'group' .                             (rule 701)
 
     Conflict: 'by'
 
@@ -354,10 +354,21 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 1228 contains 1 reduce/reduce conflicts.
+state 1229 contains 1 reduce/reduce conflicts.
+
+    *** tyconsym -> ':' .                                   (rule 642)
+        consym -> ':' .                                     (rule 712)
+
+    Conflict: ')'
+
+TODO: Same as State 1230
+
+-------------------------------------------------------------------------------
+
+state 1230 contains 1 reduce/reduce conflicts.
 
     *** tyconsym -> CONSYM .                                (rule 640)
-        consym -> CONSYM .                                  (rule 710)
+        consym -> CONSYM .                                  (rule 711)
 
     Conflict: ')'
 
@@ -2857,6 +2868,7 @@ qtyconsym :: { Located RdrName }
 tyconsym :: { Located RdrName }
         : CONSYM                { sL1 $1 $! mkUnqual tcClsName (getCONSYM $1) }
         | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
+        | ':'                   { sL1 $1 $! consDataCon_RDR }
         | '*'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "*") }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
 

@@ -100,3 +100,4 @@ test('RdrNoStaticPointers01', when(compiler_lt('ghc', '7.9'), skip), compile, ['
 test('T5682', normal, compile, [''])
 test('T9723a', normal, compile, [''])
 test('T9723b', normal, compile, [''])
+test('T10188', normal, compile, [''])
