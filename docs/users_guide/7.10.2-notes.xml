@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-10-2">
+  <title>Release notes for version 7.10.2</title>
+
+  <para>
+    The 7.10.2 release is a bugfix release. The major bugfixes relative
+    to 7.10.1 are listed below.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            Lorem ipsum... (issue #ABCDE).
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>
