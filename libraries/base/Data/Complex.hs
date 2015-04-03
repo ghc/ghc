@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -34,6 +35,7 @@ module Data.Complex
 
         )  where
 
+import GHC.Generics (Generic)
 import Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
@@ -51,7 +53,7 @@ infix  6  :+
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
-        deriving (Eq, Show, Read, Data)
+        deriving (Eq, Show, Read, Data, Generic)
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex

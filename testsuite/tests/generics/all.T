@@ -26,7 +26,8 @@ test('T5462Yes2', extra_clean(['T5462Yes2/GFunctor.hi'])
 test('T5462No1', extra_clean(['T5462No1/GFunctor.hi'])
      , multimod_compile_fail, ['T5462No1', '-iGFunctor -outputdir=T5462No1'])
 
-test('T5884',      normal, compile, [''])
+test('T5884',      extra_clean(['T5884Other.o', 'T5884Other.hi'])
+    , multimod_compile, ['T5884Other', '-v0'])
 test('GenNewtype', normal, compile_and_run, [''])
 
 test('GenDerivOutput1_0', normal, compile, ['-dsuppress-uniques'])

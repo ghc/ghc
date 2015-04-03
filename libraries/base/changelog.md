@@ -29,6 +29,7 @@
 
   * New `GHC.Stack.CallStack` data type
 
+  * `Complex` now has a `Generic` instance
 
 ## 4.8.0.0  *Mar 2015*
 
