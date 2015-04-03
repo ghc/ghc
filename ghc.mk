@@ -49,18 +49,18 @@
 #           o Build utils/ghc-pkg
 #           o Build utils/hsc2hs
 #     * For each package:
-#	    o configure, generate package-data.mk and inplace-pkg-info
+#	    o configure, generate package-data.mk and inplace-pkg-config
 #           o register each package into inplace/lib/package.conf
 #     * build libffi (if not disabled by --with-system-libffi)
 #     * With bootstrapping compiler:
 #	    o Build libraries/{filepath,hpc,Cabal}
 #           o Build compiler (stage 1)
-#     * With stage 1:
+#     * With stage 1 compiler:
 #           o Build libraries/*
 #	    o Build rts
 #           o Build utils/* (except haddock)
 #           o Build compiler (stage 2)
-#     * With stage 2:
+#     * With stage 2 compiler:
 #           o Build utils/haddock
 #           o Build compiler (stage 3) (optional)
 #     * With haddock:

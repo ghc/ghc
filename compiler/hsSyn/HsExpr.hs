@@ -772,7 +772,7 @@ However, some code is internally generated, and in some places
 parens are absolutely required; so for these places we use
 pprParendExpr (but don't print double parens of course).
 
-For operator applications we don't add parens, because the oprerator
+For operator applications we don't add parens, because the operator
 fixities should do the job, except in debug mode (-dppr-debug) so we
 can see the structure of the parse tree.
 -}

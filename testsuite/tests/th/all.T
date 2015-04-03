@@ -1,6 +1,6 @@
 
 # This test needs to come before the setTestOpts calls below, as we want
-# to run it if !compiler_profiled
+# to run it if compiler_profiled.
 test('T4255', unless(compiler_profiled(), skip), compile_fail, ['-v0'])
 
 def f(name, opts):

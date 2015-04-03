@@ -97,7 +97,7 @@ label_self thread_name = do
 --
 -- Note that each 'ModSummary' in the module graph caches its 'DynFlags'.
 -- These 'DynFlags' are determined by the /current/ session 'DynFlags' and the
--- @OPTIONS@ and @LANGUAGE@ pragmas of the parsed module.  Thus if you want to
+-- @OPTIONS@ and @LANGUAGE@ pragmas of the parsed module.  Thus if you want
 -- changes to the 'DynFlags' to take effect you need to call this function
 -- again.
 --

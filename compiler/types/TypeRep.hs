@@ -98,7 +98,7 @@ import qualified Data.Data        as Data hiding ( TyCon )
 data Type
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
-  | AppTy         -- See Note [AppTy invariant]
+  | AppTy         -- See Note [AppTy rep]
         Type
         Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
                         --
@@ -107,10 +107,10 @@ data Type
                         --
                         --  2) Argument type
 
-  | TyConApp      -- See Note [AppTy invariant]
+  | TyConApp      -- See Note [AppTy rep]
         TyCon
         [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
-                        -- Invariant: saturated appliations of 'FunTyCon' must
+                        -- Invariant: saturated applications of 'FunTyCon' must
                         -- use 'FunTy' and saturated synonyms must use their own
                         -- constructors. However, /unsaturated/ 'FunTyCon's
                         -- do appear as 'TyConApp's.

@@ -325,7 +325,7 @@ data PackageArg
     -- match a single entry in the package database.
     | IPId InstalledPackageId
     -- | A glob against the package name.  The first string is the literal
-    -- glob, the second is a function which returns @True@ if the the argument
+    -- glob, the second is a function which returns @True@ if the argument
     -- matches.
     | Substring String (String->Bool)
 
@@ -2023,5 +2023,7 @@ removeFileSafe fn =
   removeFile fn `catchIO` \ e ->
     when (not $ isDoesNotExistError e) $ ioError e
 
+-- | Turn a path relative to the current directory into a (normalised)
+-- absolute path.
 absolutePath :: FilePath -> IO FilePath
 absolutePath path = return . normalise . (</> path) =<< getCurrentDirectory
