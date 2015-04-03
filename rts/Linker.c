@@ -4038,8 +4038,9 @@ lookupSymbolInDLLs ( UChar *lbl )
                 ret->addr = sym;
                 ret->next = indirects;
                 indirects = ret;
-                errorBelch("warning: %s from %S is linked instead of %s",
-                              (char*)(lbl+6), o_dll->name, (char*)lbl);
+                IF_DEBUG(linker,
+                  debugBelch("warning: %s from %S is linked instead of %s",
+                             (char*)(lbl+6), o_dll->name, (char*)lbl));
                 return (void*) & ret->addr;
                }
         }
