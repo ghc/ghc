@@ -877,7 +877,7 @@ AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
 [if test x"$HappyCmd" != x; then
    fptools_cv_happy_version=`"$HappyCmd" -v |
-			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'` ;
+              grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'` ;
 else
    fptools_cv_happy_version="";
 fi;
@@ -904,7 +904,7 @@ AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
 [if test x"$AlexCmd" != x; then
    fptools_cv_alex_version=`"$AlexCmd" -v |
-			  grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'` ;
+              grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'` ;
 else
    fptools_cv_alex_version="";
 fi;
@@ -1276,7 +1276,7 @@ if grep '^conftest.txt$' conftest.out > /dev/null 2>&1 ; then
     *mingw32)
       if test x${OSTYPE} != xmsys
       then
- 	    fp_prog_find="`cygpath --mixed ${fp_prog_find}`"
+        fp_prog_find="`cygpath --mixed ${fp_prog_find}`"
         AC_MSG_NOTICE([normalized find command to $fp_prog_find])
       fi ;;
     *) ;;
@@ -2099,18 +2099,18 @@ AC_DEFUN([XCODE_VERSION],[
 # $4 = the version of the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-	# Test for program with version name.
+    # Test for program with version name.
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3-$4])
     if test "$$1" = ""; then
-		# Test for program without version name.
-		FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
-		AC_MSG_CHECKING([$$1 is version $4])
-		if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
+        # Test for program without version name.
+        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
+        AC_MSG_CHECKING([$$1 is version $4])
+        if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
             AC_MSG_RESULT(yes)
         else
-			AC_MSG_RESULT(no)
-			$1=""
-		fi
+            AC_MSG_RESULT(no)
+            $1=""
+        fi
     fi
 ])
 
@@ -2124,12 +2124,12 @@ AC_DEFUN([FIND_LLVM_PROG],[
 # $3 = The string to grep for to find the correct line.
 #
 AC_DEFUN([FIND_GHC_BOOTSTRAP_PROG],[
-	BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
-	if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
-		AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
-	else
-		$1=$BootstrapTmpCmd
-	fi
+    BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
+    if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
+        AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
+    else
+        $1=$BootstrapTmpCmd
+    fi
 ])
 
 
