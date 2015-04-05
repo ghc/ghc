@@ -88,7 +88,8 @@ minJumpTableOffset = 2
 -- We use an Integer for the keys the map so that it can be used in switches on
 -- unsigned as well as signed integers.
 --
--- The map must not be empty.
+-- The map may be empty (we prune out-of-range branches here, so it could be us
+-- emptying it).
 --
 -- Before code generation, the table needs to be brought into a form where all
 -- entries are non-negative, so that it can be compiled into a jump table.
@@ -270,6 +271,7 @@ createSwitchPlan (SwitchTargets signed mbdef range m) =
 --- Step 1: Splitting at large holes
 ---
 splitAtHoles :: Integer -> M.Map Integer a -> [M.Map Integer a]
+splitAtHoles _        m | M.null m = []
 splitAtHoles holeSize m = map (\range -> restrictMap range m) nonHoles
   where
     holes = filter (\(l,h) -> h - l > holeSize) $ zip (M.keys m) (tail (M.keys m))
@@ -282,7 +284,7 @@ splitAtHoles holeSize m = map (\range -> restrictMap range m) nonHoles
 --- Step 2: Avoid small jump tables
 ---
 -- We do not want jump tables below a certain size. This breaks them up
--- (into singleton maps, for now)
+-- (into singleton maps, for now).
 breakTooSmall :: M.Map Integer a -> [M.Map Integer a]
 breakTooSmall m
   | M.size m > minJumpTableSize = [m]
