@@ -208,19 +208,16 @@ dmdAnal' env dmd (Lam var body)
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
+dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isProductTyCon tycon
   , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_w_tc              = env { ae_rec_tc = rec_tc' }
-        env_alt               = extendAnalEnv NotTopLevel env_w_tc case_bndr case_bndr_sig
-        (alt_ty, alt')        = dmdAnalAlt env_alt dmd alt
-        (alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
-        (_, bndrs', _)        = alt'
-        case_bndr_sig         = cprProdSig (dataConRepArity dc)
-                -- Inside the alternative, the case binder has the CPR property.
+        env_w_tc      = env { ae_rec_tc = rec_tc' }
+        env_alt       = extendAnalEnv NotTopLevel env_w_tc case_bndr case_bndr_sig
+        case_bndr_sig = cprProdSig (dataConRepArity dc)
+                -- cprProdSig: inside the alternative, the case binder has the CPR property.
                 -- Meaning that a case on it will successfully cancel.
                 -- Example:
                 --      f True  x = case x of y { I# x' -> if x' ==# 3 then y else I# 8 }
@@ -231,44 +228,33 @@ dmdAnal' env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
                 --      fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
                 --      fw False x = 3
 
-        -- Figure out whether the demand on the case binder is used, and use
-        -- that to set the scrut_dmd.  This is utterly essential.
-        -- Consider     f x = case x of y { (a,b) -> k y a }
-        -- If we just take scrut_demand = U(L,A), then we won't pass x to the
-        -- worker, so the worker will rebuild
-        --      x = (a, absent-error)
-        -- and that'll crash.
-        -- So at one stage I had:
-        --      dead_case_bndr           = isAbsDmd (idDemandInfo case_bndr')
-        --      keepity | dead_case_bndr = Drop
-        --              | otherwise      = Keep
-        --
-        -- But then consider
-        --      case x of y { (a,b) -> h y + a }
-        -- where h : U(LL) -> T
-        -- The above code would compute a Keep for x, since y is not Abs, which is silly
-        -- The insight is, of course, that a demand on y is a demand on the
-        -- scrutinee, so we need to `both` it with the scrut demand
+        (rhs_ty, rhs')                  = dmdAnal env_alt dmd rhs
+        (alt_ty1, dmds)                 = findBndrsDmds env rhs_ty bndrs
+        (alt_ty2, case_bndr_dmd)        = findBndrDmd env False alt_ty1 case_bndr
+        id_dmds                         = addCaseBndrDmd case_bndr_dmd dmds
+        alt_ty3 | io_hack_reqd dc bndrs = deferAfterIO alt_ty2
+                | otherwise             = alt_ty2
 
-        scrut_dmd1 = mkProdDmd [idDemandInfo b | b <- bndrs', isId b]
-        scrut_dmd2 = strictenDmd (idDemandInfo case_bndr')
-        scrut_dmd  = scrut_dmd1 `bothCleanDmd` scrut_dmd2
-
+        -- Compute demand on the scrutinee
+        -- See Note [Demand on scrutinee of a product case]
+        scrut_dmd          = mkProdDmd (addDataConStrictness dc id_dmds)
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty1 `bothDmdType` toBothDmdArg scrut_ty
+        res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
+        case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
+        bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
 --                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
 --                                   , text "scrut_dmd" <+> ppr scrut_dmd
 --                                   , text "scrut_ty" <+> ppr scrut_ty
---                                   , text "alt_ty" <+> ppr alt_ty1
+--                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty [alt'])
+    (res_ty, Case scrut' case_bndr' ty [(DataAlt dc, bndrs', rhs')])
 
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
+        (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd case_bndr) alts
         (scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
         (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
@@ -315,6 +301,32 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
+io_hack_reqd :: DataCon -> [Var] -> Bool
+-- Note [IO hack in the demand analyser]
+--
+-- There's a hack here for I/O operations.  Consider
+--      case foo x s of { (# s, r #) -> y }
+-- Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
+-- operation that simply terminates the program (not in an erroneous way)?
+-- In that case we should not evaluate y before the call to 'foo'.
+-- Hackish solution: spot the IO-like situation and add a virtual branch,
+-- as if we had
+--      case foo x s of
+--         (# s, r #) -> y
+--         other      -> return ()
+-- So the 'y' isn't necessarily going to be evaluated
+--
+-- A more complete example (Trac #148, #1592) where this shows up is:
+--      do { let len = <expensive> ;
+--         ; when (...) (exitWith ExitSuccess)
+--         ; print len }
+io_hack_reqd con bndrs
+  | (bndr:_) <- bndrs
+  = con == unboxedPairDataCon &&
+    idType bndr `eqType` realWorldStatePrimTy
+  | otherwise
+  = False
+
 annLamWithShotness :: Demand -> CoreExpr -> CoreExpr
 annLamWithShotness d e
   | Just u <- cleanUseDmd_maybe d
@@ -334,40 +346,32 @@ setOneShotness :: Count -> Id -> Id
 setOneShotness One  bndr = setOneShotLambda bndr
 setOneShotness Many bndr = bndr
 
-dmdAnalAlt :: AnalEnv -> CleanDemand -> Alt Var -> (DmdType, Alt Var)
-dmdAnalAlt env dmd (con,bndrs,rhs)
-  = let
-        (rhs_ty, rhs')   = dmdAnal env dmd rhs
-        rhs_ty'          = addDataConPatDmds con bndrs rhs_ty
-        (alt_ty, bndrs') = annotateBndrs env rhs_ty' bndrs
-        final_alt_ty | io_hack_reqd = deferAfterIO alt_ty
-                     | otherwise    = alt_ty
+dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
+dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
+  | null bndrs    -- Literals, DEFAULT, and nullary constructors
+  , (rhs_ty, rhs') <- dmdAnal env dmd rhs
+  = (rhs_ty, (con, [], rhs'))
 
-        -- Note [IO hack in the demand analyser]
-        --
-        -- There's a hack here for I/O operations.  Consider
-        --      case foo x s of { (# s, r #) -> y }
-        -- Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
-        -- operation that simply terminates the program (not in an erroneous way)?
-        -- In that case we should not evaluate y before the call to 'foo'.
-        -- Hackish solution: spot the IO-like situation and add a virtual branch,
-        -- as if we had
-        --      case foo x s of
-        --         (# s, r #) -> y
-        --         other      -> return ()
-        -- So the 'y' isn't necessarily going to be evaluated
-        --
-        -- A more complete example (Trac #148, #1592) where this shows up is:
-        --      do { let len = <expensive> ;
-        --         ; when (...) (exitWith ExitSuccess)
-        --         ; print len }
+  | otherwise     -- Non-nullary data constructors
+  , (rhs_ty, rhs') <- dmdAnal env dmd rhs
+  , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
+  , let case_bndr_dmd = findIdDemand alt_ty case_bndr
+        id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
+  = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
-        io_hack_reqd = con == DataAlt unboxedPairDataCon &&
-                       idType (head bndrs) `eqType` realWorldStatePrimTy
-    in
-    (final_alt_ty, (con, bndrs', rhs'))
+{- Note [Demand on the scrutinee of a product case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When figuring out the demand on the scrutinee of a product case,
+we use the demands of the case alternative, i.e. id_dmds.
+But note that these include the demand on the case binder;
+see Note [Demand on case-alternative binders] in Demand.hs.
+This is crucial. Example:
+   f x = case x of y { (a,b) -> k y a }
+If we just take scrut_demand = U(L,A), then we won't pass x to the
+worker, so the worker will rebuild
+     x = (a, absent-error)
+and that'll crash.
 
-{-
 Note [Aggregated demand for cardinality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use different strategies for strictness and usage/cardinality to
@@ -426,18 +430,6 @@ In other words, for locally-bound lambdas we can infer
 one-shotness.
 -}
 
-addDataConPatDmds :: AltCon -> [Var] -> DmdType -> DmdType
--- See Note [Add demands for strict constructors]
-addDataConPatDmds DEFAULT    _ dmd_ty = dmd_ty
-addDataConPatDmds (LitAlt _) _ dmd_ty = dmd_ty
-addDataConPatDmds (DataAlt con) bndrs dmd_ty
-  = foldr add dmd_ty str_bndrs
-  where
-    add bndr dmd_ty = addVarDmd dmd_ty bndr seqDmd
-    str_bndrs = [ b | (b,s) <- zipEqual "addDataConPatBndrs"
-                                   (filter isId bndrs)
-                                   (dataConRepStrictness con)
-                    , isMarkedStrict s ]
 
 {-
 Note [Add demands for strict constructors]
@@ -457,8 +449,8 @@ We want the worker for 'foo' too look like this:
     $wfoo :: Int# -> Int# -> Int#
 
 with the first argument unboxed, so that it is not eval'd each time
-around the loop (which would otherwise happen, since 'foo' is not
-strict in 'a'.  It is sound for the wrapper to pass an unboxed arg
+around the 'go' loop (which would otherwise happen, since 'foo' is not
+strict in 'a').  It is sound for the wrapper to pass an unboxed arg
 because X is strict, so its argument must be evaluated.  And if we
 *don't* pass an unboxed argument, we can't even repair it by adding a
 `seq` thus:
@@ -471,6 +463,13 @@ There is the usual danger of reboxing, which as usual we ignore. But
 if X is monomorphic, and has an UNPACK pragma, then this optimisation
 is even more important.  We don't want the wrapper to rebox an unboxed
 argument, and pass an Int to $wfoo!
+
+We add these extra strict demands to the demand on the *scrutinee* of
+the case expression; hence the use of addDataConStrictness when
+forming scrut_dmd.  The case alternatives aren't strict in their
+sub-components, but simply evaluating the scrutinee to HNF does force
+those sub-components.
+
 
 ************************************************************************
 *                                                                      *
@@ -746,6 +745,13 @@ conservative thing and refrain from strictifying a dfun's argument
 dictionaries.
 -}
 
+setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
+setBndrsDemandInfo (b:bs) (d:ds)
+  | isTyVar b = b : setBndrsDemandInfo bs (d:ds)
+  | otherwise = setIdDemandInfo b d : setBndrsDemandInfo bs ds
+setBndrsDemandInfo [] ds = ASSERT( null ds ) []
+setBndrsDemandInfo bs _  = pprPanic "setBndrsDemandInfo" (ppr bs)
+
 annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- The returned env has the var deleted
 -- The returned var is annotated with demand info
@@ -756,9 +762,6 @@ annotateBndr env dmd_ty var
   | otherwise = (dmd_ty, var)
   where
     (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
-
-annotateBndrs :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Var])
-annotateBndrs env = mapAccumR (annotateBndr env)
 
 annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
 annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
@@ -1084,6 +1087,29 @@ extendSigsWithLam env id
 
   | otherwise
   = env
+
+addDataConStrictness :: DataCon -> [Demand] -> [Demand]
+-- See Note [Add demands for strict constructors]
+addDataConStrictness con ds
+  = ASSERT2( equalLength strs ds, ppr con $$ ppr strs $$ ppr ds )
+    zipWith add ds strs
+  where
+    strs = dataConRepStrictness con
+    add dmd str | isMarkedStrict str = dmd `bothDmd` seqDmd
+                | otherwise          = dmd
+    -- Yes, even if 'dmd' is Absent!
+
+findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
+-- Return the demands on the Ids in the [Var]
+findBndrsDmds env dmd_ty bndrs
+  = go dmd_ty bndrs
+  where
+    go dmd_ty []  = (dmd_ty, [])
+    go dmd_ty (b:bs)
+      | isId b    = let (dmd_ty1, dmds) = go dmd_ty bs
+                        (dmd_ty2, dmd)  = findBndrDmd env False dmd_ty1 b
+                    in (dmd_ty2, dmd : dmds)
+      | otherwise = go dmd_ty bs
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
 -- See Note [Trimming a demand to a type] in Demand.lhs
