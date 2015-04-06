@@ -30,7 +30,7 @@ import Foreign
 import Foreign.C
 
 import GHC.Exts         ( Int(I#), addr2Int# )
-import GHC.Ptr          ( Ptr(..) )
+import GHC.Ptr          ( FunPtr(..) )
 
 {-
   Manufacturing of info tables for DataCons
@@ -87,7 +87,7 @@ make_constr_itbls dflags cons
         mk_dirret_itbl (dcon, conNo)
            = mk_itbl dcon conNo stg_interp_constr_entry
 
-        mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
+        mk_itbl :: DataCon -> Int -> EntryFunPtr -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr = do
            let rep_args = [ (typePrimRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
                (tot_wds, ptr_wds, _) = mkVirtHeapOffsets dflags False{-not a THUNK-} rep_args
@@ -128,10 +128,10 @@ make_constr_itbls dflags cons
 
 type ItblCodes = Either [Word8] [Word32]
 
-ptrToInt :: Ptr a -> Int
-ptrToInt (Ptr a#) = I# (addr2Int# a#)
+funPtrToInt :: FunPtr a -> Int
+funPtrToInt (FunPtr a#) = I# (addr2Int# a#)
 
-mkJumpToAddr :: DynFlags -> Ptr () -> ItblCodes
+mkJumpToAddr :: DynFlags -> EntryFunPtr -> ItblCodes
 mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
     ArchSPARC ->
         -- After some consideration, we'll try this, where
@@ -144,7 +144,7 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
         --   0008 81C0C000              jmp     %g3
         --   000c 01000000              nop
 
-        let w32 = fromIntegral (ptrToInt a)
+        let w32 = fromIntegral (funPtrToInt a)
 
             hi22, lo10 :: Word32 -> Word32
             lo10 x = x .&. 0x3FF
@@ -163,7 +163,7 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
         -- 7D8903A6 mtctr r12
         -- 4E800420 bctr
 
-        let w32 = fromIntegral (ptrToInt a)
+        let w32 = fromIntegral (funPtrToInt a)
             hi16 x = (x `shiftR` 16) .&. 0xFFFF
             lo16 x = x .&. 0xFFFF
         in Right [ 0x3D800000 .|. hi16 w32,
@@ -176,7 +176,7 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
         -- which is
         -- B8 ZZ YY XX WW FF E0
 
-        let w32 = fromIntegral (ptrToInt a) :: Word32
+        let w32 = fromIntegral (funPtrToInt a) :: Word32
             insnBytes :: [Word8]
             insnBytes
                = [0xB8, byte0 w32, byte1 w32,
@@ -200,7 +200,7 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
         -- allocated in low memory).  Assuming the info pointer is aligned to
         -- an 8-byte boundary, the addr will also be aligned.
 
-        let w64 = fromIntegral (ptrToInt a) :: Word64
+        let w64 = fromIntegral (funPtrToInt a) :: Word64
             insnBytes :: [Word8]
             insnBytes
                = [0xff, 0x25, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -210,7 +210,7 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
             Left insnBytes
 
     ArchAlpha ->
-        let w64 = fromIntegral (ptrToInt a) :: Word64
+        let w64 = fromIntegral (funPtrToInt a) :: Word64
         in Right [ 0xc3800000      -- br   at, .+4
                  , 0xa79c000c      -- ldq  at, 12(at)
                  , 0x6bfc0000      -- jmp  (at)    # with zero hint -- oh well
@@ -227,7 +227,7 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
         --     00000000 <.addr-0x8>:
         --     0:       4900        ldr    r1, [pc]      ; 8 <.addr>
         --     4:       4708        bx     r1
-        let w32 = fromIntegral (ptrToInt a) :: Word32
+        let w32 = fromIntegral (funPtrToInt a) :: Word32
         in Left [ 0x49, 0x00
                 , 0x47, 0x08
                 , byte0 w32, byte1 w32, byte2 w32, byte3 w32]
@@ -249,7 +249,8 @@ byte6 w = fromIntegral (w `shiftR` 48)
 byte7 w = fromIntegral (w `shiftR` 56)
 
 -- entry point for direct returns for created constr itbls
-foreign import ccall "&stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr_entry"
+    stg_interp_constr_entry :: EntryFunPtr
 
 
 
@@ -285,8 +286,10 @@ pokeConItbl dflags wr_ptr ex_ptr itbl
            store' (sizeOfItbl dflags) (pokeItbl dflags) (infoTable itbl)
            unless ghciTablesNextToCode $ store (conDesc itbl)
 
+type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
+
 data StgInfoTable = StgInfoTable {
-   entry  :: Maybe (Ptr ()), -- Just <=> not ghciTablesNextToCode
+   entry  :: Maybe EntryFunPtr, -- Just <=> not ghciTablesNextToCode
    ptrs   :: HalfWord,
    nptrs  :: HalfWord,
    tipe   :: HalfWord,
