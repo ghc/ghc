@@ -1730,7 +1730,7 @@ getLinkInfo dflags dep_packages = do
    --
    return (show link_info)
 
--- generates a Perl skript starting a parallel prg under PVM
+-- generates a Perl script starting a parallel prg under PVM
 mk_pvm_wrapper_script :: String -> String -> String -> String
 mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
  [

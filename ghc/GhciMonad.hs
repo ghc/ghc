@@ -85,7 +85,7 @@ data GHCiState = GHCiState
         -- available ghci commands
         ghci_commands  :: [Command],
         -- ":" at the GHCi prompt repeats the last command, so we
-        -- remember is here:
+        -- remember it here:
         last_command   :: Maybe Command,
         cmdqueue       :: [String],
 

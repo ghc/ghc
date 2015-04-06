@@ -134,7 +134,7 @@ The Integer type is special because TidyPgm uses
 GHC.Integer.Type.mkInteger to construct Integer literal values
 Currently it reads the interface file whether or not the current
 module *has* any Integer literals, so it's important that
-GHC.Integer.Type (in patckage integer-gmp or integer-simple) is
+GHC.Integer.Type (in package integer-gmp or integer-simple) is
 compiled before any other module.  (There's a hack in GHC to disable
 this for packages ghc-prim, integer-gmp, integer-simple, which aren't
 allowed to contain any Integer literals.)
