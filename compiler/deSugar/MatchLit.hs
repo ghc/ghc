@@ -382,28 +382,28 @@ hsLitKey :: DynFlags -> HsLit -> Literal
 -- others have been removed by tidy
 hsLitKey dflags (HsIntPrim    _ i) = mkMachInt  dflags i
 hsLitKey dflags (HsWordPrim   _ w) = mkMachWord dflags w
-hsLitKey _      (HsInt64Prim  _ i) = mkMachInt64  i
-hsLitKey _      (HsWord64Prim _ w) = mkMachWord64 w
-hsLitKey _      (HsCharPrim   _ c) = MachChar   c
-hsLitKey _      (HsStringPrim _ s) = MachStr    s
-hsLitKey _      (HsFloatPrim    f) = MachFloat  (fl_value f)
-hsLitKey _      (HsDoublePrim   d) = MachDouble (fl_value d)
-hsLitKey _      (HsString _ s)     = MachStr    (fastStringToByteString s)
+hsLitKey _      (HsInt64Prim  _ i) = mkMachInt64       i
+hsLitKey _      (HsWord64Prim _ w) = mkMachWord64      w
+hsLitKey _      (HsCharPrim   _ c) = mkMachChar        c
+hsLitKey _      (HsStringPrim _ s) = MachStr           s
+hsLitKey _      (HsFloatPrim    f) = mkMachFloat       (fl_value f)
+hsLitKey _      (HsDoublePrim   d) = mkMachDouble      (fl_value d)
+hsLitKey _      (HsString _ s)     = MachStr           (fastStringToByteString s)
 hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 
 ---------------------------
-hsOverLitKey :: HsOverLit a -> Bool -> Literal
+hsOverLitKey :: DynFlags -> HsOverLit a -> Bool -> Literal
 -- Ditto for HsOverLit; the boolean indicates to negate
-hsOverLitKey (OverLit { ol_val = l }) neg = litValKey l neg
+hsOverLitKey dflags (OverLit { ol_val = l }) neg = litValKey dflags l neg
 
 ---------------------------
-litValKey :: OverLitVal -> Bool -> Literal
-litValKey (HsIntegral _ i) False = MachInt i
-litValKey (HsIntegral _ i) True  = MachInt (-i)
-litValKey (HsFractional r) False = MachFloat (fl_value r)
-litValKey (HsFractional r) True  = MachFloat (negate (fl_value r))
-litValKey (HsIsString _ s) neg   = ASSERT( not neg) MachStr
-                                                      (fastStringToByteString s)
+litValKey :: DynFlags -> OverLitVal -> Bool -> Literal
+litValKey dflags (HsIntegral _ i) False = mkMachInt dflags i
+litValKey dflags (HsIntegral _ i) True  = mkMachInt dflags (-i)
+litValKey _      (HsFractional r) False = mkMachFloat (fl_value r)
+litValKey _      (HsFractional r) True  = mkMachFloat (negate (fl_value r))
+litValKey _      (HsIsString _ s) neg   = ASSERT(not neg)
+                                          MachStr (fastStringToByteString s)
 
 {-
 ************************************************************************

@@ -134,8 +134,8 @@ test('cgrun074', normal, compile_and_run, [''])
 test('CmmSwitchTest32', unless(wordsize(32), skip), compile_and_run, [''])
 test('CmmSwitchTest64', unless(wordsize(64), skip), compile_and_run, [''])
 # Skipping WAY=ghci, because it is not broken.
-test('T10245', [omit_ways(['ghci']), expect_broken(10246)], compile_and_run, [''])
-test('T10246', expect_broken(10246), compile_and_run, [''])
+test('T10245', normal, compile_and_run, [''])
+test('T10246', normal,  compile_and_run, [''])
 test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
      compile_and_run, ['-feager-blackholing'])
 test('T10521', normal, compile_and_run, [''])

@@ -52,8 +52,8 @@ import BasicTypes
 import Binary
 import Constants
 import DynFlags
+import Platform
 import UniqFM
-import Util
 
 import Data.ByteString (ByteString)
 import Data.Int
@@ -76,6 +76,11 @@ import Numeric ( fromRat )
 -- * An unboxed (/machine/) literal ('MachInt', 'MachFloat', etc.),
 --   which is presumed to be surrounded by appropriate constructors
 --   (@Int#@, etc.), so that the overall thing makes sense.
+--
+--   We maintain the invariant that the 'Integer' the Mach{Int,Word}*
+--   constructors are actually in the (possibly target-dependent) range.
+--   The mkMach{Int,Word}* smart constructors ensure this by applying the
+--   exepcted wrapping semantics.
 --
 -- * The literal derived from the label mentioned in a \"foreign label\"
 --   declaration ('MachLabel')
@@ -213,23 +218,33 @@ instance Ord Literal where
         ~~~~~~~~~~~~
 -}
 
--- | Creates a 'Literal' of type @Int#@
+-- | Creates a 'Literal' of type @Int#@.
+--   If the argument is out of the (target-dependent) range, it is wrapped.
 mkMachInt :: DynFlags -> Integer -> Literal
-mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
-                       MachInt x
+mkMachInt dflags i
+ = MachInt $ case platformWordSize (targetPlatform dflags) of
+   4 -> toInteger (fromIntegral i :: Int32)
+   8 -> toInteger (fromIntegral i :: Int64)
+   w -> panic ("toIntRange: Unknown platformWordSize: " ++ show w)
 
 -- | Creates a 'Literal' of type @Word#@
+--   If the argument is out of the (target-dependent) range, it is wrapped.
 mkMachWord :: DynFlags -> Integer -> Literal
-mkMachWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
-                        MachWord x
+mkMachWord dflags i
+ = MachWord $ case platformWordSize (targetPlatform dflags) of
+   4 -> toInteger (fromInteger i :: Word32)
+   8 -> toInteger (fromInteger i :: Word64)
+   w -> panic ("toWordRange: Unknown platformWordSize: " ++ show w)
 
 -- | Creates a 'Literal' of type @Int64#@
+--   If the argument is out of the range, it is wrapped.
 mkMachInt64 :: Integer -> Literal
-mkMachInt64  x = MachInt64 x
+mkMachInt64  i = MachInt64 (toInteger (fromIntegral i :: Int64))
 
 -- | Creates a 'Literal' of type @Word64#@
+--   If the argument is out of the range, it is wrapped.
 mkMachWord64 :: Integer -> Literal
-mkMachWord64 x = MachWord64 x
+mkMachWord64 i = MachWord64 (toInteger (fromIntegral i :: Word64))
 
 -- | Creates a 'Literal' of type @Float#@
 mkMachFloat :: Rational -> Literal
@@ -289,15 +304,15 @@ isLitValue_maybe _                = Nothing
 
 -- | Apply a function to the 'Integer' contained in the 'Literal', for when that
 -- makes sense, e.g. for 'Char', 'Int', 'Word' and 'LitInteger'.
-mapLitValue  :: (Integer -> Integer) -> Literal -> Literal
-mapLitValue f (MachChar   c)   = MachChar (fchar c)
+mapLitValue  :: DynFlags -> (Integer -> Integer) -> Literal -> Literal
+mapLitValue _      f (MachChar   c)   = mkMachChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
-mapLitValue f (MachInt    i)   = MachInt (f i)
-mapLitValue f (MachInt64  i)   = MachInt64 (f i)
-mapLitValue f (MachWord   i)   = MachWord (f i)
-mapLitValue f (MachWord64 i)   = MachWord64 (f i)
-mapLitValue f (LitInteger i t) = LitInteger (f i) t
-mapLitValue _ l                = pprPanic "mapLitValue" (ppr l)
+mapLitValue dflags f (MachInt    i)   = mkMachInt dflags (f i)
+mapLitValue _      f (MachInt64  i)   = mkMachInt64 (f i)
+mapLitValue dflags f (MachWord   i)   = mkMachWord dflags (f i)
+mapLitValue _      f (MachWord64 i)   = mkMachWord64 (f i)
+mapLitValue _      f (LitInteger i t) = mkLitInteger (f i) t
+mapLitValue _      _ l                = pprPanic "mapLitValue" (ppr l)
 
 -- | Indicate if the `Literal` contains an 'Integer' value, e.g. 'Char',
 -- 'Int', 'Word' and 'LitInteger'.

@@ -1966,7 +1966,7 @@ mkCase2 dflags scrut bndr alts_ty alts
     mapAlt f alt@(c,bs,e) = case c of
       DEFAULT          -> (c, bs, wrap_rhs scrut e)
       LitAlt l
-        | isLitValue l -> (LitAlt (mapLitValue f l), bs, wrap_rhs (Lit l) e)
+        | isLitValue l -> (LitAlt (mapLitValue dflags f l), bs, wrap_rhs (Lit l) e)
       _ -> pprPanic "Unexpected alternative (mkCase2)" (ppr alt)
 
 --------------------------------------------------

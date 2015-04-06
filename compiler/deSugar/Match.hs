@@ -1046,19 +1046,19 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
 patGroup :: DynFlags -> Pat Id -> PatGroup
-patGroup _ (ConPatOut { pat_con = L _ con
+patGroup _      (ConPatOut { pat_con = L _ con
                       , pat_arg_tys = tys })
- | RealDataCon dcon <- con              = PgCon dcon
- | PatSynCon psyn <- con                = PgSyn psyn tys
-patGroup _ (WildPat {})                 = PgAny
-patGroup _ (BangPat {})                 = PgBang
-patGroup _ (NPat (L _ olit) mb_neg _ _) = PgN   (hsOverLitKey olit (isJust mb_neg))
-patGroup _ (NPlusKPat _ (L _ olit) _ _ _ _)= PgNpK (hsOverLitKey olit False)
-patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
-patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
-patGroup _ (ListPat _ _ (Just _))       = PgOverloadedList
-patGroup dflags (LitPat lit)            = PgLit (hsLitKey dflags lit)
-patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
+ | RealDataCon dcon <- con                   = PgCon dcon
+ | PatSynCon psyn <- con                     = PgSyn psyn tys
+patGroup _      (WildPat {})                 = PgAny
+patGroup _      (BangPat {})                 = PgBang
+patGroup dflags (NPat (L _ olit) mb_neg _ _) = PgN   (hsOverLitKey dflags olit (isJust mb_neg))
+patGroup dflags (NPlusKPat _ (L _ olit) _ _ _ _)= PgNpK (hsOverLitKey dflags olit False)
+patGroup _      (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
+patGroup _      (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
+patGroup _      (ListPat _ _ (Just _))       = PgOverloadedList
+patGroup dflags (LitPat lit)                 = PgLit (hsLitKey dflags lit)
+patGroup _      pat                          = pprPanic "patGroup" (ppr pat)
 
 {-
 Note [Grouping overloaded literal patterns]
