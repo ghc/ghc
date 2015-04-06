@@ -893,10 +893,10 @@ $ cat foo.hspp</screen>
           executables linked against the library are smaller as they only
           link against the object files that they need. However, assembling
           all the sections separately is expensive, so this is slower than
-          compiling normally.
-          We use this feature for building GHC's libraries
-          (warning: don't use it unless you know what you're
-          doing!).</para>
+          compiling normally. Additionally, the size of the library itself
+          (the <literal>.a</literal> file) can be a factor of 2 to 2.5
+          larger.
+          We use this feature for building GHC's libraries.</para>
         </listitem>
       </varlistentry>
 
