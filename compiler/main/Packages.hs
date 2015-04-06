@@ -8,6 +8,7 @@ module Packages (
 
         -- * Reading the package config, and processing cmdline args
         PackageState(preloadPackages),
+        emptyPackageState,
         initPackages,
         readPackageConfigs,
         getPackageConfRefs,
@@ -286,6 +287,14 @@ data PackageState = PackageState {
   -- package IDs.
   installedPackageIdMap :: InstalledPackageIdMap
   }
+
+emptyPackageState :: PackageState
+emptyPackageState = PackageState {
+    pkgIdMap = emptyUFM,
+    preloadPackages = [],
+    moduleNameDb = Map.empty,
+    installedPackageIdMap = Map.empty
+    }
 
 type InstalledPackageIdMap = Map InstalledPackageId PackageKey
 type InstalledPackageIndex = Map InstalledPackageId PackageConfig

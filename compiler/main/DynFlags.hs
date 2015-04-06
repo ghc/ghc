@@ -157,7 +157,7 @@ import Module
 import PackageConfig
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState)
+import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
@@ -1480,7 +1480,8 @@ defaultDynFlags mySettings =
         packageFlags            = [],
         packageEnv              = Nothing,
         pkgDatabase             = Nothing,
-        pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
+        -- This gets filled in with GHC.setSessionDynFlags
+        pkgState                = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
         rtsBuildTag             = mkBuildTag (defaultWays mySettings),
