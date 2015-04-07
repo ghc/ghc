@@ -10,8 +10,6 @@
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
 module TysPrim(
-        mkPrimTyConName, -- For implicit parameters in TysWiredIn only
-
         tyVarList, alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTy, betaTy, gammaTy, deltaTy,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar, openAlphaTyVars,
@@ -330,21 +328,26 @@ constraintKindTyCon   = mkKindTyCon constraintKindTyConName   superKind
 -- ... and now their names
 
 -- If you edit these, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
-superKindTyConName      = mkPrimTyConName (fsLit "BOX") superKindTyConKey superKindTyCon
-anyKindTyConName          = mkPrimTyConName (fsLit "AnyK") anyKindTyConKey anyKindTyCon
-liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon
-openTypeKindTyConName     = mkPrimTyConName (fsLit "OpenKind") openTypeKindTyConKey openTypeKindTyCon
-unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
-constraintKindTyConName   = mkPrimTyConName (fsLit "Constraint") constraintKindTyConKey constraintKindTyCon
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+superKindTyConName        = mkPrimTyConName (fsLit "BOX")        superKindTyConKey        superKindTyCon
+anyKindTyConName          = mkPrimTyConName (fsLit "AnyK")       anyKindTyConKey          anyKindTyCon
+liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*")          liftedTypeKindTyConKey   liftedTypeKindTyCon
+openTypeKindTyConName     = mkPrimTyConName (fsLit "OpenKind")   openTypeKindTyConKey     openTypeKindTyCon
+unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#")          unliftedTypeKindTyConKey unliftedTypeKindTyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
-mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkTcOccFS occ)
-                                              key
-                                              (ATyCon tycon)
-                                              BuiltInSyntax
-        -- All of the super kinds and kinds are defined in Prim and use BuiltInSyntax,
-        -- because they are never in scope in the source
+mkPrimTyConName = mkPrimTcName BuiltInSyntax
+  -- All of the super kinds and kinds are defined in Prim,
+  -- and use BuiltInSyntax, because they are never in scope in the source
+
+constraintKindTyConName -- Unlike the others, Constraint does *not* use BuiltInSyntax,
+                        -- and can be imported/exported like any other type constructor
+  = mkPrimTcName UserSyntax (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
+
+
+mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
+mkPrimTcName built_in_syntax occ key tycon
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
 
 kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []   -- mkTyConApp isn't defined yet
