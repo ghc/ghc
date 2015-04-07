@@ -2,6 +2,7 @@ annotations
 parseTree
 comments
 exampleTest
+listcomps
 *.hi
 *.o
 *.run.*
