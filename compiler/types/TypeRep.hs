@@ -352,7 +352,10 @@ as ATyCon.  You can tell the difference, and get to the class, with
 The Class and its associated TyCon have the same Name.
 -}
 
--- | A typecheckable-thing, essentially anything that has a name
+-- | A global typecheckable-thing, essentially anything that has a name.
+-- Not to be confused with a 'TcTyThing', which is also a typecheckable
+-- thing but in the *local* context.  See 'TcEnv' for how to retrieve
+-- a 'TyThing' given a 'Name'.
 data TyThing
   = AnId     Id
   | AConLike ConLike

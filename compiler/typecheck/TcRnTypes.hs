@@ -796,6 +796,9 @@ data ArrowCtxt   -- Note [Escaping the arrow scope]
 -- TcTyThing
 ---------------------------
 
+-- | A typecheckable thing available in a local context.  Could be
+-- 'AGlobal' 'TyThing', but also lexically scoped variables, etc.
+-- See 'TcEnv' for how to retrieve a 'TyThing' given a 'Name'.
 data TcTyThing
   = AGlobal TyThing             -- Used only in the return type of a lookup
 
