@@ -1189,9 +1189,7 @@ isPrimTyCon _              = False
 -- only be true for primitive and unboxed-tuple 'TyCon's
 isUnLiftedTyCon :: TyCon -> Bool
 isUnLiftedTyCon (PrimTyCon  {isUnLifted = is_unlifted}) = is_unlifted
-isUnLiftedTyCon (TupleTyCon {tyConTupleSort = sort})
-    = not (isBoxed (tupleSortBoxity sort))
-isUnLiftedTyCon _                                       = False
+isUnLiftedTyCon tc = isUnboxedTupleTyCon tc
 
 -- | Returns @True@ if the supplied 'TyCon' resulted from either a
 -- @data@ or @newtype@ declaration
@@ -1217,8 +1215,7 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
         NewTyCon {}        -> False
         DataFamilyTyCon {} -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
-isDataTyCon (TupleTyCon {tyConTupleSort = sort}) = isBoxed (tupleSortBoxity sort)
-isDataTyCon _ = False
+isDataTyCon tc = isBoxedTupleTyCon tc
 
 -- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to
 -- themselves, even via coercions (except for unsafeCoerce).

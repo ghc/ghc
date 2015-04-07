@@ -1137,8 +1137,8 @@ gen_Show_binds get_fixity loc tycon
          ([a_Pat, con_pat], nlHsPar (nested_compose_Expr show_thingies))
       | otherwise   =
          ([a_Pat, con_pat],
-          showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR
-                                        (nlHsLit (HsInt "" con_prec_plus_one))))
+          showParen_Expr (genOpApp a_Expr ge_RDR
+                              (nlHsLit (HsInt "" con_prec_plus_one)))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
