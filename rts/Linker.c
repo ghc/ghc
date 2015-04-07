@@ -365,7 +365,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
       SymI_HasProto(atexit)                     \
-      SymI_NeedsProto(nocldstop)
+      SymI_NeedsDataProto(nocldstop)
 #endif
 
 #if defined (cygwin32_HOST_OS)
@@ -890,18 +890,18 @@ typedef struct _RtsSymbolVal {
 #define RTS_LIBFFI_SYMBOLS                                  \
      SymE_NeedsProto(ffi_prep_cif)                          \
      SymE_NeedsProto(ffi_call)                              \
-     SymE_NeedsProto(ffi_type_void)                         \
-     SymE_NeedsProto(ffi_type_float)                        \
-     SymE_NeedsProto(ffi_type_double)                       \
-     SymE_NeedsProto(ffi_type_sint64)                       \
-     SymE_NeedsProto(ffi_type_uint64)                       \
-     SymE_NeedsProto(ffi_type_sint32)                       \
-     SymE_NeedsProto(ffi_type_uint32)                       \
-     SymE_NeedsProto(ffi_type_sint16)                       \
-     SymE_NeedsProto(ffi_type_uint16)                       \
-     SymE_NeedsProto(ffi_type_sint8)                        \
-     SymE_NeedsProto(ffi_type_uint8)                        \
-     SymE_NeedsProto(ffi_type_pointer)
+     SymE_NeedsDataProto(ffi_type_void)                     \
+     SymE_NeedsDataProto(ffi_type_float)                    \
+     SymE_NeedsDataProto(ffi_type_double)                   \
+     SymE_NeedsDataProto(ffi_type_sint64)                   \
+     SymE_NeedsDataProto(ffi_type_uint64)                   \
+     SymE_NeedsDataProto(ffi_type_sint32)                   \
+     SymE_NeedsDataProto(ffi_type_uint32)                   \
+     SymE_NeedsDataProto(ffi_type_sint16)                   \
+     SymE_NeedsDataProto(ffi_type_uint16)                   \
+     SymE_NeedsDataProto(ffi_type_sint8)                    \
+     SymE_NeedsDataProto(ffi_type_uint8)                    \
+     SymE_NeedsDataProto(ffi_type_pointer)
 
 #ifdef TABLES_NEXT_TO_CODE
 #define RTS_RET_SYMBOLS /* nothing */
@@ -931,8 +931,8 @@ typedef struct _RtsSymbolVal {
 /* Modules compiled with -ticky may mention ticky counters */
 /* This list should marry up with the one in $(TOP)/includes/stg/Ticky.h */
 #define RTS_TICKY_SYMBOLS                               \
-      SymI_NeedsProto(ticky_entry_ctrs)                 \
-      SymI_NeedsProto(top_ct)                           \
+      SymI_NeedsDataProto(ticky_entry_ctrs)             \
+      SymI_NeedsDataProto(top_ct)                       \
                                                         \
       SymI_HasProto(ENT_VIA_NODE_ctr)                   \
       SymI_HasProto(ENT_STATIC_THK_SINGLE_ctr)          \
@@ -1410,9 +1410,9 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(getAllocations)                                     \
       SymI_HasProto(revertCAFs)                                         \
       SymI_HasProto(RtsFlags)                                           \
-      SymI_NeedsProto(rts_breakpoint_io_action)                         \
-      SymI_NeedsProto(rts_stop_next_breakpoint)                         \
-      SymI_NeedsProto(rts_stop_on_exception)                            \
+      SymI_NeedsDataProto(rts_breakpoint_io_action)                     \
+      SymI_NeedsDataProto(rts_stop_next_breakpoint)                     \
+      SymI_NeedsDataProto(rts_stop_on_exception)                        \
       SymI_HasProto(stopTimer)                                          \
       SymI_HasProto(n_capabilities)                                     \
       SymI_HasProto(enabled_capabilities)                               \
@@ -1462,15 +1462,19 @@ typedef struct _RtsSymbolVal {
 
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
+#define SymI_NeedsDataProto(vvv)  extern StgWord vvv[];
 #if defined(COMPILING_WINDOWS_DLL)
 #define SymE_HasProto(vvv)    SymE_HasProto(vvv);
 #  if defined(x86_64_HOST_ARCH)
 #    define SymE_NeedsProto(vvv)    extern void __imp_ ## vvv (void);
+#    define SymE_NeedsDataProto(vvv) SymE_NeedsProto(vvv)
 #  else
 #    define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
+#    define SymE_NeedsDataProto(vvv) SymE_NeedsProto(vvv)
 #  endif
 #else
 #define SymE_NeedsProto(vvv)  SymI_NeedsProto(vvv);
+#define SymE_NeedsDataProto(vvv)  SymI_NeedsDataProto(vvv);
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv)
 #endif
 #define SymI_HasProto(vvv) /**/
@@ -1484,10 +1488,13 @@ RTS_DARWIN_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 #undef SymI_NeedsProto
+#undef SymI_NeedsDataProto
 #undef SymI_HasProto
 #undef SymI_HasProto_redirect
 #undef SymE_HasProto
+#undef SymE_HasDataProto
 #undef SymE_NeedsProto
+#undef SymE_NeedsDataProto
 
 #ifdef LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
@@ -1497,11 +1504,17 @@ RTS_LIBFFI_SYMBOLS
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)) },
+#define SymI_HasDataProto(vvv) \
+                    SymI_HasProto(vvv)
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
             (void*)DLL_IMPORT_DATA_REF(vvv) },
+#define SymE_HasDataProto(vvv) \
+                    SymE_HasProto(vvv)
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
+#define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
 #define SymE_NeedsProto(vvv) SymE_HasProto(vvv)
+#define SymE_NeedsDataProto(vvv) SymE_HasDataProto(vvv)
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newDynCAF for an example.
@@ -7343,20 +7356,31 @@ machoInitSymbolsWithoutUnderscore(void)
     __asm__ volatile(".globl _symbolsWithoutUnderscore\n.data\n_symbolsWithoutUnderscore:");
 
 #undef SymI_NeedsProto
+#undef SymI_NeedsDataProto
+
 #define SymI_NeedsProto(x)  \
     __asm__ volatile(".long " # x);
+
+#define SymI_NeedsDataProto(x) \
+    SymI_NeedsProto(x)
 
     RTS_MACHO_NOUNDERLINE_SYMBOLS
 
     __asm__ volatile(".text");
 
 #undef SymI_NeedsProto
+#undef SymI_NeedsDataProto
+
 #define SymI_NeedsProto(x)  \
     ghciInsertSymbolTable("(GHCi built-in symbols)", symhash, #x, *p++, HS_BOOL_FALSE, NULL);
+
+#define SymI_NeedsDataProto(x) \
+    SymI_NeedsProto(x)
 
     RTS_MACHO_NOUNDERLINE_SYMBOLS
 
 #undef SymI_NeedsProto
+#undef SymI_NeedsDataProto
 }
 #endif
 
