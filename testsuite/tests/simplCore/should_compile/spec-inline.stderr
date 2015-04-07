@@ -5,43 +5,32 @@ Result size of Tidy Core = {terms: 162, types: 61, coercions: 0}
 Roman.foo3 :: Int
 [GblId, Str=DmdType b]
 Roman.foo3 =
-  Control.Exception.Base.patError
-    @ Int "spec-inline.hs:(19,5)-(29,25)|function go"#
+  patError @ Int "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 Rec {
-Roman.foo_$s$wgo [Occ=LoopBreaker]
-  :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+Roman.foo_$s$wgo [Occ=LoopBreaker] :: Int# -> Int# -> Int#
 [GblId, Arity=2, Caf=NoCafRefs, Str=DmdType <L,U><L,U>]
 Roman.foo_$s$wgo =
-  \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
+  \ (sc :: Int#) (sc1 :: Int#) ->
     let {
-      a :: GHC.Prim.Int#
+      a :: Int#
       [LclId, Str=DmdType]
-      a =
-        GHC.Prim.+#
-          (GHC.Prim.+#
-             (GHC.Prim.+#
-                (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc1 sc1) sc1) sc1) sc1)
-             sc1)
-          sc1 } in
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# sc 0#)
-    of _ [Occ=Dead] {
+      a = +# (+# (+# (+# (+# (+# sc1 sc1) sc1) sc1) sc1) sc1) sc1 } in
+    case tagToEnum# @ Bool (<=# sc 0#) of _ [Occ=Dead] {
       False ->
-        case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc 100#)
-        of _ [Occ=Dead] {
+        case tagToEnum# @ Bool (<# sc 100#) of _ [Occ=Dead] {
           False ->
-            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc 500#)
-            of _ [Occ=Dead] {
-              False -> Roman.foo_$s$wgo (GHC.Prim.-# sc 1#) (GHC.Prim.+# a a);
-              True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 3#) a
+            case tagToEnum# @ Bool (<# sc 500#) of _ [Occ=Dead] {
+              False -> Roman.foo_$s$wgo (-# sc 1#) (+# a a);
+              True -> Roman.foo_$s$wgo (-# sc 3#) a
             };
-          True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 2#) sc1
+          True -> Roman.foo_$s$wgo (-# sc 2#) sc1
         };
       True -> 0#
     }
 end Rec }
 
-Roman.$wgo [InlPrag=[0]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
+Roman.$wgo [InlPrag=[0]] :: Maybe Int -> Maybe Int -> Int#
 [GblId,
  Arity=2,
  Str=DmdType <S,1*U><S,1*U>,
@@ -52,33 +41,24 @@ Roman.$wgo =
     case w1 of _ [Occ=Dead] {
       Nothing -> case Roman.foo3 of wild1 { };
       Just x ->
-        case x of _ [Occ=Dead] { GHC.Types.I# ipv ->
+        case x of _ [Occ=Dead] { I# ipv ->
         let {
-          a :: GHC.Prim.Int#
+          a :: Int#
           [LclId, Str=DmdType]
-          a =
-            GHC.Prim.+#
-              (GHC.Prim.+#
-                 (GHC.Prim.+#
-                    (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# ipv ipv) ipv) ipv) ipv)
-                 ipv)
-              ipv } in
+          a = +# (+# (+# (+# (+# (+# ipv ipv) ipv) ipv) ipv) ipv) ipv } in
         case w of _ [Occ=Dead] {
           Nothing -> Roman.foo_$s$wgo 10# a;
           Just n ->
-            case n of _ [Occ=Dead] { GHC.Types.I# x2 ->
-            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# x2 0#)
-            of _ [Occ=Dead] {
+            case n of _ [Occ=Dead] { I# x2 ->
+            case tagToEnum# @ Bool (<=# x2 0#) of _ [Occ=Dead] {
               False ->
-                case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 100#)
-                of _ [Occ=Dead] {
+                case tagToEnum# @ Bool (<# x2 100#) of _ [Occ=Dead] {
                   False ->
-                    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 500#)
-                    of _ [Occ=Dead] {
-                      False -> Roman.foo_$s$wgo (GHC.Prim.-# x2 1#) (GHC.Prim.+# a a);
-                      True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 3#) a
+                    case tagToEnum# @ Bool (<# x2 500#) of _ [Occ=Dead] {
+                      False -> Roman.foo_$s$wgo (-# x2 1#) (+# a a);
+                      True -> Roman.foo_$s$wgo (-# x2 3#) a
                     };
-                  True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 2#) ipv
+                  True -> Roman.foo_$s$wgo (-# x2 2#) ipv
                 };
               True -> 0#
             }
@@ -95,10 +75,10 @@ Roman.foo_go [InlPrag=INLINE[0]] :: Maybe Int -> Maybe Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once] :: Maybe Int) (w1 [Occ=Once] :: Maybe Int) ->
-                 case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }}]
+                 case Roman.$wgo w w1 of ww { __DEFAULT -> I# ww }}]
 Roman.foo_go =
   \ (w :: Maybe Int) (w1 :: Maybe Int) ->
-    case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }
+    case Roman.$wgo w w1 of ww { __DEFAULT -> I# ww }
 
 Roman.foo2 :: Int
 [GblId,
@@ -106,7 +86,7 @@ Roman.foo2 :: Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-Roman.foo2 = GHC.Types.I# 6#
+Roman.foo2 = I# 6#
 
 Roman.foo1 :: Maybe Int
 [GblId,
@@ -114,32 +94,31 @@ Roman.foo1 :: Maybe Int
  Str=DmdType m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-Roman.foo1 = GHC.Base.Just @ Int Roman.foo2
+Roman.foo1 = Just @ Int Roman.foo2
 
 foo :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U>m,
+ Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of n1 { GHC.Types.I# _ [Occ=Dead] ->
-                 Roman.foo_go (GHC.Base.Just @ Int n1) Roman.foo1
+                 case n of n1 { I# _ [Occ=Dead] ->
+                 Roman.foo_go (Just @ Int n1) Roman.foo1
                  }}]
 foo =
   \ (n :: Int) ->
-    case n of _ [Occ=Dead] { GHC.Types.I# ipv ->
-    case Roman.foo_$s$wgo ipv 6# of ww { __DEFAULT -> GHC.Types.I# ww }
+    case n of _ [Occ=Dead] { I# ipv ->
+    case Roman.foo_$s$wgo ipv 6# of ww { __DEFAULT -> I# ww }
     }
 
 
 ------ Local rules for imported ids --------
 "SC:$wgo0" [0]
-    forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
-      Roman.$wgo (GHC.Base.Just @ Int (GHC.Types.I# sc))
-                 (GHC.Base.Just @ Int (GHC.Types.I# sc1))
+    forall (sc :: Int#) (sc1 :: Int#).
+      Roman.$wgo (Just @ Int (I# sc)) (Just @ Int (I# sc1))
       = Roman.foo_$s$wgo sc sc1
 
 

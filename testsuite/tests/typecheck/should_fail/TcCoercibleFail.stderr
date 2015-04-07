@@ -28,8 +28,7 @@ TcCoercibleFail.hs:16:8:
 TcCoercibleFail.hs:18:8:
     Couldn't match representation of type ‘Int’ with that of ‘Down Int’
     Relevant role signatures: type role Down representational
-    The data constructor ‘Data.Ord.Down’
-      of newtype ‘Down’ is not in scope
+    The data constructor ‘Down’ of newtype ‘Down’ is not in scope
     In the expression: coerce
     In the expression: coerce $ one :: Down Int
     In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int

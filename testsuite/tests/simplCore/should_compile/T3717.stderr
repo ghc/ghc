@@ -3,12 +3,12 @@
 Result size of Tidy Core = {terms: 22, types: 10, coercions: 0}
 
 Rec {
-$wfoo [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int#
+T3717.$wfoo [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
-$wfoo =
+T3717.$wfoo =
   \ (ww :: Int#) ->
     case ww of ds {
-      __DEFAULT -> $wfoo (-# ds 1#);
+      __DEFAULT -> T3717.$wfoo (-# ds 1#);
       0# -> 0#
     }
 end Rec }
@@ -23,12 +23,12 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: Int) ->
                  case w of _ [Occ=Dead] { I# ww1 [Occ=Once] ->
-                 case $wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
+                 case T3717.$wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
                  }}]
 foo =
   \ (w :: Int) ->
     case w of _ [Occ=Dead] { I# ww1 ->
-    case $wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
+    case T3717.$wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
     }
 
 

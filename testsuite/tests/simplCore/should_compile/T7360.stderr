@@ -11,20 +11,14 @@ T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
          Tmpl= \ (dt [Occ=Once!] :: Int) ->
-                 case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
-                 T7360.Foo3 dt
-                 }}]
+                 case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }}]
 T7360.$WFoo3 =
   \ (dt [Occ=Once!] :: Int) ->
-    case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
-    T7360.Foo3 dt
-    }
+    case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }
 
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
-fun1 =
-  \ (x :: Foo) ->
-    case x of _ [Occ=Dead] { __DEFAULT -> GHC.Tuple.() }
+fun1 = \ (x :: Foo) -> case x of _ [Occ=Dead] { __DEFAULT -> () }
 
 T7360.fun4 :: ()
 [GblId,
@@ -39,7 +33,7 @@ T7360.fun3 :: Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun3 = GHC.Types.I# 0#
+T7360.fun3 = I# 0#
 
 fun2 :: forall a. [a] -> ((), Int)
 [GblId,
@@ -53,9 +47,7 @@ fun2 :: forall a. [a] -> ((), Int)
                   case x of wild {
                     [] -> T7360.fun3;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
-                      GHC.Types.I# ww2
-                      }
+                      case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT -> I# ww2 }
                   })}]
 fun2 =
   \ (@ a) (x :: [a]) ->
@@ -63,9 +55,7 @@ fun2 =
      case x of wild {
        [] -> T7360.fun3;
        : ds ds1 ->
-         case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
-         GHC.Types.I# ww2
-         }
+         case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT -> I# ww2 }
      })
 
 

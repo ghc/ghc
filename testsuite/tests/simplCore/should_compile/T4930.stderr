@@ -4,7 +4,7 @@ Result size of Tidy Core = {terms: 23, types: 11, coercions: 0}
 
 lvl :: [Char]
 [GblId, Str=DmdType]
-lvl = GHC.CString.unpackCString# "Too small"#
+lvl = unpackCString# "Too small"#
 
 T4930.foo1 :: Int
 [GblId, Str=DmdType b]
@@ -18,19 +18,17 @@ foo :: Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of _ [Occ=Dead] { GHC.Types.I# x ->
-                 case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x 5#)
-                 of _ [Occ=Dead] {
-                   False -> GHC.Types.I# (GHC.Prim.+# x 5#);
+                 case n of _ [Occ=Dead] { I# x ->
+                 case tagToEnum# @ Bool (<# x 5#) of _ [Occ=Dead] {
+                   False -> I# (+# x 5#);
                    True -> T4930.foo1
                  }
                  }}]
 foo =
   \ (n :: Int) ->
-    case n of _ [Occ=Dead] { GHC.Types.I# x ->
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x 5#)
-    of _ [Occ=Dead] {
-      False -> GHC.Types.I# (GHC.Prim.+# x 5#);
+    case n of _ [Occ=Dead] { I# x ->
+    case tagToEnum# @ Bool (<# x 5#) of _ [Occ=Dead] {
+      False -> I# (+# x 5#);
       True -> T4930.foo1
     }
     }
