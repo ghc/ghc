@@ -345,3 +345,5 @@ test('T3776', normal, compile, [''])
 test('T7765', normal, compile_fail, [''])
 test('T9061', normal, compile, [''])
 test('T9997', normal, compile, [''])
+test('T10233', extra_clean(['T01233a.hi', 'T01233a.o']),
+     multimod_compile, ['T10233', '-v0'])
