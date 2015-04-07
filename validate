@@ -20,7 +20,8 @@ Flags:
                     HTML generated here: testsuite/hpc_output/hpc_index.html
   --normal          Default settings
   --fast            Omit dyn way, omit binary distribution
-  --slow            Build stage2 with -DDEBUG.
+  --slow            Build stage2 with -DDEBUG. Skips tests that call
+                    `compiler_stats_num_field`.
                     2008-07-01: 14% slower than the default.
   --dph:            Also build libraries/dph and run associated tests.
   --help            shows this usage help.
