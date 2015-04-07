@@ -1996,10 +1996,8 @@ matchClassInst _ clas [k,t] loc
 
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
-        ; tclvl <- getTcLevel
         ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
-                                           , text "inerts=" <+> ppr inerts
-                                           , text "untouchables=" <+> ppr tclvl ]
+                                           , text "inerts=" <+> ppr inerts ]
         ; instEnvs <- getInstEnvs
         ; case lookupInstEnv instEnvs clas tys of
             ([], _, _)               -- Nothing matches
@@ -2009,11 +2007,11 @@ matchClassInst inerts clas tys loc
 
             ([(ispec, inst_tys)], [], _) -- A single match
                 | not (xopt Opt_IncoherentInstances dflags)
-                , given_overlap tclvl
+                , not (isEmptyBag unifiable_givens)
                 -> -- See Note [Instance and Given overlap]
                    do { traceTcS "Delaying instance application" $
-                          vcat [ text "Workitem=" <+> pprType (mkClassPred clas tys)
-                               , text "Relevant given dictionaries=" <+> ppr givens_for_this_clas ]
+                          vcat [ text "Work item=" <+> pprType (mkClassPred clas tys)
+                               , text "Relevant given dictionaries=" <+> ppr unifiable_givens ]
                       ; return NoInstance  }
 
                 | otherwise
@@ -2050,70 +2048,83 @@ matchClassInst inerts clas tys loc
                   dfun_app = EvDFunApp dfun_id tys (map (ctEvTerm . fst) evc_vars)
             ; return $ GenInst new_ev_vars dfun_app } }
 
-     givens_for_this_clas :: Cts
-     givens_for_this_clas
-         = filterBag isGivenCt (findDictsByClass (inert_dicts $ inert_cans inerts) clas)
+     unifiable_givens :: Cts
+     unifiable_givens = filterBag matchable $
+                        findDictsByClass (inert_dicts $ inert_cans inerts) clas
 
-     given_overlap :: TcLevel -> Bool
-     given_overlap tclvl = anyBag (matchable tclvl) givens_for_this_clas
-
-     matchable tclvl (CDictCan { cc_class = clas_g, cc_tyargs = sys
-                               , cc_ev = fl })
+     matchable (CDictCan { cc_class = clas_g, cc_tyargs = sys, cc_ev = fl })
        | isGiven fl
-       = ASSERT( clas_g == clas )
-         case tcUnifyTys (\tv -> if isTouchableMetaTyVar tclvl tv &&
-                                    tv `elemVarSet` tyVarsOfTypes tys
-                                 then BindMe else Skolem) tys sys of
-       -- We can't learn anything more about any variable at this point, so the only
-       -- cause of overlap can be by an instantiation of a touchable unification
-       -- variable. Hence we only bind touchable unification variables. In addition,
-       -- we use tcUnifyTys instead of tcMatchTys to rule out cyclic substitutions.
-            Nothing -> False
-            Just _  -> True
+       , Just {} <- tcUnifyTys bind_meta_tv tys sys
+       = ASSERT( clas_g == clas ) True
        | otherwise = False -- No overlap with a solved, already been taken care of
                            -- by the overlap check with the instance environment.
-     matchable _tys ct = pprPanic "Expecting dictionary!" (ppr ct)
 
-{-
-Note [Instance and Given overlap]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Assume that we have an inert set that looks as follows:
-       [Given] D [Int]
-And an instance declaration:
-       instance C a => D [a]
-A new wanted comes along of the form:
-       [Wanted] D [alpha]
+     matchable ct = pprPanic "Expecting dictionary!" (ppr ct)
 
-One possibility is to apply the instance declaration which will leave us
-with an unsolvable goal (C alpha). However, later on a new constraint may
-arise (for instance due to a functional dependency between two later dictionaries),
-that will add the equality (alpha ~ Int), in which case our ([Wanted] D [alpha])
-will be transformed to [Wanted] D [Int], which could have been discharged by the given.
+     bind_meta_tv :: TcTyVar -> BindFlag
+     -- Any meta tyvar may be unified later, so we treat it as
+     -- bindable when unifying with givens. That ensures that we
+     -- conservatively assume that a meta tyvar might get unified with
+     -- something that matches the 'given', until demonstrated
+     -- otherwise.
+     bind_meta_tv tv | isMetaTyVar tv = BindMe
+                     | otherwise      = Skolem
 
-The solution is that in matchClassInst and eventually in topReact, we get back with
-a matching instance, only when there is no Given in the inerts which is unifiable to
-this particular dictionary.
+{- Note [Instance and Given overlap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example, from the OutsideIn(X) paper:
+       instance P x => Q [x]
+       instance (x ~ y) => R y [x]
 
-The end effect is that, much as we do for overlapping instances, we delay choosing a
-class instance if there is a possibility of another instance OR a given to match our
-constraint later on. This fixes bugs #4981 and #5002.
+       wob :: forall a b. (Q [b], R b a) => a -> Int
 
-This is arguably not easy to appear in practice due to our aggressive prioritization
-of equality solving over other constraints, but it is possible. I've added a test case
-in typecheck/should-compile/GivenOverlapping.hs
+       g :: forall a. Q [a] => [a] -> Int
+       g x = wob x
 
-We ignore the overlap problem if -XIncoherentInstances is in force: see
-Trac #6002 for a worked-out example where this makes a difference.
+This will generate the impliation constraint:
+            Q [a] => (Q [beta], R beta [a])
+If we react (Q [beta]) with its top-level axiom, we end up with a
+(P beta), which we have no way of discharging. On the other hand,
+if we react R beta [a] with the top-level we get  (beta ~ a), which
+is solvable and can help us rewrite (Q [beta]) to (Q [a]) which is
+now solvable by the given Q [a].
 
-Moreover notice that our goals here are different than the goals of the top-level
-overlapping checks. There we are interested in validating the following principle:
+The solution is that:
+  In matchClassInst (and thus in topReact), we return a matching
+  instance only when there is no Given in the inerts which is
+  unifiable to this particular dictionary.
 
-    If we inline a function f at a site where the same global instance environment
-    is available as the instance environment at the definition site of f then we
-    should get the same behaviour.
+  We treat any meta-tyvar as "unifiable" for this purpose,
+  *including* untouchable ones
 
-But for the Given Overlap check our goal is just related to completeness of
-constraint solving.
+The end effect is that, much as we do for overlapping instances, we
+delay choosing a class instance if there is a possibility of another
+instance OR a given to match our constraint later on. This fixes
+Trac #4981 and #5002.
+
+Other notes:
+
+* This is arguably not easy to appear in practice due to our
+  aggressive prioritization of equality solving over other
+  constraints, but it is possible. I've added a test case in
+  typecheck/should-compile/GivenOverlapping.hs
+
+* Another "live" example is Trac #10195
+
+* We ignore the overlap problem if -XIncoherentInstances is in force:
+  see Trac #6002 for a worked-out example where this makes a
+  difference.
+
+* Moreover notice that our goals here are different than the goals of
+  the top-level overlapping checks. There we are interested in
+  validating the following principle:
+
+      If we inline a function f at a site where the same global
+      instance environment is available as the instance environment at
+      the definition site of f then we should get the same behaviour.
+
+  But for the Given Overlap check our goal is just related to completeness of
+  constraint solving.
 -}
 
 -- | Assumes that we've checked that this is the 'Typeable' class,

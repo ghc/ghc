@@ -445,8 +445,8 @@ Note [TcLevel and untouchable type variables]
 Note [Skolem escape prevention]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We only unify touchable unification variables.  Because of
-(MetaTvInv), there can be no occurrences of he variable further out,
-so the unification can't cause the kolems to escape. Example:
+(MetaTvInv), there can be no occurrences of the variable further out,
+so the unification can't cause the skolems to escape. Example:
      data T = forall a. MkT a (a->Int)
      f x (MkT v f) = length [v,x]
 We decide (x::alpha), and generate an implication like
