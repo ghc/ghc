@@ -22,7 +22,19 @@
  ListComprehensions.hs:20:28-29, ListComprehensions.hs:20:32-33,
  ListComprehensions.hs:21:22, ListComprehensions.hs:21:22-34,
  ListComprehensions.hs:21:27-34, ListComprehensions.hs:21:28-29,
- ListComprehensions.hs:21:32-33, <no location info>}
+ ListComprehensions.hs:21:32-33, ListComprehensions.hs:24:1-6,
+ ListComprehensions.hs:24:1-27, ListComprehensions.hs:24:11-15,
+ ListComprehensions.hs:24:11-27, ListComprehensions.hs:24:12-14,
+ ListComprehensions.hs:24:20-27, ListComprehensions.hs:24:21-26,
+ ListComprehensions.hs:25:1-6, ListComprehensions.hs:(25,1)-(28,14),
+ ListComprehensions.hs:25:8-10,
+ ListComprehensions.hs:(25,12)-(28,14),
+ ListComprehensions.hs:(25,14)-(28,14),
+ ListComprehensions.hs:25:16-20, ListComprehensions.hs:26:16,
+ ListComprehensions.hs:26:16-23,
+ ListComprehensions.hs:(26,16)-(27,22),
+ ListComprehensions.hs:26:21-23, ListComprehensions.hs:27:21-22,
+ <no location info>}
 --------------------------------
 [
 (AK ListComprehensions.hs:1:1 AnnModule = [ListComprehensions.hs:6:1-6])
@@ -71,7 +83,7 @@
 
 (AK ListComprehensions.hs:(18,1)-(22,20) AnnFunId = [ListComprehensions.hs:18:1-16])
 
-(AK ListComprehensions.hs:(18,1)-(22,20) AnnSemi = [ListComprehensions.hs:23:1])
+(AK ListComprehensions.hs:(18,1)-(22,20) AnnSemi = [ListComprehensions.hs:24:1])
 
 (AK ListComprehensions.hs:(18,20)-(22,20) AnnCloseS = [ListComprehensions.hs:22:20])
 
@@ -111,6 +123,38 @@
 
 (AK ListComprehensions.hs:21:27-34 AnnOpenS = [ListComprehensions.hs:21:27])
 
-(AK <no location info> AnnEofPos = [ListComprehensions.hs:23:1])
+(AK ListComprehensions.hs:24:1-27 AnnDcolon = [ListComprehensions.hs:24:8-9])
+
+(AK ListComprehensions.hs:24:1-27 AnnSemi = [ListComprehensions.hs:25:1])
+
+(AK ListComprehensions.hs:24:11-15 AnnCloseS = [ListComprehensions.hs:24:15])
+
+(AK ListComprehensions.hs:24:11-15 AnnOpenS = [ListComprehensions.hs:24:11])
+
+(AK ListComprehensions.hs:24:11-27 AnnRarrow = [ListComprehensions.hs:24:17-18])
+
+(AK ListComprehensions.hs:24:20-27 AnnCloseS = [ListComprehensions.hs:24:27])
+
+(AK ListComprehensions.hs:24:20-27 AnnOpenS = [ListComprehensions.hs:24:20])
+
+(AK ListComprehensions.hs:(25,1)-(28,14) AnnEqual = [ListComprehensions.hs:25:12])
+
+(AK ListComprehensions.hs:(25,1)-(28,14) AnnFunId = [ListComprehensions.hs:25:1-6])
+
+(AK ListComprehensions.hs:(25,1)-(28,14) AnnSemi = [ListComprehensions.hs:29:1])
+
+(AK ListComprehensions.hs:(25,14)-(28,14) AnnCloseS = [ListComprehensions.hs:28:14])
+
+(AK ListComprehensions.hs:(25,14)-(28,14) AnnOpenS = [ListComprehensions.hs:25:14])
+
+(AK ListComprehensions.hs:(25,14)-(28,14) AnnVbar = [ListComprehensions.hs:26:14])
+
+(AK ListComprehensions.hs:26:16-23 AnnComma = [ListComprehensions.hs:27:14])
+
+(AK ListComprehensions.hs:26:16-23 AnnLarrow = [ListComprehensions.hs:26:18-19])
+
+(AK ListComprehensions.hs:(26,16)-(27,22) AnnThen = [ListComprehensions.hs:27:16-19])
+
+(AK <no location info> AnnEofPos = [ListComprehensions.hs:29:1])
 ]
 

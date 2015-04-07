@@ -2331,11 +2331,13 @@ squals :: { Located [LStmt RdrName (LHsExpr RdrName)] }   -- In reverse order, b
                                         -- one can "grab" the earlier ones
     : squals ',' transformqual
              {% addAnnotation (gl $ last $ unLoc $1) AnnComma (gl $2) >>
-                return (sLL $1 $> [L (getLoc $3) ((unLoc $3) (reverse (unLoc $1)))]) }
+                ams (sLL $1 $> ()) (fst $ unLoc $3) >>
+                return (sLL $1 $> [sLL $1 $> ((snd $ unLoc $3) (reverse (unLoc $1)))]) }
     | squals ',' qual
              {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
                 return (sLL $1 $> ($3 : unLoc $1)) }
-    | transformqual                       { sLL $1 $> [L (getLoc $1) ((unLoc $1) [])] }
+    | transformqual        {% ams $1 (fst $ unLoc $1) >>
+                              return (sLL $1 $> [L (getLoc $1) ((snd $ unLoc $1) [])]) }
     | qual                                { sL1 $1 [$1] }
 --  | transformquals1 ',' '{|' pquals '|}'   { sLL $1 $> ($4 : unLoc $1) }
 --  | '{|' pquals '|}'                       { sL1 $1 [$2] }
@@ -2345,19 +2347,15 @@ squals :: { Located [LStmt RdrName (LHsExpr RdrName)] }   -- In reverse order, b
 -- consensus on the syntax, this feature is not being used until we
 -- get user demand.
 
-transformqual :: { Located ([LStmt RdrName (LHsExpr RdrName)] -> Stmt RdrName (LHsExpr RdrName)) }
+transformqual :: { Located ([AddAnn],[LStmt RdrName (LHsExpr RdrName)] -> Stmt RdrName (LHsExpr RdrName)) }
                         -- Function is applied to a list of stmts *in order*
-    : 'then' exp               {% ams (sLL $1 $> $ \ss -> (mkTransformStmt ss $2))
-                                      [mj AnnThen $1] }
-    | 'then' exp 'by' exp      {% ams (sLL $1 $> $ \ss -> (mkTransformByStmt ss $2 $4))
-                                      [mj AnnThen $1,mj AnnBy  $3] }
+    : 'then' exp               { sLL $1 $> ([mj AnnThen $1], \ss -> (mkTransformStmt ss $2)) }
+    | 'then' exp 'by' exp      { sLL $1 $> ([mj AnnThen $1,mj AnnBy  $3],\ss -> (mkTransformByStmt ss $2 $4)) }
     | 'then' 'group' 'using' exp
-             {% ams (sLL $1 $> $ \ss -> (mkGroupUsingStmt ss $4))
-                    [mj AnnThen $1,mj AnnGroup $2,mj AnnUsing $3] }
+             { sLL $1 $> ([mj AnnThen $1,mj AnnGroup $2,mj AnnUsing $3], \ss -> (mkGroupUsingStmt ss $4)) }
 
     | 'then' 'group' 'by' exp 'using' exp
-             {% ams (sLL $1 $> $ \ss -> (mkGroupByUsingStmt ss $4 $6))
-                     [mj AnnThen $1,mj AnnGroup $2,mj AnnBy $3,mj AnnUsing $5] }
+             { sLL $1 $> ([mj AnnThen $1,mj AnnGroup $2,mj AnnBy $3,mj AnnUsing $5], \ss -> (mkGroupByUsingStmt ss $4 $6)) }
 
 -- Note that 'group' is a special_id, which means that you can enable
 -- TransformListComp while still using Data.List.group. However, this
