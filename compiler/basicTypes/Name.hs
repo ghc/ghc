@@ -534,8 +534,8 @@ pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
       NameNotInScope2  -> ppr (modulePackageKey mod) <> colon     -- Module not in
-                          <> ppr (moduleName mod) <> dot         -- scope either
-      _otherwise       -> empty
+                          <> ppr (moduleName mod) <> dot          -- scope either
+      NameUnqual       -> empty                   -- In scope unqualified
 
 ppr_underscore_unique :: Unique -> SDoc
 -- Print an underscore separating the name from its unique

@@ -1524,11 +1524,26 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
                                              (mkQualPackage dflags)
   where
   qual_name mod occ
+        | [] <- unqual_gres
+        , modulePackageKey mod `elem` [primPackageKey, basePackageKey, thPackageKey]
+        , not (isDerivedOccName occ)
+        = NameUnqual   -- For names from ubiquitous packages that come with GHC, if
+                       -- there are no entities called unqualified 'occ', then
+                       -- print unqualified.  Doing so does not cause ambiguity,
+                       -- and it reduces the amount of qualification in error
+                       -- messages.  We can't do this for all packages, because we
+                       -- might get errors like "Can't unify T with T".  But the
+                       -- ubiquitous packages don't contain any such gratuitous
+                       -- name clashes.
+                       --
+                       -- A motivating example is 'Constraint'. It's often not in
+                       -- scope, but printing GHC.Prim.Constraint seems overkill.
+
         | [gre] <- unqual_gres
         , right_name gre
-        = NameUnqual
-                -- If there's a unique entity that's in scope unqualified with 'occ'
-                -- AND that entity is the right one, then we can use the unqualified name
+        = NameUnqual   -- If there's a unique entity that's in scope
+                       -- unqualified with 'occ' AND that entity is
+                       -- the right one, then we can use the unqualified name
 
         | [gre] <- qual_gres
         = NameQual (get_qual_mod (gre_prov gre))
