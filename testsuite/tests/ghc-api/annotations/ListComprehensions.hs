@@ -20,3 +20,9 @@ parallelListComp = [ x + y * z
                    | y <- [10..20]
                    | z <- [20..30]
                    ]
+
+oldest :: [Int] -> [String]
+oldest tbl = [ "str"
+             | n <- tbl
+             , then id
+             ]

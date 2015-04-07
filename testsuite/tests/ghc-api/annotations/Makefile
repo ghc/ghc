@@ -31,4 +31,4 @@ listcomps:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc listcomps
 	./listcomps "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
-.PHONY: clean annotations parseTree comments exampleTest listcops
+.PHONY: clean annotations parseTree comments exampleTest listcomps

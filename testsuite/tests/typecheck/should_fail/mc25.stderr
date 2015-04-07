@@ -1,5 +1,5 @@
 
-mc25.hs:9:24:
+mc25.hs:9:10:
     No instance for (Functor t1) arising from a use of ‘fmap’
     Possible fix:
       add (Functor t1) to the context of
