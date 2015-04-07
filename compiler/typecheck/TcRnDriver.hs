@@ -1043,10 +1043,10 @@ emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 ----------------
 missingBootThing :: Bool -> Name -> String -> SDoc
 missingBootThing is_boot name what
-  = ppr name <+> ptext (sLit "is exported by the") <+>
-              (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
-              <+> ptext (sLit "file, but not")
-              <+> text what <+> ptext (sLit "the module")
+  = quotes (ppr name) <+> ptext (sLit "is exported by the")
+    <+> (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
+    <+> ptext (sLit "file, but not")
+    <+> text what <+> ptext (sLit "the module")
 
 bootMisMatch :: Bool -> SDoc -> TyThing -> TyThing -> SDoc
 bootMisMatch is_boot extra_info real_thing boot_thing

@@ -44,10 +44,10 @@ RnFail055.hs-boot:14:1:
     The datatype contexts do not match
 
 RnFail055.hs-boot:16:11:
-    T3 is exported by the hs-boot file, but not exported by the module
+    ‘T3’ is exported by the hs-boot file, but not exported by the module
 
 RnFail055.hs-boot:17:12:
-    T3' is exported by the hs-boot file, but not exported by the module
+    ‘T3'’ is exported by the hs-boot file, but not exported by the module
 
 RnFail055.hs-boot:21:1:
     Type constructor ‘T5’ has conflicting definitions in the module
@@ -76,7 +76,7 @@ RnFail055.hs-boot:25:1:
     The constructors do not match: The types for ‘T7’ differ
 
 RnFail055.hs-boot:27:22:
-    RnFail055.m1 is exported by the hs-boot file, but not exported by the module
+    ‘RnFail055.m1’ is exported by the hs-boot file, but not exported by the module
 
 RnFail055.hs-boot:28:1:
     Class ‘C2’ has conflicting definitions in the module
