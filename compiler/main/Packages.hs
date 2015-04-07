@@ -1325,12 +1325,10 @@ missingDependencyMsg (Just parent)
 
 -- -----------------------------------------------------------------------------
 
-packageKeyPackageIdString :: DynFlags -> PackageKey -> String
+packageKeyPackageIdString :: DynFlags -> PackageKey -> Maybe String
 packageKeyPackageIdString dflags pkg_key
-    | pkg_key == mainPackageKey = "main"
-    | otherwise = maybe "(unknown)"
-                      sourcePackageIdString
-                      (lookupPackage dflags pkg_key)
+    | pkg_key == mainPackageKey = Just "main"
+    | otherwise = fmap sourcePackageIdString (lookupPackage dflags pkg_key)
 
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: DynFlags -> PackageKey -> Module -> Name -> Bool
