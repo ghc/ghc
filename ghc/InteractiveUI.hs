@@ -611,8 +611,10 @@ checkPerms name =
              groupWriteMode /= mode `intersectFileModes` groupWriteMode &&
              otherWriteMode /= mode `intersectFileModes` otherWriteMode
     unless ok $
+      -- #8248: Improving warning to include a possible fix.
       putStrLn $ "*** WARNING: " ++ name ++
-                 " is writable by someone else, IGNORING!"
+                 " is writable by someone else, IGNORING!" ++
+                 "\nSuggested fix: execute 'chmod 644 " ++ name ++ "'"
     return ok
 #endif
 
