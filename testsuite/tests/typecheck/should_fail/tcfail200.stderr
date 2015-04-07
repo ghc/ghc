@@ -3,7 +3,7 @@ tcfail200.hs:5:15:
     Couldn't match kind ‘*’ with ‘#’
     When matching types
       t1 :: *
-      GHC.Prim.Int# :: #
+      Int# :: #
     Relevant bindings include
       x :: (t1, Char) (bound at tcfail200.hs:5:9)
     In the expression: 1#

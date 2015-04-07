@@ -11,14 +11,9 @@ dl :: Double -> Double
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
-                 case x of _ [Occ=Dead] { GHC.Types.D# y ->
-                 GHC.Types.D# (GHC.Prim.+## y y)
-                 }}]
+                 case x of _ [Occ=Dead] { D# y -> D# (+## y y) }}]
 dl =
-  \ (x :: Double) ->
-    case x of _ [Occ=Dead] { GHC.Types.D# y ->
-    GHC.Types.D# (GHC.Prim.+## y y)
-    }
+  \ (x :: Double) -> case x of _ [Occ=Dead] { D# y -> D# (+## y y) }
 
 dr :: Double -> Double
 [GblId,
@@ -29,9 +24,7 @@ dr :: Double -> Double
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
-                 case x of _ [Occ=Dead] { GHC.Types.D# x1 ->
-                 GHC.Types.D# (GHC.Prim.+## x1 x1)
-                 }}]
+                 case x of _ [Occ=Dead] { D# x1 -> D# (+## x1 x1) }}]
 dr = dl
 
 fl :: Float -> Float
@@ -43,14 +36,10 @@ fl :: Float -> Float
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Float) ->
-                 case x of _ [Occ=Dead] { GHC.Types.F# y ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# y y)
-                 }}]
+                 case x of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }}]
 fl =
   \ (x :: Float) ->
-    case x of _ [Occ=Dead] { GHC.Types.F# y ->
-    GHC.Types.F# (GHC.Prim.plusFloat# y y)
-    }
+    case x of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }
 
 fr :: Float -> Float
 [GblId,
@@ -61,9 +50,7 @@ fr :: Float -> Float
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Float) ->
-                 case x of _ [Occ=Dead] { GHC.Types.F# x1 ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
-                 }}]
+                 case x of _ [Occ=Dead] { F# x1 -> F# (plusFloat# x1 x1) }}]
 fr = fl
 
 

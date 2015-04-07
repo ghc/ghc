@@ -1,15 +1,12 @@
 
 annfail10.hs:9:1:
-    No instance for (Data.Data.Data a0) arising from an annotation
+    No instance for (Data a0) arising from an annotation
     The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
-      instance (Data.Data.Data a, Data.Data.Data b) =>
-               Data.Data.Data (Either a b)
+      instance (Data a, Data b) => Data (Either a b)
         -- Defined in ‘Data.Data’
-      instance Data.Data.Data Data.Monoid.All -- Defined in ‘Data.Data’
-      instance (Data.Data.Data (f a), Data.Data.Data a,
-                Data.Typeable.Internal.Typeable f) =>
-               Data.Data.Data (Data.Monoid.Alt f a)
+      instance Data All -- Defined in ‘Data.Data’
+      instance (Data (f a), Data a, Typeable f) => Data (Alt f a)
         -- Defined in ‘Data.Data’
       ...plus 39 others
     In the annotation: {-# ANN f 1 #-}
@@ -20,11 +17,9 @@ annfail10.hs:9:11:
     Note: there are several potential instances:
       instance forall (k :: BOX) (f :: k -> *) (a :: k).
                Num (f a) =>
-               Num (Data.Monoid.Alt f a)
+               Num (Alt f a)
         -- Defined in ‘Data.Monoid’
-      instance Num a => Num (Data.Monoid.Product a)
-        -- Defined in ‘Data.Monoid’
-      instance Num a => Num (Data.Monoid.Sum a)
-        -- Defined in ‘Data.Monoid’
+      instance Num a => Num (Product a) -- Defined in ‘Data.Monoid’
+      instance Num a => Num (Sum a) -- Defined in ‘Data.Monoid’
       ...plus 14 others
     In the annotation: {-# ANN f 1 #-}

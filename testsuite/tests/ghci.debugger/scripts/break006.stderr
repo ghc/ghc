@@ -7,10 +7,10 @@
     Note: there are several potential instances:
       instance (Show a, Show b) => Show (Either a b)
         -- Defined in ‘Data.Either’
-      instance Show Data.Monoid.All -- Defined in ‘Data.Monoid’
+      instance Show All -- Defined in ‘Data.Monoid’
       instance forall (k :: BOX) (f :: k -> *) (a :: k).
                Show (f a) =>
-               Show (Data.Monoid.Alt f a)
+               Show (Alt f a)
         -- Defined in ‘Data.Monoid’
       ...plus 33 others
     In a stmt of an interactive GHCi command: print it
@@ -23,10 +23,10 @@
     Note: there are several potential instances:
       instance (Show a, Show b) => Show (Either a b)
         -- Defined in ‘Data.Either’
-      instance Show Data.Monoid.All -- Defined in ‘Data.Monoid’
+      instance Show All -- Defined in ‘Data.Monoid’
       instance forall (k :: BOX) (f :: k -> *) (a :: k).
                Show (f a) =>
-               Show (Data.Monoid.Alt f a)
+               Show (Alt f a)
         -- Defined in ‘Data.Monoid’
       ...plus 33 others
     In a stmt of an interactive GHCi command: print it

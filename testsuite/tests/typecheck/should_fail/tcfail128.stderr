@@ -4,7 +4,7 @@ tcfail128.hs:18:16:
       arising from a use of ‘thaw’
     The type variable ‘b0’ is ambiguous
     Note: there is a potential instance available:
-      instance Data.Array.Base.MArray GHC.IOArray.IOArray e IO
+      instance Data.Array.Base.MArray IOArray e IO
         -- Defined in ‘Data.Array.Base’
     In a stmt of a 'do' block: v <- thaw tmp
     In the expression:

@@ -3,4 +3,4 @@ T5700.hs:8:3-9: Splicing declarations
   ======>
     instance C D where
       {-# INLINE inlinable #-}
-      inlinable _ = GHC.Tuple.()
+      inlinable _ = ()

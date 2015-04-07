@@ -1,4 +1,4 @@
-data Int = GHC.Types.I# GHC.Prim.Int# 	-- Defined in ‘GHC.Types’
+data Int = I# Int# 	-- Defined in ‘GHC.Types’
 instance Bounded Int -- Defined in ‘GHC.Enum’
 instance Enum Int -- Defined in ‘GHC.Enum’
 instance Eq Int -- Defined in ‘GHC.Classes’
