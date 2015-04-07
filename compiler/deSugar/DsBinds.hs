@@ -569,37 +569,46 @@ decomposeRuleLhs orig_bndrs orig_lhs
                           -- See Note [Unused spec binders]
   = Left (vcat (map dead_msg unbound))
 
-  | Var fn_var <- fun
-  , not (fn_var `elemVarSet` orig_bndr_set)
+  | Just (fn_id, args) <- decompose fun2 args2
+  , let extra_dict_bndrs = mk_extra_dict_bndrs fn_id args
   = -- pprTrace "decmposeRuleLhs" (vcat [ ptext (sLit "orig_bndrs:") <+> ppr orig_bndrs
     --                                  , ptext (sLit "orig_lhs:") <+> ppr orig_lhs
     --                                  , ptext (sLit "lhs1:")     <+> ppr lhs1
-    --                                  , ptext (sLit "bndrs1:") <+> ppr bndrs1
-    --                                  , ptext (sLit "fn_var:") <+> ppr fn_var
+    --                                  , ptext (sLit "extra_dict_bndrs:") <+> ppr extra_dict_bndrs
+    --                                  , ptext (sLit "fn_id:") <+> ppr fn_id
     --                                  , ptext (sLit "args:")   <+> ppr args]) $
-    Right (bndrs1, fn_var, args)
-
-  | Case scrut bndr ty [(DEFAULT, _, body)] <- fun
-  , isDeadBinder bndr   -- Note [Matching seqId]
-  , let args' = [Type (idType bndr), Type ty, scrut, body]
-  = Right (bndrs1, seqId, args' ++ args)
+    Right (orig_bndrs ++ extra_dict_bndrs, fn_id, args)
 
   | otherwise
   = Left bad_shape_msg
  where
-   lhs1       = drop_dicts orig_lhs
-   lhs2       = simpleOptExpr lhs1  -- See Note [Simplify rule LHS]
-   (fun,args) = collectArgs lhs2
+   lhs1         = drop_dicts orig_lhs
+   lhs2         = simpleOptExpr lhs1  -- See Note [Simplify rule LHS]
+   (fun2,args2) = collectArgs lhs2
+
    lhs_fvs    = exprFreeVars lhs2
    unbound    = filterOut (`elemVarSet` lhs_fvs) orig_bndrs
-   bndrs1     = orig_bndrs ++ extra_dict_bndrs
 
    orig_bndr_set = mkVarSet orig_bndrs
 
         -- Add extra dict binders: Note [Free dictionaries]
-   extra_dict_bndrs = [ mkLocalId (localiseName (idName d)) (idType d)
-                      | d <- varSetElems (lhs_fvs `delVarSetList` orig_bndrs)
-                      , isDictId d ]
+   mk_extra_dict_bndrs fn_id args
+     = [ mkLocalId (localiseName (idName d)) (idType d)
+       | d <- varSetElems (exprsFreeVars args `delVarSetList` (fn_id : orig_bndrs))
+              -- fn_id: do not quantify over the function itself, which may
+              -- itself be a dictionary (in pathological cases, Trac #10251)
+       , isDictId d ]
+
+   decompose (Var fn_id) args
+      | not (fn_id `elemVarSet` orig_bndr_set)
+      = Just (fn_id, args)
+
+   decompose (Case scrut bndr ty [(DEFAULT, _, body)]) args
+      | isDeadBinder bndr   -- Note [Matching seqId]
+      , let args' = [Type (idType bndr), Type ty, scrut, body]
+      = Just (seqId, args' ++ args)
+
+   decompose _ _ = Nothing
 
    bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
                       2 (vcat [ text "Optimised lhs:" <+> ppr lhs2
