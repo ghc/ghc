@@ -22,8 +22,11 @@ integerLibraryName = case integerLibrary of
 buildHaddock :: Bool
 buildHaddock = True
 
+supportsPackageKey :: Guard
+supportsPackageKey = keyYes "supports-package-key"
+
 whenPackageKey :: Guard
-whenPackageKey = keyYes "supports-package-key" <> notStage Stage0
+whenPackageKey = supportsPackageKey <> notStage Stage0
 
 depSettings :: Settings
 depSettings =
