@@ -1266,9 +1266,9 @@ instance Monoid LookupResult where
     l                   `mappend` LookupHidden{}    = l
 
     LookupFound m1      `mappend` LookupFound m2
-        = ASSERT (fst m1 /= fst m2)             LookupMultiple [m1, m2]
+        = ASSERT(fst m1 /= fst m2)             LookupMultiple [m1, m2]
     LookupFound m       `mappend` LookupMultiple ms
-        = ASSERT (not (any ((==fst m).fst) ms)) LookupMultiple (m:ms)
+        = ASSERT(not (any ((==fst m).fst) ms)) LookupMultiple (m:ms)
     LookupFound m       `mappend` LookupFoundSigs ms check
         | fst m == check    = LookupFound m
         | otherwise         = LookupMultiple (m:ms)
@@ -1283,7 +1283,7 @@ instance Monoid LookupResult where
         = l2 `mappend` l1
 
     LookupFoundSigs ms1 m1 `mappend` LookupFoundSigs ms2 m2
-        = ASSERT (m1 /= m2)                     LookupMultiple (ms1 ++ ms2)
+        = ASSERT(m1 /= m2)                     LookupMultiple (ms1 ++ ms2)
 
 data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
