@@ -2114,6 +2114,28 @@ AC_DEFUN([FIND_LLVM_PROG],[
     fi
 ])
 
+# FIND_LD
+# Find the version of `ld` to use. This is used in both in the top level
+# configure.ac and in distrib/configure.ac.in.
+#
+# $1 = the variable to set
+#
+AC_DEFUN([FIND_LD],[
+    FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
+    case $target in
+        arm*linux*)
+            # Arm requires use of the binutils ld.gold linker.
+            # This case should catch at least arm-unknown-linux-gnueabihf and
+            # arm-linux-androideabi.
+            FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
+            $1="$LD_GOLD"
+            ;;
+        *)
+            $1="$LD"
+            ;;
+    esac
+])
+
 # FIND_GHC_BOOTSTRAP_PROG()
 # --------------------------------
 # Parse the bootstrap GHC's compier settings file for the location of things

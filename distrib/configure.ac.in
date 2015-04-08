@@ -68,10 +68,27 @@ FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 AC_SUBST([HaskellCPPCmd])
 AC_SUBST([HaskellCPPArgs])
 
+# Here is where we re-target which specific version of the LLVM
+# tools we are looking for. In the past, GHC supported a number of
+# versions of LLVM simultaneously, but that stopped working around
+# 3.5/3.6 release of LLVM.
+LlvmVersion=@LlvmVersion@
+
+dnl ** Which LLVM llc to use?
+dnl --------------------------------------------------------------
+FIND_LLVM_PROG([LLC], [llc], [llc], [$LlvmVersion])
+LlcCmd="$LLC"
+AC_SUBST([LlcCmd])
+
+dnl ** Which LLVM opt to use?
+dnl --------------------------------------------------------------
+FIND_LLVM_PROG([OPT], [opt], [opt], [$LlvmVersion])
+OptCmd="$OPT"
+AC_SUBST([OptCmd])
+
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
-LdCmd="$LD"
+FIND_LD([LdCmd])
 AC_SUBST([LdCmd])
 
 FP_GCC_VERSION
