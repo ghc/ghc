@@ -470,26 +470,31 @@ which the coercion proves equality. The choice of this parameter affects
 the required roles of the arguments of the TyConAppCo. To help explain
 it, assume the following definition:
 
-newtype Age = MkAge Int
+  type instance F Int = Bool   -- Axiom axF : F Int ~N Bool
+  newtype Age = MkAge Int      -- Axiom axAge : Age ~R Int
+  data Foo a = MkFoo a         -- Role on Foo's parameter is Represntational
 
-Nominal: All arguments must have role Nominal. Why? So that Foo Age ~N Foo Int
-does *not* hold.
+TyConAppCo Nominal Foo axF : Foo (F Int) ~N Foo Bool
+  For (TyConAppCo Nominal) all arguments must have role Nominal. Why?
+  So that Foo Age ~N Foo Int does *not* hold.
 
-Representational: All arguments must have the roles corresponding to the
-result of tyConRoles on the TyCon. This is the whole point of having
-roles on the TyCon to begin with. So, we can have Foo Age ~R Foo Int,
-if Foo's parameter has role R.
+TyConAppCo Representational Foo (SubCo axF) : Foo (F Int) ~R Foo Bool
+TyConAppCo Representational Foo axAge       : Foo Age     ~R Foo Int
+  For (TyConAppCo Representational), all arguments must have the roles
+  corresponding to the result of tyConRoles on the TyCon. This is the
+  whole point of having roles on the TyCon to begin with. So, we can
+  have Foo Age ~R Foo Int, if Foo's parameter has role R.
 
-If a Representational TyConAppCo is over-saturated (which is otherwise fine),
-the spill-over arguments must all be at Nominal. This corresponds to the
-behavior for AppCo.
+  If a Representational TyConAppCo is over-saturated (which is otherwise fine),
+  the spill-over arguments must all be at Nominal. This corresponds to the
+  behavior for AppCo.
 
-Phantom: All arguments must have role Phantom. This one isn't strictly
-necessary for soundness, but this choice removes ambiguity.
+TyConAppCo Phantom Foo (UnivCo Phantom Int Bool) : Foo Int ~P Foo Bool
+  All arguments must have role Phantom. This one isn't strictly
+  necessary for soundness, but this choice removes ambiguity.
 
-
-
-The rules here also dictate what the parameters to mkTyConAppCo.
+The rules here dictate the roles of the parameters to mkTyConAppCo
+(should be checked by Lint).
 
 ************************************************************************
 *                                                                      *
@@ -1079,7 +1084,10 @@ mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole c
 -- only *downgrades* a role. See Note [Role twiddling functions]
 downgradeRole_maybe :: Role   -- desired role
                     -> Role   -- current role
-                    -> Coercion -> Maybe Coercion
+                    -> Coercion
+                    -> Maybe Coercion
+-- In (downgradeRole_maybe dr cr co) it's a precondition that
+--                                   cr = coercionRole co
 downgradeRole_maybe Representational Nominal co = Just (mkSubCo co)
 downgradeRole_maybe Nominal Representational _  = Nothing
 downgradeRole_maybe Phantom Phantom          co = Just co
