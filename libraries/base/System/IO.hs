@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, CApiFFI #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -509,7 +509,7 @@ openTempFile' loc tmp_dir template binary mode = findTempName
                   | otherwise = a ++ [pathSeparator] ++ b
 
 -- int rand(void) from <stdlib.h>, limited by RAND_MAX (small value, 32768)
-foreign import ccall "rand" c_rand :: IO CInt
+foreign import capi "stdlib.h rand" c_rand :: IO CInt
 
 -- build large digit-alike number
 rand_string :: IO String
