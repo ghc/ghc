@@ -1066,8 +1066,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
                                  -- sc_co :: sc_pred ~ norm_sc_pred
       , ClassPred cls tys <- classifyPredType norm_sc_pred
       , className cls /= typeableClassName
-        -- `Typeable` has custom solving rules, which is why we exlucde it
-        -- from the short cut, and fall throught to calling the solver.
+        -- `Typeable` has custom solving rules, which is why we exclude it
+        -- from the short cut, and fall through to calling the solver.
 
       = do { sc_ev_tm <- emit_sc_cls_pred norm_sc_pred cls tys
            ; sc_ev_id <- newEvVar sc_pred
@@ -1097,7 +1097,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
                  -> do { let dfun_id = instanceDFunId ispec
                        ; (inst_tys, inst_theta) <- instDFunType dfun_id dfun_inst_tys
                        ; arg_evs  <- emitWanteds ScOrigin inst_theta
-                       ; let dict_app = EvDFunApp dfun_id inst_tys (map EvId arg_evs)
+                       ; let dict_app = EvDFunApp dfun_id inst_tys arg_evs
                        ; traceTc "tcSuperClass 2" (ppr sc_pred $$ ppr dict_app)
                        ; return dict_app }
 
@@ -1379,7 +1379,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
            ; self_dict <- newDict clas inst_tys
            ; let self_ev_bind = mkWantedEvBind self_dict
-                                   (EvDFunApp dfun_id (mkTyVarTys tyvars) (map EvId dfun_ev_vars))
+                                   (EvDFunApp dfun_id (mkTyVarTys tyvars) dfun_ev_vars)
 
            ; (meth_id, local_meth_sig, hs_wrap)
                    <- mkMethIds hs_sig_fn clas tyvars dfun_ev_vars inst_tys sel_id

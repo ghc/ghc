@@ -935,7 +935,7 @@ tidyCt env ct
      _ -> mkNonCanonical (tidy_ev env (ctEvidence ct))
   where
     tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
-     -- NB: we do not tidy the ctev_evtm/var field because we don't
+     -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
     tidy_ev env ctev@(CtGiven { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }

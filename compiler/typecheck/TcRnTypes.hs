@@ -1646,14 +1646,39 @@ pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 
 Note [Evidence field of CtEvidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During constraint solving we never look at the type of ctev_evtm, or
-ctev_evar; instead we look at the cte_pred field.  The evtm/evar field
+During constraint solving we never look at the type of ctev_evar;
+instead we look at the cte_pred field.  The evtm/evar field
 may be un-zonked.
+
+Note [Bind new Givens immediately]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For Givens we make new EvVars and bind them immediately. Two main reasons:
+  * Gain sharing.  E.g. suppose we start with g :: C a b, where
+       class D a => C a b
+       class (E a, F a) => D a
+    If we generate all g's superclasses as separate EvTerms we might
+    get    selD1 (selC1 g) :: E a
+           selD2 (selC1 g) :: F a
+           selC1 g :: D a
+    which we could do more economically as:
+           g1 :: D a = selC1 g
+           g2 :: E a = selD1 g1
+           g3 :: F a = selD2 g1
+
+  * For *coercion* evidence we *must* bind each given:
+      class (a~b) => C a b where ....
+      f :: C a b => ....
+    Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
+    But that superclass selector can't (yet) appear in a coercion
+    (see evTermCoercion), so the easy thing is to bind it to an Id.
+
+So a Given has EvVar inside it rather that (as previously) an EvTerm.
 -}
+
 
 data CtEvidence
   = CtGiven { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-            , ctev_evtm :: EvTerm          -- See Note [Evidence field of CtEvidence]
+            , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
             , ctev_loc  :: CtLoc }
     -- Truly given, not depending on subgoals
     -- NB: Spontaneous unifications belong here
@@ -1685,25 +1710,19 @@ ctEvRole :: CtEvidence -> Role
 ctEvRole = eqRelRole . ctEvEqRel
 
 ctEvTerm :: CtEvidence -> EvTerm
-ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
-ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
-ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot have id"
-                                      (ppr ctev)
+ctEvTerm ev = EvId (ctEvId ev)
 
 ctEvCoercion :: CtEvidence -> TcCoercion
--- ctEvCoercion ev = evTermCoercion (ctEvTerm ev)
-ctEvCoercion (CtGiven   { ctev_evtm = tm }) = evTermCoercion tm
-ctEvCoercion (CtWanted  { ctev_evar = v })  = mkTcCoVarCo v
-ctEvCoercion ctev@(CtDerived {}) = pprPanic "ctEvCoercion: derived constraint cannot have id"
-                                      (ppr ctev)
+ctEvCoercion ev = mkTcCoVarCo (ctEvId ev)
 
 ctEvId :: CtEvidence -> TcId
-ctEvId (CtWanted  { ctev_evar = ev }) = ev
+ctEvId (CtWanted { ctev_evar = ev }) = ev
+ctEvId (CtGiven  { ctev_evar = ev }) = ev
 ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
 
 instance Outputable CtEvidence where
   ppr fl = case fl of
-             CtGiven {}   -> ptext (sLit "[G]") <+> ppr (ctev_evtm fl) <+> ppr_pty
+             CtGiven {}   -> ptext (sLit "[G]") <+> ppr (ctev_evar fl) <+> ppr_pty
              CtWanted {}  -> ptext (sLit "[W]") <+> ppr (ctev_evar fl) <+> ppr_pty
              CtDerived {} -> ptext (sLit "[D]") <+> text "_" <+> ppr_pty
          where ppr_pty = dcolon <+> ppr (ctEvPred fl)

@@ -189,13 +189,13 @@ canTuple :: CtEvidence -> [PredType] -> TcS (StopOrContinue Ct)
 canTuple ev preds
   | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
   = do { new_evars <- mapM (newWantedEvVar loc) preds
-       ; setWantedEvBind evar (EvTupleMk (map (ctEvTerm . fst) new_evars))
+       ; setWantedEvBind evar (EvTupleMk (map (ctEvId . fst) new_evars))
        ; emitWorkNC (freshGoals new_evars)
          -- Note the "NC": these are fresh goals, not necessarily canonical
        ; stopWith ev "Decomposed tuple constraint" }
 
-  | CtGiven { ctev_evtm = tm, ctev_loc = loc } <- ev
-  = do { let mk_pr pred i = (pred, EvTupleSel tm i)
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  = do { let mk_pr pred i = (pred, EvTupleSel evar i)
        ; given_evs <- newGivenEvVars loc (zipWith mk_pr preds [0..])
        ; emitWorkNC given_evs
        ; stopWith ev "Decomposed tuple constraint" }
@@ -353,9 +353,9 @@ newSCWorkFromFlavored flavor cls xis
   = return ()  -- Deriveds don't yield more superclasses because we will
                -- add them transitively in the case of wanteds.
 
-  | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- flavor
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
   = do { let sc_theta = immSuperClasses cls xis
-             mk_pr sc_pred i = (sc_pred, EvSuperClass ev_tm i)
+             mk_pr sc_pred i = (sc_pred, EvSuperClass (EvId evar) i)
        ; given_evs <- newGivenEvVars loc (zipWith mk_pr sc_theta [0..])
        ; emitWorkNC given_evs }
 
@@ -666,8 +666,8 @@ can_eq_app ev s1 t1 s2 t2
        ; let co = mkTcAppCo (ctEvCoercion ev_s) co_t
        ; setWantedEvBind evar (EvCoercion co)
        ; canEqNC ev_s NomEq s1 s2 }
-  | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- ev
-  = do { let co   = evTermCoercion ev_tm
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  = do { let co   = mkTcCoVarCo evar
              co_s = mkTcLRCo CLeft  co
              co_t = mkTcLRCo CRight co
        ; evar_s <- newGivenEvVar loc (mkTcEqPred s1 s2, EvCoercion co_s)
@@ -730,8 +730,8 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
         -> do { cos <- zipWith3M (unifyWanted loc) tc_roles tys1 tys2
               ; setWantedEvBind evar (EvCoercion (mkTcTyConAppCo role tc cos)) }
 
-     CtGiven { ctev_evtm = ev_tm, ctev_loc = loc }
-        -> do { let ev_co = evTermCoercion ev_tm
+     CtGiven { ctev_evar = evar, ctev_loc = loc }
+        -> do { let ev_co = mkTcCoVarCo evar
               ; given_evs <- newGivenEvVars loc $
                              [ ( mkTcEqPredRole r ty1 ty2
                                , EvCoercion (mkTcNthCo i ev_co) )
@@ -1227,23 +1227,6 @@ as possible.  Hence the ps_ty1, ps_ty2 argument passed to canEqTyVar.
 ************************************************************************
 -}
 
-{-
-Note [Bind new Givens immediately]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For Givens we make new EvVars and bind them immediately. We don't worry
-about caching, but we don't expect complicated calculations among Givens.
-It is important to bind each given:
-      class (a~b) => C a b where ....
-      f :: C a b => ....
-Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
-But that superclass selector can't (yet) appear in a coercion
-(see evTermCoercion), so the easy thing is to bind it to an Id.
-
-See Note [Coercion evidence terms] in TcEvidence.
--}
-
-
------------------------------
 data StopOrContinue a
   = ContinueWith a    -- The constraint was not solved, although it may have
                       --   been rewritten
@@ -1331,14 +1314,14 @@ rewriteEvidence old_ev new_pred co
   | isTcReflCo co -- See Note [Rewriting with Refl]
   = return (ContinueWith (old_ev { ctev_pred = new_pred }))
 
-rewriteEvidence ev@(CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
-  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
+rewriteEvidence ev@(CtGiven { ctev_evar = old_evar , ctev_loc = loc }) new_pred co
+  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm) 
        ; return (ContinueWith new_ev) }
   where
     -- mkEvCast optimises ReflCo
-    new_tm = mkEvCast old_tm (tcDowngradeRole Representational
-                                              (ctEvRole ev)
-                                              (mkTcSymCo co))  
+    new_tm = mkEvCast (EvId old_evar) (tcDowngradeRole Representational
+                                                       (ctEvRole ev)
+                                                       (mkTcSymCo co))
 
 rewriteEvidence ev@(CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { (new_ev, freshness) <- newWantedEvVar loc new_pred
@@ -1386,12 +1369,11 @@ rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
            Just new_ev -> continueWith new_ev
            Nothing     -> stopWith old_ev "Cached derived" }
 
-  | CtGiven { ctev_evtm = old_tm } <- old_ev
+  | CtGiven { ctev_evar = old_evar } <- old_ev
   = do { let new_tm = EvCoercion (lhs_co
-                                  `mkTcTransCo` maybeSym swapped (evTermCoercion old_tm)
+                                  `mkTcTransCo` maybeSym swapped (mkTcCoVarCo old_evar)
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; new_ev <- newGivenEvVar loc' (new_pred, new_tm)
-                   -- See Note [Bind new Givens immediately]
        ; return (ContinueWith new_ev) }
 
   | CtWanted { ctev_evar = evar } <- old_ev

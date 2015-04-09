@@ -1604,9 +1604,8 @@ newFlattenSkolem Given loc fam_ty
                  do { uniq <- TcM.newUnique
                     ; let name = TcM.mkTcTyVarName uniq (fsLit "fsk")
                     ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
-        ; let ev = CtGiven { ctev_pred = mkTcEqPred fam_ty (mkTyVarTy fsk)
-                           , ctev_evtm = EvCoercion (mkTcNomReflCo fam_ty)
-                           , ctev_loc  = loc }
+        ; ev <- newGivenEvVar loc (mkTcEqPred fam_ty (mkTyVarTy fsk),
+                                   EvCoercion (mkTcNomReflCo fam_ty))
         ; return (ev, fsk) }
 
 newFlattenSkolem _ loc fam_ty  -- Make a wanted
@@ -1706,6 +1705,7 @@ newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
+-- See Note [Bind new Givens immediately] in TcRnTypes
 -- Precondition: this is not a kind equality
 --               See Note [Do not create Given kind equalities]
 newGivenEvVar loc (pred, rhs)
@@ -1713,7 +1713,7 @@ newGivenEvVar loc (pred, rhs)
     do { checkReductionDepth loc pred
        ; new_ev <- newEvVar pred
        ; setEvBind (mkGivenEvBind new_ev rhs)
-       ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev, ctev_loc = loc }) }
+       ; return (CtGiven { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc }) }
 
 newGivenEvVars :: CtLoc -> [(TcPredType, EvTerm)] -> TcS [CtEvidence]
 -- Like newGivenEvVar, but automatically discard kind equalities

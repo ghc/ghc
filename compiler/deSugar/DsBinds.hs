@@ -849,27 +849,22 @@ dsEvTerm (EvCast tm co)
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
-dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
-                                     ; return (Var df `mkTyApps` tys `mkApps` tms') }
-
+dsEvTerm (EvDFunApp df tys tms)     = return (Var df `mkTyApps` tys `mkApps` (map Var tms))
 dsEvTerm (EvCoercion (TcCoVarCo v)) = return (Var v)  -- See Note [Simple coercions]
 dsEvTerm (EvCoercion co)            = dsTcCoercion co mkEqBox
 
 dsEvTerm (EvTupleSel v n)
-   = do { tm' <- dsEvTerm v
-        ; let scrut_ty = exprType tm'
+   = do { let scrut_ty  = idType v
               (tc, tys) = splitTyConApp scrut_ty
               Just [dc] = tyConDataCons_maybe tc
               xs = mkTemplateLocals tys
               the_x = getNth xs n
         ; ASSERT( isTupleTyCon tc )
           return $
-          Case tm' (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
+          Case (Var v) (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
 
 dsEvTerm (EvTupleMk tms)
-  = do { tms' <- mapM dsEvTerm tms
-       ; let tys = map exprType tms'
-       ; return $ Var (dataConWorkId dc) `mkTyApps` tys `mkApps` tms' }
+  = return (Var (dataConWorkId dc) `mkTyApps` map idType tms `mkApps` map Var tms)
   where
     dc = tupleCon ConstraintTuple (length tms)
 
@@ -878,7 +873,6 @@ dsEvTerm (EvSuperClass d n)
        ; let (cls, tys) = getClassPredTys (exprType d')
              sc_sel_id  = classSCSelId cls n    -- Zero-indexed
        ; return $ Var sc_sel_id `mkTyApps` tys `App` d' }
-  where
 
 dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
   where

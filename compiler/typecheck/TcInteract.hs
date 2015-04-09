@@ -131,7 +131,7 @@ solveSimpleGivens loc givens
   | otherwise
   = go (map mk_given_ct givens)
   where
-    mk_given_ct ev_id = mkNonCanonical (CtGiven { ctev_evtm = EvId ev_id
+    mk_given_ct ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
                                                 , ctev_pred = evVarPred ev_id
                                                 , ctev_loc  = loc })
     go givens = do { solveSimples (listToBag givens)
@@ -504,9 +504,7 @@ solveOneFromTheOther ev_i ev_w
      lvl_i = ctLocLevel loc_i
      lvl_w = ctLocLevel loc_w
 
-     has_binding binds ev
-       | EvId v <- ctEvTerm ev = isJust (lookupEvBind binds v)
-       | otherwise             = True
+     has_binding binds ev = isJust (lookupEvBind binds (ctEvId ev))
 
      use_replacement
        | isIPPred pred = lvl_w > lvl_i
@@ -806,8 +804,8 @@ lookupFlattenTyVar inert_eqs ftv
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F tys ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F tys ~ fsk2
            -> TcS ()
-reactFunEq from_this fsk1 (CtGiven { ctev_evtm = tm, ctev_loc = loc }) fsk2
-  = do { let fsk_eq_co = mkTcSymCo (evTermCoercion tm)
+reactFunEq from_this fsk1 (CtGiven { ctev_evar = evar, ctev_loc = loc }) fsk2
+  = do { let fsk_eq_co = mkTcSymCo (mkTcCoVarCo evar)
                          `mkTcTransCo` ctEvCoercion from_this
                          -- :: fsk2 ~ fsk1
              fsk_eq_pred = mkTcEqPred (mkTyVarTy fsk2) (mkTyVarTy fsk1)
@@ -1742,7 +1740,7 @@ matchClassInst inerts clas tys loc
             ; evc_vars <- mapM (newWantedEvVar loc) theta
             ; let new_ev_vars = freshGoals evc_vars
                       -- new_ev_vars are only the real new variables that can be emitted
-                  dfun_app = EvDFunApp dfun_id tys (map (ctEvTerm . fst) evc_vars)
+                  dfun_app = EvDFunApp dfun_id tys (map (ctEvId . fst) evc_vars)
             ; return $ GenInst new_ev_vars dfun_app }
 
      unifiable_givens :: Cts
