@@ -728,16 +728,20 @@ The type constructor Any of kind forall k. k has these properties:
 
 Note [Any kinds]
 ~~~~~~~~~~~~~~~~
-
 The type constructor AnyK (of sort BOX) is used internally only to zonk kind
 variables with no constraints on them. It appears in similar circumstances to
 Any, but at the kind level. For example:
 
   type family Length (l :: [k]) :: Nat
-  type instance Length [] = Zero
 
-Length is kind-polymorphic, and when applied to the empty (promoted) list it
-will have the kind Length AnyK [].
+  f :: Proxy (Length []) -> Int
+  f = ....
+
+Length is kind-polymorphic.  So what is the elaborated type of f?
+   f :: Proxy (Length AnyK ([] AnyK)) -> Int
+
+Just like (length []) at the term level, which elaborates to
+   length (Any *) ([] (Any *))
 
 Note [Strangely-kinded void TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
