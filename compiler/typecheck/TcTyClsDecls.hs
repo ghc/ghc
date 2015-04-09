@@ -1323,11 +1323,13 @@ rejigConRes tmpl_tvs res_ty dc_tvs ResTyH98
   = (tmpl_tvs, dc_tvs, [], res_ty)
         -- In H98 syntax the dc_tvs are the existential ones
         --      data T a b c = forall d e. MkT ...
-        -- The {a,b,c} are tc_tvs, and {d,e} are dc_tvs
+        -- The universals {a,b,c} are tc_tvs, and the existentials {d,e} are dc_tvs
 
 rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT _ res_ty)
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
+        -- The {a,b,c} are the tmpl_tvs, and the {x,y,z} are the dc_tvs
+        --     (NB: unlike the H98 case, the dc_tvs are not all existential)
         -- Then we generate
         --      Univ tyvars     Eq-spec
         --          a              a~(x,y)
@@ -1340,7 +1342,10 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT _ res_ty)
     Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty
                 -- This 'Just' pattern is sure to match, because if not
                 -- checkValidDataCon will complain first.
-               -- See Note [Checking GADT return types]
+                -- But care: this only works if the result of rejigConRes
+                --           is not demanded until checkValidDataCon has
+                --           first succeeded
+                -- See Note [Checking GADT return types]
 
                 -- /Lazily/ figure out the univ_tvs etc
                 -- Each univ_tv is either a dc_tv or a tmpl_tv
