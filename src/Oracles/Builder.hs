@@ -20,6 +20,7 @@ import Oracles.Option
 -- GhcPkg Stage0 is the bootstrapping GhcPkg
 -- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
 -- TODO: add Cpp and Haddock builders
+-- TODO: rename Gcc to Cc?
 data Builder = Ar
              | Ld
              | Alex

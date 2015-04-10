@@ -1,92 +1,96 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
-    targetPackages, targetPackagesInStage
+    targetPackages, targetPackagesInStage,
+    targetWays
     ) where
 
 import Package.Base
 import Settings
+import Expression.Base
 
 -- These are the packages we build:
--- TODO: this should eventually be removed and replaced by the top-level
--- target, i.e. GHC (and perhaps, something else)
 targetPackages :: [Package]
-targetPackages =
-    [ library "array"            [        Stage1]
-    , library "base"             [        Stage1] `customise` baseTraits
-    , library "bin-package-db"   [Stage0, Stage1]
-    , library "binary"           [Stage0, Stage1]
-    , library "bytestring"       [        Stage1]
-    , library "Cabal/Cabal"      [Stage0, Stage1] `customise` cabalTraits
-    , library "containers"       [        Stage1]
-    , library "deepseq"          [        Stage1]
-    , library "directory"        [        Stage1]
-    , library "filepath"         [        Stage1]
-    , library "ghc-prim"         [        Stage1] `customise` ghcPrimTraits
-    , library "haskeline"        [        Stage1]
-    , library "hoopl"            [Stage0, Stage1]
-    , library "hpc"              [Stage0, Stage1]
-    , library integerLibraryName [        Stage1] `customise` intLibTraits
-    , library "parallel"         [        Stage1]
-    , library "pretty"           [        Stage1]
-    , library "primitive"        [        Stage1]
-    , library "process"          [        Stage1]
-    , library "stm"              [        Stage1]
-    , library "template-haskell" [        Stage1]
-    , library "terminfo"         [Stage0, Stage1] `customise` terminfoTraits
-    , library "time"             [        Stage1]
-    , library "transformers"     [Stage0, Stage1]
-    , library "unix"             [        Stage1] `customise` unixTraits
-    , library "Win32"            [        Stage1] `customise` win32Traits
-    , library "xhtml"            [        Stage1] `customise` xhtmlTraits
-    ]
+targetPackages = [deepseq]
+    --[ library "array"            [        Stage1]
+    --, library "base"             [        Stage1] `customise` baseTraits
+    --, library "bin-package-db"   [Stage0, Stage1]
+    --, library "binary"           [Stage0, Stage1]
+    --, library "bytestring"       [        Stage1]
+    --, library "Cabal/Cabal"      [Stage0, Stage1] `customise` cabalTraits
+    --, library "containers"       [        Stage1]
+    --, library "deepseq"          [        Stage1]
+    --, library "directory"        [        Stage1]
+    --, library "filepath"         [        Stage1]
+    --, library "ghc-prim"         [        Stage1] `customise` ghcPrimTraits
+    --, library "haskeline"        [        Stage1]
+    --, library "hoopl"            [Stage0, Stage1]
+    --, library "hpc"              [Stage0, Stage1]
+    --, library integerLibraryName [        Stage1] `customise` intLibTraits
+    --, library "parallel"         [        Stage1]
+    --, library "pretty"           [        Stage1]
+    --, library "primitive"        [        Stage1]
+    --, library "process"          [        Stage1]
+    --, library "stm"              [        Stage1]
+    --, library "template-haskell" [        Stage1]
+    --, library "terminfo"         [Stage0, Stage1] `customise` terminfoTraits
+    --, library "time"             [        Stage1]
+    --, library "transformers"     [Stage0, Stage1]
+    --, library "unix"             [        Stage1] `customise` unixTraits
+    --, library "Win32"            [        Stage1] `customise` win32Traits
+    --, library "xhtml"            [        Stage1] `customise` xhtmlTraits
+    --]
 
-baseTraits :: Package -> Package
-baseTraits = updateSettings (\settings ->
-    settings { customConfArgs = arg $ "--flags=" ++ integerLibraryName })
+-- Package definitions:
+deepseq :: Package
+deepseq = library "deepseq" [Stage1]
 
--- see Note [Cabal package weirdness]
-cabalTraits :: Package -> Package
-cabalTraits (Package name path cabal todo) = Package name path "Cabal" todo
+--baseTraits :: Package -> Package
+--baseTraits = updateSettings (\settings ->
+--    settings { customConfArgs = arg $ "--flags=" ++ integerLibraryName })
 
-ghcPrimTraits :: Package -> Package
-ghcPrimTraits = updateSettings (\settings ->
-    settings { customConfArgs = arg "--flag=include-ghc-prim" })
+---- see Note [Cabal package weirdness]
+--cabalTraits :: Package -> Package
+--cabalTraits (Package name path cabal todo) = Package name path "Cabal" todo
 
-intLibTraits :: Package -> Package
-intLibTraits (Package name path cabal todo) = updateSettings update pkg
-  where
-    pkg = Package name path cabalName todo
-    cabalName = case integerLibrary of
-        IntegerGmp    -> "integer-gmp"
-        IntegerGmp2   -> "integer-gmp" -- Indeed, why make life easier?
-        IntegerSimple -> "integer-simple"
-    update settings = settings
-        {
-            customConfArgs = when windowsHost $
-                             arg "--configure-option=--with-intree-gmp",
-            customCcArgs   = arg "-Ilibraries/integer-gmp2/gmp"
-        }
+--ghcPrimTraits :: Package -> Package
+--ghcPrimTraits = updateSettings (\settings ->
+--    settings { customConfArgs = arg "--flag=include-ghc-prim" })
 
-terminfoTraits :: Package -> Package
-terminfoTraits = updateSettings (\settings ->
-    settings
-    {
-        buildWhen = do
-            os <- showArg TargetOs
-            not windowsHost && (os /= "ios")
-    })
+--intLibTraits :: Package -> Package
+--intLibTraits (Package name path cabal todo) = updateSettings update pkg
+--  where
+--    pkg = Package name path cabalName todo
+--    cabalName = case integerLibrary of
+--        IntegerGmp    -> "integer-gmp"
+--        IntegerGmp2   -> "integer-gmp" -- Indeed, why make life easier?
+--        IntegerSimple -> "integer-simple"
+--    update settings = settings
+--        {
+--            customConfArgs = when windowsHost $
+--                             arg "--configure-option=--with-intree-gmp",
+--            customCcArgs   = arg "-Ilibraries/integer-gmp2/gmp"
+--        }
 
-unixTraits :: Package -> Package
-unixTraits = updateSettings (\settings ->
-    settings { buildWhen = not windowsHost })
+--terminfoTraits :: Package -> Package
+--terminfoTraits = updateSettings (\settings ->
+--    settings
+--    {
+--        buildWhen = do
+--            os <- showArg TargetOs
+--            not windowsHost && (os /= "ios")
+--    })
 
-win32Traits :: Package -> Package
-win32Traits = updateSettings (\settings ->
-    settings { buildWhen = windowsHost })
+--unixTraits :: Package -> Package
+--unixTraits = updateSettings (\settings ->
+--    settings { buildWhen = not windowsHost })
 
-xhtmlTraits :: Package -> Package
-xhtmlTraits = updateSettings (\settings ->
-    settings { buildWhen = return buildHaddock })
+--win32Traits :: Package -> Package
+--win32Traits = updateSettings (\settings ->
+--    settings { buildWhen = windowsHost })
+
+--xhtmlTraits :: Package -> Package
+--xhtmlTraits = updateSettings (\settings ->
+--    settings { buildWhen = return buildHaddock })
 
 targetPackagesInStage :: Stage -> [Package]
 targetPackagesInStage stage = filter inStage targetPackages

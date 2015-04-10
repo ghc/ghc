@@ -3,6 +3,7 @@
 module Expression.ArgList (
     ArgList (..),
     ArgsTeller,
+    plain,
     fromPlain,
     tellArgs
     ) where
@@ -10,9 +11,14 @@ module Expression.ArgList (
 import Data.Monoid
 
 data ArgList = Plain [String]
+             | KeyValue String
              | PackageKey String
              | PackageDeps String
              | PackageDepKeys String
+             deriving Eq
+
+plain :: String -> ArgList
+plain s = Plain [s]
 
 type ArgsTeller = ArgList -> Maybe [String]
 
@@ -29,4 +35,3 @@ tellArgs :: ArgsTeller -> ArgList -> ArgList
 tellArgs t a = case t a of
     Just list -> Plain list
     Nothing   -> a
-

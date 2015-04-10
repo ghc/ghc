@@ -6,7 +6,11 @@ module Settings (
     ) where
 
 import Base
-import Expression
+import Ways
+import Oracles.Builder
+import Expression.Base
+import Expression.Predicate
+import Expression.PGPredicate
 
 data IntegerLibrary = IntegerGmp | IntegerGmp2 | IntegerSimple
 
@@ -22,35 +26,110 @@ integerLibraryName = case integerLibrary of
 buildHaddock :: Bool
 buildHaddock = True
 
-supportsPackageKey :: Guard
-supportsPackageKey = keyYes "supports-package-key"
-
 whenPackageKey :: Guard
-whenPackageKey = supportsPackageKey <> notStage Stage0
+whenPackageKey = supportsPackageKey `And` notStage Stage0
 
-depSettings :: Settings
-depSettings =
+packageSettings :: Settings
+packageSettings =
     opts ["-hide-all-packages", "-no-user-package-db", "-include-pkg-deps"]
     <>
     stage Stage0 ? opts ["-package-db libraries/bootstrapping.conf"]
     <>
-    whenPackageKey ?
+    ite whenPackageKey
         (packageKey "-this-package-key" <> packageDepKeys "-package-key")
-    <>
-    (Not $ whenPackageKey) ?
-        (packageKey "-package-name" <> packageDeps "-package")
+        (packageKey "-package-name"     <> packageDeps    "-package"    )
 
---packageArgs :: Stage -> FilePath -> Args
---packageArgs stage pathDist = do
---    usePackageKey <- SupportsPackageKey || stage /= Stage0
---    args [ arg "-hide-all-packages"
---         , arg "-no-user-package-db"
---         , arg "-include-pkg-deps"
---         , when (stage == Stage0) $
---           arg "-package-db libraries/bootstrapping.conf"
---         , if usePackageKey
---           then productArgs ["-this-package-key"] [arg  $ PackageKey pathDist]
---             <> productArgs ["-package-key"     ] [args $ DepKeys    pathDist]
---           else productArgs ["-package-name"    ] [arg  $ PackageKey pathDist]
---             <> productArgs ["-package"         ] [args $ Deps       pathDist]
---         ]
+librarySettings :: Ways -> Settings
+librarySettings ways =
+    ite (whenExists vanilla ways)
+        (opt  "--enable-library-vanilla")
+        (opt "--disable-library-vanilla")
+    <>
+    ite (ghcWithInterpreter
+        `And` (Not dynamicGhcPrograms)
+        `And` whenExists vanilla ways)
+        (opt  "--enable-library-for-ghci")
+        (opt "--disable-library-for-ghci")
+    <>
+    ite (whenExists profiling ways)
+        (opt  "--enable-library-profiling")
+        (opt "--disable-library-profiling")
+    <>
+    ite (whenExists dynamic ways)
+        (opt  "--enable-shared")
+        (opt "--disable-shared")
+
+
+ccSettings :: Settings
+ccSettings = mempty
+
+ldSettings :: Settings
+ldSettings = mempty
+
+cppSettings :: Settings
+cppSettings = mempty
+
+configureSettings :: Settings
+configureSettings =
+    let conf key    = subSettings $ "--configure-option=" ++ key ++ "="
+        ccSettings' = remove ["-Werror"] ccSettings
+    in
+    mconcat [ conf "CFLAGS"   ccSettings'
+            , conf "LDFLAGS"  ldSettings
+            , conf "CPPFLAGS" cppSettings
+            , subSettings "--gcc-options="  $ ccSettings' <> ldSettings
+            , conf "--with-iconv-includes"  $ optKeyValue "iconv-include-dirs"
+            , conf "--with-iconv-libraries" $ optKeyValue "iconv-lib-dirs"
+            , conf "--with-gmp-includes"    $ optKeyValue "gmp-include-dirs"
+            , conf "--with-gmp-libraries"   $ optKeyValue "gmp-lib-dirs"
+            -- TODO: why TargetPlatformFull and not host?
+            , crossCompiling ?
+              conf "--host"    (optKeyValue "target-platform-full")
+            , conf "--with-cc" $ optStagedBuilder Gcc ]
+
+-- this is a positional argument, hence:
+-- * if it is empty, we need to emit one empty string argument
+-- * otherwise, we must collapse it into one space-separated string
+dllSettings :: Settings
+dllSettings = opt ""
+
+-- customConfArgs
+customConfigureSettings :: Settings
+customConfigureSettings = mempty
+
+-- bootPackageDb
+bootPackageDbSettings :: Settings
+bootPackageDbSettings =
+    stage Stage0 ?
+        optPath "--package-db="
+        (optKeyValue "ghc-source-path" <> opt "libraries/bootstrapping.conf")
+
+cabalSettings :: Settings
+cabalSettings =
+    opt "configure"
+    `fence` optBuildPath
+    `fence` optBuildDist
+    `fence` dllSettings
+    `fence` mconcat
+    [ optStagedBuilder Ghc -- TODO: used to be limited to max stage1 GHC
+    , optStagedBuilder GhcPkg
+    , customConfigureSettings
+    , bootPackageDbSettings
+    , librarySettings targetWays
+    , keyNonEmpty "hscolour" ? optBuilder HsColour -- TODO: more reuse
+    , configureSettings
+    , stage Stage0 ? optBootPkgConstraints
+    , optStagedBuilder Gcc
+    , notStage Stage0 ? optBuilder Ld
+    , optBuilder Ar
+    , optBuilder Alex
+    , optBuilder Happy ] -- TODO: reorder with's
+
+ghcPkgSettings :: Settings
+ghcPkgSettings =
+    opt "update"
+    `fence` mconcat
+    [ opt "--force"
+    , optPath "" $
+      mconcat [optBuildPath, optBuildDist, opt "inplace-pkg-config"]
+    , bootPackageDbSettings ]
