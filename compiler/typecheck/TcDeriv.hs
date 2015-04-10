@@ -1601,7 +1601,7 @@ mkNewTypeEqn dflags overlap_mode tvs
             substTheta (zipOpenTvSubst cls_tyvars inst_tys) (classSCTheta cls)
 
 
-        -- Next we collect Coercible constaints between
+        -- Next we collect Coercible constraints between
         -- the Class method types, instantiated with the representation and the
         -- newtype type; precisely the constraints required for the
         -- calls to coercible that we are going to generate.

@@ -351,7 +351,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
              <- decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
 
          -- Emit an implication constraint for the 
-         -- remaining constaints from the RHS
+         -- remaining constraints from the RHS
        ; bound_ev_vars <- mapM TcM.newEvVar bound_theta
        ; let skol_info = InferSkol [ (name, mkSigmaTy [] bound_theta ty)
                                    | (name, ty) <- name_taus ]

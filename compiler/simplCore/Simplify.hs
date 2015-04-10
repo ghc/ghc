@@ -515,7 +515,7 @@ we'd like to transform it to
         x' = e
         x = x `cast` co         -- A trivial binding
 There's a chance that e will be a constructor application or function, or something
-like that, so moving the coerion to the usage site may well cancel the coersions
+like that, so moving the coercion to the usage site may well cancel the coercions
 and lead to further optimisation.  Example:
 
      data family T a :: *

@@ -4964,7 +4964,7 @@ Specfically, <option>-XFlexibleContexts</option>, allows (well-kinded) class con
 of form <literal>(C t1 ... tn)</literal> in the context of an instance declaration.
 </para>
 <para>
-Notice that the flag does not affect equality constaints in an instance context;
+Notice that the flag does not affect equality constraints in an instance context;
 they are permitted by <option>-XTypeFamilies</option> or <option>-XGADTs</option>.
 </para>
 <para>

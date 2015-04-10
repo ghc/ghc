@@ -1844,7 +1844,7 @@ isCallStackIP _ _ _
 
 
 -- | Assumes that we've checked that this is the 'Typeable' class,
--- and it was applied to the correc arugment.
+-- and it was applied to the correct argument.
 matchTypeableClass :: Class -> Kind -> Type -> CtLoc -> TcS LookupInstResult
 matchTypeableClass clas k t loc
   | isForAllTy k                               = return NoInstance

@@ -270,7 +270,7 @@ addPreference (u, c) color
                 u
 
 
--- | Do agressive coalescing on this graph.
+-- | Do aggressive coalescing on this graph.
 --      returns the new graph and the list of pairs of nodes that got coaleced together.
 --      for each pair, the resulting node will have the least key and be second in the pair.
 --
@@ -322,7 +322,7 @@ coalesceGraph' aggressive triv graph kkPairsAcc
          pairs  -> coalesceGraph' aggressive triv graph' (reverse pairs ++ kkPairsAcc)
 
 
--- | Coalesce this pair of nodes unconditionally \/ agressively.
+-- | Coalesce this pair of nodes unconditionally \/ aggressively.
 --      The resulting node is the one with the least key.
 --
 --      returns: Just    the pair of keys if the nodes were coalesced

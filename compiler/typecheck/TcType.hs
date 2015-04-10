@@ -1647,8 +1647,8 @@ checkRepTyCon check_tc ty extra
   where
     msg = quotes (ppr ty) <+> ptext (sLit "cannot be marshalled in a foreign call")
     mk_nt_reason tc tys
-      | null tys  = ptext (sLit "because its data construtor is not in scope")
-      | otherwise = ptext (sLit "because the data construtor for")
+      | null tys  = ptext (sLit "because its data constructor is not in scope")
+      | otherwise = ptext (sLit "because the data constructor for")
                     <+> quotes (ppr tc) <+> ptext (sLit "is not in scope")
     nt_fix = ptext (sLit "Possible fix: import the data constructor to bring it into scope")
 

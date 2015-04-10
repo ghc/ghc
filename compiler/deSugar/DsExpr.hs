@@ -485,7 +485,7 @@ For record construction we do this (assuming T has three arguments)
           e
           (recConErr t1 "M.hs/230/op3")
 \end{verbatim}
-@recConErr@ then converts its arugment string into a proper message
+@recConErr@ then converts its argument string into a proper message
 before printing it as
 \begin{verbatim}
         M.hs, line 230: missing field op1 was evaluated

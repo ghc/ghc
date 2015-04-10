@@ -179,7 +179,7 @@ Why might the wrapper have anything to do?  Two reasons:
   The wrapper has the programmer-specified type:
         \$wMkT :: a -> T [a]
         \$wMkT a x = MkT [a] a [a] x
-  The third argument is a coerion
+  The third argument is a coercion
         [a] :: [a]~[a]
 
 INVARIANT: the dictionary constructor for a class

@@ -215,7 +215,7 @@ opcodes =
  , ("false",	  TBool False, 		error "incorrect use of false")
  , ("true",	  TBool True, 		error "incorrect use of true")
  ] ++ map (\ (a,b,c) -> (a,TOp b,c))
-   -- These are just invocation, any coersions need to occur between here
+   -- These are just invocation, any coercions need to occur between here
    -- and before arriving at the application code (like deg -> rad).
  [ ("acos",	  Op_acos, 	 Real_Real (rad2deg . acos))
  , ("addi",	  Op_addi, 	 Int_Int_Int (+))

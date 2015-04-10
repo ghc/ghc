@@ -308,7 +308,7 @@ io_hack_reqd :: DataCon -> [Var] -> Bool
 --      case foo x s of { (# s, r #) -> y }
 -- Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
 -- operation that simply terminates the program (not in an erroneous way)?
--- In that case we should not evaluate y before the call to 'foo'.
+-- In that case we should not evaluate 'y' before the call to 'foo'.
 -- Hackish solution: spot the IO-like situation and add a virtual branch,
 -- as if we had
 --      case foo x s of

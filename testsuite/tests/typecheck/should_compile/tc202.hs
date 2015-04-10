@@ -1,5 +1,5 @@
 
--- Tests that subFunTys works when the arugment is a type of form (a ty1 ty2)
+-- Tests that subFunTys works when the argument is a type of form (a ty1 ty2)
 
 module ShouldCompile where
 

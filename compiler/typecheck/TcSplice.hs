@@ -1388,7 +1388,7 @@ annotation anyway. This should be a rare case, indeed. Here is an example:
 
 Here G's kind is (forall k. k -> k), and the desugared RHS of that last
 instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
-the algoritm above, there are 3 arguments to G so we should peel off 3
+the algorithm above, there are 3 arguments to G so we should peel off 3
 arguments in G's kind. But G's kind has only two arguments. This is the
 rare special case, and we conservatively choose to put the annotation
 in.

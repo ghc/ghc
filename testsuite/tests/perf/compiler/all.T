@@ -329,7 +329,7 @@ test('T5030',
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
-           # 2014-12-10:  227205560 constraint solver got worse again; more agressive solving
+           # 2014-12-10:  227205560 constraint solver got worse again; more aggressive solving
            #                        of family-applications leads to less sharing, I think
 
            (wordsize(64), 403932600, 10)]),
@@ -346,7 +346,7 @@ test('T5030',
              # general round of updates
              # 2014-09-10 385152728  post-AMP-cleanup
              # 2014-12-08 340969128  constraint solver perf improvements (esp kick-out)
-             # 2014-12-10 449042120  constraint solver got worse again; more agressive solving
+             # 2014-12-10 449042120  constraint solver got worse again; more aggressive solving
              #                          of family-applications leads to less sharing, I think
              # 2015-03-17 403932600  tweak to solver algorithm
 

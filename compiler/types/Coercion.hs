@@ -472,7 +472,7 @@ it, assume the following definition:
 
   type instance F Int = Bool   -- Axiom axF : F Int ~N Bool
   newtype Age = MkAge Int      -- Axiom axAge : Age ~R Int
-  data Foo a = MkFoo a         -- Role on Foo's parameter is Represntational
+  data Foo a = MkFoo a         -- Role on Foo's parameter is Representational
 
 TyConAppCo Nominal Foo axF : Foo (F Int) ~N Foo Bool
   For (TyConAppCo Nominal) all arguments must have role Nominal. Why?

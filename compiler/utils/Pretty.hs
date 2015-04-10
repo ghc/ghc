@@ -448,7 +448,7 @@ The argument of @NilAbove@ is never @Empty@. Therefore
 a @NilAbove@ occupies at least two lines.
 
 \item
-The arugment of @TextBeside@ is never @Nest@.
+The argument of @TextBeside@ is never @Nest@.
 
 \item
 The layouts of the two arguments of @Union@ both flatten to the same string.

@@ -393,7 +393,7 @@ After strictness analysis:
         False -> GHC.Types.True;
         True -> foo wild_X7 }
 
-It's true that ds_dnz is *itself* absent, b ut the use of wild_X7 means
+It's true that ds_dnz is *itself* absent, but the use of wild_X7 means
 that it is very much alive and demanded.  See Trac #10148 for how the
 consequences play out.
 

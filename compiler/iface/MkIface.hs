@@ -1703,7 +1703,7 @@ tyConToIfaceDecl env tycon
           -- (a) we don't need to redundantly put them into the interface file
           -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
           --     we know that the type variables will line up
-          -- The latter (b) is important because we pretty-print type construtors
+          -- The latter (b) is important because we pretty-print type constructors
           -- by converting to IfaceSyn and pretty-printing that
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!

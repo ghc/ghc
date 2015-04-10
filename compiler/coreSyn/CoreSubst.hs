@@ -768,7 +768,7 @@ InlVanilla.  The WARN is just so I can see if it happens a lot.
 *                                                                      *
 ************************************************************************
 
-Note [Optimise coercion boxes agressively]
+Note [Optimise coercion boxes aggressively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The simple expression optimiser needs to deal with Eq# boxes as follows:
@@ -789,7 +789,7 @@ We do this for two reasons:
 
  2. The test T4356 fails Lint because it creates a coercion between types
     of kind (* -> * -> *) and (?? -> ? -> *), which differ. If we do this
-    inlining agressively we can collapse away the intermediate coercion between
+    inlining aggressively we can collapse away the intermediate coercion between
     these two types and hence pass Lint again. (This is a sort of a hack.)
 
 In fact, our implementation uses slightly liberalised versions of the second rule
@@ -827,7 +827,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- or where the RHS is trivial
 --
 -- We also inline bindings that bind a Eq# box: see
--- See Note [Optimise coercion boxes agressively].
+-- See Note [Optimise coercion boxes aggressively].
 --
 -- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
@@ -904,7 +904,7 @@ simple_opt_expr subst expr
 
     go lam@(Lam {})     = go_lam [] subst lam
     go (Case e b ty as)
-       -- See Note [Optimise coercion boxes agressively]
+       -- See Note [Optimise coercion boxes aggressively]
       | isDeadBinder b
       , Just (con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
       , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
@@ -1034,7 +1034,7 @@ maybe_substitute subst b r
             | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
             , dc `hasKey` eqBoxDataConKey || dc `hasKey` coercibleDataConKey
-            , all exprIsTrivial args = True -- See Note [Optimise coercion boxes agressively]
+            , all exprIsTrivial args = True -- See Note [Optimise coercion boxes aggressively]
             | otherwise = False
 
 ----------------------

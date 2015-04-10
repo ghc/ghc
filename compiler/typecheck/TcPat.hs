@@ -690,7 +690,7 @@ are not made available in the RHS of the match. For example
         f :: T a -> Int -> a
         f ~(T1 i) y = y
 It's obviously not sound to refine a to Int in the right
-hand side, because the arugment might not match T1 at all!
+hand side, because the argument might not match T1 at all!
 
 Finally, a lazy pattern should not bind any existential type variables
 because they won't be in scope when we do the desugaring

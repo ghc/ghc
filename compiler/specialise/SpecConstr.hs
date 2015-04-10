@@ -1093,7 +1093,7 @@ evalScrutOcc = ScrutOcc emptyUFM
 -- Experimentally, this vesion of combineOcc makes ScrutOcc "win", so
 -- that if the thing is scrutinised anywhere then we get to see that
 -- in the overall result, even if it's also used in a boxed way
--- This might be too agressive; see Note [Reboxing] Alternative 3
+-- This might be too aggressive; see Note [Reboxing] Alternative 3
 combineOcc :: ArgOcc -> ArgOcc -> ArgOcc
 combineOcc NoOcc         occ           = occ
 combineOcc occ           NoOcc         = occ

@@ -191,7 +191,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
 
 #include "rts/Config.h"
 
-/* Global constaints */
+/* Global constraints */
 #include "rts/Constants.h"
 
 /* Profiling information */
