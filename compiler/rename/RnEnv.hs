@@ -17,6 +17,7 @@ module RnEnv (
         reportUnboundName,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
+        lookupSigCtxtOccRn,
 
         lookupFixityRn, lookupTyFixityRn,
         lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
@@ -1064,13 +1065,22 @@ data HsSigCtxt
   | ClsDeclCtxt   Name       -- Class decl for this class
   | InstDeclCtxt  Name       -- Intsance decl for this class
   | HsBootCtxt               -- Top level of a hs-boot file
+  | RoleAnnotCtxt NameSet    -- A role annotation, with the names of all types
+                             -- in the group
 
 lookupSigOccRn :: HsSigCtxt
                -> Sig RdrName
                -> Located RdrName -> RnM (Located Name)
-lookupSigOccRn ctxt sig
+lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
+
+-- | Lookup a name in relation to the names in a 'HsSigCtxt'
+lookupSigCtxtOccRn :: HsSigCtxt
+                   -> SDoc         -- ^ description of thing we're looking up,
+                                   -- like "type family"
+                   -> Located RdrName -> RnM (Located Name)
+lookupSigCtxtOccRn ctxt what
   = wrapLocM $ \ rdr_name ->
-    do { mb_name <- lookupBindGroupOcc ctxt (hsSigDoc sig) rdr_name
+    do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
            Left err   -> do { addErr err; return (mkUnboundName rdr_name) }
            Right name -> return name }
@@ -1098,6 +1108,7 @@ lookupBindGroupOcc ctxt what rdr_name
   = case ctxt of
       HsBootCtxt            -> lookup_top (const True)       True
       TopSigCtxt ns meth_ok -> lookup_top (`elemNameSet` ns) meth_ok
+      RoleAnnotCtxt ns      -> lookup_top (`elemNameSet` ns) False
       LocalBindCtxt ns      -> lookup_group ns
       ClsDeclCtxt  cls      -> lookup_cls_op cls
       InstDeclCtxt cls      -> lookup_cls_op cls

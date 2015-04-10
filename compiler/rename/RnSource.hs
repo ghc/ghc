@@ -943,7 +943,8 @@ rnTyClDecls :: [Name] -> [TyClGroup RdrName]
 -- Rename the declarations and do depedency analysis on them
 rnTyClDecls extra_deps tycl_ds
   = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
-       ; role_annot_env <- rnRoleAnnots (concatMap group_roles tycl_ds)
+       ; let decl_names = mkNameSet (map (tcdName . unLoc . fst) ds_w_fvs)
+       ; role_annot_env <- rnRoleAnnots decl_names (concatMap group_roles tycl_ds)
        ; thisPkg  <- fmap thisPackage getDynFlags
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
@@ -1082,13 +1083,14 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 rnTySyn :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnTySyn doc rhs = rnLHsType doc rhs
 
--- Renames role annotations, returning them as the values in a NameEnv
+-- | Renames role annotations, returning them as the values in a NameEnv
 -- and checks for duplicate role annotations.
 -- It is quite convenient to do both of these in the same place.
 -- See also Note [Role annotations in the renamer]
-rnRoleAnnots :: [LRoleAnnotDecl RdrName]
-                -> RnM (NameEnv (LRoleAnnotDecl Name))
-rnRoleAnnots role_annots
+rnRoleAnnots :: NameSet  -- ^ of the decls in this group
+             -> [LRoleAnnotDecl RdrName]
+             -> RnM (NameEnv (LRoleAnnotDecl Name))
+rnRoleAnnots decl_names role_annots
   = do {  -- check for duplicates *before* renaming, to avoid lumping
           -- together all the unboundNames
          let (no_dups, dup_annots) = removeDups role_annots_cmp role_annots
@@ -1104,8 +1106,11 @@ rnRoleAnnots role_annots
                             , not (isUnboundName name) ] }
   where
     rn_role_annot1 (RoleAnnotDecl tycon roles)
-      = do {  -- the name is an *occurrence*
-             tycon' <- wrapLocM lookupGlobalOccRn tycon
+      = do {  -- the name is an *occurrence*, but look it up only in the
+              -- decls defined in this group (see #10263)
+             tycon' <- lookupSigCtxtOccRn (RoleAnnotCtxt decl_names)
+                                          (text "role annotation")
+                                          tycon
            ; return $ RoleAnnotDecl tycon' roles }
 
 dupRoleAnnotErr :: [LRoleAnnotDecl RdrName] -> RnM ()
