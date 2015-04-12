@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
-    targetPackages, targetPackagesInStage,
-    targetWays
+    targetPackages, targetPackagesInStage
     ) where
 
 import Package.Base

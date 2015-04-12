@@ -1,189 +1,119 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module Expression.Base (
-    Guard,
+    module Expression.Build,
+    module Expression.Predicate,
+    (?), (??), whenExists,
+    Args (..), -- hide?
     Settings,
-    ArgList (..),
-    Ways, targetWays,
-    remove,
-    opt, opts, subSettings, optBuildPath, optBuildDist, optPath,
-    optBootPkgConstraints,
-    packages, package, setPackage,
-    builders, builder, setBuilder, setBuilderFamily,
-    stages, stage, notStage, setStage,
-    ways, way, setWay,
-    files, file, setFile,
-    optKeyValue, optBuilder, optStagedBuilder,
-    crossCompiling,
-    keyValues, keyValue, keyYes, keyNo, keyNonEmpty, setKeyValue,
-    packageKey, packageDeps, packageDepKeys,
-    supportsPackageKey, targetPlatforms, targetPlatform,
-    targetOss, targetArchs,
-    dynamicGhcPrograms, ghcWithInterpreter
+    Ways,
+    remove, project,
+    arg, args, argsOrdered, argPairs, argBuildPath, argBuildDist,
+    argConfig, argBuilderPath, argStagedBuilderPath,
+    argPackageKey, argPackageDeps, argPackageDepKeys,
+    argComplex, argPath, argBootPkgConstraints,
+    setPackage, setBuilder, setBuilderFamily, setStage, setWay,
+    setFile, setConfig
     ) where
 
-import Base
+import Base hiding (arg, args, Args)
 import Ways
 import Package.Base (Package)
 import Oracles.Builder
 import Expression.PG
 import Expression.Predicate
-import Expression.PGPredicate
--- import Expression.ArgList
+import Expression.Build
 
-data BuildParameter = WhenPackage  Package
-                    | WhenBuilder  Builder
-                    | WhenStage    Stage
-                    | WhenWay      Way
-                    | WhenFile     FilePattern
-                    | WhenKeyValue String String -- from config files
+-- Settings can be built out of the following primitive elements
+data Args
+    = Plain [String]          -- an (ordered) list of arguments: ["-i", "dir"]
+    | Pairs String [String]   -- resolves to a list of pairs: "-i dir1 -i dir2"
+    | BuildPath               -- evaluates to build path: libraries/base
+    | BuildDist               -- evaluates to build subdirectory: dist-install
+    | Config String           -- evaluates to the value of a given config key
+    | BuilderPath Builder     -- evaluates to the path to a given builder
+    | PackageKey String       -- looks up "PACKAGE_KEY" in package-data.mk
+    | PackageDeps String      -- looks up "DEPS"        in package-data.mk
+    | PackageDepKeys String   -- looks up "DEP_KEYS"    in package-data.mk
+    | BootPkgConstraints      -- evaluates to boot package constraints
+    | Complex String Settings -- joins a prefix with settings: "CFLAGS=..."
+    | Path String Settings    -- as above but joins settings elements with </>
 
-type Guard = Predicate BuildParameter
+type Settings = BuildExpression Args
+type Ways     = BuildExpression Way
 
-type Matcher = TruthTeller BuildParameter
+-- A single argument
+arg :: String -> Settings
+arg s = Vertex $ Plain [s]
 
-type Expression v = PGPredicate BuildParameter v
+-- A set of arguments (unordered)
+args :: [String] -> Settings
+args = mconcat . map arg
 
-type Settings = Expression ArgList
+-- An (ordered) list of arguments
+argsOrdered :: [String] -> Settings
+argsOrdered = Vertex . Plain
 
-type Ways = Expression Way
+-- An (ordered) list of pair of arguments: [prefix, arg1, prefix, arg2, ...]
+argPairs :: String -> [String] -> Settings
+argPairs prefix = Vertex . Pairs prefix
 
-data ArgList = Plain [String]
-             | Complex String Settings
-             | Path String Settings
-             | BuildPath
-             | BuildDist
-             | BootPkgConstraints
-             | KeyValue String
-             | BuilderPath Builder
-             | PackageKey String
-             | PackageDeps String
-             | PackageDepKeys String
+argBuildDist :: Settings
+argBuildPath = Vertex $ BuildPath
 
-plain :: String -> ArgList
-plain s = Plain [s]
+argBuildPath :: Settings
+argBuildDist = Vertex $ BuildDist
 
-subSettings :: String -> Settings -> Settings
-subSettings prefix = Vertex . Complex prefix
+argConfig :: String -> Settings
+argConfig = Vertex . Config
 
-type ArgsTeller = ArgList -> Maybe [String]
+argBuilderPath :: Builder -> Settings
+argBuilderPath = Vertex . BuilderPath
 
--- Monoid instance for args-tellers (asks them one by one)
-instance Monoid ArgsTeller where
-    mempty        = const Nothing
-    p `mappend` q = \a -> getFirst $ First (p a) <> First (q a)
+-- evaluates to the path to a given builder, taking current stage into account
+argStagedBuilderPath :: (Stage -> Builder) -> Settings
+argStagedBuilderPath f =
+    mconcat $ map (\s -> stage s ? argBuilderPath (f s)) [Stage0 ..]
 
-fromPlain :: ArgsTeller
-fromPlain (Plain list) = Just list
-fromPlain _            = Nothing
+argPackageKey :: String -> Settings
+argPackageKey = Vertex . PackageKey
 
-tellArgs :: ArgsTeller -> ArgList -> ArgList
-tellArgs t a = case t a of
-    Just list -> Plain list
-    Nothing   -> a
+argPackageDeps :: String -> Settings
+argPackageDeps = Vertex . PackageDeps
 
--- TODO: move to Targets.hs
-targetWays :: Ways
-targetWays = Vertex vanilla
-    <> notStage Stage0 ? Vertex profiling
-    <> platformSupportsSharedLibs ? Vertex dynamic
+argPackageDepKeys :: String -> Settings
+argPackageDepKeys = Vertex . PackageDepKeys
 
--- TODO: rename to 'arg' and args'
-opt :: String -> Settings
-opt = Vertex . plain
+argBootPkgConstraints :: Settings
+argBootPkgConstraints = Vertex $ BootPkgConstraints
 
-opts :: [String] -> Settings
-opts = mconcat . map opt
+argComplex :: String -> Settings -> Settings
+argComplex prefix = Vertex . Complex prefix
 
-optBuildPath, optBuildDist, optBootPkgConstraints :: Settings
-optBuildPath          = Vertex $ BuildPath
-optBuildDist          = Vertex $ BuildDist
-optBootPkgConstraints = Vertex $ BootPkgConstraints
-
-optPath :: String -> Settings -> Settings
-optPath prefix = Vertex . Path prefix
-
----- Extract all plain and unconditional arguments.
----- Overlay subexpressions are evaluated in arbitrary order.
---plainArgs :: PGPredicate p v -> [v]
---plainArgs Epsilon         = []
---plainArgs (Vertex (Plain args)) = args
---plainArgs (Vertex _)            = []
---plainArgs (Overlay   l r) = (++) <$> plainArgs l <*> plainArgs r -- TODO: union
---plainArgs (Sequence  l r) = (++) <$> plainArgs l <*> plainArgs r
---plainArgs (Condition x r) = case tellTruth x of
---    Just True -> plainArgs r
---    _         -> []
+argPath :: String -> Settings -> Settings
+argPath prefix = Vertex . Path prefix
 
 -- Partially evaluate Settings using a truth-teller (compute a 'projection')
-project :: Matcher -> Settings -> Settings
-project _ Epsilon         = Epsilon
-project m (Vertex v)  = case v of
-    Complex l r -> Vertex $ Complex l (project m r)
+project :: (BuildVariable -> Maybe Bool) -> Settings -> Settings
+project _ Epsilon = Epsilon
+project t (Vertex v) = case v of
+    Complex l r -> argComplex l (project t r)
+    Path    l r -> argPath    l (project t r)
     _           -> Vertex v
-project m (Overlay   l r) = Overlay   (project  m l) (project m r)
-project m (Sequence  l r) = Sequence  (project  m l) (project m r)
-project m (Condition l r) = Condition (evaluate m l) (project m r)
+project t (Overlay   l r) = Overlay   (project  t l) (project t r)
+project t (Sequence  l r) = Sequence  (project  t l) (project t r)
+project t (Condition l r) = Condition (evaluate t l) (project t r)
 
+-- Removes a given argument list from settings
 remove :: [String] -> Settings -> Settings
-remove _ Epsilon         = Epsilon
-remove a v @ (Vertex (Plain b))
-    | a == b    = Epsilon
+remove _ Epsilon = Epsilon
+remove as v @ (Vertex (Plain bs))
+    | as == bs  = Epsilon
     | otherwise = v
-remove _ v @ (Vertex _)  = v
-remove a (Overlay   l r) = Overlay   (remove a l) (remove a r)
-remove a (Sequence  l r) = Sequence  (remove a l) (remove a r)
-remove a (Condition x r) = Condition x            (remove a r)
-
-
-alternatives :: (a -> BuildParameter) -> [a] -> Guard
-alternatives p = multiOr . map (Parameter . p)
-
--- Basic GHC build guards
-
-packages :: [Package] -> Guard
-packages = alternatives WhenPackage
-
-builders :: [Builder] -> Guard
-builders = alternatives WhenBuilder
-
-stages :: [Stage] -> Guard
-stages = alternatives WhenStage
-
-ways :: [Way] -> Guard
-ways = alternatives WhenWay
-
-files :: [FilePattern] -> Guard
-files = alternatives WhenFile
-
-keyValues :: String -> [String] -> Guard
-keyValues key = alternatives (WhenKeyValue key)
-
-package :: Package -> Guard
-package p = packages [p]
-
-builder :: Builder -> Guard
-builder b = builders [b]
-
-stage :: Stage -> Guard
-stage s = stages [s]
-
-notStage :: Stage -> Guard
-notStage = Not . Parameter . WhenStage
-
-way :: Way -> Guard
-way w = ways [w]
-
-file :: FilePattern -> Guard
-file f = files [f]
-
-keyValue :: String -> String -> Guard
-keyValue key value = keyValues key [value]
-
-keyYes, keyNo, keyNonEmpty :: String -> Guard
-keyYes      key = keyValues key ["YES"]
-keyNo       key = keyValues key ["NO" ]
-keyNonEmpty key = Not $ keyValues key [""]
+remove _ v @ (Vertex _)   = v
+remove as (Overlay   l r) = Overlay   (remove as l) (remove as r)
+remove as (Sequence  l r) = Sequence  (remove as l) (remove as r)
+remove as (Condition x r) = Condition x             (remove as r)
 
 -- Partial evaluation of settings
 
@@ -194,7 +124,7 @@ setBuilder :: Builder -> Settings -> Settings
 setBuilder = project . matchBuilder
 
 setBuilderFamily :: (Stage -> Builder) -> Settings -> Settings
-setBuilderFamily f = mconcat $ map (setBuilder . f) [Stage0 ..]
+setBuilderFamily = project . matchBuilderFamily
 
 setStage :: Stage -> Settings -> Settings
 setStage = project . matchStage
@@ -205,97 +135,16 @@ setWay = project . matchWay
 setFile :: FilePath -> Settings -> Settings
 setFile = project . matchFile
 
-setKeyValue :: String -> String -> Settings -> Settings
-setKeyValue key = project . matchKeyValue key
+setConfig :: String -> String -> Settings -> Settings
+setConfig key = project . matchConfig key
 
--- Truth-tellers for partial evaluation
+--type ArgsTeller = Args -> Maybe [String]
 
-matchPackage :: Package -> Matcher
-matchPackage p (WhenPackage p') = Just $ p == p'
-matchPackage _ _                = Nothing
+--fromPlain :: ArgsTeller
+--fromPlain (Plain list) = Just list
+--fromPlain _            = Nothing
 
-matchBuilder :: Builder -> Matcher
-matchBuilder b (WhenBuilder b') = Just $ b == b'
-matchBuilder _ _                = Nothing
-
-matchStage :: Stage -> Matcher
-matchStage s (WhenStage s') = Just $ s == s'
-matchStage _ _              = Nothing
-
-matchWay :: Way -> Matcher
-matchWay w (WhenWay w') = Just $ w == w'
-matchWay _ _            = Nothing
-
-matchFile :: FilePath -> Matcher
-matchFile file (WhenFile pattern) = Just $ pattern ?== file
-matchFile _ _                     = Nothing
-
-matchKeyValue :: String -> String -> Matcher
-matchKeyValue key value (WhenKeyValue key' value')
-    | key == key' = Just $ value == value'
-    | otherwise   = Nothing
-matchKeyValue _ _ _ = Nothing
-
--- Argument templates
-
-optKeyValue :: String -> Settings
-optKeyValue = Vertex . KeyValue
-
-optBuilder :: Builder -> Settings
-optBuilder = Vertex . BuilderPath
-
-optStagedBuilder :: (Stage -> Builder) -> Settings
-optStagedBuilder f =
-    mconcat $ map (\s -> builder (f s) ? optBuilder (f s)) [Stage0 ..]
-
-packageKey :: String -> Settings
-packageKey = Vertex . PackageKey
-
-packageDeps :: String -> Settings
-packageDeps = Vertex . PackageDeps
-
-packageDepKeys :: String -> Settings
-packageDepKeys = Vertex . PackageDepKeys
-
--- Derived guards
-
-supportsPackageKey :: Guard
-supportsPackageKey = keyYes "supports-package-key"
-
-targetPlatforms :: [String] -> Guard
-targetPlatforms = keyValues "target-platform-full"
-
-targetPlatform :: String -> Guard
-targetPlatform s = targetPlatforms [s]
-
-targetOss :: [String] -> Guard
-targetOss = keyValues "target-os"
-
-targetArchs :: [String] -> Guard
-targetArchs = keyValues "target-arch"
-
-solarisBrokenShld :: Guard
-solarisBrokenShld = keyYes "solaris-broken-shld"
-
-platformSupportsSharedLibs :: Guard
-platformSupportsSharedLibs =
-    Not $ (targetPlatforms [ "powerpc-unknown-linux"
-                           , "x86_64-unknown-mingw32"
-                           , "i386-unknown-mingw32" ]
-           `Or`
-           solarisBrokenShld `And` targetPlatform "i386-unknown-solaris2")
-
-dynamicGhcPrograms :: Guard
-dynamicGhcPrograms = keyYes "dynamic-ghc-programs"
-
-ghcWithInterpreter :: Guard
-ghcWithInterpreter =
-    targetOss [ "mingw32", "cygwin32", "linux", "solaris2"
-              , "freebsd", "dragonfly", "netbsd", "openbsd"
-              , "darwin", "kfreebsdgnu" ]
-    `And`
-    targetArchs ["i386", "x86_64", "powerpc", "sparc", "sparc64", "arm"]
-
-crossCompiling :: Guard
-crossCompiling = keyYes "cross-compiling"
-
+--tellArgs :: ArgsTeller -> Args -> Args
+--tellArgs t a = case t a of
+--    Just list -> Plain list
+--    Nothing   -> a
