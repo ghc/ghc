@@ -111,10 +111,6 @@ data Severity
   | SevError
   | SevFatal
 
-isWarning :: Severity -> Bool
-isWarning SevWarning = True
-isWarning _          = False
-
 instance Show ErrMsg where
     show em = errMsgShortString em
 
@@ -132,10 +128,13 @@ mkLocMessage severity locn msg
                   else ppr (srcSpanStart locn)
       in hang (locn' <> colon <+> sev_info) 4 msg
   where
-    sev_info = ppWhen (isWarning severity)
-                      (ptext (sLit "Warning:"))
-      -- For warnings, print    Foo.hs:34: Warning:
-      --                           <the warning message>
+    -- Add prefixes, like    Foo.hs:34: warning:
+    --                           <the warning message>
+    sev_info = case severity of
+                 SevWarning -> ptext (sLit "warning:")
+                 SevError -> ptext (sLit "error:")
+                 SevFatal -> ptext (sLit "fatal:")
+                 _ -> empty
 
 makeIntoWarning :: ErrMsg -> ErrMsg
 makeIntoWarning err = err { errMsgSeverity = SevWarning }

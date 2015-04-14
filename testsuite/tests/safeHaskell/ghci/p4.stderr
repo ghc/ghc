@@ -1,6 +1,7 @@
 
-<interactive>:6:9: Not in scope: ‘System.IO.Unsafe.unsafePerformIO’
+<interactive>:6:9: error:
+    Not in scope: ‘System.IO.Unsafe.unsafePerformIO’
 
-<interactive>:7:9: Not in scope: ‘x’
+<interactive>:7:9: error: Not in scope: ‘x’
 
-<interactive>:8:1: Not in scope: ‘y’
+<interactive>:8:1: error: Not in scope: ‘y’
