@@ -1021,7 +1021,7 @@ opt_lc dflags = sOpt_lc (settings dflags)
 versionedAppDir :: DynFlags -> IO FilePath
 versionedAppDir dflags = do
   appdir <- getAppUserDataDirectory (programName dflags)
-  return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+  return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':projectVersion dflags)
 
 -- | The target code type of the compilation (if any).
 --
