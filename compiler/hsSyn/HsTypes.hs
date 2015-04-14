@@ -417,7 +417,7 @@ After renaming
 Qualified currently behaves exactly as Implicit,
 but it is deprecated to use it for implicit quantification.
 In this case, GHC 7.10 gives a warning; see
-Note [Context quantification] and Trac #4426.
+Note [Context quantification] in RnTypes, and Trac #4426.
 In GHC 7.12, Qualified will no longer bind variables
 and this will become an error.
 
@@ -506,7 +506,12 @@ data HsTupleSort = HsUnboxedTuple
                  | HsBoxedOrConstraintTuple
                  deriving (Data, Typeable)
 
-data HsExplicitFlag = Qualified | Implicit | Explicit deriving (Data, Typeable)
+data HsExplicitFlag
+  = Explicit     -- An explicit forall, eg  f :: forall a. a-> a
+  | Implicit     -- No explicit forall, eg  f :: a -> a, or f :: Eq a => a -> a
+  | Qualified    -- A *nested* occurrences of (ctxt => ty), with no explicit forall
+                 -- e.g.  f :: (Eq a => a -> a) -> Int
+ deriving (Data, Typeable)
 
 type LConDeclField name = Located (ConDeclField name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
@@ -571,6 +576,8 @@ Qualified `plus` Qualified = Qualified
 Explicit  `plus` _         = Explicit
 _         `plus` Explicit  = Explicit
 _         `plus` _         = Implicit
+  -- NB: Implicit `plus` Qualified = Implicit
+  --     so that  f :: Eq a => a -> a  ends up Implicit
 
 hsExplicitTvs :: LHsType Name -> [Name]
 -- The explicitly-given forall'd type variables of a HsType
