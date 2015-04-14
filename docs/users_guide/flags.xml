@@ -37,15 +37,21 @@
           </row>
           <row>
             <entry><option>-fprint-explicit-foralls</option></entry>
-            <entry>print explicit <literal>forall</literal> quantification in types</entry>
+            <entry>Print explicit <literal>forall</literal> quantification in types. See also <option>-XExplicitForAll</option></entry>
             <entry>dynamic</entry>
             <entry>-fno-print-explicit-foralls</entry>
           </row>
           <row>
             <entry><option>-fprint-explicit-kinds</option></entry>
-            <entry>print explicit kind foralls and kind arguments in types</entry>
+            <entry>Print explicit kind foralls and kind arguments in types. See also <option>-XKindSignature</option></entry>
             <entry>dynamic</entry>
             <entry>-fno-print-explicit-kinds</entry>
+          </row>
+          <row>
+            <entry><option>-fprint-unicode-syntax</option></entry>
+            <entry>Use unicode syntax when printing expressions, types and kinds. See also <option>-XUnicodeSyntax</option></entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-unicode-syntax</entry>
           </row>
           <row>
             <entry><option>-ferror-spans</option></entry>

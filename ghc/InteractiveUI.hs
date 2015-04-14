@@ -2073,6 +2073,7 @@ showDynFlags show_all dflags = do
                                         DynFlags.fFlags
         flgs = [ Opt_PrintExplicitForalls
                , Opt_PrintExplicitKinds
+               , Opt_PrintUnicodeSyntax
                , Opt_PrintBindResult
                , Opt_BreakOnException
                , Opt_BreakOnError

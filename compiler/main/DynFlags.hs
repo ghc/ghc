@@ -329,6 +329,7 @@ data GeneralFlag
 
    | Opt_PrintExplicitForalls
    | Opt_PrintExplicitKinds
+   | Opt_PrintUnicodeSyntax
 
    -- optimisation opts
    | Opt_CallArity
@@ -1767,8 +1768,9 @@ lang_set dflags lang =
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
 
+-- | Check whether to use unicode syntax for output
 useUnicodeSyntax :: DynFlags -> Bool
-useUnicodeSyntax = xopt Opt_UnicodeSyntax
+useUnicodeSyntax = gopt Opt_PrintUnicodeSyntax
 
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
@@ -2972,6 +2974,7 @@ fFlags = [
   flagGhciSpec "print-evld-with-show"         Opt_PrintEvldWithShow,
   flagSpec "print-explicit-foralls"           Opt_PrintExplicitForalls,
   flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
+  flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "regs-graph"                       Opt_RegsGraph,

@@ -896,12 +896,13 @@ ghc -c Foo.hs
 
 
       <varlistentry>
-        <term><option>--fprint-explicit-foralls, -fprint-explicit-kinds</option>
+        <term><option>--fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax</option>
           <indexterm><primary><option>-fprint-explicit-foralls</option></primary></indexterm>
           <indexterm><primary><option>-fprint-explicit-kinds</option></primary></indexterm>
+          <indexterm><primary><option>-fprint-unicode-syntax</option></primary></indexterm>
         </term>
         <listitem>
-          <para>These two flags control the way in which GHC displays types, in error messages and in GHCi.
+          <para>These three flags control the way in which GHC displays types, in error messages and in GHCi.
           Using <option>-fprint-explicit-foralls</option> makes GHC print explicit <literal>forall</literal>
           quantification at the top level of a type; normally this is suppressed.  For example, in GHCi:
 <screen>
@@ -944,6 +945,15 @@ MkT :: forall (k :: BOX) (a :: k). T a
 ghci> :set -fprint-explicit-foralls
 ghci> :t MkT
 MkT :: forall (k :: BOX) (a :: k). T k a
+</screen>
+         </para>
+         <para>
+          When <option>-fprint-unicode-syntax</option> is enabled, GHC prints type signatures using
+          the unicode symbols from the <option>-XUnicodeSyntax</option> extension.
+<screen>
+ghci> :set -fprint-unicode-syntax
+ghci> :t (>>)
+(>>) :: &forall; (m :: * &rarr; *) a b. Monad m &rArr; m a &rarr; m b &rarr; m b
 </screen>
          </para>
         </listitem>

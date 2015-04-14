@@ -5,14 +5,14 @@
 :t () >- () -< () >>- () -<< ()
 let fun foo | True <- () = ()
 
-:set -XUnicodeSyntax
+:set -fprint-unicode-syntax
 
 :t lookup
 :t undefined :: (forall a. a -> a) -> a
 :t () >- () -< () >>- () -<< ()
 let fun foo | True <- () = ()
 
-:set -XNoUnicodeSyntax
+:set -fno-print-unicode-syntax
 
 :t lookup
 :t undefined :: (forall a. a -> a) -> a
