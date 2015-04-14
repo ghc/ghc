@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections,TypeFamilies #-}
 module AnnotationTuple (foo) where
 
 {
@@ -13,6 +13,9 @@ foo = let
 bar = print $ map (1, "hello"   , 6.5,, [5, 5, 6, 7]) [Just (), Nothing]
 ;
 baz = (1, "hello", 6.5,,,,) 'a' (Just ())
+;
+
+data family GMap k :: * -> *
 }
 -- Note: the trailing whitespace in this file is used to check that we
 -- have an annotation for it.

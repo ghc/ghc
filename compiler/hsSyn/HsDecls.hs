@@ -466,7 +466,8 @@ data TyClDecl name
     --
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
     --             'ApiAnnotation.AnnData',
-    --             'ApiAnnotation.AnnFamily','ApiAnnotation.AnnWhere',
+    --             'ApiAnnotation.AnnFamily','ApiAnnotation.AnnDcolon',
+    --             'ApiAnnotation.AnnWhere',
     --             'ApiAnnotation.AnnOpen','ApiAnnotation.AnnDcolon',
     --             'ApiAnnotation.AnnClose'
 
@@ -490,7 +491,8 @@ data TyClDecl name
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnData',
     --              'ApiAnnotation.AnnFamily',
     --              'ApiAnnotation.AnnNewType',
-    --              'ApiAnnotation.AnnNewType','ApiAnnotation.AnnWhere'
+    --              'ApiAnnotation.AnnNewType','ApiAnnotation.AnnDcolon'
+    --              'ApiAnnotation.AnnWhere',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
     DataDecl { tcdLName    :: Located name        -- ^ Type constructor
@@ -1095,6 +1097,7 @@ data DataFamInstDecl name
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnData',
     --           'ApiAnnotation.AnnNewType','ApiAnnotation.AnnInstance',
+    --           'ApiAnnotation.AnnDcolon'
     --           'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen',
     --           'ApiAnnotation.AnnClose'
 
