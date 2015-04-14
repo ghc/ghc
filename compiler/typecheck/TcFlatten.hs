@@ -553,7 +553,7 @@ instance Applicative FlatM where
 
 liftTcS :: TcS a -> FlatM a
 liftTcS thing_inside
-  = FlatM $ const thing_inside 
+  = FlatM $ const thing_inside
 
 emitFlatWork :: Ct -> FlatM ()
 -- See Note [The flattening work list]
@@ -622,7 +622,7 @@ setEqRel new_eq_rel thing_inside
     if new_eq_rel == fe_eq_rel env
     then runFlatM thing_inside env
     else runFlatM thing_inside (env { fe_eq_rel = new_eq_rel })
-    
+
 -- | Change the 'FlattenMode' in a 'FlattenEnv'.
 setMode :: FlattenMode -> FlatM a -> FlatM a
 setMode new_mode thing_inside

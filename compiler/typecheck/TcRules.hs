@@ -227,11 +227,15 @@ revert to SimplCheck when going under an implication.
 
 ------------------------ So the plan is this -----------------------
 
+* Step 0: typecheck the LHS and RHS to get constraints from each
+
 * Step 1: Simplify the LHS and RHS constraints all together in one bag
           We do this to discover all unification equalities
 
-* Step 2: Zonk the ORIGINAL lhs constraints, and partition them into
-          the ones we will quantify over, and the others
+* Step 2: Zonk the ORIGINAL (unsimplified) lhs constraints, to take
+          advantage of those unifications, and partition them into the
+          ones we will quantify over, and the others
+          See Note [RULE quantification over equalities]
 
 * Step 3: Decide on the type variables to quantify over
 
@@ -251,7 +255,7 @@ From the RULE we get
    lhs-constraints:  T Int ~ alpha
    rhs-constraints:  Bool ~ alpha
 where 'alpha' is the type that connects the two.  If we glom them
-all together, and solve the RHS constraint first, we might solve 
+all together, and solve the RHS constraint first, we might solve
 with alpha := Bool.  But then we'd end up with a RULE like
 
     RULE: f 3 |> (co :: T Int ~ Booo) = True
