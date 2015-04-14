@@ -3,6 +3,7 @@ parseTree
 comments
 exampleTest
 listcomps
+t10255
 *.hi
 *.o
 *.run.*

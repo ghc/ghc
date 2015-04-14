@@ -1,0 +1,3 @@
+
+Test10255.hs:1:14: Warning:
+    -XPatternSignatures is deprecated: use -XScopedTypeVariables or pragma {-# LANGUAGE ScopedTypeVariables #-} instead
