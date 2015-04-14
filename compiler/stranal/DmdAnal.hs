@@ -1116,7 +1116,7 @@ findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where
-    dmd' = zapDemand (ae_dflags env) $
+    dmd' = killUsageDemand (ae_dflags env) $
            strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)
 
@@ -1138,7 +1138,7 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
 set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
-  = setIdStrictness id (zapStrictSig (ae_dflags env) sig)
+  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
 
 dumpStrSig :: CoreProgram -> SDoc
 dumpStrSig binds = vcat (map printId ids)

@@ -24,7 +24,7 @@ module IdInfo (
 
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
-        zapDemandInfo,
+        zapDemandInfo, zapUsageInfo,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -475,9 +475,13 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
 
     is_safe_dmd dmd = not (isStrictDmd dmd)
 
--- | Remove demand info on the 'IdInfo' if it is present, otherwise return @Nothing@
+-- | Remove all demand info on the 'IdInfo'
 zapDemandInfo :: IdInfo -> Maybe IdInfo
 zapDemandInfo info = Just (info {demandInfo = topDmd})
+
+-- | Remove usage (but not strictness) info on the 'IdInfo'
+zapUsageInfo :: IdInfo -> Maybe IdInfo
+zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables

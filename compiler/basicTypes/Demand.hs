@@ -48,8 +48,8 @@ module Demand (
         argOneShots, argsOneShots,
         trimToType, TypeShape(..),
 
-        isSingleUsed, reuseEnv, zapDemand, zapStrictSig,
-
+        isSingleUsed, reuseEnv,
+        killUsageDemand, killUsageSig, zapUsageDemand,
         strictifyDictDmd
 
      ) where
@@ -1714,21 +1714,34 @@ of arguments, says conservatively if the function is going to diverge
 or not.
 
 Zap absence or one-shot information, under control of flags
+
+Note [Killing usage information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The flags -fkill-one-shot and -fkill-absence let you switch off the generation
+of absence or one-shot information altogether.  This is only used for performance
+tests, to see how important they are.
 -}
 
-zapDemand :: DynFlags -> Demand -> Demand
-zapDemand dflags dmd
-  | Just kfs <- killFlags dflags = zap_dmd kfs dmd
+zapUsageDemand :: Demand -> Demand
+-- Remove the usage info, but not the strictness info, from the demand
+zapUsageDemand = kill_usage (True, True)
+
+killUsageDemand :: DynFlags -> Demand -> Demand
+-- See Note [Killing usage information]
+killUsageDemand dflags dmd
+  | Just kfs <- killFlags dflags = kill_usage kfs dmd
   | otherwise                    = dmd
 
-zapStrictSig :: DynFlags -> StrictSig -> StrictSig
-zapStrictSig dflags sig@(StrictSig (DmdType env ds r))
-  | Just kfs <- killFlags dflags = StrictSig (DmdType env (map (zap_dmd kfs) ds) r)
+killUsageSig :: DynFlags -> StrictSig -> StrictSig
+-- See Note [Killing usage information]
+killUsageSig dflags sig@(StrictSig (DmdType env ds r))
+  | Just kfs <- killFlags dflags = StrictSig (DmdType env (map (kill_usage kfs) ds) r)
   | otherwise                    = sig
 
 type KillFlags = (Bool, Bool)
 
 killFlags :: DynFlags -> Maybe KillFlags
+-- See Note [Killing usage information]
 killFlags dflags
   | not kill_abs && not kill_one_shot = Nothing
   | otherwise                         = Just (kill_abs, kill_one_shot)
@@ -1736,8 +1749,8 @@ killFlags dflags
     kill_abs      = gopt Opt_KillAbsence dflags
     kill_one_shot = gopt Opt_KillOneShot dflags
 
-zap_dmd :: KillFlags -> Demand -> Demand
-zap_dmd kfs (JD {strd = s, absd = u}) = JD {strd = s, absd = zap_musg kfs u}
+kill_usage :: KillFlags -> Demand -> Demand
+kill_usage kfs (JD {strd = s, absd = u}) = JD {strd = s, absd = zap_musg kfs u}
 
 zap_musg :: KillFlags -> MaybeUsed -> MaybeUsed
 zap_musg (kill_abs, _) Abs

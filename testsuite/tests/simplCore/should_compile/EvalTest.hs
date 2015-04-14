@@ -2,9 +2,9 @@
 -- for 'rght' was initially determined (correctly) to be
 -- strictly demanded, but the FloatOut pass made it lazy
 --
--- The test compiles the program and greps for the 
+-- The test compiles the program and greps for the
 -- binding of 'rght' to check that it is marked strict
--- somethign like this:
+-- something like this:
 --         rght [Dmd=Just S] :: EvalTest.AList a
 
 module EvalTest where
