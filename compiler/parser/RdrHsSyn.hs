@@ -849,7 +849,8 @@ checkAPat msg loc e0 = do
                                         L _ (HsForAllTy Implicit _ _
                                              (L _ []) ty) -> ty
                                         other -> other
-                             return (SigPatIn e (mkHsWithBndrs t'))
+                             return (SigPatIn e (mkHsWithBndrs
+                                                   (L (getLoc t) (HsParTy t'))))
 
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _
