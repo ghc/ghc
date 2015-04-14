@@ -24,8 +24,7 @@ import Hoopl
 import DynFlags
 import FastString
 import ForeignCall
-import Outputable hiding ( panic, pprPanic )
-import qualified Outputable
+import Outputable
 import Platform
 import OrdList
 import UniqSupply
@@ -1671,14 +1670,6 @@ toI32 = mkIntLit i32
 
 toIWord :: Integral a => DynFlags -> a -> LlvmVar
 toIWord dflags = mkIntLit (llvmWord dflags)
-
-
--- | Error functions
-panic :: String -> a
-panic s = Outputable.panic $ "LlvmCodeGen.CodeGen." ++ s
-
-pprPanic :: String -> SDoc -> a
-pprPanic s d = Outputable.pprPanic ("LlvmCodeGen.CodeGen." ++ s) d
 
 
 -- | Returns TBAA meta data by unique
