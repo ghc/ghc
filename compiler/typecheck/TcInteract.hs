@@ -12,7 +12,7 @@ import TcCanonical
 import TcFlatten
 import VarSet
 import Type
-import Kind (isKind)
+import Kind (isKind, isConstraintKind)
 import Unify
 import InstEnv( lookupInstEnv, instanceDFunId )
 import CoAxiom(sfInteractTop, sfInteractInert)
@@ -2131,7 +2131,9 @@ Other notes:
 -- and it was applied to the correc arugment.
 matchTypeableClass :: Class -> Kind -> Type -> CtLoc -> TcS LookupInstResult
 matchTypeableClass clas k t loc
-  | isForAllTy k                               = return NoInstance
+  | isForAllTy t                               = return NoInstance
+  | isConstraintKind k                         = return NoInstance
+      -- See Note [No Typeable for qualified types]
   | Just (tc, ks) <- splitTyConApp_maybe t
   , all isKind ks                              = doTyCon tc ks
   | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
@@ -2178,3 +2180,37 @@ matchTypeableClass clas k t loc
                   newWantedEvVar loc goal
 
   mkSimpEv ev = return (GenInst [] (EvTypeable ev))
+
+{- Note [No Typeable for polytype or for constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not support impredicative typeable, such as
+   Typeable (forall a. a->a)
+   Typeable (Eq a => a -> a)
+   Typeable (Eq a)
+   Typeable (() :: Constraint)
+   Typeable (() => Int)
+   Typeable (((),()) => Int)
+
+See Trac #9858.  For forall's the case is clear: we simply don't have
+a TypeRep for them.  For qualified but not polymorphic types, like
+(Eq a => a -> a), things are murkier.  But:
+
+ * We don't need a TypeRep for these things.  TypeReps are for
+   monotypes only.
+
+ * The types (Eq a, Show a) => ...blah...
+   and       Eq a => Show a => ...blah...
+   are represented the same way, as a curried function;
+   that is, the tuple before the '=>' is just syntactic
+   sugar.  But since we can abstract over tuples of constraints,
+   we really do have tuples of constraints as well.
+
+   This dichotomy is not well worked out, and Trac #9858 comment:76
+   shows that Typeable treated it one way, while newtype instance
+   matching treated it another.  Or maybe it was the fact that
+   '*' and Constraint are distinct to the type checker, but are
+   the same afterwards.  Anyway, the result was a function of
+   type (forall ab. a -> b), which is pretty dire.
+
+So the simple solution is not to attempt Typable for constraints.
+-}

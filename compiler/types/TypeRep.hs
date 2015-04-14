@@ -730,8 +730,7 @@ pprTcApp _ pp tc [ty]
 
 pprTcApp p pp tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
-  = pprPromotionQuote tc <>
-    tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
+  = pprTupleApp p pp tc tys
 
   | Just dc <- isPromotedDataCon_maybe tc
   , let dc_tc = dataConTyCon dc
@@ -745,6 +744,17 @@ pprTcApp p pp tc tys
 
   | otherwise
   = sdocWithDynFlags (pprTcApp_help p pp tc tys)
+
+pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
+-- Print a saturated tuple
+pprTupleApp p pp tc tys
+  | null tys
+  , ConstraintTuple <- tupleTyConSort tc
+  = maybeParen p TopPrec $
+    ppr tc <+> dcolon <+> ppr (tyConKind tc)
+  | otherwise
+  = pprPromotionQuote tc <>
+    tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
 
 pprTcApp_help :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
 -- This one has accss to the DynFlags
