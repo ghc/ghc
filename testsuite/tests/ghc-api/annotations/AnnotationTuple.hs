@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections,TypeFamilies #-}
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE PatternGuards,ScopedTypeVariables #-}
 module AnnotationTuple (foo) where
 
 {
@@ -22,6 +22,8 @@ match n
       , Just 6 <- Nothing
       , Just 7 <- Just 9
       = Just 8
+;
+boo :: Int = 3
 }
 -- Note: the trailing whitespace in this file is used to check that we
 -- have an annotation for it.
