@@ -12,7 +12,7 @@ module CSE (cseProgram) where
 
 import CoreSubst
 import Var              ( Var )
-import Id               ( Id, idType, idInlineActivation, zapIdOccInfo )
+import Id               ( Id, idType, idInlineActivation, zapIdOccInfo, zapIdUsageInfo )
 import CoreUtils        ( mkAltExpr
                         , exprIsTrivial
                         , stripTicksE, stripTicksT, stripTicksTopE, mkTick, mkTicks )
@@ -158,27 +158,27 @@ cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind env (NonRec b e)
-  = (env2, NonRec b' e')
+  = (env2, NonRec b'' e')
   where
     (env1, b') = addBinder env b
-    (env2, e') = cseRhs env1 (b',e)
+    (env2, (b'', e')) = cseRhs env1 (b',e)
 
 cseBind env (Rec pairs)
-  = (env2, Rec (bs' `zip` es'))
+  = (env2, Rec pairs')
   where
     (bs,es) = unzip pairs
     (env1, bs') = addRecBinders env bs
-    (env2, es') = mapAccumL cseRhs env1 (bs' `zip` es)
+    (env2, pairs') = mapAccumL cseRhs env1 (bs' `zip` es)
 
-cseRhs :: CSEnv -> (OutBndr, InExpr) -> (CSEnv, OutExpr)
+cseRhs :: CSEnv -> (OutBndr, InExpr) -> (CSEnv, (OutBndr, OutExpr))
 cseRhs env (id',rhs)
   = case lookupCSEnv env rhs'' of
         Nothing
-          | always_active -> (extendCSEnv env rhs' id', rhs')
-          | otherwise     -> (env,                      rhs')
+          | always_active -> (extendCSEnv env rhs' id', (zapped_id, rhs'))
+          | otherwise     -> (env,                      (id', rhs'))
         Just id
-          | always_active -> (extendCSSubst env id' id, mkTicks ticks $ Var id)
-          | otherwise     -> (env,                      mkTicks ticks $ Var id)
+          | always_active -> (extendCSSubst env id' id, (id', mkTicks ticks $ Var id))
+          | otherwise     -> (env,                      (id', mkTicks ticks $ Var id))
           -- In the Just case, we have
           --        x = rhs
           --        ...
@@ -188,6 +188,17 @@ cseRhs env (id',rhs)
           -- that subsequent uses of x' are replaced with x,
           -- See Trac #5996
   where
+    zapped_id = zapIdUsageInfo id'
+       -- Putting the Id into the environment makes it possible that
+       -- it'll become shared more than it is now, which would
+       -- invalidate (the usage part of) its demand info.  This caused
+       -- Trac #100218.
+       -- Easiest thing is to zap the usage info; subsequently
+       -- performing late demand-analysis will restore it.  Don't zap
+       -- the strictness info; it's not necessary to do so, and losing
+       -- it is bad for performance if you don't do late demand
+       -- analysis
+
     rhs' = cseExpr env rhs
 
     ticks = stripTicksT tickishFloatable rhs'
@@ -222,7 +233,7 @@ cseExpr env (Lam b e)              = let (env', b') = addBinder env b
                                      in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)           = let (env', bind') = cseBind env bind
                                      in Let bind' (cseExpr env' e)
-cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty alts'
+cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr''' ty alts'
                           where
                                 alts' = cseAlts env2 scrut' bndr bndr'' alts
                                 (env1, bndr') = addBinder env bndr
@@ -230,7 +241,7 @@ cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty alts'
                                 -- The swizzling from Note [Case binders 2] may
                                 -- cause a dead case binder to be alive, so we
                                 -- play safe here and bring them all to life
-                                (env2, scrut') = cseRhs env1 (bndr'', scrut)
+                                (env2, (bndr''', scrut')) = cseRhs env1 (bndr'', scrut)
                                 -- Note [CSE for case expressions]
 
 cseAlts :: CSEnv -> OutExpr -> InBndr -> InBndr -> [InAlt] -> [OutAlt]
