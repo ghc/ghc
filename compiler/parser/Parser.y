@@ -1999,9 +1999,9 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
                                         let { l = comb2 $1 $> };
                                         case r of {
                                           (FunBind n _ _ _ _ _) ->
-                                                ams (L l ()) [mj AnnFunId n] >> return () ;
+                                                ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
                                           _ -> return () } ;
-                                        _ <- ams (L l ()) (fst $ unLoc $3);
+                                        _ <- ams (L l ()) ((fst $2) ++ (fst $ unLoc $3));
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | pattern_synonym_decl  { sLL $1 $> $ unitOL $1 }
         | docdecl               { sLL $1 $> $ unitOL $1 }
@@ -2573,7 +2573,7 @@ alts1   :: { Located ([AddAnn],[LMatch RdrName (LHsExpr RdrName)]) }
 alt     :: { LMatch RdrName (LHsExpr RdrName) }
         : pat opt_sig alt_rhs      {%ams (sLL $1 $> (Match Nothing [$1] (snd $2)
                                                               (snd $ unLoc $3)))
-                                         (fst $ unLoc $3)}
+                                         ((fst $2) ++ (fst $ unLoc $3))}
 
 alt_rhs :: { Located ([AddAnn],GRHSs RdrName (LHsExpr RdrName)) }
         : ralt wherebinds           { sLL $1 $> (fst $ unLoc $2,
