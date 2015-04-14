@@ -970,7 +970,7 @@ lineCommentToken span buf len = do
 nested_comment :: P (RealLocated Token) -> Action
 nested_comment cont span buf len = do
   input <- getInput
-  go (reverse $ drop 2 $ lexemeToString buf len) (1::Int) input
+  go (reverse $ lexemeToString buf len) (1::Int) input
   where
     go commentAcc 0 input = do
       setInput input
@@ -982,9 +982,9 @@ nested_comment cont span buf len = do
       Nothing -> errBrace input span
       Just ('-',input) -> case alexGetChar' input of
         Nothing  -> errBrace input span
-        Just ('\125',input) -> go commentAcc (n-1) input
+        Just ('\125',input) -> go ('\125':'-':commentAcc) (n-1) input -- '}'
         Just (_,_)          -> go ('-':commentAcc) n input
-      Just ('\123',input) -> case alexGetChar' input of
+      Just ('\123',input) -> case alexGetChar' input of  -- '{' char
         Nothing  -> errBrace input span
         Just ('-',input) -> go ('-':'\123':commentAcc) (n+1) input
         Just (_,_)       -> go ('\123':commentAcc) n input
