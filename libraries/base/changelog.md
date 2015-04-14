@@ -33,6 +33,8 @@
 
   * `System.Exit.ExitCode` now has a `Generic` instance
 
+  * `Data.Version.Version` now has a `Generic` instance
+
 ## 4.8.0.0  *Mar 2015*
 
   * Bundled with GHC 7.10.1
