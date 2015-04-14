@@ -2,12 +2,12 @@
 [
 (AK AnnotationTuple.hs:13:39 AnnComma = [AnnotationTuple.hs:13:39])
 
-(AK <no location info> AnnEofPos = [AnnotationTuple.hs:21:1])
+(AK <no location info> AnnEofPos = [AnnotationTuple.hs:24:1])
 ]
 
 --------------------------------
 [
-(AK AnnotationTuple.hs:1:1 AnnCloseC = [AnnotationTuple.hs:16:1])
+(AK AnnotationTuple.hs:1:1 AnnCloseC = [AnnotationTuple.hs:19:1])
 
 (AK AnnotationTuple.hs:1:1 AnnModule = [AnnotationTuple.hs:2:1-6])
 
@@ -95,6 +95,8 @@
 
 (AK AnnotationTuple.hs:15:1-41 AnnFunId = [AnnotationTuple.hs:15:1-3])
 
+(AK AnnotationTuple.hs:15:1-41 AnnSemi = [AnnotationTuple.hs:16:1])
+
 (AK AnnotationTuple.hs:15:7-27 AnnCloseP = [AnnotationTuple.hs:15:27])
 
 (AK AnnotationTuple.hs:15:7-27 AnnOpenP = [AnnotationTuple.hs:15:7])
@@ -119,6 +121,14 @@
 
 (AK AnnotationTuple.hs:15:39-40 AnnOpenP = [AnnotationTuple.hs:15:39])
 
-(AK <no location info> AnnEofPos = [AnnotationTuple.hs:21:1])
+(AK AnnotationTuple.hs:18:1-28 AnnData = [AnnotationTuple.hs:18:1-4])
+
+(AK AnnotationTuple.hs:18:1-28 AnnDcolon = [AnnotationTuple.hs:18:20-21])
+
+(AK AnnotationTuple.hs:18:1-28 AnnFamily = [AnnotationTuple.hs:18:6-11])
+
+(AK AnnotationTuple.hs:18:23-28 AnnRarrow = [AnnotationTuple.hs:18:25-26])
+
+(AK <no location info> AnnEofPos = [AnnotationTuple.hs:24:1])
 ]
 

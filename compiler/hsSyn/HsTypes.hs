@@ -122,6 +122,9 @@ type LHsType name = Located (HsType name)
       -- For details on above see note [Api annotations] in ApiAnnotation
 type HsKind name = HsType name
 type LHsKind name = Located (HsKind name)
+      -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+
+      -- For details on above see note [Api annotations] in ApiAnnotation
 
 --------------------------------------------------
 --             LHsTyVarBndrs

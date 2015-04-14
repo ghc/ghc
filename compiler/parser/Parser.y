@@ -927,8 +927,8 @@ ty_decl :: { LTyClDecl RdrName }
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
                 {% amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $5) $3
-                                   (unLoc $4))
-                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $5)) }
+                                   (snd $ unLoc $4))
+                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
           -- ordinary data type or newtype declaration
         | data_or_newtype capi_ctype tycl_hdr constrs deriving
@@ -944,15 +944,15 @@ ty_decl :: { LTyClDecl RdrName }
                  gadt_constrlist
                  deriving
             {% amms (mkTyData (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2 $3
-                            (unLoc $4) (snd $ unLoc $5) (unLoc $6) )
+                            (snd $ unLoc $4) (snd $ unLoc $5) (unLoc $6) )
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
-                    ((fst $ unLoc $1):(fst $ unLoc $5)) }
+                    ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
           -- data/newtype family
         | 'data' 'family' type opt_kind_sig
-                {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3 (unLoc $4))
-                        [mj AnnData $1,mj AnnFamily $2] }
+                {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3 (snd $ unLoc $4))
+                        (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
 inst_decl :: { LInstDecl RdrName }
         : 'instance' overlap_pragma inst_type where_inst
@@ -987,9 +987,9 @@ inst_decl :: { LInstDecl RdrName }
                  gadt_constrlist
                  deriving
             {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 $4
-                                   (unLoc $5) (snd $ unLoc $6) (unLoc $7))
+                                   (snd $ unLoc $5) (snd $ unLoc $6) (unLoc $7))
                     ((fst $ unLoc $1):mj AnnInstance $2
-                       :(fst $ unLoc $6)) }
+                       :(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 overlap_pragma :: { Maybe (Located OverlapMode) }
   : '{-# OVERLAPPABLE'    '#-}' {% ajs (Just (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1))))
@@ -1049,19 +1049,19 @@ at_decl_cls :: { LHsDecl RdrName }
         :  -- data family declarations, with optional 'family' keyword
           'data' opt_family type opt_kind_sig
                 {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3
-                                                  (unLoc $4)))
-                        (mj AnnData $1:$2) }
+                                                  (snd $ unLoc $4)))
+                        (mj AnnData $1:$2++(fst $ unLoc $4)) }
 
            -- type family declarations, with optional 'family' keyword
            -- (can't use opt_instance because you get shift/reduce errors
         | 'type' type opt_kind_sig
                {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $2 $3)
-                                                  OpenTypeFamily $2 (unLoc $3)))
-                       [mj AnnType $1] }
+                                                  OpenTypeFamily $2 (snd $ unLoc $3)))
+                       (mj AnnType $1:(fst $ unLoc $3)) }
         | 'type' 'family' type opt_kind_sig
                {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4)
-                                                  OpenTypeFamily $3 (unLoc $4)))
-                       [mj AnnType $1,mj AnnFamily $2] }
+                                                  OpenTypeFamily $3 (snd $ unLoc $4)))
+                       (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
@@ -1097,16 +1097,16 @@ at_decl_inst :: { LInstDecl RdrName }
                  gadt_constrlist
                  deriving
                 {% amms (mkDataFamInst (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2
-                                $3 (unLoc $4) (snd $ unLoc $5) (unLoc $6))
-                        ((fst $ unLoc $1):(fst $ unLoc $5)) }
+                                $3 (snd $ unLoc $4) (snd $ unLoc $5) (unLoc $6))
+                        ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
 data_or_newtype :: { Located (AddAnn,NewOrData) }
         : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
         | 'newtype'     { sL1 $1 (mj AnnNewtype $1,NewType) }
 
-opt_kind_sig :: { Located (Maybe (LHsKind RdrName)) }
-        :                             { noLoc Nothing }
-        | '::' kind                   {% ajl (sLL $1 $> (Just $2)) AnnDcolon (gl $1) }
+opt_kind_sig :: { Located ([AddAnn],Maybe (LHsKind RdrName)) }
+        :                             { noLoc ([],Nothing) }
+        | '::' kind                   { sLL $1 $> ([mj AnnDcolon $1],Just ($2)) }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
