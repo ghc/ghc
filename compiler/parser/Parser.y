@@ -2392,7 +2392,7 @@ guardquals :: { Located [LStmt RdrName (LHsExpr RdrName)] }
     : guardquals1           { L (getLoc $1) (reverse (unLoc $1)) }
 
 guardquals1 :: { Located [LStmt RdrName (LHsExpr RdrName)] }
-    : guardquals1 ',' qual  {% addAnnotation (gl $ last $ unLoc $1) AnnComma
+    : guardquals1 ',' qual  {% addAnnotation (gl $ head $ unLoc $1) AnnComma
                                              (gl $2) >>
                                return (sLL $1 $> ($3 : unLoc $1)) }
     | qual                  { sL1 $1 [$1] }
