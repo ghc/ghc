@@ -207,3 +207,5 @@ test('T9878b',
       extra_clean(['T9878b.hi','T9878b.o'])],
     ghci_script, ['T9878b.script'])
 test('T10122', normal, ghci_script, ['T10122.script'])
+test('T10322', when(opsys('darwin'), expect_broken(10322)),
+    ghci_script, ['T10322.script'])
