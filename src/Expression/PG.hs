@@ -2,9 +2,14 @@
 
 module Expression.PG (
     module Expression.Predicate,
-    PG (..), (?), (??), whenExists
+    PG (..), (|>), (?), (??), whenExists,
+    msum, mproduct,
+    fromList, fromOrderedList
     ) where
 
+import Data.Functor
+import Control.Monad
+import Control.Applicative
 import Expression.Predicate
 
 -- A generic Parameterised Graph datatype
@@ -16,15 +21,53 @@ data PG p v = Epsilon
             | Sequence (PG p v) (PG p v)
             | Condition p (PG p v)
 
+instance Functor (PG p) where
+    fmap = liftM
+
+instance Applicative (PG p) where
+    pure = return
+    (<*>) = ap
+
+instance Monad (PG p) where
+    return = Vertex
+
+    Epsilon       >>= _ = Epsilon
+    Vertex    v   >>= f = f v
+    Overlay   l r >>= f = Overlay   (l >>= f) (r >>= f)
+    Sequence  l r >>= f = Sequence  (l >>= f) (r >>= f)
+    Condition l r >>= f = Condition l         (r >>= f)
+
+instance MonadPlus (PG p) where
+    mzero = Epsilon
+    mplus = Overlay
+
+instance Alternative (PG p) where
+    empty = Epsilon
+    (<|>) = Overlay
+
+(|>) :: PG p v -> PG p v -> PG p v
+(|>) = Sequence
+
+mproduct :: [PG p v] -> PG p v
+mproduct = foldr (|>) Epsilon
+
+fromList :: [v] -> PG p v
+fromList = msum . map return
+
+fromOrderedList :: [v] -> PG p v
+fromOrderedList = mproduct . map return
+
+infixl 7 |>
+
 (?) :: p -> PG p v -> PG p v
 (?) = Condition
 
-infixl 7 ?
+infixl 8 ?
 
 (??) :: Predicate p => p -> (PG p v, PG p v) -> PG p v
 (??) p (t, f) = Overlay (p ? t) (not p ? f)
 
-infixl 7 ??
+infixl 8 ??
 
 -- Given a vertex and a PG return a predicate, which tells when the vertex
 -- exists in the PG.

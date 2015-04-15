@@ -4,9 +4,9 @@ module Package.Base (
     module Ways,
     module Util,
     module Oracles,
-    Package (..), Settings (..), TodoItem (..),
-    defaultSettings, library, customise, updateSettings,
-    commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
+    -- Package (..), Settings (..), TodoItem (..),
+    -- defaultSettings, library, customise, updateSettings,
+    -- commonCcArgs, commonLdArgs, commonCppArgs, commonCcWarninigArgs,
     pathArgs, packageArgs,
     includeGccArgs, includeGhcArgs, pkgHsSources,
     pkgDepHsObjects, pkgLibHsObjects, pkgCObjects,
@@ -20,137 +20,45 @@ import Base
 import Ways
 import Util
 import Oracles
+import Settings
 import qualified System.Directory as S
 
-data Settings = Settings
-     {
-         customConfArgs  :: Args,         -- custom args for configure
-         customCcArgs    :: Args,         -- custom args for Gcc
-         customLdArgs    :: Args,         -- custom args for Ld
-         customCppArgs   :: Args,         -- custom args for C preprocessor
-         customDllArgs   :: Args,         -- custom dll args
-         registerPackage :: Bool,         -- do we need to call ghc-pkg update?
-         ways            :: Action [Way], -- ways to build
-         buildWhen       :: Condition     -- skip the package if need be, e.g.
-     }                                    -- don't build unix on Windows
+--pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
+--pathArgs key path as = map (\a -> key ++ unifyPath (path </> a)) <$> args as
 
-defaultSettings :: Stage -> Settings
-defaultSettings stage = Settings
-                        {
-                            customConfArgs  = mempty,
-                            customCcArgs    = mempty,
-                            customLdArgs    = mempty, -- currently not used
-                            customCppArgs   = mempty, -- currently not used
-                            customDllArgs   = mempty, -- only for compiler
-                            registerPackage = True,
-                            ways            = defaultWays stage,
-                            buildWhen       = return True
-                        }
+prefixedPath :: String -> [Settings] -> Settings
+prefixedPath prefix = argPrefix prefix . argConcatPath . sconcat
 
--- Stage is the stage of the GHC that we use to build the package
--- FilePath is the directory to put the build results (relative to pkgPath)
--- The typical structure of that directory is:
--- * build/           : contains compiled object code
--- * doc/             : produced by haddock
--- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal.cabal
--- Settings may be different for different combinations of Stage & FilePath
--- TODO: the above may be incorrect, settings seem to *only* depend on the
--- stage. In fact Stage seem to define FilePath and Settings, therefore we
--- can drop the TodoItem and replace it by [Stage] and two functions
---    * distDirectory :: Package -> Stage -> FilePath
---    * settings      :: Package -> Stage -> Settings
-type TodoItem = (Stage, FilePath, Settings)
+--includeGccArgs :: FilePath -> FilePath -> Args
+--includeGccArgs path dist =
+--    let pathDist = path </> dist
+--        autogen  = pathDist </> "build/autogen"
+--    in args [ arg $ "-I" ++ unifyPath autogen
+--            , pathArgs "-I" path $ IncludeDirs pathDist
+--            , pathArgs "-I" path $ DepIncludeDirs pathDist ]
 
--- pkgPath is the path to the source code relative to the root
-data Package = Package
-     {
-         pkgName  :: String,    -- For example: "deepseq"
-         pkgPath  :: FilePath,  -- "libraries/deepseq"
-         pkgCabal :: FilePath,  -- "deepseq"
-         pkgTodo  :: [TodoItem] -- [(Stage1, "dist-install", defaultSettings)]
-     }
 
-instance Eq Package where
-    (==) = (==) `on` pkgName
+includeGccSettings :: Settings
+includeGccSettings = mconcat
+    [ prefixedPath "-I" [argBuildPath, argBuildDir, arg "build", arg "autogen"]
+    , argPrefix "-I" $ argPaths ...
+    , prefixedPath "-I" [argBuildPath, argIncludeDirs ] -- wrong
+    , prefixedPath "-I" [argBuildPath, argDepIncludeDirs ]]
 
-updateSettings :: (Settings -> Settings) -> Package -> Package
-updateSettings update (Package name path cabal todo) =
-    Package name path cabal (map updateTodo todo)
-  where
-    updateTodo (stage, filePath, settings) = (stage, filePath, update settings)
+includeGhcSettings :: Settings
+includeGhcSettings =
+    let buildDir = argBuildPath `fence` argSrcDirs
+    in arg "-i" `fence`
+       mconcat
+       [ argPathList "-i" [argBuildPath, argSrcDirs]
+       , argPath "-i" buildDir
+       , argPath "-I" buildDir
+       , argPathList "-i" [buildDir, arg "autogen"]
+       , argPathList "-I" [buildDir, arg "autogen"]
+       , argPathList "-I" [argBuildPath, argIncludeDirs]
+       , arg "-optP-include" -- TODO: Shall we also add -cpp?
+       , argPathList "-optP" [buildDir, arg "autogen/cabal_macros.h"] ]
 
-customise :: Package -> (Package -> Package) -> Package
-customise = flip ($)
-
-libraryPackage :: String -> String -> [Stage] -> (Stage -> Settings) -> Package
-libraryPackage name cabalName stages settings =
-    Package
-        name
-        (unifyPath $ "libraries" </> name)
-        cabalName
-        [ (stage
-        , if stage == Stage0 then "dist-boot" else "dist-install"
-        , settings stage)
-        | stage <- stages ]
-
-library :: String -> [Stage] -> Package
-library name stages = libraryPackage name name stages defaultSettings
-
-commonCcArgs :: Args
-commonCcArgs = when Validating $ args ["-Werror", "-Wall"]
-
-commonLdArgs :: Args
-commonLdArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
-
-commonCppArgs :: Args
-commonCppArgs = mempty -- TODO: Why empty? Perhaps drop it altogether?
-
-commonCcWarninigArgs :: Args
-commonCcWarninigArgs = when Validating $
-    args [ when GccIsClang                      $ arg "-Wno-unknown-pragmas"
-         , when (not GccIsClang && not GccLt46) $ arg "-Wno-error=inline"
-         , when (GccIsClang && not GccLt46 && windowsHost) $
-           arg "-Werror=unused-but-set-variable" ]
-
-pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
-pathArgs key path as = map (\a -> key ++ unifyPath (path </> a)) <$> args as
-
-packageArgs :: Stage -> FilePath -> Args
-packageArgs stage pathDist = do
-    usePackageKey <- SupportsPackageKey || stage /= Stage0
-    args [ arg "-hide-all-packages"
-         , arg "-no-user-package-db"
-         , arg "-include-pkg-deps"
-         , when (stage == Stage0) $
-           arg "-package-db libraries/bootstrapping.conf"
-         , if usePackageKey
-           then productArgs ["-this-package-key"] [arg  $ PackageKey pathDist]
-             <> productArgs ["-package-key"     ] [args $ DepKeys    pathDist]
-           else productArgs ["-package-name"    ] [arg  $ PackageKey pathDist]
-             <> productArgs ["-package"         ] [args $ Deps       pathDist]
-         ]
-
-includeGccArgs :: FilePath -> FilePath -> Args
-includeGccArgs path dist =
-    let pathDist = path </> dist
-        autogen  = pathDist </> "build/autogen"
-    in args [ arg $ "-I" ++ unifyPath autogen
-            , pathArgs "-I" path $ IncludeDirs pathDist
-            , pathArgs "-I" path $ DepIncludeDirs pathDist ]
-
-includeGhcArgs :: FilePath -> FilePath -> Args
-includeGhcArgs path dist =
-    let pathDist = path </> dist
-        buildDir = unifyPath $ pathDist </> "build"
-    in args [ arg "-i"
-            , pathArgs "-i" path $ SrcDirs pathDist
-            , concatArgs ["-i", "-I"]
-              [buildDir, unifyPath $ buildDir </> "autogen"]
-            , pathArgs "-I" path $ IncludeDirs pathDist
-            , arg "-optP-include" -- TODO: Shall we also add -cpp?
-            , concatArgs ["-optP"]
-              [unifyPath $ buildDir </> "autogen/cabal_macros.h"]
-            ]
 
 pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
 pkgHsSources path dist = do

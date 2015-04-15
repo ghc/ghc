@@ -5,7 +5,7 @@ module Expression.Build (
     BuildPredicate (..),
     BuildExpression (..),
     evaluate, tellTruth,
-    singleton, fence, linearise,
+    linearise, msum, mproduct, fromList, fromOrderedList,
     packages, package, matchPackage,
     builders, builder, matchBuilder, matchBuilderFamily,
     stages, stage, notStage, matchStage,
@@ -13,15 +13,15 @@ module Expression.Build (
     files, file, matchFile,
     configValues, config, configYes, configNo, configNonEmpty, matchConfig,
     supportsPackageKey, targetPlatforms, targetPlatform,
-    targetOss, targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
-    platformSupportsSharedLibs, crossCompiling
+    targetOss, targetOs, targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
+    platformSupportsSharedLibs, crossCompiling,
+    gccIsClang, gccLt46, windowsHost
     ) where
 
-import Data.Monoid
 import Control.Applicative
 import Base
 import Ways
-import Package.Base (Package)
+import Package (Package)
 import Oracles.Builder
 import Expression.PG
 
@@ -54,18 +54,6 @@ alternatives :: Predicate a => (b -> Variable a) -> [b] -> a
 alternatives f = foldr (||) false . map (variable . f)
 
 type BuildExpression v = PG BuildPredicate v
-
-singleton :: v -> BuildExpression v
-singleton = Vertex
-
--- Monoid instance for combining arguments when order does not matter.
-instance Monoid (BuildExpression v) where
-    mempty  = Epsilon
-    mappend = Overlay
-
--- Insert a fence between two build expressions (for positional arguments)
-fence :: BuildExpression v -> BuildExpression v -> BuildExpression v
-fence = Sequence
 
 -- Partially evaluate a BuildPredicate with a truth-teller function
 -- that takes a BuildVariable and returns a Maybe Bool, where Nothing
@@ -209,6 +197,9 @@ targetPlatform s = targetPlatforms [s]
 targetOss :: [String] -> BuildPredicate
 targetOss = configValues "target-os"
 
+targetOs :: String -> BuildPredicate
+targetOs s = targetOss [s]
+
 targetArchs :: [String] -> BuildPredicate
 targetArchs = configValues "target-arch"
 
@@ -236,3 +227,12 @@ ghcWithInterpreter =
 
 crossCompiling :: BuildPredicate
 crossCompiling = configYes "cross-compiling"
+
+gccIsClang :: BuildPredicate
+gccIsClang = configYes "gcc-is-clang"
+
+gccLt46 :: BuildPredicate
+gccLt46 = configYes "gcc-lt-46"
+
+windowsHost :: BuildPredicate
+windowsHost = configValues "host-os-cpp" ["mingw32", "cygwin32"]

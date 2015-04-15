@@ -6,19 +6,24 @@ module Expression.Base (
     (?), (??), whenExists,
     Args (..), -- hide?
     Settings,
+    Packages,
+    FilePaths,
     Ways,
-    remove, project,
-    arg, args, argsOrdered, argPairs, argBuildPath, argBuildDist,
-    argConfig, argBuilderPath, argStagedBuilderPath,
-    argPackageKey, argPackageDeps, argPackageDepKeys,
-    argComplex, argPath, argBootPkgConstraints,
+    project,
+    arg, args, argsOrdered, argBuildPath, argBuildDir,
+    argInput, argOutput,
+    argConfig, argConfigStaged, argBuilderPath, argStagedBuilderPath,
+    argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
+    argIncludeDirs, argDepIncludeDirs,
+    argConcat, argConcatPath, argPairs, argPrefix,
+    argBootPkgConstraints,
     setPackage, setBuilder, setBuilderFamily, setStage, setWay,
     setFile, setConfig
     ) where
 
 import Base hiding (arg, args, Args)
 import Ways
-import Package.Base (Package)
+import Package (Package)
 import Oracles.Builder
 import Expression.PG
 import Expression.Predicate
@@ -26,94 +31,115 @@ import Expression.Build
 
 -- Settings can be built out of the following primitive elements
 data Args
-    = Plain [String]          -- an (ordered) list of arguments: ["-i", "dir"]
-    | Pairs String [String]   -- resolves to a list of pairs: "-i dir1 -i dir2"
-    | BuildPath               -- evaluates to build path: libraries/base
-    | BuildDist               -- evaluates to build subdirectory: dist-install
-    | Config String           -- evaluates to the value of a given config key
-    | BuilderPath Builder     -- evaluates to the path to a given builder
-    | PackageKey String       -- looks up "PACKAGE_KEY" in package-data.mk
-    | PackageDeps String      -- looks up "DEPS"        in package-data.mk
-    | PackageDepKeys String   -- looks up "DEP_KEYS"    in package-data.mk
-    | BootPkgConstraints      -- evaluates to boot package constraints
-    | Complex String Settings -- joins a prefix with settings: "CFLAGS=..."
-    | Path String Settings    -- as above but joins settings elements with </>
+    = Plain String           -- a plain old string argument: e.g., "-O2"
+    | BuildPath              -- evaluates to build path: "libraries/base"
+    | BuildDir               -- evaluates to build directory: "dist-install"
+    | Input                  -- evaluates to input file(s): "src.c"
+    | Output                 -- evaluates to output file(s): "src.o"
+    | Config String          -- evaluates to the value of a given config key
+    | ConfigStaged String    -- as above, but stage is appended to the key
+    | BuilderPath Builder    -- evaluates to the path to a given builder
+    | PackageData String     -- looks up value a given key in package-data.mk
+    | BootPkgConstraints     -- evaluates to boot package constraints
+    | Pair Combine Args Args -- combine two Args using a given append method
+    | Fold Combine Settings  -- fold settings using a given combine method
 
-type Settings = BuildExpression Args
-type Ways     = BuildExpression Way
+-- Assume original settings structure: (a `op1` b `op2` c ...)
+data Combine = Concat        -- Concatenate all: a ++ b ++ c ...
+             | ConcatPath    -- </>-concatenate all: a </> b </> c ...
+
+type Ways      = BuildExpression Way
+type Settings  = BuildExpression Args
+type Packages  = BuildExpression Package
+type FilePaths = BuildExpression FilePath
 
 -- A single argument
 arg :: String -> Settings
-arg s = Vertex $ Plain [s]
+arg = return . Plain
 
 -- A set of arguments (unordered)
 args :: [String] -> Settings
-args = mconcat . map arg
+args = msum . map arg
 
 -- An (ordered) list of arguments
 argsOrdered :: [String] -> Settings
-argsOrdered = Vertex . Plain
-
--- An (ordered) list of pair of arguments: [prefix, arg1, prefix, arg2, ...]
-argPairs :: String -> [String] -> Settings
-argPairs prefix = Vertex . Pairs prefix
-
-argBuildDist :: Settings
-argBuildPath = Vertex $ BuildPath
+argsOrdered = mproduct . map arg
 
 argBuildPath :: Settings
-argBuildDist = Vertex $ BuildDist
+argBuildPath = return BuildPath
+
+argBuildDir :: Settings
+argBuildDir = return BuildDir
+
+argInput :: Settings
+argInput = return Input
+
+argOutput :: Settings
+argOutput = return Output
 
 argConfig :: String -> Settings
-argConfig = Vertex . Config
+argConfig = return . Config
+
+argConfigStaged :: String -> Settings
+argConfigStaged = return . ConfigStaged
 
 argBuilderPath :: Builder -> Settings
-argBuilderPath = Vertex . BuilderPath
+argBuilderPath = return . BuilderPath
 
 -- evaluates to the path to a given builder, taking current stage into account
 argStagedBuilderPath :: (Stage -> Builder) -> Settings
 argStagedBuilderPath f =
-    mconcat $ map (\s -> stage s ? argBuilderPath (f s)) [Stage0 ..]
+    msum $ map (\s -> stage s ? argBuilderPath (f s)) [Stage0 ..]
 
-argPackageKey :: String -> Settings
-argPackageKey = Vertex . PackageKey
+-- Accessing key value pairs from package-data.mk files
+argPackageKey :: Settings
+argPackageKey = return $ PackageData "PACKAGE_KEY"
 
-argPackageDeps :: String -> Settings
-argPackageDeps = Vertex . PackageDeps
+argPackageDeps :: Settings
+argPackageDeps = return $ PackageData "DEPS"
 
-argPackageDepKeys :: String -> Settings
-argPackageDepKeys = Vertex . PackageDepKeys
+argPackageDepKeys :: Settings
+argPackageDepKeys = return $ PackageData "DEP_KEYS"
+
+argSrcDirs :: Settings
+argSrcDirs = return $ PackageData "HS_SRC_DIRS"
+
+argIncludeDirs :: Settings
+argIncludeDirs = return $ PackageData "INCLUDE_DIRS"
+
+argDepIncludeDirs :: Settings
+argDepIncludeDirs = return $ PackageData "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
 
 argBootPkgConstraints :: Settings
-argBootPkgConstraints = Vertex $ BootPkgConstraints
+argBootPkgConstraints = return BootPkgConstraints
 
-argComplex :: String -> Settings -> Settings
-argComplex prefix = Vertex . Complex prefix
+-- A concatenation of arguments: arg1 ++ arg2 ++ ...
+argConcat :: Settings -> Settings
+argConcat = return . Fold Concat
 
-argPath :: String -> Settings -> Settings
-argPath prefix = Vertex . Path prefix
+-- A </>-concatenation of arguments: arg1 </> arg2 </> ...
+argConcatPath :: Settings -> Settings
+argConcatPath = return . Fold ConcatPath
+
+-- An ordered list of pairs of arguments: prefix |> arg1, prefix |> arg2, ...
+argPairs :: String -> Settings -> Settings
+argPairs prefix settings = settings >>= (arg prefix |>) . return
+
+-- An ordered list of prefixed arguments: prefix ++ arg1, prefix ++ arg2, ...
+argPrefix :: String -> Settings -> Settings
+argPrefix prefix = fmap (Pair Concat $ Plain prefix)
+
+-- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
+argPaths :: String -> Settings -> Settings
+argPaths prefix = fmap (Pair ConcatPath $ Plain prefix)
 
 -- Partially evaluate Settings using a truth-teller (compute a 'projection')
 project :: (BuildVariable -> Maybe Bool) -> Settings -> Settings
 project _ Epsilon = Epsilon
-project t (Vertex v) = case v of
-    Complex l r -> argComplex l (project t r)
-    Path    l r -> argPath    l (project t r)
-    _           -> Vertex v
+project t (Vertex v) = Vertex v -- TODO: go deeper
 project t (Overlay   l r) = Overlay   (project  t l) (project t r)
 project t (Sequence  l r) = Sequence  (project  t l) (project t r)
 project t (Condition l r) = Condition (evaluate t l) (project t r)
-
--- Removes a given argument list from settings
-remove :: [String] -> Settings -> Settings
-remove _ Epsilon = Epsilon
-remove as v @ (Vertex (Plain bs))
-    | as == bs  = Epsilon
-    | otherwise = v
-remove _ v @ (Vertex _)   = v
-remove as (Overlay   l r) = Overlay   (remove as l) (remove as r)
-remove as (Sequence  l r) = Sequence  (remove as l) (remove as r)
-remove as (Condition x r) = Condition x             (remove as r)
 
 -- Partial evaluation of settings
 

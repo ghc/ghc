@@ -1,119 +1,114 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
-    targetPackages, targetPackagesInStage
+    buildHaddock,
+    targetWays, targetPackages, targetPackagesInStage,
+    IntegerLibraryImpl (..), integerLibraryImpl, integerLibraryName,
+    array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
+    directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
+    parallel, pretty, primitive, process, stm, templateHaskell, terminfo, time,
+    transformers, unix, win32, xhtml
     ) where
 
-import Package.Base
-import Settings
+import Ways
+import Base
+import Package
 import Expression.Base
 
--- These are the packages we build:
-targetPackages :: [Package]
-targetPackages = [deepseq]
-    --[ library "array"            [        Stage1]
-    --, library "base"             [        Stage1] `customise` baseTraits
-    --, library "bin-package-db"   [Stage0, Stage1]
-    --, library "binary"           [Stage0, Stage1]
-    --, library "bytestring"       [        Stage1]
-    --, library "Cabal/Cabal"      [Stage0, Stage1] `customise` cabalTraits
-    --, library "containers"       [        Stage1]
-    --, library "deepseq"          [        Stage1]
-    --, library "directory"        [        Stage1]
-    --, library "filepath"         [        Stage1]
-    --, library "ghc-prim"         [        Stage1] `customise` ghcPrimTraits
-    --, library "haskeline"        [        Stage1]
-    --, library "hoopl"            [Stage0, Stage1]
-    --, library "hpc"              [Stage0, Stage1]
-    --, library integerLibraryName [        Stage1] `customise` intLibTraits
-    --, library "parallel"         [        Stage1]
-    --, library "pretty"           [        Stage1]
-    --, library "primitive"        [        Stage1]
-    --, library "process"          [        Stage1]
-    --, library "stm"              [        Stage1]
-    --, library "template-haskell" [        Stage1]
-    --, library "terminfo"         [Stage0, Stage1] `customise` terminfoTraits
-    --, library "time"             [        Stage1]
-    --, library "transformers"     [Stage0, Stage1]
-    --, library "unix"             [        Stage1] `customise` unixTraits
-    --, library "Win32"            [        Stage1] `customise` win32Traits
-    --, library "xhtml"            [        Stage1] `customise` xhtmlTraits
-    --]
+buildHaddock :: BuildPredicate
+buildHaddock = true
 
--- Package definitions:
-deepseq :: Package
-deepseq = library "deepseq" [Stage1]
+-- These are the packages we build
+targetPackages :: Packages
+targetPackages =
+    [ stage Stage0 ? packagesStage0
+    , stage Stage1 ? packagesStage1 ]
 
---baseTraits :: Package -> Package
---baseTraits = updateSettings (\settings ->
---    settings { customConfArgs = arg $ "--flags=" ++ integerLibraryName })
+packagesStage0 :: Packages
+packagesStage0 = mconcat
+    [ fromList [ binPackageDb, binary, cabal, hoopl, hpc, transformers ]
+    , windowsHost && not (targetOs "ios") ? terminfo ]
 
----- see Note [Cabal package weirdness]
---cabalTraits :: Package -> Package
---cabalTraits (Package name path cabal todo) = Package name path "Cabal" todo
+packagesStage1 :: Packages
+packagesStage1 = msum
+    [ packagesStage0
+    , fromList [ array, base, bytestring, containers, deepseq, directory
+               , filepath, ghcPrim, haskeline, integerLibrary, parallel
+               , pretty, primitive, process, stm, templateHaskell, time ]
+    , not windowsHost ? unix
+    , windowsHost     ? win32
+    , buildHaddock    ? xhtml ]
 
---ghcPrimTraits :: Package -> Package
---ghcPrimTraits = updateSettings (\settings ->
---    settings { customConfArgs = arg "--flag=include-ghc-prim" })
+-- Packages will be build these ways
+targetWays :: Ways
+targetWays = msum
+    [                              return vanilla -- always build vanilla
+    , notStage Stage0            ? return profiling
+    , platformSupportsSharedLibs ? return dynamic ]
 
---intLibTraits :: Package -> Package
---intLibTraits (Package name path cabal todo) = updateSettings update pkg
---  where
---    pkg = Package name path cabalName todo
---    cabalName = case integerLibrary of
---        IntegerGmp    -> "integer-gmp"
---        IntegerGmp2   -> "integer-gmp" -- Indeed, why make life easier?
---        IntegerSimple -> "integer-simple"
---    update settings = settings
---        {
---            customConfArgs = when windowsHost $
---                             arg "--configure-option=--with-intree-gmp",
---            customCcArgs   = arg "-Ilibraries/integer-gmp2/gmp"
---        }
+-- Build results will be placed into a target directory with the following
+-- typical structure:
+-- * build/           : contains compiled object code
+-- * doc/             : produced by haddock
+-- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
+targetDirectories :: FilePaths
+targetDirectories =
+    stage Stage0 ?? (return "dist-boot", return "dist-install")
 
---terminfoTraits :: Package -> Package
---terminfoTraits = updateSettings (\settings ->
---    settings
---    {
---        buildWhen = do
---            os <- showArg TargetOs
---            not windowsHost && (os /= "ios")
---    })
+-- Support for multiple integer library implementations
+data IntegerLibraryImpl = IntegerGmp | IntegerGmp2 | IntegerSimple
 
---unixTraits :: Package -> Package
---unixTraits = updateSettings (\settings ->
---    settings { buildWhen = not windowsHost })
+integerLibraryImpl :: IntegerLibraryImpl
+integerLibraryImpl = IntegerGmp2
 
---win32Traits :: Package -> Package
---win32Traits = updateSettings (\settings ->
---    settings { buildWhen = windowsHost })
+integerLibraryName :: String
+integerLibraryName = case integerLibraryImpl of
+    IntegerGmp    -> "integer-gmp"
+    IntegerGmp2   -> "integer-gmp2"
+    IntegerSimple -> "integer-simple"
 
---xhtmlTraits :: Package -> Package
---xhtmlTraits = updateSettings (\settings ->
---    settings { buildWhen = return buildHaddock })
+-- see Note [Cabal name weirdness]
+integerLibraryCabal :: FilePath
+integerLibraryCabal = case integerLibraryImpl of
+        IntegerGmp    -> "integer-gmp.cabal"
+        IntegerGmp2   -> "integer-gmp.cabal" -- Indeed, why make life easier?
+        IntegerSimple -> "integer-simple.cabal"
 
-targetPackagesInStage :: Stage -> [Package]
-targetPackagesInStage stage = filter inStage targetPackages
-  where
-    inStage (Package _ _ _ todoItems) = any matchStage todoItems
-    matchStage (todoStage, _, _)    = todoStage == stage
+-- Package definitions
+array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
+    directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
+    parallel, pretty, primitive, process, stm, templateHaskell, terminfo, time,
+    transformers, unix, win32, xhtml :: Package
+
+array           = library "array"
+base            = library "base"
+binPackageDb    = library "bin-package-db"
+binary          = library "binary"
+bytestring      = library "bytestring"
+cabal           = library "Cabal/Cabal" `setCabal` "Cabal.cabal"
+containers      = library "containers"
+deepseq         = library "deepseq"
+directory       = library "directory"
+filepath        = library "filepath"
+ghcPrim         = library "ghc-prim"
+haskeline       = library "haskeline"
+hoopl           = library "hoopl"
+hpc             = library "hpc"
+integerLibrary  = library integerLibraryName `setCabal` integerLibraryCabal
+parallel        = library "parallel"
+pretty          = library "pretty"
+primitive       = library "primitive"
+process         = library "process"
+stm             = library "stm"
+templateHaskell = library "template-haskell"
+terminfo        = library "terminfo"
+time            = library "time"
+transformers    = library "transformers"
+unix            = library "unix"
+win32           = library "Win32"
+xhtml           = library "xhtml"
 
 -- TODISCUSS
--- Note [Cabal package weirdness]
+-- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/
 -- What is Cabal/cabal-install? Do we need it?
-
--- TODISCUSS
--- Note [configuration files]
--- In this file we have two configuration options: integerLibrary and
--- buildHaddock. Arguably, their place should be among other configuration
--- options in the config files, however, moving integerLibrary there would
--- actually be quite painful, because it would then be confined to live in
--- the Action monad.
--- In general, shall we keep as many options as possible inside Shake, or
--- leave them in one place -- configuration files? We could try to move
--- everything to Shake which would be great:
---    * type safety and better abstractions
---    * useable outside the Action monad, e.g. for creating rules
---    * recompiling Shake is much faster then re-running configure script
---    * ... no more autoconf/configure and native Windows build?! Sign me up!
--- However, moving everything to Shake seems unfeasible at the moment.
+-- A related question about gmp2 -- let's rename the cabal file?

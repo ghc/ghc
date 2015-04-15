@@ -2,9 +2,10 @@ import Base
 import Config
 import Oracles
 import Package
+import Targets
 
 main = shakeArgs shakeOptions{shakeFiles="_build/"} $ do
-    oracleRules        
-    autoconfRules        
+    oracleRules
+    autoconfRules
     configureRules
-    packageRules
+    --packageRules
