@@ -63,7 +63,11 @@ a thunk (function type), called multiple times, still calls once:
 a thunk (non-function-type), in mutual recursion, still calls once (d 1 would be good):
     go 2
     x 0
-    d 1
+    d 0
+a thunk (non-function-type), in mutual recursion, causes many calls (d 1 would be bad):
+    go 2
+    x 0
+    d 0
 a thunk (function type), in mutual recursion, still calls once (d 1 would be good):
     go 1
     d 1
