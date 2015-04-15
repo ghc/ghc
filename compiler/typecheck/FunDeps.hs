@@ -382,11 +382,12 @@ checkInstCoverage be_liberal clas theta inst_taus
        = NotValid msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
-         ls_tvs = closeOverKinds (tyVarsOfTypes ls)  -- See Note [Closing over kinds in coverage]
+         ls_tvs = tyVarsOfTypes ls
          rs_tvs = tyVarsOfTypes rs
 
-         conservative_ok = rs_tvs `subVarSet` ls_tvs
-         liberal_ok      = rs_tvs `subVarSet` oclose theta ls_tvs
+         conservative_ok = rs_tvs `subVarSet` closeOverKinds ls_tvs
+         liberal_ok      = rs_tvs `subVarSet` closeOverKinds (oclose theta ls_tvs)
+                           -- closeOverKinds: see Note [Closing over kinds in coverage]
 
          msg = vcat [ sep [ ptext (sLit "The")
                             <+> ppWhen be_liberal (ptext (sLit "liberal"))
@@ -419,7 +420,7 @@ Example (Trac #8391), using liberal coverage
     instance Bar a (Foo a)
 
 In the instance decl, (a:k) does fix (Foo k a), but only if we notice
-that (a:k) fixes k.
+that (a:k) fixes k.  Trac #10109 is another example.
 
 Note [The liberal coverage condition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
