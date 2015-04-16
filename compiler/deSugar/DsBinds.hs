@@ -41,10 +41,11 @@ import Digraph
 import PrelNames
 import TysPrim ( mkProxyPrimTy )
 import TyCon      ( isTupleTyCon, tyConDataCons_maybe
-                  , tyConName, isPromotedTyCon, isPromotedDataCon )
+                  , tyConName, isPromotedTyCon, isPromotedDataCon, tyConKind )
 import TcEvidence
 import TcType
 import Type
+import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, tupleCon, mkListTy
                   , mkBoxedTupleTy, stringTy )
@@ -983,6 +984,9 @@ dsEvTypeable ev =
     hash_name_fs
       | isPromotedTyCon tc    = appendFS (mkFastString "$k") name_fs
       | isPromotedDataCon tc  = appendFS (mkFastString "$c") name_fs
+      | isTupleTyCon tc &&
+        returnsConstraintKind (tyConKind tc)
+                              = appendFS (mkFastString "$p") name_fs
       | otherwise             = name_fs
 
     hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, hash_name_fs]
