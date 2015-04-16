@@ -12,7 +12,7 @@ import TcCanonical
 import TcFlatten
 import VarSet
 import Type
-import Kind (isKind, isConstraintKind)
+import Kind (isKind, isConstraintKind )
 import Unify
 import InstEnv( lookupInstEnv, instanceDFunId )
 import CoAxiom(sfInteractTop, sfInteractInert)
@@ -2130,10 +2130,14 @@ Other notes:
 -- | Assumes that we've checked that this is the 'Typeable' class,
 -- and it was applied to the correc arugment.
 matchTypeableClass :: Class -> Kind -> Type -> CtLoc -> TcS LookupInstResult
-matchTypeableClass clas k t loc
+matchTypeableClass clas _k t loc
+
+  -- See Note [No Typeable for qualified types]
   | isForAllTy t                               = return NoInstance
-  | isConstraintKind k                         = return NoInstance
-      -- See Note [No Typeable for qualified types]
+  -- Is the type of the form `C => t`?
+  | Just (t1,_) <- splitFunTy_maybe t,
+    isConstraintKind (typeKind t1)             = return NoInstance
+
   | Just (tc, ks) <- splitTyConApp_maybe t
   , all isKind ks                              = doTyCon tc ks
   | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
@@ -2186,8 +2190,6 @@ matchTypeableClass clas k t loc
 We do not support impredicative typeable, such as
    Typeable (forall a. a->a)
    Typeable (Eq a => a -> a)
-   Typeable (Eq a)
-   Typeable (() :: Constraint)
    Typeable (() => Int)
    Typeable (((),()) => Int)
 
@@ -2198,19 +2200,9 @@ a TypeRep for them.  For qualified but not polymorphic types, like
  * We don't need a TypeRep for these things.  TypeReps are for
    monotypes only.
 
- * The types (Eq a, Show a) => ...blah...
-   and       Eq a => Show a => ...blah...
-   are represented the same way, as a curried function;
-   that is, the tuple before the '=>' is just syntactic
-   sugar.  But since we can abstract over tuples of constraints,
-   we really do have tuples of constraints as well.
-
-   This dichotomy is not well worked out, and Trac #9858 comment:76
-   shows that Typeable treated it one way, while newtype instance
-   matching treated it another.  Or maybe it was the fact that
-   '*' and Constraint are distinct to the type checker, but are
-   the same afterwards.  Anyway, the result was a function of
-   type (forall ab. a -> b), which is pretty dire.
-
-So the simple solution is not to attempt Typable for constraints.
+  * Perhaps we could treat `=>` as another type constructor for `Typeable`
+    purposes, and thus support things like `Eq Int => Int`, however,
+    at the current state of affairs this would be an odd exception as
+    no other class works with impredicative types.
+    For now we leave it off, until we have a better story for impredicativity.
 -}
