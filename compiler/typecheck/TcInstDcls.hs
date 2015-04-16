@@ -43,7 +43,8 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import PrelNames  ( typeableClassName, genericClassNames )
+import PrelNames  ( typeableClassName, genericClassNames
+                  , knownNatClassName, knownSymbolClassName )
 import Bag
 import BasicTypes
 import DynFlags
@@ -1065,9 +1066,10 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
       | (sc_co, norm_sc_pred) <- normaliseType fam_envs Nominal sc_pred
                                  -- sc_co :: sc_pred ~ norm_sc_pred
       , ClassPred cls tys <- classifyPredType norm_sc_pred
-      , className cls /= typeableClassName
-        -- `Typeable` has custom solving rules, which is why we exclude it
-        -- from the short cut, and fall through to calling the solver.
+      , not (usesCustomSolver cls)
+        -- Some classes (e.g., `Typeable`, `KnownNat`) have custom solving
+        -- rules, which is why we exclude it from the short cut,
+        -- and fall through to calling the solver.
 
       = do { sc_ev_tm <- emit_sc_cls_pred norm_sc_pred cls tys
            ; sc_ev_id <- newEvVar sc_pred
@@ -1108,6 +1110,18 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
                        ; emitInsoluble (mkNonCanonical sc_ev)
                        ; traceTc "tcSuperClass 3" (ppr sc_pred $$ ppr sc_ev)
                        ; return (ctEvTerm sc_ev) } }
+
+
+
+-- | Do we use a custom solver, which is safe to use when solving super-class
+-- constraints.
+usesCustomSolver :: Class -> Bool
+usesCustomSolver cls = name == typeableClassName
+                    || name == knownNatClassName
+                    || name == knownSymbolClassName
+  where
+  name = className cls
+
 
 -------------------
 checkInstConstraints :: (EvBindsVar -> TcM result)
