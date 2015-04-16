@@ -12,10 +12,11 @@ module Expression.Base (
     project,
     arg, args, argsOrdered, argBuildPath, argBuildDir,
     argInput, argOutput,
-    argConfig, argConfigStaged, argBuilderPath, argStagedBuilderPath,
+    argConfig, argStagedConfig, argBuilderPath, argStagedBuilderPath,
+    argWithBuilder, argWithStagedBuilder,
     argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     argIncludeDirs, argDepIncludeDirs,
-    argConcat, argConcatPath, argPairs, argPrefix,
+    argConcat, argConcatPath, argConcatSpace, argPairs, argPrefix,
     argBootPkgConstraints,
     setPackage, setBuilder, setBuilderFamily, setStage, setWay,
     setFile, setConfig
@@ -37,16 +38,14 @@ data Args
     | Input                  -- evaluates to input file(s): "src.c"
     | Output                 -- evaluates to output file(s): "src.o"
     | Config String          -- evaluates to the value of a given config key
-    | ConfigStaged String    -- as above, but stage is appended to the key
     | BuilderPath Builder    -- evaluates to the path to a given builder
     | PackageData String     -- looks up value a given key in package-data.mk
     | BootPkgConstraints     -- evaluates to boot package constraints
-    | Pair Combine Args Args -- combine two Args using a given append method
     | Fold Combine Settings  -- fold settings using a given combine method
 
--- Assume original settings structure: (a `op1` b `op2` c ...)
-data Combine = Concat        -- Concatenate all: a ++ b ++ c ...
-             | ConcatPath    -- </>-concatenate all: a </> b </> c ...
+data Combine = Concat        -- Concatenate: a ++ b
+             | ConcatPath    -- </>-concatenate: a </> b
+             | ConcatSpace   -- concatenate with a space: a ++ " " ++ b
 
 type Ways      = BuildExpression Way
 type Settings  = BuildExpression Args
@@ -80,8 +79,12 @@ argOutput = return Output
 argConfig :: String -> Settings
 argConfig = return . Config
 
-argConfigStaged :: String -> Settings
-argConfigStaged = return . ConfigStaged
+argStagedConfig :: String -> Settings
+argStagedConfig key =
+    msum $ map (\s -> stage s ? argConfig (stagedKey s)) [Stage0 ..]
+  where
+    stagedKey :: Stage -> String
+    stagedKey stage = key ++ "-stage" ++ show stage
 
 argBuilderPath :: Builder -> Settings
 argBuilderPath = return . BuilderPath
@@ -90,6 +93,25 @@ argBuilderPath = return . BuilderPath
 argStagedBuilderPath :: (Stage -> Builder) -> Settings
 argStagedBuilderPath f =
     msum $ map (\s -> stage s ? argBuilderPath (f s)) [Stage0 ..]
+
+argWithBuilder :: Builder -> Settings
+argWithBuilder builder =
+    let key = case builder of
+            Ar       -> "--with-ar="
+            Ld       -> "--with-ld="
+            Gcc _    -> "--with-gcc="
+            Ghc _    -> "--with-ghc="
+            Alex     -> "--with-alex="
+            Happy    -> "--with-happy="
+            GhcPkg _ -> "--with-ghc-pkg="
+            HsColour -> "--with-hscolour="
+    in
+    argPrefix key (argBuilderPath builder)
+
+argWithStagedBuilder :: (Stage -> Builder) -> Settings
+argWithStagedBuilder f =
+    msum $ map (\s -> stage s ? argWithBuilder (f s)) [Stage0 ..]
+
 
 -- Accessing key value pairs from package-data.mk files
 argPackageKey :: Settings
@@ -113,13 +135,17 @@ argDepIncludeDirs = return $ PackageData "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
 argBootPkgConstraints :: Settings
 argBootPkgConstraints = return BootPkgConstraints
 
--- A concatenation of arguments: arg1 ++ arg2 ++ ...
+-- Concatenate arguments: arg1 ++ arg2 ++ ...
 argConcat :: Settings -> Settings
 argConcat = return . Fold Concat
 
--- A </>-concatenation of arguments: arg1 </> arg2 </> ...
+-- </>-concatenate arguments: arg1 </> arg2 </> ...
 argConcatPath :: Settings -> Settings
 argConcatPath = return . Fold ConcatPath
+
+-- Concatene arguments (space separated): arg1 ++ " " ++ arg2 ++ ...
+argConcatSpace :: Settings -> Settings
+argConcatSpace = return . Fold ConcatSpace
 
 -- An ordered list of pairs of arguments: prefix |> arg1, prefix |> arg2, ...
 argPairs :: String -> Settings -> Settings
@@ -127,11 +153,11 @@ argPairs prefix settings = settings >>= (arg prefix |>) . return
 
 -- An ordered list of prefixed arguments: prefix ++ arg1, prefix ++ arg2, ...
 argPrefix :: String -> Settings -> Settings
-argPrefix prefix = fmap (Pair Concat $ Plain prefix)
+argPrefix prefix = fmap (Fold Concat . (arg prefix |>) . return)
 
 -- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
 argPaths :: String -> Settings -> Settings
-argPaths prefix = fmap (Pair ConcatPath $ Plain prefix)
+argPaths prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
 
 -- Partially evaluate Settings using a truth-teller (compute a 'projection')
 project :: (BuildVariable -> Maybe Bool) -> Settings -> Settings

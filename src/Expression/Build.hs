@@ -5,7 +5,7 @@ module Expression.Build (
     BuildPredicate (..),
     BuildExpression (..),
     evaluate, tellTruth,
-    linearise, msum, mproduct, fromList, fromOrderedList,
+    linearise, (|>), msum, mproduct, fromList, fromOrderedList,
     packages, package, matchPackage,
     builders, builder, matchBuilder, matchBuilderFamily,
     stages, stage, notStage, matchStage,

@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
     buildHaddock,
-    targetWays, targetPackages, targetPackagesInStage,
+    targetWays, targetPackages,
     IntegerLibraryImpl (..), integerLibraryImpl, integerLibraryName,
     array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
     directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
@@ -9,7 +9,7 @@ module Targets (
     transformers, unix, win32, xhtml
     ) where
 
-import Ways
+import qualified Ways
 import Base
 import Package
 import Expression.Base
@@ -19,14 +19,14 @@ buildHaddock = true
 
 -- These are the packages we build
 targetPackages :: Packages
-targetPackages =
+targetPackages = msum
     [ stage Stage0 ? packagesStage0
     , stage Stage1 ? packagesStage1 ]
 
 packagesStage0 :: Packages
-packagesStage0 = mconcat
+packagesStage0 = msum
     [ fromList [ binPackageDb, binary, cabal, hoopl, hpc, transformers ]
-    , windowsHost && not (targetOs "ios") ? terminfo ]
+    , windowsHost && not (targetOs "ios") ? return terminfo ]
 
 packagesStage1 :: Packages
 packagesStage1 = msum
@@ -34,16 +34,16 @@ packagesStage1 = msum
     , fromList [ array, base, bytestring, containers, deepseq, directory
                , filepath, ghcPrim, haskeline, integerLibrary, parallel
                , pretty, primitive, process, stm, templateHaskell, time ]
-    , not windowsHost ? unix
-    , windowsHost     ? win32
-    , buildHaddock    ? xhtml ]
+    , not windowsHost ? return unix
+    , windowsHost     ? return win32
+    , buildHaddock    ? return xhtml ]
 
 -- Packages will be build these ways
 targetWays :: Ways
 targetWays = msum
-    [                              return vanilla -- always build vanilla
-    , notStage Stage0            ? return profiling
-    , platformSupportsSharedLibs ? return dynamic ]
+    [                              return Ways.vanilla -- always build vanilla
+    , notStage Stage0            ? return Ways.profiling
+    , platformSupportsSharedLibs ? return Ways.dynamic ]
 
 -- Build results will be placed into a target directory with the following
 -- typical structure:

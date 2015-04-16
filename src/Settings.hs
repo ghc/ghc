@@ -11,19 +11,21 @@ import Ways
 import Oracles.Builder
 import Expression.Base
 
-whenPackageKey :: BuildPredicate
-whenPackageKey = supportsPackageKey && notStage Stage0
+validating :: BuildPredicate
+validating = false
 
 packageSettings :: Settings
-packageSettings = mconcat
+packageSettings = msum
     [ args ["-hide-all-packages", "-no-user-package-db", "-include-pkg-deps"]
-    , stage Stage0 ? args ["-package-db libraries/bootstrapping.conf"]
-    , whenPackageKey ??
-      ( argPackageKey "-this-package-key" <> argPackageDepKeys "-package-key"
-      , argPackageKey "-package-name"     <> argPackageDeps    "-package"    )]
+    , stage Stage0 ? arg "-package-db libraries/bootstrapping.conf"
+    , supportsPackageKey && notStage Stage0 ??
+      ( argPairs "-this-package-key" argPackageKey <|>
+        argPairs "-package-key"      argPackageDepKeys
+      , argPairs "-package-name"     argPackageKey <|>
+        argPairs "-package"          argPackageDeps )]
 
 librarySettings :: Ways -> Settings
-librarySettings ways = mconcat
+librarySettings ways = msum
     [ whenExists vanilla ways     ?? ( arg  "--enable-library-vanilla"
                                      , arg "--disable-library-vanilla" )
     , (ghcWithInterpreter
@@ -35,37 +37,34 @@ librarySettings ways = mconcat
     , whenExists dynamic ways     ?? ( arg  "--enable-shared"
                                      , arg "--disable-shared" )]
 
-validating :: BuildPredicate
-validating = false
-
 ccSettings :: Settings
-ccSettings = mconcat
+ccSettings = msum
     [ package integerLibrary ? arg "-Ilibraries/integer-gmp2/gmp"
-    , builder GhcCabal ? argConfigStaged "conf-cc-args"
-    , validating ? mconcat
+    , builder GhcCabal ? argStagedConfig "conf-cc-args"
+    , validating ? msum
         [ not (builder GhcCabal) ? arg "-Werror"
         , arg "-Wall"
         , gccIsClang ??
-          ( arg "-Wno-unknown-pragmas" <>
+          ( arg "-Wno-unknown-pragmas" <|>
             not gccLt46 && windowsHost ? arg "-Werror=unused-but-set-variable"
-          , not gccLt46 ? arg "-Wno-error=inline" )
-        ]
-    ]
+          , not gccLt46 ? arg "-Wno-error=inline" )]]
 
 ldSettings :: Settings
-ldSettings = builder GhcCabal ? argConfigStaged "conf-gcc-linker-args"
+ldSettings = builder GhcCabal ? argStagedConfig "conf-gcc-linker-args"
 
 cppSettings :: Settings
-cppSettings = builder GhcCabal ? argConfigStaged "conf-cpp-args"
+cppSettings = builder GhcCabal ? argStagedConfig "conf-cpp-args"
 
 configureSettings :: Settings
 configureSettings =
-    let conf key = argComplex $ "--configure-option=" ++ key ++ "="
+    let conf key = argPrefix ("--configure-option=" ++ key ++ "=")
+                 . argConcatSpace
     in
-    mconcat [ conf "CFLAGS"   ccSettings
+    msum [ conf "CFLAGS"   ccSettings
             , conf "LDFLAGS"  ldSettings
             , conf "CPPFLAGS" cppSettings
-            , argComplex "--gcc-options="   (ccSettings <> ldSettings)
+            , argPrefix "--gcc-options=" $
+              argConcatSpace (ccSettings <|> ldSettings)
             , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
             , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
             , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
@@ -83,7 +82,7 @@ dllSettings = arg ""
 
 -- customConfArgs
 customConfigureSettings :: Settings
-customConfigureSettings = mconcat
+customConfigureSettings = msum
     [ package base    ? arg ("--flags=" ++ integerLibraryName)
     , package ghcPrim ? arg "--flag=include-ghc-prim"
     , package integerLibrary && windowsHost ?
@@ -94,33 +93,40 @@ customConfigureSettings = mconcat
 bootPackageDbSettings :: Settings
 bootPackageDbSettings =
     stage Stage0 ?
-        argPath "--package-db="
-        (argConfig "ghc-source-path" <> arg "libraries/bootstrapping.conf")
+        argPrefix "--package-db="
+        (argConcatPath $
+            argConfig "ghc-source-path" |>
+            arg "libraries"             |>
+            arg "bootstrapping.conf" )
 
 cabalSettings :: Settings
 cabalSettings =
-    argsOrdered ["configure", argBuildPath, argBuildDist, dllSettings]
-    `fence`
-    mconcat
-    [ argStagedBuilderPath Ghc -- TODO: used to be limited to max stage1 GHC
-    , argStagedBuilderPath GhcPkg
+    mproduct
+    [ argBuilderPath GhcCabal
+    , arg "configure"
+    , argBuildPath
+    , argBuildDir
+    , dllSettings ]
+    |>
+    msum
+    [ argWithStagedBuilder Ghc -- TODO: used to be limited to max stage1 GHC
+    , argWithStagedBuilder GhcPkg
     , customConfigureSettings
-    , bootPackageDbSettings
+    , stage Stage0 ? bootPackageDbSettings
     , librarySettings targetWays
-    , configNonEmpty "hscolour" ? argBuilderPath HsColour -- TODO: more reuse
+    , configNonEmpty "hscolour" ? argWithBuilder HsColour -- TODO: more reuse
     , configureSettings
     , stage Stage0 ? argBootPkgConstraints
-    , argStagedBuilderPath Gcc
-    , notStage Stage0 ? argBuilderPath Ld
-    , argBuilderPath Ar
-    , argBuilderPath Alex
-    , argBuilderPath Happy ] -- TODO: reorder with's
+    , argWithStagedBuilder Gcc
+    , notStage Stage0 ? argWithBuilder Ld
+    , argWithBuilder Ar
+    , argWithBuilder Alex
+    , argWithBuilder Happy ] -- TODO: reorder with's
 
 ghcPkgSettings :: Settings
 ghcPkgSettings =
-    arg "update"
-    `fence` mconcat
-    [ arg "--force"
-    , argPath "" $
-      mconcat [argBuildPath, argBuildDist, arg "inplace-pkg-config"]
-    , bootPackageDbSettings ]
+    arg "update" |> msum
+        [ arg "--force"
+        , argConcatPath $
+          msum [argBuildPath, argBuildDir, arg "inplace-pkg-config"]
+        , bootPackageDbSettings ]
