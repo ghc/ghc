@@ -1,4 +1,18 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{- |
+Module : Language.Haskell.TH.Quote
+Description : Quasi-quoting support for Template Haskell
+
+Template Haskell supports quasiquoting, which permits users to construct
+program fragments by directly writing concrete syntax.  A quasiquoter is
+essentially a function with takes a string to a Template Haskell AST.
+This module defines the 'QuasiQuoter' datatype, which specifies a
+quasiquoter @q@ which can be invoked using the syntax
+@[q| ... string to parse ... |]@ when the @QuasiQuotes@ language
+extension is enabled, and some utility functions for manipulating
+quasiquoters.  Nota bene: this package does not define any parsers,
+that is up to you.
+-}
 module Language.Haskell.TH.Quote(
         QuasiQuoter(..),
         dataToQa, dataToExpQ, dataToPatQ,
@@ -9,11 +23,28 @@ import Data.Data
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax
 
-data QuasiQuoter = QuasiQuoter { quoteExp  :: String -> Q Exp,
-                                 quotePat  :: String -> Q Pat,
-                                 quoteType :: String -> Q Type,
-                                 quoteDec  :: String -> Q [Dec] }
+-- | The 'QuasiQuoter' type, a value @q@ of this type can be used
+-- in the syntax @[q| ... string to parse ...|]@.  In fact, for
+-- convenience, a 'QuasiQuoter' actually defines multiple quasiquoters
+-- to be used in different splice contexts; if you are only interested
+-- in defining a quasiquoter to be used for expressions, you would
+-- define a 'QuasiQuoter' with only 'quoteExp', and leave the other
+-- fields stubbed out with errors.
+data QuasiQuoter = QuasiQuoter {
+    -- | Quasi-quoter for expressions, invoked by quotes like @lhs = $[q|...]@
+    quoteExp  :: String -> Q Exp,
+    -- | Quasi-quoter for patterns, invoked by quotes like @f $[q|...] = rhs@
+    quotePat  :: String -> Q Pat,
+    -- | Quasi-quoter for types, invoked by quotes like @f :: $[q|...]@
+    quoteType :: String -> Q Type,
+    -- | Quasi-quoter for declarations, invoked by top-level quotes
+    quoteDec  :: String -> Q [Dec]
+    }
 
+-- | 'dataToQa' is a generic utility function for constructing generic
+-- conversion functions from types with 'Data' instances to various
+-- quasi-quoting representations.  It's used by 'dataToExpQ' and
+-- 'dataToPatQ'
 dataToQa  ::  forall a k q. Data a
           =>  (Name -> k)
           ->  (Lit -> Q q)
@@ -55,8 +86,10 @@ dataToQa mkCon mkLit appCon antiQ t =
 
       Just y -> y
 
--- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the same
--- value. It takes a function to handle type-specific cases.
+-- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the
+-- same value, in the SYB style. It is generalized to take a function
+-- override type-specific cases; a useful default is 'const Nothing'
+-- for no overriding.
 dataToExpQ  ::  Data a
             =>  (forall b . Data b => b -> Maybe (Q Exp))
             ->  a
@@ -64,7 +97,8 @@ dataToExpQ  ::  Data a
 dataToExpQ = dataToQa conE litE (foldl appE)
 
 -- | 'dataToPatQ' converts a value to a 'Q Pat' representation of the same
--- value. It takes a function to handle type-specific cases.
+-- value, in the SYB style. It takes a function to handle type-specific cases,
+-- alternatively, pass @const Nothing@ to get default behavior.
 dataToPatQ  ::  Data a
             =>  (forall b . Data b => b -> Maybe (Q Pat))
             ->  a
