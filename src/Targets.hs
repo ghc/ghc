@@ -26,7 +26,7 @@ targetPackages = msum
 packagesStage0 :: Packages
 packagesStage0 = msum
     [ fromList [ binPackageDb, binary, cabal, hoopl, hpc, transformers ]
-    , windowsHost && not (targetOs "ios") ? return terminfo ]
+    , not windowsHost && not (targetOs "ios") ? return terminfo ]
 
 packagesStage1 :: Packages
 packagesStage1 = msum

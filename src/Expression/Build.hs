@@ -21,8 +21,8 @@ module Expression.Build (
 import Control.Applicative
 import Base
 import Ways
-import Package (Package)
 import Oracles.Builder
+import Package (Package)
 import Expression.PG
 
 -- Build variables that can be used in build predicates

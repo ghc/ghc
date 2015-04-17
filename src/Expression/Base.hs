@@ -118,7 +118,6 @@ argWithStagedBuilder :: (Stage -> Builder) -> Settings
 argWithStagedBuilder f =
     msum $ map (\s -> stage s ? argWithBuilder (f s)) [Stage0 ..]
 
-
 -- Accessing key value pairs from package-data.mk files
 argPackageKey :: Settings
 argPackageKey = return $ PackageData "PACKAGE_KEY"
@@ -165,35 +164,36 @@ argPrefix prefix = fmap (Fold Concat . (arg prefix |>) . return)
 argPrefixPath :: String -> Settings -> Settings
 argPrefixPath prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
 
--- Partially evaluate Settings using a truth-teller (compute a 'projection')
-project :: (BuildVariable -> Maybe Bool) -> Settings -> Settings
+-- Partially evaluate expression using a truth-teller (compute a 'projection')
+project :: (BuildVariable -> Maybe Bool) -> BuildExpression v
+                                         -> BuildExpression v
 project _ Epsilon = Epsilon
 project t (Vertex v) = Vertex v -- TODO: go deeper
 project t (Overlay   l r) = Overlay   (project  t l) (project t r)
 project t (Sequence  l r) = Sequence  (project  t l) (project t r)
 project t (Condition l r) = Condition (evaluate t l) (project t r)
 
--- Partial evaluation of settings
-
-setPackage :: Package -> Settings -> Settings
+-- Partial evaluation of setting
+setPackage :: Package -> BuildExpression v -> BuildExpression v
 setPackage = project . matchPackage
 
-setBuilder :: Builder -> Settings -> Settings
+setBuilder :: Builder -> BuildExpression v -> BuildExpression v
 setBuilder = project . matchBuilder
 
-setBuilderFamily :: (Stage -> Builder) -> Settings -> Settings
+setBuilderFamily :: (Stage -> Builder) -> BuildExpression v
+                                       -> BuildExpression v
 setBuilderFamily = project . matchBuilderFamily
 
-setStage :: Stage -> Settings -> Settings
+setStage :: Stage -> BuildExpression v -> BuildExpression v
 setStage = project . matchStage
 
-setWay :: Way -> Settings -> Settings
+setWay :: Way -> BuildExpression v -> BuildExpression v
 setWay = project . matchWay
 
-setFile :: FilePath -> Settings -> Settings
+setFile :: FilePath -> BuildExpression v -> BuildExpression v
 setFile = project . matchFile
 
-setConfig :: String -> String -> Settings -> Settings
+setConfig :: String -> String -> BuildExpression v -> BuildExpression v
 setConfig key = project . matchConfig key
 
 --type ArgsTeller = Args -> Maybe [String]
