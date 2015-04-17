@@ -9,6 +9,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "ProfHeap.h"
@@ -279,7 +280,13 @@ nextEra( void )
         era++;
 
         if (era == max_era) {
-            errorBelch("maximum number of censuses reached; use +RTS -i to reduce");
+            if (rtsConfig.rts_opts_enabled == RtsOptsAll) {
+                errorBelch("maximum number of censuses reached;\n"
+                           "use +RTS -i to reduce");
+            } else {
+                errorBelch("maximum number of censuses reached;\n"
+                           "Relink with -rtsopts and use `+RTS -i` to reduce");
+            }
             stg_exit(EXIT_FAILURE);
         }
 

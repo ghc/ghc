@@ -1,0 +1,2 @@
+Stack space overflow: current size 99136 bytes.
+Use `+RTS -Ksize -RTS' to increase it.
