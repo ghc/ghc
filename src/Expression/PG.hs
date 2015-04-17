@@ -1,12 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 
 module Expression.PG (
+    module Expression.Simplify,
     module Expression.Predicate,
-    PG (..), (|>), (?), (??), whenExists,
+    PG (..),
+    (|>), (?), (??), whenExists,
     msum, mproduct,
     fromList, fromOrderedList
     ) where
 
+import Expression.Simplify
 import Data.Functor
 import Control.Monad
 import Control.Applicative
@@ -20,6 +23,7 @@ data PG p v = Epsilon
             | Overlay (PG p v) (PG p v)
             | Sequence (PG p v) (PG p v)
             | Condition p (PG p v)
+            deriving Eq -- TODO: create a proper Eq instance
 
 instance Functor (PG p) where
     fmap = liftM
@@ -85,3 +89,45 @@ whenExists a (Condition x r) = x              && whenExists a r
 --mapP f (Overlay   l r) = Overlay   (mapP f l) (mapP f r)
 --mapP f (Sequence  l r) = Sequence  (mapP f l) (mapP f r)
 --mapP f (Condition x r) = Condition (f x     ) (mapP f r)
+
+instance (Show p, Show v) => Show (PG p v) where
+    showsPrec _ Epsilon       = showString "()"
+    showsPrec _ (Vertex v)    = shows v
+
+    showsPrec d (Overlay l r) =
+        showParen (d > 0) $ shows l . showChar ' ' . shows r
+
+    showsPrec d (Sequence l r) =
+        showParen (d > 1) $ showsPrec 1 l . showString " -> " . showsPrec 1 r
+
+    showsPrec d (Condition l r) =
+        showChar '[' . shows l . showChar ']' . showsPrec 2 r
+
+instance (Simplify p, Predicate p, Eq p, Eq v) => Simplify (PG p v) where
+    simplify Epsilon = Epsilon
+    simplify v @ (Vertex _) = v
+    simplify (Overlay l r)
+        | l' == Epsilon = r'
+        | r' == Epsilon = l'
+        | l' == r'      = l'
+        | otherwise     = Overlay l' r'
+      where
+        l' = simplify l
+        r' = simplify r
+    simplify (Sequence l r)
+        | l' == Epsilon = r'
+        | r' == Epsilon = l'
+        | otherwise     = Sequence l' r'
+      where
+        l' = simplify l
+        r' = simplify r
+    simplify (Condition l r)
+        | l' == true    = r'
+        | l' == false   = Epsilon
+        | r' == Epsilon = Epsilon
+        | otherwise     = Condition l' r'
+      where
+        l' = simplify l
+        r' = simplify r
+
+

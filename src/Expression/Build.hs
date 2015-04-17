@@ -4,7 +4,7 @@ module Expression.Build (
     BuildVariable (..),
     BuildPredicate (..),
     BuildExpression (..),
-    evaluate, tellTruth,
+    evaluate, simplify, tellTruth,
     linearise, (|>), msum, mproduct, fromList, fromOrderedList,
     packages, package, matchPackage,
     builders, builder, matchBuilder, matchBuilderFamily,
@@ -32,6 +32,7 @@ data BuildVariable = PackageVariable Package
                    | WayVariable     Way
                    | FileVariable    FilePattern
                    | ConfigVariable  String String -- from config files
+                   deriving (Show, Eq)
 
 -- A datatype for build predicates
 data BuildPredicate
@@ -40,6 +41,19 @@ data BuildPredicate
     | Not BuildPredicate                -- Negation
     | And BuildPredicate BuildPredicate -- Conjunction
     | Or  BuildPredicate BuildPredicate -- Disjunction
+    deriving Eq -- TODO: create a proper Eq instance (use BDDs?)
+
+instance Show BuildPredicate where
+    showsPrec _ (Evaluated bool) = shows bool
+    showsPrec _ (Unevaluated var) = shows var
+
+    showsPrec d (Or p q) =
+        showParen (d > 0) $ shows p . showString " \\/ " . shows q
+
+    showsPrec d (And p q) =
+        showParen (d > 1) $ showsPrec 1 p . showString " /\\ " . showsPrec 1 q
+
+    showsPrec d (Not p) = showChar '!' . showsPrec 2 p
 
 instance Predicate BuildPredicate where
     type Variable BuildPredicate = BuildVariable
@@ -71,23 +85,36 @@ evaluate t (Or  p q) = Or  (evaluate t p) (evaluate t q)
 -- Nothing if the predicate cannot be evaluated due to remaining unevaluated
 -- variables.
 tellTruth :: BuildPredicate -> Maybe Bool
-tellTruth (Evaluated bool) = Just bool
-tellTruth (Unevaluated _)  = Nothing
-tellTruth (Not p)          = not <$> tellTruth p
-tellTruth (And p q)
-    | (p' == Just False) || (q' == Just False) = Just False
-    | (p' == Just True ) && (q' == Just True ) = Just True
-    | otherwise                                = Nothing
-  where
-    p' = tellTruth p
-    q' = tellTruth q
-tellTruth (Or p q)
-    | (p' == Just True ) || (q' == Just True ) = Just True
-    | (p' == Just False) && (q' == Just False) = Just False
-    | otherwise                                = Nothing
-  where
-    p' = tellTruth p
-    q' = tellTruth q
+tellTruth p = case simplify p of
+    Evaluated bool -> Just bool
+    _              -> Nothing
+
+-- Simplify the predicate by constant propagation
+instance Simplify BuildPredicate where
+    simplify p @ (Evaluated _) = p
+    simplify p @ (Unevaluated _) = p
+    simplify (Not p) = case p' of
+        Evaluated bool -> Evaluated (not bool)
+        _              -> Not p'
+      where p' = simplify p
+    simplify (And p q)
+        | p' == false = false
+        | q' == false = false
+        | p' == true  = q'
+        | q' == true  = p'
+        | otherwise   = And p' q'
+      where
+        p' = simplify p
+        q' = simplify q
+    simplify (Or p q)
+        | p' == true  = true
+        | q' == true  = true
+        | p' == false = q'
+        | q' == false = p'
+        | otherwise   = Or p' q'
+      where
+        p' = simplify p
+        q' = simplify q
 
 -- Linearise a build expression into a list. Returns Nothing if the given
 -- expression cannot be uniquely evaluated due to remaining variables.

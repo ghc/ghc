@@ -11,6 +11,9 @@ data Package = Package
          pkgCabal :: FilePath  -- "deepseq.cabal", "Cabal.cabal"
      }
 
+instance Show Package where
+    show = pkgName
+
 instance Eq Package where
     (==) = (==) `on` pkgName
 

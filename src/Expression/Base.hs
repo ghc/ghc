@@ -10,13 +10,14 @@ module Expression.Base (
     FilePaths,
     Ways,
     project,
-    arg, args, argsOrdered, argBuildPath, argBuildDir,
+    arg, args, argPath, argsOrdered, argBuildPath, argBuildDir,
     argInput, argOutput,
     argConfig, argStagedConfig, argBuilderPath, argStagedBuilderPath,
     argWithBuilder, argWithStagedBuilder,
     argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     argIncludeDirs, argDepIncludeDirs,
-    argConcat, argConcatPath, argConcatSpace, argPairs, argPrefix,
+    argConcat, argConcatPath, argConcatSpace,
+    argPairs, argPrefix, argPrefixPath,
     argBootPkgConstraints,
     setPackage, setBuilder, setBuilderFamily, setStage, setWay,
     setFile, setConfig
@@ -24,6 +25,7 @@ module Expression.Base (
 
 import Base hiding (arg, args, Args)
 import Ways
+import Util
 import Package (Package)
 import Oracles.Builder
 import Expression.PG
@@ -55,6 +57,10 @@ type FilePaths = BuildExpression FilePath
 -- A single argument
 arg :: String -> Settings
 arg = return . Plain
+
+-- A single FilePath argument
+argPath :: FilePath -> Settings
+argPath = return . Plain . unifyPath
 
 -- A set of arguments (unordered)
 args :: [String] -> Settings
@@ -156,8 +162,8 @@ argPrefix :: String -> Settings -> Settings
 argPrefix prefix = fmap (Fold Concat . (arg prefix |>) . return)
 
 -- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
-argPaths :: String -> Settings -> Settings
-argPaths prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
+argPrefixPath :: String -> Settings -> Settings
+argPrefixPath prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
 
 -- Partially evaluate Settings using a truth-teller (compute a 'projection')
 project :: (BuildVariable -> Maybe Bool) -> Settings -> Settings

@@ -37,6 +37,9 @@ data Way = Way
          units       :: [WayUnit]  -- e.g., [Threaded, Profiling]
      }
 
+instance Show Way where
+    show = tag
+
 instance Eq Way where
     -- The tag is fully determined by the units
     a == b = units a == units b

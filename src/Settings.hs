@@ -17,7 +17,8 @@ validating = false
 packageSettings :: Settings
 packageSettings = msum
     [ args ["-hide-all-packages", "-no-user-package-db", "-include-pkg-deps"]
-    , stage Stage0 ? arg "-package-db libraries/bootstrapping.conf"
+    , stage Stage0 ?
+      (arg "-package-db" |> argPath "libraries/bootstrapping.conf")
     , supportsPackageKey && notStage Stage0 ??
       ( argPairs "-this-package-key" argPackageKey <|>
         argPairs "-package-key"      argPackageDepKeys
@@ -39,7 +40,7 @@ librarySettings ways = msum
 
 ccSettings :: Settings
 ccSettings = msum
-    [ package integerLibrary ? arg "-Ilibraries/integer-gmp2/gmp"
+    [ package integerLibrary ? argPath "-Ilibraries/integer-gmp2/gmp"
     , builder GhcCabal ? argStagedConfig "conf-cc-args"
     , validating ? msum
         [ not (builder GhcCabal) ? arg "-Werror"
@@ -61,18 +62,18 @@ configureSettings =
                  . argConcatSpace
     in
     msum [ conf "CFLAGS"   ccSettings
-            , conf "LDFLAGS"  ldSettings
-            , conf "CPPFLAGS" cppSettings
-            , argPrefix "--gcc-options=" $
-              argConcatSpace (ccSettings <|> ldSettings)
-            , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
-            , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
-            , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
-            , conf "--with-gmp-libraries"   (argConfig "gmp-lib-dirs")
-            -- TODO: why TargetPlatformFull and not host?
-            , crossCompiling ?
-              conf "--host"    (argConfig "target-platform-full")
-            , conf "--with-cc" (argStagedBuilderPath Gcc) ]
+         , conf "LDFLAGS"  ldSettings
+         , conf "CPPFLAGS" cppSettings
+         , argPrefix "--gcc-options=" $
+           argConcatSpace (ccSettings <|> ldSettings)
+         , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
+         , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
+         , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
+         , conf "--with-gmp-libraries"   (argConfig "gmp-lib-dirs")
+         -- TODO: why TargetPlatformFull and not host?
+         , crossCompiling ?
+           conf "--host"    (argConfig "target-platform-full")
+         , conf "--with-cc" (argStagedBuilderPath Gcc) ]
 
 -- this is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument
@@ -89,15 +90,12 @@ customConfigureSettings = msum
         arg "--configure-option=--with-intree-gmp"
     ]
 
--- bootPackageDb
 bootPackageDbSettings :: Settings
 bootPackageDbSettings =
     stage Stage0 ?
         argPrefix "--package-db="
-        (argConcatPath $
-            argConfig "ghc-source-path" |>
-            arg "libraries"             |>
-            arg "bootstrapping.conf" )
+        (argConcatPath $ argConfig "ghc-source-path" |>
+                         argPath "libraries/bootstrapping.conf")
 
 cabalSettings :: Settings
 cabalSettings =
@@ -106,22 +104,21 @@ cabalSettings =
     , arg "configure"
     , argBuildPath
     , argBuildDir
-    , dllSettings ]
-    |>
-    msum
-    [ argWithStagedBuilder Ghc -- TODO: used to be limited to max stage1 GHC
-    , argWithStagedBuilder GhcPkg
-    , customConfigureSettings
-    , stage Stage0 ? bootPackageDbSettings
-    , librarySettings targetWays
-    , configNonEmpty "hscolour" ? argWithBuilder HsColour -- TODO: more reuse
-    , configureSettings
-    , stage Stage0 ? argBootPkgConstraints
-    , argWithStagedBuilder Gcc
-    , notStage Stage0 ? argWithBuilder Ld
-    , argWithBuilder Ar
-    , argWithBuilder Alex
-    , argWithBuilder Happy ] -- TODO: reorder with's
+    , dllSettings
+    , msum
+      [ argWithStagedBuilder Ghc -- TODO: used to be limited to max stage1 GHC
+      , argWithStagedBuilder GhcPkg
+      , customConfigureSettings
+      , stage Stage0 ? bootPackageDbSettings
+      , librarySettings targetWays
+      , configNonEmpty "hscolour" ? argWithBuilder HsColour -- TODO: more reuse
+      , configureSettings
+      , stage Stage0 ? argBootPkgConstraints
+      , argWithStagedBuilder Gcc
+      , notStage Stage0 ? argWithBuilder Ld
+      , argWithBuilder Ar
+      , argWithBuilder Alex
+      , argWithBuilder Happy ]] -- TODO: reorder with's
 
 ghcPkgSettings :: Settings
 ghcPkgSettings =
