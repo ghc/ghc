@@ -179,9 +179,11 @@ getCoreToDo dflags
                                   , sm_names = ["Gentle"]
                                   , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
                                   , sm_inline = False
-                                  , sm_case_case = False })
-                          -- Don't do case-of-case transformations.
-                          -- This makes full laziness work better
+                                  , sm_case_case = False
+                                      -- Don't do case-of-case transformations.
+                                      -- This makes full laziness work better
+                                  , sm_eta_expand = False})
+                                      -- Note [Do not eta-expand in SimplGently]
 
     -- New demand analyser
     demand_analyser = (CoreDoPasses ([
@@ -946,3 +948,14 @@ transferIdInfo exported_id local_id
                                (specInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another
+
+-- Note [Do not eta-expand in SimplGently]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Eta-expansion can seriously blow up the size of the code, if there are
+-- newtypes and coercions involved; see #9020 for a particularly good example.
+--
+-- It may work out well in a full simplifier phase, when the additional
+-- coercions can be optimized away, e.g. after inlining. But the gentle phase
+-- does less, in particular no inlining, so chances are high that we will blow
+-- up our code for on good reason.
