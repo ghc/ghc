@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
     buildHaddock,
-    targetWays, targetPackages,
+    targetWays, targetPackages, targetDirectories,
     IntegerLibraryImpl (..), integerLibraryImpl, integerLibraryName,
     array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
     directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,

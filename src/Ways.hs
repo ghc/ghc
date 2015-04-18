@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Ways (
+module Ways ( -- TODO: rename to "Way"?
     WayUnit (..),
     Way, tag,
 

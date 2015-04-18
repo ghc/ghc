@@ -7,6 +7,14 @@ import Settings
 import Expression.Base
 import Expression.Simplify
 import Expression.Resolve
+import Util
+
+buildSettings = empty
+
+setBuildDir = undefined
+
+buildPackage :: Package -> Ways -> Settings -> Action ()
+buildPackage = undefined
 
 main = shakeArgs shakeOptions{shakeFiles="_build/"} $ do
     oracleRules
@@ -15,21 +23,24 @@ main = shakeArgs shakeOptions{shakeFiles="_build/"} $ do
     --packageRules
 
     action $ do
-        putNormal $ "\ntargetPackages = " ++ show (simplify targetPackages)
-        putNormal $ "\n\ntargetWays = " ++ show (simplify targetWays)
-        putNormal $ "\n\n=============================\n"
-
-        -- Read config file
-        targetPackages' <- resolveConfig targetPackages
-        targetWays' <- resolveConfig targetWays
-
-        -- Build stages
         forM_ [Stage0 ..] $ \stage -> do
-            putNormal $ "Stage = " ++ show stage
-            let packages = setStage stage targetPackages'
-                ways     = setStage stage targetWays'
-            putNormal $ "\n packages = " ++ show (simplify packages)
-            putNormal $ "\n ways = " ++ show (simplify ways)
+            pkgs <- resolve $ setStage stage targetPackages
+            case linearise pkgs of
+                Nothing      -> redError "Cannot determine target packages."
+                Just pkgList ->
+                    forM_ pkgList $ \pkg -> do
+                        let eval = setPackage pkg . setStage stage
+                        dirs <- resolve $ eval targetDirectories
+                        case linearise dirs of
+                            Just [dir] -> do
+                                let eval' = setBuildDir dir . eval
+                                ways <- resolve $ eval' targetWays
+                                stgs <- resolve $ eval' buildSettings
+                                buildPackage pkg ways stgs
+                            _ -> redError "Cannot determine target directory."
+
+
+
 
         --forM_ targetPackages $ \pkg @ (Package name path _ todo) -> do
         --        forM_ todo $ \todoItem @ (stage, dist, settings) -> do

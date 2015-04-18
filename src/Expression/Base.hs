@@ -4,7 +4,8 @@ module Expression.Base (
     module Expression.Build,
     module Expression.Predicate,
     (?), (??), whenExists,
-    Args (..), -- hide?
+    Args (..), -- TODO: hide?
+    Combine (..), -- TODO: hide?
     Settings,
     Packages,
     FilePaths,
@@ -12,7 +13,8 @@ module Expression.Base (
     project,
     arg, args, argPath, argsOrdered, argBuildPath, argBuildDir,
     argInput, argOutput,
-    argConfig, argStagedConfig, argBuilderPath, argStagedBuilderPath,
+    argConfig, argStagedConfig, argConfigList, argStagedConfigList,
+    argBuilderPath, argStagedBuilderPath,
     argWithBuilder, argWithStagedBuilder,
     argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     argIncludeDirs, argDepIncludeDirs,
@@ -40,12 +42,15 @@ data Args
     | Input                  -- evaluates to input file(s): "src.c"
     | Output                 -- evaluates to output file(s): "src.o"
     | Config String          -- evaluates to the value of a given config key
+    | ConfigList String      -- as above, but evaluates to a list of values
     | BuilderPath Builder    -- evaluates to the path to a given builder
     | PackageData String     -- looks up value a given key in package-data.mk
+    | PackageDataList String -- as above, but evaluates to a list of values
     | BootPkgConstraints     -- evaluates to boot package constraints
     | Fold Combine Settings  -- fold settings using a given combine method
 
-data Combine = Concat        -- Concatenate: a ++ b
+data Combine = Id            -- Keep given settings as is
+             | Concat        -- Concatenate: a ++ b
              | ConcatPath    -- </>-concatenate: a </> b
              | ConcatSpace   -- concatenate with a space: a ++ " " ++ b
 
@@ -85,9 +90,19 @@ argOutput = return Output
 argConfig :: String -> Settings
 argConfig = return . Config
 
+argConfigList :: String -> Settings
+argConfigList = return . ConfigList
+
 argStagedConfig :: String -> Settings
 argStagedConfig key =
     msum $ map (\s -> stage s ? argConfig (stagedKey s)) [Stage0 ..]
+  where
+    stagedKey :: Stage -> String
+    stagedKey stage = key ++ "-stage" ++ show stage
+
+argStagedConfigList :: String -> Settings
+argStagedConfigList key =
+    msum $ map (\s -> stage s ? argConfigList (stagedKey s)) [Stage0 ..]
   where
     stagedKey :: Stage -> String
     stagedKey stage = key ++ "-stage" ++ show stage
@@ -123,19 +138,19 @@ argPackageKey :: Settings
 argPackageKey = return $ PackageData "PACKAGE_KEY"
 
 argPackageDeps :: Settings
-argPackageDeps = return $ PackageData "DEPS"
+argPackageDeps = return $ PackageDataList "DEPS"
 
 argPackageDepKeys :: Settings
-argPackageDepKeys = return $ PackageData "DEP_KEYS"
+argPackageDepKeys = return $ PackageDataList "DEP_KEYS"
 
 argSrcDirs :: Settings
-argSrcDirs = return $ PackageData "HS_SRC_DIRS"
+argSrcDirs = return $ PackageDataList "HS_SRC_DIRS"
 
 argIncludeDirs :: Settings
-argIncludeDirs = return $ PackageData "INCLUDE_DIRS"
+argIncludeDirs = return $ PackageDataList "INCLUDE_DIRS"
 
 argDepIncludeDirs :: Settings
-argDepIncludeDirs = return $ PackageData "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
+argDepIncludeDirs = return $ PackageDataList "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
 
 argBootPkgConstraints :: Settings
 argBootPkgConstraints = return BootPkgConstraints
