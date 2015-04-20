@@ -27,6 +27,7 @@ import Id
 import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial )
 import TyCon
 import Type
+import Coercion         ( Coercion, coVarsOfCo )
 import FamInstEnv
 import Util
 import Maybes           ( isJust )
@@ -131,13 +132,14 @@ dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
 
 dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
 dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
-dmdAnal' _ _ (Coercion co) = (nopDmdType, Coercion co)
+dmdAnal' _ _ (Coercion co)
+  = (unitDmdType (coercionDmdEnv co), Coercion co)
 
 dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = (dmd_ty, Cast e' co)
+  = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd e
 
@@ -504,7 +506,7 @@ dmdTransform env var dmd
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
 
   | otherwise                                    -- Local non-letrec-bound thing
-  = unitVarDmd var (mkOnceUsedDmd dmd)
+  = unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
 
 {-
 ************************************************************************
@@ -700,9 +702,12 @@ a product type.
 ************************************************************************
 -}
 
-unitVarDmd :: Var -> Demand -> DmdType
-unitVarDmd var dmd
-  = DmdType (unitVarEnv var dmd) [] topRes
+unitDmdType :: DmdEnv -> DmdType
+unitDmdType dmd_env = DmdType dmd_env [] topRes
+
+coercionDmdEnv :: Coercion -> DmdEnv
+coercionDmdEnv co = mapVarEnv (const topDmd) (coVarsOfCo co)
+                    -- The VarSet from coVarsOfCo is really a VarEnv Var
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
