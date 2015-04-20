@@ -565,9 +565,11 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
-    arm*linux*)
-        # On arm/linux and arm/android, tell gcc to link using the gold linker.
-        # Forcing LD to be ld.gold is done in configre.ac.
+    arm*linux*       | \
+    aarch64*linux*   )
+        # On arm/linux, aarch64/linux, arm/android and aarch64/android, tell
+        # gcc to link using the gold linker.
+        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
         $3="$$3 -fuse-ld=gold"
         ;;
     esac
@@ -2093,10 +2095,12 @@ AC_DEFUN([FIND_LLVM_PROG],[
 AC_DEFUN([FIND_LD],[
     FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
     case $target in
-        arm*linux*)
-            # Arm requires use of the binutils ld.gold linker.
-            # This case should catch at least arm-unknown-linux-gnueabihf and
-            # arm-linux-androideabi.
+        arm*linux*       | \
+        aarch64*linux*   )
+            # Arm and Aarch64 requires use of the binutils ld.gold linker.
+            # This case should catch at least arm-unknown-linux-gnueabihf,
+            # arm-linux-androideabi, arm64-unknown-linux and
+            # aarch64-linux-android
             FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
             $1="$LD_GOLD"
             ;;
