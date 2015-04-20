@@ -112,7 +112,7 @@ We do not expect the rule to fire.  But if we do CSE, then we risk
 getting yes=no, and the rule does fire.  Actually, it won't because
 NOINLINE means that 'yes' will never be inlined, not even if we have
 yes=no.  So that's fine (now; perhaps in the olden days, yes=no would
-have substituted even if 'yes' was NOINLINE.
+have substituted even if 'yes' was NOINLINE).
 
 But we do need to take care.  Consider
 
