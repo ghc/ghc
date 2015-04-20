@@ -1,4 +1,5 @@
 module DataCon where
+import Var( TyVar )
 import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )
 import Unique ( Uniquable )
@@ -8,7 +9,7 @@ data DataCon
 data DataConRep
 dataConName      :: DataCon -> Name
 dataConTyCon     :: DataCon -> TyCon
-isVanillaDataCon :: DataCon -> Bool
+dataConExTyVars  :: DataCon -> [TyVar]
 
 instance Eq DataCon
 instance Ord DataCon

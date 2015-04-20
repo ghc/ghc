@@ -422,7 +422,7 @@ dataConCPR :: DataCon -> DmdResult
 dataConCPR con
   | isDataTyCon tycon     -- Real data types only; that is,
                           -- not unboxed tuples or newtypes
-  , isVanillaDataCon con  -- No existentials
+  , null (dataConExTyVars con)  -- No existentials
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
   = if is_prod then vanillaCprProdRes (dataConRepArity con)
@@ -430,8 +430,8 @@ dataConCPR con
   | otherwise
   = topRes
   where
-    is_prod = isProductTyCon tycon
-    tycon = dataConTyCon con
+    is_prod   = isProductTyCon tycon
+    tycon     = dataConTyCon con
     wkr_arity = dataConRepArity con
 
     mAX_CPR_SIZE :: Arity

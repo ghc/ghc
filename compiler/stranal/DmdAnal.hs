@@ -211,7 +211,7 @@ dmdAnal' env dmd (Lam var body)
 dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
-  , isProductTyCon tycon
+  , isJust (isDataProductTyCon_maybe tycon)
   , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
         env_w_tc      = env { ae_rec_tc = rec_tc' }
@@ -257,6 +257,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
         (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd case_bndr) alts
         (scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
         (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
+                               -- NB: Base case is botDmdType, for empty case alternatives
+                               --     This is a unit for lubDmdType, and the right result
+                               --     when there really are no alternatives
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut

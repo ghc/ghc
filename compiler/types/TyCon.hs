@@ -95,7 +95,7 @@ module TyCon(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
-import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
+import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars )
 
 import Var
 import Class
@@ -1262,10 +1262,11 @@ unwrapNewTyConEtad_maybe _ = Nothing
 
 isProductTyCon :: TyCon -> Bool
 -- True of datatypes or newtypes that have
---   one, vanilla, data constructor
+--   one, non-existential, data constructor
+-- See Note [Product types]
 isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
                                     DataTyCon{ data_cons = [data_con] }
-                                                -> isVanillaDataCon data_con
+                                                -> null (dataConExTyVars data_con)
                                     NewTyCon {} -> True
                                     _           -> False
 isProductTyCon (TupleTyCon {})  = True
@@ -1275,13 +1276,40 @@ isProductTyCon _                = False
 isDataProductTyCon_maybe :: TyCon -> Maybe DataCon
 -- True of datatypes (not newtypes) with
 --   one, vanilla, data constructor
+-- See Note [Product types]
 isDataProductTyCon_maybe (AlgTyCon { algTcRhs = DataTyCon { data_cons = cons } })
-  | [con] <- cons         -- Singleton
-  , isVanillaDataCon con  -- Vanilla
+  | [con] <- cons               -- Singleton
+  , null (dataConExTyVars con)  -- non-existential
   = Just con
 isDataProductTyCon_maybe (TupleTyCon { dataCon = con })
   = Just con
 isDataProductTyCon_maybe _ = Nothing
+
+{- Note [Product types]
+~~~~~~~~~~~~~~~~~~~~~~~
+A product type is
+ * A data type (not a newtype)
+ * With one, boxed data constructor
+ * That binds no existential type variables
+
+The main point is that product types are amenable to unboxing for
+  * Strict function calls; we can transform
+        f (D a b) = e
+    to
+        fw a b = e
+    via the worker/wrapper transformation.  (Question: couldn't this
+    work for existentials too?)
+
+  * CPR for function results; we can transform
+        f x y = let ... in D a b
+    to
+        fw x y = let ... in (# a, b #)
+
+Note that the data constructor /can/ have evidence arguments: equality
+constraints, type classes etc.  So it can be GADT.  These evidence
+arguments are simply value arguments, and should not get in the way.
+-}
+
 
 -- | Is this a 'TyCon' representing a regular H98 type synonym (@type@)?
 isTypeSynonymTyCon :: TyCon -> Bool
