@@ -1,64 +1,81 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 
 module Expression.Resolve (
-    Resolve (..)
+    Resolve (..), evaluate
     ) where
 
-import Base hiding (Args)
+import Base hiding (Args, arg)
 import Package
 import Ways
 import Util
+import Control.Monad
+import Expression.Simplify
 import Oracles.Base
+import Oracles.PackageData
 import Expression.PG
-import Expression.Base
+import Expression.Args
+import Expression.Build
 
 -- Resolve unevaluated variables by calling the associated oracles
 class Resolve a where
     resolve :: a -> Action a
     resolve = return . id
 
+evaluate :: (Simplify a, Resolve a) => a -> Action a
+evaluate = resolve . simplify
+
 -- Nothing to resolve for expressions containing FilePaths, Packages or Ways
-instance Resolve FilePath where
+instance Resolve TargetDir where
 instance Resolve Package where
 instance Resolve Way where
 
---data Args
---    = Plain String           -- a plain old string argument: e.g., "-O2"
---    | BuildPath              -- evaluates to build path: "libraries/base"
---    | BuildDir               -- evaluates to build directory: "dist-install"
---    | Input                  -- evaluates to input file(s): "src.c"
---    | Output                 -- evaluates to output file(s): "src.o"
---    | Config String          -- evaluates to the value of a given config key
---    | ConfigList String
---    | BuilderPath Builder    -- evaluates to the path to a given builder
---    | PackageData String     -- looks up value a given key in package-data.mk
---    | PackageDataList String
---    | BootPkgConstraints     -- evaluates to boot package constraints
---    | Fold Combine Settings  -- fold settings using a given combine method
-
 instance Resolve Args where
-    resolve (Config key) = do
+    resolve (EnvironmentParameter (Config Single key)) = do
         value <- askConfig key
         return $ Plain value
 
-    resolve (ConfigList key) = do
+    resolve (EnvironmentParameter (Config Multiple key)) = do
         values <- words <$> askConfig key
+        return $ Fold Id $ argsOrdered values -- TODO: dedup 'Fold Id'
+
+    resolve (EnvironmentParameter (BuilderPath builder)) = do
+        value <- showArg builder
+        return $ Plain value
+
+    resolve a @ (EnvironmentParameter (PackageData _ _ Nothing _)) = return a
+    resolve a @ (EnvironmentParameter (PackageData _ _ _ Nothing)) = return a
+
+    resolve (EnvironmentParameter
+            (PackageData Single key (Just path) (Just dir))) = do
+        value <- askPackageData (path </> dir) key
+        return $ Plain value
+
+    resolve (EnvironmentParameter
+            (PackageData Multiple key (Just path) (Just dir))) = do
+        values <- words <$> askPackageData (path </> dir) key
         return $ Fold Id $ argsOrdered values
 
-    resolve (BuilderPath builder) = do
-        path <- showArg builder
-        return $ Plain $ unifyPath path
-
-    --resolve (PackageData key) = ...
-    --resolve (PackageDataList key) = ...
-    --resolve (BootPkgConstraints) = ...
+    resolve (EnvironmentParameter (PackageConstraints pkgs)) = do
+        pkgs' <- evaluate $ pkgs
+        constraints <- case linearise pkgs' of
+            Nothing      -> redError "Cannot determine boot packages."
+            Just pkgList -> forM pkgList $ \pkg -> do
+                let cabal  = pkgPath pkg </> pkgCabal pkg
+                    prefix = dropExtension (pkgCabal pkg) ++ " == "
+                need [cabal]
+                content <- lines <$> liftIO (readFile cabal)
+                let vs = filter (("ersion:" `isPrefixOf`) . drop 1) content
+                case vs of
+                    [v] -> return $ arg (prefix ++ dropWhile (not . isDigit) v)
+                    _   -> redError $ "Cannot determine package version in '"
+                                    ++ cabal ++ "'."
+        return $ Fold Id (argPairs "--constraint" $ msum constraints)
 
     resolve (Fold op settings) = do
         settings' <- resolve settings
         return $ Fold op settings'
 
     resolve a = return a
-
 
 instance Resolve BuildPredicate where
     resolve p @ (Evaluated _) = return p

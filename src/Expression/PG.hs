@@ -1,15 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 
 module Expression.PG (
-    module Expression.Simplify,
     module Expression.Predicate,
     PG (..),
-    (|>), (?), (??), whenExists,
+    bimap, (|>), (?), (??), whenExists, support,
     msum, mproduct,
     fromList, fromOrderedList
     ) where
 
-import Expression.Simplify
 import Data.Functor
 import Control.Monad
 import Control.Applicative
@@ -27,6 +25,13 @@ data PG p v = Epsilon
 
 instance Functor (PG p) where
     fmap = liftM
+
+bimap :: (p -> q) -> (v -> w) -> PG p v -> PG q w
+bimap _ _ Epsilon = Epsilon
+bimap f g (Vertex      v) = Vertex    (g v)
+bimap f g (Overlay   l r) = Overlay   (bimap f g l) (bimap f g r)
+bimap f g (Sequence  l r) = Sequence  (bimap f g l) (bimap f g r)
+bimap f g (Condition l r) = Condition (f l)         (bimap f g r)
 
 instance Applicative (PG p) where
     pure = return
@@ -82,13 +87,20 @@ whenExists a (Overlay   l r) = whenExists a l || whenExists a r
 whenExists a (Sequence  l r) = whenExists a l || whenExists a r
 whenExists a (Condition x r) = x              && whenExists a r
 
--- Map over all PG predicates, e.g., partially evaluate a given PG.
---mapP :: (p -> p) -> PG p v -> PG p v
---mapP _ Epsilon         = Epsilon
---mapP _ v @ (Vertex _)  = v
---mapP f (Overlay   l r) = Overlay   (mapP f l) (mapP f r)
---mapP f (Sequence  l r) = Sequence  (mapP f l) (mapP f r)
---mapP f (Condition x r) = Condition (f x     ) (mapP f r)
+support :: Ord v => PG p v -> [v]
+support Epsilon         = []
+support (Vertex      v) = [v]
+support (Overlay   l r) = support l `union` support r
+support (Sequence  l r) = support l `union` support r
+support (Condition _ r) = support r
+
+union :: Ord v => [v] -> [v] -> [v]
+union ls     []     = ls
+union []     rs     = rs
+union (l:ls) (r:rs) = case compare l r of
+    LT -> l : union ls (r:rs)
+    EQ -> l : union ls rs
+    GT -> r : union (l:ls) rs
 
 instance (Show p, Show v) => Show (PG p v) where
     showsPrec _ Epsilon       = showString "()"
@@ -102,32 +114,3 @@ instance (Show p, Show v) => Show (PG p v) where
 
     showsPrec d (Condition l r) =
         showChar '[' . shows l . showChar ']' . showsPrec 2 r
-
-instance (Simplify p, Predicate p, Eq p, Eq v) => Simplify (PG p v) where
-    simplify Epsilon = Epsilon
-    simplify v @ (Vertex _) = v
-    simplify (Overlay l r)
-        | l' == Epsilon = r'
-        | r' == Epsilon = l'
-        | l' == r'      = l'
-        | otherwise     = Overlay l' r'
-      where
-        l' = simplify l
-        r' = simplify r
-    simplify (Sequence l r)
-        | l' == Epsilon = r'
-        | r' == Epsilon = l'
-        | otherwise     = Sequence l' r'
-      where
-        l' = simplify l
-        r' = simplify r
-    simplify (Condition l r)
-        | l' == true    = r'
-        | l' == false   = Epsilon
-        | r' == Epsilon = Epsilon
-        | otherwise     = Condition l' r'
-      where
-        l' = simplify l
-        r' = simplify r
-
-

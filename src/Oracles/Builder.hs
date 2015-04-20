@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Oracles.Builder (
-    Builder (..),
+    Builder (..), builderKey, withBuilderKey,
     with, run, verboseRun, specified
     ) where
 
@@ -32,25 +32,27 @@ data Builder = Ar
              | GhcPkg Stage
              deriving (Show, Eq)
 
+builderKey :: Builder -> String
+builderKey builder = case builder of
+    Ar            -> "ar"
+    Ld            -> "ld"
+    Alex          -> "alex"
+    Happy         -> "happy"
+    HsColour      -> "hscolour"
+    GhcCabal      -> "ghc-cabal"
+    Ghc Stage0    -> "system-ghc"
+    Ghc Stage1    -> "ghc-stage1"
+    Ghc Stage2    -> "ghc-stage2"
+    Ghc Stage3    -> "ghc-stage3"
+    Gcc Stage0    -> "system-gcc"
+    Gcc _         -> "gcc"
+    GhcPkg Stage0 -> "system-ghc-pkg"
+    GhcPkg _      -> "ghc-pkg"
+
 instance ShowArg Builder where
     showArg builder = toStandard <$> do
-        let key = case builder of
-                Ar            -> "ar"
-                Ld            -> "ld"
-                Alex          -> "alex"
-                Happy         -> "happy"
-                HsColour      -> "hscolour"
-                GhcCabal      -> "ghc-cabal"
-                Ghc Stage0    -> "system-ghc"
-                Ghc Stage1    -> "ghc-stage1"
-                Ghc Stage2    -> "ghc-stage2"
-                Ghc Stage3    -> "ghc-stage3"
-                Gcc Stage0    -> "system-gcc"
-                Gcc _         -> "gcc"
-                GhcPkg Stage0 -> "system-ghc-pkg"
-                GhcPkg _      -> "ghc-pkg"
-        cfgPath <- askConfigWithDefault key $
-            redError $ "\nCannot find path to '" ++ key
+        cfgPath <- askConfigWithDefault (builderKey builder) $
+            redError $ "\nCannot find path to '" ++ (builderKey builder)
                      ++ "' in configuration files."
         let cfgPathExe = if null cfgPath then "" else cfgPath -<.> exe
         windows <- windowsHost
@@ -82,18 +84,21 @@ needBuilder builder = do
 -- Action 'with Gcc' returns '--with-gcc=/path/to/gcc' and needs Gcc
 with :: Builder -> Args
 with builder = do
-    let key = case builder of
-            Ar       -> "--with-ar="
-            Ld       -> "--with-ld="
-            Gcc _    -> "--with-gcc="
-            Ghc _    -> "--with-ghc="
-            Alex     -> "--with-alex="
-            Happy    -> "--with-happy="
-            GhcPkg _ -> "--with-ghc-pkg="
-            HsColour -> "--with-hscolour="
     exe <- showArg builder
     needBuilder builder
-    return [key ++ exe]
+    return [withBuilderKey builder ++ exe]
+
+withBuilderKey :: Builder -> String
+withBuilderKey builder = case builder of
+    Ar       -> "--with-ar="
+    Ld       -> "--with-ld="
+    Gcc _    -> "--with-gcc="
+    Ghc _    -> "--with-ghc="
+    Alex     -> "--with-alex="
+    Happy    -> "--with-happy="
+    GhcPkg _ -> "--with-ghc-pkg="
+    HsColour -> "--with-hscolour="
+    _        -> error "withBuilderKey: not supported builder"
 
 -- Run the builder with a given collection of arguments
 verboseRun :: ShowArgs a => Builder -> a -> Action ()

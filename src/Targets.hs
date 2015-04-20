@@ -1,8 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Targets (
-    buildHaddock,
     targetWays, targetPackages, targetDirectories,
-    IntegerLibraryImpl (..), integerLibraryImpl, integerLibraryName,
+    customConfigureSettings,
     array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
     directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
     parallel, pretty, primitive, process, stm, templateHaskell, terminfo, time,
@@ -10,12 +9,10 @@ module Targets (
     ) where
 
 import qualified Ways
-import Base
+import Base hiding (arg, args, Args)
+import Switches
 import Package
 import Expression.Base
-
-buildHaddock :: BuildPredicate
-buildHaddock = true
 
 -- These are the packages we build
 targetPackages :: Packages
@@ -50,28 +47,10 @@ targetWays = msum
 -- * build/           : contains compiled object code
 -- * doc/             : produced by haddock
 -- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
-targetDirectories :: FilePaths
+targetDirectories :: TargetDirs
 targetDirectories =
-    stage Stage0 ?? (return "dist-boot", return "dist-install")
-
--- Support for multiple integer library implementations
-data IntegerLibraryImpl = IntegerGmp | IntegerGmp2 | IntegerSimple
-
-integerLibraryImpl :: IntegerLibraryImpl
-integerLibraryImpl = IntegerGmp2
-
-integerLibraryName :: String
-integerLibraryName = case integerLibraryImpl of
-    IntegerGmp    -> "integer-gmp"
-    IntegerGmp2   -> "integer-gmp2"
-    IntegerSimple -> "integer-simple"
-
--- see Note [Cabal name weirdness]
-integerLibraryCabal :: FilePath
-integerLibraryCabal = case integerLibraryImpl of
-        IntegerGmp    -> "integer-gmp.cabal"
-        IntegerGmp2   -> "integer-gmp.cabal" -- Indeed, why make life easier?
-        IntegerSimple -> "integer-simple.cabal"
+    stage Stage0 ?? ( return $ TargetDir "dist-boot"
+                    , return $ TargetDir "dist-install")
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
@@ -106,6 +85,28 @@ transformers    = library "transformers"
 unix            = library "unix"
 win32           = library "Win32"
 xhtml           = library "xhtml"
+
+integerLibraryName :: String
+integerLibraryName = case integerLibraryImpl of
+    IntegerGmp    -> "integer-gmp"
+    IntegerGmp2   -> "integer-gmp2"
+    IntegerSimple -> "integer-simple"
+
+-- see Note [Cabal name weirdness]
+integerLibraryCabal :: FilePath
+integerLibraryCabal = case integerLibraryImpl of
+        IntegerGmp    -> "integer-gmp.cabal"
+        IntegerGmp2   -> "integer-gmp.cabal" -- Indeed, why make life easier?
+        IntegerSimple -> "integer-simple.cabal"
+
+-- Custom configure settings for packages
+customConfigureSettings :: Settings
+customConfigureSettings = msum
+    [ package base    ? arg ("--flags=" ++ integerLibraryName)
+    , package ghcPrim ? arg "--flag=include-ghc-prim"
+    , package integerLibrary && windowsHost ?
+        arg "--configure-option=--with-intree-gmp"
+    ]
 
 -- TODISCUSS
 -- Note [Cabal name weirdness]

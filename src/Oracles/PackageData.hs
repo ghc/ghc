@@ -2,7 +2,7 @@
 
 module Oracles.PackageData (
     PackageData (..), MultiPackageData (..),
-    PackageDataKey (..)
+    PackageDataKey (..), askPackageData
     ) where
 
 import Development.Shake.Classes
@@ -38,6 +38,15 @@ data MultiPackageData = Modules        FilePath
 newtype PackageDataKey = PackageDataKey (FilePath, String)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
+askPackageData :: FilePath -> String -> Action String
+askPackageData path key = do
+    let fullKey = replaceSeparators '_' $ path ++ "_" ++ key
+        pkgData = path </> "package-data.mk"
+    value <- askOracle $ PackageDataKey (pkgData, fullKey)
+    return $ fromMaybe
+        (error $ "No key '" ++ key ++ "' in " ++ pkgData ++ ".") value
+
+-- TODO: remove
 instance ShowArg PackageData where
     showArg packageData = do
         let (key, path) = case packageData of

@@ -1,4 +1,4 @@
-module Package (Package, library, setCabal) where
+module Package (Package (..), library, setCabal) where
 
 import Base
 import Util
@@ -8,7 +8,7 @@ data Package = Package
      {
          pkgName  :: String,   -- Examples: "deepseq", "Cabal/Cabal"
          pkgPath  :: FilePath, -- "libraries/deepseq", "libraries/Cabal/Cabal"
-         pkgCabal :: FilePath  -- "deepseq.cabal", "Cabal.cabal"
+         pkgCabal :: FilePath  -- "deepseq.cabal", "Cabal.cabal" (relative)
      }
 
 instance Show Package where
@@ -16,6 +16,9 @@ instance Show Package where
 
 instance Eq Package where
     (==) = (==) `on` pkgName
+
+instance Ord Package where
+    compare = compare `on` pkgName
 
 libraryPackage :: String -> String -> Package
 libraryPackage name cabalName =
