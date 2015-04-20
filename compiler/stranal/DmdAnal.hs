@@ -164,15 +164,13 @@ dmdAnal' env dmd (App fun (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
 
-dmdAnal' sigs dmd (App fun (Coercion co))
-  = (fun_ty, App fun' (Coercion co))
-  where
-    (fun_ty, fun') = dmdAnal sigs dmd fun
-
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
-dmdAnal' env dmd (App fun arg)  -- Non-type arguments
-  = let                         -- [Type arg handled above]
+dmdAnal' env dmd (App fun arg)
+  =  -- This case handles value arguments (type args handled above)
+     -- Crucially, coercions /are/ handled here, because they are
+     -- value arguments (Trac #10288)
+  = let
         call_dmd          = mkCallDmd dmd
         (fun_ty, fun')    = dmdAnal env call_dmd fun
         (arg_dmd, res_ty) = splitDmdTy fun_ty
