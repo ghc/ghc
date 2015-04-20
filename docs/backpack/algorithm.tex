@@ -1,0 +1,413 @@
+\documentclass{article}
+
+\usepackage{mdframed}
+\usepackage{pifont}
+\usepackage{graphicx} %[pdftex] OR [dvips]
+\usepackage{fullpage}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{titling}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{color}
+\usepackage{footnote}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{bigfoot}
+\usepackage{amssymb}
+
+\newenvironment{aside}
+  {\begin{mdframed}[style=0,%
+      leftline=false,rightline=false,leftmargin=2em,rightmargin=2em,%
+          innerleftmargin=0pt,innerrightmargin=0pt,linewidth=0.75pt,%
+      skipabove=7pt,skipbelow=7pt]\small}
+  {\end{mdframed}}
+
+\setlength{\droptitle}{-6em}
+
+\newcommand{\Red}[1]{{\color{red} #1}}
+
+\title{The Backpack algorithm}
+
+\begin{document}
+
+\maketitle
+
+This document describes the Backpack shaping and typechecking
+passes, as we intend to implement it.
+
+\section{Front-end syntax}
+
+For completeness, here is the package language we will be shaping and typechecking:
+
+\begin{verbatim}
+package     ::= "package" pkgname [pkgexports] "where" pkgbody
+pkgbody     ::= "{" pkgdecl_0 ";" ... ";" pkgdecl_n "}"
+pkgdecl     ::= "module"    modid [exports] where body
+              | "signature" modid [exports] where body
+              | "include"   pkgname [inclspec]
+inclspec    ::= "(" renaming_0 "," ... "," renaming_n [","] ")"
+                [ "requires" "(" renaming_0 "," ... "," renaming_n [","] ")" ]
+pkgexports  ::= inclspec
+renaming    ::= modid "as" modid
+\end{verbatim}
+
+See the ``Backpack manual'' for more explanation about the syntax.  It
+is slightly simplified here by removing any constructs which are easily implemented as
+syntactic sugar (e.g. a \verb|modid| renaming is simply \verb|modid as modid|.)
+
+\section{Shaping}
+
+Shaping computes a \verb|Shape| which has this form:
+
+\begin{verbatim}
+Shape ::= provides: { ModName -> Module { Name } }
+          requires: { ModName ->        { Name } }
+\end{verbatim}
+
+Starting with the empty shape, we incrementally construct a shape by
+shaping package declarations (the partially constructed shape serves as
+a context for renaming modules and signatures and instantiating
+includes) and merging them until we have processed all declarations.
+There are two things to specify: what shape each declaration has, and
+how the merge operation proceeds.
+
+In the description below, we'll assume \verb|THIS| is the package key
+of the package being processed.
+
+\newpage
+
+\subsection{\texttt{module M}}
+
+Merge with this shape:
+
+\begin{verbatim}
+    provides: { M -> THIS:M { exports of renamed M } }
+    requires: (nothing)
+\end{verbatim}
+
+\noindent Example:
+
+\begin{verbatim}
+    -- provides: (nothing)
+    -- requires: (nothing)
+
+    module A(T) where
+        data T = T
+
+    -- provides: A -> THIS:A { THIS:A.T }           -- NEW
+    -- requires: (nothing)
+
+    module M(T, f) where
+        import A(T)
+        f x = x
+
+    -- provides: A -> THIS:A { THIS:A.T }
+                 M -> THIS:M { THIS:A.T, THIS:M.f } -- NEW
+    -- requires: (nothing)
+\end{verbatim}
+
+\newpage
+\subsection{\texttt{signature M}}
+
+Merge with this shape:
+
+\begin{verbatim}
+    provides: { M -> HOLE:M { exports of renamed M } }
+    requires: { M ->        { exports of renamed M } }
+\end{verbatim}
+
+\noindent Example:
+
+\begin{verbatim}
+    -- provides: (nothing)
+    -- requires: (nothing)
+
+    signature H(T) where
+        data T
+
+    -- provides: H -> HOLE:H { HOLE:H.T }
+    -- requires: H ->        { HOLE:H.T }
+
+    module A(T) where
+        import H(T)
+    module B(T) where
+        data T = T
+
+    -- provides: H -> HOLE:H { HOLE:H.T }
+    --           A -> THIS:A { HOLE:H.T } -- NEW
+    --           B -> THIS:B { THIS:B.T } -- NEW
+    -- requires: H ->        { HOLE:H.T }
+
+    signature H(T, f) where
+        import B(T)
+        f :: a -> a
+
+    -- provides: H -> HOLE:H { THIS:B.T, HOLE:H.f } -- UPDATED
+    --           A -> THIS:A { THIS:B.T }           -- UPDATED
+    --           B -> THIS:B { THIS:B.T }
+    -- requires: H ->        { THIS:B.T, HOLE:H.f } -- UPDATED
+\end{verbatim}
+
+Notice that in the last example, when a signature with reexports is merged,
+it can result in updates to the shapes of other module names.
+
+\newpage
+
+\subsection{\texttt{include pkg (X) requires (Y)}}
+
+We merge with the transformed shape of package \verb|pkg|, where this
+shape is transformed by:
+
+\begin{itemize}
+    \item Renaming and thinning the provisions according to \verb|(X)|
+    \item Renaming requirements according to \verb|(Y)| (requirements cannot
+          be thinned, so non-mentioned requirements are passed through.)
+          For each renamed requirement from \verb|Y| to \verb|Y'|,
+          substitute \verb|HOLE:Y| with \verb|HOLE:Y'| in the
+          \verb|Module|s and \verb|Name|s of the provides and requires.
+          (Freshen holes.)
+    \item If there are no thinnings/renamings, you just merge the
+          shape unchanged!
+\end{itemize}
+
+\noindent Example:
+
+\begin{verbatim}
+    package p (M) requires (H) where
+        signature H where
+            data T
+        module M where
+            import H
+            data S = S T
+
+    -- p requires: M -> { p(H -> HOLE:H):M.S }
+    --   provides: H -> { HOLE:H.T }
+
+    package q (A) where
+        module X where
+            data T = T
+
+        -- provides: X -> { q():X.T }
+        -- requires: (nothing)
+
+        include p (M as A) requires (H as X)
+        -- 1. Rename/thin provisions:
+        --      provides: A -> { p(H -> HOLE:H):M.S }
+        --      requires: H -> { HOLE:H.T }
+        -- 2. Rename requirements, substituting HOLEs:
+        --      provides: A -> { p(H -> HOLE:X):M.S }
+        --      requires: X -> { HOLE:X.T }
+
+        -- (after merge)
+        -- provides: X -> { q():X.T }
+        --           A -> { p(H -> q():X):M.S }
+        -- requires: (nothing)
+\end{verbatim}
+
+\newpage
+
+\subsection{Merging}
+
+Merging combines two shapes, filling requirements with implementations
+and substituting information we learn about the identities of
+\verb|Name|s.  Importantly, merging is a \emph{directed} process, akin
+to taking two boxes with input and output ports and wiring them up so
+that the first box feeds into the second box.  This algorithm does not
+support mutual recursion.
+
+Suppose we are merging shape $p$ with shape $q$.  Merging proceeds as follows:
+
+\begin{enumerate}
+    \item \emph{Fill every requirement of $q$ with provided modules from
+        $p$.} For each requirement $M$ of $q$ that is provided by $p$,
+        substitute each \verb|Module| occurrence of \verb|HOLE:M| with the
+        provided $p(M)$, merge the names, and remove the requirement from $q$.
+    \item \emph{Merge in provided signatures of $q$, add the provided modules of $q$.}
+        For each provision $M$ of $q$: if $q(M)$ is a hole, substitute every
+        \verb|Module| occurrence of \verb|HOLE:|$q(M)$ with $p(M)$ if it exists and merge
+        the names; otherwise, add it to $p$, erroring if $p(M)$ exists.
+\end{enumerate}
+
+Substitutions apply to both shapes.  To merge two sets of names, take
+each pair of names with matching \verb|OccName|s $n$ and $m$.
+
+\begin{enumerate}
+    \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$. (E.g., pick the one with the lexicographically first \verb|ModName|).
+    \item If one $n$ is from a hole, substitute $n$ with $m$.
+    \item Otherwise, error if the names are not the same.
+\end{enumerate}
+
+It is important to note that substitutions on \verb|Module|s and substitutions on
+\verb|Name|s are disjoint: a substitution from \verb|HOLE:A| to \verb|HOLE:B|
+does \emph{not} substitute inside the name \verb|HOLE:A.T|.
+Here is a simple example:
+
+\begin{verbatim}
+          shape 1                       shape 2
+provides: A -> THIS:A { q():A.T }       M -> p(A -> HOLE:A) { HOLE:A.T, p(A -> HOLE:A).S }
+requires: (nothing)                     A ->                { HOLE:A.T }
+
+(after filling requirements)
+provides: A -> THIS:A { q():A.T }       M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
+requires: (nothing)                     (nothing)
+
+(after adding provides)
+provides: A -> THIS:A         { q():A.T }
+          M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
+requires: (nothing)
+\end{verbatim}
+
+\Red{Example of canonical choice for signature merging}
+
+\Red{Example of how provides DO NOT merge}
+
+\Red{How to relax this so hs-boot works}
+
+\Red{Example of how loopy modules which rename requirements make it un-obvious whether or not
+a requirement is still required.  Same example works declaration level.}
+
+\Red{package p (A) requires (A); the input output ports should be the same}
+
+% We figure out the requirements (because no loopy modules)
+%
+% package p (A, B) requires (B)
+%   include base
+%   sig B(T)
+%       import Prelude(T)
+%
+% requirement example
+%
+% mental model: you start with an empty package, and you start accreting
+% things on things, merging things together as you discover that this is
+% the case.
+
+\newpage
+
+\subsection{Export declarations}
+
+If an explicit export declaration is given, the final shape is the
+computed shape, minus any provisions not mentioned in the list, with the
+appropriate renaming applied to provisions and requirements.  (Provisions
+are implicitly passed through if they are not named.)
+
+If no explicit export declaration is given, the final shape is
+the computed shape, minus any provisions which did not have an in-line
+module or signature declaration.
+
+\begin{aside}
+\textbf{Guru meditation.}  The defaulting behavior for signatures
+is slightly delicate, as can be seen in this example:
+
+\begin{verbatim}
+package p (S) requires (S) where
+    signature S where
+        x :: True
+
+package q where
+    include p
+    signature S where
+        y :: True
+    module M where
+        import S
+        z = x && y      -- OK
+
+package r where
+    include q
+    module N where
+        import S
+        z = y           -- OK
+        z = x           -- ???
+\end{verbatim}
+
+Absent the second signature declaration in \verb|q|, \verb|S.x| clearly
+should not be visible.  However, what ought to occur when this signature
+declaration is added?  One interpretation is to say that only some
+(but not all) declarations are provided (\verb|S.x| remains invisible);
+another interpretation is that adding \verb|S| is enough to treat
+the signature as ``in-line'', and all declarations are now provided
+(\verb|S.x| is visible).
+
+The latter interpretation avoids having to keep track of providedness
+per declarations, and means that you can always express defaulting
+behavior by writing an explicit provides declaration on the package.
+However, it has the odd behavior of making empty signatures semantically
+meaningful:
+
+\begin{verbatim}
+package q where
+    include p
+    signature S where
+\end{verbatim}
+
+Note that if \verb|p| didn't provide \verb|S|, \verb|x| would \emph{never}
+be visible unless it was redeclared in an interface.
+\end{aside}
+%
+%   SPJ: This would be too complicated (if there's yet a third way)
+
+\subsection{Package key}
+
+What is \verb|THIS|?  It is the package name, plus for every requirement \verb|M|,
+a mapping \verb|M -> HOLE:M|.  Annoyingly, you don't know the full set of
+requirements until the end of shaping, so you don't know the package key ahead of time;
+however, it can be substituted at the end easily.
+
+\newpage
+
+\section{Type checking}
+
+(UNDER CONSTRUCTION)
+
+%
+%   what do we know for each type checked package
+%       ModEnv
+%
+%   ModIface -> ModDetails (rename + tcIface)
+
+For type-checking, we assume that for every \verb|pkgname|, we have a mapping of \verb|ModName -> ModIface| (We distinguish \verb|ModIface| from the typechecked \verb|ModDetails|, which may have had \verb|HOLE|s renamed in the process.)  We maintain a context of \verb|ModName -> Module| and \verb|Module -> ModDetails|
+
+How to type-check a signature?  Well, a signature has a \verb|Module|, but it's \emph{NOT} necessarily in the home package.
+
+\subsection{Semantic objects}
+
+\begin{verbatim}
+PkgKey      ::= SrcPkgId "(" { ModName "->" Module } ")"
+              | HOLE
+Module      ::= PkgKey ":" ModName
+Name        ::= Module "." OccName
+OccName     ::= -- a plain old name, e.g. undefined, Bool, Int
+
+Shape       ::= "provided:" { ModName "->" Module { Name } }
+                "required:" { ModName "->" { Name } }
+Type        ::= "shape:"  Shape
+                "modenv:" { Module "->" ModIface }
+\end{verbatim}
+
+\begin{verbatim}
+ModIface --- rename / tcIface ---> ModDetails
+\end{verbatim}
+
+A shape consists of the modules we provide (as well as what declarations
+are provided), and what module names (with what declarations) must
+be provided.
+
+\subsection{Renamed packages}
+
+\begin{verbatim}
+spackage    ::= "package" pkgname Shape "where" spkgbody
+spkgbody    ::= "{" spkgdecl_0 ";" ... ";" spkgdecl_n "}"
+spkgdecl    ::= "module"    Module (rnexports) where rnbody
+              | "signature" Module (rnexports) where rnbody
+              | "include"   pkgname sinclspec
+sinclspec   ::= "(" srenaming_0 "," ... "," srenaming_n ")"
+                "requires" "(" srenaming_0 "," ... "," srenaming_n ")"
+srenaming   ::= ModName "as" Module
+\end{verbatim}
+
+After shaping, we have renamed all of the identifiers inside a package.
+Here is the elaborated version.  This is now immediately ready for
+type-checking.  \Red{Representation is slightly redundant.}
+
+\end{document}

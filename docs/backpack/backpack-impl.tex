@@ -2436,6 +2436,33 @@ while it might be aesthetically displeasing to have the signature impose
 extra restrictions on linking identities, we can carry this out without
 violating the linking restriction.
 
+\subsection{Orphans}
+
+Controlling instance visibility via signature problems poses an implementation
+challenge similar to that of orphan instances.  To describe this problem,
+we first have to describe how instance resolution works for orphans and
+non-orphans in GHC today.
+
+Type information for already compiled code in other packages is cached
+on disk using interface files.  For efficiency reasons, it's desirable to
+avoid loading interface file until absolutely necessary: if we don't
+use any of the identifiers for a file, it should not be necessary to
+load the interface.  Among other things, type class instances are stored
+in interface files.
+
+Signatures and hs-boot files notwithstanding, non-orphan instance
+resolution is achieved through a (somewhat) astonishing coincidence: at
+the point when a type class is resolved, we are guaranteed to have
+loaded the interfaces for all of the names involved in the type class
+instantiation.  This means that if there is a type class, we will have
+seen it; conversely, it means that non-orphan instances are a closed
+world: if we load all these interfaces and see no non-orphan instance,
+we know there never be a non-orphan instance.
+
+Things are a bit worse for orphans: these instances are an open world,
+and so the only way to tell if an orphan instance is in scope is by consulting
+the transitive closure of module imports.
+
 \section{Bits and bobs}
 
 \subsection{Abstract type synonyms}
