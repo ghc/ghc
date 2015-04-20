@@ -590,8 +590,8 @@ cantFindErr cannot_find _ dflags mod_name find_result
     more_info
       = case find_result of
             NoPackage pkg
-                -> ptext (sLit "no package matching") <+> quotes (ppr pkg) <+>
-                   ptext (sLit "was found")
+                -> ptext (sLit "no package key matching") <+> quotes (ppr pkg) <+>
+                   ptext (sLit "was found") $$ looks_like_srcpkgid pkg
 
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
@@ -650,6 +650,18 @@ cantFindErr cannot_find _ dflags mod_name find_result
            in ptext (sLit "Perhaps you need to add") <+>
               quotes (ppr (packageName pkg)) <+>
               ptext (sLit "to the build-depends in your .cabal file.")
+     | otherwise = Outputable.empty
+
+    looks_like_srcpkgid :: PackageKey -> SDoc
+    looks_like_srcpkgid pk
+     -- Unsafely coerce a package key FastString into a source package ID
+     -- FastString and see if it means anything.
+     | (pkg:pkgs) <- searchPackageId dflags (SourcePackageId (packageKeyFS pk))
+     = parens (text "This package key looks like the source package ID;" $$
+       text "the real package key is" <+> quotes (ftext (packageKeyFS (packageKey pkg))) $$
+       (if null pkgs then Outputable.empty
+        else text "and" <+> int (length pkgs) <+> text "other candidates"))
+     -- Todo: also check if it looks like a package name!
      | otherwise = Outputable.empty
 
     mod_hidden pkg =

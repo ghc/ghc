@@ -1,0 +1,8 @@
+
+T10279.hs:10:10:
+    Failed to load interface for ‘A’
+    no package key matching ‘rts-1.0’ was found
+    (This package key looks like the source package ID;
+     the real package key is ‘rts’)
+    In the expression: (rts-1.0:A.Foo)
+    In an equation for ‘blah’: blah = (rts-1.0:A.Foo)
