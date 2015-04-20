@@ -360,6 +360,7 @@ test('T8624', normal, run_command, ['$MAKE -s --no-print-directory T8624'])
 test('TH_Lift', normal, compile, ['-v0'])
 test('T10047', normal, ghci_script, ['T10047.script'])
 test('T10019', normal, ghci_script, ['T10019.script'])
+test('T10279', normal, compile_fail, ['-v0'])
 test('T10306', normal, compile, ['-v0'])
 
 test('TH_abstractFamily', normal, compile_fail, [''])
