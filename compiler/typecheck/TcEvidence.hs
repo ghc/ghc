@@ -13,7 +13,7 @@ module TcEvidence (
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds, lookupEvBind, evBindMapBinds,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds,
-  EvTerm(..), mkEvCast, evVarsOfTerm,
+  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvTupleSelectors, mkEvScSelectors,
   EvLit(..), evTermCoercion,
   EvTypeable(..),
 
@@ -34,10 +34,11 @@ module TcEvidence (
 import Var
 import Coercion
 import PprCore ()   -- Instance OutputableBndr TyVar
-import TypeRep  -- Knows type representation
+import TypeRep      -- Knows type representation
 import TcType
 import Type
 import TyCon
+import Class( Class )
 import CoAxiom
 import PrelNames
 import VarEnv
@@ -824,6 +825,17 @@ mkEvCast ev lco
   | ASSERT2(tcCoercionRole lco == Representational, (vcat [ptext (sLit "Coercion of wrong role passed to mkEvCast:"), ppr ev, ppr lco]))
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
+
+mkEvTupleSelectors :: EvTerm -> [TcPredType] -> [(TcPredType, EvTerm)]
+mkEvTupleSelectors ev preds = zipWith mk_pr preds [0..]
+  where
+    mk_pr pred i = (pred, EvTupleSel ev i)
+
+mkEvScSelectors :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
+mkEvScSelectors ev cls tys
+   = zipWith mk_pr (immSuperClasses cls tys) [0..]
+  where
+    mk_pr pred i = (pred, EvSuperClass ev i)
 
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
