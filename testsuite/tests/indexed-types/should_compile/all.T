@@ -233,9 +233,9 @@ test('T8500',
 
 test('T8018', normal, compile, [''])
 test('T8020', normal, compile, [''])
-test('ClosedFam1', extra_clean(['ClosedFam1.o-boot', 'ClosedFam1.hi-boot']),
+test('ClosedFam1', extra_clean(['ClosedFam1.o-boot', 'ClosedFam1.hi-boot', 'ClosedFam1a.o', 'ClosedFam1a.hi']),
      multimod_compile, ['ClosedFam1', '-v0'])
-test('ClosedFam2', extra_clean(['ClosedFam2.o-boot', 'ClosedFam2.hi-boot']),
+test('ClosedFam2', extra_clean(['ClosedFam2.o-boot', 'ClosedFam2.hi-boot', 'ClosedFam2a.o', 'ClosedFam2a.hi']),
      multimod_compile, ['ClosedFam2', '-v0'])
 test('T8651', normal, compile, [''])
 test('T8889', normal, compile, [''])

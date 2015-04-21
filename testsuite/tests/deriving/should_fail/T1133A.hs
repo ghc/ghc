@@ -1,6 +1,6 @@
 
 module T1133A where
 
-import {-# SOURCE #-} T1133A
+import T1133Aa
 
 newtype X = X Int deriving Enum

@@ -35,7 +35,7 @@ test('T5478', normal, compile_fail, [''])
 test('T5686', normal, compile_fail, [''])
 test('T5922', normal, compile_fail, [''])
 test('T1133A',
-     extra_clean(['T1133A.o-boot', 'T1133A.hi-boot']),
+     extra_clean(['T1133A.o-boot', 'T1133A.hi-boot', 'T1133Aa.o', 'T1133Aa.hi']),
      run_command,
      ['$MAKE --no-print-directory -s T1133A'])
 # 5863a was removed as it was out of date re: fixing #9858

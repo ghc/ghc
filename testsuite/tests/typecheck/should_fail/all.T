@@ -215,7 +215,7 @@ test('T3950', normal, compile_fail, [''])
 test('T3966', normal, compile_fail, ['-O'])
 test('IPFail', normal, compile_fail, [''])
 
-test('T3468', extra_clean(['T3468.hi-boot', 'T3468.o-boot']),
+test('T3468', extra_clean(['T3468.hi-boot', 'T3468.o-boot', 'T3468a.hi', 'T3468a.o']),
      multimod_compile_fail, ['T3468', '-v0'])
 test('T2846b', normal, compile_fail, [''])
 test('FrozenErrorTests', normal, compile_fail, [''])
