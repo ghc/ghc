@@ -5,7 +5,7 @@ Result size of Tidy Core = {terms: 8, types: 19, coercions: 1}
 T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
- Str=DmdType,
+ Str=DmdType m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=False)
