@@ -11,10 +11,10 @@ module TcEvidence (
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
-  EvBindMap(..), emptyEvBindMap, extendEvBinds, 
+  EvBindMap(..), emptyEvBindMap, extendEvBinds,
                  lookupEvBind, evBindMapBinds, foldEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  EvTerm(..), mkEvCast, evVarsOfTerm,
+  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvTupleSelectors, mkEvScSelectors,
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
@@ -37,10 +37,11 @@ module TcEvidence (
 import Var
 import Coercion
 import PprCore ()   -- Instance OutputableBndr TyVar
-import TypeRep  -- Knows type representation
+import TypeRep      -- Knows type representation
 import TcType
 import Type
 import TyCon
+import Class( Class )
 import CoAxiom
 import PrelNames
 import VarEnv
@@ -711,7 +712,7 @@ data EvTerm
   | EvDFunApp DFunId             -- Dictionary instance application
        [Type] [EvId]
 
-  | EvTupleSel EvId  Int         -- n'th component of the tuple, 0-indexed
+  | EvTupleSel EvTerm Int        -- n'th component of the tuple, 0-indexed
 
   | EvTupleMk [EvId]             -- tuple built from this stuff
 
@@ -974,6 +975,17 @@ mkEvCast ev lco
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 
+mkEvTupleSelectors :: EvTerm -> [TcPredType] -> [(TcPredType, EvTerm)]
+mkEvTupleSelectors ev preds = zipWith mk_pr preds [0..]
+  where
+    mk_pr pred i = (pred, EvTupleSel ev i)
+
+mkEvScSelectors :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
+mkEvScSelectors ev cls tys
+   = zipWith mk_pr (immSuperClasses cls tys) [0..]
+  where
+    mk_pr pred i = (pred, EvSuperClass ev i)
+
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
 
@@ -994,7 +1006,7 @@ evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvId v)             = unitVarSet v
 evVarsOfTerm (EvCoercion co)      = coVarsOfTcCo co
 evVarsOfTerm (EvDFunApp _ _ evs)  = mkVarSet evs
-evVarsOfTerm (EvTupleSel v _)     = unitVarSet v
+evVarsOfTerm (EvTupleSel ev _)    = evVarsOfTerm ev
 evVarsOfTerm (EvSuperClass v _)   = evVarsOfTerm v
 evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo co
 evVarsOfTerm (EvTupleMk evs)      = mkVarSet evs

@@ -195,8 +195,7 @@ canTuple ev preds
        ; stopWith ev "Decomposed tuple constraint" }
 
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
-  = do { let mk_pr pred i = (pred, EvTupleSel evar i)
-       ; given_evs <- newGivenEvVars loc (zipWith mk_pr preds [0..])
+  = do { given_evs <- newGivenEvVars loc (mkEvTupleSelectors (EvId evar) preds)
        ; emitWorkNC given_evs
        ; stopWith ev "Decomposed tuple constraint" }
 

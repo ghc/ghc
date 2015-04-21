@@ -1247,7 +1247,6 @@ zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcCoToCo env co
 zonkEvTerm env (EvCast tm co)     = do { tm' <- zonkEvTerm env tm
                                        ; co' <- zonkTcCoToCo env co
                                        ; return (mkEvCast tm' co') }
-zonkEvTerm env (EvTupleSel tm n)  = return (EvTupleSel (zonkIdOcc env tm) n)
 zonkEvTerm env (EvTupleMk tms)    = return (EvTupleMk (zonkIdOccs env tms))
 zonkEvTerm _   (EvLit l)          = return (EvLit l)
 
@@ -1271,6 +1270,9 @@ zonkEvTerm env (EvCallStack cs)
                            ; return (EvCallStack (EvCsTop n l tm')) }
       EvCsPushCall n l tm -> do { tm' <- zonkEvTerm env tm
                                 ; return (EvCallStack (EvCsPushCall n l tm')) }
+
+zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
+                                       ; return (EvTupleSel tm' n) }
 zonkEvTerm env (EvSuperClass d n) = do { d' <- zonkEvTerm env d
                                        ; return (EvSuperClass d' n) }
 zonkEvTerm env (EvDFunApp df tys tms)

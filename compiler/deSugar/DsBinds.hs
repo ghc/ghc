@@ -854,15 +854,16 @@ dsEvTerm (EvDFunApp df tys tms)     = return (Var df `mkTyApps` tys `mkApps` (ma
 dsEvTerm (EvCoercion (TcCoVarCo v)) = return (Var v)  -- See Note [Simple coercions]
 dsEvTerm (EvCoercion co)            = dsTcCoercion co mkEqBox
 
-dsEvTerm (EvTupleSel v n)
-   = do { let scrut_ty  = idType v
+dsEvTerm (EvTupleSel tm n)
+   = do { tup <- dsEvTerm tm
+        ; let scrut_ty  = exprType tup
               (tc, tys) = splitTyConApp scrut_ty
               Just [dc] = tyConDataCons_maybe tc
               xs = mkTemplateLocals tys
               the_x = getNth xs n
         ; ASSERT( isTupleTyCon tc )
           return $
-          Case (Var v) (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
+          Case tup (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
 
 dsEvTerm (EvTupleMk tms)
   = return (Var (dataConWorkId dc) `mkTyApps` map idType tms `mkApps` map Var tms)

@@ -1006,38 +1006,38 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
     head_size = sizeTypes inst_tys
 
     ------------
-    given_cls_preds :: [(EvTerm, TcType)] -- (ev_term, type of that ev_term)
-    -- given_cls_preds is the list of (ev_term, type) that can be derived
-    -- from the dfun_evs, using the rules (sc1) and (sc3) of
+    given_cls_preds :: [(TcPredType, EvTerm)] -- (type of that ev_term, ev_term)
+    -- given_cls_preds is the list of (type, ev_term) that can be derived
+    -- from the dfun_evs, using the rules (sc1) and (sc2) of
     -- Note [Recursive superclasses] below
     -- When solving for superclasses, we search this list
     given_cls_preds
       = [ ev_pr | dfun_ev <- dfun_evs
-                , ev_pr <- super_classes (EvId dfun_ev, idType dfun_ev) ]
+                , ev_pr <- super_classes (idType dfun_ev, EvId dfun_ev) ]
 
     ------------
     super_classes ev_pair
-      | (ev_tm, pred) <- normalise_pr ev_pair
-      , ClassPred cls tys <- classifyPredType pred
-      = (ev_tm, pred) : super_classes_help ev_tm cls tys
-      | otherwise
-      = []
+      = case classifyPredType pred of
+          ClassPred cls tys -> (pred, ev_tm) : super_classes_help ev_tm cls tys
+          TuplePred preds   -> concatMap super_classes (mkEvTupleSelectors ev_tm preds)
+          _                 -> []
+      where
+        (pred, ev_tm) = normalise_pr ev_pair
 
     ------------
-    super_classes_help :: EvTerm -> Class -> [TcType] -> [(EvTerm, TcType)]
+    super_classes_help :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
     super_classes_help ev_tm cls tys  -- ev_tm :: cls tys
       | sizeTypes tys >= head_size  -- Here is where we test for
       = []                          -- a smaller dictionary
       | otherwise
-      = concatMap super_classes ([EvSuperClass ev_tm i | i <- [0..]]
-                                 `zip` immSuperClasses cls tys)
+      = concatMap super_classes (mkEvScSelectors ev_tm cls tys)
 
     ------------
-    normalise_pr :: (EvTerm, TcPredType) -> (EvTerm, TcPredType)
+    normalise_pr :: (TcPredType, EvTerm) -> (TcPredType, EvTerm)
     -- Normalise type functions as much as possible
-    normalise_pr (ev_tm, pred)
-      | isReflCo norm_co = (ev_tm,                pred)
-      | otherwise        = (mkEvCast ev_tm tc_co, norm_pred)
+    normalise_pr (pred, ev_tm)
+      | isReflCo norm_co = (pred,      ev_tm)
+      | otherwise        = (norm_pred, mkEvCast ev_tm tc_co)
       where
         (norm_co, norm_pred) = normaliseType fam_envs Nominal pred
         tc_co = TcCoercion (mkSubCo norm_co)
@@ -1087,7 +1087,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
 
     -------------------
     emit_sc_cls_pred sc_pred cls tys
-      | (ev_tm:_) <- [ ev_tm | (ev_tm, ev_ty) <- given_cls_preds
+      | (ev_tm:_) <- [ ev_tm | (ev_ty, ev_tm) <- given_cls_preds
                              , ev_ty `tcEqType` sc_pred ]
       = do { traceTc "tcSuperClass 1" (ppr sc_pred $$ ppr ev_tm)
            ; return ev_tm }
@@ -1198,10 +1198,10 @@ definition.  More precisely:
 To achieve the Superclass Invariant, in a dfun definition we can
 generate a guaranteed-non-bottom superclass witness from:
   (sc1) one of the dictionary arguments itself (all non-bottom)
-  (sc2) a call of a dfun (always returns a dictionary constructor)
-  (sc3) an immediate superclass of a smaller dictionary
+  (sc2) an immediate superclass of a smaller dictionary
+  (sc3) a call of a dfun (always returns a dictionary constructor)
 
-The tricky case is (sc3).  We proceed by induction on the size of
+The tricky case is (sc2).  We proceed by induction on the size of
 the (type of) the dictionary, defined by TcValidity.sizePred.
 Let's suppose we are building a dictionary of size 3, and
 suppose the Superclass Invariant holds of smaller dictionaries.
