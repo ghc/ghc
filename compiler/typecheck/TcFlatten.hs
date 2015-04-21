@@ -1744,7 +1744,7 @@ Note [Unflatten using funeqs first]
     [W] F (G a) ~ G a
 
 do not want to end up with
-    [W} F Int ~ Int
+    [W] F Int ~ Int
 because that might actually hold!  Better to end up with the two above
 unsolved constraints.  The flat form will be
 

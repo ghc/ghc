@@ -454,11 +454,16 @@ tcInstTyVarX subst tyvar
   = do  { uniq <- newUnique
         ; details <- newMetaDetails (TauTv False)
         ; let name   = mkSystemName uniq (getOccName tyvar)
+                       -- See Note [Name of an instantiated type variable]
               kind   = substTy subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
         ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
 
-{-
+{- Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+
 ************************************************************************
 *                                                                      *
              Quantification
