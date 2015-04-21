@@ -919,7 +919,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = do { let msg = vcat [ ptext (sLit "Cannot instantiate unification variable")
                           <+> quotes (ppr tv1)
                         , hang (ptext (sLit "with a type involving foralls:")) 2 (ppr ty2)
-                        , nest 2 (ptext (sLit "Perhaps you want ImpredicativeTypes")) ]
+                        , nest 2 (ptext (sLit "GHC doesn't yet support impredicative polymorphism")) ]
        ; mkErrorMsgFromCt ctxt ct msg }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and

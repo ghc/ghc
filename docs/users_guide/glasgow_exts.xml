@@ -8220,9 +8220,9 @@ for rank-2 types.
 <sect2 id="impredicative-polymorphism">
 <title>Impredicative polymorphism
 </title>
-<para>GHC supports <emphasis>impredicative polymorphism</emphasis>,
+<para>GHC has extremely flaky support for <emphasis>impredicative polymorphism</emphasis>,
 enabled with <option>-XImpredicativeTypes</option>.
-This means
+If it worked, this would mean
 that you can call a polymorphic function at a polymorphic type, and
 parameterise data structures over polymorphic types.  For example:
 <programlisting>
@@ -8233,11 +8233,11 @@ parameterise data structures over polymorphic types.  For example:
 Notice here that the <literal>Maybe</literal> type is parameterised by the
 <emphasis>polymorphic</emphasis> type <literal>(forall a. [a] ->
 [a])</literal>.
-</para>
-<para>The technical details of this extension are described in the paper
-<ulink url="http://research.microsoft.com/%7Esimonpj/papers/boxy/">Boxy types:
-type inference for higher-rank types and impredicativity</ulink>,
-which appeared at ICFP 2006.
+However <emphasis>the extension should be considered highly experimental, and certainly un-supported</emphasis>.
+You are welcome to try it, but please don't rely on it working consistently, or
+working the same in subsequent releases.  See 
+<ulink url="https://ghc.haskell.org/trac/ghc/wiki/ImpredicativePolymorphism">this wiki page</ulink>
+for more details.
 </para>
 </sect2>
 

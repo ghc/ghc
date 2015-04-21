@@ -360,7 +360,7 @@ data Rank = ArbitraryRank         -- Any rank ok
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType :: Rank
 rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types"))
-tyConArgMonoType = MonoType (ptext (sLit "Perhaps you intended to use ImpredicativeTypes"))
+tyConArgMonoType = MonoType (ptext (sLit "GHC doesn't yet support impredicative polymorphism"))
 synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use LiberalTypeSynonyms"))
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
