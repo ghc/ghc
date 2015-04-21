@@ -438,9 +438,10 @@ tcRnImports hsc_env import_decls
 
                 -- Load any orphan-module and family instance-module
                 -- interfaces, so that their rules and instance decls will be
-                -- found.
+                -- found.  But filter out a self hs-boot: these instances
+                -- will be checked when we define them locally.
         ; loadModuleInterfaces (ptext (sLit "Loading orphan modules"))
-                               (imp_orphs imports)
+                               (filter (/= this_mod) (imp_orphs imports))
 
                 -- Check type-family consistency
         ; traceRn (text "rn1: checking family instance consistency")

@@ -413,6 +413,7 @@ loadInterface :: SDoc -> Module -> WhereFrom
 loadInterface doc_str mod from
   = do  {       -- Read the state
           (eps,hpt) <- getEpsAndHpt
+        ; gbl_env <- getGblEnv
 
         ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
@@ -429,7 +430,15 @@ loadInterface doc_str mod from
         -- READ THE MODULE IN
         ; read_result <- case (wantHiBootFile dflags eps mod from) of
                            Failed err             -> return (Failed err)
-                           Succeeded hi_boot_file -> findAndReadIface doc_str mod hi_boot_file
+                           Succeeded hi_boot_file ->
+                            -- Stoutly warn against an EPS-updating import
+                            -- of one's own boot file! (one-shot only)
+                            --See Note [Do not update EPS with your own hi-boot]
+                            -- in MkIface.
+                            WARN( hi_boot_file &&
+                                  fmap fst (if_rec_types gbl_env) == Just mod,
+                                  ppr mod )
+                            findAndReadIface doc_str mod hi_boot_file
         ; case read_result of {
             Failed err -> do
                 { let fake_iface = emptyModIface mod

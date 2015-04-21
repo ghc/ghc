@@ -560,9 +560,20 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- dependency tree.  We only care about orphan modules in the current
    -- package, because changes to orphans outside this package will be
    -- tracked by the usage on the ABI hash of package modules that we import.
-   let orph_mods = filter ((== this_pkg) . modulePackageKey)
-                   $ dep_orphs sorted_deps
+   let orph_mods
+        = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
+        . filter ((== this_pkg) . modulePackageKey)
+        $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
+
+   -- Note [Do not update EPS with your own hi-boot]
+   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   -- (See also Trac #10182).  When your hs-boot file includes an orphan
+   -- instance declaration, you may find that the dep_orphs of a module you
+   -- import contains reference to yourself.  DO NOT actually load this module
+   -- or add it to the orphan hashes: you're going to provide the orphan
+   -- instances yourself, no need to consult hs-boot; if you do load the
+   -- interface into EPS, you will see a duplicate orphan instance.
 
    orphan_hash <- computeFingerprint (mk_put_name local_env)
                       (map ifDFun orph_insts, orph_rules, orph_fis)

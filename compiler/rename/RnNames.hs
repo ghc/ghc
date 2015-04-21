@@ -200,10 +200,16 @@ rnImportDecl this_mod
     -- Check for self-import, which confuses the typechecker (Trac #9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
     -- at least not until TcIface.tcHiBootIface, which is too late to avoid
-    -- typechecker crashes.  ToDo: what about indirect self-import?
-    -- But 'import {-# SOURCE #-} M' is ok, even if a bit odd
-    when (not want_boot &&
-          imp_mod_name == moduleName this_mod &&
+    -- typechecker crashes.  (Indirect self imports are not caught until
+    -- TcIface, see #10337 tracking how to make this error better.)
+    --
+    -- Originally, we also allowed 'import {-# SOURCE #-} M', but this
+    -- caused bug #10182: in one-shot mode, we should never load an hs-boot
+    -- file for the module we are compiling into the EPS.  In principle,
+    -- it should be possible to support this mode of use, but we would have to
+    -- extend Provenance to support a local definition in a qualified location.
+    -- For now, we don't support it, but see #10336
+    when (imp_mod_name == moduleName this_mod &&
           (case mb_pkg of  -- If we have import "<pkg>" M, then we should
                            -- check that "<pkg>" is "this" (which is magic)
                            -- or the name of this_mod's package.  Yurgh!

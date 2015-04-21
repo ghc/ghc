@@ -431,3 +431,8 @@ test('T10219', normal, run_command,
 test('T10220', normal, run_command,
      # Preprocessed T10220.hspp imports T10220B. Should work in --make mode.
      ['{compiler} --make T10220.hspp -fno-code -v0'])
+
+test('T10182',
+     extra_clean(['T10182.o', 'T10182a.o', 'T10182.o-boot', 'T10182.hi', 'T10182a.hi', 'T10182.hi-boot']),
+     run_command,
+     ['$MAKE -s --no-print-directory T10182'])
