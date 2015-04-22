@@ -7979,10 +7979,21 @@ are clearly not Haskell-98, and an extra flag did not seem worth the bother.
 </para>
 
 <para>
-The obselete language options <option>-XPolymorphicComponents</option> and <option>-XRank2Types</option>
-are synonyms for <option>-XRankNTypes</option>.  They used to specify finer distinctions that
-GHC no longer makes.  (They should really elicit a deprecation warning, but they don't, purely
-to avoid the need to library authors to change their old flags specifciations.)
+In particular, in <literal>data</literal> and
+<literal>newtype</literal> declarations the constructor arguments may
+be polymorphic types of any rank; see examples in <xref linkend="univ"/>.
+Note that the declared types are
+nevertheless always monomorphic. This is important because by default
+GHC will not instantiate type variables to a polymorphic type
+(<xref linkend="impredicative-polymorphism"/>).
+</para>
+<para>
+The obsolete language options <option>-XPolymorphicComponents</option>
+and <option>-XRank2Types</option> are synonyms for
+<option>-XRankNTypes</option>.  They used to specify finer
+distinctions that GHC no longer makes.  (They should really elicit a
+deprecation warning, but they don't, purely to avoid the need to
+library authors to change their old flags specifciations.)
 </para>
 
 <sect3 id="univ">
@@ -7990,12 +8001,8 @@ to avoid the need to library authors to change their old flags specifciations.)
 </title>
 
 <para>
-In a <literal>data</literal> or <literal>newtype</literal> declaration one can quantify
-the types of the constructor arguments.  Here are several examples:
-</para>
-
-<para>
-
+These are examples of <literal>data</literal> and <literal>newtype</literal>
+declarations whose data constructors have polymorphic argument types:
 <programlisting>
 data T a = T1 (forall b. b -> b -> b) a
 
@@ -8220,10 +8227,24 @@ for rank-2 types.
 <sect2 id="impredicative-polymorphism">
 <title>Impredicative polymorphism
 </title>
+<para>In general, GHC will only instantiate a polymorphic function at
+a monomorphic type (one with no foralls). For example, 
+<programlisting>
+runST :: (forall s. ST s a) -> a
+id :: forall b. b -> b
+
+foo = id runST   -- Rejected
+</programlisting>
+The definition of <literal>foo</literal> is rejected because one would have to instantiate
+<literal>id</literal>'s type with <literal>b := (forall s. ST s a) -> a</literal>, and
+that is not allowed.
+Instanting polymorpic type variables with polymorphic types is called <emphasis>impredicative polymorphism</emphasis>.
+</para>
+
 <para>GHC has extremely flaky support for <emphasis>impredicative polymorphism</emphasis>,
 enabled with <option>-XImpredicativeTypes</option>.
 If it worked, this would mean
-that you can call a polymorphic function at a polymorphic type, and
+that you <emphasis>could</emphasis> call a polymorphic function at a polymorphic type, and
 parameterise data structures over polymorphic types.  For example:
 <programlisting>
   f :: Maybe (forall a. [a] -> [a]) -> Maybe ([Int], [Char])
@@ -8231,14 +8252,27 @@ parameterise data structures over polymorphic types.  For example:
   f Nothing  = Nothing
 </programlisting>
 Notice here that the <literal>Maybe</literal> type is parameterised by the
-<emphasis>polymorphic</emphasis> type <literal>(forall a. [a] ->
-[a])</literal>.
+<emphasis>polymorphic</emphasis> type <literal>(forall a. [a] -> [a])</literal>.
 However <emphasis>the extension should be considered highly experimental, and certainly un-supported</emphasis>.
 You are welcome to try it, but please don't rely on it working consistently, or
-working the same in subsequent releases.  See 
+working the same in subsequent releases.  See
 <ulink url="https://ghc.haskell.org/trac/ghc/wiki/ImpredicativePolymorphism">this wiki page</ulink>
 for more details.
 </para>
+<para>If you want impredicative polymorphism, the main workaround is to use a newtype wrapper.
+The <literal>id runST</literal> example can be written using theis workaround like this:
+<programlisting>
+runST :: (forall s. ST s a) -> a
+id :: forall b. b -> b
+
+nwetype Wrap a = Wrap { unWrap :: (forall s. ST s a) -> a }
+
+foo :: (forall s. ST s a) -> a
+foo = unWrap (id (Wrap runST))
+      -- Here id is called at monomorphic type (Wrap a)
+</programlisting>
+</para>
+
 </sect2>
 
 <sect2 id="scoped-type-variables">
