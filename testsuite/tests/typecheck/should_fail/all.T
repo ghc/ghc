@@ -361,3 +361,4 @@ test('T10285',
      multimod_compile_fail, ['T10285', '-v0'])
 test('T9858a', normal, compile_fail, [''])
 test('T9858b', normal, compile_fail, [''])
+test('T9858c', normal, compile_fail, [''])
