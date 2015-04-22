@@ -1,4 +1,4 @@
-T9858c.hs:9:8:
+T9858e.hs:9:8: error:
     Couldn't match type ‘Eq Int => Int’ with ‘a0 b0’
     Expected type: Proxy (a0 b0)
       Actual type: Proxy (Eq Int => Int)
