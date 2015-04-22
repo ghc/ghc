@@ -333,6 +333,26 @@ allDistinctTyVars tkvs = go emptyVarSet tkvs
 We need to be pretty careful with AppTy to make sure we obey the
 invariant that a TyConApp is always visibly so.  mkAppTy maintains the
 invariant: use it.
+
+Note [Decomposing fat arrow c=>t]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Can we unify (a b) with (Eq a => ty)?   If we do so, we end up with
+a partial application like ((=>) Eq a) which doesn't make sense in
+source Haskell.  In constrast, we *can* unify (a b) with (t1 -> t2).
+Here's an example (Trac #9858) of how you might do it:
+   i :: (Typeable a, Typeable b) => Proxy (a b) -> TypeRep
+   i p = typeRep p
+
+   j = i (Proxy :: Proxy (Eq Int => Int))
+The type (Proxy (Eq Int => Int)) is only accepted with -XImpredicativeTypes,
+but suppose we want that.  But then in the call to 'i', we end
+up decomposing (Eq Int => Int), and we definitely don't want that.
+
+This really only applies to the type checker; in Core, '=>' and '->'
+are the same, as are 'Constraint' and '*'.  But for now I've put
+the test in repSplitAppTy_maybe, which applies throughout, because
+the other calls to splitAppTy are in Unify, which is also used by
+the type checker (e.g. when matching type-function equations).
 -}
 
 -- | Applies a type to another, as in e.g. @k a@
@@ -366,7 +386,9 @@ splitAppTy_maybe ty = repSplitAppTy_maybe ty
 repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
-repSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
+repSplitAppTy_maybe (FunTy ty1 ty2)
+  | isConstraintKind (typeKind ty1)   = Nothing  -- See Note [Decomposing fat arrow c=>t]
+  | otherwise                         = Just (TyConApp funTyCon [ty1], ty2)
 repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 repSplitAppTy_maybe (TyConApp tc tys)
   | isDecomposableTyCon tc || tys `lengthExceeds` tyConArity tc
