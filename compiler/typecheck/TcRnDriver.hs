@@ -705,23 +705,20 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM TcGblEnv
 -- with the type environment we've just come up with
 -- In the common case where there is no hi-boot file, the list
 -- of boot_names is empty.
---
--- The bindings we return give bindings for the dfuns defined in the
--- hs-boot file, such as        $fbEqT = $fEqT
 
 checkHiBootIface
-        tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds,
-                            tcg_insts = local_insts,
-                            tcg_type_env = local_type_env, tcg_exports = local_exports })
+        tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds
+                          , tcg_insts = local_insts
+                          , tcg_type_env = local_type_env
+                          , tcg_exports = local_exports })
         boot_details
   | HsBootFile <- hs_src     -- Current module is already a hs-boot file!
   = return tcg_env
 
   | otherwise
-  = do  { mb_dfun_prs <- checkHiBootIface' local_insts local_type_env
-                                           local_exports boot_details
-        ; let dfun_prs   = catMaybes mb_dfun_prs
-              boot_dfuns = map fst dfun_prs
+  = do  { dfun_prs <- checkHiBootIface' local_insts local_type_env
+                                        local_exports boot_details
+        ; let boot_dfuns = map fst dfun_prs
               dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
                                      | (boot_dfun, dfun) <- dfun_prs ]
               type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
@@ -734,9 +731,15 @@ checkHiBootIface
              -- can "see" that boot dfun.   See Trac #4003
 
 checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
-                  -> ModDetails -> TcM [Maybe (Id, Id)]
+                  -> ModDetails -> TcM [(Id, Id)]
 -- Variant which doesn't require a full TcGblEnv; you could get the
 -- local components from another ModDetails.
+--
+-- We return a list of "impedence-matching" bindings for the dfuns 
+-- defined in the hs-boot file, such as
+--           $fxEqT = $fEqT
+-- We need these because the module and hi-boot file might differ in
+-- the name it chose for the dfun.
 
 checkHiBootIface'
         local_insts local_type_env local_exports
@@ -757,11 +760,12 @@ checkHiBootIface'
             --        instances?  We can't easily equate tycons...
 
                 -- Check instance declarations
+                -- and generate an impedence-matching binding
         ; mb_dfun_prs <- mapM check_inst boot_insts
 
         ; failIfErrsM
 
-        ; return mb_dfun_prs }
+        ; return (catMaybes mb_dfun_prs) }
 
   where
     check_export boot_avail     -- boot_avail is exported by the boot iface
@@ -804,18 +808,25 @@ checkHiBootIface'
     check_inst boot_inst
         = case [dfun | inst <- local_insts,
                        let dfun = instanceDFunId inst,
-                       idType dfun `eqType` boot_inst_ty ] of
-            [] -> do { traceTc "check_inst" (vcat [ text "local_insts" <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
-                                                  , text "boot_inst"   <+> ppr boot_inst
-                                                  , text "boot_inst_ty" <+> ppr boot_inst_ty
-                                                  ])
+                       idType dfun `eqType` boot_dfun_ty ] of
+            [] -> do { traceTc "check_inst" $ vcat
+                          [ text "local_insts"  <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
+                          , text "boot_inst"    <+> ppr boot_inst
+                          , text "boot_dfun_ty" <+> ppr boot_dfun_ty
+                          ]
                      ; addErrTc (instMisMatch True boot_inst); return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
+                     where
+                        local_boot_dfun = Id.mkExportedLocalId VanillaId boot_dfun_name (idType dfun)
+                           -- Name from the /boot-file/ ClsInst, but type from the dfun
+                           -- defined in /this module/.  That ensures that the TyCon etc
+                           -- inside the type are the ones defined in this module, not
+                           -- the ones gotten from the hi-boot file, which may have
+                           -- a lot less info (Trac #T8743, comment:10).
         where
-          boot_dfun = instanceDFunId boot_inst
-          boot_inst_ty = idType boot_dfun
-          local_boot_dfun = Id.mkExportedLocalId VanillaId (idName boot_dfun) boot_inst_ty
-
+          boot_dfun      = instanceDFunId boot_inst
+          boot_dfun_ty   = idType boot_dfun
+          boot_dfun_name = idName boot_dfun
 
 -- This has to compare the TyThing from the .hi-boot file to the TyThing
 -- in the current source file.  We must be careful to allow alpha-renaming
