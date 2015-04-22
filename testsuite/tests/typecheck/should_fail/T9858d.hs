@@ -1,6 +1,6 @@
 {-# LANGUAGE ImpredicativeTypes, FlexibleContexts #-}
 
-module T9858b where
+module T9858d where
 import Data.Typeable
 
 i :: (Typeable a, Typeable b) => Proxy (a b) -> TypeRep
