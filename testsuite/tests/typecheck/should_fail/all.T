@@ -359,3 +359,7 @@ test('T8030', normal, compile_fail, [''])
 test('T9858a', normal, compile_fail, [''])
 test('T9858b', normal, compile_fail, [''])
 test('T9858e', normal, compile_fail, [''])
+
+test('T10285',
+     extra_clean(['T10285a.hi', 'T10285a.o']),
+     multimod_compile_fail, ['T10285', '-v0'])
