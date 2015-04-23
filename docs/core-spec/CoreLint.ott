@@ -209,7 +209,7 @@ G |-co z_(s ~R#k t) : s ~Rep k t
 
 G |-ty t1 : k1
 G |-ty t2 : k2
-R <= Phant \/ not (k1 <: OpenKind) \/ not (k2 <: OpenKind) \/ compatibleUnBoxedTys t1 t2
+R <= Ph \/ not (k1 <: OpenKind) \/ not (k2 <: OpenKind) \/ compatibleUnBoxedTys t1 t2
 ------------------------------------------------------------------------ :: UnivCo
 G |-co t1 ==>!_R t2 : t1 ~R k2 t2
 
@@ -276,7 +276,7 @@ G |-co mu </ ti // i /> </ gj // j /> : t'1 ~R' k0 t'2
 
 defn validRoles T ::  :: checkValidRoles :: 'Cvr_'
   {{ com Type constructor role validity, \coderef{typecheck/TcTyClsDecls.lhs}{checkValidRoles} }}
-by  
+by
 
 </ Ki // i /> = tyConDataCons T
 </ Rj // j /> = tyConRoles T
@@ -341,7 +341,7 @@ Nom <= R
 R <= Ph
 
 ------- :: Refl
-R <= R 
+R <= R
 
 defn G |- ki k ok ::  :: lintKind :: 'K_'
   {{ com Kind validity, \coderef{coreSyn/CoreLint.lhs}{lintKind} }}
@@ -352,7 +352,7 @@ G |-ty k : BOX
 -------------- :: Box
 G |-ki k ok
 
-defn G |- ty t : k ::  :: lintType :: 'Ty_'  
+defn G |- ty t : k ::  :: lintType :: 'Ty_'
   {{ com Kinding, \coderef{coreSyn/CoreLint.lhs}{lintType} }}
   {{ tex [[G]] \labeledjudge{ty} [[t]] : [[k]] }}
 by

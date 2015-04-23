@@ -30,7 +30,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 21 November, 2013
+\Large 23 April 2015
 \end{center}
 
 \section{Introduction}
@@ -136,9 +136,9 @@ There are some invariants on types:
 \begin{itemize}
 \item The type $[[t1]]$ in the form $[[t1 t2]]$ must not be a type constructor
 $[[T]]$. It should be another application or a type variable.
-\item The form $[[T </ ti // i /> ]]$ (\texttt{TyConApp}) 
+\item The form $[[T </ ti // i /> ]]$ (\texttt{TyConApp})
 does \emph{not} need to be saturated.
-\item A saturated application of $[[(->) t1 t2]]$ should be represented as 
+\item A saturated application of $[[(->) t1 t2]]$ should be represented as
 $[[t1 -> t2]]$. This is a different point in the grammar, not just pretty-printing.
 The constructor for a saturated $[[(->)]]$ is \texttt{FunTy}.
 \item A type-level literal is represented in GHC with a different datatype than
@@ -326,7 +326,7 @@ and \ottdrulename{Co\_CoVarCoRepr}.
 \ottdefnlintCoercion{}
 
 In \ottdrulename{Co\_AxiomInstCo}, the use of $[[inits]]$ creates substitutions from
-the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of 
+the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of
 folding the substitution over the kinds for kind-checking.
 
 See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$, and
@@ -446,11 +446,13 @@ use of FC does not require modeling recursion, you will not need to track $[[S]]
 \subsection{Notes}
 
 \begin{itemize}
-\item The \ottdrulename{S\_LetRec} and \ottdrulename{S\_LetRecReturn} rules
+\item The \ottdrulename{S\_LetRec} rules
 implement recursion. \ottdrulename{S\_LetRec} adds to the context $[[S]]$ bindings
 for all of the mutually recursive equations. Then, after perhaps many steps,
 when the body of the $[[let]]\ [[rec]]$ contains no variables that are bound
-in the $[[let]]\ [[rec]]$, the context is popped.
+in the $[[let]]\ [[rec]]$, the context is popped in \ottdrulename{S\_LetRecReturn}.
+The other \ottdrulename{S\_LetRecXXX}
+rules are there to prevent reduction from getting stuck.
 \item In the $[[case]]$ rules, a constructor $[[K]]$ is written taking three
 lists of arguments: two lists of types and a list of terms. The types passed
 in are the universally and, respectively, existentially quantified type variables
