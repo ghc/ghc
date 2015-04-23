@@ -9,14 +9,14 @@ A ``lint'' pass to check for Core correctness
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fprof-auto #-}
 
-module CoreLint ( 
-    lintCoreBindings, lintUnfolding, 
+module CoreLint (
+    lintCoreBindings, lintUnfolding,
     lintPassResult, lintInteractiveExpr, lintExpr,
     lintAnnots,
 
     -- ** Debug output
-    CoreLint.showPass, showPassIO, endPass, endPassIO, 
-    dumpPassResult, 
+    CoreLint.showPass, showPassIO, endPass, endPassIO,
+    dumpPassResult,
     CoreLint.dumpIfSet,
  ) where
 
@@ -1150,6 +1150,8 @@ lintCoercion the_co@(NthCo n co)
        ; case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
            (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
+             , isDistinctTyCon tc_s || r /= Representational
+                 -- see Note [NthCo and newtypes] in Coercion
              , tys_s `equalLength` tys_t
              , n < length tys_s
              -> return (ks, ts, tt, tr)
@@ -1284,7 +1286,7 @@ lintCoercion this@(AxiomRuleCo co ts cs)
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-data LintEnv 
+data LintEnv
   = LE { le_flags :: LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
        , le_subst :: TvSubst         -- Current type substitution; we also use this
@@ -1398,7 +1400,7 @@ addMsg env msgs msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m
-  = LintM $ \ env errs -> 
+  = LintM $ \ env errs ->
     unLintM m (env { le_loc = extra_loc : le_loc env }) errs
 
 inCasePat :: LintM Bool         -- A slight hack; see the unique call site
@@ -1409,18 +1411,18 @@ inCasePat = LintM $ \ env errs -> (Just (is_case_pat env), errs)
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m
-  = LintM $ \ env errs -> 
-    unLintM m (env { le_subst = extendTvInScopeList (le_subst env) vars }) 
+  = LintM $ \ env errs ->
+    unLintM m (env { le_subst = extendTvInScopeList (le_subst env) vars })
               errs
 
 addInScopeVar :: Var -> LintM a -> LintM a
 addInScopeVar var m
-  = LintM $ \ env errs -> 
+  = LintM $ \ env errs ->
     unLintM m (env { le_subst = extendTvInScope (le_subst env) var }) errs
 
 extendSubstL :: TyVar -> Type -> LintM a -> LintM a
 extendSubstL tv ty m
-  = LintM $ \ env errs -> 
+  = LintM $ \ env errs ->
     unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
 
 updateTvSubst :: TvSubst -> LintM a -> LintM a
