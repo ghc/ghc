@@ -1,15 +1,17 @@
 [1 of 1] Compiling ShouldFail[sig of Prelude] ( tcfail220.hsig, nothing )
 
-tcfail220.hsig:4:1:
+tcfail220.hsig:4:1: error:
     Type constructor ‘Bool’ has conflicting definitions in the module
     and its hsig file
     Main module: data Bool = False | True
-    Hsig file:  data Bool a b c d = False
+    Hsig file:  type role Bool phantom phantom phantom phantom
+                data Bool a b c d = False
     The types have different kinds
 
-tcfail220.hsig:5:1:
+tcfail220.hsig:5:1: error:
     Type constructor ‘Maybe’ has conflicting definitions in the module
     and its hsig file
     Main module: data Maybe a = Nothing | Just a
-    Hsig file:  data Maybe a b = Nothing
+    Hsig file:  type role Maybe phantom phantom
+                data Maybe a b = Nothing
     The types have different kinds

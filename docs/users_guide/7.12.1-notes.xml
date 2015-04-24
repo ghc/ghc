@@ -59,7 +59,18 @@
                     See the release notes for base for a description of the
                     <literal>CallStack</literal> type.
                </para>
-           </listitem>
+            </listitem>
+	    <listitem>
+	      <para>
+		To conform to the common case, the default role assigned to parameters
+		of datatypes declared in <literal>hs-boot</literal> files is
+		<literal>representational</literal>. However, if the constructor(s)
+		for the datatype are given, it makes sense to do normal role inference.
+		This is now implemented, effectively making the default role for
+		non-abstract datatypes in <literal>hs-boot</literal> files to be
+		<literal>phantom</literal>, like it is in regular Haskell code.
+	      </para>
+	    </listitem>
        </itemizedlist>
     </sect3>
 

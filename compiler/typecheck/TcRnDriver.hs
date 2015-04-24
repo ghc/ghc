@@ -460,7 +460,7 @@ tcRnImports hsc_env import_decls
 ************************************************************************
 -}
 
-tcRnSrcDecls :: ModDetails 
+tcRnSrcDecls :: ModDetails
              -> Maybe (Located [LIE RdrName])   -- Exports
              -> [LHsDecl RdrName]               -- Declarations
              -> TcM TcGblEnv
@@ -736,7 +736,7 @@ checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
 -- Variant which doesn't require a full TcGblEnv; you could get the
 -- local components from another ModDetails.
 --
--- We return a list of "impedence-matching" bindings for the dfuns 
+-- We return a list of "impedence-matching" bindings for the dfuns
 -- defined in the hs-boot file, such as
 --           $fxEqT = $fEqT
 -- We need these because the module and hi-boot file might differ in
@@ -996,9 +996,9 @@ checkBootTyCon tc1 tc2
   where
     roles1 = tyConRoles tc1
     roles2 = tyConRoles tc2
-    roles_msg = text "The roles do not match." <+>
-                (text "Roles default to" <+>
-                 quotes (text "representational") <+> text "in boot files")
+    roles_msg = text "The roles do not match." $$
+                (text "Roles on abstract types default to" <+>
+                 quotes (text "representational") <+> text "in boot files.")
 
     eqAlgRhs tc (AbstractTyCon dis1) rhs2
       | dis1      = check (isDistinctAlgRhs rhs2)   --Check compatibility
@@ -1921,7 +1921,7 @@ getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (ptext (sLit "getModuleInterface")) mod
 
-tcRnLookupRdrName :: HscEnv -> Located RdrName 
+tcRnLookupRdrName :: HscEnv -> Located RdrName
                   -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)

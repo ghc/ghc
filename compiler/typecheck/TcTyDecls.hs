@@ -684,9 +684,9 @@ initialRoleEnv1 is_boot annots_env tc
                         zipWith orElse role_annots (repeat default_role)
 
         default_role
-          | isClassTyCon tc = Nominal
-          | is_boot         = Representational
-          | otherwise       = Phantom
+          | isClassTyCon tc               = Nominal
+          | is_boot && isAbstractTyCon tc = Representational
+          | otherwise                     = Phantom
 
 irGroup :: RoleEnv -> [TyCon] -> RoleEnv
 irGroup env tcs
