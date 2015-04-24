@@ -1,20 +1,20 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module Expression.Base (
-    module Expression.Args,
-    module Expression.Build,
+    BuildPredicate,
+    module Expression.Derived,
     module Expression.Project,
     module Expression.Resolve,
     module Expression.Simplify,
     module Expression.Predicate,
-    module Control.Applicative,
+    module Expression.BuildExpression,
+    module Control.Applicative
     ) where
 
 import Base
-import Expression.Args
-    hiding ( Args, BuildParameter, EnvironmentParameter, Arity, Combine )
-import Expression.Build hiding (BuildVariable)
+import Expression.Derived
 import Expression.Predicate
+import Expression.BuildPredicate
+import Control.Monad
+import Expression.BuildExpression
 import Expression.Project
 import Expression.Resolve
 import Expression.Simplify

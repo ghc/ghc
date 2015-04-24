@@ -108,7 +108,6 @@ customConfigureSettings = msum
         arg "--configure-option=--with-intree-gmp"
     ]
 
--- TODISCUSS
 -- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/
 -- What is Cabal/cabal-install? Do we need it?

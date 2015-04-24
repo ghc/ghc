@@ -9,14 +9,17 @@ import Package
 import Ways
 import Oracles.Builder
 import Expression.PG
-import Expression.Args
-import Expression.Build
+import Expression.Settings
+import Expression.BuildPredicate
+import Expression.BuildExpression
 
+-- Projecting (partially evaluating) values of type b by setting the
+-- parameters of type a
 class Project a b where
     project :: a -> b -> b
     project = const id
 
--- Project recursively through Not, And and Or
+-- Project a build predicate recursively through Not, And and Or
 pmap :: Project a BuildPredicate => a -> BuildPredicate -> BuildPredicate
 pmap a (Not p  ) = Not (project a p)
 pmap a (And p q) = And (project a p) (project a q)
@@ -130,4 +133,3 @@ instance (Project a z, Project b z) => Project (a, b) z where
 
 instance (Project a z, Project b z, Project c z) => Project (a, b, c) z where
     project (p, q, r) = project p . project q . project r
-

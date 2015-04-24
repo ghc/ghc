@@ -1,9 +1,16 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
-module Expression.Args (
-    Args (..), BuildParameter (..), EnvironmentParameter (..),
-    Arity (..), Combine (..),
+module Expression.Derived (
     Settings,
+
+    -- Constructing build predicates
+    packages, package,
+    builders, builder, stagedBuilder,
+    stages, stage, notStage,
+    ways, way, files, file,
+    configValues, config, configYes, configNo, configNonEmpty,
+
+    -- Primitive settings elements
     arg, args, argPath, argsOrdered, argBuildPath, argBuildDir,
     argInput, argOutput,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
@@ -16,53 +23,71 @@ module Expression.Args (
     argPackageConstraints
     ) where
 
-import Base hiding (arg, args, Args)
+import Base hiding (Args, arg, args)
+import Ways
 import Util
+import Package (Package)
 import Oracles.Builder
-import Expression.Build
+import Expression.PG
+import Expression.Settings
+import Expression.BuildPredicate
+import Expression.BuildExpression
 
--- Settings comprise the following primitive elements
-data Args
-    = Plain String                              -- e.g. "-O2"
-    | BuildParameter BuildParameter             -- e.g. build path
-    | EnvironmentParameter EnvironmentParameter -- e.g. host OS
-    | Fold Combine Settings                     -- e.g. ccSettings
-    deriving (Show, Eq)
+-- Auxiliary function for multiway disjunction
+alternatives :: Predicate a => (b -> Variable a) -> [b] -> a
+alternatives f = foldr (||) false . map (variable . f)
 
--- Build parameters to be determined during the build process
-data BuildParameter
-    = PackagePath -- path to the current package, e.g. "libraries/deepseq"
-    | BuildDir    -- build directory, e.g. "dist-install"
-    | Input       -- input file(s), e.g. "src.hs"
-    | Output      -- output file(s), e.g. ["src.o", "src.hi"]
-    deriving (Show, Eq)
+-- Basic GHC build predicates
+packages :: [Package] -> BuildPredicate
+packages = alternatives PackageVariable
 
--- Environment parameters to be determined using oracles
-data EnvironmentParameter
-    = BuilderPath Builder                -- look up path to a Builder
-    | Config Arity String                -- look up configuration flag(s)
-    | PackageData                        -- look up package-data.mk flag(s)
-      {
-        pdArity       :: Arity,          -- arity of value (Single or Multiple)
-        pdKey         :: String,         -- key to look up, e.g. "PACKAGE_KEY"
-        pdPackagePath :: Maybe FilePath, -- path to the current package
-        pdBuildDir    :: Maybe FilePath  -- build directory
-      }
-    | PackageConstraints Packages        -- package version constraints
-    deriving (Show, Eq)
+builders :: [Builder] -> BuildPredicate
+builders = alternatives BuilderVariable
 
--- Method for combining settings elements in Fold Combine Settings
-data Combine = Id            -- Keep given settings as is
-             | Concat        -- Concatenate: a ++ b
-             | ConcatPath    -- </>-concatenate: a </> b
-             | ConcatSpace   -- concatenate with a space: a ++ " " ++ b
-             deriving (Show, Eq)
+stages :: [Stage] -> BuildPredicate
+stages = alternatives StageVariable
 
-data Arity = Single   -- expands to a single argument
-           | Multiple -- expands to a list of arguments
-           deriving (Show, Eq)
+ways :: [Way] -> BuildPredicate
+ways = alternatives WayVariable
 
-type Settings = BuildExpression Args
+files :: [FilePattern] -> BuildPredicate
+files = alternatives FileVariable
+
+configValues :: String -> [String] -> BuildPredicate
+configValues key = alternatives (ConfigVariable key)
+
+package :: Package -> BuildPredicate
+package p = packages [p]
+
+builder :: Builder -> BuildPredicate
+builder b = builders [b]
+
+stagedBuilder :: (Stage -> Builder) -> BuildPredicate
+stagedBuilder s2b = builders $ map s2b [Stage0 ..]
+
+stage :: Stage -> BuildPredicate
+stage s = stages [s]
+
+notStage :: Stage -> BuildPredicate
+notStage = not . Unevaluated . StageVariable
+
+way :: Way -> BuildPredicate
+way w = ways [w]
+
+file :: FilePattern -> BuildPredicate
+file f = files [f]
+
+config :: String -> String -> BuildPredicate
+config key value = configValues key [value]
+
+configYes :: String -> BuildPredicate
+configYes key = configValues key ["YES"]
+
+configNo :: String -> BuildPredicate
+configNo key = configValues key ["NO" ]
+
+configNonEmpty :: String -> BuildPredicate
+configNonEmpty key = not $ configValues key [""]
 
 -- A single argument
 arg :: String -> Settings

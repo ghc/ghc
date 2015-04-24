@@ -13,8 +13,10 @@ import Expression.Simplify
 import Oracles.Base
 import Oracles.PackageData
 import Expression.PG
-import Expression.Args
-import Expression.Build
+import Expression.Derived
+import Expression.Settings
+import Expression.BuildPredicate
+import Expression.BuildExpression
 
 -- Resolve unevaluated variables by calling the associated oracles
 class Resolve a where

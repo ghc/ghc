@@ -8,8 +8,9 @@ import Base hiding (Args)
 import Ways
 import Package
 import Expression.PG
-import Expression.Args
-import Expression.Build
+import Expression.Settings
+import Expression.BuildPredicate
+import Expression.BuildExpression
 
 -- Simplify expressions by constant propagation
 class Simplify a where
