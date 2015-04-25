@@ -558,6 +558,40 @@ then
 fi
 AC_SUBST([GHC_LLVM_AFFECTED_BY_9439])
 
+dnl ** Bug 9920: Llvm version 3.5.0 was released with a bug in the ARM version
+dnl of the GHC calling convention implementation. This bug was fixed in the
+dnl 3.5.1 release but some Linux distributions are likely to patch llvm
+dnl 3.5.0 rather than release a new 3.5.1 version.
+dnl
+dnl Unfortunately we don't know whether the user is going to request a
+dnl build with the LLVM backend as this is only given in build.mk.
+
+if test ${TargetArch} = arm ; then
+    AC_MSG_CHECKING(if llvm version is affected by bug 9920)
+    rm -f conftest.ll conftest.asm
+    cat << LLVM_IR_CODE > conftest.ll
+declare cc10 void @target_function()
+define cc10 void @test_direct_tail() {
+ tail call cc10 void @target_function()
+ ret void
+}
+LLVM_IR_CODE
+
+    res=$(${LlcCmd} -mtriple=armv7-eabi conftest.ll -o conftest.asm)
+    if test $? -eq 0 ; then
+        if test $(grep -c target_function conftest.asm) -eq 1 ; then
+            AC_MSG_RESULT(no)
+        else
+            AC_MSG_RESULT(yes)
+            echo
+            AC_MSG_FAILURE([Cannot compile for ARM with ${LlcCmd}. See GHC trac ticket #9920.], 1)
+        fi
+    else
+        AC_MSG_WARN([unexpected output $res])
+    fi
+	rm -f conftest.ll conftest.asm
+fi
+
 dnl ** Can the unix package be built?
 dnl --------------------------------------------------------------
 
