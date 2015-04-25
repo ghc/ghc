@@ -432,19 +432,7 @@ FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
-case $target in
-arm*linux*)
-	# Arm requires use of the binutils ld.gold linker.
-	# This case should catch at least arm-unknown-linux-gnueabihf and
-	# arm-linux-androideabi.
-	FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
-	LdCmd="$LD_GOLD"
-	;;
-*)
-	LdCmd="$LD"
-	;;
-esac
+FIND_LD([LdCmd])
 AC_SUBST([LdCmd])
 
 dnl ** Which nm to use?
@@ -482,17 +470,18 @@ esac
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-llvm_version=3.6
+LlvmVersion=3.5
+AC_SUBST([LlvmVersion])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([LLC], [llc], [llc], [$llvm_version])
+FIND_LLVM_PROG([LLC], [llc], [llc], [$LlvmVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([OPT], [opt], [opt], [$llvm_version])
+FIND_LLVM_PROG([OPT], [opt], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 

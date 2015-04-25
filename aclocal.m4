@@ -2099,19 +2099,41 @@ AC_DEFUN([XCODE_VERSION],[
 # $4 = the version of the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-	# Test for program with version name.
+    # Test for program with version name.
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3-$4])
     if test "$$1" = ""; then
-		# Test for program without version name.
-		FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
-		AC_MSG_CHECKING([$$1 is version $4])
-		if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
+        # Test for program without version name.
+        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
+        AC_MSG_CHECKING([$$1 is version $4])
+        if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
             AC_MSG_RESULT(yes)
         else
-			AC_MSG_RESULT(no)
-			$1=""
-		fi
+            AC_MSG_RESULT(no)
+            $1=""
+        fi
     fi
+])
+
+# FIND_LD
+# Find the version of `ld` to use. This is used in both in the top level
+# configure.ac and in distrib/configure.ac.in.
+#
+# $1 = the variable to set
+#
+AC_DEFUN([FIND_LD],[
+    FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
+    case $target in
+        arm*linux*)
+            # Arm requires use of the binutils ld.gold linker.
+            # This case should catch at least arm-unknown-linux-gnueabihf and
+            # arm-linux-androideabi.
+            FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
+            $1="$LD_GOLD"
+            ;;
+        *)
+            $1="$LD"
+            ;;
+    esac
 ])
 
 # FIND_GHC_BOOTSTRAP_PROG()
@@ -2124,12 +2146,12 @@ AC_DEFUN([FIND_LLVM_PROG],[
 # $3 = The string to grep for to find the correct line.
 #
 AC_DEFUN([FIND_GHC_BOOTSTRAP_PROG],[
-	BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
-	if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
-		AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
-	else
-		$1=$BootstrapTmpCmd
-	fi
+    BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
+    if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
+        AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
+    else
+        $1=$BootstrapTmpCmd
+    fi
 ])
 
 
