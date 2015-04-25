@@ -84,6 +84,8 @@ evtConcat = foldl' evtCombine evtNothing
 {-# INLINE evtConcat #-}
 
 -- | The lifetime of a registration.
+--
+-- @since 4.8.1.0
 data Lifetime = OneShot | MultiShot
               deriving (Show, Eq)
 

@@ -39,6 +39,8 @@
 
   * Bundled with GHC 7.10.2
 
+  * `Lifetime` is now exported from `GHC.Event`
+
 ## 4.8.0.0  *Mar 2015*
 
   * Bundled with GHC 7.10.1
