@@ -24,6 +24,8 @@ module GHC.Stack (
     errorWithStackTrace,
 
     -- ** Explicitly created via implicit-parameters
+    --
+    -- @since 4.8.2.0
     CallStack,
     getCallStack,
     showCallStack,
@@ -171,11 +173,14 @@ errorWithStackTrace x = unsafeDupablePerformIO $ do
 -- that was called, the 'SrcLoc' is the call-site. The list is ordered with the
 -- most recently called function at the head.
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 data CallStack = CallStack { getCallStack :: [(String, SrcLoc)] }
   -- See Note [Overview of implicit CallStacks]
   deriving (Show, Eq)
 
+-- | Pretty print 'CallStack'
+--
+-- @since 4.8.2.0
 showCallStack :: CallStack -> String
 showCallStack (CallStack (root:rest))
   = unlines (showCallSite root : map (indent . showCallSite) rest)
