@@ -1,7 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, GADTs,
              ConstraintKinds, DataKinds, KindSignatures,
              FlexibleInstances #-}
-{-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module T10195 where
 
