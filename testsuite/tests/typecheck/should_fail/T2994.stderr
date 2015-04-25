@@ -2,7 +2,7 @@
 T2994.hs:11:10:
     Expecting one more argument to ‘MonadReader Int’
     Expected a constraint,
-      but ‘MonadReader Int’ has kind ‘* -> Constraint’
+      but ‘MonadReader Int’ has kind ‘* -> GHC.Prim.Constraint’
     In the instance declaration for ‘MonadReader Int’
 
 T2994.hs:13:23:

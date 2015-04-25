@@ -1,5 +1,5 @@
 
 drvfail005.hs:4:13:
-    Expected kind ‘k0 -> Constraint’,
-      but ‘Show a’ has kind ‘Constraint’
+    Expected kind ‘k0 -> GHC.Prim.Constraint’,
+      but ‘Show a’ has kind ‘GHC.Prim.Constraint’
     In the data declaration for ‘Test’
