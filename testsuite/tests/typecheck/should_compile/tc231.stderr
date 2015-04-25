@@ -15,5 +15,5 @@ COERCION AXIOMS
   axiom NTCo:Zork ::
       Zork s a b = forall chain. Q s a chain -> ST s ()
 Dependent modules: []
-Dependent packages: [base-4.8.0.0, ghc-prim-0.4.0.0,
+Dependent packages: [base-4.8.1.0, ghc-prim-0.4.0.0,
                      integer-gmp-1.0.0.0]
