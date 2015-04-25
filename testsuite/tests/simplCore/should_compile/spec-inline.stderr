@@ -120,7 +120,7 @@ foo :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U>m,
+ Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
