@@ -62,7 +62,10 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
                                   then anchor ! [href url]
                                        << fromMaybe url mLabel
                                   else toHtml $ fromMaybe url mLabel,
-  markupAName                = \aname -> namedAnchor aname << "",
+  markupAName                = \aname
+                               -> if insertAnchors
+                                  then namedAnchor aname << ""
+                                  else noHtml,
   markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
   markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml,

@@ -12,3 +12,6 @@
 /doc/configure
 tags
 TAGS
+
+.cabal-sandbox
+cabal.sandbox.config
