@@ -289,7 +289,7 @@ mkNodeList qual ss p ts = case ts of
 
 
 mkNode :: Qualification -> [String] -> String -> ModuleTree -> Html
-mkNode qual ss p (Node s leaf pkg short ts) =
+mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
   htmlModule <+> shortDescr +++ htmlPkg +++ subtree
   where
     modAttrs = case (ts, leaf) of
@@ -313,7 +313,7 @@ mkNode qual ss p (Node s leaf pkg short ts) =
     mdl = intercalate "." (reverse (s:ss))
 
     shortDescr = maybe noHtml (origDocToHtml qual) short
-    htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) pkg
+    htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) srcPkg
 
     subtree = mkNodeList qual (s:ss) p ts ! collapseSection p True ""
 
