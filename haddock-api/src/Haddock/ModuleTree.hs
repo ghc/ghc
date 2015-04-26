@@ -15,41 +15,44 @@ module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 import Haddock.Types ( MDoc )
 
 import GHC           ( Name )
-import Module        ( Module, moduleNameString, moduleName, modulePackageKey )
+import Module        ( Module, moduleNameString, moduleName, modulePackageKey, packageKeyString )
 import DynFlags      ( DynFlags )
 import Packages      ( lookupPackage )
 import PackageConfig ( sourcePackageIdString )
 
 
-data ModuleTree = Node String Bool (Maybe String) (Maybe (MDoc Name)) [ModuleTree]
+data ModuleTree = Node String Bool (Maybe String) (Maybe String) (Maybe (MDoc Name)) [ModuleTree]
 
 
 mkModuleTree :: DynFlags -> Bool -> [(Module, Maybe (MDoc Name))] -> [ModuleTree]
 mkModuleTree dflags showPkgs mods =
-  foldr fn [] [ (splitModule mdl, modPkg mdl, short) | (mdl, short) <- mods ]
+  foldr fn [] [ (splitModule mdl, modPkg mdl, modSrcPkg mdl, short) | (mdl, short) <- mods ]
   where
-    modPkg mod_ | showPkgs = fmap sourcePackageIdString
-                                  (lookupPackage dflags (modulePackageKey mod_))
+    modPkg mod_ | showPkgs = Just (packageKeyString (modulePackageKey mod_))
                 | otherwise = Nothing
-    fn (mod_,pkg,short) = addToTrees mod_ pkg short
+    modSrcPkg mod_ | showPkgs = fmap sourcePackageIdString
+                                     (lookupPackage dflags (modulePackageKey mod_))
+                   | otherwise = Nothing
+    fn (mod_,pkg,srcPkg,short) = addToTrees mod_ pkg srcPkg short
 
 
-addToTrees :: [String] -> Maybe String -> Maybe (MDoc Name) -> [ModuleTree] -> [ModuleTree]
-addToTrees [] _ _ ts = ts
-addToTrees ss pkg short [] = mkSubTree ss pkg short
-addToTrees (s1:ss) pkg short (t@(Node s2 leaf node_pkg node_short subs) : ts)
-  | s1 >  s2  = t : addToTrees (s1:ss) pkg short ts
-  | s1 == s2  = Node s2 (leaf || null ss) this_pkg this_short (addToTrees ss pkg short subs) : ts
-  | otherwise = mkSubTree (s1:ss) pkg short ++ t : ts
+addToTrees :: [String] -> Maybe String -> Maybe String -> Maybe (MDoc Name) -> [ModuleTree] -> [ModuleTree]
+addToTrees [] _ _ _ ts = ts
+addToTrees ss pkg srcPkg short [] = mkSubTree ss pkg srcPkg short
+addToTrees (s1:ss) pkg srcPkg short (t@(Node s2 leaf node_pkg node_srcPkg node_short subs) : ts)
+  | s1 >  s2  = t : addToTrees (s1:ss) pkg srcPkg short ts
+  | s1 == s2  = Node s2 (leaf || null ss) this_pkg this_srcPkg this_short (addToTrees ss pkg srcPkg short subs) : ts
+  | otherwise = mkSubTree (s1:ss) pkg srcPkg short ++ t : ts
  where
   this_pkg = if null ss then pkg else node_pkg
+  this_srcPkg = if null ss then srcPkg else node_srcPkg
   this_short = if null ss then short else node_short
 
 
-mkSubTree :: [String] -> Maybe String -> Maybe (MDoc Name) -> [ModuleTree]
-mkSubTree []     _   _     = []
-mkSubTree [s]    pkg short = [Node s True pkg short []]
-mkSubTree (s:ss) pkg short = [Node s (null ss) Nothing Nothing (mkSubTree ss pkg short)]
+mkSubTree :: [String] -> Maybe String -> Maybe String -> Maybe (MDoc Name) -> [ModuleTree]
+mkSubTree []     _   _      _     = []
+mkSubTree [s]    pkg srcPkg short = [Node s True pkg srcPkg short []]
+mkSubTree (s:ss) pkg srcPkg short = [Node s (null ss) Nothing Nothing Nothing (mkSubTree ss pkg srcPkg short)]
 
 
 splitModule :: Module -> [String]
