@@ -64,6 +64,12 @@ Shaping computes a \verb|Shape| which has this form:
 \begin{verbatim}
 Shape ::= provides: { ModName -> Module { Name } }
           requires: { ModName ->        { Name } }
+
+PkgKey      ::= SrcPkgId "(" { ModName "->" Module } ")"
+              | HOLE
+Module      ::= PkgKey ":" ModName
+Name        ::= Module "." OccName
+OccName     ::= -- a plain old name, e.g. undefined, Bool, Int
 \end{verbatim}
 
 Starting with the empty shape, we incrementally construct a shape by
@@ -72,6 +78,13 @@ a context for renaming modules and signatures and instantiating
 includes) and merging them until we have processed all declarations.
 There are two things to specify: what shape each declaration has, and
 how the merge operation proceeds.
+
+One variation of shaping also computes the renamed version of a package,
+i.e., where each identifier in the module and signature is replaced with
+the original name (equivalently, we record the output of GHC's renaming
+pass). This simplifies type checking because you no longer have to
+recalculate the set of available names, which otherwise would be lost.
+See more about this in the type checking section.
 
 In the description below, we'll assume \verb|THIS| is the package key
 of the package being processed.
@@ -475,56 +488,189 @@ however, it can be substituted at the end easily.
 
 \section{Type checking}
 
-(UNDER CONSTRUCTION)
-
-%
-%   what do we know for each type checked package
-%       ModEnv
-%
-%   ModIface -> ModDetails (rename + tcIface)
-
-For type-checking, we assume that for every \verb|pkgname|, we have a mapping of \verb|ModName -> ModIface| (We distinguish \verb|ModIface| from the typechecked \verb|ModDetails|, which may have had \verb|HOLE|s renamed in the process.)  We maintain a context of \verb|ModName -> Module| and \verb|Module -> ModDetails|
-
-How to type-check a signature?  Well, a signature has a \verb|Module|, but it's \emph{NOT} necessarily in the home package.
-
-\subsection{Semantic objects}
+Type checking computes, for every \verb|Module|, a \verb|ModIface|
+representing the type of the module in question:
 
 \begin{verbatim}
-PkgKey      ::= SrcPkgId "(" { ModName "->" Module } ")"
-              | HOLE
-Module      ::= PkgKey ":" ModName
-Name        ::= Module "." OccName
-OccName     ::= -- a plain old name, e.g. undefined, Bool, Int
-
-Shape       ::= "provided:" { ModName "->" Module { Name } }
-                "required:" { ModName "->" { Name } }
-Type        ::= "shape:"  Shape
-                "modenv:" { Module "->" ModIface }
+Type ::= { Module "->" ModIface }
 \end{verbatim}
+
+\subsection{The basic plan}
+
+Given a module or signature, we can type check given these two assumptions:
+
+\begin{itemize}
+    \item We have a renamed syntax tree, whose identifiers have been
+          resolved as according to the result of the shaping pass.
+    \item For any \verb|Name| in the renamed tree, the corresponding
+          \verb|ModDetails| for the \verb|Module| has been loaded
+          (or can be lazily loaded).
+\end{itemize}
+
+The result of type checking is a \verb|ModDetails| which can then be
+converted into a \verb|ModIface|.
+Arranging for these two assumptions to be true is the bulk of the
+complexity of type checking.
+
+\subsection{A little bit of night music}
+
+A little bit of background about the relationship of GHC \verb|ModIface| and
+\verb|ModDetails|.
+
+A \verb|ModIface| corresponds to an interface file, it is essentially a
+big pile of \verb|Name|s which have not been resolved to their locations
+yet.  Once a \verb|ModIface| is loaded, we type check it
+(\verb|tcIface|), which turns them into \verb|TyThing|s and \verb|Type|s
+(linked up against their true locations.) Conversely, once we finish
+type checking a module, we have a \verb|ModDetails|, which we then
+serialize into a \verb|ModIface|.
+
+One very important (non-obvious) distinction is that a \verb|ModDetails|
+does \emph{not} contain the information for handling renaming.
+(Actually, it does carry along a \verb|md_exports|, but this is only a
+hack to transmit this information when we're creating an interface;
+no code actually uses it.)  So any information about reexports is
+recorded in the \verb|ModIface| and used by the renamer, at which point
+we don't need it anymore and can drop it from \verb|ModDetails|.
+
+\subsection{Loading modules from indefinite packages}
+
+\paragraph{Everything is done modulo a shape}  Consider
+this package:
 
 \begin{verbatim}
-ModIface --- rename / tcIface ---> ModDetails
+package p where
+    signature H(T) where
+        data T = T
+    module A(T) where
+        data T = T
+    signature H(T) where
+        import A(T)
+
+-- provides: A -> THIS:A { THIS:A.T }
+--           H -> HOLE:H { THIS:A.T }
+-- requires: H ->        { THIS:A.T }
 \end{verbatim}
 
-A shape consists of the modules we provide (as well as what declarations
-are provided), and what module names (with what declarations) must
-be provided.
+With this shaping information, when we are type-checking the first
+signature for \verb|H|, it is completely wrong to try to create
+a definition for \verb|HOLE:H.T|, since we know that it refers
+to \verb|THIS:A.T| via the requirements of the shape.  This applies
+even if \verb|H| is included from another package.  Thus, when
+we are loading \verb|ModDetails| into memory, it is always done
+\emph{with respect to some shaping}.  Whenever you reshape,
+you must clear the module environment.
 
-\subsection{Renamed packages}
+\paragraph{Figuring out where to consult for shape information}
+
+For this example, let's suppose we have already type-checked
+this package \verb|p|:
 
 \begin{verbatim}
-spackage    ::= "package" pkgname Shape "where" spkgbody
-spkgbody    ::= "{" spkgdecl_0 ";" ... ";" spkgdecl_n "}"
-spkgdecl    ::= "module"    Module (rnexports) where rnbody
-              | "signature" Module (rnexports) where rnbody
-              | "include"   pkgname sinclspec
-sinclspec   ::= "(" srenaming_0 "," ... "," srenaming_n ")"
-                "requires" "(" srenaming_0 "," ... "," srenaming_n ")"
-srenaming   ::= ModName "as" Module
+package p (A) requires (S) where
+    signature S where
+        data S
+        data T
+    module A(A) where
+        import S
+        data A = A S T
 \end{verbatim}
 
-After shaping, we have renamed all of the identifiers inside a package.
-Here is the elaborated version.  This is now immediately ready for
-type-checking.  \Red{Representation is slightly redundant.}
+giving us the following \verb|ModIface|s:
+
+\begin{verbatim}
+module HOLE:S.S where
+    data S
+    data T
+module THIS:A where
+    data A = A HOLE:S.S HOLE:S.T
+-- where THIS = p(S -> HOLE:S)
+\end{verbatim}
+
+Next, we'd like to type check a package which includes \verb|p|:
+
+\begin{verbatim}
+package q (T, A, B) requires (H) where
+    include p (A) requires (S as H)
+    module T(T) where
+        data T = T
+    signature H(T) where
+        import T(T)
+    module B(B) where
+        import A
+        data B = B A
+\end{verbatim}
+
+%   package r where
+%       include q
+%       module H(S,T) where
+%           import T(T)
+%           data S = S
+%       module C where
+%           import A
+%           import B
+%           ...
+
+Prior to typechecking, we compute its shape:
+
+\begin{verbatim}
+provides: (elided)
+requires: H -> { HOLE:H.S, THIS:T.T }
+-- where THIS = q(H -> HOLE:H)
+\end{verbatim}
+
+Our goal is to get the following type:
+
+\begin{verbatim}
+module THIS:T where
+    data T = T
+module THIS:B where
+    data B = B p(S -> HOLE:H):A.A
+        -- where data A = A HOLE:H.S THIS:T.T
+-- where THIS = q(H -> HOLE:H)
+\end{verbatim}
+
+This type information does \emph{not} match the pre-existing
+type information from \verb|p|: when we translate the \verb|ModIface| for
+\verb|A| in the context into a \verb|ModDetails| from this typechecking,
+we need to substitute \verb|Name|s and \verb|Module|s
+as specified by shaping.  Specifically, when we load \verb|p(S -> HOLE:H):A|
+to find out the type of \verb|p(S -> HOLE:H):A.A|,
+we need to take \verb|HOLE:S.S| to \verb|HOLE:H.S| and \verb|HOLE:S.T| to \verb|THIS:T.T|.
+In both cases, we can determine the right translation by looking at how \verb|S| is
+instantiated in the package key for \verb|p| (it is instantiated with \verb|HOLE:H|),
+and then consulting the shape in the requirements.
+
+This process is done lazily, as we may not have typechecked the original
+\verb|Name| in question when doing this.  \verb|hs-boot| considerations apply
+if things are loopy: we have to treat the type abstractly and re-typecheck it
+to the right type later.
+
+
+\subsection{Re-renaming}
+
+Theoretically, the cleanest way to do shaping and typechecking is to have shaping
+result in a fully renamed syntax tree, which we then typecheck: when done this way,
+we don't have to worry about logical contexts (i.e., what is in scope) because
+shaping will already have complained if things were not in scope.
+
+However, for practical purposes, it's better if we don't try to keep
+around renamed syntax trees, because this could result in very large
+memory use; additionally, whenever a substitution occurs, we would have
+to substitute over all of the renamed syntax trees.  Thus, while
+type-checking, we'll also re-compute what is in scope (i.e.,  just the
+\verb|OccName| bits of \verb|provided|). Nota bene: we still use the
+\verb|Name|s from the shape as the destinations of these
+\verb|OccName|s!  Note that we can't just use the final shape, because
+this may report more things in scope than we actually want.  (It's also
+worth noting that if we could reduce the set of provided things in
+scope in a single package, just the \verb|Shape| would not be enough.)
+
+\subsection{Merging \texttt{ModDetails}}
+
+After type-checking a signature, we may turn to add it to our module
+environment and discover there is already an entry for it!  In that case,
+we simply merge it with the existing entry, erroring if there are incompatible
+entries.
 
 \end{document}
