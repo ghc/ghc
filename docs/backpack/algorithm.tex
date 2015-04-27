@@ -277,18 +277,18 @@ signature A(T) where
 signature B(T) where
     data T
 
--- requires: A -> HOLE:A  	{ HOLE:A.T }
-             B -> HOLE:B	{ HOLE:B.T }
+-- requires: A -> HOLE:A        { HOLE:A.T }
+             B -> HOLE:B        { HOLE:B.T }
 
 -- the sharing constraint!
 signature A(T) where
     import B(T)
 -- (shape to merge)
--- requires: A -> HOLE:A	{ HOLE:B.T }
+-- requires: A -> HOLE:A        { HOLE:B.T }
 
 -- (after merge)
--- requires: A -> HOLE:A	{ HOLE:A.T }
---			 B -> HOLE:B	{ HOLE:A.T }
+-- requires: A -> HOLE:A        { HOLE:A.T }
+--           B -> HOLE:B        { HOLE:A.T }
 \end{verbatim}
 
 Notably, we could equivalently have chosen \verb|HOLE:B.T| as the post-merge
@@ -334,17 +334,51 @@ package r where
         data T = T
     include q (A) requires (B)
     -- provides: A -> THIS:A { THIS:A.T }
-    -- requires: B -> 		 { THIS:A.T }
+    -- requires: (nothing)
 \end{verbatim}
 
-How mysterious! We really ought to have discharged the requirement when
-this occurred. But, from just looking at \verb|r|, it's not obvious that
-\verb|B|'s requirement will get filled when you link with \verb|A|.
+Notice that the requirement was discharged because we unified \verb|HOLE:B|
+with \verb|THIS:A|.  While this is certainly the most accurate picture
+of the package we can get from this situation, it is a bit unsatisfactory
+in that looking at the text of module \verb|r|, it is not obvious that
+all the requirements were filled; only that there is some funny business
+going on with multiple provisions with \verb|A|.
 
-It would seem safest to disallow this form of linking, appealing to the
-fact that it doesn't make much sense for two provisions to be assigned
-the same name. But there's a counterexample for this: you want to be able
-to include two different signatures and see the merged version.
+Note that we \emph{cannot} disallow multiple bindings to the same provision:
+this is a very important use-case when you want to include one signature,
+include another signature, and see the merge of the two signatures in your
+context.  \Red{So maybe this is what we should do.}  However, there is
+a saving grace, which is signature-signature linking can be done when
+linking requirements; linking provisions is unnecessary in this case.
+So perhaps the merge rule should be something like:
+
+\begin{enumerate}
+    \item \emph{Fill every requirement of $q$ with provided modules from
+        $p$.} For each requirement $M$ of $q$ that is provided by $p$,
+        substitute each \verb|Module| occurrence of \verb|HOLE:M| with the
+        provided $p(M)$, merge the names, and remove the requirement from $q$.
+    \item \emph{Merge requirements.}  For each requirement $M$ of $q$ that is not
+        provided by $p$ but required by $p$, merge the names.
+    \item \emph{Add provisions of $q$.} For each provision $M$ of $q$:
+        add it to $p$, erroring if the addition is incompatible with an
+        existing entry in $p$.
+\end{enumerate}
+
+Now, because there is no provision linking, and the requirement \verb|B| is
+not linked against anything, \verb|A| ends up being incompatible with
+the \verb|A| in context and is rejected.  We also reject situations where
+a provision unification would require us to pick a signature:
+
+\begin{verbatim}
+package p (S) requires (S) where
+    signature S
+
+package q where
+    include p (S) requires (S as A)
+    include p (S) requires (S as B)
+    -- rejected; provided S doesn't unify
+    -- (if we accepted, what's the requirement? A? B?)
+\end{verbatim}
 
 \Red{How to relax this so hs-boot works}
 
