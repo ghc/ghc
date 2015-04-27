@@ -259,9 +259,92 @@ provides: A -> THIS:A         { q():A.T }
 requires: (nothing)
 \end{verbatim}
 
-\Red{Example of canonical choice for signature merging}
+Here are some more involved examples, which illustrate some important
+cases:
 
-\Red{Example of how provides DO NOT merge}
+\subsubsection{Sharing constraints}
+
+Suppose you have two signature which both independently define a type,
+and you would like to assert that these two types are the same.  In the
+ML world, such a constraint is known as a sharing constraint.  Sharing
+constraints can be encoded in Backpacks via clever use of reexports;
+they are also an instructive example for signature merging.
+For brevity, we've omitted \verb|provided| from the shapes in this example.
+
+\begin{verbatim}
+signature A(T) where
+    data T
+signature B(T) where
+    data T
+
+-- requires: A -> HOLE:A  	{ HOLE:A.T }
+             B -> HOLE:B	{ HOLE:B.T }
+
+-- the sharing constraint!
+signature A(T) where
+    import B(T)
+-- (shape to merge)
+-- requires: A -> HOLE:A	{ HOLE:B.T }
+
+-- (after merge)
+-- requires: A -> HOLE:A	{ HOLE:A.T }
+--			 B -> HOLE:B	{ HOLE:A.T }
+\end{verbatim}
+
+Notably, we could equivalently have chosen \verb|HOLE:B.T| as the post-merge
+name.  \Red{Actually, I don't think any choice can be wrong. The point is to
+ensure that the substitution applies to everything we know about, and since requirements
+monotonically increase in size (or are filled), this will hold.}
+
+\subsubsection{Provision linking does not discharge requirements}
+
+It is not an error to define a module, and then define a signature
+afterwards: this can be useful for checking if a module implements
+a signature, and also for sharing constraints:
+
+\begin{verbatim}
+module M(T) where
+    data T = T
+signature S(T) where
+    data T
+
+signature M(T)
+    import S(T)
+-- (partial)
+-- provides: S -> HOLE:S { THIS:M.T } -- resolved!
+
+-- alternately:
+signature S(T) where
+    import M(T)
+\end{verbatim}
+
+However, in some circumstances, linking a signature to a module can cause an
+unrelated requirement to be ``filled'':
+
+\begin{verbatim}
+package p (S) requires (S) where
+    signature S where
+        data T
+
+package q (A) requires (B) where
+    include S (S as A) requires (S as B)
+
+package r where
+    module A where
+        data T = T
+    include q (A) requires (B)
+    -- provides: A -> THIS:A { THIS:A.T }
+    -- requires: B -> 		 { THIS:A.T }
+\end{verbatim}
+
+How mysterious! We really ought to have discharged the requirement when
+this occurred. But, from just looking at \verb|r|, it's not obvious that
+\verb|B|'s requirement will get filled when you link with \verb|A|.
+
+It would seem safest to disallow this form of linking, appealing to the
+fact that it doesn't make much sense for two provisions to be assigned
+the same name. But there's a counterexample for this: you want to be able
+to include two different signatures and see the merged version.
 
 \Red{How to relax this so hs-boot works}
 
