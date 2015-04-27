@@ -174,7 +174,7 @@ ccSettings = msum
         , arg "-Wall"
         , gccIsClang ??
           ( arg "-Wno-unknown-pragmas" <|>
-            not gccLt46 && windowsHost ? arg "-Werror=unused-but-set-variable"
+            not gccLt46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
           , not gccLt46 ? arg "-Wno-error=inline" )]]
 
 ldSettings :: Settings

@@ -15,8 +15,9 @@ import Oracles.PackageData
 import Expression.PG
 import Expression.Derived
 import Expression.Settings
-import Expression.BuildPredicate
 import Expression.BuildExpression
+import qualified Expression.BuildPredicate as BP
+import           Expression.BuildPredicate hiding (rewrite)
 
 -- Resolve unevaluated variables by calling the associated oracles
 class Resolve a where
@@ -80,46 +81,20 @@ instance Resolve Args where
     resolve a = return a
 
 instance Resolve BuildPredicate where
-    resolve p @ (Evaluated _) = return p
+    resolve = BP.rewrite (return . fromBool) fv (fmap not . resolve) fa fo
+      where
+        fv (ConfigVariable key value) = do
+            lookup <- askConfig key
+            return $ fromBool (lookup == value)
+        fv v = return $ variable v
 
-    resolve (Unevaluated (ConfigVariable key value)) = do
-        lookup <- askConfig key
-        return $ Evaluated $ lookup == value
+        fa p q = (&&) <$> resolve p <*> resolve q
+        fo p q = (||) <$> resolve p <*> resolve q
 
-    resolve p @ (Unevaluated _) = return p
-
-    resolve (Not p) = do
-        p' <- resolve p
-        return $ Not p'
-
-    resolve (And p q) = do
-        p' <- resolve p
-        q' <- resolve q
-        return $ And p' q'
-
-    resolve (Or p q) = do
-        p' <- resolve p
-        q' <- resolve q
-        return $ Or p' q'
-
+-- TODO: implement with a bimap
 instance Resolve v => Resolve (BuildExpression v) where
-    resolve Epsilon = return Epsilon
-
-    resolve (Vertex v) = do
-        v' <- resolve v
-        return $ Vertex v'
-
-    resolve (Overlay l r) = do
-            l' <- resolve l
-            r' <- resolve r
-            return $ Overlay l' r'
-
-    resolve (Sequence l r) = do
-            l' <- resolve l
-            r' <- resolve r
-            return $ Sequence l' r'
-
-    resolve (Condition l r) = do
-            l' <- resolve l
-            r' <- resolve r
-            return $ Condition l' r'
+    resolve = rewrite (return empty) (fmap return . resolve) fo fs fc
+      where
+        fo l r = (<|>) <$> resolve l <*> resolve r
+        fs l r = ( |>) <$> resolve l <*> resolve r
+        fc l r = ( ? ) <$> resolve l <*> resolve r

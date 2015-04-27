@@ -23,7 +23,7 @@ targetPackages = msum
 packagesStage0 :: Packages
 packagesStage0 = msum
     [ fromList [ binPackageDb, binary, cabal, hoopl, hpc, transformers ]
-    , not windowsHost && not (targetOs "ios") ? return terminfo ]
+    , not windowsHost ? not (targetOs "ios") ? return terminfo ]
 
 packagesStage1 :: Packages
 packagesStage1 = msum
@@ -104,7 +104,7 @@ customConfigureSettings :: Settings
 customConfigureSettings = msum
     [ package base    ? arg ("--flags=" ++ integerLibraryName)
     , package ghcPrim ? arg "--flag=include-ghc-prim"
-    , package integerLibrary && windowsHost ?
+    , package integerLibrary ? windowsHost ?
         arg "--configure-option=--with-intree-gmp"
     ]
 

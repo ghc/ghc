@@ -1,19 +1,21 @@
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 
 module Expression.PG (
+    PG,
+    module Control.Monad,
+    module Control.Applicative,
     module Expression.Predicate,
-    PG (..),
-    bimap, (|>), (?), (??), whenExists, support,
-    msum, mproduct,
+    rewrite, bimap, (|>), (?), (??),
+    mproduct,
+    support, whenExists,
     fromList, fromOrderedList
     ) where
 
-import Data.Functor
 import Control.Monad
 import Control.Applicative
 import Expression.Predicate
 
--- A generic Parameterised Graph datatype
+-- A basic Parameterised Graph datatype
 -- * p is the type of predicates
 -- * v is the type of vertices
 data PG p v = Epsilon
@@ -23,28 +25,56 @@ data PG p v = Epsilon
             | Condition p (PG p v)
             deriving Eq -- TODO: create a proper Eq instance
 
+(|>) :: PG p v -> PG p v -> PG p v
+(|>) = Sequence
+
+(?) :: p -> PG p v -> PG p v
+(?) = Condition
+
+(??) :: Predicate p => p -> (PG p v, PG p v) -> PG p v
+(??) p (t, f) = Overlay (p ? t) (not p ? f)
+
+infixl 7 |>
+infixr 8 ?
+infixr 8 ??
+
+-- A (fold like) rewrite of a PG according to given instructions
+rewrite ::                      r  -- how to rewrite epsilon
+        -> (v                -> r) -- how to rewrite vertices
+        -> (PG p v -> PG p v -> r) -- how to rewrite overlays
+        -> (PG p v -> PG p v -> r) -- how to rewrite sequences
+        -> (p      -> PG p v -> r) -- how to rewrite conditions
+        -> PG p v                  -- PG to rewrite
+        -> r                       -- result
+rewrite fe fv fo fs fc pg = case pg of
+    Epsilon       -> fe            -- Epsilon is preserved
+    Vertex      v -> fv v
+    Overlay   l r -> fo l r
+    Sequence  l r -> fs l r
+    Condition l r -> fc l r
+
+instance Monad (PG p) where
+    return   = Vertex
+    pg >>= f = rewrite Epsilon f fo fs fc pg
+      where
+        fo l r = Overlay   (l >>= f) (r >>= f)
+        fs l r = Sequence  (l >>= f) (r >>= f)
+        fc l r = Condition l         (r >>= f)
+
 instance Functor (PG p) where
     fmap = liftM
 
 bimap :: (p -> q) -> (v -> w) -> PG p v -> PG q w
-bimap _ _ Epsilon = Epsilon
-bimap f g (Vertex      v) = Vertex    (g v)
-bimap f g (Overlay   l r) = Overlay   (bimap f g l) (bimap f g r)
-bimap f g (Sequence  l r) = Sequence  (bimap f g l) (bimap f g r)
-bimap f g (Condition l r) = Condition (f l)         (bimap f g r)
+bimap f g = rewrite Epsilon fv fo fs fc
+  where
+    fv v   = Vertex    (g v        )
+    fo l r = Overlay   (bimap f g l) (bimap f g r)
+    fs l r = Sequence  (bimap f g l) (bimap f g r)
+    fc l r = Condition (f l        ) (bimap f g r)
 
 instance Applicative (PG p) where
     pure = return
     (<*>) = ap
-
-instance Monad (PG p) where
-    return = Vertex
-
-    Epsilon       >>= _ = Epsilon
-    Vertex    v   >>= f = f v
-    Overlay   l r >>= f = Overlay   (l >>= f) (r >>= f)
-    Sequence  l r >>= f = Sequence  (l >>= f) (r >>= f)
-    Condition l r >>= f = Condition l         (r >>= f)
 
 instance MonadPlus (PG p) where
     mzero = Epsilon
@@ -53,9 +83,6 @@ instance MonadPlus (PG p) where
 instance Alternative (PG p) where
     empty = Epsilon
     (<|>) = Overlay
-
-(|>) :: PG p v -> PG p v -> PG p v
-(|>) = Sequence
 
 mproduct :: [PG p v] -> PG p v
 mproduct = foldr (|>) Epsilon
@@ -66,17 +93,21 @@ fromList = msum . map return
 fromOrderedList :: [v] -> PG p v
 fromOrderedList = mproduct . map return
 
-infixl 7 |>
+-- Returns sorted list of all vertices that appear in a PG
+support :: Ord v => PG p v -> [v]
+support = rewrite [] fv fos fos fc
+  where
+    fv    v = [v]
+    fos l r = support l `union` support r
+    fc  _ r = support r
 
-(?) :: p -> PG p v -> PG p v
-(?) = Condition
-
-infixl 8 ?
-
-(??) :: Predicate p => p -> (PG p v, PG p v) -> PG p v
-(??) p (t, f) = Overlay (p ? t) (not p ? f)
-
-infixl 8 ??
+union :: Ord v => [v] -> [v] -> [v]
+union ls     []     = ls
+union []     rs     = rs
+union (l:ls) (r:rs) = case compare l r of
+    LT -> l : union ls (r:rs)
+    EQ -> l : union ls rs
+    GT -> r : union (l:ls) rs
 
 -- Given a vertex and a PG return a predicate, which tells when the vertex
 -- exists in the PG.
@@ -86,21 +117,6 @@ whenExists a (Vertex b)      = if a == b then true else false
 whenExists a (Overlay   l r) = whenExists a l || whenExists a r
 whenExists a (Sequence  l r) = whenExists a l || whenExists a r
 whenExists a (Condition x r) = x              && whenExists a r
-
-support :: Ord v => PG p v -> [v]
-support Epsilon         = []
-support (Vertex      v) = [v]
-support (Overlay   l r) = support l `union` support r
-support (Sequence  l r) = support l `union` support r
-support (Condition _ r) = support r
-
-union :: Ord v => [v] -> [v] -> [v]
-union ls     []     = ls
-union []     rs     = rs
-union (l:ls) (r:rs) = case compare l r of
-    LT -> l : union ls (r:rs)
-    EQ -> l : union ls rs
-    GT -> r : union (l:ls) rs
 
 instance (Show p, Show v) => Show (PG p v) where
     showsPrec _ Epsilon       = showString "()"

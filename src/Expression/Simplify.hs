@@ -9,7 +9,8 @@ import Ways
 import Package
 import Expression.PG
 import Expression.Settings
-import Expression.BuildPredicate
+import qualified Expression.BuildPredicate as BP
+import           Expression.BuildPredicate hiding (rewrite)
 import Expression.BuildExpression
 
 -- Simplify expressions by constant propagation
@@ -20,14 +21,15 @@ class Simplify a where
 -- Linearise a build expression into a list. Returns Nothing if the given
 -- expression cannot be uniquely evaluated due to remaining variables.
 -- Overlay subexpressions are linearised in arbitrary order.
+-- TODO: topological sort
 linearise :: (Predicate p, Simplify (PG p v)) => PG p v -> Maybe [v]
 linearise = go . simplify
   where
-    go Epsilon         = Just []
-    go (Vertex v)      = Just [v]
-    go (Overlay   p q) = (++) <$> go p <*> go q -- TODO: union
-    go (Sequence  p q) = (++) <$> go p <*> go q
-    go (Condition _ _) = Nothing
+    go     = rewrite (Just []) fv fo fs fc
+    fv v   = Just [v]
+    fo l r = (++) <$> go l <*> go r -- TODO: merge
+    fs l r = (++) <$> go l <*> go r
+    fc _ _ = Nothing
 
 fromArgs :: Args -> BuildExpression (Maybe [String])
 fromArgs (Plain s) = return $ Just [s]
@@ -59,30 +61,31 @@ fromSettings settings = case linearise (settings >>= fromArgs) of
     concatMaybes (Nothing : _) = Nothing
 
 instance Simplify BuildPredicate where
-    simplify p @ (Evaluated _) = p
-    simplify p @ (Unevaluated _) = p
-    simplify (Not p) = case p' of
-        Evaluated bool -> Evaluated (not bool)
-        _              -> Not p'
-      where p' = simplify p
-    simplify (And p q)
-        | p' == false = false
-        | q' == false = false
-        | p' == true  = q'
-        | q' == true  = p'
-        | otherwise   = And p' q'
+    simplify = BP.rewrite fromBool variable simplifyN simplifyA simplifyO
       where
-        p' = simplify p
-        q' = simplify q
-    simplify (Or p q)
-        | p' == true  = true
-        | q' == true  = true
-        | p' == false = q'
-        | q' == false = p'
-        | otherwise   = Or p' q'
-      where
-        p' = simplify p
-        q' = simplify q
+        simplifyN p
+            | p' == true  = false
+            | p' == false = true
+            | otherwise   = not p'
+          where p' = simplify p
+        simplifyA p q
+            | p' == false = false
+            | q' == false = false
+            | p' == true  = q'
+            | q' == true  = p'
+            | otherwise   = p' && q'
+          where
+            p' = simplify p
+            q' = simplify q
+        simplifyO p q
+            | p' == true  = true
+            | q' == true  = true
+            | p' == false = q'
+            | q' == false = p'
+            | otherwise   = p' || q'
+          where
+            p' = simplify p
+            q' = simplify q
 
 -- Nothing to simplify here
 instance Simplify Way where
@@ -97,28 +100,28 @@ instance Simplify Args where
 
 instance (Simplify p, Simplify v, Predicate p, Eq p, Eq v) => Simplify (PG p v)
   where
-    simplify Epsilon = Epsilon
-    simplify (Vertex v) = Vertex $ simplify v
-    simplify (Overlay l r)
-        | l' == Epsilon = r'
-        | r' == Epsilon = l'
-        | l' == r'      = l'
-        | otherwise     = Overlay l' r'
+    simplify = rewrite empty (return . simplify) simplifyO simplifyS simplifyC
       where
-        l' = simplify l
-        r' = simplify r
-    simplify (Sequence l r)
-        | l' == Epsilon = r'
-        | r' == Epsilon = l'
-        | otherwise     = Sequence l' r'
-      where
-        l' = simplify l
-        r' = simplify r
-    simplify (Condition l r)
-        | l' == true    = r'
-        | l' == false   = Epsilon
-        | r' == Epsilon = Epsilon
-        | otherwise     = Condition l' r'
-      where
-        l' = simplify l
-        r' = simplify r
+        simplifyO l r
+            | l' == empty = r'
+            | r' == empty = l'
+            | l' == r'    = l'
+            | otherwise   = l' <|> r'
+          where
+            l' = simplify l
+            r' = simplify r
+        simplifyS l r
+            | l' == empty = r'
+            | r' == empty = l'
+            | otherwise   = l' |> r'
+          where
+            l' = simplify l
+            r' = simplify r
+        simplifyC l r
+            | l' == true  = r'
+            | l' == false = empty
+            | r' == empty = empty
+            | otherwise   = l' ? r'
+          where
+            l' = simplify l
+            r' = simplify r

@@ -34,7 +34,7 @@ import Expression.BuildPredicate
 import Expression.BuildExpression
 
 -- Auxiliary function for multiway disjunction
-alternatives :: Predicate a => (b -> Variable a) -> [b] -> a
+alternatives :: (a -> BuildVariable) -> [a] -> BuildPredicate
 alternatives f = foldr (||) false . map (variable . f)
 
 -- Basic GHC build predicates
@@ -69,7 +69,7 @@ stage :: Stage -> BuildPredicate
 stage s = stages [s]
 
 notStage :: Stage -> BuildPredicate
-notStage = not . Unevaluated . StageVariable
+notStage = not . variable . StageVariable
 
 way :: Way -> BuildPredicate
 way w = ways [w]
