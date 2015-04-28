@@ -37,41 +37,48 @@
 This document describes the Backpack shaping and typechecking
 passes, as we intend to implement it.
 
+\section{Changelog}
+
+\paragraph{April 28, 2015}  A signatures declaration no longer provides
+a signature in the technical shaping sense; the motivation for this change
+is explained in \textbf{Signatures cannot be provided}.  This means that,
+by default, all requirements are importable (Derek has stated that he doesn't
+think this will be too much of a problem in practice); we can consider extensions
+which allow us to hide requirements from import.
+
 \section{Front-end syntax}
 
 For completeness, here is the package language we will be shaping and typechecking:
 
 \begin{verbatim}
-package     ::= "package" pkgname [pkgexports] "where" pkgbody
-pkgbody     ::= "{" pkgdecl_0 ";" ... ";" pkgdecl_n "}"
-pkgdecl     ::= "module"    modid [exports] where body
-              | "signature" modid [exports] where body
-              | "include"   pkgname [inclspec]
-inclspec    ::= "(" renaming_0 "," ... "," renaming_n [","] ")"
-                [ "requires" "(" renaming_0 "," ... "," renaming_n [","] ")" ]
-pkgexports  ::= inclspec
-renaming    ::= modid "as" modid
+    package     ::= "package" pkgname [pkgexports] "where" pkgbody
+    pkgbody     ::= "{" pkgdecl_0 ";" ... ";" pkgdecl_n "}"
+    pkgdecl     ::= "module"    modid [exports] where body
+                  | "signature" modid [exports] where body
+                  | "include"   pkgname [inclspec]
+    inclspec    ::= "(" renaming_0 "," ... "," renaming_n [","] ")"
+                    [ "requires" "(" renaming_0 "," ... "," renaming_n [","] ")" ]
+    pkgexports  ::= inclspec
+    renaming    ::= modid "as" modid
 \end{verbatim}
-
 See the ``Backpack manual'' for more explanation about the syntax.  It
 is slightly simplified here by removing any constructs which are easily implemented as
-syntactic sugar (e.g. a \verb|modid| renaming is simply \verb|modid as modid|.)
+syntactic sugar (e.g., a \verb|modid| renaming is simply \verb|modid as modid|.)
 
 \section{Shaping}
 
 Shaping computes a \verb|Shape| which has this form:
 
 \begin{verbatim}
-Shape ::= provides: { ModName -> Module { Name } }
-          requires: { ModName ->        { Name } }
+    Shape ::= provides: { ModName -> Module { Name } }
+              requires: { ModName ->        { Name } }
 
-PkgKey      ::= SrcPkgId "(" { ModName "->" Module } ")"
-              | HOLE
-Module      ::= PkgKey ":" ModName
-Name        ::= Module "." OccName
-OccName     ::= -- a plain old name, e.g. undefined, Bool, Int
+    PkgKey      ::= SrcPkgId "(" { ModName "->" Module } ")"
+                  | HOLE
+    Module      ::= PkgKey ":" ModName
+    Name        ::= Module "." OccName
+    OccName     ::= undefined | Bool | Int | ...
 \end{verbatim}
-
 Starting with the empty shape, we incrementally construct a shape by
 shaping package declarations (the partially constructed shape serves as
 a context for renaming modules and signatures and instantiating
@@ -89,85 +96,225 @@ See more about this in the type checking section.
 In the description below, we'll assume \verb|THIS| is the package key
 of the package being processed.
 
-\newpage
+\begin{aside}
+\textbf{\texttt{OccName} is implied by \texttt{Name}.}
+In Haskell, the following is not valid syntax:
+
+\begin{verbatim}
+    import A (foobar as baz)
+\end{verbatim}
+In particular, a \verb|Name| which is in scope will always have the same
+\verb|OccName| (even if it may be qualified.)  You might imagine relaxing
+this restriction so that declarations can be used under different \verb|OccName|s;
+in such a world, we need a different definition of shape:
+
+\begin{verbatim}
+    Shape ::=
+        provided: ModName -> { OccName -> Name }
+        required: ModName -> { OccName -> Name }
+\end{verbatim}
+Presently, however, such an \verb|OccName| annotation would be redundant: it can be inferred from the \verb|Name|.
+\end{aside}
+
+\begin{aside}
+\textbf{Holes of a package are a mapping, not a set.} Why can't the \verb|PkgKey| just record a
+set of \verb|Module|s, e.g. \verb|PkgKey ::= SrcPkgKey { Module }|?  Consider:
+
+\begin{verbatim}
+    package p (A) requires (H1, H2) where
+        signature H1(T) where
+            data T
+        signature H2(T) where
+            data T
+        module A(A(..)) where
+            import qualified H1
+            import qualified H2
+            data A = A H1.T H2.T
+
+    package q (A12, A21) where
+        module I1(T) where
+            data T = T Int
+        module I2(T) where
+            data T = T Bool
+        include p (A as A12) requires (H1 as I1, H2 as I2)
+        include p (A as A21) requires (H1 as I2, H2 as I1)
+\end{verbatim}
+With a mapping, the first instance of \verb|p| has key \verb|p(H1 -> q():I1, H2 -> q():I2)|
+while the second instance has key \verb|p(H1 -> q():I2, H2 -> q():I1)|; with
+a set, both would have the key \verb|p(q():I1, q():I2)|.
+\end{aside}
+
+
+\begin{aside}
+\textbf{Signatures can require a specific entity.}
+With requirements like \verb|A -> { HOLE:A.T, HOLE:A.foo }|,
+why not specify it as \verb|A -> { T, foo }|,
+e.g., \verb|required: { ModName -> { OccName } }|?  Consider:
+
+\begin{verbatim}
+    package p () requires (A, B) where
+        signature A(T) where
+            data T
+        signature B(T) where
+            import T
+\end{verbatim}
+The requirements of this package specify that \verb|A.T| $=$ \verb|B.T|; this
+can be expressed with \verb|Name|s as
+
+\begin{verbatim}
+    A -> { HOLE:A.T }
+    B -> { HOLE:A.T }
+\end{verbatim}
+But, without \verb|Name|s, the sharing constraint is impossible:  \verb|A -> { T }; B -> { T }|. (NB: \verb|A| and \verb|B| don't have to be implemented with the same module.)
+\end{aside}
+
+\begin{aside}
+\textbf{The \texttt{Name} of a value is used to avoid
+ambiguous identifier errors.}  We state that two types
+are equal when their \texttt{Name}s are the same; however,
+for values, it is less clear why we care.  But consider this example:
+
+\begin{verbatim}
+    package p (A) requires (H1, H2) where
+        signature H1(x) where
+            x :: Int
+        signature H2(x) where
+            import H1(x)
+        module A(y) where
+            import H1
+            import H2
+            y = x
+\end{verbatim}
+The reference to \verb|x| in \verb|A| is unambiguous, because it is known
+that \verb|x| from \verb|H1| and \verb|x| from \verb|H2| are the same (have
+the same \verb|Name|.)  If they were not the same, it would be ambiguous and
+should cause an error.  Knowing the \verb|Name| of a value distinguishes
+between these two cases.
+\end{aside}
+
+\begin{aside}
+\textbf{Absence of \texttt{Module} in \texttt{requires} implies holes are linear}
+Because the requirements do not record a \verb|Module| representing
+the identity of a requirement, it means that it's not possible to assert
+that hole \verb|A| and hole \verb|B| should be implemented with the same module,
+as might occur with aliasing:
+
+\begin{verbatim}
+    signature A where
+    signature B where
+    alias A = B
+\end{verbatim}
+%
+The benefit of this restriction is that when a requirement is filled,
+it is obvious that this is the only requirement that is filled: you won't
+magically cause some other requirements to be filled.  The downside is
+it's not possible to write a package which looks for an interface it is
+looking for in one of $n$ names, accepting any name as an acceptable linkage.
+If aliasing was allowed, we'd need a separate physical shaping context,
+to make sure multiple mentions of the same hole were consistent.
+
+\end{aside}
+
+%\newpage
 
 \subsection{\texttt{module M}}
 
-Merge with this shape:
+A module declaration provides a module \verb|THIS:M| at module name \verb|M|. It
+has the shape:
 
 \begin{verbatim}
     provides: { M -> THIS:M { exports of renamed M } }
     requires: (nothing)
 \end{verbatim}
-
-\noindent Example:
+Example:
 
 \begin{verbatim}
-    -- provides: (nothing)
-    -- requires: (nothing)
-
     module A(T) where
         data T = T
 
-    -- provides: A -> THIS:A { THIS:A.T }           -- NEW
-    -- requires: (nothing)
-
-    module M(T, f) where
-        import A(T)
-        f x = x
-
     -- provides: A -> THIS:A { THIS:A.T }
-                 M -> THIS:M { THIS:A.T, THIS:M.f } -- NEW
     -- requires: (nothing)
 \end{verbatim}
 
 \newpage
 \subsection{\texttt{signature M}}
 
-Merge with this shape:
+A signature declaration creates a requirement at module name \verb|M|.  It has the shape:
 
 \begin{verbatim}
-    provides: { M -> HOLE:M { exports of renamed M } }
-    requires: { M ->        { exports of renamed M } }
+    provides: (nothing)
+    requires: { M -> { exports of renamed M } }
 \end{verbatim}
 
 \noindent Example:
 
 \begin{verbatim}
-    -- provides: (nothing)
-    -- requires: (nothing)
-
     signature H(T) where
         data T
 
-    -- provides: H -> HOLE:H { HOLE:H.T }
-    -- requires: H ->        { HOLE:H.T }
-
-    module A(T) where
-        import H(T)
-    module B(T) where
-        data T = T
-
-    -- provides: H -> HOLE:H { HOLE:H.T }
-    --           A -> THIS:A { HOLE:H.T } -- NEW
-    --           B -> THIS:B { THIS:B.T } -- NEW
-    -- requires: H ->        { HOLE:H.T }
-
-    signature H(T, f) where
-        import B(T)
-        f :: a -> a
-
-    -- provides: H -> HOLE:H { THIS:B.T, HOLE:H.f } -- UPDATED
-    --           A -> THIS:A { THIS:B.T }           -- UPDATED
-    --           B -> THIS:B { THIS:B.T }
-    -- requires: H ->        { THIS:B.T, HOLE:H.f } -- UPDATED
+    -- provides: H -> (nothing)
+    -- requires: H -> { HOLE:H.T }
 \end{verbatim}
 
-Notice that in the last example, when a signature with reexports is merged,
-it can result in updates to the shapes of other module names.
+\begin{aside}
+\textbf{Signatures cannot be provided}.  A signature \emph{never} counts
+as a provision, as far as shaping is concerned.  While it seems like
+a signature package which provides signatures for import should actually,
+you know, \emph{provide} its signatures, this observation at its
+logical conclusion is a mess.  The problem can most clearly be
+seen in this example:
+
+\begin{verbatim}
+    package a-sigs (A) requires (A) where -- ***
+        signature A where
+            data T
+
+    package a-user (B) requires (A) where
+        signature A where
+            data T
+            x :: T
+        module B where
+            ...
+
+    package p where
+        include a-sigs
+        include a-user
+\end{verbatim}
+%
+When we consider merging in the shape of \verb|a-user|, does the
+\verb|A| provided by \verb|a-sigs| fill in the \verb|A| requirement
+in \verb|a-user|?  It \emph{should not}, since \verb|a-sigs| does not
+actually provide enough declarations to satisfy \verb|a-user|'s
+requirement: the intended semantics \emph{merges} the requirements
+of \verb|a-sigs| and \verb|a-user|, but doesn't use the provision to
+fill the signature.  However, in this case:
+
+\begin{verbatim}
+    package a-sigs (M as A) requires (H as A) where
+        signature H(T) where
+            data T
+        module M(T) where
+            import H(T)
+\end{verbatim}
+%
+We rightly should error, since the provision is a module. And in this situation:
+
+\begin{verbatim}
+    package a-sigs (H as A) requires (H) where
+        signature H(T) where
+            data T
+\end{verbatim}
+%
+The requirements should be merged, but should the merged requirement
+be under the name \verb|H| or \verb|A|?
+
+It may still be possible to use the \verb|(A) requires (A)| syntax to
+indicate exposed signatures, but this would be a mere syntactic
+alternative to \verb|() requires (exposed A)|.
+\end{aside}
+%
 
 \newpage
-
 \subsection{\texttt{include pkg (X) requires (Y)}}
 
 We merge with the transformed shape of package \verb|pkg|, where this
@@ -176,16 +323,14 @@ shape is transformed by:
 \begin{itemize}
     \item Renaming and thinning the provisions according to \verb|(X)|
     \item Renaming requirements according to \verb|(Y)| (requirements cannot
-          be thinned, so non-mentioned requirements are passed through.)
+          be thinned, so non-mentioned requirements are implicitly passed through.)
           For each renamed requirement from \verb|Y| to \verb|Y'|,
           substitute \verb|HOLE:Y| with \verb|HOLE:Y'| in the
           \verb|Module|s and \verb|Name|s of the provides and requires.
-          (Freshen holes.)
-    \item If there are no thinnings/renamings, you just merge the
-          shape unchanged!
 \end{itemize}
-
-\noindent Example:
+%
+If there are no thinnings/renamings, you just merge the
+shape unchanged! Here is an example:
 
 \begin{verbatim}
     package p (M) requires (H) where
@@ -195,70 +340,114 @@ shape is transformed by:
             import H
             data S = S T
 
-    -- p requires: M -> { p(H -> HOLE:H):M.S }
-    --   provides: H -> { HOLE:H.T }
-
     package q (A) where
         module X where
             data T = T
-
-        -- provides: X -> { q():X.T }
-        -- requires: (nothing)
-
         include p (M as A) requires (H as X)
-        -- 1. Rename/thin provisions:
-        --      provides: A -> { p(H -> HOLE:H):M.S }
-        --      requires: H -> { HOLE:H.T }
-        -- 2. Rename requirements, substituting HOLEs:
-        --      provides: A -> { p(H -> HOLE:X):M.S }
-        --      requires: X -> { HOLE:X.T }
+\end{verbatim}
+%
+The shape of package \verb|p| is:
 
-        -- (after merge)
-        -- provides: X -> { q():X.T }
-        --           A -> { p(H -> q():X):M.S }
-        -- requires: (nothing)
+\begin{verbatim}
+    requires: M -> { p(H -> HOLE:H):M.S }
+    provides: H -> { HOLE:H.T }
+\end{verbatim}
+%
+Thus, when we process the \verb|include| in package \verb|q|,
+we make the following two changes: we rename the provisions,
+and we rename the requirements, substituting \verb|HOLE|s.
+The resulting shape to be merged in is:
+
+\begin{verbatim}
+    provides: A -> { p(H -> HOLE:X):M.S }
+    requires: X -> { HOLE:X.T }
+\end{verbatim}
+%
+After merging this in, the final shape of \verb|q| is:
+
+\begin{verbatim}
+    provides: X -> { q():X.T }              -- from shaping 'module X'
+              A -> { p(H -> q():X):M.S }
+    requires: (nothing)                     -- discharged by provided X
 \end{verbatim}
 
 \newpage
 
 \subsection{Merging}
 
-Merging combines two shapes, filling requirements with implementations
-and substituting information we learn about the identities of
-\verb|Name|s.  Importantly, merging is a \emph{directed} process, akin
-to taking two boxes with input and output ports and wiring them up so
-that the first box feeds into the second box.  This algorithm does not
-support mutual recursion.
+The shapes we've given for individual declarations have been quite
+simple.  Merging combines two shapes, filling requirements with
+implementations and substituting information we learn about the
+identities of \verb|Name|s; it is the most complicated part of the
+shaping process.
 
-Suppose we are merging shape $p$ with shape $q$.  Merging proceeds as follows:
+The best way to think about merging is that we take two packages with
+inputs (requirements) and outputs (provisions) and ``wiring'' them up so
+that outputs feed into inputs.  In the absence
+of mutual recursion, this wiring process is \emph{directed}: the provisions
+of the first package feed into the requirements of the second package,
+but never vice versa.  (With mutual recursion, things can go in the opposite
+direction as well.)
+
+Suppose we are merging shape $p$ with shape $q$ (e.g., $p; q$).  Merging
+proceeds as follows:
 
 \begin{enumerate}
     \item \emph{Fill every requirement of $q$ with provided modules from
-        $p$.} For each requirement $M$ of $q$ that is provided by $p$,
+        $p$.} For each requirement $M$ of $q$ that is provided by $p$ (in particular,
+        all of its required \verb|Name|s are provided),
         substitute each \verb|Module| occurrence of \verb|HOLE:M| with the
         provided $p(M)$, merge the names, and remove the requirement from $q$.
-    \item \emph{Merge in provided signatures of $q$, add the provided modules of $q$.}
-        For each provision $M$ of $q$: if $q(M)$ is a hole, substitute every
-        \verb|Module| occurrence of \verb|HOLE:|$q(M)$ with $p(M)$ if it exists and merge
-        the names; otherwise, add it to $p$, erroring if $p(M)$ exists.
+        Error if a provision is insufficient for the requirement.
+    \item If mutual recursion is supported, \emph{fill every requirement of $p$ with provided modules from $q$.}
+    \item \emph{Merge leftover requirements.}  For each requirement $M$ of $q$ that is not
+        provided by $p$ but required by $p$, merge the names.  (It's not
+        necessary to substitute \verb|Module|s, since they are guaranteed to be the same.)
+    \item \emph{Add provisions of $q$.} Union the provisions of $p$ and $q$, erroring
+        if there is a duplicate that doesn't have the same identity.
 \end{enumerate}
-
-Substitutions apply to both shapes.  To merge two sets of names, take
-each pair of names with matching \verb|OccName|s $n$ and $m$.
+%
+To merge two sets of names, take each pair of names with matching \verb|OccName|s $n$ and $m$.
 
 \begin{enumerate}
-    \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$. (E.g., pick the one with the lexicographically first \verb|ModName|).
+    \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$.
     \item If one $n$ is from a hole, substitute $n$ with $m$.
     \item Otherwise, error if the names are not the same.
 \end{enumerate}
-
+%
 It is important to note that substitutions on \verb|Module|s and substitutions on
 \verb|Name|s are disjoint: a substitution from \verb|HOLE:A| to \verb|HOLE:B|
 does \emph{not} substitute inside the name \verb|HOLE:A.T|.
-Here is a simple example:
+
+Since merging is the most complicated step of shaping, here are a big
+pile of examples of it in action.
+
+\subsubsection{A simple example}
+
+In the following set of packages:
+
+\begin{verbatim}
+    package p(M) requires (A) where
+        signature A(T) where
+            data T
+        module M(T, S) where
+            import A(T)
+            data S = S T
+
+    package q where
+        module A where
+            data T = T
+        include p
+\end{verbatim}
+
+When we \verb|include p|, we need to merge the partial shape
+of \verb|q| (with just provides \verb|A|) with the shape
+of \verb|p|.  Here is each step of the merging process:
 
 \begin{verbatim}
           shape 1                       shape 2
+          --------------------------------------------------------------------------------
+(initial shapes)
 provides: A -> THIS:A { q():A.T }       M -> p(A -> HOLE:A) { HOLE:A.T, p(A -> HOLE:A).S }
 requires: (nothing)                     A ->                { HOLE:A.T }
 
@@ -272,8 +461,33 @@ provides: A -> THIS:A         { q():A.T }
 requires: (nothing)
 \end{verbatim}
 
-Here are some more involved examples, which illustrate some important
-cases:
+Notice that we substituted \verb|HOLE:A| with \verb|THIS:A|, but \verb|HOLE:A.T| with \verb|q():A.T|.
+
+\subsubsection{Requirements merging can affect provisions}
+
+When a merge results in a substitution, we substitute over both
+requirements and provisions:
+
+\begin{verbatim}
+    signature H(T) where
+        data T
+    module A(T) where
+        import H(T)
+    module B(T) where
+        data T = T
+
+    -- provides: A -> THIS:A { HOLE:H.T }
+    --           B -> THIS:B { THIS:B.T }
+    -- requires: H ->        { HOLE:H.T }
+
+    signature H(T, f) where
+        import B(T)
+        f :: a -> a
+
+    -- provides: A -> THIS:A { THIS:B.T }           -- UPDATED
+    --           B -> THIS:B { THIS:B.T }
+    -- requires: H ->        { THIS:B.T, HOLE:H.f } -- UPDATED
+\end{verbatim}
 
 \subsubsection{Sharing constraints}
 
@@ -282,123 +496,41 @@ and you would like to assert that these two types are the same.  In the
 ML world, such a constraint is known as a sharing constraint.  Sharing
 constraints can be encoded in Backpacks via clever use of reexports;
 they are also an instructive example for signature merging.
-For brevity, we've omitted \verb|provided| from the shapes in this example.
 
 \begin{verbatim}
-signature A(T) where
-    data T
-signature B(T) where
-    data T
-
--- requires: A -> HOLE:A        { HOLE:A.T }
-             B -> HOLE:B        { HOLE:B.T }
-
--- the sharing constraint!
-signature A(T) where
-    import B(T)
--- (shape to merge)
--- requires: A -> HOLE:A        { HOLE:B.T }
-
--- (after merge)
--- requires: A -> HOLE:A        { HOLE:A.T }
---           B -> HOLE:B        { HOLE:A.T }
-\end{verbatim}
-
-Notably, we could equivalently have chosen \verb|HOLE:B.T| as the post-merge
-name.  \Red{Actually, I don't think any choice can be wrong. The point is to
-ensure that the substitution applies to everything we know about, and since requirements
-monotonically increase in size (or are filled), this will hold.}
-
-\subsubsection{Provision linking does not discharge requirements}
-
-It is not an error to define a module, and then define a signature
-afterwards: this can be useful for checking if a module implements
-a signature, and also for sharing constraints:
-
-\begin{verbatim}
-module M(T) where
-    data T = T
-signature S(T) where
-    data T
-
-signature M(T)
-    import S(T)
--- (partial)
--- provides: S -> HOLE:S { THIS:M.T } -- resolved!
-
--- alternately:
-signature S(T) where
-    import M(T)
-\end{verbatim}
-
-However, in some circumstances, linking a signature to a module can cause an
-unrelated requirement to be ``filled'':
-
-\begin{verbatim}
-package p (S) requires (S) where
-    signature S where
+    signature A(T) where
+        data T
+    signature B(T) where
         data T
 
-package q (A) requires (B) where
-    include S (S as A) requires (S as B)
+    -- requires: A -> { HOLE:A.T }
+                 B -> { HOLE:B.T }
 
-package r where
-    module A where
-        data T = T
-    include q (A) requires (B)
-    -- provides: A -> THIS:A { THIS:A.T }
-    -- requires: (nothing)
+    -- the sharing constraint!
+    signature A(T) where
+        import B(T)
+    -- (shape to merge)
+    -- requires: A -> { HOLE:B.T }
+
+    -- (after merge)
+    -- requires: A -> { HOLE:A.T }
+    --           B -> { HOLE:A.T }
 \end{verbatim}
+%
+\Red{I'm pretty sure any choice of \texttt{Name} is OK, since the
+subsequent substitution will make it alpha-equivalent.}
 
-Notice that the requirement was discharged because we unified \verb|HOLE:B|
-with \verb|THIS:A|.  While this is certainly the most accurate picture
-of the package we can get from this situation, it is a bit unsatisfactory
-in that looking at the text of module \verb|r|, it is not obvious that
-all the requirements were filled; only that there is some funny business
-going on with multiple provisions with \verb|A|.
+%   \subsubsection{Leaky requirements}
 
-Note that we \emph{cannot} disallow multiple bindings to the same provision:
-this is a very important use-case when you want to include one signature,
-include another signature, and see the merge of the two signatures in your
-context.  \Red{So maybe this is what we should do.}  However, there is
-a saving grace, which is signature-signature linking can be done when
-linking requirements; linking provisions is unnecessary in this case.
-So perhaps the merge rule should be something like:
+%   Both requirements and provisions can be imported, but requirements
+%   are always available
 
-\begin{enumerate}
-    \item \emph{Fill every requirement of $q$ with provided modules from
-        $p$.} For each requirement $M$ of $q$ that is provided by $p$,
-        substitute each \verb|Module| occurrence of \verb|HOLE:M| with the
-        provided $p(M)$, merge the names, and remove the requirement from $q$.
-    \item \emph{Merge requirements.}  For each requirement $M$ of $q$ that is not
-        provided by $p$ but required by $p$, merge the names.
-    \item \emph{Add provisions of $q$.} For each provision $M$ of $q$:
-        add it to $p$, erroring if the addition is incompatible with an
-        existing entry in $p$.
-\end{enumerate}
+%\Red{How to relax this so hs-boot works}
 
-Now, because there is no provision linking, and the requirement \verb|B| is
-not linked against anything, \verb|A| ends up being incompatible with
-the \verb|A| in context and is rejected.  We also reject situations where
-a provision unification would require us to pick a signature:
+%\Red{Example of how loopy modules which rename requirements make it un-obvious whether or not
+%a requirement is still required.  Same example works declaration level.}
 
-\begin{verbatim}
-package p (S) requires (S) where
-    signature S
-
-package q where
-    include p (S) requires (S as A)
-    include p (S) requires (S as B)
-    -- rejected; provided S doesn't unify
-    -- (if we accepted, what's the requirement? A? B?)
-\end{verbatim}
-
-\Red{How to relax this so hs-boot works}
-
-\Red{Example of how loopy modules which rename requirements make it un-obvious whether or not
-a requirement is still required.  Same example works declaration level.}
-
-\Red{package p (A) requires (A); the input output ports should be the same}
+%\Red{package p (A) requires (A); the input output ports should be the same}
 
 % We figure out the requirements (because no loopy modules)
 %
@@ -413,46 +545,54 @@ a requirement is still required.  Same example works declaration level.}
 % things on things, merging things together as you discover that this is
 % the case.
 
-\newpage
+%\newpage
 
 \subsection{Export declarations}
 
 If an explicit export declaration is given, the final shape is the
 computed shape, minus any provisions not mentioned in the list, with the
-appropriate renaming applied to provisions and requirements.  (Provisions
+appropriate renaming applied to provisions and requirements.  (Requirements
 are implicitly passed through if they are not named.)
-
 If no explicit export declaration is given, the final shape is
-the computed shape, minus any provisions which did not have an in-line
-module or signature declaration.
+the computed shape, including only provisions which were defined
+in the declarations of the package.
 
 \begin{aside}
-\textbf{Guru meditation.}  The defaulting behavior for signatures
-is slightly delicate, as can be seen in this example:
+\textbf{Signature visibility, and defaulting}
+The simplest formulation of requirements is to have them always be
+visible.  Signature visibility could be controlled by associating
+every requirement with a flag indicating if it is importable or
+not: a signature declaration sets a requirement to be visible, and
+an explicit export list can specify if a requirement is to be visible
+or not.
+
+When an export list is absent, we have to pick a default visibility
+for a signature.  If we use the same behavior as with modules,
+a strange situation can occur:
 
 \begin{verbatim}
-package p (S) requires (S) where
-    signature S where
-        x :: True
+    package p where -- S is visible
+        signature S where
+            x :: True
 
-package q where
-    include p
-    signature S where
-        y :: True
-    module M where
-        import S
-        z = x && y      -- OK
+    package q where -- use defaulting
+        include p
+        signature S where
+            y :: True
+        module M where
+            import S
+            z = x && y      -- OK
 
-package r where
-    include q
-    module N where
-        import S
-        z = y           -- OK
-        z = x           -- ???
+    package r where
+        include q
+        module N where
+            import S
+            z = y           -- OK
+            z = x           -- ???
 \end{verbatim}
-
+%
 Absent the second signature declaration in \verb|q|, \verb|S.x| clearly
-should not be visible.  However, what ought to occur when this signature
+should not be visible in \verb|N|.  However, what ought to occur when this signature
 declaration is added?  One interpretation is to say that only some
 (but not all) declarations are provided (\verb|S.x| remains invisible);
 another interpretation is that adding \verb|S| is enough to treat
@@ -470,9 +610,6 @@ package q where
     include p
     signature S where
 \end{verbatim}
-
-Note that if \verb|p| didn't provide \verb|S|, \verb|x| would \emph{never}
-be visible unless it was redeclared in an interface.
 \end{aside}
 %
 %   SPJ: This would be too complicated (if there's yet a third way)
@@ -484,7 +621,7 @@ a mapping \verb|M -> HOLE:M|.  Annoyingly, you don't know the full set of
 requirements until the end of shaping, so you don't know the package key ahead of time;
 however, it can be substituted at the end easily.
 
-\newpage
+%\newpage
 
 \section{Type checking}
 
