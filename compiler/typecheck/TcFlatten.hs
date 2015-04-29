@@ -920,7 +920,7 @@ flatten_one (TyVarTy tv)
 
            Right (ty1, co1)  -- Recurse
                     -> do { (ty2, co2) <- flatten_one ty1
-                          ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2 $$ ppr co1)
+                          ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
                           ; return (ty2, co2 `mkTcTransCo` co1) } }
 
 flatten_one (AppTy ty1 ty2)
@@ -937,7 +937,7 @@ flatten_one (AppTy ty1 ty2)
       = do { (xi2,co2) <- setEqRel eq_rel2 $ flatten_one ty2
            ; traceFlat "flatten/appty"
                        (ppr ty1 $$ ppr ty2 $$ ppr xi1 $$
-                        ppr co1 $$ ppr xi2 $$ ppr co2)
+                        ppr co1 $$ ppr xi2)
            ; role1 <- getRole
            ; let role2 = eqRelRole eq_rel2
            ; return ( mkAppTy xi1 xi2
@@ -1104,7 +1104,7 @@ flatten_exact_fam_app_fully tc tys
              | (flav, NomEq) `canRewriteOrSameFR` flavour_role
              ->  -- Usable hit in the flat-cache
                  -- We certainly *can* use a Wanted for a Wanted
-                do { traceFlat "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr rhs_ty $$ ppr co)
+                do { traceFlat "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr rhs_ty)
                    ; (fsk_xi, fsk_co) <- flatten_one rhs_ty
                           -- The fsk may already have been unified, so flatten it
                           -- fsk_co :: fsk_xi ~ fsk
@@ -1131,7 +1131,7 @@ flatten_exact_fam_app_fully tc tys
                                         , cc_fsk    = fsk }
                    ; emitFlatWork ct
 
-                   ; traceFlat "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk $$ ppr ev)
+                   ; traceFlat "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk)
                    ; return (fsk_ty, maybeTcSubCo eq_rel
                                                   (mkTcSymCo co)
                                      `mkTcTransCo` ret_co) }
