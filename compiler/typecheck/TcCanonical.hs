@@ -948,7 +948,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
   = rewriteEqEvidence ev eq_rel swapped xi1 xi2 co1 co2
     `andWhenContinue` \ new_ev ->
     case eq_rel of
-      NomEq  -> do { emitInsoluble (mkNonCanonical ev)
+      NomEq  -> do { emitInsoluble (mkNonCanonical new_ev)
               -- If we have a ~ [a], it is not canonical, and in particular
               -- we don't want to rewrite existing inerts with it, otherwise
               -- we'd risk divergence in the constraint solver
