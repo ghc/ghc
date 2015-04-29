@@ -62,7 +62,8 @@ module TcRnTypes(
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
-        dropDerivedWC, insolubleImplic, trulyInsoluble,
+        dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
+        insolubleImplic, trulyInsoluble,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
         SubGoalDepth, initialSubGoalDepth,
@@ -1275,34 +1276,59 @@ ctEqRel = ctEvEqRel . ctEvidence
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
-dropDerivedWC wc@(WC { wc_simple = simples })
-  = wc { wc_simple  = filterBag isWantedCt simples }
+dropDerivedWC wc@(WC { wc_simple = simples, wc_insol = insols })
+  = wc { wc_simple = dropDerivedSimples simples
+       , wc_insol  = dropDerivedInsols insols }
     -- The wc_impl implications are already (recursively) filtered
 
-{-
-Note [Dropping derived constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dropDerivedSimples :: Cts -> Cts
+dropDerivedSimples simples = filterBag isWantedCt simples
+                             -- simples are all Wanted or Derived
+
+dropDerivedInsols :: Cts -> Cts
+-- See Note [Dropping derived constraints]
+dropDerivedInsols insols = filterBag keep insols
+  where                    -- insols can include Given
+    keep ct
+      | isDerivedCt ct = keep_orig (ctLocOrigin (ctLoc ct))
+      | otherwise      = True
+
+    keep_orig :: CtOrigin -> Bool
+    keep_orig (KindEqOrigin {})          = True
+    keep_orig (GivenOrigin {})           = True
+    keep_orig (FunDepOrigin1 {}) = True
+    keep_orig (FunDepOrigin2 {}) = True
+--    keep_orig (FunDepOrigin1 _ loc _ _)  = keep_orig (ctLocOrigin loc)
+--    keep_orig (FunDepOrigin2 _ orig _ _) = keep_orig orig
+    keep_orig _                          = False
+
+
+{- Note [Dropping derived constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we discard derived constraints at the end of constraint solving;
 see dropDerivedWC.  For example
- * If we have an unsolved (Ord a), we don't want to complain about
-   an unsolved (Eq a) as well.
 
-But we keep Derived *insoluble* constraints because they indicate a solid,
-comprehensible error.  Particularly:
+ * If we have an unsolved [W] (Ord a), we don't want to complain about
+   an unsolved [D] (Eq a) as well.
 
- * Insolubles Givens indicate unreachable code
+ * If we have [W] a ~ Int, [W] a ~ Bool, improvement will generate
+   [D] Int ~ Bool, and we don't want to report that becuase it's incomprehensible.
+   That is why we don't rewrite wanteds with wanteds!
+
+But (tiresomely) we do keep *some* Derived insolubles:
 
  * Insoluble kind equalities (e.g. [D] * ~ (* -> *)) may arise from
-   a type equality a ~ Int#, say
+   a type equality a ~ Int#, say.  In future they'll be Wanted, not Derived,
+   but at the moment they are Derived.
 
- * Insoluble derived wanted equalities (e.g. [D] Int ~ Bool) may
-   arise from functional dependency interactions.  We are careful
-   to keep a good CtOrigin on such constraints (FunDepOrigin1, FunDepOrigin2)
-   so that we can produce a good error message (Trac #9612)
+ * Insoluble derived equalities (e.g. [D] Int ~ Bool) may arise from
+   functional dependency interactions, either between Givens or
+   Wanteds.  It seems sensible to retain these:
+   - For Givens they reflect unreachable code
+   - For Wanteds it is arguably better to get a fundep error than
+     a no-instance error (Trac #9612)
 
-Since we leave these Derived constraints in the residual WantedConstraints,
-we must filter them out when we re-process the WantedConstraint,
-in TcSimplify.solve_wanteds.
+To distinguish these cases we use the CtOrigin.
 
 
 ************************************************************************
@@ -1450,6 +1476,7 @@ unionsWC = foldr andWC emptyWC
 addSimples :: WantedConstraints -> Bag Ct -> WantedConstraints
 addSimples wc cts
   = wc { wc_simple = wc_simple wc `unionBags` cts }
+    -- Consider: Put the new constraints at the front, so they get solved first
 
 addImplics :: WantedConstraints -> Bag Implication -> WantedConstraints
 addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
@@ -1471,10 +1498,16 @@ insolubleWC (WC { wc_impl = implics, wc_insol = insols })
   || anyBag insolubleImplic implics
 
 trulyInsoluble :: Ct -> Bool
--- The constraint is in the wc_insol set, but we do not
--- treat type-holes, arising from PartialTypeSignatures,
--- as "truly insoluble". Yuk.
-trulyInsoluble insol = not (isTypeHoleCt insol)
+-- The constraint is in the wc_insol set,
+-- but we do not treat as truly isoluble
+--  a) type-holes, arising from PartialTypeSignatures,
+--  b) superclass constraints, arising from the emitInsoluble
+--     in TcInstDcls.tcSuperClasses. In fact only equalities
+--     are truly-insoluble.
+-- Yuk!
+trulyInsoluble insol
+  =  isEqPred (ctPred insol)
+  && not (isTypeHoleCt insol)
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
@@ -2026,7 +2059,7 @@ data CtOrigin
   | OccurrenceOf Name              -- Occurrence of an overloaded identifier
   | AppOrigin                      -- An application of some kind
 
-  | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for 
+  | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for
                                    -- function or instance
 
   | TypeEqOrigin { uo_actual   :: TcType

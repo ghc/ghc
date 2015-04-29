@@ -12,7 +12,7 @@ class Test p where
 
 instance Test PrintRuleInterp where
   test (f :: p a) =
-    MkPRI $ printRule_ f 
+    MkPRI $ printRule_ f
 
 
 newtype RecDecParser a = MkRD {

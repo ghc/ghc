@@ -25,7 +25,7 @@ module TcSMonad (
     Freshness(..), freshGoals, isFresh,
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
-    setWantedTyBind, reportUnifications,
+    unifyTyVar, reportUnifications,
     setEvBind, setWantedEvBind, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
     newDerived, emitNewDerived, checkReductionDepth,
@@ -37,10 +37,10 @@ module TcSMonad (
         -- Inerts
     InertSet(..), InertCans(..),
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
-    getNoGivenEqs, setInertCans, getInertEqs, getInertCans,
-    emptyInert, getTcSInerts, setTcSInerts,
+    getNoGivenEqs, setInertCans, getInertEqs, getInertCans, getInertGivens,
+    emptyInert, getTcSInerts, setTcSInerts, takeInertInsolubles,
     getUnsolvedInerts, checkAllSolved,
-    splitInertCans, removeInertCts,
+    removeInertCts,
     prepareInertsForImplications,
     addInertCan, insertInertItemTcS, insertFunEq,
     emitInsoluble, emitWorkNC, emitWorkCt,
@@ -70,7 +70,7 @@ module TcSMonad (
 
     TcLevel, isTouchableMetaTyVarTcS,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
-    zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkSimples,
+    zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkSimples, zonkWC,
 
     -- References
     newTcRef, readTcRef, updTcRef,
@@ -132,7 +132,7 @@ import Control.Arrow ( first )
 import Control.Monad( ap, when, unless, MonadPlus(..) )
 import MonadUtils
 import Data.IORef
-import Data.List ( partition, foldl' )
+import Data.List ( foldl' )
 
 #ifdef DEBUG
 import Digraph
@@ -613,6 +613,16 @@ getInertCans = do { inerts <- getTcSInerts; return (inert_cans inerts) }
 setInertCans :: InertCans -> TcS ()
 setInertCans ics = updInertTcS $ \ inerts -> inerts { inert_cans = ics }
 
+takeInertInsolubles :: TcS Cts
+-- Take the insoluble constraints out of the inert set
+takeInertInsolubles
+  = do { is_var <- getTcSInertsRef
+       ; wrapTcS (do { inerts <- TcM.readTcRef is_var
+                     ; let cans = inert_cans inerts
+                           cans' = cans { inert_insols = emptyBag }
+                     ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
+                     ; return (inert_insols cans) }) }
+
 updInertCans :: (InertCans -> InertCans) -> TcS ()
 -- Modify the inert set with the supplied function
 updInertCans upd_fn
@@ -634,7 +644,7 @@ updInertIrreds upd_fn
   = updInertCans $ \ ics -> ics { inert_irreds = upd_fn (inert_irreds ics) }
 
 
-prepareInertsForImplications :: InertSet -> (InertSet)
+prepareInertsForImplications :: InertSet -> InertSet
 -- See Note [Preparing inert set for implications]
 prepareInertsForImplications is@(IS { inert_cans = cans })
   = is { inert_cans       = getGivens cans
@@ -689,30 +699,49 @@ them into Givens.  There can *be* deriving CFunEqCans; see Trac #8129.
 
 getInertEqs :: TcS (TyVarEnv EqualCtList)
 getInertEqs
-  = do { inert <- getTcSInerts
-       ; return (inert_eqs (inert_cans inert)) }
+  = do { inert <- getInertCans
+       ; return (inert_eqs inert) }
+
+getInertGivens :: TcS [Ct]
+-- Returns the Given constraints in the inert set,
+-- with type functions *not* unflattened
+getInertGivens
+  = do { inerts <- getInertCans
+       ; let all_cts = foldDicts (:) (inert_dicts inerts)
+                     $ foldFunEqs (:) (inert_funeqs inerts)
+                     $ concat (varEnvElts (inert_eqs inerts))
+       ; return (filter isGivenCt all_cts) }
 
 getUnsolvedInerts :: TcS ( Bag Implication
                          , Cts     -- Tyvar eqs: a ~ ty
                          , Cts     -- Fun eqs:   F a ~ ty
                          , Cts     -- Insoluble
                          , Cts )   -- All others
+-- Post-condition: the returned simple constraints are all fully zonked
+--                     (because they come from the inert set)
+--                 the unsolved implics may not be
 getUnsolvedInerts
  = do { IC { inert_eqs    = tv_eqs
            , inert_funeqs = fun_eqs
            , inert_irreds = irreds, inert_dicts = idicts
            , inert_insols = insols } <- getInertCans
 
-      ; let unsolved_tv_eqs   = foldVarEnv (\cts rest ->
-                                             foldr add_if_unsolved rest cts)
-                                          emptyCts tv_eqs
-            unsolved_fun_eqs  = foldFunEqs add_if_unsolved fun_eqs emptyCts
-            unsolved_irreds   = Bag.filterBag is_unsolved irreds
-            unsolved_dicts    = foldDicts add_if_unsolved idicts emptyCts
-
-            others       = unsolved_irreds `unionBags` unsolved_dicts
+      ; let unsolved_tv_eqs  = foldVarEnv (\cts rest ->
+                                            foldr add_if_unsolved rest cts)
+                                         emptyCts tv_eqs
+            unsolved_fun_eqs = foldFunEqs add_if_unsolved fun_eqs emptyCts
+            unsolved_irreds  = Bag.filterBag is_unsolved irreds
+            unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
+            others           = unsolved_irreds `unionBags` unsolved_dicts
 
       ; implics <- getWorkListImplics
+
+      ; traceTcS "getUnsolvedInerts" $
+        vcat [ text " tv eqs =" <+> ppr unsolved_tv_eqs
+             , text "fun eqs =" <+> ppr unsolved_fun_eqs
+             , text "insols =" <+> ppr insols
+             , text "others =" <+> ppr others
+             , text "implics =" <+> ppr implics ]
 
       ; return ( implics, unsolved_tv_eqs, unsolved_fun_eqs, insols, others) }
               -- Keep even the given insolubles
@@ -827,17 +856,6 @@ b) 'a' will have been completely substituted out in the inert set,
 
 For an example, see Trac #9211.
 -}
-
-splitInertCans :: InertCans -> ([Ct], [Ct], [Ct])
--- ^ Extract the (given, derived, wanted) inert constraints
-splitInertCans iCans = (given,derived,wanted)
-  where
-    allCts   = foldDicts  (:) (inert_dicts iCans)
-             $ foldFunEqs (:) (inert_funeqs iCans)
-             $ concat (varEnvElts (inert_eqs iCans))
-
-    (derived,other) = partition isDerivedCt allCts
-    (wanted,given)  = partition isWantedCt  other
 
 removeInertCts :: [Ct] -> InertCans -> InertCans
 -- ^ Remove inert constraints from the 'InertCans', for use when a
@@ -1447,22 +1465,20 @@ getTcEvBindsMap
   = do { EvBindsVar ev_ref _ <- getTcEvBinds
        ; wrapTcS $ TcM.readTcRef ev_ref }
 
-setWantedTyBind :: TcTyVar -> TcType -> TcS ()
--- Add a type binding
--- We never do this twice!
-setWantedTyBind tv ty
-  | ASSERT2( isMetaTyVar tv, ppr tv )
-    isFmvTyVar tv
+unifyTyVar :: TcTyVar -> TcType -> TcS ()
+-- Unify a meta-tyvar with a type
+-- We keep track of whether we have done any unifications in tcs_unified,
+-- but only for *non-flatten* meta-vars
+--
+-- We should never unify the same varaiable twice!
+unifyTyVar tv ty
   = ASSERT2( isMetaTyVar tv, ppr tv )
-    wrapTcS (TcM.writeMetaTyVar tv ty)
-           -- Write directly into the mutable tyvar
-           -- Flatten meta-vars are born and die locally
-
-  | otherwise
-  = TcS $ \ env ->
-    do { TcM.traceTc "setWantedTyBind" (ppr tv <+> text ":=" <+> ppr ty)
+    TcS $ \ env ->
+    do { TcM.traceTc "unifyTyVar" (ppr tv <+> text ":=" <+> ppr ty)
        ; TcM.writeMetaTyVar tv ty
-       ; TcM.writeTcRef (tcs_unified env) True }
+       ; unless (isFmvTyVar tv) $  -- Flatten meta-vars are born and die locally
+                                   -- so do not track them in tcs_unified
+         TcM.writeTcRef (tcs_unified env) True }
 
 reportUnifications :: TcS a -> TcS (Bool, a)
 reportUnifications (TcS thing_inside)
@@ -1470,7 +1486,8 @@ reportUnifications (TcS thing_inside)
     do { inner_unified <- TcM.newTcRef False
        ; res <- thing_inside (env { tcs_unified = inner_unified })
        ; dirty <- TcM.readTcRef inner_unified
-       ; return (dirty, res) }
+       ; TcM.updTcRef (tcs_unified env) (|| dirty)  -- Inner unifications affect
+       ; return (dirty, res) }                      -- the outer scope too
 
 getDefaultInfo ::  TcS ([Type], (Bool, Bool))
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
@@ -1542,6 +1559,9 @@ zonkTcTyVar tv = wrapTcS (TcM.zonkTcTyVar tv)
 zonkSimples :: Cts -> TcS Cts
 zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
 
+zonkWC :: WantedConstraints -> TcS WantedConstraints
+zonkWC wc = wrapTcS (TcM.zonkWC wc)
+
 {-
 Note [Do not add duplicate derived insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1599,27 +1619,35 @@ newFlattenSkolem :: CtFlavour -> CtLoc
                  -> TcType         -- F xis
                  -> TcS (CtEvidence, TcTyVar)    -- [W] x:: F xis ~ fsk
 newFlattenSkolem Given loc fam_ty
-  =  do { checkReductionDepth loc fam_ty
-        ; fsk <- wrapTcS $
-                 do { uniq <- TcM.newUnique
-                    ; let name = TcM.mkTcTyVarName uniq (fsLit "fsk")
-                    ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
-        ; ev <- newGivenEvVar loc (mkTcEqPred fam_ty (mkTyVarTy fsk),
+  = do { fsk <- newFsk fam_ty
+       ; ev  <- newGivenEvVar loc (mkTcEqPred fam_ty (mkTyVarTy fsk),
                                    EvCoercion (mkTcNomReflCo fam_ty))
-        ; return (ev, fsk) }
+       ; return (ev, fsk) }
 
-newFlattenSkolem _ loc fam_ty  -- Make a wanted
-  = do { checkReductionDepth loc fam_ty
-       ; fuv <- wrapTcS $
-                 do { uniq <- TcM.newUnique
-                    ; ref  <- TcM.newMutVar Flexi
-                    ; let details = MetaTv { mtv_info  = FlatMetaTv
-                                           , mtv_ref   = ref
-                                           , mtv_tclvl = fskTcLevel }
-                          name = TcM.mkTcTyVarName uniq (fsLit "s")
-                    ; return (mkTcTyVar name (typeKind fam_ty) details) }
-       ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fuv))
-       ; return (ev, fuv) }
+newFlattenSkolem Wanted loc fam_ty
+  = do { fmv <- newFmv fam_ty
+       ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fmv))
+       ; return (ev, fmv) }
+
+newFlattenSkolem Derived loc fam_ty
+  = do { fmv <- newFmv fam_ty
+       ; ev <- newDerivedNC loc (mkTcEqPred fam_ty (mkTyVarTy fmv))
+       ; return (ev, fmv) }
+
+newFsk, newFmv :: TcType -> TcS TcTyVar
+newFsk fam_ty
+  = wrapTcS $ do { uniq <- TcM.newUnique
+                 ; let name = TcM.mkTcTyVarName uniq (fsLit "fsk")
+                 ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
+
+newFmv fam_ty
+  = wrapTcS $ do { uniq <- TcM.newUnique
+                 ; ref  <- TcM.newMutVar Flexi
+                 ; let details = MetaTv { mtv_info  = FlatMetaTv
+                                        , mtv_ref   = ref
+                                        , mtv_tclvl = fskTcLevel }
+                       name = TcM.mkTcTyVarName uniq (fsLit "s")
+                 ; return (mkTcTyVar name (typeKind fam_ty) details) }
 
 extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType, CtFlavour) -> TcS ()
 extendFlatCache tc xi_args stuff
@@ -1793,11 +1821,16 @@ newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Returns Nothing    if cached,
 --         Just pred  if not cached
 newDerived loc pred
+  = do { mb_ct <- lookupInInerts pred
+       ; case mb_ct of
+           Just {} -> return Nothing
+           Nothing -> do { ev <- newDerivedNC loc pred
+                         ; return (Just ev) } }
+
+newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
+newDerivedNC loc pred
   = do { checkReductionDepth loc pred
-       ; mb_ct <- lookupInInerts pred
-       ; return (case mb_ct of
-                    Just {} -> Nothing
-                    Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }
+       ; return (CtDerived { ctev_pred = pred, ctev_loc = loc }) }
 
 -- | Checks if the depth of the given location is too much. Fails if
 -- it's too big, with an appropriate error message.

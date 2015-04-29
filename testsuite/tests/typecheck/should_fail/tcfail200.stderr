@@ -1,5 +1,5 @@
 
-tcfail200.hs:5:15:
+tcfail200.hs:5:15: error:
     Couldn't match kind ‘*’ with ‘#’
     When matching types
       t1 :: *

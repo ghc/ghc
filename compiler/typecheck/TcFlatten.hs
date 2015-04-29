@@ -235,52 +235,6 @@ Solution: always put fmvs on the left, so we get
   is a bad idea.  We want to use other constraints on alpha first.
 
 
-Note [Derived constraints from wanted CTyEqCans]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Is this type ambiguous:  (Foo e ~ Maybe e) => Foo e
- (indexed-types/should_fail/T4093a)
-
- [G] Foo e ~ Maybe e
- [W] Foo e ~ Foo ee      -- ee is a unification variable
- [W] Foo ee ~ Maybe ee)
----
- [G] Foo e ~ fsk
- [G] fsk ~ Maybe e
-
- [W] Foo e ~ fmv1
- [W] Foo ee ~ fmv2
- [W] fmv1 ~ fmv2
- [W] fmv2 ~ Maybe ee
-
---->   fmv1 := fsk  by matching LHSs
- [W] Foo ee ~ fmv2
- [W] fsk ~ fmv2
- [W] fmv2 ~ Maybe ee
-
---->
- [W] Foo ee ~ fmv2
- [W] fmv2 ~ Maybe e
- [W] fmv2 ~ Maybe ee
-
-Now maybe we shuld get [D] e ~ ee, and then we'd solve it entirely.
-But if in a smilar situation we got [D] Int ~ Bool we'd be back
-to complaining about wanted/wanted interactions.  Maybe this arises
-also for fundeps?
-
-Here's another example:
-  f :: [a] -> [b] -> blah
-  f (e1 :: F Int) (e2 :: F Int)
-
-  we get
-     F Int ~ fmv
-     fmv ~ [alpha]
-     fmv ~ [beta]
-
-  We want: alpha := beta (which might unlock something else).  If we
-  generated [D] [alpha] ~ [beta] we'd be good here.
-
-Current story: we don't generate these derived constraints.  We could, but
-we'd want to make them very weak, so we didn't get the Int~Bool complaint.
 
 
 ************************************************************************
@@ -1570,9 +1524,12 @@ ctFlavourRole = ctEvFlavourRole . cc_ev
 eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- Very important function!
 -- See Note [eqCanRewrite]
-eqCanRewriteFR (Given,   NomEq)  (_,       _)      = True
-eqCanRewriteFR (Given,   ReprEq) (_,       ReprEq) = True
-eqCanRewriteFR _                 _                 = False
+-- See Note [Wanteds do not rewrite Wanteds]
+-- See Note [Deriveds do rewrite Deriveds]
+eqCanRewriteFR (Given,   NomEq)   (_,       _)      = True
+eqCanRewriteFR (Given,   ReprEq)  (_,       ReprEq) = True
+eqCanRewriteFR (Derived, NomEq)   (Derived, _)      = True
+eqCanRewriteFR _                 _                  = False
 
 canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewriteOrSame]
@@ -1582,15 +1539,20 @@ canRewriteOrSame ev1 ev2 = ev1 `eqCanRewrite` ev2 ||
 canRewriteOrSameFR :: CtFlavourRole -> CtFlavourRole -> Bool
 canRewriteOrSameFR fr1 fr2 = fr1 `eqCanRewriteFR` fr2 || fr1 == fr2
 
-{-
-Note [eqCanRewrite]
+{- Note [eqCanRewrite]
 ~~~~~~~~~~~~~~~~~~~
 (eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
 tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
 a can-rewrite relation, see Definition [Can-rewrite relation]
 
-At the moment we don't allow Wanteds to rewrite Wanteds, because that can give
-rise to very confusing type error messages.  A good example is Trac #8450.
+With the solver handling Coercible constraints like equality constraints,
+the rewrite conditions must take role into account, never allowing
+a representational equality to rewrite a nominal one.
+
+Note [Wanteds do not rewrite Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't allow Wanteds to rewrite Wanteds, because that can give rise
+to very confusing type error messages.  A good example is Trac #8450.
 Here's another
    f :: a -> Bool
    f x = ( [x,'c'], [x,True] ) `seq` True
@@ -1599,11 +1561,10 @@ Here we get
   [W] a ~ Bool
 but we do not want to complain about Bool ~ Char!
 
-Accordingly, we also don't let Deriveds rewrite Deriveds.
-
-With the solver handling Coercible constraints like equality constraints,
-the rewrite conditions must take role into account, never allowing
-a representational equality to rewrite a nominal one.
+Note [Deriveds do rewrite Deriveds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+However we DO allow Deriveds to rewrite Deriveds, because that's how
+improvement works; see Note [The improvement story] in TcInteract.
 
 Note [canRewriteOrSame]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1636,6 +1597,9 @@ unflatten tv_eqs funeqs
              , ptext (sLit "Tv eqs =") <+> pprCts tv_eqs ]
 
          -- Step 1: unflatten the CFunEqCans, except if that causes an occurs check
+         -- Occurs check: consider  [W] alpha ~ [F alpha]
+         --                 ==> (flatten) [W] F alpha ~ fmv, [W] alpha ~ [fmv]
+         --                 ==> (unify)   [W] F [fmv] ~ fmv
          -- See Note [Unflatten using funeqs first]
       ; funeqs <- foldrBagM (unflatten_funeq dflags) emptyCts funeqs
       ; traceTcS "Unflattening 1" $ braces (pprCts funeqs)
@@ -1654,7 +1618,10 @@ unflatten tv_eqs funeqs
       ; let all_flat = tv_eqs `andCts` funeqs
       ; traceTcS "Unflattening done" $ braces (pprCts all_flat)
 
-      ; return all_flat }
+          -- Step 5: zonk the result
+          -- Motivation: makes them nice and ready for the next step
+          --             (see TcInteract.solveSimpleWanteds)
+      ; zonkSimples all_flat }
   where
     ----------------
     unflatten_funeq :: DynFlags -> Ct -> Cts -> TcS Cts
@@ -1731,7 +1698,7 @@ tryFill dflags tv rhs ev
            OC_OK rhs''    -- Normal case: fill the tyvar
              -> do { setEvBindIfWanted ev
                                (EvCoercion (mkTcReflCo (ctEvRole ev) rhs''))
-                   ; setWantedTyBind tv rhs''
+                   ; unifyTyVar tv rhs''
                    ; return True }
 
            _ ->  -- Occurs check

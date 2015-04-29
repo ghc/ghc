@@ -1,5 +1,5 @@
 
-T5246.hs:11:10:
+T5246.hs:11:10: error:
     Couldn't match type ‘[Char]’ with ‘Int’
     arising from a functional dependency between constraints:
       ‘?x::Int’ arising from a use of ‘foo’ at T5246.hs:11:10-12

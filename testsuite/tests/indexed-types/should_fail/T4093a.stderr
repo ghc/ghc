@@ -1,14 +1,14 @@
 
-T4093a.hs:7:9:
-    Could not deduce: Foo e0 ~ Maybe e
+T4093a.hs:8:8: error:
+    Could not deduce: e ~ ()
     from the context: Foo e ~ Maybe e
       bound by the type signature for: hang :: (Foo e ~ Maybe e) => Foo e
       at T4093a.hs:7:9-34
-    The type variable ‘e0’ is ambiguous
+      ‘e’ is a rigid type variable bound by
+          the type signature for: hang :: (Foo e ~ Maybe e) => Foo e
+          at T4093a.hs:7:9
     Expected type: Foo e
-      Actual type: Foo e0
-    In the ambiguity check for the type signature for ‘hang’:
-      hang :: forall e. (Foo e ~ Maybe e) => Foo e
-    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    In the type signature for ‘hang’:
-      hang :: (Foo e ~ Maybe e) => Foo e
+      Actual type: Maybe ()
+    Relevant bindings include hang :: Foo e (bound at T4093a.hs:8:1)
+    In the expression: Just ()
+    In an equation for ‘hang’: hang = Just ()

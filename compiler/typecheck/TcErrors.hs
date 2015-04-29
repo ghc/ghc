@@ -126,23 +126,25 @@ report_unsolved :: Maybe EvBindsVar  -- cec_binds
                 -> HoleChoice        -- Expression holes
                 -> HoleChoice        -- Type holes
                 -> WantedConstraints -> TcM ()
--- Important precondition:
--- WantedConstraints are fully zonked and unflattened, that is,
--- zonkWC has already been applied to these constraints.
 report_unsolved mb_binds_var defer_errors expr_holes type_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
-  = do { traceTc "reportUnsolved (before unflattening)" (ppr wanted)
-       ; warn_redundant <- woptM Opt_WarnRedundantConstraints
+  = do { traceTc "reportUnsolved (before zonking and tidying)" (ppr wanted)
 
+       ; wanted <- zonkWC wanted   -- Zonk to reveal all information
        ; env0 <- tcInitTidyEnv
-
             -- If we are deferring we are going to need /all/ evidence around,
             -- including the evidence produced by unflattening (zonkWC)
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
              free_tvs = tyVarsOfWC wanted
-             err_ctxt = CEC { cec_encl  = []
+
+       ; traceTc "reportUnsolved (after zonking and tidying):" $
+         vcat [ pprTvBndrs (varSetElems free_tvs)
+              , ppr wanted ]
+
+       ; warn_redundant <- woptM Opt_WarnRedundantConstraints
+       ; let err_ctxt = CEC { cec_encl  = []
                             , cec_tidy  = tidy_env
                             , cec_defer_type_errors = defer_errors
                             , cec_expr_holes = expr_holes
@@ -150,10 +152,6 @@ report_unsolved mb_binds_var defer_errors expr_holes type_holes wanted
                             , cec_suppress = False -- See Note [Suppressing error messages]
                             , cec_warn_redundant = warn_redundant
                             , cec_binds    = mb_binds_var }
-
-       ; traceTc "reportUnsolved (after unflattening):" $
-         vcat [ pprTvBndrs (varSetElems free_tvs)
-              , ppr wanted ]
 
        ; reportWanteds err_ctxt wanted }
 
@@ -286,72 +284,76 @@ This only matters in instance declarations..
 
 reportWanteds :: ReportErrCtxt -> WantedConstraints -> TcM ()
 reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
-  = do { ctxt1 <- reportSimples ctxt  (mapBag (tidyCt env) insol_given)
-       ; ctxt2 <- reportSimples ctxt1 (mapBag (tidyCt env) insol_wanted)
+  = do { traceTc "reportWanteds" (vcat [ ptext (sLit "Simples =") <+> ppr simples
+                                       , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)])
+       ; let tidy_insols  = bagToList (mapBag (tidyCt env) insols)
+             tidy_simples = bagToList (mapBag (tidyCt env) simples)
+
+         -- First deal with things that are utterly wrong
+         -- Like Int ~ Bool (incl nullary TyCons)
+         -- or  Int ~ t a   (AppTy on one side)
+         -- Do this first so that we know the ctxt for the nested implications
+       ; (ctxt1, insols1) <- tryReporters ctxt  insol_given  tidy_insols
+       ; (ctxt2, insols2) <- tryReporters ctxt1 insol_wanted insols1
 
          -- For the simple wanteds, suppress them if there are any
          -- insolubles in the tree, to avoid unnecessary clutter
        ; let ctxt2' = ctxt { cec_suppress = cec_suppress ctxt2
                                          || anyBag insolubleImplic implics }
-       ; _ <- reportSimples ctxt2'  (mapBag (tidyCt env) simples)
 
+       ; (_, leftovers) <- tryReporters ctxt2' reporters (insols2 ++ tidy_simples)
+       ; MASSERT2( null leftovers, ppr leftovers )
+
+            -- TuplePreds should have been expanded away by the constraint
+            -- simplifier, so they shouldn't show up at this point
             -- All the Derived ones have been filtered out of simples
             -- by the constraint solver. This is ok; we don't want
             -- to report unsolved Derived goals as errors
             -- See Note [Do not report derived but soluble errors]
-       ; mapBagM_ (reportImplic ctxt1) implics }
+
+     ; mapBagM_ (reportImplic ctxt1) implics }
             -- NB ctxt1: don't suppress inner insolubles if there's only a
             -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
-    (insol_given, insol_wanted) = partitionBag isGivenCt insols
+    insol_given  = [ ("insoluble1", is_given &&& utterly_wrong,  True, mkGroupReporter mkEqErr)
+                   , ("insoluble2", is_given &&& is_equality,    True, mkSkolReporter) ]
+    insol_wanted = [ ("insoluble3",              utterly_wrong,  True, mkGroupReporter mkEqErr)
+                   , ("insoluble4",              is_equality,    True, mkSkolReporter) ]
 
-reportSimples :: ReportErrCtxt -> Cts -> TcM ReportErrCtxt
-reportSimples ctxt simples    -- Here 'simples' includes insolble goals
-  =  traceTc "reportSimples" (vcat [ ptext (sLit "Simples =") <+> ppr simples
-                                   , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)])
-  >> tryReporters ctxt
-      [ -- First deal with things that are utterly wrong
-        -- Like Int ~ Bool (incl nullary TyCons)
-        -- or  Int ~ t a   (AppTy on one side)
-        ("Utterly wrong (given)",  utterly_wrong_given, True,  mkGroupReporter mkEqErr)
-      , ("Utterly wrong (other)",  utterly_wrong_other, True,  mkGroupReporter mkEqErr)
-      , ("Holes",          is_hole,         False, mkHoleReporter)
+    reporters = [ ("Holes",          is_hole,         False, mkHoleReporter)
 
-        -- Report equalities of form (a~ty).  They are usually
-        -- skolem-equalities, and they cause confusing knock-on
-        -- effects in other errors; see test T4093b.
-      , ("Skolem equalities", skolem_eq,  True,  mkSkolReporter)
+                  -- Report equalities of form (a~ty).  They are usually
+                  -- skolem-equalities, and they cause confusing knock-on
+                  -- effects in other errors; see test T4093b.
+                , ("Skolem equalities", is_skol_eq,  True,  mkSkolReporter)
 
-        -- Other equalities; also confusing knock on effects
-      , ("Equalities",      is_equality, True,  mkGroupReporter mkEqErr)
+                  -- Other equalities; also confusing knock on effects
+                , ("Equalities",      is_equality, True,  mkGroupReporter mkEqErr)
 
-      , ("Implicit params", is_ip,       False, mkGroupReporter mkIPErr)
-      , ("Irreds",          is_irred,    False, mkGroupReporter mkIrredErr)
-      , ("Dicts",           is_dict,     False, mkGroupReporter mkDictErr)
-      ]
-      (bagToList simples)
-          -- TuplePreds should have been expanded away by the constraint
-          -- simplifier, so they shouldn't show up at this point
-  where
-    utterly_wrong_given, utterly_wrong_other, skolem_eq, is_hole, is_dict,
+                , ("Implicit params", is_ip,       False, mkGroupReporter mkIPErr)
+                , ("Irreds",          is_irred,    False, mkGroupReporter mkIrredErr)
+                , ("Dicts",           is_dict,     False, mkGroupReporter mkDictErr) ]
+
+    (&&&) :: (Ct->PredTree->Bool) -> (Ct->PredTree->Bool) -> (Ct->PredTree->Bool)
+    (&&&) p1 p2 ct pred = p1 ct pred && p2 ct pred
+
+    is_skol_eq, is_hole, is_dict,
       is_equality, is_ip, is_irred :: Ct -> PredTree -> Bool
 
-    utterly_wrong_given ct (EqPred _ ty1 ty2)
-      | isGivenCt ct = isRigid ty1 && isRigid ty2
-    utterly_wrong_given _ _ = False
-
-    utterly_wrong_other _ (EqPred _ ty1 ty2) = isRigid ty1 && isRigid ty2
-    utterly_wrong_other _ _ = False
+    utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigid ty1 && isRigid ty2
+    utterly_wrong _ _                      = False
 
     is_hole ct _ = isHoleCt ct
 
-    skolem_eq _ (EqPred NomEq ty1 ty2) = isRigidOrSkol ty1 && isRigidOrSkol ty2
-    skolem_eq _ _ = False
-
-    is_equality _ (EqPred {}) = True
-    is_equality _ _           = False
+    is_given  ct _ = not (isWantedCt ct)  -- The Derived ones are actually all from Givens
+    is_equality  ct pred = not (isDerivedCt ct) && (case pred of
+                                                      EqPred {} -> True
+                                                      _ -> False)
+    is_skol_eq ct (EqPred NomEq ty1 ty2)
+       = not (isDerivedCt ct) && isRigidOrSkol ty1 && isRigidOrSkol ty2
+    is_skol_eq _ _ = False
 
     is_dict _ (ClassPred {}) = True
     is_dict _ _              = False
@@ -362,6 +364,10 @@ reportSimples ctxt simples    -- Here 'simples' includes insolble goals
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
 
+
+-- isRigidEqPred :: PredTree -> Bool
+-- isRigidEqPred (EqPred NomEq ty1 ty2) = isRigid ty1 && isRigid ty2
+-- isRigidEqPred _                      = False
 
 ---------------
 isRigid, isRigidOrSkol :: Type -> Bool
@@ -499,32 +505,33 @@ maybeAddDeferredBinding ctxt err ct
     | otherwise
     = return ()
 
-tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM ReportErrCtxt
+tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
 tryReporters ctxt reporters cts
   = do { traceTc "tryReporters {" (ppr cts)
-       ; ctxt' <- go ctxt reporters cts
-       ; traceTc "tryReporters }" empty
-       ; return ctxt' }
+       ; (ctxt', cts') <- go ctxt reporters cts
+       ; traceTc "tryReporters }" (ppr cts')
+       ; return (ctxt', cts') }
   where
     go ctxt [] cts
-      | null cts  = return ctxt
-      | otherwise = pprPanic "tryReporters" (ppr cts)
+      = return (ctxt, cts)
 
-    go ctxt ((str, pred, suppress_after, reporter) : rs) cts
-      | null yeses  = do { traceTc "tryReporters: no" (text str)
-                         ; go ctxt rs cts }
-      | otherwise   = do { traceTc "tryReporters: yes" (text str <+> ppr yeses)
-                         ; reporter ctxt yeses :: TcM ()
-                         ; let ctxt' = ctxt { cec_suppress = suppress_after || cec_suppress ctxt }
-                         ; go ctxt' rs nos }
-                         -- Carry on with the rest, because we must make
-                         -- deferred bindings for them if we have
-                         -- -fdefer-type-errors
-                         -- But suppress their error messages
-      where
-       (yeses, nos) = partition keep_me cts
-       keep_me ct = pred ct (classifyPredType (ctPred ct))
+    go ctxt (r : rs) cts
+      = do { (ctxt', cts') <- tryReporter ctxt r cts
+           ; go ctxt' rs cts' }
+                -- Carry on with the rest, because we must make
+                -- deferred bindings for them if we have -fdefer-type-errors
+                -- But suppress their error messages
+
+tryReporter :: ReportErrCtxt -> ReporterSpec -> [Ct] -> TcM (ReportErrCtxt, [Ct])
+tryReporter ctxt (str, keep_me,  suppress_after, reporter) cts
+  | null yeses = return (ctxt, cts)
+  | otherwise  = do { traceTc "tryReporter:" (text str <+> ppr yeses)
+                    ; reporter ctxt yeses
+                    ; let ctxt' = ctxt { cec_suppress = suppress_after || cec_suppress ctxt }
+                    ; return (ctxt', nos) }
+  where
+    (yeses, nos) = partition (\ct -> keep_me ct (classifyPredType (ctPred ct))) cts
 
 -- Add the "arising from..." part to a message about bunch of dicts
 addArising :: CtOrigin -> SDoc -> SDoc

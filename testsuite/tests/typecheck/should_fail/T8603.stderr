@@ -1,10 +1,10 @@
 
-T8603.hs:13:10:
+T8603.hs:13:10: error:
     No instance for (Applicative RV)
       arising from the superclasses of an instance declaration
     In the instance declaration for ‘Monad RV’
 
-T8603.hs:29:17:
+T8603.hs:29:17: error:
     Couldn't match kind ‘* -> *’ with ‘*’
     When matching types
       t1 :: (* -> *) -> * -> *
@@ -19,12 +19,3 @@ T8603.hs:29:17:
     In the expression:
       do { prize <- lift uniform [1, 2, ....];
            return False }
-
-T8603.hs:29:22:
-    Couldn't match type ‘RV a0’ with ‘StateT s RV t0’
-    Expected type: [a0] -> StateT s RV t0
-      Actual type: [a0] -> RV a0
-    Relevant bindings include
-      testRVState1 :: RVState s Bool (bound at T8603.hs:28:1)
-    In the first argument of ‘lift’, namely ‘uniform’
-    In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]

@@ -1807,11 +1807,10 @@ simplifyDeriv pred tvs theta
 
        ; traceTc "simplifyDeriv" $
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
-       ; (residual_wanted, _ev_binds1)
-             <- solveWantedsTcM (mkSimpleWC wanted)
-                -- Post: residual_wanted are already zonked
+       ; residual_wanted <- solveWantedsTcM wanted
 
-       ; let (good, bad) = partitionBagWith get_good (wc_simple residual_wanted)
+       ; residual_simple <- zonkSimples (wc_simple residual_wanted)
+       ; let (good, bad) = partitionBagWith get_good residual_simple
                          -- See Note [Exotic derived instance contexts]
              get_good :: Ct -> Either PredType Ct
              get_good ct | validDerivPred skol_set p

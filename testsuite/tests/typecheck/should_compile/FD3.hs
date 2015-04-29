@@ -13,3 +13,12 @@ instance MkA a a where
 
 translate :: (String, a) -> A a
 translate a = mkA a
+
+{- From the call to mkA
+
+[W] MkA alpha beta
+[W] alpha ~ (String,a)
+[W] A beta ~ A a
+
+==>  beta:=a, alpha:=(String,a)
+-}

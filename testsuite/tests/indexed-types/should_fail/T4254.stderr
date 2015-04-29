@@ -1,0 +1,4 @@
+
+T4254.hs:18:10: warning:
+    Redundant constraint: FD a b
+    In the type signature for: fails :: (a ~ Int, FD a b) => a -> Bool

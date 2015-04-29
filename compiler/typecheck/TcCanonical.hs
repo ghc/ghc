@@ -252,26 +252,24 @@ emitSuperclasses ct@(CDictCan { cc_ev = ev , cc_tyargs = xis_new, cc_class = cls
       ; continueWith ct }
 emitSuperclasses _ = panic "emit_superclasses of non-class!"
 
-{-
-Note [Adding superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Adding superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Since dictionaries are canonicalized only once in their lifetime, the
 place to add their superclasses is canonicalisation.  See Note [Add
 superclasses only during canonicalisation].  Here is what we do:
 
-  Deriveds: Do nothing.
-
   Givens:   Add all their superclasses as Givens.
+            They may be needed to prove Wanteds
 
-  Wanteds:  Add all their superclasses as Derived.
-            Not as Wanted: we don't need a proof.
-            Nor as Given: that leads to superclass loops.
+  Wanteds:  Do nothing.
 
-We also want to ensure minimal constraints to quantify over.  For
-instance, if our wanted constraint is (Eq a, Ord a) we'd only like to
-quantify over Ord a.  But we deal with that completely independently
-in TcSimplify. See Note [Minimize by SuperClasses] in TcSimplify.
+  Deriveds: Add all their superclasses as Derived.
+            The sole reason is to expose functional dependencies
+            in superclasses or equality superclasses.
+
+            We only do this in the improvement phase, if solving has
+            not succeeded; see Note [The improvement story] in
+            TcInteract
 
 Examples of how adding superclasses as Derived is useful
 
@@ -292,6 +290,7 @@ Examples of how adding superclasses as Derived is useful
          [D] F a ~ beta
     Now we we get [D] beta ~ b, and can solve that.
 
+---------- Historical note -----------
 Example of why adding superclass of a Wanted as a Given would
 be terrible, see Note [Do not add superclasses of solved dictionaries]
 in TcSMonad, which has this example:
@@ -348,21 +347,18 @@ situation can't happen.
 newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
-  | isDerived flavor
-  = return ()  -- Deriveds don't yield more superclasses because we will
-               -- add them transitively in the case of wanteds.
+  | CtWanted {} <- flavor
+  = return ()
 
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { let sc_theta = immSuperClasses cls xis
-             mk_pr sc_pred i = (sc_pred, EvSuperClass (EvId evar) i)
-       ; given_evs <- newGivenEvVars loc (zipWith mk_pr sc_theta [0..])
+  = do { given_evs <- newGivenEvVars loc (mkEvScSelectors (EvId evar) cls xis)
        ; emitWorkNC given_evs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
   = return () -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
-  | otherwise -- Wanted case, just add those SC that can lead to improvement.
+  | otherwise -- Derived case, just add those SC that can lead to improvement.
   = do { let sc_rec_theta = transSuperClasses cls xis
              impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor

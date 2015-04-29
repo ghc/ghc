@@ -1,14 +1,17 @@
 
-FDsFromGivens.hs:21:15:
-    Couldn't match type ‘Char’ with ‘[a]’
+FDsFromGivens.hs:9:7: error:
+    Couldn't match type ‘[a]’ with ‘Bool’
     arising from a functional dependency between constraints:
-      ‘C Char [a]’ arising from a use of ‘f’ at FDsFromGivens.hs:21:15
-      ‘C Char Char’
-        arising from a pattern with constructor:
-                       KCC :: C Char Char => () -> KCC,
-                     in an equation for ‘bar’
-        at FDsFromGivens.hs:21:6-10
-    Relevant bindings include
-      bar :: KCC -> a -> a (bound at FDsFromGivens.hs:21:1)
-    In the expression: f
-    In an equation for ‘bar’: bar (KCC _) = f
+      ‘C Char Bool’
+        arising from the type signature for:
+                     g1 :: (C Char [a], C Char Bool) => a -> ()
+        at FDsFromGivens.hs:9:7-42
+      ‘C Char [a]’
+        arising from the type signature for:
+                     g1 :: (C Char [a], C Char Bool) => a -> ()
+        at FDsFromGivens.hs:9:7-42
+    In the ambiguity check for the type signature for ‘g1’:
+      g1 :: forall a. (C Char [a], C Char Bool) => a -> ()
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‘g1’:
+      g1 :: (C Char [a], C Char Bool) => a -> ()

@@ -7,6 +7,8 @@ type instance Foo () = Maybe ()
 hang :: (Foo e ~ Maybe e) => Foo e
 hang = Just ()
 
+-- Type is not ambiguous; should get a complaint
+-- for (e ~ ()) arising from the Just ()
 
 {- Ambiguity check
 
