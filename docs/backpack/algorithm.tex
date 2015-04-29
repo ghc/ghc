@@ -48,19 +48,31 @@ which allow us to hide requirements from import.
 
 \section{Front-end syntax}
 
-For completeness, here is the package language we will be shaping and typechecking:
+\begin{figure}
+$$
+\begin{array}{rcll}
+p,q,r && \mbox{Package names} \\
+m,n   && \mbox{Module names} \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Packages}} \\
+  pkg & ::= & \verb|package|\; p\; [provreq]\; \verb|where {| d_1 \verb|;| \ldots \verb|;| d_n \verb|}| \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Declarations}} \\
+  d & ::= & \verb|module|\;    m \; [exports]\; \verb|where|\; body \\
+    & |   & \verb|signature|\; m \; [exports]\; \verb|where|\; body \\
+    & |   & \verb|include|\; p \; [provreq] \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Provides/requires specification}} \\
+provreq & ::= & \verb|(| \, rns \, \verb|)| \; 
+        [ \verb|requires(|\, rns \, \verb|)| ] \\
+rns & ::= & rn_0 \verb|,| \, \ldots \verb|,| \, rn_n [\verb|,|] & \mbox{Renamings} \\
+rn & ::= & m\, \verb|as| \, n & \mbox{Renaming} \\[1em] 
+\multicolumn{3}{l}{\mbox{\bf Haskell code}} \\
+exports & & \mbox{A Haskell module export list} \\
+body    & & \mbox{A Haskell module body} \\
+\end{array}
+$$
+\caption{Syntax of Backpack} \label{fig:syntax}
+\end{figure}
 
-\begin{verbatim}
-    package     ::= "package" pkgname [pkgexports] "where" pkgbody
-    pkgbody     ::= "{" pkgdecl_0 ";" ... ";" pkgdecl_n "}"
-    pkgdecl     ::= "module"    modid [exports] where body
-                  | "signature" modid [exports] where body
-                  | "include"   pkgname [inclspec]
-    inclspec    ::= "(" renaming_0 "," ... "," renaming_n [","] ")"
-                    [ "requires" "(" renaming_0 "," ... "," renaming_n [","] ")" ]
-    pkgexports  ::= inclspec
-    renaming    ::= modid "as" modid
-\end{verbatim}
+The syntax of Backpack is given in Figure~\ref{fig:syntax}.
 See the ``Backpack manual'' for more explanation about the syntax.  It
 is slightly simplified here by removing any constructs which are easily implemented as
 syntactic sugar (e.g., a \verb|modid| renaming is simply \verb|modid as modid|.)
