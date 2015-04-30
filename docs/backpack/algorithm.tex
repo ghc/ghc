@@ -1,6 +1,5 @@
 \documentclass{article}
 
-\usepackage{mdframed}
 \usepackage{pifont}
 \usepackage{graphicx} %[pdftex] OR [dvips]
 \usepackage{fullpage}
@@ -16,13 +15,35 @@
 \usepackage{algpseudocode}
 \usepackage{bigfoot}
 \usepackage{amssymb}
+\usepackage{framed}
+
+% Alter some LaTeX defaults for better treatment of figures:
+% See p.105 of "TeX Unbound" for suggested values.
+% See pp. 199-200 of Lamport's "LaTeX" book for details.
+%   General parameters, for ALL pages:
+\renewcommand{\topfraction}{0.9}	% max fraction of floats at top
+\renewcommand{\bottomfraction}{0.8}	% max fraction of floats at bottom
+%   Parameters for TEXT pages (not float pages):
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}     % 2 may work better
+\setcounter{dbltopnumber}{2}    % for 2-column pages
+\renewcommand{\dbltopfraction}{0.9}	% fit big float above 2-col. text
+\renewcommand{\textfraction}{0.07}	% allow minimal text w. figs
+%   Parameters for FLOAT pages (not text pages):
+\renewcommand{\floatpagefraction}{0.7}	% require fuller float pages
+% N.B.: floatpagefraction MUST be less than topfraction !!
+\renewcommand{\dblfloatpagefraction}{0.7}	% require fuller float pages
+
+% remember to use [htp] or [htpb] for placement
+
+
+\newcommand{\optionrule}{\noindent\rule{1.0\textwidth}{0.75pt}}
 
 \newenvironment{aside}
-  {\begin{mdframed}[style=0,%
-      leftline=false,rightline=false,leftmargin=2em,rightmargin=2em,%
-          innerleftmargin=0pt,innerrightmargin=0pt,linewidth=0.75pt,%
-      skipabove=7pt,skipbelow=7pt]\small}
-  {\end{mdframed}}
+  {\begin{figure}\def\FrameCommand{\hspace{2em}}
+   \MakeFramed {\advance\hsize-\width}\optionrule\small}
+{\par\vskip-\smallskipamount\optionrule\endMakeFramed\end{figure}}
 
 \setlength{\droptitle}{-6em}
 
@@ -48,7 +69,7 @@ which allow us to hide requirements from import.
 
 \section{Front-end syntax}
 
-\begin{figure}
+\begin{figure}[htpb]
 $$
 \begin{array}{rcll}
 p,q,r && \mbox{Package names} \\
@@ -63,7 +84,7 @@ m,n   && \mbox{Module names} \\[1em]
 provreq & ::= & \verb|(| \, rns \, \verb|)| \; 
         [ \verb|requires(|\, rns \, \verb|)| ] \\
 rns & ::= & rn_0 \verb|,| \, \ldots \verb|,| \, rn_n [\verb|,|] & \mbox{Renamings} \\
-rn & ::= & m\, \verb|as| \, n & \mbox{Renaming} \\[1em] 
+rn & ::= & m\; \verb|as| \; n & \mbox{Renaming} \\[1em] 
 \multicolumn{3}{l}{\mbox{\bf Haskell code}} \\
 exports & & \mbox{A Haskell module export list} \\
 body    & & \mbox{A Haskell module body} \\
@@ -75,22 +96,26 @@ $$
 The syntax of Backpack is given in Figure~\ref{fig:syntax}.
 See the ``Backpack manual'' for more explanation about the syntax.  It
 is slightly simplified here by removing any constructs which are easily implemented as
-syntactic sugar (e.g., a \verb|modid| renaming is simply \verb|modid as modid|.)
+syntactic sugar (e.g., a bare $m$ in a renaming is simply $m\; \verb|as|\; m$.)
 
+\newpage
 \section{Shaping}
 
-Shaping computes a \verb|Shape| which has this form:
+\begin{figure}[htpb]
+$$
+\begin{array}{rcll}
+Shape & ::= & \verb|provides:|\; m \; \verb|->|\; Module\; \verb|{|\, Name \verb|,|\, \ldots \, \verb|};| \ldots \\
+      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{Module}\; \verb|{| \, Name \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
+PkgKey & ::= & p \verb|(| \, m \; \verb|->| \; Module \verb|,|\, \ldots\, \verb|)| \\
+Module & ::= & PkgKey \verb|:| m \\
+Name   & ::= & Module \verb|.| OccName \\
+OccName & & \mbox{Unqualified name in a namespace}
+\end{array}
+$$
+\caption{Semantic entities in Backpack} \label{fig:semantic}
+\end{figure}
 
-\begin{verbatim}
-    Shape ::= provides: { ModName -> Module { Name } }
-              requires: { ModName ->        { Name } }
-
-    PkgKey      ::= SrcPkgId "(" { ModName "->" Module } ")"
-                  | HOLE
-    Module      ::= PkgKey ":" ModName
-    Name        ::= Module "." OccName
-    OccName     ::= undefined | Bool | Int | ...
-\end{verbatim}
+Shaping computes a $Shape$, whose form is described in Figure~\ref{fig:semantic}.
 Starting with the empty shape, we incrementally construct a shape by
 shaping package declarations (the partially constructed shape serves as
 a context for renaming modules and signatures and instantiating
@@ -235,7 +260,7 @@ A module declaration provides a module \verb|THIS:M| at module name \verb|M|. It
 has the shape:
 
 \begin{verbatim}
-    provides: { M -> THIS:M { exports of renamed M } }
+    provides: M -> THIS:M { exports of renamed M }
     requires: (nothing)
 \end{verbatim}
 Example:
@@ -255,7 +280,7 @@ A signature declaration creates a requirement at module name \verb|M|.  It has t
 
 \begin{verbatim}
     provides: (nothing)
-    requires: { M -> { exports of renamed M } }
+    requires: M -> { exports of renamed M }
 \end{verbatim}
 
 \noindent Example:
