@@ -23,13 +23,14 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import TypeRep
 import TcType
 import TcMType
-import TysWiredIn ( coercibleClass )
+import TysWiredIn ( coercibleClass, eqTyConName )
 import Type
 import Unify( tcMatchTyX )
 import Kind
 import CoAxiom
 import Class
 import TyCon
+import PrelNames( eqTyConKey )
 
 -- others:
 import HsSyn            -- HsType
@@ -44,6 +45,7 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
+import Unique           ( hasKey )
 import BasicTypes       ( IntWithInf, infinity )
 import FastString
 
@@ -593,6 +595,7 @@ check_valid_theta ctxt theta
   = do { dflags <- getDynFlags
        ; warnTc (wopt Opt_WarnDuplicateConstraints dflags &&
                  notNull dups) (dupPredWarn dups)
+       ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty dflags ctxt) theta }
   where
     (_,dups) = removeDups cmpPred theta
@@ -612,46 +615,29 @@ check_pred_help :: Bool    -- True <=> under a type synonym
                 -> DynFlags -> UserTypeCtxt
                 -> PredType -> TcM ()
 check_pred_help under_syn dflags ctxt pred
-  | Just pred' <- coreView pred
-  = check_pred_help True dflags ctxt pred'
+  | Just pred' <- coreView pred  -- Switch on under_syn when going under a
+                                 -- synonym (Trac #9838, yuk)
+  = check_pred_help True dflags ctxt pred'  
   | otherwise
-  = case classifyPredType pred of
-      ClassPred cls tys     -> check_class_pred dflags ctxt pred cls tys
-      EqPred NomEq _ _      -> check_eq_pred    dflags pred
-      EqPred ReprEq ty1 ty2 -> check_repr_eq_pred dflags ctxt pred ty1 ty2
-      TuplePred tys         -> check_tuple_pred under_syn dflags ctxt pred tys
-      IrredPred _           -> check_irred_pred under_syn dflags ctxt pred
+  = case splitTyConApp_maybe pred of
+      Just (tc, tys) | Just cls <- tyConClass_maybe tc
+                     -> check_class_pred dflags ctxt pred cls tys  -- Includes Coercible
+                     | tc `hasKey` eqTyConKey
+                     -> check_eq_pred dflags pred tys
+                     | isTupleTyCon tc
+                     -> check_tuple_pred under_syn dflags ctxt pred tys
+      _ -> check_irred_pred under_syn dflags ctxt pred
 
-check_class_pred :: DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
-check_class_pred dflags ctxt pred cls tys
-  = do {        -- Class predicates are valid in all contexts
-       ; checkTc (arity == n_tys) arity_err
-
-       ; checkTc (not (isIPClass cls) || okIPCtxt ctxt)
-                 (badIPPred pred)
-
-                -- Check the form of the argument types
-       ; check_class_pred_tys dflags ctxt pred tys
-       }
-  where
-    class_name = className cls
-    arity      = classArity cls
-    n_tys      = length tys
-    arity_err  = arityErr "Class" class_name arity n_tys
-
-check_eq_pred :: DynFlags -> PredType -> TcM ()
-check_eq_pred dflags pred
+check_eq_pred :: DynFlags -> PredType -> [TcType] -> TcM ()
+check_eq_pred dflags pred tys
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
-    checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags)
-            (eqPredTyErr pred)
-
-check_repr_eq_pred :: DynFlags -> UserTypeCtxt -> PredType
-                   -> TcType -> TcType -> TcM ()
-check_repr_eq_pred dflags ctxt pred ty1 ty2
-  = check_class_pred_tys dflags ctxt pred tys
+    do { checkTc (n_tys == 3)
+                 (arityErr "Equality constraint" eqTyConName 3 n_tys)
+       ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags)
+                 (eqPredTyErr pred) }
   where
-    tys = [ty1, ty2]
+    n_tys = length tys
 
 check_tuple_pred :: Bool -> DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
 check_tuple_pred under_syn dflags ctxt pred ts
@@ -670,7 +656,7 @@ check_irred_pred under_syn dflags ctxt pred
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
          -- at the definition site (Trac #9838)
-        checkTc (under_syn || xopt Opt_ConstraintKinds dflags || not (tyvar_head pred))
+        checkTc (under_syn || xopt Opt_ConstraintKinds dflags || not (hasTyVarHead pred))
                 (predIrredErr pred)
 
          -- Make sure it is OK to have an irred pred in this context
@@ -708,32 +694,30 @@ It is equally dangerous to allow them in instance heads because in that case the
 Paterson conditions may not detect duplication of a type variable or size change. -}
 
 -------------------------
-check_class_pred_tys :: DynFlags -> UserTypeCtxt
-                     -> PredType -> [KindOrType] -> TcM ()
-check_class_pred_tys dflags ctxt pred kts
-  = checkTc pred_ok (predTyVarErr pred $$ how_to_allow)
+check_class_pred :: DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
+check_class_pred dflags ctxt pred cls tys
+  | isIPClass cls
+  = do { checkTc (arity == n_tys) arity_err
+       ; checkTc (okIPCtxt ctxt)  (badIPPred pred) }
+
+  | otherwise
+  = do { checkTc (arity == n_tys) arity_err
+       ; checkTc arg_tys_ok (predTyVarErr pred) }
   where
-    (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
-    flexible_contexts = xopt Opt_FlexibleContexts dflags
-    undecidable_ok = xopt Opt_UndecidableInstances dflags
+    class_name = className cls
+    arity      = classArity cls
+    n_tys      = length tys
+    arity_err  = arityErr "Class" class_name arity n_tys
 
-    pred_ok = case ctxt of
+    flexible_contexts = xopt Opt_FlexibleContexts     dflags
+    undecidable_ok    = xopt Opt_UndecidableInstances dflags
+
+    arg_tys_ok = case ctxt of
         SpecInstCtxt -> True    -- {-# SPECIALISE instance Eq (T Int) #-} is fine
-        InstDeclCtxt -> flexible_contexts || undecidable_ok || all tcIsTyVarTy tys
-                                -- Further checks on head and theta in
-                                -- checkInstTermination
-        _             -> flexible_contexts || all tyvar_head tys
-    how_to_allow = parens (ptext (sLit "Use FlexibleContexts to permit this"))
-
-
--------------------------
-tyvar_head :: Type -> Bool
-tyvar_head ty                   -- Haskell 98 allows predicates of form
-  | tcIsTyVarTy ty = True       --      C (a ty1 .. tyn)
-  | otherwise                   -- where a is a type variable
-  = case tcSplitAppTy_maybe ty of
-        Just (ty, _) -> tyvar_head ty
-        Nothing      -> False
+        InstDeclCtxt -> checkValidClsArgs (flexible_contexts || undecidable_ok) tys
+                                -- Further checks on head and theta
+                                -- in checkInstTermination
+        _            -> checkValidClsArgs flexible_contexts tys
 
 -------------------------
 okIPCtxt :: UserTypeCtxt -> Bool
@@ -776,8 +760,9 @@ eqPredTyErr, predTyVarErr, predTupleErr, predIrredErr, predIrredBadCtxtErr :: Pr
 eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprType pred
                     $$
                     parens (ptext (sLit "Use GADTs or TypeFamilies to permit this"))
-predTyVarErr pred  = hang (ptext (sLit "Non type-variable argument"))
-                        2 (ptext (sLit "in the constraint:") <+> pprType pred)
+predTyVarErr pred  = vcat [ hang (ptext (sLit "Non type-variable argument"))
+                               2 (ptext (sLit "in the constraint:") <+> pprType pred)
+                          , parens (ptext (sLit "Use FlexibleContexts to permit this")) ]
 predTupleErr pred  = hang (ptext (sLit "Illegal tuple constraint:") <+> pprType pred)
                         2 (parens constraintKindsMsg)
 predIrredErr pred  = hang (ptext (sLit "Illegal constraint:") <+> pprType pred)

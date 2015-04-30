@@ -3264,11 +3264,6 @@ impliedXFlags
 
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
 
-    -- An implicit parameter constraint, `?x::Int`, is desugared into
-    -- `IP "x" Int`, which requires a flexible context/instance.
-    , (Opt_ImplicitParams, turnOn, Opt_FlexibleContexts)
-    , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
-
     , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
 
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)

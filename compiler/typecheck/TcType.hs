@@ -69,6 +69,7 @@ module TcType (
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed,
+  checkValidClsArgs, hasTyVarHead,
 
   ---------------------------------
   -- Misc type manipulators
@@ -1313,12 +1314,42 @@ straightforward.
 ************************************************************************
 
 Deconstructors and tests on predicate types
+
+Note [Kind polymorphic type classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    class C f where...   -- C :: forall k. k -> Constraint
+    g :: forall (f::*). C f => f -> f
+
+Here the (C f) in the signature is really (C * f), and we 
+don't want to complain that the * isn't a type variable!
 -}
 
 isTyVarClassPred :: PredType -> Bool
 isTyVarClassPred ty = case getClassPredTys_maybe ty of
     Just (_, tys) -> all isTyVarTy tys
     _             -> False
+
+-------------------------
+checkValidClsArgs :: Bool -> [KindOrType] -> Bool
+-- If the Bool is True (flexible contexts), return True (i.e. ok)
+-- Otherwise, check that the type (not kind) args are all headed by a tyvar
+--   E.g. (Eq a) accepted, (Eq (f a)) accepted, but (Eq Int) rejected
+-- This function is here rather than in TcValidity because it is
+-- called from TcSimplify, which itself is imported by TcValidity
+checkValidClsArgs flexible_contexts kts
+  | flexible_contexts = True
+  | otherwise         = all hasTyVarHead tys
+  where
+    (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
+   
+hasTyVarHead :: Type -> Bool
+-- Returns true of (a t1 .. tn), where 'a' is a type variable
+hasTyVarHead ty                 -- Haskell 98 allows predicates of form
+  | tcIsTyVarTy ty = True       --      C (a ty1 .. tyn)
+  | otherwise                   -- where a is a type variable
+  = case tcSplitAppTy_maybe ty of
+       Just (ty, _) -> hasTyVarHead ty
+       Nothing      -> False
 
 evVarPred_maybe :: EvVar -> Maybe PredType
 evVarPred_maybe v = if isPredTy ty then Just ty else Nothing

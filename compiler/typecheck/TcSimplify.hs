@@ -2,7 +2,7 @@
 
 module TcSimplify(
        simplifyInfer,
-       quantifyPred, growThetaTyVars,
+       pickQuantifiablePreds, growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
        simplifyTop, simplifyInteractive,
@@ -40,7 +40,7 @@ import Util
 import PrelInfo
 import PrelNames
 import Control.Monad    ( unless )
-import DynFlags         ( ExtensionFlag( Opt_AllowAmbiguousTypes ) )
+import DynFlags         ( ExtensionFlag( Opt_AllowAmbiguousTypes, Opt_FlexibleContexts ) )
 import Class            ( classKey )
 import Maybes           ( isNothing )
 import Outputable
@@ -424,8 +424,9 @@ If the monomorphism restriction does not apply, then we quantify as follows:
     (This actually unifies each quantifies meta-tyvar with a fresh skolem.)
     Result is qtvs.
 
-  * Filter the constraints using quantifyPred and the qtvs.  We have to
-    zonk the constraints first, so they "see" the freshly created skolems.
+  * Filter the constraints using pickQuantifyablePreds and the qtvs.
+    We have to zonk the constraints first, so they "see" the freshly
+    created skolems.
 
 If the MR does apply, mono_tvs includes all the constrained tyvars,
 and the quantified constraints are empty.
@@ -457,31 +458,43 @@ decideQuantification apply_mr constraints zonked_tau_tvs
               -- quantifyTyVars turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
 
-       ; let theta     = filter (quantifyPred (mkVarSet qtvs)) constraints
-             min_theta = mkMinimalBySCs theta  -- See Note [Minimize by Superclasses]
+       ; theta <- pickQuantifiablePreds (mkVarSet qtvs) constraints
+       ; let min_theta = mkMinimalBySCs theta  -- See Note [Minimize by Superclasses]
+
        ; traceTc "decideQuantification 2" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
                                                 , ppr tau_tvs_plus, ppr qtvs, ppr min_theta])
        ; return (qtvs, min_theta, False) }
 
 ------------------
-quantifyPred :: TyVarSet           -- Quantifying over these
-             -> PredType -> Bool   -- True <=> quantify over this wanted
+pickQuantifiablePreds :: TyVarSet         -- Quantifying over these
+                      -> TcThetaType      -- Proposed constraints to quantify
+                      -> TcM TcThetaType  -- A subset that we can actually quantify
 -- This function decides whether a particular constraint shoudl be
 -- quantified over, given the type variables that are being quantified
-quantifyPred qtvs pred
-  = case classifyPredType pred of
-      ClassPred cls tys
-         | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
-         | otherwise        -> tyVarsOfTypes tys `intersectsVarSet` qtvs
-
-      EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
-        -- representational equality is like a class constraint
-      EqPred ReprEq ty1 ty2 -> tyVarsOfTypes [ty1, ty2] `intersectsVarSet` qtvs
-
-      IrredPred ty          -> tyVarsOfType ty `intersectsVarSet` qtvs
-      TuplePred {}          -> False
+pickQuantifiablePreds qtvs theta
+  = do { flex_ctxt <- xoptM Opt_FlexibleContexts
+       ; return (filter (pick_me flex_ctxt) theta) }
   where
-    -- See Note [Quantifying over equality constraints]
+    pick_me flex_ctxt pred
+      = case classifyPredType pred of
+          ClassPred cls tys
+             | isIPClass cls -> True -- See note [Inheriting implicit parameters]
+             | otherwise     -> pick_cls_pred flex_ctxt tys
+
+          EqPred ReprEq ty1 ty2 -> pick_cls_pred flex_ctxt [ty1, ty2]
+                -- Representational equality is like a class constraint
+
+          EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
+          IrredPred ty          -> tyVarsOfType ty `intersectsVarSet` qtvs
+          TuplePred {}          -> False
+
+    pick_cls_pred flex_ctxt tys
+      = tyVarsOfTypes tys `intersectsVarSet` qtvs
+        && (checkValidClsArgs flex_ctxt tys)
+           -- Only quantify over predicates that checkValidType
+           -- will pass!  See Trac #10351.
+
+        -- See Note [Quantifying over equality constraints]
     quant_fun ty
       = case tcSplitTyConApp_maybe ty of
           Just (tc, tys) | isTypeFamilyTyCon tc
@@ -558,7 +571,7 @@ dynamic binding means) so we'd better infer the second.
 BOTTOM LINE: when *inferring types* you must quantify over implicit
 parameters, *even if* they don't mention the bound type variables.
 Reason: because implicit parameters, uniquely, have local instance
-declarations. See the predicate quantifyPred.
+declarations. See the pickQuantifiablePreds.
 
 Note [Quantification with errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
