@@ -548,11 +548,11 @@ ppr_iface_tc_app pp ctxt_prec tc tys
 
                    | Just dc <- isPromotedDataCon_maybe tc
                    , let dc_tc = dataConTyCon dc
-                   , isTupleTyCon dc_tc
+                   , Just tup_sort <- tyConTuple_maybe dc_tc
                    , let arity = tyConArity dc_tc
                          ty_args = drop arity tys
                    , ty_args `lengthIs` arity
-                   -> Just (tupleTyConSort tc, ty_args)
+                   -> Just (tup_sort, ty_args)
 
                  _ -> Nothing
 

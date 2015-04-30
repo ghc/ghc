@@ -320,11 +320,14 @@ putName _dict BinSymbolTable{
   | otherwise
   = case wiredInNameTyThing_maybe name of
      Just (ATyCon tc)
-       | isTupleTyCon tc             -> putTupleName_ bh tc 0
+       | Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 0
      Just (AConLike (RealDataCon dc))
-       | let tc = dataConTyCon dc, isTupleTyCon tc -> putTupleName_ bh tc 1
+       | let tc = dataConTyCon dc
+       , Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 1
      Just (AnId x)
-       | Just dc <- isDataConWorkId_maybe x, let tc = dataConTyCon dc, isTupleTyCon tc -> putTupleName_ bh tc 2
+       | Just dc <- isDataConWorkId_maybe x
+       , let tc = dataConTyCon dc
+       , Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 2
      _ -> do
        symtab_map <- readIORef symtab_map_ref
        case lookupUFM symtab_map name of
@@ -337,16 +340,16 @@ putName _dict BinSymbolTable{
                 $! addToUFM symtab_map name (off,name)
             put_ bh (fromIntegral off :: Word32)
 
-putTupleName_ :: BinHandle -> TyCon -> Word32 -> IO ()
-putTupleName_ bh tc thing_tag
+putTupleName_ :: BinHandle -> TyCon -> TupleSort -> Word32 -> IO ()
+putTupleName_ bh tc tup_sort thing_tag
   = -- ASSERT(arity < 2^(30 :: Int))
     put_ bh (0x80000000 .|. (sort_tag `shiftL` 28) .|. (thing_tag `shiftL` 26) .|. arity)
   where
-    arity = fromIntegral (tupleTyConArity tc)
-    sort_tag = case tupleTyConSort tc of
-        BoxedTuple      -> 0
-        UnboxedTuple    -> 1
-        ConstraintTuple -> 2
+    arity    = fromIntegral (tyConArity tc)
+    sort_tag = case tup_sort of
+                 BoxedTuple      -> 0
+                 UnboxedTuple    -> 1
+                 ConstraintTuple -> 2
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: NameCacheUpdater

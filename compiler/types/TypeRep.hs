@@ -732,32 +732,33 @@ pprTcApp _ pp tc [ty]
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
 
 pprTcApp p pp tc tys
-  | isTupleTyCon tc && tyConArity tc == length tys
-  = pprTupleApp p pp tc tys
+  | Just sort <- tyConTuple_maybe tc
+  , tyConArity tc == length tys
+  = pprTupleApp p pp tc sort tys
 
   | Just dc <- isPromotedDataCon_maybe tc
   , let dc_tc = dataConTyCon dc
-  , isTupleTyCon dc_tc
+  , Just tup_sort <- tyConTuple_maybe dc_tc
   , let arity = tyConArity dc_tc    -- E.g. 3 for (,,) k1 k2 k3 t1 t2 t3
         ty_args = drop arity tys    -- Drop the kind args
   , ty_args `lengthIs` arity        -- Result is saturated
   = pprPromotionQuote tc <>
-    (tupleParens (tupleTyConSort dc_tc) $
+    (tupleParens tup_sort $
      sep (punctuate comma (map (pp TopPrec) ty_args)))
 
   | otherwise
   = sdocWithDynFlags (pprTcApp_help p pp tc tys)
 
-pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
+pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> TupleSort -> [a] -> SDoc
 -- Print a saturated tuple
-pprTupleApp p pp tc tys
+pprTupleApp p pp tc sort tys
   | null tys
-  , ConstraintTuple <- tupleTyConSort tc
+  , ConstraintTuple <- sort
   = maybeParen p TopPrec $
     ppr tc <+> dcolon <+> ppr (tyConKind tc)
   | otherwise
   = pprPromotionQuote tc <>
-    tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
+    tupleParens sort (sep (punctuate comma (map (pp TopPrec) tys)))
 
 pprTcApp_help :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
 -- This one has accss to the DynFlags

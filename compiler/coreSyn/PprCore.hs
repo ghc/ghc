@@ -137,8 +137,9 @@ ppr_expr add_par expr@(App {})
         Var f -> case isDataConWorkId_maybe f of
                         -- Notice that we print the *worker*
                         -- for tuples in paren'd format.
-                   Just dc | saturated && isTupleTyCon tc
-                           -> tupleParens (tupleTyConSort tc) pp_tup_args
+                   Just dc | saturated
+                           , Just sort <- tyConTuple_maybe tc
+                           -> tupleParens sort pp_tup_args
                            where
                              tc        = dataConTyCon dc
                              saturated = val_args `lengthIs` idArity f
@@ -228,8 +229,8 @@ pprCoreAlt (con, args, rhs)
 
 ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
 ppr_case_pat (DataAlt dc) args
-  | isTupleTyCon tc
-  = tupleParens (tupleTyConSort tc) (hsep (punctuate comma (map ppr_bndr args)))
+  | Just sort <- tyConTuple_maybe tc
+  = tupleParens sort (hsep (punctuate comma (map ppr_bndr args)))
   where
     ppr_bndr = pprBndr CaseBind
     tc = dataConTyCon dc

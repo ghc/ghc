@@ -399,9 +399,9 @@ mkTupleOcc ns sort ar = mkOccName ns str
 
 tupleTyCon :: TupleSort -> Arity -> TyCon
 tupleTyCon sort i | i > mAX_TUPLE_SIZE = fst (mk_tuple sort i)  -- Build one specially
-tupleTyCon BoxedTuple   i = fst (boxedTupleArr   ! i)
-tupleTyCon UnboxedTuple i = fst (unboxedTupleArr ! i)
-tupleTyCon ConstraintTuple    i = fst (factTupleArr    ! i)
+tupleTyCon BoxedTuple      i = fst (boxedTupleArr   ! i)
+tupleTyCon UnboxedTuple    i = fst (unboxedTupleArr ! i)
+tupleTyCon ConstraintTuple i = fst (factTupleArr    ! i)
 
 promotedTupleTyCon :: TupleSort -> Arity -> TyCon
 promotedTupleTyCon sort i = promoteTyCon (tupleTyCon sort i)
@@ -416,9 +416,9 @@ tupleCon UnboxedTuple i = snd (unboxedTupleArr ! i)
 tupleCon ConstraintTuple    i = snd (factTupleArr    ! i)
 
 boxedTupleArr, unboxedTupleArr, factTupleArr :: Array Int (TyCon,DataCon)
-boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple BoxedTuple i | i <- [0..mAX_TUPLE_SIZE]]
-unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple UnboxedTuple i | i <- [0..mAX_TUPLE_SIZE]]
-factTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple ConstraintTuple i | i <- [0..mAX_TUPLE_SIZE]]
+boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple BoxedTuple      i | i <- [0..mAX_TUPLE_SIZE]]
+unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple UnboxedTuple    i | i <- [0..mAX_TUPLE_SIZE]]
+factTupleArr    = listArray (0,mAX_TUPLE_SIZE) [mk_tuple ConstraintTuple i | i <- [0..mAX_TUPLE_SIZE]]
 
 mk_tuple :: TupleSort -> Int -> (TyCon,DataCon)
 mk_tuple sort arity = (tycon, tuple_con)

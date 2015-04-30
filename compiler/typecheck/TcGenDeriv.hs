@@ -1644,11 +1644,12 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        | not (or xcs)     = (caseTrivial, False)   -- Variable does not occur
        -- At this point we know that xrs, xcs is not empty,
        -- and at least one xr is True
-       | isTupleTyCon con = (caseTuple (tupleTyConSort con) xrs, True)
+       | Just sort <- tyConTuple_maybe con
+                          = (caseTuple sort xrs, True)
        | or (init xcs)    = (caseWrongArg, True)         -- T (..var..)    ty
-       | otherwise        = case splitAppTy_maybe ty of  -- T (..no var..) ty
-                              Nothing -> (caseWrongArg, True)   -- Non-decomposable (eg type function)
-                              Just (fun_ty, _) -> (caseTyApp fun_ty (last xrs), True)
+       | Just (fun_ty, _) <- splitAppTy_maybe ty         -- T (..no var..) ty
+                          = (caseTyApp fun_ty (last xrs), True)
+       | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
          (xrs,xcs) = unzip (map (go co) args)
     go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)

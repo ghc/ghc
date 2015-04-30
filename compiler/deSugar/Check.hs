@@ -595,7 +595,8 @@ make_con (ConPatOut{ pat_con = L _ (RealDataCon id) }) (lp:lq:ps, constraints)
 
 make_con (ConPatOut{ pat_con = L _ (RealDataCon id), pat_args = PrefixCon pats})
          (ps, constraints)
-      | isTupleTyCon tc  = (noLoc (TuplePat pats_con (tupleTyConBoxity tc) [])
+      | Just sort <- tyConTuple_maybe tc
+                         = (noLoc (TuplePat pats_con (tupleSortBoxity sort) [])
                                 : rest_pats, constraints)
       | isPArrFakeCon id = (noLoc (PArrPat pats_con placeHolderType)
                                 : rest_pats, constraints)

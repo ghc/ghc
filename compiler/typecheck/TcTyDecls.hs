@@ -486,14 +486,17 @@ could change.
 isPromotableTyCon :: NameSet -> TyCon -> Bool
 isPromotableTyCon rec_tycons tc
   =  isAlgTyCon tc    -- Only algebraic; not even synonyms
-                     -- (we could reconsider the latter)
+                      -- (we could reconsider the latter)
   && ok_kind (tyConKind tc)
   && case algTyConRhs tc of
-       DataTyCon { data_cons = cs } -> all ok_con cs
-       NewTyCon { data_con = c }    -> ok_con c
-       AbstractTyCon {}             -> False
-       DataFamilyTyCon {}           -> False
-
+       DataTyCon { data_cons = cs }   -> all ok_con cs
+       NewTyCon { data_con = c }      -> ok_con c
+       AbstractTyCon {}               -> False
+       DataFamilyTyCon {}             -> False
+       TupleTyCon { tup_sort = sort } -> case sort of
+                                           BoxedTuple      -> True
+                                           UnboxedTuple    -> False
+                                           ConstraintTuple -> False
   where
     ok_kind kind = all isLiftedTypeKind args && isLiftedTypeKind res
             where  -- Checks for * -> ... -> * -> *

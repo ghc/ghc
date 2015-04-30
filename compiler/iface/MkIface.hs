@@ -1689,11 +1689,14 @@ tyConToIfaceDecl env tycon
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
     ifaceConDecls (DataFamilyTyCon {})              = IfDataFamTyCon
+    ifaceConDecls (TupleTyCon { data_con = con })   = IfDataTyCon [ifaceConDecl con]
     ifaceConDecls (AbstractTyCon distinct)          = IfAbstractTyCon distinct
-        -- The last case happens when a TyCon has been trimmed during tidying
-        -- Furthermore, tyThingToIfaceDecl is also used
-        -- in TcRnDriver for GHCi, when browsing a module, in which case the
-        -- AbstractTyCon case is perfectly sensible.
+        -- The AbstractTyCon case happens when a TyCon has been trimmed
+        -- during tidying.
+        -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver
+        -- for GHCi, when browsing a module, in which case the
+        -- AbstractTyCon and TupleTyCon cases are perfectly sensible.
+        -- (Tuple declarations are not serialised into interface files.)
 
     ifaceConDecl data_con
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
@@ -2029,8 +2032,9 @@ toIfaceApp (App f a) as = toIfaceApp f (a:as)
 toIfaceApp (Var v) as
   = case isDataConWorkId_maybe v of
         -- We convert the *worker* for tuples into IfaceTuples
-        Just dc |  isTupleTyCon tc && saturated
-                -> IfaceTuple (tupleTyConSort tc) tup_args
+        Just dc |  saturated
+                ,  Just tup_sort <- tyConTuple_maybe tc
+                -> IfaceTuple tup_sort tup_args
           where
             val_args  = dropWhile isTypeArg as
             saturated = val_args `lengthIs` idArity v

@@ -146,6 +146,13 @@ vectAlgTyConRhs _tc (DataTyCon { data_cons = data_cons
                             , is_enum   = is_enum
                             }
        }
+
+vectAlgTyConRhs tc (TupleTyCon { data_con = con })
+  = vectAlgTyConRhs tc (DataTyCon { data_cons = [con], is_enum = False })
+    -- I'm not certain this is what you want to do for tuples,
+    -- but it's the behaviour we had before I refactored the
+    -- representation of AlgTyConRhs to add tuples
+
 vectAlgTyConRhs tc (NewTyCon {})
   = do dflags <- getDynFlags
        cantVectorise dflags noNewtypeErr (ppr tc)
