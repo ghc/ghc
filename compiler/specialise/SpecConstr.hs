@@ -413,7 +413,10 @@ This seeding is done in the binding for seed_calls in specRec.
      (a) the call patterns in the RHS
      (b) the call patterns in the rest of the top-level bindings
    NB: before Apr 15 we used (a) only, but Dimitrios had an example
-       where (b) was  crucial, so I added that.
+       where (b) was crucial, so I added that.
+       Adding (b) also improved nofib allocation results:
+                  multiplier: 4%   better
+                  minimax:    2.8% better
 
 Actually in case (2), instead of using the calls from the RHS, it
 would be better to specialise in the importing module.  We'd need to
