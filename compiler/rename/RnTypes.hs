@@ -871,7 +871,7 @@ opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
 
 Note [Kind and type-variable binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a type signature we may implicitly bind type varaible and, more
+In a type signature we may implicitly bind type variable and, more
 recently, kind variables.  For example:
   *   f :: a -> a
       f = ...

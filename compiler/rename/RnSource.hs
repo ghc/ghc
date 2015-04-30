@@ -100,7 +100,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --          because they do not have value declarations.
    --          Aso step (C) depends on datacons and record fields
    --
-   --        * Pattern synonyms, becuase they (and data constructors)
+   --        * Pattern synonyms, because they (and data constructors)
    --          are needed for rnTopBindLHS (Trac #9889)
    --
    --        * For hs-boot files, include the value signatures

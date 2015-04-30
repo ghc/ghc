@@ -18,7 +18,7 @@ showFromF fa = undefined
 --
 -- > b ~ F a /\ Show a /\ FInv (F a) ~ a
 --
--- Introducing an intermeidate variable `x` for the result of `F a` gives us
+-- Introducing an intermediate variable `x` for the result of `F a` gives us
 --
 -- > b ~ F a /\ Show a /\ FInv x ~ a /\ F a ~ x
 --
@@ -44,7 +44,7 @@ showFromF' = showFromF
 
 {-------------------------------------------------------------------------------
   In 7.10 the definition of showFromF' is not accepted, but it gets stranger.
-  In 7.10 we cannot _call_ showFromF at all all, even at a concrete type. Below
+  In 7.10 we cannot _call_ showFromF at all, even at a concrete type. Below
   we try to call it at type b ~ Int. It would need to show
 
   > Show (FInv Int) /\ F (FInt Int) ~ Int

@@ -44,7 +44,7 @@ g _ = f (undefined :: F a)
 [D] fmv1 ~ fsk1        -- (B) From F a ~ F beta
                        -- NB: put fmv on left
 
---> rewrite (A) with (B), and metch with g2
+--> rewrite (A) with (B), and match with g2
 
 [D] F beta ~ fmv1
 [D] fmv2 ~ fsk2        -- (C)

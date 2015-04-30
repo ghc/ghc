@@ -1175,7 +1175,7 @@ so function <literal>f</literal> is rejected because the type signature is <lite
 (To see this, imagine expanding the pattern synonym.)
 </para>
 <para>
-On the other hand, function <literal>g</literal> works fine, becuase matching against <literal>P2</literal>
+On the other hand, function <literal>g</literal> works fine, because matching against <literal>P2</literal>
 (which wraps the GADT <literal>S</literal>) provides the local equality <literal>(a~Bool)</literal>.
 If you were to give an explicit pattern signature <literal>P2 :: Bool -> S Bool</literal>, then <literal>P2</literal>
 would become less polymorphic, and would behave exactly like <literal>P1</literal> so that <literal>g</literal>
@@ -8808,7 +8808,7 @@ Notice the two different types reported for the two different occurrences of <li
 <listitem><para>
 No language extension is required to use typed holes.  The lexeme "<literal>_</literal>" was previously
 illegal in Haskell, but now has a more informative error message.  The lexeme "<literal>_x</literal>"
-is a perfectly legal varaible, and its behaviour is unchanged when it is in scope.  For example
+is a perfectly legal variable, and its behaviour is unchanged when it is in scope.  For example
 <programlisting>
 f _x = _x + 1
 </programlisting>

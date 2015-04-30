@@ -184,7 +184,7 @@ solveSimpleWanteds simples
 
 solve_simple_wanteds :: WantedConstraints -> TcS (Bool, WantedConstraints)
 -- Try solving these constraints
--- Return True iff some unification happpened *during unflattening*
+-- Return True iff some unification happened *during unflattening*
 --                 because this is a form of improvement
 --                 See Note [The improvement story]
 -- Affects the unification state (of course) but not the inert set
@@ -203,7 +203,7 @@ solve_simple_wanteds (WC { wc_simple = simples1, wc_insol = insols1, wc_impl = i
 try_improvement :: WantedConstraints -> TcS (Bool, WantedConstraints)
 -- See Note [The improvement story]
 -- Try doing improvement on these simple constraints
--- Return True iff some unification happpened
+-- Return True iff some unification happened
 -- Affects the unification state (of course) but not the inert set
 try_improvement wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   | isEmptyBag simples
@@ -243,7 +243,7 @@ try_improvement wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
 
 
 usefulToFloat :: (TcPredType -> Bool) -> Ct -> Bool
-usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-cannonicalised
+usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canonicalised
   = is_meta_var_eq pred && is_useful_pred pred
   where
     pred = ctPred ct
@@ -268,7 +268,7 @@ usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canno
 
 {- Note [The improvement story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The goal of "improvement" is to use functional depenedencies,
+The goal of "improvement" is to use functional dependencies,
 type-function injectivity, etc, to derive some extra equalities that
 could let us unify one or more meta-variables, and hence make progress.
 
@@ -309,7 +309,7 @@ Some notes about this
       Note [Orient equalities with flatten-meta-vars on the left]
   Unify mm := State fmv:
        [W] MonadState ss (State fmv), [W] Any ~ fmv, [W] fmv ~ ss
-  Alas the insatnce does not match!!  So now we are stuck.
+  Alas the instance does not match!!  So now we are stuck.
 
   Unflatten: with fmv := Any, and ss := Any
        [W] MonadState Any (State Any)
@@ -383,7 +383,7 @@ Some notes about this
       [W] w5: fsk1 ~ fmv1   -- From F a ~ F beta
                             -- using flat-cache
 
-  Solving (step 1) makes not progress.  So unflatten again
+  Solving (step 1) makes no progress.  So unflatten again
       [W] w3: UnF (F beta) ~ beta
       [W] w5: fsk1 ~ F beta
 
@@ -394,7 +394,7 @@ Some notes about this
       [D] fmv1 ~ fsk1        -- (B) From F a ~ F beta
                              -- NB: put fmv on left
 
-    --> rewrite (A) with (B), and metch with g2
+    --> rewrite (A) with (B), and match with g2
       [D] F beta ~ fmv1
       [D] fmv2 ~ fsk2        -- (C)
       [D] fmv2 ~ beta        -- (D)
@@ -406,7 +406,7 @@ Some notes about this
       [D] beta ~ fsk2       -- (E)
       [D] fmv1 ~ fsk1
 
-    -- Now we can unify beta!  Halelujah!
+    -- Now we can unify beta!  Hallelujah!
 
 
 Note [Insolubles and improvement]
@@ -427,7 +427,7 @@ Note [Do not float kind-incompatible equalities]
 If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
 If we float the equality outwards, we'll get *another* Derived
 insoluble equality one level out, so the same error will be reported
-twice.  So we refrain from floating such equalities
+twice.  So we refrain from floating such equalities.
 -}
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
@@ -1649,7 +1649,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
                 -- final_co :: fsk ~ rhs_ty
           ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
                                                 EvCoercion final_co)
-          ; emitWorkNC [new_ev]   -- Non-cannonical; that will mean we flatten rhs_ty
+          ; emitWorkNC [new_ev]   -- Non-canonical; that will mean we flatten rhs_ty
           ; stopWith old_ev "Fun/Top (given)" }
 
     | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
@@ -1885,7 +1885,7 @@ It's exactly the same with implicit parameters, except that the
 Note [When improvement happens during solving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Improvement for functional dependencies or type-function injectivity
-means emitting a Derived equality constraint by iteracting the work
+means emitting a Derived equality constraint by interacting the work
 item with an inert item, or with the top-level instances.  e.g.
 
        class C a b | a -> b
@@ -1897,9 +1897,9 @@ but not Wanted.  Reason:
  * Given: we want to spot Given/Given inconsistencies because that means
           unreachable code.  See typecheck/should_fail/FDsFromGivens
 
- * Derived: during the improvment phase (i.e. when handling Derived
+ * Derived: during the improvement phase (i.e. when handling Derived
             constraints) we also do improvement for functional dependencies. e.g.
-           And similarly wrt top-level instances.
+            And similarly wrt top-level instances.
 
  * Wanted: spotting fundep improvements is somewhat inefficient, and
            and if we can solve without improvement so much the better.
@@ -1937,7 +1937,7 @@ Consider   class Het a b | a -> b where
 The two instances don't actually conflict on their fundeps,
 although it's pretty strange.  So they are both accepted. Now
 try   [W] GHet (K Int) (K Bool)
-This triggers fudeps from both instance decls;
+This triggers fundeps from both instance decls;
       [D] K Bool ~ K [a]
       [D] K Bool ~ K beta
 And there's a risk of complaining about Bool ~ [a].  But in fact

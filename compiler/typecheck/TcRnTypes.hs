@@ -1312,7 +1312,7 @@ see dropDerivedWC.  For example
    an unsolved [D] (Eq a) as well.
 
  * If we have [W] a ~ Int, [W] a ~ Bool, improvement will generate
-   [D] Int ~ Bool, and we don't want to report that becuase it's incomprehensible.
+   [D] Int ~ Bool, and we don't want to report that because it's incomprehensible.
    That is why we don't rewrite wanteds with wanteds!
 
 But (tiresomely) we do keep *some* Derived insolubles:

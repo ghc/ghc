@@ -1470,7 +1470,7 @@ unifyTyVar :: TcTyVar -> TcType -> TcS ()
 -- We keep track of whether we have done any unifications in tcs_unified,
 -- but only for *non-flatten* meta-vars
 --
--- We should never unify the same varaiable twice!
+-- We should never unify the same variable twice!
 unifyTyVar tv ty
   = ASSERT2( isMetaTyVar tv, ppr tv )
     TcS $ \ env ->
