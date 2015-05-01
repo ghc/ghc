@@ -125,7 +125,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
                 tcg_field_env      = RecFields emptyNameEnv emptyNameSet,
-                tcg_default        = Nothing,
+                tcg_default        = if modulePackageKey mod == primPackageKey
+                                     then Just []  -- See Note [Default types]
+                                     else Nothing,
                 tcg_type_env       = emptyNameEnv,
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
@@ -225,7 +227,17 @@ initTcForLookup hsc_env thing_inside
              Nothing -> throwIO $ mkSrcErr $ snd msgs
              Just x -> return x }
 
-{-
+{- Note [Default types]
+~~~~~~~~~~~~~~~~~~~~~~~
+The Integer type is simply not available in package ghc-prim (it is
+declared in integer-gmp).  So we set the defaulting types to (Just
+[]), meaning there are no default types, rather then Nothing, which
+means "use the default default types of Integer, Double".
+
+If you don't do this, attempted defaulting in package ghc-prim causes
+an actual crash (attempting to look up the Integer type).
+
+
 ************************************************************************
 *                                                                      *
                 Initialisation
