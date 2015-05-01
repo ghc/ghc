@@ -1,5 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns,
+             KindSignatures, DataKinds, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+  -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
+
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 {-# OPTIONS_HADDOCK hide #-}
@@ -17,7 +21,13 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Classes where
+module GHC.Classes(
+    IP(..),
+    Eq(..), eqInt, neInt,
+    Ord(..), gtInt, geInt, leInt, ltInt, compareInt, compareInt#,
+    (&&), (||), not,
+    divInt#, modInt#
+ ) where
 
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
@@ -31,6 +41,13 @@ infixr 3  &&
 infixr 2  ||
 
 default ()              -- Double isn't available yet
+
+-- | The syntax @?x :: a@ is desugared into @IP "x" a@
+-- IP is declared very early, so that libraries can take
+-- advantage of the implicit-call-stack feature
+class IP (x :: Symbol) a | x -> a where
+  ip :: a
+
 
 -- | The 'Eq' class defines equality ('==') and inequality ('/=').
 -- All the basic datatypes exported by the "Prelude" are instances of 'Eq',

@@ -22,6 +22,7 @@ module GHC.Types (
         Ordering(..), IO(..),
         isTrue#,
         SPEC(..),
+        Nat, Symbol,
         Coercible,
     ) where
 
@@ -29,6 +30,13 @@ import GHC.Prim
 
 
 infixr 5 :
+
+-- | (Kind) This is the kind of type-level natural numbers.
+data Nat
+
+-- | (Kind) This is the kind of type-level symbols.
+-- Declared here because class IP needs it
+data Symbol
 
 data [] a = [] | a : [a]
 

@@ -407,7 +407,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -461,7 +461,6 @@ gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
-gHC_IP          = mkBaseModule (fsLit "GHC.IP")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -1195,7 +1194,7 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 
 -- Implicit parameters
 ipClassName :: Name
-ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
+ipClassName         = clsQual gHC_CLASSES (fsLit "IP") ipClassNameKey
 
 -- Source Locations
 callStackDataConName, callStackTyConName, srcLocDataConName :: Name

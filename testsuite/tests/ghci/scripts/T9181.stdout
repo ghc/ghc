@@ -9,12 +9,10 @@ class KnownNat (n :: Nat) where
   natSing :: SNat n
 class KnownSymbol (n :: Symbol) where
   symbolSing :: SSymbol n
-data Nat
 data SomeNat where
   SomeNat :: KnownNat n => (Proxy n) -> SomeNat
 data SomeSymbol where
   SomeSymbol :: KnownSymbol n => (Proxy n) -> SomeSymbol
-data Symbol
 type family (^) (a :: Nat) (b :: Nat) :: Nat
 natVal :: KnownNat n => proxy n -> Integer
 natVal' :: KnownNat n => Proxy# n -> Integer
@@ -27,3 +25,5 @@ someNatVal :: Integer -> Maybe SomeNat
 someSymbolVal :: String -> SomeSymbol
 symbolVal :: KnownSymbol n => proxy n -> String
 symbolVal' :: KnownSymbol n => Proxy# n -> String
+data Nat
+data Symbol

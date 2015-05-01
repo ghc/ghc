@@ -231,7 +231,6 @@ Library
         GHC.IO.IOMode
         GHC.IOArray
         GHC.IORef
-        GHC.IP
         GHC.Int
         GHC.List
         GHC.MVar
