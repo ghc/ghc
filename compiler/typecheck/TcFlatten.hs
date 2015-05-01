@@ -1528,7 +1528,7 @@ eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- See Note [Deriveds do rewrite Deriveds]
 eqCanRewriteFR (Given,   NomEq)   (_,       _)      = True
 eqCanRewriteFR (Given,   ReprEq)  (_,       ReprEq) = True
-eqCanRewriteFR (Derived, NomEq)   (Derived, _)      = True
+eqCanRewriteFR (Derived, NomEq)   (Derived, NomEq)  = True
 eqCanRewriteFR _                 _                  = False
 
 canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
@@ -1565,6 +1565,16 @@ Note [Deriveds do rewrite Deriveds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 However we DO allow Deriveds to rewrite Deriveds, because that's how
 improvement works; see Note [The improvement story] in TcInteract.
+
+However, for now at least I'm only letting (Derived,NomEq) rewrite
+(Derived,NomEq) and not doing anything for ReprEq.  If we have
+    eqCanRewriteFR (Derived, NomEq) (Derived, _)  = True
+then we lose the property of Note [Can-rewrite relation]
+  R2.  If f1 >= f, and f2 >= f,
+       then either f1 >= f2 or f2 >= f1
+Consider f1 = (Given, ReprEq)
+         f2 = (Derived, NomEq)
+          f = (Derived, ReprEq)
 
 Note [canRewriteOrSame]
 ~~~~~~~~~~~~~~~~~~~~~~~
