@@ -570,7 +570,8 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         # On arm/linux, aarch64/linux, arm/android and aarch64/android, tell
         # gcc to link using the gold linker.
         # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
-        $3="$$3 -fuse-ld=gold"
+        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $4="$$4 -z,noexecstack"
         ;;
     esac
 
