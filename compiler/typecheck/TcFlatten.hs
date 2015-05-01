@@ -1576,6 +1576,11 @@ Consider f1 = (Given, ReprEq)
          f2 = (Derived, NomEq)
           f = (Derived, ReprEq)
 
+I thought maybe we could never get Derived ReprEq constraints, but
+we can; straight from the Wanteds during improvment. And from a Derived
+ReprEq we could conceivably get a Derived NomEq improvment (by decomposing
+a type constructor with Nomninal role), and hence unify.
+
 Note [canRewriteOrSame]
 ~~~~~~~~~~~~~~~~~~~~~~~
 canRewriteOrSame is similar but
