@@ -338,8 +338,9 @@ synifyType :: SynifyTypeState -> Type -> LHsType Name
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
-  | isTupleTyCon tc, tyConArity tc == length tys =
-     noLoc $ HsTupleTy (case tupleTyConSort tc of
+  | Just sort <- tyConTuple_maybe tc
+  , tyConArity tc == length tys
+  = noLoc $ HsTupleTy (case sort of
                           BoxedTuple      -> HsBoxedTuple
                           ConstraintTuple -> HsConstraintTuple
                           UnboxedTuple    -> HsUnboxedTuple)
