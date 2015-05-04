@@ -16,6 +16,7 @@ that is up to you.
 module Language.Haskell.TH.Quote(
         QuasiQuoter(..),
         dataToQa, dataToExpQ, dataToPatQ,
+        liftData,
         quoteFile
     ) where
 
@@ -88,13 +89,18 @@ dataToQa mkCon mkLit appCon antiQ t =
 
 -- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the
 -- same value, in the SYB style. It is generalized to take a function
--- override type-specific cases; a useful default is 'const Nothing'
--- for no overriding.
+-- override type-specific cases; see 'liftData' for a more commonly
+-- used variant.
 dataToExpQ  ::  Data a
             =>  (forall b . Data b => b -> Maybe (Q Exp))
             ->  a
             ->  Q Exp
 dataToExpQ = dataToQa conE litE (foldl appE)
+
+-- | 'liftData' is a variant of 'lift' in the 'Lift' type class which
+-- works for any type with a 'Data' instance.
+liftData :: Data a => a -> Q Exp
+liftData = dataToExpQ (const Nothing)
 
 -- | 'dataToPatQ' converts a value to a 'Q Pat' representation of the same
 -- value, in the SYB style. It takes a function to handle type-specific cases,
