@@ -1722,7 +1722,7 @@ extras_plus thing = thing : implicitTyThings thing
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
   | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
-  | Just co <- isClosedSynFamilyTyCon_maybe tc
+  | Just co <- isClosedSynFamilyTyConWithAxiom_maybe tc
                                    = [ACoAxiom co]
   | otherwise                      = []
 

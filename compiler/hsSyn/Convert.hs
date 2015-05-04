@@ -296,14 +296,11 @@ cvtDec (TySynInstD tc eqn)
                                         , tfid_fvs = placeHolderNames } } }
 
 cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
-  | not $ null eqns
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
        ; mkind' <- cvtMaybeKind mkind
        ; eqns' <- mapM (cvtTySynEqn tc') eqns
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind' }
-  | otherwise
-  = failWith (ptext (sLit "Illegal empty closed type family"))
+         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' mkind' }
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc

@@ -815,7 +815,7 @@ reduceTyFamApp_maybe envs role tc tys
         ty     = pSnd (coercionKind co)
     in Just (co, ty)
 
-  | Just ax <- isClosedSynFamilyTyCon_maybe tc
+  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , Just (ind, inst_tys) <- chooseBranch ax tys
   = let co     = mkAxInstCo role ax ind inst_tys
         ty     = pSnd (coercionKind co)

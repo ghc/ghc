@@ -1036,8 +1036,11 @@ checkBootTyCon tc1 tc2
         pname1 = quotes (ppr name1)
         pname2 = quotes (ppr name2)
 
-    eqClosedFamilyAx (CoAxiom { co_ax_branches = branches1 })
-                     (CoAxiom { co_ax_branches = branches2 })
+    eqClosedFamilyAx Nothing Nothing  = True
+    eqClosedFamilyAx Nothing (Just _) = False
+    eqClosedFamilyAx (Just _) Nothing = False
+    eqClosedFamilyAx (Just (CoAxiom { co_ax_branches = branches1 }))
+                     (Just (CoAxiom { co_ax_branches = branches2 }))
       =  brListLength branches1 == brListLength branches2
       && (and $ brListZipWith eqClosedFamilyBranch branches1 branches2)
 

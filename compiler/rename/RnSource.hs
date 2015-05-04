@@ -1214,10 +1214,12 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
      fmly_doc = TyFamilyCtx tycon
      kvs = extractRdrKindSigVars kind
 
-     rn_info (ClosedTypeFamily eqns)
+     rn_info (ClosedTypeFamily (Just eqns))
        = do { (eqns', fvs) <- rnList (rnTyFamInstEqn Nothing) eqns
                                                     -- no class context,
-            ; return (ClosedTypeFamily eqns', fvs) }
+            ; return (ClosedTypeFamily (Just eqns'), fvs) }
+     rn_info (ClosedTypeFamily Nothing)
+       = return (ClosedTypeFamily Nothing, emptyFVs)
      rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
      rn_info DataFamily     = return (DataFamily, emptyFVs)
 

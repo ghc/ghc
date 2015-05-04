@@ -249,6 +249,10 @@ test('Sock', normal, compile, [''])
 test('T9211', normal, compile, [''])
 test('T9747', normal, compile, [''])
 test('T9582', normal, compile, [''])
+test('T9840',
+     extra_clean(['T9840.hi-boot', 'T9840.o-boot', 'T9840a.hi', 'T9840a.o']),
+     multimod_compile,
+     ['T9840', '-v0'])
 test('T9090', normal, compile, [''])
 test('T10020', normal, compile, [''])
 test('T10079', normal, compile, [''])

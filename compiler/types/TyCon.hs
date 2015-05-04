@@ -46,7 +46,7 @@ module TyCon(
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
-        isOpenTypeFamilyTyCon, isClosedSynFamilyTyCon_maybe,
+        isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
         isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
@@ -699,8 +699,8 @@ data FamTyConFlav
 
    -- | A closed type synonym family  e.g.
    -- @type family F x where { F Int = Bool }@
-   | ClosedSynFamilyTyCon
-       (CoAxiom Branched) -- The one axiom for this family
+   | ClosedSynFamilyTyCon (Maybe (CoAxiom Branched))
+     -- See Note [Closed type families]
 
    -- | A closed type synonym family declared in an hs-boot file with
    -- type family F a where ..
@@ -717,6 +717,11 @@ Note [Closed type families]
 
 * In a closed type family you can only put equations where the family
   is defined.
+
+A non-empty closed type family has a single axiom with multiple
+branches, stored in the 'ClosedSynFamilyTyCon' constructor.  A closed
+type family with no equations does not have an axiom, because there is
+nothing for the axiom to prove!
 
 
 Note [Promoted data constructors]
@@ -1361,11 +1366,12 @@ isOpenTypeFamilyTyCon :: TyCon -> Bool
 isOpenTypeFamilyTyCon (FamilyTyCon {famTcFlav = OpenSynFamilyTyCon }) = True
 isOpenTypeFamilyTyCon _                                               = False
 
--- leave out abstract closed families here
-isClosedSynFamilyTyCon_maybe :: TyCon -> Maybe (CoAxiom Branched)
-isClosedSynFamilyTyCon_maybe
-  (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon ax}) = Just ax
-isClosedSynFamilyTyCon_maybe _                        = Nothing
+-- | Is this a non-empty closed type family? Returns 'Nothing' for
+-- abstract or empty closed families.
+isClosedSynFamilyTyConWithAxiom_maybe :: TyCon -> Maybe (CoAxiom Branched)
+isClosedSynFamilyTyConWithAxiom_maybe
+  (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
+isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
 isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe

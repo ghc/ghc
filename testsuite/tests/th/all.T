@@ -285,7 +285,7 @@ test('ClosedFam2TH', normal, compile, ['-v0'])
 
 test('T8028',
      extra_clean(['T8028a.hi', 'T8028a.o']),
-     multimod_compile_fail,
+     multimod_compile,
      ['T8028', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_Roles1', normal, compile_fail, ['-v0'])
@@ -360,3 +360,6 @@ test('T8624', normal, run_command, ['$MAKE -s --no-print-directory T8624'])
 test('TH_Lift', normal, compile, ['-v0'])
 test('T10047', normal, ghci_script, ['T10047.script'])
 test('T10019', normal, ghci_script, ['T10019.script'])
+test('T10306', normal, compile, ['-v0'])
+
+test('TH_abstractFamily', normal, compile_fail, [''])

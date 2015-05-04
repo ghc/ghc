@@ -358,8 +358,8 @@ tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n
      tc_fam_flav IfaceOpenSynFamilyTyCon   = return OpenSynFamilyTyCon
-     tc_fam_flav (IfaceClosedSynFamilyTyCon ax_name _)
-       = do { ax <- tcIfaceCoAxiom ax_name
+     tc_fam_flav (IfaceClosedSynFamilyTyCon mb_ax_name_branches)
+       = do { ax <- traverse (tcIfaceCoAxiom . fst) mb_ax_name_branches
             ; return (ClosedSynFamilyTyCon ax) }
      tc_fam_flav IfaceAbstractClosedSynFamilyTyCon
          = return AbstractClosedSynFamilyTyCon

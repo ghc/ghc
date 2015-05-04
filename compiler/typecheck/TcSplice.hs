@@ -1336,14 +1336,15 @@ reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 reifyFamFlavour :: TyCon -> TcM (Either TH.FamFlavour [TH.TySynEqn])
 reifyFamFlavour tc
   | isOpenTypeFamilyTyCon tc = return $ Left TH.TypeFam
-  | isDataFamilyTyCon    tc = return $ Left TH.DataFam
-
-    -- this doesn't really handle abstract closed families, but let's not worry
-    -- about that now
-  | Just ax <- isClosedSynFamilyTyCon_maybe tc
-  = do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
-       ; return $ Right eqns }
-
+  | isDataFamilyTyCon     tc = return $ Left TH.DataFam
+  | Just flav <- famTyConFlav_maybe tc = case flav of
+      OpenSynFamilyTyCon           -> return $ Left TH.TypeFam
+      AbstractClosedSynFamilyTyCon -> return $ Right []
+      BuiltInSynFamTyCon _         -> return $ Right []
+      ClosedSynFamilyTyCon Nothing -> return $ Right []
+      ClosedSynFamilyTyCon (Just ax)
+        -> do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
+              ; return $ Right eqns }
   | otherwise
   = panic "TcSplice.reifyFamFlavour: not a type family"
 

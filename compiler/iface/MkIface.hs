@@ -1675,10 +1675,13 @@ tyConToIfaceDecl env tycon
                Nothing           -> IfNoParent
 
     to_if_fam_flav OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
-    to_if_fam_flav (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
+    to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
+      = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
       where defs = fromBranchList $ coAxiomBranches ax
             ibr  = map (coAxBranchToIfaceBranch' tycon) defs
             axn  = coAxiomName ax
+    to_if_fam_flav (ClosedSynFamilyTyCon Nothing)
+      = IfaceClosedSynFamilyTyCon Nothing
     to_if_fam_flav AbstractClosedSynFamilyTyCon
       = IfaceAbstractClosedSynFamilyTyCon
 

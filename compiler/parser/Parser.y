@@ -1009,17 +1009,17 @@ where_type_family :: { Located ([AddAnn],FamilyInfo RdrName) }
         : {- empty -}                      { noLoc ([],OpenTypeFamily) }
         | 'where' ty_fam_inst_eqn_list
                { sLL $1 $> (mj AnnWhere $1:(fst $ unLoc $2)
-                    ,ClosedTypeFamily (reverse (snd $ unLoc $2))) }
+                    ,ClosedTypeFamily (fmap reverse $ snd $ unLoc $2)) }
 
-ty_fam_inst_eqn_list :: { Located ([AddAnn],[LTyFamInstEqn RdrName]) }
+ty_fam_inst_eqn_list :: { Located ([AddAnn],Maybe [LTyFamInstEqn RdrName]) }
         :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                                ,unLoc $2) }
+                                                ,Just (unLoc $2)) }
         | vocurly ty_fam_inst_eqns close   { let L loc _ = $2 in
-                                             L loc ([],unLoc $2) }
+                                             L loc ([],Just (unLoc $2)) }
         |     '{' '..' '}'                 { sLL $1 $> ([moc $1,mj AnnDotdot $2
-                                                 ,mcc $3],[]) }
+                                                 ,mcc $3],Nothing) }
         | vocurly '..' close               { let L loc _ = $2 in
-                                             L loc ([mj AnnDotdot $2],[]) }
+                                             L loc ([mj AnnDotdot $2],Nothing) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn RdrName] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
@@ -1028,6 +1028,7 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn RdrName] }
         | ty_fam_inst_eqns ';'        {% addAnnotation (gl $1) AnnSemi (gl $2)
                                          >> return (sLL $1 $>  (unLoc $1)) }
         | ty_fam_inst_eqn             { sLL $1 $> [$1] }
+        | {- empty -}                 { noLoc [] }
 
 ty_fam_inst_eqn :: { LTyFamInstEqn RdrName }
         : type '=' ctype

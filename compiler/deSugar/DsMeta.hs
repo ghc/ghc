@@ -316,18 +316,20 @@ repSynDecl tc bndrs ty
        ; repTySyn tc bndrs ty1 }
 
 repFamilyDecl :: LFamilyDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repFamilyDecl (L loc (FamilyDecl { fdInfo    = info,
-                                   fdLName   = tc,
-                                   fdTyVars  = tvs,
-                                   fdKindSig = opt_kind }))
+repFamilyDecl decl@(L loc (FamilyDecl { fdInfo  = info,
+                                        fdLName   = tc,
+                                        fdTyVars  = tvs,
+                                        fdKindSig = opt_kind }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
            case (opt_kind, info) of
-                  (Nothing, ClosedTypeFamily eqns) ->
+                  (_      , ClosedTypeFamily Nothing) ->
+                    notHandled "abstract closed type family" (ppr decl)
+                  (Nothing, ClosedTypeFamily (Just eqns)) ->
                     do { eqns1 <- mapM repTyFamEqn eqns
                        ; eqns2 <- coreList tySynEqnQTyConName eqns1
                        ; repClosedFamilyNoKind tc1 bndrs eqns2 }
-                  (Just ki, ClosedTypeFamily eqns) ->
+                  (Just ki, ClosedTypeFamily (Just eqns)) ->
                     do { eqns1 <- mapM repTyFamEqn eqns
                        ; eqns2 <- coreList tySynEqnQTyConName eqns1
                        ; ki1 <- repLKind ki

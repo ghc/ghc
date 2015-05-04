@@ -772,7 +772,7 @@ anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
 anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar]
-                         AbstractClosedSynFamilyTyCon
+                         (ClosedSynFamilyTyCon Nothing)
                          NoParentTyCon
   where
     kind = ForAllTy kKiVar (mkTyVarTy kKiVar)

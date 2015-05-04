@@ -6032,7 +6032,18 @@ type family F a where
 
     <para>
       A closed type family's equations have the same restrictions as the
-      equations for an open type family instances.
+      equations for open type family instances.
+    </para>
+
+    <para>
+      A closed type family may be declared with no equations.  Such
+      closed type families are opaque type-level definitions that will
+      never reduce, are not necessarily injective (unlike empty data
+      types), and cannot be given any instances.  This is different
+      from omitting the equations of a closed type family in a
+      <filename>hs-boot</filename> file, which uses the syntax
+      <literal>where ..</literal>, as in that case there may or may
+      not be equations given in the <filename>hs</filename> file.
     </para>
   </sect3>
 
@@ -6053,6 +6064,7 @@ type family H a where                            -- OK!
   H Bool = Bool
   H a    = String
 type instance H Char = Char       -- WRONG: cannot have instances of closed family
+type family K a where                            -- OK!
 
 type family G a b :: * -> *
 type instance G Int            = (,)     -- WRONG: must be two type parameters
