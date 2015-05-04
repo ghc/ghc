@@ -265,9 +265,9 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
        ppTyFamHeader summary associated decl unicode qual <+> ppFixities fixities qual
 
     instancesBit
-      | FamilyDecl { fdInfo = ClosedTypeFamily eqns } <- decl
+      | FamilyDecl { fdInfo = ClosedTypeFamily mb_eqns } <- decl
       , not summary
-      = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
+      = subEquations qual $ map (ppTyFamEqn . unLoc) $ fromMaybe [] mb_eqns
 
       | otherwise
       = ppInstances instances docname unicode qual

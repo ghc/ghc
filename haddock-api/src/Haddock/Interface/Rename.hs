@@ -347,7 +347,7 @@ renameFamilyInfo :: FamilyInfo Name -> RnM (FamilyInfo DocName)
 renameFamilyInfo DataFamily     = return DataFamily
 renameFamilyInfo OpenTypeFamily = return OpenTypeFamily
 renameFamilyInfo (ClosedTypeFamily eqns)
-  = do { eqns' <- mapM renameLTyFamInstEqn eqns
+  = do { eqns' <- mapM (mapM renameLTyFamInstEqn) eqns
        ; return $ ClosedTypeFamily eqns' }
 
 renameDataDefn :: HsDataDefn Name -> RnM (HsDataDefn DocName)
