@@ -1,6 +1,10 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
              RoleAnnotations, DeriveGeneric, FlexibleInstances #-}
 
+#if MIN_VERSION_base(4,8,0)
+#define HAS_NATURAL
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.Syntax
@@ -29,8 +33,11 @@ import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Int
 import Data.Word
 import Data.Ratio
-import Numeric.Natural
 import GHC.Generics     ( Generic )
+
+#ifdef HAS_NATURAL
+import Numeric.Natural
+#endif
 
 -----------------------------------------------------
 --
@@ -38,7 +45,7 @@ import GHC.Generics     ( Generic )
 --
 -----------------------------------------------------
 
-class Monad m => Quasi m where
+class (Applicative m, Monad m) => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -487,8 +494,10 @@ instance Lift Word32 where
 instance Lift Word64 where
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
+#ifdef HAS_NATURAL
 instance Lift Natural where
   lift x = return (LitE (IntegerL (fromIntegral x)))
+#endif
 
 instance Integral a => Lift (Ratio a) where
   lift x = return (LitE (RationalL (toRational x)))

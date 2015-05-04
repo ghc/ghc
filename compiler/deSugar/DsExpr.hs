@@ -24,11 +24,7 @@ import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
 
-#ifdef GHCI
-        -- Template Haskell stuff iff bootstrapped
 import DsMeta
-#endif
-
 import HsSyn
 
 import Platform
@@ -645,11 +641,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 -- Template Haskell stuff
 
 dsExpr (HsRnBracketOut _ _) = panic "dsExpr HsRnBracketOut"
-#ifdef GHCI
 dsExpr (HsTcBracketOut x ps) = dsBracket x ps
-#else
-dsExpr (HsTcBracketOut _ _) = panic "dsExpr HsBracketOut"
-#endif
 dsExpr (HsSpliceE s)  = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension

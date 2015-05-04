@@ -19,37 +19,172 @@ import RdrName
 import TcRnMonad
 import Kind
 
+import RnEnv
+import RnSource         ( rnSrcDecls, findSplice )
+import RnPat            ( rnPat )
+import LoadIface        ( loadInterfaceForName )
+import BasicTypes       ( TopLevelFlag, isTopLevel )
+import Outputable
+import Module
+import SrcLoc
+import DynFlags
+import FastString
+import RnTypes          ( rnLHsType )
+
+import Control.Monad    ( unless, when )
+
+import {-# SOURCE #-} RnExpr   ( rnLExpr )
+
+import PrelNames        ( isUnboundName )
+import TcEnv            ( checkWellStaged )
+import DsMeta           ( liftName )
+
 #ifdef GHCI
 import ErrUtils         ( dumpIfSet_dyn_printer )
-import Control.Monad    ( unless, when )
-import DynFlags
-import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, liftName )
-import LoadIface        ( loadInterfaceForName )
-import Module
-import RnEnv
-import RnPat            ( rnPat )
-import RnSource         ( rnSrcDecls, findSplice )
-import RnTypes          ( rnLHsType )
-import PrelNames        ( isUnboundName )
-import SrcLoc
-import TcEnv            ( checkWellStaged, tcMetaTy )
-import Outputable
-import BasicTypes       ( TopLevelFlag, isTopLevel )
-import FastString
+import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
+import TcEnv            ( tcMetaTy )
 import Hooks
 import Var              ( Id )
 import DsMeta           ( quoteExpName, quotePatName, quoteDecName, quoteTypeName )
 import Util
 
-import {-# SOURCE #-} RnExpr   ( rnLExpr )
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
 import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 #endif
 
-#ifndef GHCI
-rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
-rnBracket e _ = failTH e "Template Haskell bracket"
+{-
+************************************************************************
+*                                                                      *
+        Template Haskell brackets
+*                                                                      *
+************************************************************************
+-}
 
+rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
+rnBracket e br_body
+  = addErrCtxt (quotationCtxtDoc br_body) $
+    do { -- Check that Template Haskell is enabled and available
+         thEnabled <- xoptM Opt_TemplateHaskell
+       ; unless thEnabled $
+           failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
+                           , ptext (sLit "Perhaps you intended to use TemplateHaskell") ] )
+
+         -- Check for nested brackets
+       ; cur_stage <- getStage
+       ; case cur_stage of
+           { Splice True  -> checkTc (isTypedBracket br_body) illegalUntypedBracket
+           ; Splice False -> checkTc (not (isTypedBracket br_body)) illegalTypedBracket
+           ; Comp         -> return ()
+           ; Brack {}     -> failWithTc illegalBracket
+           }
+
+         -- Brackets are desugared to code that mentions the TH package
+       ; recordThUse
+
+       ; case isTypedBracket br_body of
+            True  -> do { (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $
+                                            rn_bracket cur_stage br_body
+                        ; return (HsBracket body', fvs_e) }
+
+            False -> do { ps_var <- newMutVar []
+                        ; (body', fvs_e) <- setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
+                                            rn_bracket cur_stage br_body
+                        ; pendings <- readMutVar ps_var
+                        ; return (HsRnBracketOut body' pendings, fvs_e) }
+       }
+
+rn_bracket :: ThStage -> HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
+rn_bracket outer_stage br@(VarBr flg rdr_name)
+  = do { name <- lookupOccRn rdr_name
+       ; this_mod <- getModule
+
+       ; case flg of
+           { -- Type variables can be quoted in TH. See #5721.
+             False -> return ()
+           ; True | nameIsLocalOrFrom this_mod name ->
+                 do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
+                    ; case mb_bind_lvl of
+                        { Nothing -> return ()      -- Can happen for data constructors,
+                                                    -- but nothing needs to be done for them
+
+                        ; Just (top_lvl, bind_lvl)  -- See Note [Quoting names]
+                             | isTopLevel top_lvl
+                             -> when (isExternalName name) (keepAlive name)
+                             | otherwise
+                             -> do { traceRn (text "rn_bracket VarBr" <+> ppr name <+> ppr bind_lvl <+> ppr outer_stage)
+                                   ; checkTc (thLevel outer_stage + 1 == bind_lvl)
+                                             (quotedNameStageErr br) }
+                        }
+                    }
+           ; True | otherwise ->  -- Imported thing
+                 discardResult (loadInterfaceForName msg name)
+                     -- Reason for loadInterface: deprecation checking
+                     -- assumes that the home interface is loaded, and
+                     -- this is the only way that is going to happen
+           }
+       ; return (VarBr flg name, unitFV name) }
+  where
+    msg = ptext (sLit "Need interface for Template Haskell quoted Name")
+
+rn_bracket _ (ExpBr e) = do { (e', fvs) <- rnLExpr e
+                            ; return (ExpBr e', fvs) }
+
+rn_bracket _ (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
+
+rn_bracket _ (TypBr t) = do { (t', fvs) <- rnLHsType TypBrCtx t
+                            ; return (TypBr t', fvs) }
+
+rn_bracket _ (DecBrL decls)
+  = do { group <- groupDecls decls
+       ; gbl_env  <- getGblEnv
+       ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
+                          -- The emptyDUs is so that we just collect uses for this
+                          -- group alone in the call to rnSrcDecls below
+       ; (tcg_env, group') <- setGblEnv new_gbl_env $
+                              rnSrcDecls Nothing group
+
+              -- Discard the tcg_env; it contains only extra info about fixity
+        ; traceRn (text "rn_bracket dec" <+> (ppr (tcg_dus tcg_env) $$
+                   ppr (duUses (tcg_dus tcg_env))))
+        ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
+  where
+    groupDecls :: [LHsDecl RdrName] -> RnM (HsGroup RdrName)
+    groupDecls decls
+      = do { (group, mb_splice) <- findSplice decls
+           ; case mb_splice of
+           { Nothing -> return group
+           ; Just (splice, rest) ->
+               do { group' <- groupDecls rest
+                  ; let group'' = appendGroups group group'
+                  ; return group'' { hs_splcds = noLoc splice : hs_splcds group' }
+                  }
+           }}
+
+rn_bracket _ (DecBrG _) = panic "rn_bracket: unexpected DecBrG"
+
+rn_bracket _ (TExpBr e) = do { (e', fvs) <- rnLExpr e
+                             ; return (TExpBr e', fvs) }
+
+quotationCtxtDoc :: HsBracket RdrName -> SDoc
+quotationCtxtDoc br_body
+  = hang (ptext (sLit "In the Template Haskell quotation"))
+         2 (ppr br_body)
+
+illegalBracket :: SDoc
+illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (without intervening splices)")
+
+illegalTypedBracket :: SDoc
+illegalTypedBracket = ptext (sLit "Typed brackets may only appear in typed slices.")
+
+illegalUntypedBracket :: SDoc
+illegalUntypedBracket = ptext (sLit "Untyped brackets may only appear in untyped slices.")
+
+quotedNameStageErr :: HsBracket RdrName -> SDoc
+quotedNameStageErr br
+  = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr br
+        , ptext (sLit "must be used at the same stage at which is is bound")]
+
+#ifndef GHCI
 rnTopSpliceDecls :: HsSplice RdrName -> RnM ([LHsDecl RdrName], FreeVars)
 rnTopSpliceDecls e = failTH e "Template Haskell top splice"
 
@@ -363,120 +498,6 @@ Pat RdrName (the result of running a top-level splice) or a Pat Name
 rnSplicePat.
 -}
 
-{-
-************************************************************************
-*                                                                      *
-        Template Haskell brackets
-*                                                                      *
-************************************************************************
--}
-
-rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
-rnBracket e br_body
-  = addErrCtxt (quotationCtxtDoc br_body) $
-    do { -- Check that Template Haskell is enabled and available
-         thEnabled <- xoptM Opt_TemplateHaskell
-       ; unless thEnabled $
-           failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
-                           , ptext (sLit "Perhaps you intended to use TemplateHaskell") ] )
-       ; checkTH e "Template Haskell bracket"
-
-         -- Check for nested brackets
-       ; cur_stage <- getStage
-       ; case cur_stage of
-           { Splice True  -> checkTc (isTypedBracket br_body) illegalUntypedBracket
-           ; Splice False -> checkTc (not (isTypedBracket br_body)) illegalTypedBracket
-           ; Comp         -> return ()
-           ; Brack {}     -> failWithTc illegalBracket
-           }
-
-         -- Brackets are desugared to code that mentions the TH package
-       ; recordThUse
-
-       ; case isTypedBracket br_body of
-            True  -> do { (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $
-                                            rn_bracket cur_stage br_body
-                        ; return (HsBracket body', fvs_e) }
-
-            False -> do { ps_var <- newMutVar []
-                        ; (body', fvs_e) <- setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
-                                            rn_bracket cur_stage br_body
-                        ; pendings <- readMutVar ps_var
-                        ; return (HsRnBracketOut body' pendings, fvs_e) }
-       }
-
-rn_bracket :: ThStage -> HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
-rn_bracket outer_stage br@(VarBr flg rdr_name)
-  = do { name <- lookupOccRn rdr_name
-       ; this_mod <- getModule
-
-       ; case flg of
-           { -- Type variables can be quoted in TH. See #5721.
-             False -> return ()
-           ; True | nameIsLocalOrFrom this_mod name ->
-                 do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
-                    ; case mb_bind_lvl of
-                        { Nothing -> return ()      -- Can happen for data constructors,
-                                                    -- but nothing needs to be done for them
-
-                        ; Just (top_lvl, bind_lvl)  -- See Note [Quoting names]
-                             | isTopLevel top_lvl
-                             -> when (isExternalName name) (keepAlive name)
-                             | otherwise
-                             -> do { traceRn (text "rn_bracket VarBr" <+> ppr name <+> ppr bind_lvl <+> ppr outer_stage)
-                                   ; checkTc (thLevel outer_stage + 1 == bind_lvl)
-                                             (quotedNameStageErr br) }
-                        }
-                    }
-           ; True | otherwise ->  -- Imported thing
-                 discardResult (loadInterfaceForName msg name)
-                     -- Reason for loadInterface: deprecation checking
-                     -- assumes that the home interface is loaded, and
-                     -- this is the only way that is going to happen
-           }
-       ; return (VarBr flg name, unitFV name) }
-  where
-    msg = ptext (sLit "Need interface for Template Haskell quoted Name")
-
-rn_bracket _ (ExpBr e) = do { (e', fvs) <- rnLExpr e
-                            ; return (ExpBr e', fvs) }
-
-rn_bracket _ (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
-
-rn_bracket _ (TypBr t) = do { (t', fvs) <- rnLHsType TypBrCtx t
-                            ; return (TypBr t', fvs) }
-
-rn_bracket _ (DecBrL decls)
-  = do { group <- groupDecls decls
-       ; gbl_env  <- getGblEnv
-       ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
-                          -- The emptyDUs is so that we just collect uses for this
-                          -- group alone in the call to rnSrcDecls below
-       ; (tcg_env, group') <- setGblEnv new_gbl_env $
-                              rnSrcDecls Nothing group
-
-              -- Discard the tcg_env; it contains only extra info about fixity
-        ; traceRn (text "rn_bracket dec" <+> (ppr (tcg_dus tcg_env) $$
-                   ppr (duUses (tcg_dus tcg_env))))
-        ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
-  where
-    groupDecls :: [LHsDecl RdrName] -> RnM (HsGroup RdrName)
-    groupDecls decls
-      = do { (group, mb_splice) <- findSplice decls
-           ; case mb_splice of
-           { Nothing -> return group
-           ; Just (splice, rest) ->
-               do { group' <- groupDecls rest
-                  ; let group'' = appendGroups group group'
-                  ; return group'' { hs_splcds = noLoc splice : hs_splcds group' }
-                  }
-           }}
-
-rn_bracket _ (DecBrG _) = panic "rn_bracket: unexpected DecBrG"
-
-rn_bracket _ (TExpBr e) = do { (e', fvs) <- rnLExpr e
-                             ; return (TExpBr e', fvs) }
-
 spliceCtxt :: HsSplice RdrName -> SDoc
 spliceCtxt splice
   = hang (ptext (sLit "In the") <+> what) 2 (ppr splice)
@@ -533,30 +554,11 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
       = vcat [ text "--" <+> ppr loc <> colon <+> text "Splicing" <+> text sd
              , gen ]
 
-illegalBracket :: SDoc
-illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (without intervening splices)")
-
-illegalTypedBracket :: SDoc
-illegalTypedBracket = ptext (sLit "Typed brackets may only appear in typed slices.")
-
-illegalUntypedBracket :: SDoc
-illegalUntypedBracket = ptext (sLit "Untyped brackets may only appear in untyped slices.")
-
 illegalTypedSplice :: SDoc
 illegalTypedSplice = ptext (sLit "Typed splices may not appear in untyped brackets")
 
 illegalUntypedSplice :: SDoc
 illegalUntypedSplice = ptext (sLit "Untyped splices may not appear in typed brackets")
-
-quotedNameStageErr :: HsBracket RdrName -> SDoc
-quotedNameStageErr br
-  = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr br
-        , ptext (sLit "must be used at the same stage at which is is bound")]
-
-quotationCtxtDoc :: HsBracket RdrName -> SDoc
-quotationCtxtDoc br_body
-  = hang (ptext (sLit "In the Template Haskell quotation"))
-         2 (ppr br_body)
 
 -- spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
 -- spliceResultDoc expr
@@ -566,13 +568,6 @@ quotationCtxtDoc br_body
 #endif
 
 checkThLocalName :: Name -> RnM ()
-#ifndef GHCI  /* GHCI and TH is off */
---------------------------------------
--- Check for cross-stage lifting
-checkThLocalName _name
-  = return ()
-
-#else         /* GHCI and TH is on */
 checkThLocalName name
   | isUnboundName name   -- Do not report two errors for
   = return ()            --   $(not_in_scope args)
@@ -638,7 +633,6 @@ check_cross_stage_lifting top_lvl name ps_var
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
-#endif /* GHCI */
 
 {-
 Note [Keeping things alive for Template Haskell]

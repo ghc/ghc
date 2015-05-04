@@ -9571,8 +9571,8 @@ Typed expression splices and quotations are supported.)
 
     <listitem><para>
 	    If you are building GHC from source, you need at least a stage-2 bootstrap compiler to
-	      run Template Haskell.  A stage-1 compiler will reject the TH constructs.  Reason: TH
-	      compiles and runs a program, and then looks at the result.  So it's important that
+	      run Template Haskell splices and quasi-quotes.  A stage-1 compiler will only accept regular quotes of Haskell.  Reason: TH splices and quasi-quotes
+	      compile and run a program, and then looks at the result.  So it's important that
 	      the program it compiles produces results whose representations are identical to
 	      those of the compiler itself.
    </para></listitem>

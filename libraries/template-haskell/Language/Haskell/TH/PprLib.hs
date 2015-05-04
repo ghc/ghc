@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP, FlexibleInstances #-}
 
 -- | Monadic front-end to Text.PrettyPrint
 
@@ -41,6 +41,9 @@ import qualified Text.PrettyPrint as HPJ
 import Control.Monad (liftM, liftM2, ap)
 import Language.Haskell.TH.Lib.Map ( Map )
 import qualified Language.Haskell.TH.Lib.Map as Map ( lookup, insert, empty )
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative( Applicative(..) )
+#endif
 
 infixl 6 <> 
 infixl 6 <+>
