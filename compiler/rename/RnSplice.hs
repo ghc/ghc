@@ -595,6 +595,9 @@ checkCrossStageLifting :: TopLevelFlag -> Name -> ThStage -> TcM ()
 -- Now we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [| x |]
 --            [| map |]
+--
+-- This code is similar to checkCrossStageLifting in TcExpr, but
+-- this is only run on *untyped* brackets.
 
 checkCrossStageLifting top_lvl name (Brack _ (RnPendingUntyped ps_var))
   | isTopLevel top_lvl

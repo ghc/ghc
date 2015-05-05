@@ -1254,15 +1254,18 @@ checkThLocalId id
 
 --------------------------------------
 checkCrossStageLifting :: Id -> ThStage -> TcM ()
--- If we are inside brackets, and (use_lvl > bind_lvl)
+-- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
--- Examples   \x -> [| x |]
---            [| map |]
+-- Examples   \x -> [|| x ||]
+--            [|| map ||]
 -- There is no error-checking to do, because the renamer did that
+--
+-- This is similar to checkCrossStageLifting in RnSplice, but
+-- this code is applied to *typed* brackets.
 
 checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
   =     -- Nested identifiers, such as 'x' in
-        -- E.g. \x -> [| h x |]
+        -- E.g. \x -> [|| h x ||]
         -- We must behave as if the reference to x was
         --      h $(lift x)
         -- We use 'x' itself as the splice proxy, used by
