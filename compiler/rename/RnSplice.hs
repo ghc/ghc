@@ -586,11 +586,11 @@ checkThLocalName name
     do  { let use_lvl = thLevel use_stage
         ; checkWellStaged (quotes (ppr name)) bind_lvl use_lvl
         ; traceRn (text "checkThLocalName" <+> ppr name <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
-        ; when (use_lvl > bind_lvl) $
-          checkCrossStageLifting top_lvl name use_stage } } }
+        ; checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name } } }
 
 --------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> Name -> ThStage -> TcM ()
+checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
+                       -> Name -> TcM ()
 -- We are inside brackets, and (use_lvl > bind_lvl)
 -- Now we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [| x |]
@@ -599,7 +599,15 @@ checkCrossStageLifting :: TopLevelFlag -> Name -> ThStage -> TcM ()
 -- This code is similar to checkCrossStageLifting in TcExpr, but
 -- this is only run on *untyped* brackets.
 
-checkCrossStageLifting top_lvl name (Brack _ (RnPendingUntyped ps_var))
+checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
+  | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
+  , use_lvl > bind_lvl                               -- Cross-stage condition
+  = check_cross_stage_lifting top_lvl name ps_var
+  | otherwise
+  = return ()
+
+check_cross_stage_lifting :: TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
+check_cross_stage_lifting top_lvl name ps_var
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
         -- (which have External Names)
@@ -630,8 +638,6 @@ checkCrossStageLifting top_lvl name (Brack _ (RnPendingUntyped ps_var))
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
-
-checkCrossStageLifting _ _ _ = return ()
 #endif /* GHCI */
 
 {-
