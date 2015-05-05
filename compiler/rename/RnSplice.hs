@@ -35,11 +35,14 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
+import PrelNames        ( isUnboundName )
+import TcEnv            ( checkWellStaged )
+import DsMeta           ( liftName )
+
 #ifdef GHCI
 import ErrUtils         ( dumpIfSet_dyn_printer )
-import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, liftName )
-import PrelNames        ( isUnboundName )
-import TcEnv            ( checkWellStaged, tcMetaTy )
+import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
+import TcEnv            ( tcMetaTy )
 import Hooks
 import Var              ( Id )
 import DsMeta           ( quoteExpName, quotePatName, quoteDecName, quoteTypeName )
@@ -565,13 +568,6 @@ illegalUntypedSplice = ptext (sLit "Untyped splices may not appear in typed brac
 #endif
 
 checkThLocalName :: Name -> RnM ()
-#ifndef GHCI  /* GHCI and TH is off */
---------------------------------------
--- Check for cross-stage lifting
-checkThLocalName _name
-  = return ()
-
-#else         /* GHCI and TH is on */
 checkThLocalName name
   | isUnboundName name   -- Do not report two errors for
   = return ()            --   $(not_in_scope args)
@@ -637,7 +633,6 @@ check_cross_stage_lifting top_lvl name ps_var
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
-#endif /* GHCI */
 
 {-
 Note [Keeping things alive for Template Haskell]
