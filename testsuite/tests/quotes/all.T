@@ -15,6 +15,7 @@ test('T8455', normal, compile, ['-v0'])
 test('T8633', normal, compile_and_run, [''])
 test('T8759a', normal, compile_fail, ['-v0'])
 test('T9824', normal, compile, ['-v0'])
+test('T10384', normal, compile_fail, [''])
 
 test('TH_tf2', normal, compile, ['-v0'])
 test('TH_ppr1', normal, compile_and_run, [''])

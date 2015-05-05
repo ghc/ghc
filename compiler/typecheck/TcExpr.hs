@@ -16,9 +16,7 @@ module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
 #include "HsVersions.h"
 
 import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
-#ifdef GHCI
 import DsMeta( liftStringName, liftName )
-#endif
 
 import HsSyn
 import TcHsSyn
@@ -1234,13 +1232,6 @@ tcTagToEnum loc fun_name arg res_ty
 -}
 
 checkThLocalId :: Id -> TcM ()
-#ifndef GHCI  /* GHCI and TH is off */
---------------------------------------
--- Check for cross-stage lifting
-checkThLocalId _id
-  = return ()
-
-#else         /* GHCI and TH is on */
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
         ; case mb_local_use of
@@ -1303,7 +1294,6 @@ checkCrossStageLifting _ _ = return ()
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
   = ptext (sLit "Can't splice the polymorphic local variable") <+> quotes (ppr id)
-#endif /* GHCI */
 
 {-
 Note [Lifting strings]
