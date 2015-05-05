@@ -9,7 +9,7 @@ $( [d| class C a where
          foo :: Bool -> T a |] )
 
 $( [d| instance C Int where
-         data T Int = TInt Bool 
+         data T Int = TInt Bool
          foo b = TInt (b && b) |] )
 
 $( [d| instance C Float where
@@ -18,9 +18,9 @@ $( [d| instance C Float where
 -}
 
 class D a where
-         type S a 
+         type S a
          bar :: S a -> Int
 
 instance D Int where
-         type S Int = Bool 
+         type S Int = Bool
          bar c = if c then 1 else 2
