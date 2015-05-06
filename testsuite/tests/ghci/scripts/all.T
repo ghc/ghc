@@ -210,4 +210,4 @@ test('T10122', normal, ghci_script, ['T10122.script'])
 test('T10322', when(opsys('darwin'), expect_broken(10322)),
     ghci_script, ['T10322.script'])
 
-test('T10321', expect_broken(10321), ghci_script, ['T10321.script'])
+test('T10321', normal, ghci_script, ['T10321.script'])
