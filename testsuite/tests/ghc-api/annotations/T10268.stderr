@@ -1,0 +1,10 @@
+
+Test10268.hs:5:6:
+    Not in scope: ‘footemplate’
+    In the untyped splice: $footemplate
+
+Test10268.hs:7:14:
+    Not in scope: type constructor or class ‘Pattern’
+
+Test10268.hs:10:10:
+    Not in scope: type constructor or class ‘Pattern’

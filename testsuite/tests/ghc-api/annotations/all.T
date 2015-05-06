@@ -4,3 +4,4 @@ test('comments',    normal, run_command, ['$MAKE -s --no-print-directory comment
 test('exampleTest', normal, run_command, ['$MAKE -s --no-print-directory exampleTest'])
 test('listcomps',   normal, run_command, ['$MAKE -s --no-print-directory listcomps'])
 test('T10255',      normal, run_command, ['$MAKE -s --no-print-directory t10255'])
+test('T10268',      normal, run_command, ['$MAKE -s --no-print-directory T10268'])

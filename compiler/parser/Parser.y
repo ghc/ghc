@@ -1620,8 +1620,10 @@ type :: { LHsType RdrName }
         | btype '~'      btype          {% ams (sLL $1 $> $ HsEqTy $1 $3)
                                                [mj AnnTilde $2] }
                                         -- see Note [Promotion]
-        | btype SIMPLEQUOTE qconop type     { sLL $1 $> $ mkHsOpTy $1 $3 $4 }
-        | btype SIMPLEQUOTE varop  type     { sLL $1 $> $ mkHsOpTy $1 $3 $4 }
+        | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
+                                                [mj AnnSimpleQuote $2] }
+        | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
+                                                [mj AnnSimpleQuote $2] }
 
 typedoc :: { LHsType RdrName }
         : btype                          { $1 }
@@ -1638,8 +1640,10 @@ typedoc :: { LHsType RdrName }
         | btype '~'      btype           {% ams (sLL $1 $> $ HsEqTy $1 $3)
                                                 [mj AnnTilde $2] }
                                         -- see Note [Promotion]
-        | btype SIMPLEQUOTE qconop type     { sLL $1 $> $ mkHsOpTy $1 $3 $4 }
-        | btype SIMPLEQUOTE varop  type     { sLL $1 $> $ mkHsOpTy $1 $3 $4 }
+        | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
+                                                [mj AnnSimpleQuote $2] }
+        | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
+                                                [mj AnnSimpleQuote $2] }
 
 btype :: { LHsType RdrName }
         : btype atype                   { sLL $1 $> $ HsAppTy $1 $2 }
@@ -1682,15 +1686,16 @@ atype :: { LHsType RdrName }
         | TH_ID_SPLICE                { sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
                                         mkUnqual varName (getTH_ID_SPLICE $1) }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist { sLL $1 $> $ HsTyVar $ unLoc $2 }
+        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar $ unLoc $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
                                 ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
-                                    [mop $2,mcp $6] }
+                                    [mj AnnSimpleQuote $1,mop $2,mcp $6] }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy
                                                             placeHolderKind $3)
-                                                       [mos $2,mcs $4] }
-        | SIMPLEQUOTE var                       { sLL $1 $> $ HsTyVar $ unLoc $2 }
+                                                       [mj AnnSimpleQuote $1,mos $2,mcs $4] }
+        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar $ unLoc $2)
+                                                       [mj AnnSimpleQuote $1,mj AnnName $2] }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
         -- if you had written '[ty, ty, ty]
@@ -2298,10 +2303,10 @@ aexp2   :: { LHsExpr RdrName }
         -- Template Haskell Extension
         | splice_exp            { $1 }
 
-        | SIMPLEQUOTE  qvar     { sLL $1 $> $ HsBracket (VarBr True  (unLoc $2)) }
-        | SIMPLEQUOTE  qcon     { sLL $1 $> $ HsBracket (VarBr True  (unLoc $2)) }
-        | TH_TY_QUOTE tyvar     { sLL $1 $> $ HsBracket (VarBr False (unLoc $2)) }
-        | TH_TY_QUOTE gtycon    { sLL $1 $> $ HsBracket (VarBr False (unLoc $2)) }
+        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThIdSplice $1,mj AnnName $2] }
+        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThIdSplice $1,mj AnnName $2] }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2)) [mo $1,mc $3] }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2)) [mo $1,mc $3]}
         | '[t|' ctype '|]'    {% checkNoPartialType
@@ -2321,13 +2326,15 @@ aexp2   :: { LHsExpr RdrName }
                                           [mo $1,mc $4] }
 
 splice_exp :: { LHsExpr RdrName }
-        : TH_ID_SPLICE          { sL1 $1 $ mkHsSpliceE
+        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE
                                         (sL1 $1 $ HsVar (mkUnqual varName
-                                                        (getTH_ID_SPLICE $1))) }
+                                                        (getTH_ID_SPLICE $1))))
+                                       [mj AnnThIdSplice $1] }
         | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE $2) [mo $1,mc $3] }
-        | TH_ID_TY_SPLICE       { sL1 $1 $ mkHsSpliceTE
+        | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE
                                         (sL1 $1 $ HsVar (mkUnqual varName
-                                                     (getTH_ID_TY_SPLICE $1))) }
+                                                     (getTH_ID_TY_SPLICE $1))))
+                                       [mj AnnThIdTySplice $1] }
         | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE $2) [mo $1,mc $3] }
 
 cmdargs :: { [LHsCmdTop RdrName] }
