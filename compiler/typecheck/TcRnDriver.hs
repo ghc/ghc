@@ -1770,7 +1770,15 @@ tcRnExpr hsc_env rdr_expr
     _ <- simplifyInteractive (andWC stWC lie_top) ;
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
-    zonkTcType all_expr_ty
+    ty <- zonkTcType all_expr_ty ;
+
+    -- We normalise type families, so that the type of an expression is the
+    -- same as of a bound expression (TcBinds.mkInferredPolyId). See Trac
+    -- #10321 for further discussion.
+    fam_envs <- tcGetFamInstEnvs ;
+    -- normaliseType returns a coercion which we discard, so the Role is
+    -- irrelevant
+    return (snd (normaliseType fam_envs Nominal ty))
     }
 
 --------------------------
