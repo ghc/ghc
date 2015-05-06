@@ -254,16 +254,6 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 432 contains 1 shift/reduce conflicts.
-
-        atype -> SIMPLEQUOTE '[' . comma_types0 ']'         (rule 318)
-        sysdcon -> '[' . ']'                                (rule 613)
-
-    Conflict: ']' (empty comma_types0 reudes)
-
-TODO: Why?
-
--------------------------------------------------------------------------------
 
 state 462 contains 1 shift/reduce conflicts.
 
@@ -1692,7 +1682,7 @@ atype :: { LHsType RdrName }
         | TH_ID_SPLICE                { sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
                                         mkUnqual varName (getTH_ID_SPLICE $1) }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon                    { sLL $1 $> $ HsTyVar $ unLoc $2 }
+        | SIMPLEQUOTE qcon_nowiredlist { sLL $1 $> $ HsTyVar $ unLoc $2 }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
                                 ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
@@ -2768,11 +2758,22 @@ name_var : var { $1 }
 
 -----------------------------------------
 -- Data constructors
-qcon    :: { Located RdrName }
-        : qconid                { $1 }
-        | '(' qconsym ')'       {% ams (sLL $1 $> (unLoc $2))
-                                       [mop $1,mj AnnVal $2,mcp $3] }
-        | sysdcon               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
+-- There are two different productions here as lifted list constructors
+-- are parsed differently.
+
+qcon_nowiredlist :: { Located RdrName }
+        : gen_qcon                     { $1 }
+        | sysdcon_nolist               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
+
+qcon :: { Located RdrName }
+  : gen_qcon              { $1}
+  | sysdcon               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
+
+gen_qcon :: { Located RdrName }
+  : qconid                { $1 }
+  | '(' qconsym ')'       {% ams (sLL $1 $> (unLoc $2))
+                                   [mop $1,mj AnnVal $2,mcp $3] }
+
 -- The case of '[:' ':]' is part of the production `parr'
 
 con     :: { Located RdrName }
@@ -2786,13 +2787,16 @@ con_list : con                  { sL1 $1 [$1] }
          | con ',' con_list     {% addAnnotation (gl $1) AnnComma (gl $2) >>
                                    return (sLL $1 $> ($1 : unLoc $3)) }
 
-sysdcon :: { Located DataCon }  -- Wired in data constructors
+sysdcon_nolist :: { Located DataCon }  -- Wired in data constructors
         : '(' ')'               {% ams (sLL $1 $> unitDataCon) [mop $1,mcp $2] }
         | '(' commas ')'        {% ams (sLL $1 $> $ tupleCon BoxedTuple (snd $2 + 1))
                                        (mop $1:mcp $3:(mcommas (fst $2))) }
         | '(#' '#)'             {% ams (sLL $1 $> $ unboxedUnitDataCon) [mo $1,mc $2] }
         | '(#' commas '#)'      {% ams (sLL $1 $> $ tupleCon UnboxedTuple (snd $2 + 1))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
+
+sysdcon :: { Located DataCon }
+        : sysdcon_nolist                 { $1 }
         | '[' ']'               {% ams (sLL $1 $> nilDataCon) [mos $1,mcs $2] }
 
 conop :: { Located RdrName }
