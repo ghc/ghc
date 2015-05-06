@@ -5,6 +5,8 @@
 /latex-test/out/
 
 /doc/haddock
+/doc/haddock.ps
+/doc/haddock.pdf
 /doc/autom4te.cache/
 /doc/config.log
 /doc/config.mk
