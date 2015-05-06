@@ -61,7 +61,7 @@ module Name (
         isValName, isVarName,
         isWiredInName, isBuiltInSyntax,
         wiredInNameTyThing_maybe,
-        nameIsLocalOrFrom, nameIsHomePackageImport,
+        nameIsLocalOrFrom, nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
 
         -- * Class 'NamedThing' and overloaded friends
@@ -255,6 +255,17 @@ nameIsHomePackageImport this_mod
                           && modulePackageKey nm_mod == this_pkg
   where
     this_pkg = modulePackageKey this_mod
+
+-- | Returns True if the Name comes from some other package: neither this
+-- pacakge nor the interactive package.
+nameIsFromExternalPackage :: PackageKey -> Name -> Bool
+nameIsFromExternalPackage this_pkg name
+  | Just mod <- nameModule_maybe name
+  , modulePackageKey mod /= this_pkg    -- Not this package
+  , not (isInteractiveModule mod)       -- Not the 'interactive' package
+  = True
+  | otherwise
+  = False
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
