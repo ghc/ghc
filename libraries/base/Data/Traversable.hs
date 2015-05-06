@@ -144,10 +144,9 @@ import qualified GHC.List as List ( foldr )
 class (Functor t, Foldable t) => Traversable t where
     {-# MINIMAL traverse | sequenceA #-}
 
-    -- | Map each element of a structure to an action, evaluate these
-    -- these actions from left to right, and collect the results.
-    -- actions from left to right, and collect the results. For a
-    -- version that ignores the results see 'Data.Foldable.traverse_'.
+    -- | Map each element of a structure to an action, evaluate these actions
+    -- from left to right, and collect the results. For a version that ignores
+    -- the results see 'Data.Foldable.traverse_'.
     traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
     traverse f = sequenceA . fmap f
 
