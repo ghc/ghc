@@ -1109,7 +1109,7 @@ tc_infer_id orig id_name
                  PatSynCon ps    -> tcPatSynBuilderOcc orig ps
 
              _ -> failWithTc $
-                  ppr thing <+> ptext (sLit "used where a value identifer was expected") }
+                  ppr thing <+> ptext (sLit "used where a value identifier was expected") }
   where
     inst_normal_id id
       = do { (wrap, rho) <- deeplyInstantiate orig (idType id)

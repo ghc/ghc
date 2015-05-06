@@ -1,7 +1,7 @@
 {-# OPTIONS -fwarn-unused-binds #-}
 module ShouldCompile where
 
--- !!! should produce warnings about unused identifers
+-- !!! should produce warnings about unused identifiers
 x :: [()]
 x = [ () | y <- [] ]
 
