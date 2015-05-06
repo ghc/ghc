@@ -1,0 +1,55 @@
+---Problems---------------------
+[
+]
+
+--------------------------------
+[
+(AK Test10268.hs:1:1 AnnModule = [Test10268.hs:3:1-6])
+
+(AK Test10268.hs:1:1 AnnWhere = [Test10268.hs:3:18-22])
+
+(AK Test10268.hs:5:1-17 AnnEqual = [Test10268.hs:5:4])
+
+(AK Test10268.hs:5:1-17 AnnFunId = [Test10268.hs:5:1-2])
+
+(AK Test10268.hs:5:1-17 AnnSemi = [Test10268.hs:7:1])
+
+(AK Test10268.hs:5:6-17 AnnThIdSplice = [Test10268.hs:5:6-17])
+
+(AK Test10268.hs:7:1-27 AnnDcolon = [Test10268.hs:7:6-7])
+
+(AK Test10268.hs:7:1-27 AnnSemi = [Test10268.hs:8:1])
+
+(AK Test10268.hs:7:9-27 AnnRarrow = [Test10268.hs:7:11-12])
+
+(AK Test10268.hs:7:22-25 AnnCloseS = [Test10268.hs:7:25])
+
+(AK Test10268.hs:7:22-25 AnnOpenS = [Test10268.hs:7:23])
+
+(AK Test10268.hs:7:22-25 AnnSimpleQuote = [Test10268.hs:7:22])
+
+(AK Test10268.hs:8:1-16 AnnEqual = [Test10268.hs:8:6])
+
+(AK Test10268.hs:8:1-16 AnnFunId = [Test10268.hs:8:1-4])
+
+(AK Test10268.hs:8:1-16 AnnSemi = [Test10268.hs:10:1])
+
+(AK Test10268.hs:10:1-22 AnnDcolon = [Test10268.hs:10:7-8])
+
+(AK Test10268.hs:10:1-22 AnnSemi = [Test10268.hs:11:1])
+
+(AK Test10268.hs:10:18-20 AnnCloseS = [Test10268.hs:10:20])
+
+(AK Test10268.hs:10:18-20 AnnOpenS = [Test10268.hs:10:19])
+
+(AK Test10268.hs:10:18-20 AnnSimpleQuote = [Test10268.hs:10:18])
+
+(AK Test10268.hs:11:1-17 AnnEqual = [Test10268.hs:11:7])
+
+(AK Test10268.hs:11:1-17 AnnFunId = [Test10268.hs:11:1-5])
+
+(AK Test10268.hs:11:1-17 AnnSemi = [Test10268.hs:12:1])
+
+(AK <no location info> AnnEofPos = [Test10268.hs:12:1])
+]
+
