@@ -64,6 +64,9 @@ typedef struct {
     // Whether to interpret +RTS options on the command line
     RtsOptsEnabledEnum rts_opts_enabled;
 
+    // Whether to give RTS flag suggestions
+    HsBool rts_opts_suggestions;
+
     // additional RTS options
     const char *rts_opts;
 

@@ -1221,6 +1221,27 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <option>-no-rtsopts-suggestions</option>
+          <indexterm><primary><option>-no-rtsopts-suggestions</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            This option disables RTS suggestions about linking with <option>-rtsopts</option>
+            when they are not available.
+
+            These suggestions would be unhelpful if the users have installed Haskell programs
+            through their package managers.
+            With this option enabled, these suggestions will not appear.
+
+            It is recommended for people distributing binaries
+            to build with either <option>-rtsopts</option> or
+            <option>-no-rtsopts-suggestions</option>.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-fno-gen-manifest</option>
           <indexterm><primary><option>-fno-gen-manifest</option></primary>
           </indexterm>

@@ -1657,6 +1657,10 @@ mkExtraObjToLinkIntoBinary dflags = do
       text " RtsConfig __conf = defaultRtsConfig;",
       text " __conf.rts_opts_enabled = "
           <> text (show (rtsOptsEnabled dflags)) <> semi,
+      text " __conf.rts_opts_suggestions = "
+          <> text (if rtsOptsSuggestions dflags
+                      then "rtsTrue"
+                      else "rtsFalse") <> semi,
       case rtsOpts dflags of
          Nothing   -> Outputable.empty
          Just opts -> ptext (sLit "    __conf.rts_opts= ") <>

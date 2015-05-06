@@ -59,6 +59,7 @@ RtsConfig rtsConfig;
 
 const RtsConfig defaultRtsConfig  = {
     .rts_opts_enabled = RtsOptsSafeOnly,
+    .rts_opts_suggestions = rtsTrue,
     .rts_opts = NULL,
     .rts_hs_main = rtsFalse,
     .defaultsHook = FlagDefaultsHook,

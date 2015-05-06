@@ -1,2 +1,2 @@
-Stack space overflow: current size 99136 bytes.
-Relink with -rtsopts and use `+RTS -Ksize -RTS' to increase it.
+T9579_stackoverflow_rtssome: Stack space overflow: current size 99136 bytes.
+T9579_stackoverflow_rtssome: Relink with -rtsopts and use `+RTS -Ksize -RTS' to increase it.

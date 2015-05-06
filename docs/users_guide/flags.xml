@@ -2607,6 +2607,14 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-no-rtsopts-suggestions</option></entry>
+            <entry>Don't print RTS suggestions about linking with
+              <literal>-rtsopts</literal>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-no-link</option></entry>
             <entry>Omit linking</entry>
             <entry>dynamic</entry>

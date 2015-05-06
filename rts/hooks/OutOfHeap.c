@@ -13,17 +13,24 @@
 void
 OutOfHeapHook (W_ request_size, W_ heap_size) /* both sizes in bytes */
 {
-  (void)request_size;   /* keep gcc -Wall happy */
-  if (heap_size > 0) {
-      errorBelch("Heap exhausted;\n"
-                 "Current maximum heap size is %" FMT_Word
-                 " bytes (%" FMT_Word " MB);\n"
-                 "%s `+RTS -M<size>' to increase it.",
-                 heap_size, heap_size / (1024*1024),
-                 ((rtsConfig.rts_opts_enabled == RtsOptsAll)
-                  ? "use"
-                  : "relink with -rtsopts and use"));
-  } else {
-      errorBelch("out of memory");
-  }
+    (void)request_size;   /* keep gcc -Wall happy */
+    if (heap_size > 0) {
+        errorBelch("Heap exhausted;");
+        errorBelch("Current maximum heap size is %" FMT_Word
+                   " bytes (%" FMT_Word " MB).",
+                   heap_size, heap_size / (1024*1024));
+
+        if (rtsConfig.rts_opts_suggestions == rtsTrue) {
+
+            if (rtsConfig.rts_opts_enabled == RtsOptsAll) {
+                errorBelch("Use `+RTS -M<size>' to increase it.");
+            } else {
+                errorBelch("Relink with -rtsopts and "
+                           "use `+RTS -M<size>' to increase it.");
+            }
+
+        }
+    } else {
+        errorBelch("Out of memory.\n");
+    }
 }

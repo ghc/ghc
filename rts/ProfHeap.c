@@ -280,12 +280,14 @@ nextEra( void )
         era++;
 
         if (era == max_era) {
-            if (rtsConfig.rts_opts_enabled == RtsOptsAll) {
-                errorBelch("maximum number of censuses reached;\n"
-                           "use +RTS -i to reduce");
-            } else {
-                errorBelch("maximum number of censuses reached;\n"
-                           "Relink with -rtsopts and use `+RTS -i` to reduce");
+            errorBelch("Maximum number of censuses reached.");
+            if (rtsConfig.rts_opts_suggestions == rtsTrue) {
+                if (rtsConfig.rts_opts_enabled == RtsOptsAll)  {
+                    errorBelch("Use `+RTS -i' to reduce censuses.");
+                } else  {
+                    errorBelch("Relink with -rtsopts and "
+                               "use `+RTS -i' to reduce censuses.");
+                }
             }
             stg_exit(EXIT_FAILURE);
         }

@@ -1,2 +1,2 @@
-Stack space overflow: current size 99136 bytes.
-Use `+RTS -Ksize -RTS' to increase it.
+T9579_stackoverflow_rtsall: Stack space overflow: current size 99136 bytes.
+T9579_stackoverflow_rtsall: Use `+RTS -Ksize -RTS' to increase it.

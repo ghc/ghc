@@ -746,6 +746,7 @@ data DynFlags = DynFlags {
 
   rtsOpts               :: Maybe String,
   rtsOptsEnabled        :: RtsOptsEnabled,
+  rtsOptsSuggestions    :: Bool,
 
   hpcDir                :: String,      -- ^ Path to store the .mix files
 
@@ -1473,6 +1474,7 @@ defaultDynFlags mySettings =
         cmdlineFrameworks       = [],
         rtsOpts                 = Nothing,
         rtsOptsEnabled          = RtsOptsSafeOnly,
+        rtsOptsSuggestions      = True,
 
         hpcDir                  = ".hpc",
 
@@ -2392,6 +2394,8 @@ dynamic_flags = [
   , defGhcFlag "rtsopts=some"   (NoArg (setRtsOptsEnabled RtsOptsSafeOnly))
   , defGhcFlag "rtsopts=none"   (NoArg (setRtsOptsEnabled RtsOptsNone))
   , defGhcFlag "no-rtsopts"     (NoArg (setRtsOptsEnabled RtsOptsNone))
+  , defGhcFlag "no-rtsopts-suggestions"
+      (noArg (\d -> d {rtsOptsSuggestions = False} ))
   , defGhcFlag "main-is"        (SepArg setMainIs)
   , defGhcFlag "haddock"        (NoArg (setGeneralFlag Opt_Haddock))
   , defGhcFlag "haddock-opts"   (hasArg addHaddockOpts)
