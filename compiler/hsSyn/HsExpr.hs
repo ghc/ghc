@@ -227,7 +227,7 @@ data HsExpr id
   --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsLet       (Located (HsLocalBinds id))
+  | HsLet       (HsLocalBinds id)
                 (LHsExpr  id)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
@@ -236,11 +236,11 @@ data HsExpr id
   --             'ApiAnnotation.AnnClose'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsDo        (HsStmtContext Name)     -- The parameterisation is unimportant
-                                         -- because in this context we never use
-                                         -- the PatGuard or ParStmt variant
-                (Located [ExprLStmt id]) -- "do":one or more stmts
-                (PostTc id Type)         -- Type of the whole expression
+  | HsDo        (HsStmtContext Name) -- The parameterisation is unimportant
+                                     -- because in this context we never use
+                                     -- the PatGuard or ParStmt variant
+                [ExprLStmt id]       -- "do":one or more stmts
+                (PostTc id Type)     -- Type of the whole expression
 
   -- | Syntactic list: [a,b,c,...]
   --
@@ -672,15 +672,15 @@ ppr_expr (HsMultiIf _ alts)
               , ptext (sLit "->") <+> pprDeeper (ppr expr) ]
 
 -- special case: let ... in let ...
-ppr_expr (HsLet (L _ binds) expr@(L _ (HsLet _ _)))
+ppr_expr (HsLet binds expr@(L _ (HsLet _ _)))
   = sep [hang (ptext (sLit "let")) 2 (hsep [pprBinds binds, ptext (sLit "in")]),
          ppr_lexpr expr]
 
-ppr_expr (HsLet (L _ binds) expr)
+ppr_expr (HsLet binds expr)
   = sep [hang (ptext (sLit "let")) 2 (pprBinds binds),
          hang (ptext (sLit "in"))  2 (ppr expr)]
 
-ppr_expr (HsDo do_or_list_comp (L _ stmts) _) = pprDo do_or_list_comp stmts
+ppr_expr (HsDo do_or_list_comp stmts _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList _ _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -898,7 +898,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdLet    (Located (HsLocalBinds id))      -- let(rec)
+  | HsCmdLet    (HsLocalBinds id)               -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
     --       'ApiAnnotation.AnnOpen' @'{'@,
@@ -906,7 +906,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdDo     (Located [CmdLStmt id])
+  | HsCmdDo     [CmdLStmt id]
                 (PostTc id Type)                -- Type of the whole expression
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
     --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
@@ -992,15 +992,15 @@ ppr_cmd (HsCmdIf _ e ct ce)
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
-ppr_cmd (HsCmdLet (L _ binds) cmd@(L _ (HsCmdLet _ _)))
+ppr_cmd (HsCmdLet binds cmd@(L _ (HsCmdLet _ _)))
   = sep [hang (ptext (sLit "let")) 2 (hsep [pprBinds binds, ptext (sLit "in")]),
          ppr_lcmd cmd]
 
-ppr_cmd (HsCmdLet (L _ binds) cmd)
+ppr_cmd (HsCmdLet binds cmd)
   = sep [hang (ptext (sLit "let")) 2 (pprBinds binds),
          hang (ptext (sLit "in"))  2 (ppr cmd)]
 
-ppr_cmd (HsCmdDo (L  _ stmts) _)  = pprDo ArrowExpr stmts
+ppr_cmd (HsCmdDo stmts _)  = pprDo ArrowExpr stmts
 ppr_cmd (HsCmdCast co cmd) = sep [ ppr_cmd cmd
                                  , ptext (sLit "|>") <+> ppr co ]
 
@@ -1061,7 +1061,7 @@ patterns in each equation.
 -}
 
 data MatchGroup id body
-  = MG { mg_alts    :: Located [LMatch id body]  -- The alternatives
+  = MG { mg_alts    :: [LMatch id body]  -- The alternatives
        , mg_arg_tys :: [PostTc id Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: PostTc id Type    -- Type of the result, tr
        , mg_origin  :: Origin }
@@ -1116,13 +1116,13 @@ Example infix function definition requiring individual API Annotations
 -}
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
-isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
+isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
 
 matchGroupArity :: MatchGroup id body -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
-  | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
+  | (alt1:_) <- alts = length (hsLMatchPats alt1)
   | otherwise        = panic "matchGroupArity"
 
 hsLMatchPats :: LMatch id body -> [LPat id]
@@ -1139,7 +1139,7 @@ hsLMatchPats (L _ (Match _ pats _ _)) = pats
 data GRHSs id body
   = GRHSs {
       grhssGRHSs :: [LGRHS id body],       -- ^ Guarded RHSs
-      grhssLocalBinds :: Located (HsLocalBinds id) -- ^ The where clause
+      grhssLocalBinds :: (HsLocalBinds id) -- ^ The where clause
     } deriving (Typeable)
 deriving instance (Data body,DataId id) => Data (GRHSs id body)
 
@@ -1156,7 +1156,7 @@ deriving instance (Data body,DataId id) => Data (GRHS id body)
 pprMatches :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
            => HsMatchContext idL -> MatchGroup idR body -> SDoc
 pprMatches ctxt (MG { mg_alts = matches })
-    = vcat (map (pprMatch ctxt) (map unLoc (unLoc matches)))
+    = vcat (map (pprMatch ctxt) (map unLoc matches))
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
@@ -1207,7 +1207,7 @@ pprMatch ctxt (Match _ pats maybe_ty grhss)
 
 pprGRHSs :: (OutputableBndr idR, Outputable body)
          => HsMatchContext idL -> GRHSs idR body -> SDoc
-pprGRHSs ctxt (GRHSs grhss (L _ binds))
+pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
  $$ ppUnless (isEmptyLocalBinds binds)
       (text "where" $$ nest 4 (pprBinds binds))
@@ -1284,7 +1284,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@,
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | LetStmt  (Located (HsLocalBindsLR idL idR))
+  | LetStmt  (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  [ParStmtBlock idL idR]
@@ -1517,7 +1517,7 @@ pprStmt :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
         => (StmtLR idL idR body) -> SDoc
 pprStmt (LastStmt expr _)         = ifPprDebug (ptext (sLit "[last]")) <+> ppr expr
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, larrow, ppr expr]
-pprStmt (LetStmt (L _ binds))     = hsep [ptext (sLit "let"), pprBinds binds]
+pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (BodyStmt expr _ _ _)     = ppr expr
 pprStmt (ParStmt stmtss _ _)      = sep (punctuate (ptext (sLit " | ")) (map ppr stmtss))
 

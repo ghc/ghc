@@ -57,7 +57,7 @@ dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchCon
         -> GRHSs Id (LHsExpr Id)                -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx _ (GRHSs grhss (L _ binds)) rhs_ty
+dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
   = ASSERT( notNull grhss )
     do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
@@ -106,7 +106,7 @@ matchGuards (BodyStmt expr _ _ _ : stmts) ctx rhs rhs_ty = do
     pred_expr <- dsLExpr expr
     return (mkGuardedMatchResult pred_expr match_result)
 
-matchGuards (LetStmt (L _ binds) : stmts) ctx rhs rhs_ty = do
+matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     return (adjustMatchResultDs (dsLocalBinds binds) match_result)
         -- NB the dsLet occurs inside the match_result

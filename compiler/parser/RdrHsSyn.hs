@@ -492,15 +492,13 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
-                               fun_matches
-                                 = MG { mg_alts = L _ mtchs1 } })) binds
+                               fun_matches = MG { mg_alts = mtchs1 } })) binds
   | has_args mtchs1
   = go is_infix1 mtchs1 loc1 binds []
   where
     go is_infix mtchs loc
        (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_infix = is_infix2,
-                                fun_matches
-                                  = MG { mg_alts = L _ mtchs2 } })) : binds) _
+                                fun_matches = MG { mg_alts = mtchs2 } })) : binds) _
         | f1 == f2 = go (is_infix || is_infix2) (mtchs2 ++ mtchs)
                         (combineSrcSpans loc loc2) binds []
     go is_infix mtchs loc (doc_decl@(L loc2 (DocD _)) : binds) doc_decls
@@ -1258,8 +1256,8 @@ checkCmd _ (HsIf cf ep et ee) = do
     return $ HsCmdIf cf ep pt pe
 checkCmd _ (HsLet lb e) =
     checkCommand e >>= (\c -> return $ HsCmdLet lb c)
-checkCmd _ (HsDo DoExpr (L l stmts) ty) =
-    mapM checkCmdLStmt stmts >>= (\ss -> return $ HsCmdDo (L l ss) ty)
+checkCmd _ (HsDo DoExpr stmts ty) =
+    mapM checkCmdLStmt stmts >>= (\ss -> return $ HsCmdDo ss ty)
 
 checkCmd _ (OpApp eLeft op _fixity eRight) = do
     -- OpApp becomes a HsCmdArrForm with a (Just fixity) in it
@@ -1288,9 +1286,9 @@ checkCmdStmt _ stmt@(RecStmt { recS_stmts = stmts }) = do
 checkCmdStmt l stmt = cmdStmtFail l stmt
 
 checkCmdMatchGroup :: MatchGroup RdrName (LHsExpr RdrName) -> P (MatchGroup RdrName (LHsCmd RdrName))
-checkCmdMatchGroup mg@(MG { mg_alts = L l ms }) = do
+checkCmdMatchGroup mg@(MG { mg_alts = ms }) = do
     ms' <- mapM (locMap $ const convert) ms
-    return $ mg { mg_alts = L l ms' }
+    return $ mg { mg_alts = ms' }
     where convert (Match mf pat mty grhss) = do
             grhss' <- checkCmdGRHSs grhss
             return $ Match mf pat mty grhss'

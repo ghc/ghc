@@ -321,19 +321,19 @@ dsExpr (HsCase discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet (L _ binds) body) = do
+dsExpr (HsLet binds body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-dsExpr (HsDo ListComp     (L _ stmts) res_ty) = dsListComp stmts res_ty
-dsExpr (HsDo PArrComp     (L _ stmts) _)      = dsPArrComp (map unLoc stmts)
-dsExpr (HsDo DoExpr       (L _ stmts) _)      = dsDo stmts
-dsExpr (HsDo GhciStmtCtxt (L _ stmts) _)      = dsDo stmts
-dsExpr (HsDo MDoExpr      (L _ stmts) _)      = dsDo stmts
-dsExpr (HsDo MonadComp    (L _ stmts) _)      = dsMonadComp stmts
+dsExpr (HsDo ListComp     stmts res_ty) = dsListComp stmts res_ty
+dsExpr (HsDo PArrComp     stmts _)      = dsPArrComp (map unLoc stmts)
+dsExpr (HsDo DoExpr       stmts _)      = dsDo stmts
+dsExpr (HsDo GhciStmtCtxt stmts _)      = dsDo stmts
+dsExpr (HsDo MDoExpr      stmts _)      = dsDo stmts
+dsExpr (HsDo MonadComp    stmts _)      = dsMonadComp stmts
 
 dsExpr (HsIf mb_fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -571,8 +571,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd (MG { mg_alts = noLoc alts
-                                           , mg_arg_tys = [in_ty]
+                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty]
                                            , mg_res_ty = out_ty, mg_origin = FromSource })
                                            -- FromSource is not strictly right, but we
                                            -- want incomplete pattern-match warnings
@@ -840,7 +839,7 @@ dsDo stmts
            ; rest <- goL stmts
            ; return (mkApps then_expr2 [rhs2, rest]) }
 
-    go _ (LetStmt (L _ binds)) stmts
+    go _ (LetStmt binds) stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
@@ -872,12 +871,11 @@ dsDo stmts
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
         mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
-        mfix_arg = noLoc
-                   $ HsLam (MG { mg_alts = noLoc [mkSimpleMatch [mfix_pat] body]
-                                , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
-                                , mg_origin = Generated })
+        mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
+                                         , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
+                                         , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
-        body     = noLoc $ HsDo DoExpr (noLoc (rec_stmts ++ [ret_stmt])) body_ty
+        body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
         ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,

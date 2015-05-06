@@ -278,21 +278,20 @@ tcPatSynMatcher (L loc name) lpat
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase (nlHsVar scrutinee) $
-                    MG{ mg_alts = L (getLoc lpat) cases
+                    MG{ mg_alts = cases
                       , mg_arg_tys = [pat_ty]
                       , mg_res_ty = res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam $
-                     MG{ mg_alts = noLoc [mkSimpleMatch args body]
+                     MG{ mg_alts = [mkSimpleMatch args body]
                        , mg_arg_tys = [pat_ty, cont_ty, res_ty]
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body')
-                             (noLoc EmptyLocalBinds)
-             mg = MG{ mg_alts = L (getLoc match) [match]
+             match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body') EmptyLocalBinds
+             mg = MG{ mg_alts = [match]
                     , mg_arg_tys = []
                     , mg_res_ty = res_ty
                     , mg_origin = Generated
@@ -386,17 +385,17 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
 
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
     mk_mg body = mkMatchGroupName Generated [builder_match]
-             where
-               builder_args  = [L loc (VarPat n) | L loc n <- args]
-               builder_match = mkMatch builder_args body (noLoc EmptyLocalBinds)
+               where
+                 builder_args  = [L loc (VarPat n) | L loc n <- args]
+                 builder_match = mkMatch builder_args body EmptyLocalBinds
 
     args = case details of
               PrefixPatSyn args     -> args
               InfixPatSyn arg1 arg2 -> [arg1, arg2]
 
     add_dummy_arg :: MatchGroup Name (LHsExpr Name) -> MatchGroup Name (LHsExpr Name)
-    add_dummy_arg mg@(MG { mg_alts = L l [L loc (Match Nothing [] ty grhss)] })
-      = mg { mg_alts = L l [L loc (Match Nothing [nlWildPatName] ty grhss)] }
+    add_dummy_arg mg@(MG { mg_alts = [L loc (Match Nothing [] ty grhss)] })
+      = mg { mg_alts = [L loc (Match Nothing [nlWildPatName] ty grhss)] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
 

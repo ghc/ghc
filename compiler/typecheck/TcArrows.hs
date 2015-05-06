@@ -136,11 +136,11 @@ tc_cmd env (HsCmdPar cmd) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
         ; return (HsCmdPar cmd') }
 
-tc_cmd env (HsCmdLet (L l binds) (L body_loc body)) res_ty
+tc_cmd env (HsCmdLet binds (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
                              setSrcSpan body_loc        $
                              tc_cmd env body res_ty
-        ; return (HsCmdLet (L l binds') (L body_loc body')) }
+        ; return (HsCmdLet binds' (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCmdCase scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
@@ -234,7 +234,7 @@ tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
 -- D;G |-a (\x.cmd) : (t,stk) --> res
 
 tc_cmd env
-       (HsCmdLam (MG { mg_alts = L l [L mtch_loc
+       (HsCmdLam (MG { mg_alts = [L mtch_loc
                                    (match@(Match _ pats _maybe_rhs_sig grhss))],
                        mg_origin = origin }))
        (cmd_stk, res_ty)
@@ -248,7 +248,7 @@ tc_cmd env
 
         ; let match' = L mtch_loc (Match Nothing pats' Nothing grhss')
               arg_tys = map hsLPatType pats'
-              cmd' = HsCmdLam (MG { mg_alts = L l [match'], mg_arg_tys = arg_tys
+              cmd' = HsCmdLam (MG { mg_alts = [match'], mg_arg_tys = arg_tys
                                   , mg_res_ty = res_ty, mg_origin = origin })
         ; return (mkHsCmdCast co cmd') }
   where
@@ -256,10 +256,10 @@ tc_cmd env
     match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
-    tc_grhss (GRHSs grhss (L l binds)) stk_ty res_ty
+    tc_grhss (GRHSs grhss binds) stk_ty res_ty
         = do { (binds', grhss') <- tcLocalBinds binds $
                                    mapM (wrapLocM (tc_grhs stk_ty res_ty)) grhss
-             ; return (GRHSs grhss' (L l binds')) }
+             ; return (GRHSs grhss' binds') }
 
     tc_grhs stk_ty res_ty (GRHS guards body)
         = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
@@ -269,10 +269,10 @@ tc_cmd env
 -------------------------------------------
 --              Do notation
 
-tc_cmd env (HsCmdDo (L l stmts) _) (cmd_stk, res_ty)
+tc_cmd env (HsCmdDo stmts _) (cmd_stk, res_ty)
   = do  { co <- unifyType unitTy cmd_stk  -- Expecting empty argument stack
         ; stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
-        ; return (mkHsCmdCast co (HsCmdDo (L l stmts') res_ty)) }
+        ; return (mkHsCmdCast co (HsCmdDo stmts' res_ty)) }
 
 
 -----------------------------------------------------------------

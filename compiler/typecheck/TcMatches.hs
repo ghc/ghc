@@ -104,8 +104,7 @@ tcMatchesCase :: (Outputable (body Name)) =>
 
 tcMatchesCase ctxt scrut_ty matches res_ty
   | isEmptyMatchGroup matches   -- Allow empty case expressions
-  = return (MG { mg_alts = noLoc [], mg_arg_tys = [scrut_ty]
-               , mg_res_ty = res_ty, mg_origin = mg_origin matches })
+  = return (MG { mg_alts = [], mg_arg_tys = [scrut_ty], mg_res_ty = res_ty, mg_origin = mg_origin matches })
 
   | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
@@ -171,11 +170,10 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcRhoType
                  -> TcM (Located (body TcId)) }
 
-tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches, mg_origin = origin })
+tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
     do  { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
-        ; return (MG { mg_alts = L l matches', mg_arg_tys = pat_tys
-                     , mg_res_ty = rhs_ty, mg_origin = origin }) }
+        ; return (MG { mg_alts = matches', mg_arg_tys = pat_tys, mg_res_ty = rhs_ty, mg_origin = origin }) }
 
 -------------
 tcMatch :: (Outputable (body Name)) => TcMatchCtxt body
@@ -217,11 +215,11 @@ tcGRHSs :: TcMatchCtxt body -> GRHSs Name (Located (body Name)) -> TcRhoType
 -- We used to force it to be a monotype when there was more than one guard
 -- but we don't need to do that any more
 
-tcGRHSs ctxt (GRHSs grhss (L l binds)) res_ty
+tcGRHSs ctxt (GRHSs grhss binds) res_ty
   = do  { (binds', grhss') <- tcLocalBinds binds $
                               mapM (wrapLocM (tcGRHS ctxt res_ty)) grhss
 
-        ; return (GRHSs grhss' (L l binds')) }
+        ; return (GRHSs grhss' binds') }
 
 -------------
 tcGRHS :: TcMatchCtxt body -> TcRhoType -> GRHS Name (Located (body Name))
@@ -243,32 +241,32 @@ tcGRHS ctxt res_ty (GRHS guards rhs)
 -}
 
 tcDoStmts :: HsStmtContext Name
-          -> Located [LStmt Name (LHsExpr Name)]
+          -> [LStmt Name (LHsExpr Name)]
           -> TcRhoType
           -> TcM (HsExpr TcId)          -- Returns a HsDo
-tcDoStmts ListComp (L l stmts) res_ty
+tcDoStmts ListComp stmts res_ty
   = do  { (co, elt_ty) <- matchExpectedListTy res_ty
         ; let list_ty = mkListTy elt_ty
         ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts elt_ty
-        ; return $ mkHsWrapCo co (HsDo ListComp (L l stmts') list_ty) }
+        ; return $ mkHsWrapCo co (HsDo ListComp stmts' list_ty) }
 
-tcDoStmts PArrComp (L l stmts) res_ty
+tcDoStmts PArrComp stmts res_ty
   = do  { (co, elt_ty) <- matchExpectedPArrTy res_ty
         ; let parr_ty = mkPArrTy elt_ty
         ; stmts' <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts elt_ty
-        ; return $ mkHsWrapCo co (HsDo PArrComp (L l stmts') parr_ty) }
+        ; return $ mkHsWrapCo co (HsDo PArrComp stmts' parr_ty) }
 
-tcDoStmts DoExpr (L l stmts) res_ty
+tcDoStmts DoExpr stmts res_ty
   = do  { stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty
-        ; return (HsDo DoExpr (L l stmts') res_ty) }
+        ; return (HsDo DoExpr stmts' res_ty) }
 
-tcDoStmts MDoExpr (L l stmts) res_ty
+tcDoStmts MDoExpr stmts res_ty
   = do  { stmts' <- tcStmts MDoExpr tcDoStmt stmts res_ty
-        ; return (HsDo MDoExpr (L l stmts') res_ty) }
+        ; return (HsDo MDoExpr stmts' res_ty) }
 
-tcDoStmts MonadComp (L l stmts) res_ty
+tcDoStmts MonadComp stmts res_ty
   = do  { stmts' <- tcStmts MonadComp tcMcStmt stmts res_ty
-        ; return (HsDo MonadComp (L l stmts') res_ty) }
+        ; return (HsDo MonadComp stmts' res_ty) }
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
@@ -322,11 +320,10 @@ tcStmtsAndThen _ _ [] res_ty thing_inside
         ; return ([], thing) }
 
 -- LetStmts are handled uniformly, regardless of context
-tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt (L l binds)) : stmts) res_ty
-                                                                    thing_inside
+tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt binds) : stmts) res_ty thing_inside
   = do  { (binds', (stmts',thing)) <- tcLocalBinds binds $
                                       tcStmtsAndThen ctxt stmt_chk stmts res_ty thing_inside
-        ; return (L loc (LetStmt (L l binds')) : stmts', thing) }
+        ; return (L loc (LetStmt binds') : stmts', thing) }
 
 -- For the vanilla case, handle the location-setting part
 tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
@@ -845,9 +842,9 @@ number of args are used in each equation.
 -}
 
 checkArgs :: Name -> MatchGroup Name body -> TcM ()
-checkArgs _ (MG { mg_alts = L _ [] })
+checkArgs _ (MG { mg_alts = [] })
     = return ()
-checkArgs fun (MG { mg_alts = L _ (match1:matches) })
+checkArgs fun (MG { mg_alts = match1:matches })
     | null bad_matches
     = return ()
     | otherwise

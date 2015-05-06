@@ -427,10 +427,10 @@ tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
 ************************************************************************
 -}
 
-tcExpr (HsLet (L l binds) expr) res_ty
+tcExpr (HsLet binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcMonoExpr expr res_ty
-        ; return (HsLet (L l binds') expr') }
+        ; return (HsLet binds' expr') }
 
 tcExpr (HsCase scrut matches) exp_ty
   = do  {  -- We used to typecheck the case alternatives first.
