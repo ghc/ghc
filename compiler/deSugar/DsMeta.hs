@@ -1013,8 +1013,8 @@ repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
         -- HsOverlit can definitely occur
 repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam (MG { mg_alts = [m] })) = repLambda m
-repE (HsLamCase _ (MG { mg_alts = ms }))
+repE (HsLam (MG { mg_alts = L _ [m] })) = repLambda m
+repE (HsLamCase _ (MG { mg_alts = L _ ms }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreList matchQTyConName ms'
                         ; repLamCase core_ms }
@@ -1032,7 +1032,7 @@ repE (NegApp x _)        = do
 repE (HsPar x)            = repLE x
 repE (SectionL x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
-repE (HsCase e (MG { mg_alts = ms }))
+repE (HsCase e (MG { mg_alts = L _ ms }))
                           = do { arg <- repLE e
                                ; ms2 <- mapM repMatchTup ms
                                ; core_ms2 <- coreList matchQTyConName ms2
@@ -1046,13 +1046,13 @@ repE (HsMultiIf _ alts)
   = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList alts')
        ; wrapGenSyms (concat binds) expr' }
-repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
-                               ; e2 <- addBinds ss (repLE e)
-                               ; z <- repLetE ds e2
-                               ; wrapGenSyms ss z }
+repE (HsLet (L _ bs) e)         = do { (ss,ds) <- repBinds bs
+                                     ; e2 <- addBinds ss (repLE e)
+                                     ; z <- repLetE ds e2
+                                     ; wrapGenSyms ss z }
 
 -- FIXME: I haven't got the types here right yet
-repE e@(HsDo ctxt sts _)
+repE e@(HsDo ctxt (L _ sts) _)
  | case ctxt of { DoExpr -> True; GhciStmtCtxt -> True; _ -> False }
  = do { (ss,zs) <- repLSts sts;
         e'      <- repDoE (nonEmptyCoreList zs);
@@ -1114,7 +1114,7 @@ repE e                     = notHandled "Expression form" (ppr e)
 -- Building representations of auxillary structures like Match, Clause, Stmt,
 
 repMatchTup ::  LMatch Name (LHsExpr Name) -> DsM (Core TH.MatchQ)
-repMatchTup (L _ (Match _ [p] _ (GRHSs guards wheres))) =
+repMatchTup (L _ (Match _ [p] _ (GRHSs guards (L _ wheres)))) =
   do { ss1 <- mkGenSyms (collectPatBinders p)
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
@@ -1126,7 +1126,7 @@ repMatchTup (L _ (Match _ [p] _ (GRHSs guards wheres))) =
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
 repClauseTup ::  LMatch Name (LHsExpr Name) -> DsM (Core TH.ClauseQ)
-repClauseTup (L _ (Match _ ps _ (GRHSs guards wheres))) =
+repClauseTup (L _ (Match _ ps _ (GRHSs guards (L _ wheres)))) =
   do { ss1 <- mkGenSyms (collectPatsBinders ps)
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
@@ -1201,7 +1201,7 @@ repSts (BindStmt p e _ _ : ss) =
       ; (ss2,zs) <- repSts ss
       ; z <- repBindSt p1 e2
       ; return (ss1++ss2, z : zs) }}
-repSts (LetStmt bs : ss) =
+repSts (LetStmt (L _ bs) : ss) =
    do { (ss1,ds) <- repBinds bs
       ; z <- repLetSt ds
       ; (ss2,zs) <- addBinds ss1 (repSts ss)
@@ -1280,8 +1280,9 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- with an empty list of patterns
 rep_bind (L loc (FunBind
                  { fun_id = fn,
-                   fun_matches = MG { mg_alts = [L _ (Match _ [] _
-                                                   (GRHSs guards wheres))] } }))
+                   fun_matches = MG { mg_alts
+                           = L _ [L _ (Match _ [] _
+                                             (GRHSs guards (L _ wheres)))] } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; fn'  <- lookupLBinder fn
@@ -1290,13 +1291,15 @@ rep_bind (L loc (FunBind
         ; ans' <- wrapGenSyms ss ans
         ; return (loc, ans') }
 
-rep_bind (L loc (FunBind { fun_id = fn, fun_matches = MG { mg_alts = ms } }))
+rep_bind (L loc (FunBind { fun_id = fn
+                         , fun_matches = MG { mg_alts = L _ ms } }))
  =   do { ms1 <- mapM repClauseTup ms
         ; fn' <- lookupLBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (loc, ans) }
 
-rep_bind (L loc (PatBind { pat_lhs = pat, pat_rhs = GRHSs guards wheres }))
+rep_bind (L loc (PatBind { pat_lhs = pat
+                         , pat_rhs = GRHSs guards (L _ wheres) }))
  =   do { patcore <- repLP pat
         ; (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
@@ -1340,7 +1343,7 @@ rep_bind (L _ dec@(PatSynBind {})) = notHandled "pattern synonyms" (ppr dec)
 -- (\ p1 .. pn -> exp) by causing an error.
 
 repLambda :: LMatch Name (LHsExpr Name) -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match _ ps _ (GRHSs [L _ (GRHS [] e)] EmptyLocalBinds)))
+repLambda (L _ (Match _ ps _ (GRHSs [L _ (GRHS [] e)] (L _ EmptyLocalBinds))))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (

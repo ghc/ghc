@@ -1339,35 +1339,35 @@ decls   :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
         | decl                          { sL1 $1 ([],unLoc $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
-decllist :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
+decllist :: { Located ([AddAnn],Located (OrdList (LHsDecl RdrName))) }
         : '{'            decls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
-                                                   ,snd $ unLoc $2) }
-        |     vocurly    decls close   { L (gl $2) (fst $ unLoc $2,snd $ unLoc $2) }
+                                                   ,sL1 $2 $ snd $ unLoc $2) }
+        |     vocurly    decls close   { L (gl $2) (fst $ unLoc $2,sL1 $2 $ snd $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
 --
-binds   ::  { Located ([AddAnn],HsLocalBinds RdrName) }
+binds   ::  { Located ([AddAnn],Located (HsLocalBinds RdrName)) }
                                          -- May have implicit parameters
                                                 -- No type declarations
-        : decllist          {% do { val_binds <- cvBindGroup (snd $ unLoc $1)
+        : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
                                   ; return (sL1 $1 (fst $ unLoc $1
-                                                    ,HsValBinds val_binds)) } }
+                                                    ,sL1 $1 $ HsValBinds val_binds)) } }
 
         | '{'            dbinds '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                             ,HsIPBinds (IPBinds (unLoc $2)
+                                             ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
                                                          emptyTcEvBinds)) }
 
         |     vocurly    dbinds close   { L (getLoc $2) ([]
-                                            ,HsIPBinds (IPBinds (unLoc $2)
+                                            ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
                                                         emptyTcEvBinds)) }
 
 
-wherebinds :: { Located ([AddAnn],HsLocalBinds RdrName) }
+wherebinds :: { Located ([AddAnn],Located (HsLocalBinds RdrName)) }
                                                 -- May have implicit parameters
                                                 -- No type declarations
         : 'where' binds                 { sLL $1 $> (mj AnnWhere $1 : (fst $ unLoc $2)
                                              ,snd $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],emptyLocalBinds) }
+        | {- empty -}                   { noLoc ([],noLoc emptyLocalBinds) }
 
 
 -----------------------------------------------------------------------------

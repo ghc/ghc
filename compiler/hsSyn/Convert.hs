@@ -153,7 +153,7 @@ cvtDec (TH.ValD pat body ds)
         ; body' <- cvtGuard body
         ; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) ds
         ; returnJustL $ Hs.ValD $
-          PatBind { pat_lhs = pat', pat_rhs = GRHSs body' ds'
+          PatBind { pat_lhs = pat', pat_rhs = GRHSs body' (noLoc ds')
                   , pat_rhs_ty = placeHolderType, bind_fvs = placeHolderNames
                   , pat_ticks = ([],[]) } }
 
@@ -611,7 +611,7 @@ cvtClause (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) wheres
-        ; returnL $ Hs.Match Nothing ps' Nothing (GRHSs g' ds') }
+        ; returnL $ Hs.Match Nothing ps' Nothing (GRHSs g' (noLoc ds')) }
 
 
 -------------------------------------------------------------------
@@ -650,7 +650,7 @@ cvtl e = wrapL (cvt e)
       | otherwise      = do { alts' <- mapM cvtpair alts
                             ; return $ HsMultiIf placeHolderType alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
-                            ; e' <- cvtl e; return $ HsLet ds' e' }
+                            ; e' <- cvtl e; return $ HsLet (noLoc ds') e' }
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
                             ; return $ HsCase e' (mkMatchGroup FromSource ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
@@ -801,7 +801,7 @@ cvtHsDo do_or_lc stmts
                     L loc (BodyStmt body _ _ _) -> return (L loc (mkLastStmt body))
                     _ -> failWith (bad_last last')
 
-        ; return $ HsDo do_or_lc (stmts'' ++ [last'']) placeHolderType }
+        ; return $ HsDo do_or_lc (noLoc (stmts'' ++ [last''])) placeHolderType }
   where
     bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprAStmtContext do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
@@ -814,7 +814,7 @@ cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt RdrName (LHsExpr RdrName))
 cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnL $ mkBodyStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkBindStmt p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (ptext (sLit "a let binding")) ds
-                            ; returnL $ LetStmt ds' }
+                            ; returnL $ LetStmt (noLoc ds') }
 cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' noSyntaxExpr noSyntaxExpr }
                        where
                          cvt_one ds = do { ds' <- cvtStmts ds; return (ParStmtBlock ds' undefined noSyntaxExpr) }
@@ -824,7 +824,7 @@ cvtMatch (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (ptext (sLit "a where clause")) decs
-        ; returnL $ Hs.Match Nothing [p'] Nothing (GRHSs g' decs') }
+        ; returnL $ Hs.Match Nothing [p'] Nothing (GRHSs g' (noLoc decs')) }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS RdrName (LHsExpr RdrName)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

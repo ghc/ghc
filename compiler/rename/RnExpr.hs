@@ -199,14 +199,14 @@ rnExpr (HsCase expr matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
-rnExpr (HsLet binds expr)
+rnExpr (HsLet (L l binds) expr)
   = rnLocalBindsAndThen binds $ \binds' -> do
       { (expr',fvExpr) <- rnLExpr expr
-      ; return (HsLet binds' expr', fvExpr) }
+      ; return (HsLet (L l binds') expr', fvExpr) }
 
-rnExpr (HsDo do_or_lc stmts _)
+rnExpr (HsDo do_or_lc (L l stmts) _)
   = do  { ((stmts', _), fvs) <- rnStmts do_or_lc rnLExpr stmts (\ _ -> return ((), emptyFVs))
-        ; return ( HsDo do_or_lc stmts' placeHolderType, fvs ) }
+        ; return ( HsDo do_or_lc (L l stmts') placeHolderType, fvs ) }
 
 rnExpr (ExplicitList _ _  exps)
   = do  { opt_OverloadedLists <- xoptM Opt_OverloadedLists
@@ -499,14 +499,14 @@ rnCmd (HsCmdIf _ p b1 b2)
        ; (mb_ite, fvITE) <- lookupIfThenElse
        ; return (HsCmdIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
-rnCmd (HsCmdLet binds cmd)
+rnCmd (HsCmdLet (L l binds) cmd)
   = rnLocalBindsAndThen binds $ \ binds' -> do
       { (cmd',fvExpr) <- rnLCmd cmd
-      ; return (HsCmdLet binds' cmd', fvExpr) }
+      ; return (HsCmdLet (L l binds') cmd', fvExpr) }
 
-rnCmd (HsCmdDo stmts _)
+rnCmd (HsCmdDo (L l stmts) _)
   = do  { ((stmts', _), fvs) <- rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
-        ; return ( HsCmdDo stmts' placeHolderType, fvs ) }
+        ; return ( HsCmdDo (L l stmts') placeHolderType, fvs ) }
 
 rnCmd cmd@(HsCmdCast {}) = pprPanic "rnCmd" (ppr cmd)
 
@@ -532,10 +532,10 @@ methodNamesCmd (HsCmdPar c) = methodNamesLCmd c
 methodNamesCmd (HsCmdIf _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
-methodNamesCmd (HsCmdLet _ c)      = methodNamesLCmd c
-methodNamesCmd (HsCmdDo stmts _) = methodNamesStmts stmts
-methodNamesCmd (HsCmdApp c _)      = methodNamesLCmd c
-methodNamesCmd (HsCmdLam match)    = methodNamesMatch match
+methodNamesCmd (HsCmdLet _ c)          = methodNamesLCmd c
+methodNamesCmd (HsCmdDo (L _ stmts) _) = methodNamesStmts stmts
+methodNamesCmd (HsCmdApp c _)          = methodNamesLCmd c
+methodNamesCmd (HsCmdLam match)        = methodNamesMatch match
 
 methodNamesCmd (HsCmdCase _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
@@ -547,7 +547,7 @@ methodNamesCmd (HsCmdCase _ matches)
 
 ---------------------------------------------------
 methodNamesMatch :: MatchGroup Name (LHsCmd Name) -> FreeVars
-methodNamesMatch (MG { mg_alts = ms })
+methodNamesMatch (MG { mg_alts = L _ ms })
   = plusFVs (map do_one ms)
  where
     do_one (L _ (Match _ _ _ grhss)) = methodNamesGRHSs grhss
@@ -698,10 +698,10 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _)) thing_inside
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
         -- but it does not matter because the names are unique
 
-rnStmt _ _ (L loc (LetStmt binds)) thing_inside
+rnStmt _ _ (L loc (LetStmt (L l binds))) thing_inside
   = do  { rnLocalBindsAndThen binds $ \binds' -> do
         { (thing, fvs) <- thing_inside (collectLocalBinders binds')
-        ; return (([L loc (LetStmt binds')], thing), fvs) }  }
+        ; return (([L loc (LetStmt (L l binds'))], thing), fvs) }  }
 
 rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = rec_stmts })) thing_inside
   = do  { (return_op, fvs1)  <- lookupStmtName ctxt returnMName
@@ -892,11 +892,11 @@ rnRecStmtsAndThen rnBody s cont
 collectRecStmtsFixities :: [LStmtLR RdrName RdrName body] -> [LFixitySig RdrName]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-                            (L _ (LetStmt (HsValBinds (ValBindsIn _ sigs)))) ->
-                                foldr (\ sig -> \ acc -> case sig of
-                                                           (L loc (FixSig s)) -> (L loc s) : acc
-                                                           _ -> acc) acc sigs
-                            _ -> acc) [] l
+            (L _ (LetStmt (L _ (HsValBinds (ValBindsIn _ sigs))))) ->
+                foldr (\ sig -> \ acc -> case sig of
+                                           (L loc (FixSig s)) -> (L loc s) : acc
+                                           _ -> acc) acc sigs
+            _ -> acc) [] l
 
 -- left-hand sides
 
@@ -920,12 +920,12 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt pat body a b))
       return [(L loc (BindStmt pat' body a b),
                fv_pat)]
 
-rn_rec_stmt_lhs _ (L _ (LetStmt binds@(HsIPBinds _)))
+rn_rec_stmt_lhs _ (L _ (LetStmt (L _ binds@(HsIPBinds _))))
   = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
-rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds)))
+rn_rec_stmt_lhs fix_env (L loc (LetStmt (L l(HsValBinds binds))))
     = do (_bound_names, binds') <- rnLocalValBindsLHS fix_env binds
-         return [(L loc (LetStmt (HsValBinds binds')),
+         return [(L loc (LetStmt (L l (HsValBinds binds'))),
                  -- Warning: this is bogus; see function invariant
                  emptyFVs
                  )]
@@ -940,7 +940,7 @@ rn_rec_stmt_lhs _ stmt@(L _ (ParStmt {}))       -- Syntactically illegal in mdo
 rn_rec_stmt_lhs _ stmt@(L _ (TransStmt {}))     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
 
-rn_rec_stmt_lhs _ (L _ (LetStmt EmptyLocalBinds))
+rn_rec_stmt_lhs _ (L _ (LetStmt (L _ EmptyLocalBinds)))
   = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
 
 rn_rec_stmts_lhs :: Outputable body => MiniFixityEnv
@@ -987,14 +987,14 @@ rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _), fv_pat)
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
                   L loc (BindStmt pat' body' bind_op fail_op))] }
 
-rn_rec_stmt _ _ (L _ (LetStmt binds@(HsIPBinds _)), _)
+rn_rec_stmt _ _ (L _ (LetStmt (L _ binds@(HsIPBinds _))), _)
   = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
-rn_rec_stmt _ all_bndrs (L loc (LetStmt (HsValBinds binds')), _)
+rn_rec_stmt _ all_bndrs (L loc (LetStmt (L l (HsValBinds binds'))), _)
   = do { (binds', du_binds) <- rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
            -- fixities and unused are handled above in rnRecStmtsAndThen
        ; return [(duDefs du_binds, allUses du_binds,
-                  emptyNameSet, L loc (LetStmt (HsValBinds binds')))] }
+                  emptyNameSet, L loc (LetStmt (L l (HsValBinds binds'))))] }
 
 -- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ stmt@(L _ (RecStmt {}), _)
@@ -1006,7 +1006,7 @@ rn_rec_stmt _ _ stmt@(L _ (ParStmt {}), _)       -- Syntactically illegal in mdo
 rn_rec_stmt _ _ stmt@(L _ (TransStmt {}), _)     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransStmt" (ppr stmt)
 
-rn_rec_stmt _ _ (L _ (LetStmt EmptyLocalBinds), _)
+rn_rec_stmt _ _ (L _ (LetStmt (L _ EmptyLocalBinds)), _)
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
 
 rn_rec_stmts :: Outputable (body RdrName) =>
@@ -1281,8 +1281,8 @@ okPatGuardStmt stmt
 -------------
 okParStmt dflags ctxt stmt
   = case stmt of
-      LetStmt (HsIPBinds {}) -> emptyInvalid
-      _                      -> okStmt dflags ctxt stmt
+      LetStmt (L _ (HsIPBinds {})) -> emptyInvalid
+      _                            -> okStmt dflags ctxt stmt
 
 ----------------
 okDoStmt dflags ctxt stmt

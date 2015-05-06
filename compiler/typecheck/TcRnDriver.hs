@@ -1570,7 +1570,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch [] rn_expr emptyLocalBinds]
+              matches   = [mkMatch [] rn_expr (noLoc emptyLocalBinds)]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }
                           -- Care here!  In GHCi the expression might have
@@ -1578,7 +1578,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt $ HsValBinds $
+              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds $
                           ValBindsOut [(NonRecursive,unitBag the_bind)] []
 
               -- [it <- e]
@@ -1707,7 +1707,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo GhciStmtCtxt stmts io_ret_ty))
+                     noLoc (HsDo GhciStmtCtxt (noLoc stmts) io_ret_ty))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
