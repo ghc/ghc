@@ -565,7 +565,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseFullStmt   stmt
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
-%name parseType ctype
+%name parseType ctype_noann
 %partial parseHeader header
 %%
 
@@ -909,7 +909,7 @@ ty_decl :: { LTyClDecl RdrName }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% amms (mkTySynonym (comb2 $1 $4) $2 $4)
+                {% amms (mkTySynonym (comb2 $1 $4) $2 (snd $ unLoc $4))
                         [mj AnnType $1,mj AnnEqual $3] }
 
            -- type family declarations
@@ -1024,7 +1024,7 @@ ty_fam_inst_eqn :: { LTyFamInstEqn RdrName }
         : type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-              {% do { (eqn,ann) <- mkTyFamInstEqn $1 $3
+              {% do { (eqn,ann) <- mkTyFamInstEqn $1 (snd $ unLoc $3)
                     ; ams (sLL $1 $> eqn) (mj AnnEqual $2:ann) } }
 
 -- Associated type family declarations
@@ -1404,7 +1404,7 @@ rule_var_list :: { [LRuleBndr RdrName] }
 rule_var :: { LRuleBndr RdrName }
         : varid                         { sLL $1 $> (RuleBndr $1) }
         | '(' varid '::' ctype ')'      {% ams (sLL $1 $> (RuleBndrSig $2
-                                                       (mkHsWithBndrs $4)))
+                                                       (mkHsWithBndrs (snd $ unLoc $4))))
                                                [mop $1,mj AnnDcolon $3,mcp $5] }
 
 -----------------------------------------------------------------------------
@@ -1518,11 +1518,13 @@ opt_asig :: { ([AddAnn],Maybe (LHsType RdrName)) }
 
 sigtype :: { LHsType RdrName }          -- Always a HsForAllTy,
                                         -- to tell the renamer where to generalise
-        : ctype                         { sL1 $1 (mkImplicitHsForAllTy (noLoc []) $1) }
+        : ctype                         {% ams (sL1 $1 (mkImplicitHsForAllTy (noLoc []) (snd $ unLoc $1)))
+                                               (fst $ unLoc $1) }
         -- Wrap an Implicit forall if there isn't one there already
 
 sigtypedoc :: { LHsType RdrName }       -- Always a HsForAllTy
-        : ctypedoc                      { sL1 $1 (mkImplicitHsForAllTy (noLoc []) $1) }
+        : ctypedoc                      {% ams (sL1 $1 (mkImplicitHsForAllTy (noLoc []) (snd $ unLoc $1)))
+                                                (fst $ unLoc $1) }
         -- Wrap an Implicit forall if there isn't one there already
 
 sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
@@ -1554,17 +1556,22 @@ strict_mark :: { Located ([AddAnn],HsBang) }
         -- better error message if we parse it here
 
 -- A ctype is a for-all type
-ctype   :: { LHsType RdrName }
+ctype   :: { Located ([AddAnn],LHsType RdrName) }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
-                                           ams (sLL $1 $> $ mkExplicitHsForAllTy $2
-                                                                 (noLoc []) $4)
-                                               [mj AnnForall $1,mj AnnDot $3] }
+                                           ams (sLL $1 $> (mj AnnForall $1:mj AnnDot $3:(fst $ unLoc $4),
+                                                sLL $1 $> $ mkExplicitHsForAllTy $2
+                                                                 (noLoc []) (snd $ unLoc $4)))
+                                               (mj AnnForall $1:mj AnnDot $3:(fst $ unLoc $4)) }
         | context '=>' ctype          {% addAnnotation (gl $1) AnnDarrow (gl $2)
-                                         >> return (sLL $1 $> $
-                                               mkQualifiedHsForAllTy $1 $3) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
+                                         >> ams (sLL $1 $> ([], sLL $1 $> $
+                                                    mkQualifiedHsForAllTy $1 (snd $ unLoc $3)))
+                                                (fst $ unLoc $3) }
+        | ipvar '::' type             {% ams (sLL $1 $> ([],sLL $1 $> (HsIParamTy (unLoc $1) $3)))
                                              [mj AnnVal $1,mj AnnDcolon $2] }
-        | type                        { $1 }
+        | type                        { sL1 $1 ([], $1) }
+
+ctype_noann  :: { LHsType RdrName }
+ctype_noann  : ctype                       { snd $ unLoc $1 }
 
 ----------------------
 -- Notes for 'ctypedoc'
@@ -1577,17 +1584,19 @@ ctype   :: { LHsType RdrName }
 -- If we allow comments on types here, it's not clear if the comment applies
 -- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
 
-ctypedoc :: { LHsType RdrName }
+ctypedoc :: { Located ([AddAnn],LHsType RdrName) }
         : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
-                                            ams (sLL $1 $> $ mkExplicitHsForAllTy $2
-                                                                  (noLoc []) $4)
-                                                [mj AnnForall $1,mj AnnDot $3] }
+                                            ams (sLL $1 $> (mj AnnForall $1:mj AnnDot $3:(fst $ unLoc $4),
+                                                      sLL $1 $> $ mkExplicitHsForAllTy $2
+                                                                  (noLoc []) (snd $ unLoc $4)))
+                                                (mj AnnForall $1:mj AnnDot $3:(fst $ unLoc $4)) }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) AnnDarrow (gl $2)
-                                         >> return (sLL $1 $> $
-                                                  mkQualifiedHsForAllTy $1 $3) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
+                                         >> ams (sLL $1 $>
+                                                  ([], sLL $1 $> $ mkQualifiedHsForAllTy $1 (snd $ unLoc $3)))
+                                                  (fst $ unLoc $3) }
+        | ipvar '::' type             {% ams (sLL $1 $> ([],sLL $1 $> (HsIParamTy (unLoc $1) $3)))
                                              [mj AnnDcolon $2] }
-        | typedoc                     { $1 }
+        | typedoc                     { sL1 $1 ([],$1) }
 
 ----------------------
 -- Notes for 'context'
@@ -1615,7 +1624,7 @@ type :: { LHsType RdrName }
         : btype                         { $1 }
         | btype qtyconop type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype '->'     ctype          {% ams (sLL $1 $> $ HsFunTy $1 $3)
+        | btype '->'     ctype          {% ams (sLL $1 $> $ HsFunTy $1 (snd $ unLoc $3))
                                                [mj AnnRarrow $2] }
         | btype '~'      btype          {% ams (sLL $1 $> $ HsEqTy $1 $3)
                                                [mj AnnTilde $2] }
@@ -1632,10 +1641,10 @@ typedoc :: { LHsType RdrName }
         | btype qtyconop type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
         | btype tyvarop  type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
-        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy $1 $3)
+        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy $1 (snd $ unLoc $3))
                                                 [mj AnnRarrow $2] }
         | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $ HsFunTy (L (comb2 $1 $2)
-                                                            (HsDocTy $1 $2)) $4)
+                                                            (HsDocTy $1 $2)) (snd $ unLoc $4))
                                                 [mj AnnRarrow $3] }
         | btype '~'      btype           {% ams (sLL $1 $> $ HsEqTy $1 $3)
                                                 [mj AnnTilde $2] }
@@ -1669,16 +1678,16 @@ atype :: { LHsType RdrName }
         | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
                                                           (gl $3) >>
                                             ams (sLL $1 $> $ HsTupleTy
-                                             HsBoxedOrConstraintTuple ($2 : $4))
+                                             HsBoxedOrConstraintTuple ((snd $ unLoc $2) : $4))
                                                 [mop $1,mcp $5] }
         | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple [])
                                              [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple $2)
                                              [mo $1,mc $3] }
-        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy  $2) [mos $1,mcs $3] }
-        | '[:' ctype ':]'             {% ams (sLL $1 $> $ HsPArrTy  $2) [mo $1,mc $3] }
-        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy   $2) [mop $1,mcp $3] }
-        | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig $2 $4)
+        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy  (snd $ unLoc $2)) [mos $1,mcs $3] }
+        | '[:' ctype ':]'             {% ams (sLL $1 $> $ HsPArrTy  (snd $ unLoc $2)) [mo $1,mc $3] }
+        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy   (snd $ unLoc $2)) [mop $1,mcp $3] }
+        | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig (snd $ unLoc $2) $4)
                                              [mop $1,mj AnnDcolon $3,mcp $5] }
         | quasiquote                  { sL1 $1 (HsSpliceTy (unLoc $1) placeHolderKind) }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy $2)
@@ -1689,7 +1698,7 @@ atype :: { LHsType RdrName }
         | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar $ unLoc $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
-                                ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
+                                ams (sLL $1 $> $ HsExplicitTupleTy [] ((snd $ unLoc $3) : $5))
                                     [mj AnnSimpleQuote $1,mop $2,mcp $6] }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy
                                                             placeHolderKind $3)
@@ -1704,7 +1713,7 @@ atype :: { LHsType RdrName }
         | '[' ctype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
                                              ams (sLL $1 $> $ HsExplicitListTy
-                                                     placeHolderKind ($2 : $4))
+                                                     placeHolderKind ((snd $ unLoc $2) : $4))
                                                  [mos $1,mcs $5] }
         | INTEGER              { sLL $1 $> $ HsTyLit $ HsNumTy (getINTEGERs $1)
                                                                (getINTEGER $1) }
@@ -1730,9 +1739,9 @@ comma_types0  :: { [LHsType RdrName] }  -- Zero or more:  ty,ty,ty
         | {- empty -}                   { [] }
 
 comma_types1    :: { [LHsType RdrName] }  -- One or more:  ty,ty,ty
-        : ctype                        { [$1] }
+        : ctype                        { [snd $ unLoc $1] }
         | ctype  ',' comma_types1      {% addAnnotation (gl $1) AnnComma (gl $2)
-                                          >> return ($1 : $3) }
+                                          >> return ((snd $ unLoc $1) : $3) }
 
 tv_bndrs :: { [LHsTyVarBndr RdrName] }
          : tv_bndr tv_bndrs             { $1 : $2 }
@@ -1921,7 +1930,7 @@ fielddecl :: { LConDeclField RdrName }
                                               -- A list because of   f,g :: Int
         : maybe_docnext sig_vars '::' ctype maybe_docprev
             {% ams (L (comb2 $2 $4)
-                      (ConDeclField (reverse (unLoc $2)) $4 ($1 `mplus` $5)))
+                      (ConDeclField (reverse (unLoc $2)) (snd $ unLoc $4) ($1 `mplus` $5)))
                    [mj AnnDcolon $3] }
 
 -- We allow the odd-looking 'inst_type' in a deriving clause, so that
@@ -2311,8 +2320,8 @@ aexp2   :: { LHsExpr RdrName }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2)) [mo $1,mc $3]}
         | '[t|' ctype '|]'    {% checkNoPartialType
                                    (text "in type brackets" <> colon
-                                    <+> quotes (text "[t|" <+> ppr $2 <+> text "|]")) $2 >>
-                                 ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
+                                    <+> quotes (text "[t|" <+> ppr (snd $ unLoc $2) <+> text "|]")) (snd $ unLoc $2) >>
+                                 ams (sLL $1 $> $ HsBracket (TypBr (snd $ unLoc $2))) [mo $1,mc $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
                                       ams (sLL $1 $> $ HsBracket (PatBr p))
                                           [mo $1,mc $3] }
