@@ -63,7 +63,7 @@ module TcRnTypes(
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
-        insolubleImplic, trulyInsoluble,
+        isDroppableDerivedLoc, insolubleImplic, trulyInsoluble,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
         SubGoalDepth, initialSubGoalDepth,
@@ -87,6 +87,8 @@ module TcRnTypes(
         getEvBindsTcPluginM_maybe,
 
         CtFlavour(..), ctEvFlavour,
+        CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
+        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeF,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -1293,17 +1295,18 @@ dropDerivedInsols :: Cts -> Cts
 dropDerivedInsols insols = filterBag keep insols
   where                    -- insols can include Given
     keep ct
-      | isDerivedCt ct = keep_orig (ctLocOrigin (ctLoc ct))
+      | isDerivedCt ct = not (isDroppableDerivedLoc (ctLoc ct))
       | otherwise      = True
 
-    keep_orig :: CtOrigin -> Bool
-    keep_orig (KindEqOrigin {})          = True
-    keep_orig (GivenOrigin {})           = True
-    keep_orig (FunDepOrigin1 {}) = True
-    keep_orig (FunDepOrigin2 {}) = True
---    keep_orig (FunDepOrigin1 _ loc _ _)  = keep_orig (ctLocOrigin loc)
---    keep_orig (FunDepOrigin2 _ orig _ _) = keep_orig orig
-    keep_orig _                          = False
+isDroppableDerivedLoc :: CtLoc -> Bool
+-- Note [Dropping derived constraints]
+isDroppableDerivedLoc loc
+  = case ctLocOrigin loc of
+      KindEqOrigin {}  -> False
+      GivenOrigin {}   -> False
+      FunDepOrigin1 {} -> False
+      FunDepOrigin2 {} -> False
+      _                -> True
 
 
 {- Note [Dropping derived constraints]
@@ -1330,6 +1333,14 @@ But (tiresomely) we do keep *some* Derived insolubles:
    - For Givens they reflect unreachable code
    - For Wanteds it is arguably better to get a fundep error than
      a no-instance error (Trac #9612)
+
+Moreover, we keep *all* derived insolubles under some circumstances:
+
+  * They are looked at by simplifyInfer, to decide whether to
+    generalise.  Example: [W] a ~ Int, [W] a ~ Bool
+    We get [D] Int ~ Bool, and indeed the constraints are insoluble,
+    and we want simplifyInfer to see that, even though we don't
+    ultimately want to generate an (inexplicable) error message from
 
 To distinguish these cases we use the CtOrigin.
 
@@ -1802,6 +1813,93 @@ ctEvFlavour :: CtEvidence -> CtFlavour
 ctEvFlavour (CtWanted {})  = Wanted
 ctEvFlavour (CtGiven {})   = Given
 ctEvFlavour (CtDerived {}) = Derived
+
+-- | Whether or not one 'Ct' can rewrite another is determined by its
+-- flavour and its equality relation
+type CtFlavourRole = (CtFlavour, EqRel)
+
+-- | Extract the flavour and role from a 'CtEvidence'
+ctEvFlavourRole :: CtEvidence -> CtFlavourRole
+ctEvFlavourRole ev = (ctEvFlavour ev, ctEvEqRel ev)
+
+-- | Extract the flavour and role from a 'Ct'
+ctFlavourRole :: Ct -> CtFlavourRole
+ctFlavourRole = ctEvFlavourRole . cc_ev
+
+{- Note [eqCanRewrite]
+~~~~~~~~~~~~~~~~~~~
+(eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
+tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
+a can-rewrite relation, see Definition [Can-rewrite relation]
+
+With the solver handling Coercible constraints like equality constraints,
+the rewrite conditions must take role into account, never allowing
+a representational equality to rewrite a nominal one.
+
+Note [Wanteds do not rewrite Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't allow Wanteds to rewrite Wanteds, because that can give rise
+to very confusing type error messages.  A good example is Trac #8450.
+Here's another
+   f :: a -> Bool
+   f x = ( [x,'c'], [x,True] ) `seq` True
+Here we get
+  [W] a ~ Char
+  [W] a ~ Bool
+but we do not want to complain about Bool ~ Char!
+
+Note [Deriveds do rewrite Deriveds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+However we DO allow Deriveds to rewrite Deriveds, because that's how
+improvement works; see Note [The improvement story] in TcInteract.
+
+However, for now at least I'm only letting (Derived,NomEq) rewrite
+(Derived,NomEq) and not doing anything for ReprEq.  If we have
+    eqCanRewriteFR (Derived, NomEq) (Derived, _)  = True
+then we lose the property of Note [Can-rewrite relation]
+  R2.  If f1 >= f, and f2 >= f,
+       then either f1 >= f2 or f2 >= f1
+Consider f1 = (Given, ReprEq)
+         f2 = (Derived, NomEq)
+          f = (Derived, ReprEq)
+
+I thought maybe we could never get Derived ReprEq constraints, but
+we can; straight from the Wanteds during improvment. And from a Derived
+ReprEq we could conceivably get a Derived NomEq improvment (by decomposing
+a type constructor with Nomninal role), and hence unify.
+
+Note [canRewriteOrSame]
+~~~~~~~~~~~~~~~~~~~~~~~
+canRewriteOrSame is similar but
+ * returns True for Wanted/Wanted.
+ * works for all kinds of constraints, not just CTyEqCans
+See the call sites for explanations.
+-}
+
+eqCanRewrite :: CtEvidence -> CtEvidence -> Bool
+eqCanRewrite ev1 ev2 = ctEvFlavourRole ev1 `eqCanRewriteFR` ctEvFlavourRole ev2
+
+eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
+-- Very important function!
+-- See Note [eqCanRewrite]
+-- See Note [Wanteds do not rewrite Wanteds]
+-- See Note [Deriveds do rewrite Deriveds]
+eqCanRewriteFR (Given,   NomEq)   (_,       _)      = True
+eqCanRewriteFR (Given,   ReprEq)  (_,       ReprEq) = True
+eqCanRewriteFR (Derived, NomEq)   (Derived, NomEq)  = True
+eqCanRewriteFR _                 _                  = False
+
+canDischarge :: CtEvidence -> CtEvidence -> Bool
+-- See Note [canRewriteOrSame]
+canDischarge ev1 ev2 = ctEvFlavour ev1 `canDischargeF` ctEvFlavour ev2
+
+canDischargeF :: CtFlavour -> CtFlavour -> Bool
+canDischargeF Given  _        = True
+canDischargeF Wanted Wanted   = True
+canDischargeF Wanted Derived  = True
+canDischargeF Derived Derived = True
+canDischargeF _       _       = False
+
 
 {-
 ************************************************************************

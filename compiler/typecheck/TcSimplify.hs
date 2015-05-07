@@ -18,12 +18,11 @@ import Bag
 import Class         ( classKey )
 import Class         ( Class )
 import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes
-                                    , Opt_FlexibleContexts ) )
-import ErrUtils      ( emptyMessages )
-import FastString
-import Id            ( idType )
+                                    , Opt_FlexibleContexts )
+                     , DynFlags( solverIterations ) )
 import Inst
-import Kind          ( isKind, defaultKind_maybe )
+import Id            ( idType )
+import Kind          ( isKind, isSubKind, defaultKind_maybe )
 import ListSetOps
 import Maybes        ( isNothing )
 import Name
@@ -45,6 +44,9 @@ import Unify         ( tcMatchTy )
 import Util
 import Var
 import VarSet
+import BasicTypes    ( IntWithInf, intGtLimit )
+import ErrUtils      ( emptyMessages )
+import FastString
 
 import Control.Monad ( unless )
 import Data.List     ( partition )
@@ -862,7 +864,8 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
 
        ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
 
-       ; final_wc <- simpl_loop 0 floated_eqs
+       ; dflags <- getDynFlags
+       ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
                                 (WC { wc_simple = simples1, wc_impl = implics2
                                     , wc_insol  = insols `unionBags` insols1 })
 
@@ -873,13 +876,16 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
 
        ; return final_wc }
 
-simpl_loop :: Int -> Cts
+simpl_loop :: Int -> IntWithInf -> Cts
            -> WantedConstraints
            -> TcS WantedConstraints
-simpl_loop n floated_eqs
+simpl_loop n limit floated_eqs
            wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
-  | n > 10
-  = do { traceTcS "solveWanteds: loop!" (ppr wc); return wc }
+  | n `intGtLimit` limit
+  = failTcS (hang (ptext (sLit "solveWanteds: too many iterations")
+                   <+> parens (ptext (sLit "limit =") <+> ppr limit))
+                2 (vcat [ ptext (sLit "Set limit with -fsolver-iterations=n; n=0 for no limit")
+                        , ppr wc ] ))
 
   | no_floated_eqs
   = return wc  -- Done!
@@ -888,22 +894,20 @@ simpl_loop n floated_eqs
   = do { traceTcS "simpl_loop, iteration" (int n)
 
        -- solveSimples may make progress if either float_eqs hold
-       ; (unifs_happened1, wc1) <- if no_floated_eqs
-                                   then return (False, emptyWC)
-                                   else reportUnifications $
-                                        solveSimpleWanteds (floated_eqs `unionBags` simples)
-                                        -- Put floated_eqs first so they get solved first
-                                        -- NB: the floated_eqs may include /derived/ equalities
-                                        --     arising from fundeps inside an implication
+       ; (unifs1, wc1) <- reportUnifications $
+                          solveSimpleWanteds (floated_eqs `unionBags` simples)
+                               -- Put floated_eqs first so they get solved first
+                               -- NB: the floated_eqs may include /derived/ equalities
+                               --     arising from fundeps inside an implication
 
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
        -- solveImplications may make progress only if unifs2 holds
-       ; (floated_eqs2, implics2) <- if not unifs_happened1 && isEmptyBag implics1
+       ; (floated_eqs2, implics2) <- if unifs1 == 0 && isEmptyBag implics1
                                      then return (emptyBag, implics)
                                      else solveNestedImplications (implics `unionBags` implics1)
 
-       ; simpl_loop (n+1) floated_eqs2
+       ; simpl_loop (n+1) limit floated_eqs2
                     (WC { wc_simple = simples1, wc_impl = implics2
                         , wc_insol  = insols `unionBags` insols1 }) }
 
@@ -970,6 +974,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        ; (floated_eqs, residual_wanted)
              <- floatEqualities skols no_given_eqs residual_wanted
 
+       ; traceTcS "solveImplication 2" (ppr given_insols $$ ppr residual_wanted)
        ; let final_wanted = residual_wanted `addInsols` given_insols
 
        ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs
@@ -1565,6 +1570,30 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_simple = simples })
     (float_eqs, remaining_simples) = partitionBag (usefulToFloat is_useful) simples
     is_useful pred = tyVarsOfType pred `disjointVarSet` skol_set
 
+usefulToFloat :: (TcPredType -> Bool) -> Ct -> Bool
+usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canonicalised
+  = is_meta_var_eq pred && is_useful_pred pred
+  where
+    pred = ctPred ct
+
+      -- Float out alpha ~ ty, or ty ~ alpha
+      -- which might be unified outside
+      -- See Note [Do not float kind-incompatible equalities]
+    is_meta_var_eq pred
+      | EqPred NomEq ty1 ty2 <- classifyPredType pred
+      , let k1 = typeKind ty1
+            k2 = typeKind ty2
+      = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
+          (Just tv1, _) | isMetaTyVar tv1
+                        , k2 `isSubKind` k1
+                        -> True
+          (_, Just tv2) | isMetaTyVar tv2
+                        , k1 `isSubKind` k2
+                        -> True
+          _ -> False
+      | otherwise
+      = False
+
 {- Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Which of the simple equalities can we float out?  Obviously, only
@@ -1587,6 +1616,13 @@ become touchable by being floated (perhaps by more than one level).
 We had a very complicated rule previously, but this is nice and
 simple.  (To see the notes, look at this Note in a version of
 TcSimplify prior to Oct 2014).
+
+Note [Do not float kind-incompatible equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
+If we float the equality outwards, we'll get *another* Derived
+insoluble equality one level out, so the same error will be reported
+twice.  So we refrain from floating such equalities.
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~

@@ -691,6 +691,8 @@ data DynFlags = DynFlags {
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
   reductionDepth        :: IntWithInf,   -- ^ Typechecker maximum stack depth
+  solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
+                                         --   Typically only 1 is needed
 
   thisPackage           :: PackageKey,   -- ^ name of package currently being compiled
 
@@ -1440,6 +1442,7 @@ defaultDynFlags mySettings =
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
+        solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
         thisPackage             = mainPackageKey,
 
@@ -2593,6 +2596,8 @@ dynamic_flags = [
       (sepArg (\s d -> d{ ruleCheck = Just s }))
   , defFlag "freduction-depth"
       (intSuffix (\n d -> d{ reductionDepth = treatZeroAsInf n }))
+  , defFlag "fconstraint-solver-iterations"
+      (intSuffix (\n d -> d{ solverIterations = treatZeroAsInf n }))
   , defFlag "fcontext-stack"
       (intSuffixM (\n d ->
        do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"

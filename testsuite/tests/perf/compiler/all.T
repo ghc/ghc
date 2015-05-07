@@ -500,8 +500,8 @@ test('T5837',
              # 2014-09-03:  37096484 (Windows laptop, w/w for INLINABLE things
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
              # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
- 
-           (wordsize(64), 53424304, 10)])
+
+           (wordsize(64), 38834096, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -516,6 +516,7 @@ test('T5837',
              # 2014-12-16 231155640 Mac  Flattener parameterized over roles;
              #                           some optimization
              # 2015-03-17 53424304  Mac  Better depth checking; fails earlier
+             # 2015-06-09 38834096  Better "improvement"; I'm not sure whey it improves things
       ],
       compile_fail,['-freduction-depth=50'])
 

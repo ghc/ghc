@@ -316,9 +316,6 @@ situation can't happen.
 newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
-  | CtWanted {} <- flavor
-  = return ()
-
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
   = do { let size = sizePred (mkClassPred cls xis)
              loc' = case ctLocOrigin loc of
@@ -342,7 +339,7 @@ newSCWorkFromFlavored flavor cls xis
              impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
-       ; mapM_ (emitNewDerived loc) impr_theta }
+       ; emitNewDeriveds loc impr_theta }
 
 
 {-
@@ -623,7 +620,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
            -> TcS (StopOrContinue Ct)
 can_eq_app ev s1 t1 s2 t2
   | CtDerived { ctev_loc = loc } <- ev
-  = do { emitNewDerived loc (mkTcEqPred t1 t2)
+  = do { emitNewDerivedEq loc (mkTcEqPred t1 t2)
        ; canEqNC ev NomEq s1 s2 }
   | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
   = do { ev_s <- newWantedEvVarNC loc (mkTcEqPred s1 s2)
@@ -947,9 +944,13 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
   = do { setEvBindIfWanted ev (EvCoercion $ mkTcReflCo role xi1)
        ; stopWith ev "Equal tyvars" }
 
-  | incompat_kind   = incompat
-  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
-  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
+  | incompat_kind   = incompatibleKind ev xi1 k1 xi2 k2
+
+-- We don't do this any more
+-- See Note [Orientation of equalities with fmvs] in TcSMonad
+--  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
+--  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
+
   | same_kind       = if swap_over then do_swap else no_swap
   | k1_sub_k2       = do_swap   -- Note [Kind orientation for CTyEqCan]
   | otherwise       = no_swap   -- k2_sub_k1
@@ -976,12 +977,21 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
         continueWith (CTyEqCan { cc_ev = new_ev, cc_tyvar = tv1
                                , cc_rhs = xi2, cc_eq_rel = eq_rel })
 
-    -- See Note [Orient equalities with flatten-meta-vars on the left] in TcFlatten
+{- We don't do this any more
+   See Note [Orientation of equalities with fmvs] in TcSMonad
+    -- tv1 is the flatten meta-var
     do_fmv swapped tv1 xi1 xi2 co1 co2
       | same_kind
       = canon_eq swapped tv1 xi1 xi2 co1 co2
-      | otherwise  -- Presumably tv1 `subKind` tv2, which is the wrong way round
-      = ASSERT2( tyVarKind tv1 `isSubKind` typeKind xi2,
+      | otherwise  -- Presumably tv1 :: *, since it is a flatten meta-var,
+                   -- at a kind that has some interesting sub-kind structure.
+                   -- Since the two kinds are not the same, we must have
+                   -- tv1 `subKind` tv2, which is the wrong way round
+                   --   e.g.  (fmv::*) ~ (a::OpenKind)
+                   -- So make a new meta-var and use that:
+                   --         fmv ~ (beta::*)
+                   --         (a::OpenKind) ~ (beta::*)
+      = ASSERT2( k1_sub_k2,
                  ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1) $$
                  ppr xi2 <+> dcolon <+> ppr (typeKind xi2) )
         ASSERT2( isWanted ev, ppr ev )  -- Only wanteds have flatten meta-vars
@@ -991,8 +1001,7 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
                                                         tv_ty xi2)
            ; emitWorkNC [new_ev]
            ; canon_eq swapped tv1 xi1 tv_ty co1 (ctEvCoercion new_ev) }
-
-    incompat = incompatibleKind ev xi1 k1 xi2 k2
+-}
 
     swap_over
       -- If tv1 is touchable, swap only if tv2 is also
@@ -1050,7 +1059,7 @@ incompatibleKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible 
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
          -- Create a derived kind-equality, and solve it
-       ; emitNewDerived kind_co_loc (mkTcEqPred k1 k2)
+       ; emitNewDerivedEq kind_co_loc (mkTcEqPred k1 k2)
 
          -- Put the not-currently-soluble thing into the inert set
        ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
@@ -1279,7 +1288,7 @@ as well as in old_pred; that is important for good error messages.
  -}
 
 
-rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
+rewriteEvidence old_ev@(CtDerived {}) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteEvidence to put the isTcReflCo test first!
@@ -1287,18 +1296,15 @@ rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvTerm c), which fails for Derived constraints.
     -- (Getting this wrong caused Trac #7384.)
-    do { mb_ev <- newDerived loc new_pred
-       ; case mb_ev of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
+    continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence old_ev new_pred co
   | isTcReflCo co -- See Note [Rewriting with Refl]
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+  = continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence ev@(CtGiven { ctev_evar = old_evar , ctev_loc = loc }) new_pred co
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
-       ; return (ContinueWith new_ev) }
+       ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
     new_tm = mkEvCast (EvId old_evar) (tcDowngradeRole Representational
@@ -1340,23 +1346,20 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 --
 -- It's all a form of rewwriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
+  | CtDerived {} <- old_ev  -- Don't force the evidence for a Derived
+  = continueWith (old_ev { ctev_pred = new_pred })
+
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
   , isTcReflCo rhs_co
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
-
-  | CtDerived {} <- old_ev
-  = do { mb <- newDerived loc' new_pred
-       ; case mb of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
+  = continueWith (old_ev { ctev_pred = new_pred })
 
   | CtGiven { ctev_evar = old_evar } <- old_ev
   = do { let new_tm = EvCoercion (lhs_co
                                   `mkTcTransCo` maybeSym swapped (mkTcCoVarCo old_evar)
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; new_ev <- newGivenEvVar loc' (new_pred, new_tm)
-       ; return (ContinueWith new_ev) }
+       ; continueWith new_ev }
 
   | CtWanted { ctev_evar = evar } <- old_ev
   = do { new_evar <- newWantedEvVarNC loc' new_pred
@@ -1366,7 +1369,7 @@ rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
                   `mkTcTransCo` rhs_co
        ; setWantedEvBind evar (EvCoercion co)
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
-       ; return (ContinueWith new_evar) }
+       ; continueWith new_evar }
 
   | otherwise
   = panic "rewriteEvidence"
@@ -1469,7 +1472,7 @@ unify_derived loc role    orig_ty1 orig_ty2
                 Nothing   -> bale_out }
     go _ _ = bale_out
 
-    bale_out = emitNewDerived loc (mkTcEqPredRole role orig_ty1 orig_ty2)
+    bale_out = emitNewDerivedEq loc (mkTcEqPredRole role orig_ty1 orig_ty2)
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co

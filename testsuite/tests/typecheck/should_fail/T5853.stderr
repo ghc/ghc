@@ -1,19 +1,18 @@
 
-T5853.hs:15:52:
-    Could not deduce: fb ~ Subst (Subst (Subst fb b) a) (Elem fb)
-    from the context: (F (Subst fb b),
-                       Elem (Subst fb b) ~ b,
-                       Subst (Subst fb b) (Elem fb) ~ fb,
-                       F (Subst (Subst fb b) a),
-                       Elem (Subst (Subst fb b) a) ~ a,
-                       Elem (Subst fb b) ~ b,
-                       Subst (Subst (Subst fb b) a) b ~ Subst fb b)
+T5853.hs:15:52: error:
+    Could not deduce: t2 ~ Subst t1 (Elem t2)
+    from the context: (F t,
+                       Subst t (Elem t2) ~ t2,
+                       Subst t2 (Elem t) ~ t,
+                       F t1,
+                       Subst t1 (Elem t) ~ t,
+                       Subst t (Elem t1) ~ t1)
       bound by the RULE "map/map" at T5853.hs:15:2-57
-      ‘fb’ is a rigid type variable bound by
+      ‘t2’ is a rigid type variable bound by
            the RULE "map/map" at T5853.hs:15:2
     Relevant bindings include
-      f :: b -> Elem fb (bound at T5853.hs:15:19)
-      g :: a -> b (bound at T5853.hs:15:21)
-      xs :: Subst (Subst fb b) a (bound at T5853.hs:15:23)
+      f :: Elem t -> Elem t2 (bound at T5853.hs:15:19)
+      g :: Elem t1 -> Elem t (bound at T5853.hs:15:21)
+      xs :: t1 (bound at T5853.hs:15:23)
     In the expression: (f . g) <$> xs
     When checking the transformation rule "map/map"

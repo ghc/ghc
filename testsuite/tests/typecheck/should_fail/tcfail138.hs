@@ -15,7 +15,7 @@
 -- think that we'd generate the superclasses (L a b') and (L a b), and now 
 -- the fundep will force b=b'.  But GHC is very cautious about generating
 -- superclasses when doing context reduction for instance declarations,
--- becasue of the danger of superclass loops.
+-- because of the danger of superclass loops.
 --
 -- So, today, this program fails.  It's trivial to fix by adding a fundep for C
 -- 	class (G a, L a b) => C a b | a -> b

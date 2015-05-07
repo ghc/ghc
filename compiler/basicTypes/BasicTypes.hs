@@ -88,7 +88,7 @@ module BasicTypes(
 
         SourceText,
 
-        IntWithInf, infinity, treatZeroAsInf, mkIntWithInf
+        IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit
    ) where
 
 import FastString
@@ -1164,6 +1164,10 @@ instance Num IntWithInf where
   fromInteger = Int . fromInteger
 
   (-) = panic "subtracting IntWithInfs"
+
+intGtLimit :: Int -> IntWithInf -> Bool
+intGtLimit _ Infinity = False
+intGtLimit n (Int m)  = n > m
 
 -- | Add two 'IntWithInf's
 plusWithInf :: IntWithInf -> IntWithInf -> IntWithInf

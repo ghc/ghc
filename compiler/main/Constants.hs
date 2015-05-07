@@ -25,6 +25,11 @@ mAX_CTUPLE_SIZE = 16     -- Should match the number of decls in GHC.Classes
 mAX_REDUCTION_DEPTH :: Int
 mAX_REDUCTION_DEPTH = 200
 
+-- | Default maximum constraint-solver iterations
+-- Typically there should be very few
+mAX_SOLVER_ITERATIONS :: Int
+mAX_SOLVER_ITERATIONS = 4
+
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
 

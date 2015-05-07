@@ -14,7 +14,7 @@ g _ = f (undefined :: F a)
 
 
 {- ---------------
-[G] UnF (F a) ~ a
+[G] UnF (F b) ~ b
 
 [W] UnF (F beta) ~ beta
 [W] F a ~ F beta
@@ -59,4 +59,92 @@ g _ = f (undefined :: F a)
 [D] fmv1 ~ fsk1
 
 -- Now we can unify beta!
+-}
+
+
+
+{-
+
+-----
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+
+wl: [W] F b_amr ~ F b_amt
+
+work item: [W] UnF (F b_amt) ~ b_amt
+  b_amt is the unification variable
+
+===>      b_amt := s_amF
+
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+
+wl: [W] F b_amr ~ F b_amt
+    [W] UnF s_amD ~ s_amF
+
+work item: [W] F b_amt ~ s_amD
+
+
+===>
+wl: [W] F b_amr ~ F b_amt
+    [W] UnF s_amD ~ s_amF
+
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+       [W] F s_amF ~ s_amD
+
+===>
+wl: [W] F b_amr ~ F b_amt
+
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+       [W] F s_amF ~ s_amD
+       [W] UnF s_amD ~ s_amF
+
+===>
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+       [W] UnF s_amD ~ s_amF
+       [W] F s_amF ~ s_amD
+
+wl:
+
+work-item: [W] F b_amr ~ F b_amt
+--> fsk_amy ~ s_amD
+--> s_amD ~ fsk_amy
+
+===>
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+       [W] UnF s_amD ~ s_amF
+       [W] F s_amF ~ s_amD
+       [W] s_amD ~ fsk_amy
+
+wl:
+
+work item: [D] UnF s_amD ~ s_amF
+
+--> [D] UnF fsk_amy ~ s_amF
+--> [D] s_amF ~ fsk_amA
+
+===>
+Inert: [G] fsk_amA ~ b_amr
+       [G] UnF fsk_amy ~ fsk_amA
+       [G} F b_amr ~ fsk_amy
+       [W] UnF s_amD ~ s_amF
+       [W] F s_amF ~ s_amD
+       [W] s_amD ~ fsk_amy
+       [D] s_amF ~ fsk_amA
+
+wl:
+
+work item: [D] F s_amF ~ s_amD
+--> F fsk_amA ~ s_amD
+--> s_amd ~ b_amr
 -}
