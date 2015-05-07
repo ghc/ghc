@@ -1,0 +1,36 @@
+---Problems---------------------
+[
+(AK Test10269.hs:4:1-9 AnnCloseP = [Test10269.hs:4:9])
+
+(AK Test10269.hs:4:1-9 AnnOpenP = [Test10269.hs:4:1])
+
+(AK Test10269.hs:4:2-8 AnnVal = [Test10269.hs:4:4-6])
+
+(AK <no location info> AnnEofPos = [Test10269.hs:5:1])
+]
+
+--------------------------------
+[
+(AK Test10269.hs:1:1 AnnModule = [Test10269.hs:1:1-6])
+
+(AK Test10269.hs:1:1 AnnWhere = [Test10269.hs:1:18-22])
+
+(AK Test10269.hs:4:1-9 AnnCloseP = [Test10269.hs:4:9])
+
+(AK Test10269.hs:4:1-9 AnnOpenP = [Test10269.hs:4:1])
+
+(AK Test10269.hs:4:1-26 AnnCloseP = [Test10269.hs:4:9])
+
+(AK Test10269.hs:4:1-26 AnnEqual = [Test10269.hs:4:16])
+
+(AK Test10269.hs:4:1-26 AnnFunId = [Test10269.hs:4:4-6])
+
+(AK Test10269.hs:4:1-26 AnnOpenP = [Test10269.hs:4:1])
+
+(AK Test10269.hs:4:1-26 AnnSemi = [Test10269.hs:5:1])
+
+(AK Test10269.hs:4:2-8 AnnVal = [Test10269.hs:4:4-6])
+
+(AK <no location info> AnnEofPos = [Test10269.hs:5:1])
+]
+

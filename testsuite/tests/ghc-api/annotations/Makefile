@@ -5,6 +5,7 @@ include $(TOP)/mk/test.mk
 clean:
 	rm -f *.o *.hi
 	rm -f annotations comments parseTree exampleTest
+	rm -f t10269
 
 annotations: 
 	rm -f annotations.o annotations.hi
@@ -44,3 +45,10 @@ T10268:
 	./t10268 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: clean annotations parseTree comments exampleTest listcomps
+
+T10269:
+	rm -f T10269.o T10269.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t10269
+	./t10269 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
+.PHONY: t10269

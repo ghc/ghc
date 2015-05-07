@@ -910,7 +910,7 @@ checkValDef :: SDoc
             -> LHsExpr RdrName
             -> Maybe (LHsType RdrName)
             -> Located (a,GRHSs RdrName (LHsExpr RdrName))
-            -> P (HsBind RdrName)
+            -> P ([AddAnn],HsBind RdrName)
 
 checkValDef msg lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
@@ -920,22 +920,26 @@ checkValDef msg lhs (Just sig) grhss
 checkValDef msg lhs opt_sig g@(L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
-            Just (fun, is_infix, pats) -> checkFunBind msg (getLoc lhs)
+            Just (fun, is_infix, pats, ann) ->
+              checkFunBind msg ann (getLoc lhs)
                                            fun is_infix pats opt_sig (L l grhss)
             Nothing -> checkPatBind msg lhs g }
 
 checkFunBind :: SDoc
+             -> [AddAnn]
              -> SrcSpan
              -> Located RdrName
              -> Bool
              -> [LHsExpr RdrName]
              -> Maybe (LHsType RdrName)
              -> Located (GRHSs RdrName (LHsExpr RdrName))
-             -> P (HsBind RdrName)
-checkFunBind msg lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
+             -> P ([AddAnn],HsBind RdrName)
+checkFunBind msg ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
   = do  ps <- checkPatterns msg pats
         let match_span = combineSrcSpans lhs_loc rhs_span
-        return (makeFunBind fun is_infix
+        -- Add back the annotations stripped from any HsPar values in the lhs
+        -- mapM_ (\a -> a match_span) ann
+        return (ann,makeFunBind fun is_infix
                   [L match_span (Match (Just (fun,is_infix)) ps opt_sig grhss)])
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
@@ -953,10 +957,10 @@ makeFunBind fn is_infix ms
 checkPatBind :: SDoc
              -> LHsExpr RdrName
              -> Located (a,GRHSs RdrName (LHsExpr RdrName))
-             -> P (HsBind RdrName)
+             -> P ([AddAnn],HsBind RdrName)
 checkPatBind msg lhs (L _ (_,grhss))
   = do  { lhs <- checkPattern msg lhs
-        ; return (PatBind lhs grhss placeHolderType placeHolderNames
+        ; return ([],PatBind lhs grhss placeHolderType placeHolderNames
                     ([],[])) }
 
 checkValSig
@@ -1160,7 +1164,7 @@ splitBang (L loc (OpApp l_arg bang@(L _ (HsVar op)) _ r_arg))
 splitBang _ = Nothing
 
 isFunLhs :: LHsExpr RdrName
-         -> P (Maybe (Located RdrName, Bool, [LHsExpr RdrName]))
+         -> P (Maybe (Located RdrName, Bool, [LHsExpr RdrName],[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 --
@@ -1173,12 +1177,12 @@ isFunLhs :: LHsExpr RdrName
 --
 -- a .!. !b
 
-isFunLhs e = go e []
+isFunLhs e = go e [] []
  where
-   go (L loc (HsVar f)) es
-        | not (isRdrDataCon f)   = return (Just (L loc f, False, es))
-   go (L _ (HsApp f e)) es       = go f (e:es)
-   go (L _ (HsPar e))   es@(_:_) = go e es
+   go (L loc (HsVar f)) es ann
+        | not (isRdrDataCon f)       = return (Just (L loc f, False, es, ann))
+   go (L _ (HsApp f e)) es       ann = go f (e:es) ann
+   go (L l (HsPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
 
         -- For infix function defns, there should be only one infix *function*
         -- (though there may be infix *datacons* involved too).  So we don't
@@ -1193,23 +1197,23 @@ isFunLhs e = go e []
         -- ToDo: what about this?
         --              x + 1 `op` y = ...
 
-   go e@(L loc (OpApp l (L loc' (HsVar op)) fix r)) es
+   go e@(L loc (OpApp l (L loc' (HsVar op)) fix r)) es ann
         | Just (e',es') <- splitBang e
         = do { bang_on <- extension bangPatEnabled
-             ; if bang_on then go e' (es' ++ es)
-               else return (Just (L loc' op, True, (l:r:es))) }
+             ; if bang_on then go e' (es' ++ es) ann
+               else return (Just (L loc' op, True, (l:r:es), ann)) }
                 -- No bangs; behave just like the next case
         | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, True, (l:r:es)))
+        = return (Just (L loc' op, True, (l:r:es), ann))
         | otherwise                     -- Infix data con; keep going
-        = do { mb_l <- go l es
+        = do { mb_l <- go l es ann
              ; case mb_l of
-                 Just (op', True, j : k : es')
-                    -> return (Just (op', True, j : op_app : es'))
+                 Just (op', True, j : k : es', ann')
+                    -> return (Just (op', True, j : op_app : es', ann'))
                     where
                       op_app = L loc (OpApp k (L loc' (HsVar op)) fix r)
                  _ -> return Nothing }
-   go _ _ = return Nothing
+   go _ _ _ = return Nothing
 
 
 ---------------------------------------------------------------------------

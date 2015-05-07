@@ -1991,13 +1991,13 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
                                 -- Turn it all into an expression so that
                                 -- checkPattern can check that bangs are enabled
 
-        | infixexp opt_sig rhs  {% do { r <- checkValDef empty $1 (snd $2) $3;
+        | infixexp opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         case r of {
                                           (FunBind n _ _ _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
                                           _ -> return () } ;
-                                        _ <- ams (L l ()) ((fst $2) ++ (fst $ unLoc $3));
+                                        _ <- ams (L l ()) (ann ++ (fst $2) ++ (fst $ unLoc $3));
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | pattern_synonym_decl  { sLL $1 $> $ unitOL $1 }
         | docdecl               { sLL $1 $> $ unitOL $1 }
