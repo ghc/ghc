@@ -25,7 +25,7 @@ module TcSMonad (
     Freshness(..), freshGoals, isFresh,
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
-    unifyTyVar, reportUnifications,
+    unifyTyVar, unflattenFmv, reportUnifications,
     setEvBind, setWantedEvBind, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
     newDerived, emitNewDerived, checkReductionDepth,
@@ -74,7 +74,7 @@ module TcSMonad (
 
     TcLevel, isTouchableMetaTyVarTcS,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
-    zonkTyVarsAndFV, zonkTcType, zonkTcTyVar, zonkSimples, zonkWC,
+    zonkTyVarsAndFV, zonkTcType, zonkTcTypes, zonkTcTyVar, zonkSimples, zonkWC,
 
     -- References
     newTcRef, readTcRef, updTcRef,
@@ -1184,9 +1184,9 @@ data TcSEnv
   = TcSEnv {
       tcs_ev_binds    :: EvBindsVar,
 
-      tcs_unified :: IORef Bool,
-          -- The "dirty-flag" Bool is set True when
-          -- we unify a unification variable
+      tcs_unified :: IORef Int,
+          -- The number of unification variables we have filled
+          -- The important thing is whether it is non-zero
 
       tcs_count    :: IORef Int, -- Global step count
 
@@ -1290,7 +1290,7 @@ runTcSWithEvBinds :: EvBindsVar
                   -> TcS a
                   -> TcM a
 runTcSWithEvBinds ev_binds_var tcs
-  = do { unified_var <- TcM.newTcRef False
+  = do { unified_var <- TcM.newTcRef 0
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
        ; wl_var <- TcM.newTcRef emptyWorkList
@@ -1404,7 +1404,7 @@ tryTcS :: TcS a -> TcS a
 tryTcS (TcS thing_inside)
   = TcS $ \env ->
     do { is_var <- TcM.newTcRef emptyInert
-       ; unified_var <- TcM.newTcRef False
+       ; unified_var <- TcM.newTcRef 0
        ; ev_binds_var <- TcM.newTcEvBinds
        ; wl_var <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
@@ -1516,8 +1516,7 @@ getTcEvBindsMap
 
 unifyTyVar :: TcTyVar -> TcType -> TcS ()
 -- Unify a meta-tyvar with a type
--- We keep track of whether we have done any unifications in tcs_unified,
--- but only for *non-flatten* meta-vars
+-- We keep track of how many unifications have happened in tcs_unified,
 --
 -- We should never unify the same variable twice!
 unifyTyVar tv ty
@@ -1525,18 +1524,25 @@ unifyTyVar tv ty
     TcS $ \ env ->
     do { TcM.traceTc "unifyTyVar" (ppr tv <+> text ":=" <+> ppr ty)
        ; TcM.writeMetaTyVar tv ty
-       ; unless (isFmvTyVar tv) $  -- Flatten meta-vars are born and die locally
-                                   -- so do not track them in tcs_unified
-         TcM.writeTcRef (tcs_unified env) True }
+       ; TcM.updTcRef (tcs_unified env) (+ 1) }
 
-reportUnifications :: TcS a -> TcS (Bool, a)
+unflattenFmv :: TcTyVar -> TcType -> TcS ()
+-- Fill a flatten-meta-var, simply by unifying it.
+-- This does NOT count as a unification in tcs_unified.
+unflattenFmv tv ty
+  = ASSERT2( isMetaTyVar tv, ppr tv )
+    TcS $ \ _ ->
+    do { TcM.traceTc "unflattenFmv" (ppr tv <+> text ":=" <+> ppr ty)
+       ; TcM.writeMetaTyVar tv ty }
+
+reportUnifications :: TcS a -> TcS (Int, a)
 reportUnifications (TcS thing_inside)
   = TcS $ \ env ->
-    do { inner_unified <- TcM.newTcRef False
+    do { inner_unified <- TcM.newTcRef 0
        ; res <- thing_inside (env { tcs_unified = inner_unified })
-       ; dirty <- TcM.readTcRef inner_unified
-       ; TcM.updTcRef (tcs_unified env) (|| dirty)  -- Inner unifications affect
-       ; return (dirty, res) }                      -- the outer scope too
+       ; n_unifs <- TcM.readTcRef inner_unified
+       ; TcM.updTcRef (tcs_unified env) (+ n_unifs)  -- Inner unifications affect
+       ; return (n_unifs, res) }                     -- the outer scope too
 
 getDefaultInfo ::  TcS ([Type], (Bool, Bool))
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
@@ -1601,6 +1607,9 @@ zonkTyVarsAndFV tvs = wrapTcS (TcM.zonkTyVarsAndFV tvs)
 
 zonkTcType :: TcType -> TcS TcType
 zonkTcType ty = wrapTcS (TcM.zonkTcType ty)
+
+zonkTcTypes :: [TcType] -> TcS [TcType]
+zonkTcTypes tys = wrapTcS (TcM.zonkTcTypes tys)
 
 zonkTcTyVar :: TcTyVar -> TcS TcType
 zonkTcTyVar tv = wrapTcS (TcM.zonkTcTyVar tv)
@@ -1692,9 +1701,10 @@ newFsk fam_ty
 newFmv fam_ty
   = wrapTcS $ do { uniq <- TcM.newUnique
                  ; ref  <- TcM.newMutVar Flexi
+                 ; cur_lvl <- TcM.getTcLevel
                  ; let details = MetaTv { mtv_info  = FlatMetaTv
                                         , mtv_ref   = ref
-                                        , mtv_tclvl = fskTcLevel }
+                                        , mtv_tclvl = fmvTcLevel cur_lvl }
                        name = TcM.mkTcTyVarName uniq (fsLit "s")
                  ; return (mkTcTyVar name (typeKind fam_ty) details) }
 

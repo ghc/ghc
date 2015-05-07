@@ -25,7 +25,7 @@ module TcType (
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel,
-  strictlyDeeperThan, sameDepthAs, fskTcLevel,
+  strictlyDeeperThan, sameDepthAs, fmvTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -485,15 +485,14 @@ the whole implication disappears but when we pop out again we are left with
 uf will get unified *once more* to (F Int).
 -}
 
-fskTcLevel :: TcLevel
-fskTcLevel = TcLevel 0  -- 0 = Outside the outermost level:
-                                  --     flatten skolems
+fmvTcLevel :: TcLevel -> TcLevel
+fmvTcLevel (TcLevel n) = TcLevel (n-1)
 
 topTcLevel :: TcLevel
 topTcLevel = TcLevel 1   -- 1 = outermost level
 
 pushTcLevel :: TcLevel -> TcLevel
-pushTcLevel (TcLevel us) = TcLevel (us+1)
+pushTcLevel (TcLevel us) = TcLevel (us + 2)
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)

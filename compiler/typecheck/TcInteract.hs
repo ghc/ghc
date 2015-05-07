@@ -179,11 +179,14 @@ solveSimpleWanteds simples
           ; (rerun_plugin, wc3) <- runTcPluginsWanted wc2
              -- See Note [Running plugins on unflattened wanteds]
 
-          ; if unifs1 || unifs2 || rerun_plugin
-            then go (n+1) wc3        -- Loop
-            else return (n,wc3) }
+          ; if unifs1 == 0 && unifs2 == 0 && not rerun_plugin
+            then return (n,wc3)             -- Done
+            else do { traceTcS "solveSimple going round again:"
+                               (ppr unifs1 <+> ppr unifs2 <+> ppr rerun_plugin)
+                    ; go (n+1) wc3 } }      -- Loop
 
-solve_simple_wanteds :: WantedConstraints -> TcS (Bool, WantedConstraints)
+
+solve_simple_wanteds :: WantedConstraints -> TcS (Int, WantedConstraints)
 -- Try solving these constraints
 -- Return True iff some unification happened *during unflattening*
 --                 because this is a form of improvement
@@ -201,21 +204,22 @@ solve_simple_wanteds (WC { wc_simple = simples1, wc_insol = insols1, wc_impl = i
                      , wc_insol  = insols1 `andCts` insols2
                      , wc_impl   = implics1 `unionBags` implics2 }) }
 
-try_improvement :: WantedConstraints -> TcS (Bool, WantedConstraints)
+try_improvement :: WantedConstraints -> TcS (Int, WantedConstraints)
 -- See Note [The improvement story]
 -- Try doing improvement on these simple constraints
 -- Return True iff some unification happened
 -- Affects the unification state (of course) but not the inert set
 try_improvement wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   | isEmptyBag simples
-  = return (False, wc)
+  = return (0, wc)
   | otherwise
   = nestTcS $ reportUnifications $
     do { traceTcS "try_improvement {" (ppr wc)
        ; solveSimples init_derived
        ; (_, tv_eqs, fun_eqs, derived_insols, _) <- getUnsolvedInerts
        ; derived_eqs <- unflatten tv_eqs fun_eqs
-       ; let new_derived = filterBag (usefulToFloat is_new) derived_eqs
+       ; init_eq_preds <- zonkTcTypes init_eq_preds
+       ; let new_derived = filterBag (usefulToFloat (is_new init_eq_preds)) derived_eqs
              wc1         = WC { wc_simple = simples1 `andCts` new_derived
                               , wc_insol  = dropDerivedSimples insols `andCts` derived_insols
                                             -- See Note [Insolubles and improvement]
@@ -223,7 +227,7 @@ try_improvement wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
        ; traceTcS "try_improvement end }" (ppr wc1)
        ; return wc1 }
   where
-    is_new pred = not (any (pred `eqType`) init_eq_preds)
+    is_new init_eq_preds pred = not (any (pred `eqType`) init_eq_preds)
        -- Sigh: an equality in init_derived may well show up in derived_eqs,
        --       if no progress has been made, and we don't want to duplicate it.
        -- But happily these lists are both usually very short.
@@ -362,6 +366,10 @@ Some notes about this
   In improvement (step 2), we make both constraints Derived,
   rewrite one with the other, and do type-class reduction on
   the Derived constraint
+
+    [W] F alpha ~ fmv
+    [W] C fmv alpha
+    [W] fmv ~ Bool
 
 ----------- Example 4 (Trac #10009, a nasty example):
 
@@ -1811,9 +1819,9 @@ dischargeFmv ev fmv co xi
            CtWanted { ctev_evar = evar } -> setWantedEvBind evar (EvCoercion co)
            CtDerived {}                  -> return ()  -- Happens during improvement
            CtGiven {}                    -> pprPanic "dischargeFmv" (ppr ev)
-       ; unifyTyVar fmv xi
+       ; unflattenFmv fmv xi
        ; n_kicked <- kickOutRewritable Given NomEq fmv
-       ; traceTcS "dischargeFuv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
+       ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
 
 {- Note [Top-level reductions for type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

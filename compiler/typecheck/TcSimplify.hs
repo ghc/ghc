@@ -888,18 +888,18 @@ simpl_loop n floated_eqs
   = do { traceTcS "simpl_loop, iteration" (int n)
 
        -- solveSimples may make progress if either float_eqs hold
-       ; (unifs_happened1, wc1) <- if no_floated_eqs
-                                   then return (False, emptyWC)
-                                   else reportUnifications $
-                                        solveSimpleWanteds (floated_eqs `unionBags` simples)
-                                        -- Put floated_eqs first so they get solved first
-                                        -- NB: the floated_eqs may include /derived/ equalities
-                                        --     arising from fundeps inside an implication
+       ; (unifs1, wc1) <- if no_floated_eqs
+                          then return (0, emptyWC)
+                          else reportUnifications $
+                               solveSimpleWanteds (floated_eqs `unionBags` simples)
+                               -- Put floated_eqs first so they get solved first
+                               -- NB: the floated_eqs may include /derived/ equalities
+                               --     arising from fundeps inside an implication
 
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
        -- solveImplications may make progress only if unifs2 holds
-       ; (floated_eqs2, implics2) <- if not unifs_happened1 && isEmptyBag implics1
+       ; (floated_eqs2, implics2) <- if unifs1 == 0 && isEmptyBag implics1
                                      then return (emptyBag, implics)
                                      else solveNestedImplications (implics `unionBags` implics1)
 

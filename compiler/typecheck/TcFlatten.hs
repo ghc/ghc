@@ -1642,10 +1642,20 @@ unflatten tv_eqs funeqs
     unflatten_funeq :: DynFlags -> Ct -> Cts -> TcS Cts
     unflatten_funeq dflags ct@(CFunEqCan { cc_fun = tc, cc_tyargs = xis
                                          , cc_fsk = fmv, cc_ev = ev }) rest
-      = do {   -- fmv should be a flatten meta-tv; we now fix its final
-               -- value, and then zonking will eliminate it
-             filled <- tryFill dflags fmv (mkTyConApp tc xis) ev
-           ; return (if filled then rest else ct `consCts` rest) }
+      = do {   -- fmv should be an un-filled flatten meta-tv;
+               -- we now fix its final value by filling it, being careful
+               -- to observe the occurs check.  Zonking will eliminate it
+               -- altogether in due course
+             rhs' <- zonkTcType (mkTyConApp tc xis)
+           ; case occurCheckExpand dflags fmv rhs' of
+               OC_OK rhs''    -- Normal case: fill the tyvar
+                 -> do { setEvBindIfWanted ev
+                               (EvCoercion (mkTcReflCo (ctEvRole ev) rhs''))
+                       ; unflattenFmv fmv rhs''
+                       ; return rest }
+
+               _ ->  -- Occurs check
+                     return (ct `consCts` rest) }
 
     unflatten_funeq _ other_ct _
       = pprPanic "unflatten_funeq" (ppr other_ct)
@@ -1660,7 +1670,7 @@ unflatten tv_eqs funeqs
     ----------------
     unflatten_eq ::  DynFlags -> TcLevel -> Ct -> Cts -> TcS Cts
     unflatten_eq dflags tclvl ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
-      | isFmvTyVar tv
+      | isFmvTyVar tv   -- Previously these were untouchable, but now they are touchable
       = do { lhs_elim <- tryFill dflags tv rhs ev
            ; if lhs_elim then return rest else
         do { rhs_elim <- try_fill dflags tclvl ev rhs (mkTyVarTy tv)
