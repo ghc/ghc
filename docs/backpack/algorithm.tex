@@ -60,12 +60,13 @@ passes, as we intend to implement it.
 
 \section{Changelog}
 
-\paragraph{April 28, 2015}  A signatures declaration no longer provides
+\paragraph{April 28, 2015}  A signature declaration no longer provides
 a signature in the technical shaping sense; the motivation for this change
-is explained in \textbf{Signatures cannot be provided}.  This means that,
-by default, all requirements are importable (Derek has stated that he doesn't
-think this will be too much of a problem in practice); we can consider extensions
-which allow us to hide requirements from import.
+is explained in \textbf{In-scope signatures are not provisions}.  The simplest
+consequence of this is that all requirements are importable (Derek has stated that he doesn't
+think this will be too much of a problem in practice); it is also possible to
+extend shape with a \verb|signatures| field, although some work has to be
+done specifying coherence conditions between \verb|signatures| and \verb|requirements|.
 
 \section{Front-end syntax}
 
@@ -116,19 +117,30 @@ $$
 \end{figure}
 
 Shaping computes a $Shape$, whose form is described in Figure~\ref{fig:semantic}.
-Starting with the empty shape, we incrementally construct a shape by
-shaping package declarations (the partially constructed shape serves as
-a context for renaming modules and signatures and instantiating
-includes) and merging them until we have processed all declarations.
-There are two things to specify: what shape each declaration has, and
-how the merge operation proceeds.
+Initializing the shape context to the empty shape, we incrementally
+build the context as follows:
 
-One variation of shaping also computes the renamed version of a package,
-i.e., where each identifier in the module and signature is replaced with
-the original name (equivalently, we record the output of GHC's renaming
-pass). This simplifies type checking because you no longer have to
-recalculate the set of available names, which otherwise would be lost.
-See more about this in the type checking section.
+\begin{enumerate}
+    \item Calculate the shape of a declaration, with respect to the
+        current shape context.  (e.g., by renaming a module/signature,
+        or using the shape from an included package.)
+    \item Merge this shape into the shape context.
+\end{enumerate}
+
+The final shape context is the shape of the package as a whole.
+Optionally, we can also compute the renamed syntax trees of
+modules and signatures.
+
+%   (There is a slight
+%   technical difficulty here, where to do shaping, we actually need an \texttt{AvailInfo},
+%   so we can resolve \texttt{T(..)} style imports.)
+
+%   One variation of shaping also computes the renamed version of a package,
+%   i.e., where each identifier in the module and signature is replaced with
+%   the original name (equivalently, we record the output of GHC's renaming
+%   pass). This simplifies type checking because you no longer have to
+%   recalculate the set of available names, which otherwise would be lost.
+%   See more about this in the type checking section.
 
 In the description below, we'll assume \verb|THIS| is the package key
 of the package being processed.
@@ -294,12 +306,13 @@ A signature declaration creates a requirement at module name \verb|M|.  It has t
 \end{verbatim}
 
 \begin{aside}
-\textbf{Signatures cannot be provided}.  A signature \emph{never} counts
-as a provision, as far as shaping is concerned.  While it seems like
-a signature package which provides signatures for import should actually,
-you know, \emph{provide} its signatures, this observation at its
-logical conclusion is a mess.  The problem can most clearly be
-seen in this example:
+\textbf{In-scope signatures are not provisions}.  We enforce the invariant that
+a provision is always (syntactically) a \verb|module| and a requirement
+is always a \verb|signature|.  This means that if you have a requirement
+and a provision of the same name, the requirement can \emph{always} be filled
+with the provision. Without this invariant, it's not clear if a provision
+will actually fill a signature.  Consider this example, where
+a signature is required and exposed:
 
 \begin{verbatim}
     package a-sigs (A) requires (A) where -- ***
@@ -323,8 +336,9 @@ When we consider merging in the shape of \verb|a-user|, does the
 in \verb|a-user|?  It \emph{should not}, since \verb|a-sigs| does not
 actually provide enough declarations to satisfy \verb|a-user|'s
 requirement: the intended semantics \emph{merges} the requirements
-of \verb|a-sigs| and \verb|a-user|, but doesn't use the provision to
-fill the signature.  However, in this case:
+of \verb|a-sigs| and \verb|a-user|.
+
+
 
 \begin{verbatim}
     package a-sigs (M as A) requires (H as A) where
@@ -657,6 +671,199 @@ What is \verb|THIS|?  It is the package name, plus for every requirement \verb|M
 a mapping \verb|M -> HOLE:M|.  Annoyingly, you don't know the full set of
 requirements until the end of shaping, so you don't know the package key ahead of time;
 however, it can be substituted at the end easily.
+
+\clearpage
+\newpage
+
+\section{Type constructor exports}
+
+In the previous section, we described the \verb|Name|s of a
+module as a flat namespace; but actually, there is one level of
+hierarchy associated with type-constructors.  The type:
+
+\begin{verbatim}
+    data A = B { foo :: Int }
+\end{verbatim}
+%
+brings three \verb|OccName|s into scope, \verb|A|, \verb|B|
+and \verb|foo|, but the constructors and record selectors are
+considered \emph{children}
+of \verb|A|: in an import list, they can be implicitly brought
+into scope with \verb|A(..)|, or individually brought into
+scope with \verb|foo| or \verb|pattern B| (using the new \verb|PatternSynonyms|
+extension).  Symmetrically, a module may export only \emph{some}
+of the constructors/selectors of a type; it may not even
+export the type itself!
+
+We \emph{absolutely} need this information to rename a module or
+signature, which means that there is a little bit of extra information
+we have to collect when shaping.  What is this information?  If we take
+GHC's internal representation at face value, we have the more complex
+semantic representation seen in Figure~\ref{fig:semantic2}:
+
+\begin{figure}[htpb]
+$$
+\begin{array}{rcll}
+Shape & ::= & \verb|provides:|\; m \; \verb|->|\; Module\; \verb|{|\, AvailInfo \verb|,|\, \ldots \, \verb|};| \ldots \\
+      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{Module}\; \verb|{| \, AvailInfo \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
+AvailInfo & ::= & Name & \mbox{Plain identifiers} \\
+          & |   & Name \, \verb|{| \, Name_0\verb|,| \, \ldots\verb|,| \, Name_n \, \verb|}| & \mbox{Type constructors} \\
+\end{array}
+$$
+\caption{Enriched semantic entities in Backpack} \label{fig:semantic2}
+\end{figure}
+%
+For type constructors, the outer $Name$ identifies the \emph{parent}
+identifier, which may not necessarily be in scope (define this to be the \texttt{availName}); the inner list consists
+of the children identifiers that are actually in scope.  If a wildcard
+is written, all of the child identifiers are brought into scope.
+In the following examples, we've ensured that
+types and constructors are unambiguous, although in Haskell proper they
+live in separate namespaces; we've also elided the \verb|THIS| package
+key from the identifiers.
+
+\begin{verbatim}
+    module M(A(..)) where
+        data A = B { foo :: Int }
+    -- M.A{ M.A, M.B, M.foo }
+
+    module N(A) where
+        data A = B { foo :: Int }
+    -- N.A{ N.A }
+
+    module O(foo) where
+        data A = B { foo :: Int }
+    -- O.A{ O.foo }
+
+    module A where
+        data T = S { bar :: Int }
+    module B where
+        data T = S { baz :: Bool }
+    module C(bar, baz) where
+        import A
+        import B
+    -- A.T{ A.bar }, B.T{ B.baz }
+    -- NB: it would be illegal for the type constructors
+    -- A.T and B.T to be both exported from C!
+\end{verbatim}
+%
+Previously, we stated that we simply merged $Name$s based on their
+$OccName$s.  We now must consider what it means to merge $AvailInfo$s.
+
+\subsection{Algorithim}
+
+\Red{to write up}
+
+\subsection{Examples}
+
+Unfortunately, there are a number of tricky scenarios:
+
+\paragraph{Merging when type constructors are not in scope}
+
+\begin{verbatim}
+    signature A1(foo) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(bar) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+%
+If we merge \verb|A1| and \verb|A2|, are we supposed to conclude that
+the types \verb|A1.A| and \verb|A2.A| (not in scope!) are the same?
+The answer is no!  Consider these implementations:
+
+\begin{verbatim}
+    module A1(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    module A2(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    module A(foo, bar) where
+        import A1
+        import A2
+\end{verbatim}
+
+Here, \verb|module A1| implements \verb|signature A1|, \verb|module A2| implements \verb|signature A2|,
+and \verb|module A| implements \verb|signature A1| and \verb|signature A2| individually
+and should certainly implement their merge.
+
+\paragraph{Does merging a selector merge the type constructor?}
+
+\begin{verbatim}
+    signature A1(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(foo) where
+        import A1(foo)
+\end{verbatim}
+%
+Does the last signature, which is written in the style of a sharing constraint on \verb|foo|,
+also cause \verb|bar| and the type and constructor \verb|A| to be unified?
+It doesn't seem to be too harmful if we don't unify the rest, and arranging
+for the other children to be unified introduces a bit of complexity, so
+for now we say no.
+
+\paragraph{Incomplete data declarations}
+
+\begin{verbatim}
+    signature A1(A(foo)) where
+        data A = A { foo :: Int }
+
+    signature A2(A(bar)) where
+        data A = A { bar :: Bool }
+\end{verbatim}
+%
+Should \verb|A1| and \verb|A2| merge?  If yes, this would imply
+that data definitions in signatures could only be \emph{partial}
+specifications of their true data types.  This seems complicated,
+which suggests this should not be supported; however, in fact,
+this sort of definition, while disallowed during type checking,
+should be \emph{allowed} during shaping. The reason that the
+shape we abscribe to the signatures \verb|A1| and \verb|A2| are
+equivalent to the shapes for these which should merge:
+
+\begin{verbatim}
+    signature A1(A(foo)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(A(bar)) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+
+\paragraph{Record selectors and functions}
+
+\begin{verbatim}
+    signature H(foo) where
+        data A
+        foo :: A -> Int
+
+    module M(foo) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+%
+Does \verb|M| successfully fill \verb|H|?  If so, it means that anywhere
+a signature requests a function \verb|foo|, we can instead validly
+provide a record selector.  This capability seems quite attractive
+but actually it is quite complicated!  We'll discuss this in the next
+section.
+
+As a workaround, \verb|H| can equivalently be written as:
+
+\begin{verbatim}
+    module H(foo) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+%
+This is suboptimal, however, as the otherwise irrelevant \verb|bar| must be mentioned
+in the definition.
+
+\subsection{Subtyping record selectors as functions}
+
+\Red{to write}
 
 %\newpage
 
