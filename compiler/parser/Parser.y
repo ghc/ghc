@@ -2252,10 +2252,10 @@ texp :: { LHsExpr RdrName }
 tup_exprs :: { [LHsTupArg RdrName] }
            : texp commas_tup_tail
                           {% do { addAnnotation (gl $1) AnnComma (fst $2)
-                                ; return ((L (gl $1) (Present $1)) : snd $2) } }
+                                ; return ((sL1 $1 (Present $1)) : snd $2) } }
 
            | commas tup_tail
-                {% do { mapM_ (\ll -> addAnnotation (gl ll) AnnComma (gl ll)) $2
+                {% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (fst $1)
                       ; return
                            (let tt = if null $2
                                        then [noLoc missingTupArg]
