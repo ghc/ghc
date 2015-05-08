@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples #-}
+{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples,
+    RecordWildCards #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -10,8 +11,9 @@
 
 module InteractiveEval (
 #ifdef GHCI
-        RunResult(..), Status(..), Resume(..), History(..),
-        runStmt, runStmtWithLocation, runDecls, runDeclsWithLocation,
+        Status(..), Resume(..), History(..),
+        execStmt, ExecOptions(..), execOptions, ExecResult(..), resumeExec,
+        runDecls, runDeclsWithLocation,
         parseImportDecl, SingleStep(..),
         resume,
         abandon, abandonAll,
@@ -32,7 +34,9 @@ module InteractiveEval (
         showModule,
         isModuleInterpreted,
         compileExpr, dynCompileExpr,
-        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType
+        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
+        -- * Depcreated API (remove in GHC 7.14)
+        RunResult(..), runStmt, runStmtWithLocation,
 #endif
         ) where
 
@@ -93,21 +97,13 @@ import Data.Array
 import Exception
 import Control.Concurrent
 import System.IO.Unsafe
+import GHC.Conc         ( setAllocationCounter, getAllocationCounter )
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
 
 getResumeContext :: GhcMonad m => m [Resume]
 getResumeContext = withSession (return . ic_resume . hsc_IC)
-
-data SingleStep
-   = RunToCompletion
-   | SingleStep
-   | RunAndLogSteps
-
-isStep :: SingleStep -> Bool
-isStep RunToCompletion = False
-isStep _ = True
 
 mkHistory :: HscEnv -> HValue -> BreakInfo -> History
 mkHistory hsc_env hval bi = let
@@ -152,21 +148,30 @@ updateFixityEnv fix_env = do
   let ic = hsc_IC hsc_env
   setSession $ hsc_env { hsc_IC = ic { ic_fix_env = fix_env } }
 
--- | Run a statement in the current interactive context.  Statement
--- may bind multple values.
-runStmt :: GhcMonad m => String -> SingleStep -> m RunResult
-runStmt = runStmtWithLocation "<interactive>" 1
+-- -----------------------------------------------------------------------------
+-- execStmt
 
--- | Run a statement in the current interactive context.  Passing debug information
---   Statement may bind multple values.
-runStmtWithLocation :: GhcMonad m => String -> Int ->
-                       String -> SingleStep -> m RunResult
-runStmtWithLocation source linenumber expr step =
-  do
+-- | default ExecOptions
+execOptions :: ExecOptions
+execOptions = ExecOptions
+  { execSingleStep = RunToCompletion
+  , execSourceFile = "<interactive>"
+  , execLineNumber = 1
+  }
+
+-- | Run a statement in the current interactive context.
+execStmt
+  :: GhcMonad m
+  => String             -- ^ a statement (bind or expression)
+  -> ExecOptions
+  -> m ExecResult
+execStmt stmt ExecOptions{..} = do
     hsc_env <- getSession
 
-    breakMVar  <- liftIO $ newEmptyMVar  -- wait on this when we hit a breakpoint
-    statusMVar <- liftIO $ newEmptyMVar  -- wait on this when a computation is running
+    -- wait on this when we hit a breakpoint
+    breakMVar  <- liftIO $ newEmptyMVar
+    -- wait on this when a computation is running
+    statusMVar <- liftIO $ newEmptyMVar
 
     -- Turn off -fwarn-unused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
@@ -175,27 +180,62 @@ runStmtWithLocation source linenumber expr step =
         hsc_env' = hsc_env{ hsc_IC = ic{ ic_dflags = idflags' } }
 
     -- compile to value (IO [HValue]), don't run
-    r <- liftIO $ hscStmtWithLocation hsc_env' expr source linenumber
+    r <- liftIO $ hscStmtWithLocation hsc_env' stmt
+                    execSourceFile execLineNumber
 
     case r of
       -- empty statement / comment
-      Nothing -> return (RunOk [])
+      Nothing -> return (ExecComplete (Right []) 0)
 
       Just (tyThings, hval, fix_env) -> do
         updateFixityEnv fix_env
 
         status <-
           withVirtualCWD $
-            withBreakAction (isStep step) idflags' breakMVar statusMVar $ do
-                liftIO $ sandboxIO idflags' statusMVar hval
+            withBreakAction (isStep execSingleStep) idflags'
+               breakMVar statusMVar $ do
+                 liftIO $ sandboxIO idflags' statusMVar hval
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
 
             size = ghciHistSize idflags'
 
-        handleRunStatus step expr bindings tyThings
+        handleRunStatus execSingleStep stmt bindings tyThings
                         breakMVar statusMVar status (emptyHistory size)
+
+-- | The type returned by the deprecated 'runStmt' and
+-- 'runStmtWithLocation' API
+data RunResult
+  = RunOk [Name]                -- ^ names bound by this evaluation
+  | RunException SomeException  -- ^ statement raised an exception
+  | RunBreak ThreadId [Name] (Maybe BreakInfo)
+
+-- | Conver the old result type to the new result type
+execResultToRunResult :: ExecResult -> RunResult
+execResultToRunResult r =
+  case r of
+    ExecComplete{ execResult = Left ex } -> RunException ex
+    ExecComplete{ execResult = Right names } -> RunOk names
+    ExecBreak{..} -> RunBreak breakThreadId breakNames breakInfo
+
+-- Remove in GHC 7.14
+{-# DEPRECATED runStmt "use execStmt" #-}
+-- | Run a statement in the current interactive context.  Statement
+-- may bind multple values.
+runStmt :: GhcMonad m => String -> SingleStep -> m RunResult
+runStmt stmt step =
+  execResultToRunResult <$> execStmt stmt execOptions { execSingleStep = step }
+
+-- Remove in GHC 7.14
+{-# DEPRECATED runStmtWithLocation "use execStmtWithLocation" #-}
+runStmtWithLocation :: GhcMonad m => String -> Int ->
+                       String -> SingleStep -> m RunResult
+runStmtWithLocation source linenumber expr step = do
+  execResultToRunResult <$>
+     execStmt expr execOptions { execSingleStep = step
+                               , execSourceFile = source
+                               , execLineNumber = linenumber }
 
 runDecls :: GhcMonad m => String -> m [Name]
 runDecls = runDeclsWithLocation "<interactive>" 1
@@ -243,7 +283,7 @@ emptyHistory size = nilBL size
 handleRunStatus :: GhcMonad m
                 => SingleStep -> String-> ([TyThing],GlobalRdrEnv) -> [Id]
                 -> MVar () -> MVar Status -> Status -> BoundedList History
-                -> m RunResult
+                -> m ExecResult
 
 handleRunStatus step expr bindings final_ids
                breakMVar statusMVar status history
@@ -296,21 +336,21 @@ handleRunStatus step expr bindings final_ids
            hsc_env2 = pushResume hsc_env1 resume
   
          modifySession (\_ -> hsc_env2)
-         return (RunBreak tid names mb_info)
+         return (ExecBreak tid names mb_info)
   
     -- Completed with an exception
-    | Complete (Left e) <- status
-    = return (RunException e)
+    | Complete (Left e) alloc <- status
+    = return (ExecComplete (Left e) alloc)
   
     -- Completed successfully
-    | Complete (Right hvals) <- status
+    | Complete (Right hvals) allocs <- status
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
          liftIO $ Linker.extendLinkEnv (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          modifySession (\_ -> hsc_env')
-         return (RunOk final_names)
+         return (ExecComplete (Right final_names) allocs)
   
     | otherwise
     = panic "handleRunStatus"  -- The above cases are in fact exhaustive
@@ -351,7 +391,10 @@ foreign import ccall "&rts_breakpoint_io_action"
 sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing =
    mask $ \restore -> -- fork starts blocked
-     let runIt = liftM Complete $ try (restore $ rethrow dflags thing)
+     let runIt =
+           liftM (uncurry Complete) $
+           measureAlloc $
+           try $ restore $ rethrow dflags $ thing
      in if gopt Opt_GhciSandbox dflags
         then do tid <- forkIO $ do res <- runIt
                                    putMVar statusMVar res -- empty: can't block
@@ -397,6 +440,13 @@ redirectInterrupts target wait
           case m of
             Nothing -> wait
             Just target -> do throwTo target (e :: SomeException); wait
+
+measureAlloc :: IO a -> IO (a,Word64)
+measureAlloc io = do
+  setAllocationCounter maxBound
+  a <- io
+  allocs <- getAllocationCounter
+  return (a, fromIntegral (maxBound::Int64) - fromIntegral allocs)
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
@@ -460,7 +510,10 @@ noBreakAction False _ _ = putStrLn "*** Ignoring breakpoint"
 noBreakAction True  _ _ = return () -- exception: just continue
 
 resume :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> m RunResult
-resume canLogSpan step
+resume canLogSpan step = execResultToRunResult <$> resumeExec canLogSpan step
+
+resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> m ExecResult
+resumeExec canLogSpan step
  = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env

@@ -87,47 +87,68 @@ module GHC (
         PrintUnqualified, alwaysQualify,
 
         -- * Interactive evaluation
+
+#ifdef GHCI
+        -- ** Executing statements
+        execStmt, ExecOptions(..), execOptions, ExecResult(..),
+        resumeExec,
+
+        -- ** Adding new declarations
+        runDecls, runDeclsWithLocation,
+
+        -- ** Get/set the current context
+        parseImportDecl,
+        setContext, getContext,
+        setGHCiMonad,
+#endif
+        -- ** Inspecting the current context
         getBindings, getInsts, getPrintUnqual,
         findModule, lookupModule,
 #ifdef GHCI
-        isModuleTrusted,
-        moduleTrustReqs,
-        setContext, getContext, 
+        isModuleTrusted, moduleTrustReqs,
         getNamesInScope,
         getRdrNamesInScope,
         getGRE,
         moduleIsInterpreted,
         getInfo,
+        showModule,
+        isModuleInterpreted,
+
+        -- ** Inspecting types and kinds
         exprType,
         typeKind,
+
+        -- ** Looking up a Name
         parseName,
-        RunResult(..),  
-        runStmt, runStmtWithLocation, runDecls, runDeclsWithLocation,
+#endif
+        lookupName,
+#ifdef GHCI
+        -- ** Compiling expressions
+        InteractiveEval.compileExpr, HValue, dynCompileExpr,
+
+        -- ** Other
         runTcInteractive,   -- Desired by some clients (Trac #8878)
-        parseImportDecl, SingleStep(..),
-        resume,
+
+        -- ** The debugger
+        SingleStep(..),
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),
         History(historyBreakInfo, historyEnclosingDecls), 
         GHC.getHistorySpan, getHistoryModule,
-        getResumeContext,
         abandon, abandonAll,
-        InteractiveEval.back,
-        InteractiveEval.forward,
-        showModule,
-        isModuleInterpreted,
-        InteractiveEval.compileExpr, HValue, dynCompileExpr,
+        getResumeContext,
         GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
         BreakArray, setBreakOn, setBreakOff, getBreak,
-#endif
-        lookupName,
+        InteractiveEval.back,
+        InteractiveEval.forward,
 
-#ifdef GHCI
-        -- ** EXPERIMENTAL
-        setGHCiMonad,
+        -- ** Deprecated API
+        RunResult(..),
+        runStmt, runStmtWithLocation,
+        resume,
 #endif
 
         -- * Abstract syntax elements
@@ -1416,14 +1437,11 @@ moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [PackageKey])
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 
--- | EXPERIMENTAL: DO NOT USE.
--- 
--- Set the monad GHCi lifts user statements into.
+-- | Set the monad GHCi lifts user statements into.
 --
 -- Checks that a type (in string form) is an instance of the
 -- @GHC.GHCi.GHCiSandboxIO@ type class. Sets it to be the GHCi monad if it is,
 -- throws an error otherwise.
-{-# WARNING setGHCiMonad "This is experimental! Don't use." #-}
 setGHCiMonad :: GhcMonad m => String -> m ()
 setGHCiMonad name = withSession $ \hsc_env -> do
     ty <- liftIO $ hscIsGHCiMonad hsc_env name

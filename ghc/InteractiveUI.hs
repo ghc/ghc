@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, TupleSections #-}
+{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, TupleSections,
+             RecordWildCards #-}
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -807,9 +808,10 @@ runOneCommand eh gCmd = do
             Nothing      -> return $ Just True
             Just ml_stmt -> do
               -- temporarily compensate line-number for multi-line input
-              result <- timeIt $ lift $ runStmtWithLineNum fst_line_num ml_stmt GHC.RunToCompletion
-              return $ Just result
-        else do -- single line input and :{-multiline input
+              result <- timeIt runAllocs $ lift $
+                runStmtWithLineNum fst_line_num ml_stmt GHC.RunToCompletion
+              return $ Just (runSuccess result)
+        else do -- single line input and :{ - multiline input
           last_line_num <- lift (line_number <$> getGHCiState)
           -- reconstruct first line num from last line num and stmt
           let fst_line_num | stmt_nl_cnt > 0 = last_line_num - (stmt_nl_cnt2 + 1)
@@ -817,11 +819,13 @@ runOneCommand eh gCmd = do
               stmt_nl_cnt2 = length [ () | '\n' <- stmt' ]
               stmt' = dropLeadingWhiteLines stmt -- runStmt doesn't like leading empty lines
           -- temporarily compensate line-number for multi-line input
-          result <- timeIt $ lift $ runStmtWithLineNum fst_line_num stmt' GHC.RunToCompletion
-          return $ Just result
+          result <- timeIt runAllocs $ lift $
+            runStmtWithLineNum fst_line_num stmt' GHC.RunToCompletion
+          return $ Just (runSuccess result)
 
     -- runStmt wrapper for temporarily overridden line-number
-    runStmtWithLineNum :: Int -> String -> SingleStep -> GHCi Bool
+    runStmtWithLineNum :: Int -> String -> SingleStep
+                       -> GHCi (Maybe GHC.ExecResult)
     runStmtWithLineNum lnum stmt step = do
         st0 <- getGHCiState
         setGHCiState st0 { line_number = lnum }
@@ -899,16 +903,16 @@ declPrefixes dflags = keywords ++ concat opt_keywords
 
 -- | Entry point to execute some haskell code from user.
 -- The return value True indicates success, as in `runOneCommand`.
-runStmt :: String -> SingleStep -> GHCi Bool
+runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
 runStmt stmt step
  -- empty; this should be impossible anyways since we filtered out
  -- whitespace-only input in runOneCommand's noSpace
  | null (filter (not.isSpace) stmt)
- = return True
+ = return Nothing
 
  -- import
  | stmt `looks_like` "import "
- = do addImportToContext stmt; return True
+ = do addImportToContext stmt; return (Just (GHC.ExecComplete (Right []) 0))
 
  | otherwise
  = do dflags <- getDynFlags
@@ -920,8 +924,10 @@ runStmt stmt step
         do _ <- liftIO $ tryIO $ hFlushAll stdin
            m_result <- GhciMonad.runDecls stmt
            case m_result of
-               Nothing     -> return False
-               Just result -> afterRunStmt (const True) (GHC.RunOk result)
+               Nothing     -> return Nothing
+               Just result ->
+                 Just <$> afterRunStmt (const True)
+                            (GHC.ExecComplete (Right result) 0)
 
     run_stmt =
         do -- In the new IO library, read handles buffer data even if the Handle
@@ -932,8 +938,8 @@ runStmt stmt step
            _ <- liftIO $ tryIO $ hFlushAll stdin
            m_result <- GhciMonad.runStmt stmt step
            case m_result of
-               Nothing     -> return False
-               Just result -> afterRunStmt (const True) result
+               Nothing     -> return Nothing
+               Just result -> Just <$> afterRunStmt (const True) result
 
     s `looks_like` prefix = prefix `isPrefixOf` dropWhile isSpace s
        -- Ignore leading spaces (see Trac #9914), so that
@@ -941,15 +947,17 @@ runStmt stmt step
        -- (note leading spaces) works properly
 
 -- | Clean up the GHCi environment after a statement has run
-afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
-afterRunStmt _ (GHC.RunException e) = liftIO $ Exception.throwIO e
+afterRunStmt :: (SrcSpan -> Bool) -> GHC.ExecResult -> GHCi GHC.ExecResult
 afterRunStmt step_here run_result = do
   resumes <- GHC.getResumeContext
   case run_result of
-     GHC.RunOk names -> do
-        show_types <- isOptionSet ShowType
-        when show_types $ printTypeOfNames names
-     GHC.RunBreak _ names mb_info
+     GHC.ExecComplete{..} ->
+       case execResult of
+          Left ex -> liftIO $ Exception.throwIO ex
+          Right names -> do
+            show_types <- isOptionSet ShowType
+            when show_types $ printTypeOfNames names
+     GHC.ExecBreak _ names mb_info
          | isNothing  mb_info ||
            step_here (GHC.resumeSpan $ head resumes) -> do
                mb_id_loc <- toBreakIdAndLocation mb_info
@@ -963,14 +971,25 @@ afterRunStmt step_here run_result = do
                return ()
          | otherwise -> resume step_here GHC.SingleStep >>=
                         afterRunStmt step_here >> return ()
-     _ -> return ()
 
   flushInterpBuffers
   liftIO installSignalHandlers
   b <- isOptionSet RevertCAFs
   when b revertCAFs
 
-  return (case run_result of GHC.RunOk _ -> True; _ -> False)
+  return run_result
+
+runSuccess :: Maybe GHC.ExecResult -> Bool
+runSuccess run_result
+  | Just (GHC.ExecComplete { execResult = Right _ }) <- run_result = True
+  | otherwise = False
+
+runAllocs :: Maybe GHC.ExecResult -> Maybe Integer
+runAllocs m = do
+  res <- m
+  case res of
+    GHC.ExecComplete{..} -> Just (fromIntegral execAllocation)
+    _ -> Nothing
 
 toBreakIdAndLocation ::
   Maybe GHC.BreakInfo -> GHCi (Maybe (Int, BreakLocation))
@@ -1369,7 +1388,7 @@ checkModule m = do
 -- :load, :add, :reload
 
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
-loadModule fs = timeIt (loadModule' fs)
+loadModule fs = timeIt (const Nothing) (loadModule' fs)
 
 loadModule_ :: [FilePath] -> InputT GHCi ()
 loadModule_ fs = loadModule (zip fs (repeat Nothing)) >> return ()

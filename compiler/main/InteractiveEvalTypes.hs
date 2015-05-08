@@ -10,7 +10,8 @@
 
 module InteractiveEvalTypes (
 #ifdef GHCI
-        RunResult(..), Status(..), Resume(..), History(..),
+        Status(..), Resume(..), History(..), ExecResult(..),
+        SingleStep(..), isStep, ExecOptions(..)
 #endif
         ) where
 
@@ -26,15 +27,39 @@ import SrcLoc
 import Exception
 import Control.Concurrent
 
-data RunResult
-  = RunOk [Name]                -- ^ names bound by this evaluation
-  | RunException SomeException  -- ^ statement raised an exception
-  | RunBreak ThreadId [Name] (Maybe BreakInfo)
+import Data.Word
+
+data ExecOptions
+ = ExecOptions
+     { execSingleStep :: SingleStep         -- ^ stepping mode
+     , execSourceFile :: String             -- ^ filename (for errors)
+     , execLineNumber :: Int                -- ^ line number (for errors)
+     }
+
+data SingleStep
+   = RunToCompletion
+   | SingleStep
+   | RunAndLogSteps
+
+isStep :: SingleStep -> Bool
+isStep RunToCompletion = False
+isStep _ = True
+
+data ExecResult
+  = ExecComplete
+       { execResult :: Either SomeException [Name]
+       , execAllocation :: Word64
+       }
+  | ExecBreak
+       { breakThreadId :: ThreadId
+       , breakNames :: [Name]
+       , breakInfo :: Maybe BreakInfo
+       }
 
 data Status
    = Break Bool HValue BreakInfo ThreadId
           -- ^ the computation hit a breakpoint (Bool <=> was an exception)
-   | Complete (Either SomeException [HValue])
+   | Complete (Either SomeException [HValue]) Word64
           -- ^ the computation completed with either an exception or a value
 
 data Resume
