@@ -458,7 +458,7 @@ proceeds as follows:
         if there is a duplicate that doesn't have the same identity.
 \end{enumerate}
 %
-To merge two sets of names, take each pair of names with matching \verb|OccName|s $n$ and $m$.
+To merge two sets of names, union the two sets, handling each pair of names with matching \verb|OccName|s $n$ and $m$ as follows:
 
 \begin{enumerate}
     \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$.
@@ -750,9 +750,35 @@ key from the identifiers.
 Previously, we stated that we simply merged $Name$s based on their
 $OccName$s.  We now must consider what it means to merge $AvailInfo$s.
 
-\subsection{Algorithim}
+\subsection{Algorithm}
 
-\Red{to write up}
+Our merging algorithm takes two sets of $AvailInfo$s and merges them
+into one set.  In the degenerate case where every $AvailInfo$ is a
+$Name$, this algorithm operates the same as the original algorithm.
+Merging proceeds in two steps: unification and then simple union.
+
+Unification proceeds as follows: for each pair of $Name$s with
+matching $OccName$s, unify the names.  For each pair of $Name\, \verb|{|\,
+Name_0\verb|,|\, \ldots\verb|,|\, Name_n\, \verb|}|$, where there
+exists some pair of child names with matching $OccName$s, unify the
+parent $Name$s.  (A single $AvailInfo$ may participate in multiple such
+pairs.)  A simple identifier and a type constructor $AvailInfo$ with
+overlapping in-scope names fails to unify.  After unification,
+the simple union combines entries with matching \verb|availName|s (parent
+name in the case of a type constructor), recursively unioning the child
+names of type constructor $AvailInfo$s.
+
+Unification of $Name$s results in a substitution, and a $Name$ substitution
+on $AvailInfo$ is a little unconventional.  Specifically, substitution on $Name\, \verb|{|\,
+Name_0\verb|,|\, \ldots\verb|,|\, Name_n\, \verb|}|$ proceeds specially:
+a substitution from $Name$ to $Name'$ induces a substitution from
+$Module$ to $Module'$ (as the $OccName$s of the $Name$s are guaranteed
+to be equal), so for each child $Name_i$, perform the $Module$
+substitution.  So for example, the substitution \verb|HOLE:A.T| to \verb|THIS:A.T|
+takes the $AvailInfo$ \verb|HOLE:A.T { HOLE:A.B, HOLE:A.foo }| to
+\verb|THIS:A.T { THIS:A.B, THIS:A.foo }|.  In particular, substitution
+on children $Name$s is \emph{only} carried out by substituting on the outer name;
+we will never directly substitute children.
 
 \subsection{Examples}
 
@@ -786,7 +812,9 @@ The answer is no!  Consider these implementations:
 
 Here, \verb|module A1| implements \verb|signature A1|, \verb|module A2| implements \verb|signature A2|,
 and \verb|module A| implements \verb|signature A1| and \verb|signature A2| individually
-and should certainly implement their merge.
+and should certainly implement their merge.  This is why we cannot simply
+merge type constructors based on the $OccName$ of their top-level type;
+merging only occurs between in-scope identifiers.
 
 \paragraph{Does merging a selector merge the type constructor?}
 
@@ -803,9 +831,8 @@ and should certainly implement their merge.
 %
 Does the last signature, which is written in the style of a sharing constraint on \verb|foo|,
 also cause \verb|bar| and the type and constructor \verb|A| to be unified?
-It doesn't seem to be too harmful if we don't unify the rest, and arranging
-for the other children to be unified introduces a bit of complexity, so
-for now we say no.
+Because a merge of a child name results in a substitution on the parent name,
+the answer is yes.
 
 \paragraph{Incomplete data declarations}
 
@@ -834,7 +861,7 @@ equivalent to the shapes for these which should merge:
         data A = A { foo :: Int, bar :: Bool }
 \end{verbatim}
 
-\paragraph{Record selectors and functions}
+\subsection{Subtyping record selectors as functions}
 
 \begin{verbatim}
     signature H(foo) where
@@ -848,22 +875,90 @@ equivalent to the shapes for these which should merge:
 Does \verb|M| successfully fill \verb|H|?  If so, it means that anywhere
 a signature requests a function \verb|foo|, we can instead validly
 provide a record selector.  This capability seems quite attractive
-but actually it is quite complicated!  We'll discuss this in the next
-section.
+but actually it is quite complicated, because we can no longer assume
+that every child name is associated with a parent name.
 
 As a workaround, \verb|H| can equivalently be written as:
 
 \begin{verbatim}
-    module H(foo) where
+    signature H(foo) where
         data A = A { foo :: Int, bar :: Bool }
 \end{verbatim}
 %
 This is suboptimal, however, as the otherwise irrelevant \verb|bar| must be mentioned
 in the definition.
 
-\subsection{Subtyping record selectors as functions}
+So what if we actually want to write the original signature \verb|H|?
+The technical difficulty is that we now need to unify a plain identifier
+$AvailInfo$ (from the signature) with a type constructor $AvailInfo$
+(from a module.)  It is not clear what this should mean.
+Consider this situation:
 
-\Red{to write}
+\begin{verbatim}
+    package p where
+        signature H(A, foo, bar) where
+            data A
+            foo :: A -> Int
+            bar :: A -> Bool
+        module X(A, foo) where
+            import H
+    package q where
+        include p
+        signature H(bar) where
+            data A = A { foo :: Int, bar :: Bool }
+        module Y where
+            import X(A(..)) -- ???
+\end{verbatim}
+
+Should the wildcard import on \verb|X| be allowed?  Probably not?
+How about this situation:
+
+\begin{verbatim}
+    package p where
+        -- define without record selectors
+        signature X1(A, foo) where
+            data A
+            foo :: A -> Int
+        module M1(A, foo) where
+            import X1
+
+    package q where
+        -- define with record selectors (X1s unify)
+        signature X1(A(..)) where
+            data A = A { foo :: Int, bar :: Bool }
+        signature X2(A(..)) where
+            data A = A { foo :: Int, bar :: Bool }
+
+        -- export some record selectors
+        signature Y1(bar) where
+            import X1
+        signature Y2(bar) where
+            import X2
+
+    package r where
+        include p
+        include q
+
+        -- sharing constraint
+        signature Y2(bar) where
+            import Y1(bar)
+
+        -- the payload
+        module Test where
+            import M1(foo)
+            import X2(foo)
+            ... foo ... -- conflict?
+\end{verbatim}
+
+Without the sharing constraint, the \verb|foo|s from \verb|M1| and \verb|X2|
+should conflict.  With it, however, we should conclude that the \verb|foo|s
+are the same, even though the \verb|foo| from \verb|M1| is \emph{not}
+considered a child of \verb|A|, and even though in the sharing constraint
+we \emph{only} unified \verb|bar| (and its parent \verb|A|).  To know that
+\verb|foo| from \verb|M1| should also be unified, we have to know a bit
+more about \verb|A| when the sharing constraint performs unification;
+however, the $AvailInfo$ will only tell us about what is in-scope, which
+is \emph{not} enough information.
 
 %\newpage
 
