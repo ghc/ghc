@@ -1,0 +1,6 @@
+
+Test10280.hs:4:8: Not in scope: ‘atomicModifyIORef’
+
+Test10280.hs:4:26: Not in scope: ‘ciTokens’
+
+Test10280.hs:4:44: Not in scope: ‘f’

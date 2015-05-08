@@ -1,0 +1,36 @@
+---Problems---------------------
+[
+(AK <no location info> AnnEofPos = [Test10280.hs:5:1])
+]
+
+--------------------------------
+[
+(AK Test10280.hs:1:1 AnnModule = [Test10280.hs:2:1-6])
+
+(AK Test10280.hs:1:1 AnnWhere = [Test10280.hs:2:18-22])
+
+(AK Test10280.hs:4:1-45 AnnEqual = [Test10280.hs:4:6])
+
+(AK Test10280.hs:4:1-45 AnnFunId = [Test10280.hs:4:1-4])
+
+(AK Test10280.hs:4:1-45 AnnSemi = [Test10280.hs:5:1])
+
+(AK Test10280.hs:4:35-45 AnnCloseP = [Test10280.hs:4:45])
+
+(AK Test10280.hs:4:35-45 AnnOpenP = [Test10280.hs:4:35])
+
+(AK Test10280.hs:4:36-40 AnnCloseP = [Test10280.hs:4:40])
+
+(AK Test10280.hs:4:36-40 AnnOpenP = [Test10280.hs:4:36])
+
+(AK Test10280.hs:4:36-44 AnnVal = [Test10280.hs:4:42])
+
+(AK Test10280.hs:4:37 AnnComma = [Test10280.hs:4:37])
+
+(AK Test10280.hs:4:38-39 AnnCloseP = [Test10280.hs:4:39])
+
+(AK Test10280.hs:4:38-39 AnnOpenP = [Test10280.hs:4:38])
+
+(AK <no location info> AnnEofPos = [Test10280.hs:5:1])
+]
+
