@@ -428,9 +428,8 @@ After merging this in, the final shape of \verb|q| is:
 
 The shapes we've given for individual declarations have been quite
 simple.  Merging combines two shapes, filling requirements with
-implementations and substituting information we learn about the
-identities of \verb|Name|s; it is the most complicated part of the
-shaping process.
+implementations, unifying \verb|Name|s, and unioning requirements; it is
+the most complicated part of the shaping process.
 
 The best way to think about merging is that we take two packages with
 inputs (requirements) and outputs (provisions) and ``wiring'' them up so
@@ -448,17 +447,17 @@ proceeds as follows:
         $p$.} For each requirement $M$ of $q$ that is provided by $p$ (in particular,
         all of its required \verb|Name|s are provided),
         substitute each \verb|Module| occurrence of \verb|HOLE:M| with the
-        provided $p(M)$, merge the names, and remove the requirement from $q$.
-        Error if a provision is insufficient for the requirement.
+        provided $p(M)$, unify the names, and remove the requirement from $q$.
+        If the names of the provision are not a superset of the required names, error.
     \item If mutual recursion is supported, \emph{fill every requirement of $p$ with provided modules from $q$.}
     \item \emph{Merge leftover requirements.}  For each requirement $M$ of $q$ that is not
-        provided by $p$ but required by $p$, merge the names.  (It's not
+        provided by $p$ but required by $p$, unify the names, and union them together to form the new requirement.  (It's not
         necessary to substitute \verb|Module|s, since they are guaranteed to be the same.)
     \item \emph{Add provisions of $q$.} Union the provisions of $p$ and $q$, erroring
         if there is a duplicate that doesn't have the same identity.
 \end{enumerate}
 %
-To merge two sets of names, union the two sets, handling each pair of names with matching \verb|OccName|s $n$ and $m$ as follows:
+To unify two sets of names, find each pair of names with matching \verb|OccName|s $n$ and $m$ and do the following:
 
 \begin{enumerate}
     \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$.
