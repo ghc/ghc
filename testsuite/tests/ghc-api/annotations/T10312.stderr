@@ -1,0 +1,8 @@
+
+Test10312.hs:77:38: error: Not in scope: data constructor ‘Fixity’
+
+Test10312.hs:77:53: error:
+    Not in scope: ‘fs’
+    Perhaps you meant ‘fst’ (imported from Prelude)
+
+Test10312.hs:78:47: error: Not in scope: ‘ppDir’

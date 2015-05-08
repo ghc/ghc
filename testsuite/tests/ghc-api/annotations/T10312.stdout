@@ -1,0 +1,485 @@
+---Problems---------------------
+[
+]
+
+--------------------------------
+[
+(AK Test10312.hs:1:1 AnnModule = [Test10312.hs:4:1-6])
+
+(AK Test10312.hs:1:1 AnnWhere = [Test10312.hs:4:18-22])
+
+(AK Test10312.hs:8:1-15 AnnImport = [Test10312.hs:8:1-6])
+
+(AK Test10312.hs:8:1-15 AnnSemi = [Test10312.hs:9:1])
+
+(AK Test10312.hs:9:1-30 AnnAs = [Test10312.hs:9:27-28])
+
+(AK Test10312.hs:9:1-30 AnnImport = [Test10312.hs:9:1-6])
+
+(AK Test10312.hs:9:1-30 AnnQualified = [Test10312.hs:9:8-16])
+
+(AK Test10312.hs:9:1-30 AnnSemi = [Test10312.hs:10:1])
+
+(AK Test10312.hs:9:1-30 AnnVal = [Test10312.hs:9:30])
+
+(AK Test10312.hs:10:1-27 AnnImport = [Test10312.hs:10:1-6])
+
+(AK Test10312.hs:10:1-27 AnnSemi = [Test10312.hs:11:1])
+
+(AK Test10312.hs:10:17-27 AnnCloseP = [Test10312.hs:10:27])
+
+(AK Test10312.hs:10:17-27 AnnOpenP = [Test10312.hs:10:17])
+
+(AK Test10312.hs:11:1-25 AnnImport = [Test10312.hs:11:1-6])
+
+(AK Test10312.hs:11:1-25 AnnSemi = [Test10312.hs:15:1])
+
+(AK Test10312.hs:11:18-25 AnnCloseP = [Test10312.hs:11:25])
+
+(AK Test10312.hs:11:18-25 AnnOpenP = [Test10312.hs:11:18])
+
+(AK Test10312.hs:15:1-24 AnnDcolon = [Test10312.hs:15:17-18])
+
+(AK Test10312.hs:15:1-24 AnnSemi = [Test10312.hs:16:1])
+
+(AK Test10312.hs:15:20-24 AnnCloseS = [Test10312.hs:15:24])
+
+(AK Test10312.hs:15:20-24 AnnOpenS = [Test10312.hs:15:20])
+
+(AK Test10312.hs:(16,1)-(20,19) AnnEqual = [Test10312.hs:16:17])
+
+(AK Test10312.hs:(16,1)-(20,19) AnnFunId = [Test10312.hs:16:1-15])
+
+(AK Test10312.hs:(16,1)-(20,19) AnnSemi = [Test10312.hs:22:1])
+
+(AK Test10312.hs:(16,19)-(20,19) AnnCloseS = [Test10312.hs:20:19])
+
+(AK Test10312.hs:(16,19)-(20,19) AnnOpenS = [Test10312.hs:16:19])
+
+(AK Test10312.hs:(16,19)-(20,19) AnnVbar = [Test10312.hs:17:19])
+
+(AK Test10312.hs:16:21-25 AnnVal = [Test10312.hs:16:23])
+
+(AK Test10312.hs:16:21-29 AnnVal = [Test10312.hs:16:27])
+
+(AK Test10312.hs:17:21-32 AnnComma = [Test10312.hs:18:19])
+
+(AK Test10312.hs:17:21-32 AnnLarrow = [Test10312.hs:17:23-24])
+
+(AK Test10312.hs:17:26-32 AnnCloseS = [Test10312.hs:17:32])
+
+(AK Test10312.hs:17:26-32 AnnDotdot = [Test10312.hs:17:28-29])
+
+(AK Test10312.hs:17:26-32 AnnOpenS = [Test10312.hs:17:26])
+
+(AK Test10312.hs:18:21-33 AnnComma = [Test10312.hs:19:19])
+
+(AK Test10312.hs:18:21-33 AnnLarrow = [Test10312.hs:18:23-24])
+
+(AK Test10312.hs:18:26-33 AnnCloseS = [Test10312.hs:18:33])
+
+(AK Test10312.hs:18:26-33 AnnDotdot = [Test10312.hs:18:29-30])
+
+(AK Test10312.hs:18:26-33 AnnOpenS = [Test10312.hs:18:26])
+
+(AK Test10312.hs:19:21-33 AnnLarrow = [Test10312.hs:19:23-24])
+
+(AK Test10312.hs:19:26-33 AnnCloseS = [Test10312.hs:19:33])
+
+(AK Test10312.hs:19:26-33 AnnDotdot = [Test10312.hs:19:29-30])
+
+(AK Test10312.hs:19:26-33 AnnOpenS = [Test10312.hs:19:26])
+
+(AK Test10312.hs:22:1-25 AnnDcolon = [Test10312.hs:22:18-19])
+
+(AK Test10312.hs:22:1-25 AnnSemi = [Test10312.hs:23:1])
+
+(AK Test10312.hs:22:21-25 AnnCloseS = [Test10312.hs:22:25])
+
+(AK Test10312.hs:22:21-25 AnnOpenS = [Test10312.hs:22:21])
+
+(AK Test10312.hs:(23,1)-(27,20) AnnEqual = [Test10312.hs:23:18])
+
+(AK Test10312.hs:(23,1)-(27,20) AnnFunId = [Test10312.hs:23:1-16])
+
+(AK Test10312.hs:(23,1)-(27,20) AnnSemi = [Test10312.hs:32:1])
+
+(AK Test10312.hs:(23,20)-(27,20) AnnCloseS = [Test10312.hs:27:20])
+
+(AK Test10312.hs:(23,20)-(27,20) AnnOpenS = [Test10312.hs:23:20])
+
+(AK Test10312.hs:(23,20)-(27,20) AnnVbar = [Test10312.hs:24:20])
+
+(AK Test10312.hs:23:22-26 AnnVal = [Test10312.hs:23:24])
+
+(AK Test10312.hs:23:22-30 AnnVal = [Test10312.hs:23:28])
+
+(AK Test10312.hs:24:22-33 AnnLarrow = [Test10312.hs:24:24-25])
+
+(AK Test10312.hs:24:22-33 AnnVbar = [Test10312.hs:25:20])
+
+(AK Test10312.hs:24:27-33 AnnCloseS = [Test10312.hs:24:33])
+
+(AK Test10312.hs:24:27-33 AnnDotdot = [Test10312.hs:24:29-30])
+
+(AK Test10312.hs:24:27-33 AnnOpenS = [Test10312.hs:24:27])
+
+(AK Test10312.hs:25:22-34 AnnLarrow = [Test10312.hs:25:24-25])
+
+(AK Test10312.hs:25:22-34 AnnVbar = [Test10312.hs:26:20])
+
+(AK Test10312.hs:25:27-34 AnnCloseS = [Test10312.hs:25:34])
+
+(AK Test10312.hs:25:27-34 AnnDotdot = [Test10312.hs:25:30-31])
+
+(AK Test10312.hs:25:27-34 AnnOpenS = [Test10312.hs:25:27])
+
+(AK Test10312.hs:26:22-34 AnnLarrow = [Test10312.hs:26:24-25])
+
+(AK Test10312.hs:26:27-34 AnnCloseS = [Test10312.hs:26:34])
+
+(AK Test10312.hs:26:27-34 AnnDotdot = [Test10312.hs:26:30-31])
+
+(AK Test10312.hs:26:27-34 AnnOpenS = [Test10312.hs:26:27])
+
+(AK Test10312.hs:32:1-13 AnnDcolon = [Test10312.hs:32:6-7])
+
+(AK Test10312.hs:32:1-13 AnnSemi = [Test10312.hs:33:1])
+
+(AK Test10312.hs:32:9-13 AnnCloseS = [Test10312.hs:32:13])
+
+(AK Test10312.hs:32:9-13 AnnOpenS = [Test10312.hs:32:9])
+
+(AK Test10312.hs:(33,1)-(36,16) AnnEqual = [Test10312.hs:33:6])
+
+(AK Test10312.hs:(33,1)-(36,16) AnnFunId = [Test10312.hs:33:1-4])
+
+(AK Test10312.hs:(33,1)-(36,16) AnnSemi = [Test10312.hs:38:1])
+
+(AK Test10312.hs:33:8-12 AnnVal = [Test10312.hs:33:10])
+
+(AK Test10312.hs:(33,8)-(36,16) AnnVal = [Test10312.hs:33:14])
+
+(AK Test10312.hs:(33,16)-(36,16) AnnCloseS = [Test10312.hs:36:16])
+
+(AK Test10312.hs:(33,16)-(36,16) AnnOpenS = [Test10312.hs:33:16])
+
+(AK Test10312.hs:(33,16)-(36,16) AnnVbar = [Test10312.hs:34:16])
+
+(AK Test10312.hs:33:18-22 AnnVal = [Test10312.hs:33:20])
+
+(AK Test10312.hs:34:18-26 AnnLarrow = [Test10312.hs:34:20-21])
+
+(AK Test10312.hs:34:18-26 AnnVbar = [Test10312.hs:35:16])
+
+(AK Test10312.hs:35:18-31 AnnLarrow = [Test10312.hs:35:20-21])
+
+(AK Test10312.hs:38:1-17 AnnDcolon = [Test10312.hs:38:10-11])
+
+(AK Test10312.hs:38:1-17 AnnSemi = [Test10312.hs:39:1])
+
+(AK Test10312.hs:38:13-17 AnnCloseS = [Test10312.hs:38:17])
+
+(AK Test10312.hs:38:13-17 AnnOpenS = [Test10312.hs:38:13])
+
+(AK Test10312.hs:(39,1)-(43,20) AnnEqual = [Test10312.hs:39:10])
+
+(AK Test10312.hs:(39,1)-(43,20) AnnFunId = [Test10312.hs:39:1-8])
+
+(AK Test10312.hs:(39,1)-(43,20) AnnSemi = [Test10312.hs:46:1])
+
+(AK Test10312.hs:39:12-16 AnnVal = [Test10312.hs:39:14])
+
+(AK Test10312.hs:(39,12)-(43,20) AnnVal = [Test10312.hs:39:18])
+
+(AK Test10312.hs:(39,20)-(43,20) AnnCloseS = [Test10312.hs:43:20])
+
+(AK Test10312.hs:(39,20)-(43,20) AnnOpenS = [Test10312.hs:39:20])
+
+(AK Test10312.hs:(39,20)-(43,20) AnnVbar = [Test10312.hs:40:20])
+
+(AK Test10312.hs:39:22-26 AnnVal = [Test10312.hs:39:24])
+
+(AK Test10312.hs:39:22-30 AnnVal = [Test10312.hs:39:28])
+
+(AK Test10312.hs:40:22-30 AnnLarrow = [Test10312.hs:40:24-25])
+
+(AK Test10312.hs:40:22-30 AnnVbar = [Test10312.hs:41:20])
+
+(AK Test10312.hs:41:22-35 AnnLarrow = [Test10312.hs:41:24-25])
+
+(AK Test10312.hs:41:22-35 AnnVbar = [Test10312.hs:42:20])
+
+(AK Test10312.hs:42:22-42 AnnLarrow = [Test10312.hs:42:24-25])
+
+(AK Test10312.hs:42:32-42 AnnCloseP = [Test10312.hs:42:42])
+
+(AK Test10312.hs:42:32-42 AnnOpenP = [Test10312.hs:42:32])
+
+(AK Test10312.hs:(46,1)-(50,23) AnnData = [Test10312.hs:46:1-4])
+
+(AK Test10312.hs:(46,1)-(50,23) AnnEqual = [Test10312.hs:46:16])
+
+(AK Test10312.hs:(46,1)-(50,23) AnnSemi = [Test10312.hs:52:1])
+
+(AK Test10312.hs:(47,3)-(50,3) AnnCloseC = [Test10312.hs:50:3])
+
+(AK Test10312.hs:(47,3)-(50,3) AnnOpenC = [Test10312.hs:47:3])
+
+(AK Test10312.hs:47:5-23 AnnComma = [Test10312.hs:48:3])
+
+(AK Test10312.hs:47:5-23 AnnDcolon = [Test10312.hs:47:15-16])
+
+(AK Test10312.hs:48:5-22 AnnComma = [Test10312.hs:49:3])
+
+(AK Test10312.hs:48:5-22 AnnDcolon = [Test10312.hs:48:14-15])
+
+(AK Test10312.hs:49:5-20 AnnDcolon = [Test10312.hs:49:15-16])
+
+(AK Test10312.hs:50:5-23 AnnCloseP = [Test10312.hs:50:23])
+
+(AK Test10312.hs:50:5-23 AnnDeriving = [Test10312.hs:50:5-12])
+
+(AK Test10312.hs:50:5-23 AnnOpenP = [Test10312.hs:50:14])
+
+(AK Test10312.hs:50:15-18 AnnComma = [Test10312.hs:50:19])
+
+(AK Test10312.hs:52:1-22 AnnDcolon = [Test10312.hs:52:9-10])
+
+(AK Test10312.hs:52:1-22 AnnSemi = [Test10312.hs:53:1])
+
+(AK Test10312.hs:52:12-22 AnnCloseS = [Test10312.hs:52:22])
+
+(AK Test10312.hs:52:12-22 AnnOpenS = [Test10312.hs:52:12])
+
+(AK Test10312.hs:(53,1)-(59,11) AnnEqual = [Test10312.hs:53:9])
+
+(AK Test10312.hs:(53,1)-(59,11) AnnFunId = [Test10312.hs:53:1-7])
+
+(AK Test10312.hs:(53,1)-(59,11) AnnSemi = [Test10312.hs:61:1])
+
+(AK Test10312.hs:(53,11)-(59,11) AnnCloseS = [Test10312.hs:59:11])
+
+(AK Test10312.hs:(53,11)-(59,11) AnnOpenS = [Test10312.hs:53:11])
+
+(AK Test10312.hs:53:13-44 AnnComma = [Test10312.hs:54:11])
+
+(AK Test10312.hs:54:13-44 AnnComma = [Test10312.hs:55:11])
+
+(AK Test10312.hs:55:13-43 AnnComma = [Test10312.hs:56:11])
+
+(AK Test10312.hs:56:13-45 AnnComma = [Test10312.hs:57:11])
+
+(AK Test10312.hs:57:13-44 AnnComma = [Test10312.hs:58:11])
+
+(AK Test10312.hs:61:1-40 AnnDcolon = [Test10312.hs:61:8-9])
+
+(AK Test10312.hs:61:1-40 AnnSemi = [Test10312.hs:62:1])
+
+(AK Test10312.hs:61:11-40 AnnRarrow = [Test10312.hs:61:15-16])
+
+(AK Test10312.hs:61:18-28 AnnCloseS = [Test10312.hs:61:28])
+
+(AK Test10312.hs:61:18-28 AnnOpenS = [Test10312.hs:61:18])
+
+(AK Test10312.hs:61:18-40 AnnRarrow = [Test10312.hs:61:30-31])
+
+(AK Test10312.hs:61:33-40 AnnCloseS = [Test10312.hs:61:40])
+
+(AK Test10312.hs:61:33-40 AnnOpenS = [Test10312.hs:61:33])
+
+(AK Test10312.hs:(62,1)-(66,16) AnnEqual = [Test10312.hs:62:14])
+
+(AK Test10312.hs:(62,1)-(66,16) AnnFunId = [Test10312.hs:62:1-6])
+
+(AK Test10312.hs:(62,1)-(66,16) AnnSemi = [Test10312.hs:68:1])
+
+(AK Test10312.hs:(62,16)-(66,16) AnnCloseS = [Test10312.hs:66:16])
+
+(AK Test10312.hs:(62,16)-(66,16) AnnOpenS = [Test10312.hs:62:16])
+
+(AK Test10312.hs:(62,16)-(66,16) AnnVbar = [Test10312.hs:63:16])
+
+(AK Test10312.hs:62:18-33 AnnVal = [Test10312.hs:62:28-29])
+
+(AK Test10312.hs:62:18-45 AnnVal = [Test10312.hs:62:35-36])
+
+(AK Test10312.hs:63:18-30 AnnCloseC = [Test10312.hs:63:30])
+
+(AK Test10312.hs:63:18-30 AnnDotdot = [Test10312.hs:63:28-29])
+
+(AK Test10312.hs:63:18-30 AnnOpenC = [Test10312.hs:63:27])
+
+(AK Test10312.hs:63:18-37 AnnComma = [Test10312.hs:64:16])
+
+(AK Test10312.hs:63:18-37 AnnLarrow = [Test10312.hs:63:32-33])
+
+(AK Test10312.hs:(63,18)-(64,43) AnnBy = [Test10312.hs:64:32-33])
+
+(AK Test10312.hs:(63,18)-(64,43) AnnComma = [Test10312.hs:65:16])
+
+(AK Test10312.hs:(63,18)-(64,43) AnnThen = [Test10312.hs:64:18-21])
+
+(AK Test10312.hs:(63,18)-(65,28) AnnThen = [Test10312.hs:65:18-21])
+
+(AK Test10312.hs:68:1-51 AnnDcolon = [Test10312.hs:68:16-17])
+
+(AK Test10312.hs:68:1-51 AnnSemi = [Test10312.hs:69:1])
+
+(AK Test10312.hs:68:19-23 AnnDarrow = [Test10312.hs:68:25-26])
+
+(AK Test10312.hs:68:28-35 AnnCloseP = [Test10312.hs:68:35])
+
+(AK Test10312.hs:68:28-35 AnnOpenP = [Test10312.hs:68:28])
+
+(AK Test10312.hs:68:28-51 AnnRarrow = [Test10312.hs:68:37-38])
+
+(AK Test10312.hs:68:29-34 AnnRarrow = [Test10312.hs:68:31-32])
+
+(AK Test10312.hs:68:40-42 AnnCloseS = [Test10312.hs:68:42])
+
+(AK Test10312.hs:68:40-42 AnnOpenS = [Test10312.hs:68:40])
+
+(AK Test10312.hs:68:40-51 AnnRarrow = [Test10312.hs:68:44-45])
+
+(AK Test10312.hs:68:47-51 AnnCloseS = [Test10312.hs:68:51])
+
+(AK Test10312.hs:68:47-51 AnnOpenS = [Test10312.hs:68:47])
+
+(AK Test10312.hs:68:48-50 AnnCloseS = [Test10312.hs:68:50])
+
+(AK Test10312.hs:68:48-50 AnnOpenS = [Test10312.hs:68:48])
+
+(AK Test10312.hs:69:1-69 AnnEqual = [Test10312.hs:69:18])
+
+(AK Test10312.hs:69:1-69 AnnFunId = [Test10312.hs:69:1-14])
+
+(AK Test10312.hs:69:1-69 AnnSemi = [Test10312.hs:71:1])
+
+(AK Test10312.hs:69:20-69 AnnVal = [Test10312.hs:69:57])
+
+(AK Test10312.hs:69:27-55 AnnCloseP = [Test10312.hs:69:55])
+
+(AK Test10312.hs:69:27-55 AnnOpenP = [Test10312.hs:69:27])
+
+(AK Test10312.hs:69:38-54 AnnCloseP = [Test10312.hs:69:54])
+
+(AK Test10312.hs:69:38-54 AnnOpenP = [Test10312.hs:69:38])
+
+(AK Test10312.hs:69:39-53 AnnVal = [Test10312.hs:69:46])
+
+(AK Test10312.hs:71:1-50 AnnDcolon = [Test10312.hs:71:16-17])
+
+(AK Test10312.hs:71:1-50 AnnSemi = [Test10312.hs:72:1])
+
+(AK Test10312.hs:71:19-29 AnnCloseS = [Test10312.hs:71:29])
+
+(AK Test10312.hs:71:19-29 AnnOpenS = [Test10312.hs:71:19])
+
+(AK Test10312.hs:71:19-50 AnnRarrow = [Test10312.hs:71:31-32])
+
+(AK Test10312.hs:71:34-50 AnnCloseS = [Test10312.hs:71:50])
+
+(AK Test10312.hs:71:34-50 AnnOpenS = [Test10312.hs:71:34])
+
+(AK Test10312.hs:71:35-49 AnnCloseP = [Test10312.hs:71:49])
+
+(AK Test10312.hs:71:35-49 AnnOpenP = [Test10312.hs:71:35])
+
+(AK Test10312.hs:71:36-38 AnnComma = [Test10312.hs:71:39])
+
+(AK Test10312.hs:71:41-48 AnnCloseS = [Test10312.hs:71:48])
+
+(AK Test10312.hs:71:41-48 AnnOpenS = [Test10312.hs:71:41])
+
+(AK Test10312.hs:(72,1)-(75,22) AnnEqual = [Test10312.hs:72:20])
+
+(AK Test10312.hs:(72,1)-(75,22) AnnFunId = [Test10312.hs:72:1-14])
+
+(AK Test10312.hs:(72,1)-(75,22) AnnSemi = [Test10312.hs:77:1])
+
+(AK Test10312.hs:(72,22)-(75,22) AnnCloseS = [Test10312.hs:75:22])
+
+(AK Test10312.hs:(72,22)-(75,22) AnnOpenS = [Test10312.hs:72:22])
+
+(AK Test10312.hs:(72,22)-(75,22) AnnVbar = [Test10312.hs:73:22])
+
+(AK Test10312.hs:72:24-49 AnnCloseP = [Test10312.hs:72:49])
+
+(AK Test10312.hs:72:24-49 AnnOpenP = [Test10312.hs:72:24])
+
+(AK Test10312.hs:72:25-37 AnnComma = [Test10312.hs:72:38])
+
+(AK Test10312.hs:73:24-36 AnnCloseC = [Test10312.hs:73:36])
+
+(AK Test10312.hs:73:24-36 AnnDotdot = [Test10312.hs:73:34-35])
+
+(AK Test10312.hs:73:24-36 AnnOpenC = [Test10312.hs:73:33])
+
+(AK Test10312.hs:73:24-43 AnnComma = [Test10312.hs:74:22])
+
+(AK Test10312.hs:73:24-43 AnnLarrow = [Test10312.hs:73:38-39])
+
+(AK Test10312.hs:(73,24)-(74,67) AnnBy = [Test10312.hs:74:35-36])
+
+(AK Test10312.hs:(73,24)-(74,67) AnnGroup = [Test10312.hs:74:29-33])
+
+(AK Test10312.hs:(73,24)-(74,67) AnnThen = [Test10312.hs:74:24-27])
+
+(AK Test10312.hs:(73,24)-(74,67) AnnUsing = [Test10312.hs:74:48-52])
+
+(AK Test10312.hs:(77,1)-(79,80) AnnEqual = [Test10312.hs:77:9])
+
+(AK Test10312.hs:(77,1)-(79,80) AnnFunId = [Test10312.hs:77:1-7])
+
+(AK Test10312.hs:(77,1)-(79,80) AnnSemi = [Test10312.hs:80:1])
+
+(AK Test10312.hs:(77,11)-(79,80) AnnCloseS = [Test10312.hs:79:80])
+
+(AK Test10312.hs:(77,11)-(79,80) AnnOpenS = [Test10312.hs:77:11])
+
+(AK Test10312.hs:(77,11)-(79,80) AnnVbar = [Test10312.hs:77:32])
+
+(AK Test10312.hs:77:13-30 AnnCloseP = [Test10312.hs:77:30])
+
+(AK Test10312.hs:77:13-30 AnnOpenP = [Test10312.hs:77:13])
+
+(AK Test10312.hs:77:14 AnnComma = [Test10312.hs:77:15])
+
+(AK Test10312.hs:77:17-21 AnnComma = [Test10312.hs:77:22])
+
+(AK Test10312.hs:77:34-48 AnnCloseP = [Test10312.hs:77:48])
+
+(AK Test10312.hs:77:34-48 AnnOpenP = [Test10312.hs:77:34])
+
+(AK Test10312.hs:77:34-54 AnnComma = [Test10312.hs:78:36])
+
+(AK Test10312.hs:77:34-54 AnnLarrow = [Test10312.hs:77:50-51])
+
+(AK Test10312.hs:(77,34)-(79,78) AnnBy = [Test10312.hs:79:49-50])
+
+(AK Test10312.hs:(77,34)-(79,78) AnnGroup = [Test10312.hs:79:43-47])
+
+(AK Test10312.hs:(77,34)-(79,78) AnnThen = [Test10312.hs:79:38-41])
+
+(AK Test10312.hs:(77,34)-(79,78) AnnUsing = [Test10312.hs:79:64-68])
+
+(AK Test10312.hs:77:35 AnnComma = [Test10312.hs:77:36])
+
+(AK Test10312.hs:78:38-53 AnnComma = [Test10312.hs:79:36])
+
+(AK Test10312.hs:78:38-53 AnnLet = [Test10312.hs:78:38-40])
+
+(AK Test10312.hs:78:42-53 AnnEqual = [Test10312.hs:78:45])
+
+(AK Test10312.hs:78:42-53 AnnFunId = [Test10312.hs:78:42-43])
+
+(AK Test10312.hs:79:57-62 AnnCloseP = [Test10312.hs:79:62])
+
+(AK Test10312.hs:79:57-62 AnnOpenP = [Test10312.hs:79:57])
+
+(AK Test10312.hs:79:58 AnnComma = [Test10312.hs:79:59])
+
+(AK <no location info> AnnEofPos = [Test10312.hs:80:1])
+]
+
