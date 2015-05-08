@@ -6,6 +6,7 @@ clean:
 	rm -f *.o *.hi
 	rm -f annotations comments parseTree exampleTest
 	rm -f t10269
+	rm -f t10255 t10312
 
 annotations: 
 	rm -f annotations.o annotations.hi
@@ -57,3 +58,10 @@ T10269:
 	./t10269 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: t10269
+
+t10312:
+	rm -f t10312.o t10312.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t10312
+	./t10312 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
+.PHONY: clean annotations parseTree comments exampleTest listcomps t10255 t10312

@@ -2337,7 +2337,7 @@ pquals :: { Located [[LStmt RdrName (LHsExpr RdrName)]] }
 squals :: { Located [LStmt RdrName (LHsExpr RdrName)] }   -- In reverse order, because the last
                                         -- one can "grab" the earlier ones
     : squals ',' transformqual
-             {% addAnnotation (gl $ last $ unLoc $1) AnnComma (gl $2) >>
+             {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
                 ams (sLL $1 $> ()) (fst $ unLoc $3) >>
                 return (sLL $1 $> [sLL $1 $> ((snd $ unLoc $3) (reverse (unLoc $1)))]) }
     | squals ',' qual
