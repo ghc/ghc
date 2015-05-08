@@ -1,7 +1,14 @@
 
 Test10268.hs:5:6:
     Not in scope: ‘footemplate’
-    In the untyped splice: $footemplate
+    In the splice: $footemplate
+
+Test10268.hs:5:6:
+    GHC stage restriction:
+      ‘footemplate’ is used in a top-level splice or annotation,
+      and must be imported, not defined locally
+    In the expression: footemplate
+    In the splice: $footemplate
 
 Test10268.hs:7:14:
     Not in scope: type constructor or class ‘Pattern’
