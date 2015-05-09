@@ -48,7 +48,7 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base       == 4.8.*,
+        base,
         pretty     == 1.1.*
 
     -- We need to set the package key to template-haskell (without a
