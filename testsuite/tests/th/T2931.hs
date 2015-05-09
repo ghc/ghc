@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- Trac #2931
 
 module Foo where

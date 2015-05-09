@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, RankNTypes, FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, RankNTypes, FlexibleContexts #-}
 
 module T4056 where
 import Language.Haskell.TH

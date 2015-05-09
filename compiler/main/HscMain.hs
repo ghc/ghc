@@ -94,6 +94,7 @@ import Type             ( Type )
 import PrelNames
 import {- Kind parts of -} Type         ( Kind )
 import CoreLint         ( lintInteractiveExpr )
+import DsMeta           ( templateHaskellNames )
 import VarEnv           ( emptyTidyEnv )
 import Panic
 import ConLike
@@ -101,7 +102,6 @@ import ConLike
 import GHC.Exts
 #endif
 
-import DsMeta           ( templateHaskellNames )
 import Module
 import Packages
 import RdrName
@@ -196,7 +196,9 @@ knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
 knownKeyNames =              -- where templateHaskellNames are defined
     map getName wiredInThings
         ++ basicKnownKeyNames
+#ifdef GHCI
         ++ templateHaskellNames
+#endif
 
 -- -----------------------------------------------------------------------------
 

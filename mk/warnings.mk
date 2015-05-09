@@ -102,7 +102,6 @@ libraries/ghc-prim_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 libraries/Win32_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 
 # Temporarely disable inline rule shadowing warning
-libraries/template-haskell_dist-boot_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
 libraries/template-haskell_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
 
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror

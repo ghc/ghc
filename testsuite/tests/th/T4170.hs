@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module T4170 where
 
 import Language.Haskell.TH

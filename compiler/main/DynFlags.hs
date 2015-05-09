@@ -3008,7 +3008,7 @@ fLangFlags = [
 -- See Note [Supporting CLI completion]
   flagSpec' "th"                              Opt_TemplateHaskell
     (\on -> deprecatedForExtension "TemplateHaskell" on
-         >> setTemplateHaskellLoc on),
+         >> checkTemplateHaskellOk on),
   flagSpec' "fi"                              Opt_ForeignFunctionInterface
     (deprecatedForExtension "ForeignFunctionInterface"),
   flagSpec' "ffi"                             Opt_ForeignFunctionInterface
@@ -3178,7 +3178,7 @@ xFlags = [
   flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
   flagSpec "StaticPointers"                   Opt_StaticPointers,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
-                                              setTemplateHaskellLoc,
+                                              checkTemplateHaskellOk,
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
   flagSpec "TransformListComp"                Opt_TransformListComp,
   flagSpec "TupleSections"                    Opt_TupleSections,
@@ -3499,9 +3499,28 @@ setIncoherentInsts True = do
   l <- getCurLoc
   upd (\d -> d { incoherentOnLoc = l })
 
-setTemplateHaskellLoc :: TurnOnFlag -> DynP ()
-setTemplateHaskellLoc _
+checkTemplateHaskellOk :: TurnOnFlag -> DynP ()
+#ifdef GHCI
+checkTemplateHaskellOk turn_on
+  | turn_on && rtsIsProfiled
+  = addErr "You can't use Template Haskell with a profiled compiler"
+  | otherwise
   = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
+#else
+-- In stage 1, Template Haskell is simply illegal, except with -M
+-- We don't bleat with -M because there's no problem with TH there,
+-- and in fact GHC's build system does ghc -M of the DPH libraries
+-- with a stage1 compiler
+checkTemplateHaskellOk turn_on
+  | turn_on = do dfs <- liftEwM getCmdLineState
+                 case ghcMode dfs of
+                    MkDepend -> return ()
+                    _        -> addErr msg
+  | otherwise = return ()
+  where
+    msg = "Template Haskell requires GHC with interpreter support\n    " ++
+          "Perhaps you are using a stage-1 compiler?"
+#endif
 
 {- **********************************************************************
 %*                                                                      *

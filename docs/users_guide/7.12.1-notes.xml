@@ -105,12 +105,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    The <literal>TemplateHaskell</literal> now no longer automatically
-                    errors when used with a stage 1 compiler (i.e. GHC without
-                    interpreter support); in particular, plain
-                    Haskell quotes (not quasi-quotes) can now be compiled without erroring.
-                    Splices and quasi-quotes continue to only be supported by a
-                    stage 2 compiler.
+                    TODO FIXME.
                </para>
            </listitem>
        </itemizedlist>
