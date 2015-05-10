@@ -8,7 +8,6 @@ module Base (
     module Data.Monoid,
     module Data.List,
     Stage (..),
-    TargetDir (..),
     Arg, Args,
     ShowArg (..), ShowArgs (..),
     arg, args,
@@ -28,9 +27,6 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
 
 instance Show Stage where
     show = show . fromEnum
-
--- Need TargetDir and FilePath to be distinct types
-newtype TargetDir = TargetDir { fromTargetDir :: FilePath } deriving (Show, Eq)
 
 -- The returned string or list of strings is a part of an argument list
 -- to be passed to a Builder
