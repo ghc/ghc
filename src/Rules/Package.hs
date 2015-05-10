@@ -5,7 +5,7 @@ module Rules.Package (
 import Base
 import Package
 import Rules.Data
-import Expression.Base
+import Expression
 
 buildPackage :: Stage -> Package -> FilePath -> Ways -> Settings -> Rules ()
 buildPackage = buildPackageData

@@ -8,13 +8,13 @@ import Base hiding (arg, args, Args)
 import Util
 import Control.Monad
 import Targets
-import Settings
+-- import Settings
 import Package
-import Expression.Base
+import Expression
 import Rules.Package
 
 generateTargets :: Rules ()
-generateTargets = action $
+generateTargets = action $ do
     forM_ [Stage0 ..] $ \stage -> do
         pkgs <- evaluate $ project stage targetPackages
         case linearise pkgs of
@@ -28,7 +28,7 @@ generateTargets = action $
                         _ -> redError "Cannot determine target directory."
 
 packageRules :: Rules ()
-packageRules = do
+packageRules =
     forM_ [Stage0 ..] $ \stage -> do
         forM_ (support $ simplify $ project stage targetPackages) $ \pkg -> do
             let dirs = project (stage, pkg) targetDirectories

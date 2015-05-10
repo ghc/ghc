@@ -1,22 +1,22 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module Switches (
     buildHaddock, validating,
     IntegerLibraryImpl (..), integerLibraryImpl,
     supportsPackageKey, targetPlatforms, targetPlatform,
-    targetOss, targetOs, targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
+    targetOss, targetOs, notTargetOs,
+    targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
     platformSupportsSharedLibs, crossCompiling,
-    gccIsClang, gccLt46, windowsHost
+    gccIsClang, gccLt46, windowsHost, notWindowsHost
     ) where
 
-import Expression.Base
+import Base
+import Expression
 
 -- User-defined switches
-buildHaddock :: BuildPredicate
-buildHaddock = true
+buildHaddock :: Monad m => Predicate m
+buildHaddock = return True
 
-validating :: BuildPredicate
-validating = false
+validating :: Monad m => Predicate m
+validating = return False
 
 -- Support for multiple integer library implementations
 data IntegerLibraryImpl = IntegerGmp | IntegerGmp2 | IntegerSimple
@@ -25,54 +25,59 @@ integerLibraryImpl :: IntegerLibraryImpl
 integerLibraryImpl = IntegerGmp2
 
 -- Predicates based on configuration files
-supportsPackageKey :: BuildPredicate
-supportsPackageKey = configYes "supports-package-key"
+supportsPackageKey :: Predicate Action
+supportsPackageKey = configKeyYes "supports-package-key"
 
-targetPlatforms :: [String] -> BuildPredicate
-targetPlatforms = configValues "target-platform-full"
+targetPlatforms :: [String] -> Predicate Action
+targetPlatforms = configKeyValues "target-platform-full"
 
-targetPlatform :: String -> BuildPredicate
+targetPlatform :: String -> Predicate Action
 targetPlatform s = targetPlatforms [s]
 
-targetOss :: [String] -> BuildPredicate
-targetOss = configValues "target-os"
+targetOss :: [String] -> Predicate Action
+targetOss = configKeyValues "target-os"
 
-targetOs :: String -> BuildPredicate
+targetOs :: String -> Predicate Action
 targetOs s = targetOss [s]
 
-targetArchs :: [String] -> BuildPredicate
-targetArchs = configValues "target-arch"
+notTargetOs :: String -> Predicate Action
+notTargetOs = fmap not . targetOs
 
-solarisBrokenShld :: BuildPredicate
-solarisBrokenShld = configYes "solaris-broken-shld"
+targetArchs :: [String] -> Predicate Action
+targetArchs = configKeyValues "target-arch"
 
-platformSupportsSharedLibs :: BuildPredicate
-platformSupportsSharedLibs =
-    not (targetPlatforms [ "powerpc-unknown-linux"
-                         , "x86_64-unknown-mingw32"
-                         , "i386-unknown-mingw32" ]
-        ||
-        solarisBrokenShld && targetPlatform "i386-unknown-solaris2")
+platformSupportsSharedLibs :: Predicate Action
+platformSupportsSharedLibs = do
+    badPlatform   <- targetPlatforms [ "powerpc-unknown-linux"
+                                     , "x86_64-unknown-mingw32"
+                                     , "i386-unknown-mingw32" ]
+    solaris       <- targetPlatform    "i386-unknown-solaris2"
+    solarisBroken <- configKeyYes "solaris-broken-shld"
+    return $ not (badPlatform || solaris && solarisBroken)
 
-dynamicGhcPrograms :: BuildPredicate
-dynamicGhcPrograms = configYes "dynamic-ghc-programs"
+dynamicGhcPrograms :: Predicate Action
+dynamicGhcPrograms = configKeyYes "dynamic-ghc-programs"
 
-ghcWithInterpreter :: BuildPredicate
-ghcWithInterpreter =
-    targetOss [ "mingw32", "cygwin32", "linux", "solaris2"
-              , "freebsd", "dragonfly", "netbsd", "openbsd"
-              , "darwin", "kfreebsdgnu" ]
-    &&
-    targetArchs ["i386", "x86_64", "powerpc", "sparc", "sparc64", "arm"]
+ghcWithInterpreter :: Predicate Action
+ghcWithInterpreter = do
+    goodOs <- targetOss [ "mingw32", "cygwin32", "linux", "solaris2"
+                        , "freebsd", "dragonfly", "netbsd", "openbsd"
+                        , "darwin", "kfreebsdgnu" ]
+    goodArch <- targetArchs [ "i386", "x86_64", "powerpc", "sparc"
+                            , "sparc64", "arm" ]
+    return $ goodOs && goodArch
 
-crossCompiling :: BuildPredicate
-crossCompiling = configYes "cross-compiling"
+crossCompiling :: Predicate Action
+crossCompiling = configKeyYes "cross-compiling"
 
-gccIsClang :: BuildPredicate
-gccIsClang = configYes "gcc-is-clang"
+gccIsClang :: Predicate Action
+gccIsClang = configKeyYes "gcc-is-clang"
 
-gccLt46 :: BuildPredicate
-gccLt46 = configYes "gcc-lt-46"
+gccLt46 :: Predicate Action
+gccLt46 = configKeyYes "gcc-lt-46"
 
-windowsHost :: BuildPredicate
-windowsHost = configValues "host-os-cpp" ["mingw32", "cygwin32"]
+windowsHost :: Predicate Action
+windowsHost = configKeyValues "host-os-cpp" ["mingw32", "cygwin32"]
+
+notWindowsHost :: Predicate Action
+notWindowsHost = fmap not windowsHost

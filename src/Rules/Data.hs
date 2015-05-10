@@ -6,11 +6,11 @@ module Rules.Data (
 import qualified Ways
 import Base hiding (arg, args, Args)
 import Package
-import Expression.Base
+import Expression
 import Oracles.Flag (when)
 import Oracles.Builder
 import Targets
-import Switches
+-- import Switches
 import Util
 
 librarySettings :: Ways -> Settings
@@ -36,6 +36,7 @@ configureSettings =
          , conf "CPPFLAGS" cppSettings
          , argPrefix "--gcc-options=" $
            argConcatSpace (ccSettings <|> ldSettings)
+         -- TODO: drop if empty
          , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
          , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
          , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
@@ -47,10 +48,9 @@ configureSettings =
 
 bootPackageDbSettings :: Settings
 bootPackageDbSettings =
-    stage Stage0 ?
-        argPrefix "--package-db="
-        (argConcatPath $ argConfig "ghc-source-path" |>
-                         argPath "libraries/bootstrapping.conf")
+    argPrefix "--package-db="
+              (argConcatPath $ argConfig "ghc-source-path" |>
+                               argPath "libraries/bootstrapping.conf")
 
 dllSettings :: Settings
 dllSettings = arg ""
@@ -68,9 +68,9 @@ cabalSettings =
       , customConfigureSettings
       , stage Stage0 ? bootPackageDbSettings
       , librarySettings targetWays
-      , configNonEmpty "hscolour" ? argWithBuilder HsColour -- TODO: more reuse
+      , configNonEmpty "hscolour" ? argWithBuilder HsColour -- TODO: generalise
       , configureSettings
-      , argPackageConstraints (stage Stage0 ? targetPackages)
+      , stage Stage0 ? argPackageConstraints targetPackages
       , argWithStagedBuilder Gcc
       , notStage Stage0 ? argWithBuilder Ld
       , argWithBuilder Ar
@@ -165,6 +165,10 @@ run' builder settings = do
 --            run (GhcPkg stage) $ ghcPkgArgs pkg todo
 --        postProcessPackageData $ pathDist </> "package-data.mk"
 
+buildSettings = + builder Gcc ? ccSettings
+
+builder Gcc ? "-tricky-flag"
+
 ccSettings :: Settings
 ccSettings = msum
     [ package integerLibrary ? argPath "-Ilibraries/integer-gmp2/gmp"
@@ -175,7 +179,8 @@ ccSettings = msum
         , gccIsClang ??
           ( arg "-Wno-unknown-pragmas" <|>
             not gccLt46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
-          , not gccLt46 ? arg "-Wno-error=inline" )]]
+          , not gccLt46 ? arg "-Wno-error=inline" )]
+    ]
 
 ldSettings :: Settings
 ldSettings = builder GhcCabal ? argStagedConfig "conf-gcc-linker-args"
