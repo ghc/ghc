@@ -1,4 +1,4 @@
-module Package (Package (..), library, setCabal) where
+module Package (Package (..), library, topLevel, setCabal) where
 
 import Base
 import Util
@@ -20,15 +20,12 @@ instance Eq Package where
 instance Ord Package where
     compare = compare `on` pkgName
 
-libraryPackage :: String -> String -> Package
-libraryPackage name cabalName =
-    Package
-        name
-        (unifyPath $ "libraries" </> name)
-        cabalName
-
 library :: String -> Package
-library name = libraryPackage name (name <.> "cabal")
+library name =
+    Package name (unifyPath $ "libraries" </> name) (name <.> "cabal")
+
+topLevel :: String -> Package
+topLevel name = Package name name (name <.> "cabal")
 
 setCabal :: Package -> FilePath -> Package
 setCabal pkg cabalName = pkg { pkgCabal = cabalName }
