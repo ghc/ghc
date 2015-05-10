@@ -1,97 +1,99 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
 
 module Expression.Settings (
-    Args (..), BuildParameter (..), EnvironmentParameter (..),
-    Arity (..), Combine (..),
-    Settings
+    Settings,
+
+    -- Primitive settings elements
+    arg, args,
+    argConfig, argStagedConfig, argConfigList, argStagedConfigList,
+    -- argBuilderPath, argStagedBuilderPath,
+    -- argWithBuilder, argWithStagedBuilder,
+    -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
+    -- argIncludeDirs, argDepIncludeDirs,
+    -- argConcat, argConcatPath, argConcatSpace,
+    -- argPairs, argPrefix, argPrefixPath,
+    -- argPackageConstraints,
     ) where
 
-import Ways
-import Base hiding (Args)
-import Package
-import Oracles.Builder
-import Expression.Project
-import Expression.Predicate
-import Expression.BuildExpression
+import Base hiding (Args, arg, args)
+import Oracles hiding (not)
+import Expression
 
-type Settings = BuildExpression Args
+type Settings m = Expression m [String]
 
--- Settings comprise the following primitive elements
-data Args
-    = Plain String                              -- e.g. "-O2"
-    | BuildParameter BuildParameter             -- e.g. build path
-    | EnvironmentParameter EnvironmentParameter -- e.g. host OS
-    | Fold Combine Settings                     -- e.g. ccSettings
-    deriving (Show, Eq)
+-- A single argument
+arg :: Monad m => String -> Settings m
+arg = return . return
 
--- Build parameters to be determined during the build process
-data BuildParameter
-    = PackagePath -- path to the current package, e.g. "libraries/deepseq"
-    | BuildDir    -- build directory, e.g. "dist-install"
-    | Input       -- input file(s), e.g. "src.hs"
-    | Output      -- output file(s), e.g. ["src.o", "src.hi"]
-    deriving (Show, Eq)
+-- A list of arguments
+args :: Monad m => [String] -> Settings m
+args = return
 
--- Environment parameters to be determined using oracles
-data EnvironmentParameter
-    = BuilderPath Builder                -- look up path to a Builder
-    | Config Arity String                -- look up configuration flag(s)
-    | PackageData                        -- look up package-data.mk flag(s)
-      {
-        pdArity       :: Arity,          -- arity of value (Single or Multiple)
-        pdKey         :: String,         -- key to look up, e.g. "PACKAGE_KEY"
-        pdPackagePath :: Maybe FilePath, -- path to the current package
-        pdBuildDir    :: Maybe FilePath  -- build directory
-      }
-    | PackageConstraints Packages        -- package version constraints
-    deriving (Show, Eq)
+argConfig :: String -> Settings Action
+argConfig = lift . fmap return . askConfig
 
--- Method for combining settings elements in Fold Combine Settings
-data Combine = Id            -- Keep given settings as is
-             | Concat        -- Concatenate: a ++ b
-             | ConcatPath    -- </>-concatenate: a </> b
-             | ConcatSpace   -- concatenate with a space: a ++ " " ++ b
-             deriving (Show, Eq)
+argConfigList :: String -> Settings Action
+argConfigList = lift . fmap words . askConfig
 
-data Arity = Single   -- expands to a single argument
-           | Multiple -- expands to a list of arguments
-           deriving (Show, Eq)
+stagedKey :: Stage -> String -> String
+stagedKey stage key = key ++ "-stage" ++ show stage
 
--- Projecting on Way, Stage, Builder, FilePath and staged Builder is trivial:
--- only (Fold Combine Settings) and (EnvironmentParameter PackageConstraints)
--- can be affected (more specifically, the predicates contained in them).
--- This is handled with 'amap'.
-amap :: (Project a Settings, Project a Packages) => a -> Args -> Args
-amap p (Fold combine settings) = Fold combine (project p settings)
-amap p (EnvironmentParameter (PackageConstraints ps)) =
-    EnvironmentParameter $ PackageConstraints $ project p ps
-amap _ a = a
+argStagedConfig :: String -> Settings Action
+argStagedConfig key = do
+    stage <- asks getStage
+    argConfig (stagedKey stage key)
 
-instance Project Way Args where
-    project = amap
+argStagedConfigList :: String -> Settings Action
+argStagedConfigList key = do
+    stage <- asks getStage
+    argConfigList (stagedKey stage key)
 
-instance Project Stage Args where
-    project = amap
+-- packageData :: Arity -> String -> Settings
+-- packageData arity key =
+--     return $ EnvironmentParameter $ PackageData arity key Nothing Nothing
 
-instance Project Builder Args where
-    project = amap
+-- -- Accessing key value pairs from package-data.mk files
+-- argPackageKey :: Settings
+-- argPackageKey = packageData Single "PACKAGE_KEY"
 
-instance Project FilePath Args where
-    project = amap
+-- argPackageDeps :: Settings
+-- argPackageDeps = packageData Multiple "DEPS"
 
-instance Project (Stage -> Builder) Args where
-    project = amap
+-- argPackageDepKeys :: Settings
+-- argPackageDepKeys = packageData Multiple "DEP_KEYS"
 
--- Projecting on Package and TargetDir is more interesting.
-instance Project Package Args where
-    project p (BuildParameter PackagePath) = Plain $ pkgPath p
-    project p (EnvironmentParameter pd @ (PackageData _ _ _ _)) =
-        EnvironmentParameter $ pd { pdPackagePath = Just $ pkgPath p }
-    project p a = amap p a
+-- argSrcDirs :: Settings
+-- argSrcDirs = packageData Multiple "HS_SRC_DIRS"
 
-instance Project TargetDir Args where
-    project (TargetDir d) (BuildParameter BuildDir) = Plain d
-    project (TargetDir d) (EnvironmentParameter pd @ (PackageData _ _ _ _)) =
-        EnvironmentParameter $ pd { pdBuildDir = Just d }
-    project d a = amap d a
+-- argIncludeDirs :: Settings
+-- argIncludeDirs = packageData Multiple "INCLUDE_DIRS"
+
+-- argDepIncludeDirs :: Settings
+-- argDepIncludeDirs = packageData Multiple "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
+
+-- argPackageConstraints :: Packages -> Settings
+-- argPackageConstraints = return . EnvironmentParameter . PackageConstraints
+
+-- -- Concatenate arguments: arg1 ++ arg2 ++ ...
+-- argConcat :: Settings -> Settings
+-- argConcat = return . Fold Concat
+
+-- -- </>-concatenate arguments: arg1 </> arg2 </> ...
+-- argConcatPath :: Settings -> Settings
+-- argConcatPath = return . Fold ConcatPath
+
+-- -- Concatene arguments (space separated): arg1 ++ " " ++ arg2 ++ ...
+-- argConcatSpace :: Settings -> Settings
+-- argConcatSpace = return . Fold ConcatSpace
+
+-- -- An ordered list of pairs of arguments: prefix |> arg1, prefix |> arg2, ...
+-- argPairs :: String -> Settings -> Settings
+-- argPairs prefix settings = settings >>= (arg prefix |>) . return
+
+-- -- An ordered list of prefixed arguments: prefix ++ arg1, prefix ++ arg2, ...
+-- argPrefix :: String -> Settings -> Settings
+-- argPrefix prefix = fmap (Fold Concat . (arg prefix |>) . return)
+
+-- -- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
+-- argPrefixPath :: String -> Settings -> Settings
+-- argPrefixPath prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
