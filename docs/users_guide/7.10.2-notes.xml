@@ -3,8 +3,9 @@
   <title>Release notes for version 7.10.2</title>
 
   <para>
-    The 7.10.2 release is a bugfix release. The major bugfixes relative
-    to 7.10.1 are listed below.
+    The 7.10.2 release is a bugfix release, with over 40+ bug fixes
+    from users and contributors. The major bugfixes relative to 7.10.1
+    are listed below.
   </para>
 
   <sect2>
@@ -30,6 +31,186 @@
             accesses in the RTS has been fixed.
           </para>
        </listitem>
+       <listitem>
+          <para>
+            A type-system bug which could allow a user to write
+            <literal>unsafeCoerce</literal> has been fixed (issue
+            #9858).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which caused GHC to generate incorrect hyperlinks to
+            documentation in Haddock has been fixed (#10206).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the typechecker which allowed erroneous programs
+            using <literal>Coercible</literal> to typecheck has been
+            fixed (issue #10285).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            An issue which could cause the "Call Arity" analysis to
+            perform poorly in general has been fixed (issue #10293).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            Several dozen bugs in the new API annotations work have
+            been fixed (issues #10395, #10363, #10358, #10357, #10315,
+            #10314, #10312, and many more).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A regression which could cause the typechecker fail to
+            properly simplify type-level terms has been fixed (issue
+            #10321).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which caused programs compiled with
+            <literal>-flate-dmd-anal</literal> to crash at runtime has
+            been fixed (issue #10288).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which caused ARM/Linux binaries to be built with
+            executable stacks has been fixed (issue #10369).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            Several bugs in GHC's cross compilation support using LLVM
+            have been fixed (#10275).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            Several bugs in GHC's support for AArch64 have been fixed
+            (such as issue #10264).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which could cause GHC to generate incorrect code at
+            runtime (generating an infinite loop exception) has been
+            fixed (issue #10218).
+          </para>
+       </listitem>
     </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 4.8.1.0 (was 4.8.0.0)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    The <literal>Lifetime</literal> datatype (and its
+                    constructors) are now exported from
+                    <literal>GHC.Event</literal>.
+                </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.22.3.0 (was 1.22.2.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Several new constructors have been added to the
+                    <literal>AnnKeywordId</literal> datatype, in order
+                    to fix several problem with GHC's new support for
+                    API annotations (this should not regress or effect
+                    any clients of the GHC API not using these new
+                    features).
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Known bugs</title>
+    <itemizedlist>
+        <listitem>
+            <para>
+                For issues dealing with language changes, please see
+                the <ulink
+                url="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
+                7.10 Migration Guide</ulink> on the GHC wiki.
+           </para>
+       </listitem>
+        <listitem>
+            <para>
+                GHC's LLVM backend does not support LLVM 3.4 (<ulink
+		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>)
+           </para>
+       </listitem>
+        <listitem>
+            <para>
+                On Mac OS X, the <literal>-threaded</literal> Garbage
+                Collector currently suffers from a large performance
+                penalty due to a lack of system-specific optimization
+                (<ulink
+		url="https://ghc.haskell.org/trac/ghc/ticket/7602">issue #7602</ulink>).
+           </para>
+       </listitem>
+        <listitem>
+            <para>
+                GHC's LLVM backend is currently incompatible with LLVM
+                3.4 (<ulink
+		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>).
+           </para>
+       </listitem>
+        <listitem>
+            <para>
+                GHCi fails to appropriately load
+                <literal>.dyn_o</literal> files (<ulink
+		url="https://ghc.haskell.org/trac/ghc/ticket/8736">issue #8736</ulink>).
+           </para>
+	</listitem>
+	<listitem>
+	  <para>
+	  Not all cases of non-terminating type-level computation (with both
+	  recursive type families and recursive newtypes) are caught. This
+	  means that GHC might hang, but it should do so only when the program
+	  is ill-typed (due to non-terminating type-level features). The bugs
+	  are reported as <ulink
+	  url="https://ghc.haskell.org/trac/ghc/ticket/7788">#7788</ulink>
+	  and <ulink
+	  url="https://ghc.haskell.org/trac/ghc/ticket/10139">#10139</ulink>.
+	  There also remain certain obscure scenarios where the solver for
+	  <literal>Coercible</literal> instances is known to be still
+	  incomplete. See comments in <ulink
+	  url="https://ghc.haskell.org/trac/ghc/ticket/10079">#10079</ulink>.
+	  </para>
+	</listitem>
+   </itemizedlist>
   </sect2>
 </sect1>
