@@ -1,0 +1,12 @@
+
+Test10358.hs:5:14: error: Not in scope: ‘x’
+
+Test10358.hs:5:16: error: Not in scope: ‘x’
+
+Test10358.hs:6:12: error: Not in scope: ‘v’
+
+Test10358.hs:6:14: error: Not in scope: ‘v’
+
+Test10358.hs:6:16: error: Not in scope: ‘v’
+
+Test10358.hs:7:12: error: Not in scope: ‘d’
