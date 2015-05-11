@@ -2337,7 +2337,7 @@ flattenedpquals :: { Located [LStmt RdrName (LHsExpr RdrName)] }
 
 pquals :: { Located [[LStmt RdrName (LHsExpr RdrName)]] }
     : squals '|' pquals
-                     {% addAnnotation (gl $ last $ unLoc $1) AnnVbar (gl $2) >>
+                     {% addAnnotation (gl $ head $ unLoc $1) AnnVbar (gl $2) >>
                         return (sLL $1 $> (reverse (unLoc $1) : unLoc $3)) }
     | squals         { L (getLoc $1) [reverse (unLoc $1)] }
 

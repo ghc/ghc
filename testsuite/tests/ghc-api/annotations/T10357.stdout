@@ -1,0 +1,110 @@
+---Problems---------------------
+[
+(AK <no location info> AnnEofPos = [Test10357.hs:14:1])
+]
+
+---Problems'--------------------
+[(AnnEofPos, Test10357.hs:14:1)]
+--------------------------------
+[
+(AK Test10357.hs:1:1 AnnModule = [Test10357.hs:2:1-6])
+
+(AK Test10357.hs:1:1 AnnWhere = [Test10357.hs:2:18-22])
+
+(AK Test10357.hs:(4,1)-(13,5) AnnEqual = [Test10357.hs:4:11])
+
+(AK Test10357.hs:(4,1)-(13,5) AnnFunId = [Test10357.hs:4:1-9])
+
+(AK Test10357.hs:(4,1)-(13,5) AnnSemi = [Test10357.hs:14:1])
+
+(AK Test10357.hs:4:13-19 AnnVal = [Test10357.hs:4:17])
+
+(AK Test10357.hs:(4,13)-(13,5) AnnVal = [Test10357.hs:4:21])
+
+(AK Test10357.hs:(5,5)-(13,5) AnnCloseS = [Test10357.hs:13:5])
+
+(AK Test10357.hs:(5,5)-(13,5) AnnOpenS = [Test10357.hs:5:5])
+
+(AK Test10357.hs:(5,5)-(13,5) AnnVbar = [Test10357.hs:10:5])
+
+(AK Test10357.hs:6:9-34 AnnCloseP = [Test10357.hs:6:34])
+
+(AK Test10357.hs:6:9-34 AnnOpenP = [Test10357.hs:6:9])
+
+(AK Test10357.hs:6:18-33 AnnCloseS = [Test10357.hs:6:33])
+
+(AK Test10357.hs:6:18-33 AnnOpenS = [Test10357.hs:6:18])
+
+(AK Test10357.hs:6:25-32 AnnCloseP = [Test10357.hs:6:32])
+
+(AK Test10357.hs:6:25-32 AnnOpenP = [Test10357.hs:6:25])
+
+(AK Test10357.hs:6:26-31 AnnVal = [Test10357.hs:6:29])
+
+(AK Test10357.hs:(7,9)-(9,9) AnnCloseP = [Test10357.hs:9:9])
+
+(AK Test10357.hs:(7,9)-(9,9) AnnOpenP = [Test10357.hs:7:9])
+
+(AK Test10357.hs:7:18-57 AnnCloseP = [Test10357.hs:7:57])
+
+(AK Test10357.hs:7:18-57 AnnOpenP = [Test10357.hs:7:18])
+
+(AK Test10357.hs:7:19-56 AnnVal = [Test10357.hs:7:43-52])
+
+(AK Test10357.hs:7:27-41 AnnCloseS = [Test10357.hs:7:41])
+
+(AK Test10357.hs:7:27-41 AnnOpenS = [Test10357.hs:7:27])
+
+(AK Test10357.hs:7:28 AnnComma = [Test10357.hs:7:29])
+
+(AK Test10357.hs:7:31-36 AnnVal = [Test10357.hs:7:33])
+
+(AK Test10357.hs:7:31-40 AnnVal = [Test10357.hs:7:38])
+
+(AK Test10357.hs:7:43-52 AnnBackquote = [Test10357.hs:7:43, Test10357.hs:7:52])
+
+(AK Test10357.hs:7:43-52 AnnVal = [Test10357.hs:7:44-51])
+
+(AK Test10357.hs:8:18-59 AnnCloseP = [Test10357.hs:8:59])
+
+(AK Test10357.hs:8:18-59 AnnOpenP = [Test10357.hs:8:18])
+
+(AK Test10357.hs:8:19-58 AnnVal = [Test10357.hs:8:43-52])
+
+(AK Test10357.hs:8:37-41 AnnCloseS = [Test10357.hs:8:41])
+
+(AK Test10357.hs:8:37-41 AnnOpenS = [Test10357.hs:8:37])
+
+(AK Test10357.hs:8:38-40 AnnMinus = [Test10357.hs:8:38])
+
+(AK Test10357.hs:8:43-52 AnnBackquote = [Test10357.hs:8:43, Test10357.hs:8:52])
+
+(AK Test10357.hs:8:43-52 AnnVal = [Test10357.hs:8:44-51])
+
+(AK Test10357.hs:10:7-20 AnnComma = [Test10357.hs:10:21])
+
+(AK Test10357.hs:10:7-20 AnnLarrow = [Test10357.hs:10:13-14])
+
+(AK Test10357.hs:10:16-20 AnnCloseS = [Test10357.hs:10:20])
+
+(AK Test10357.hs:10:16-20 AnnDotdot = [Test10357.hs:10:18-19])
+
+(AK Test10357.hs:10:16-20 AnnOpenS = [Test10357.hs:10:16])
+
+(AK Test10357.hs:10:23-44 AnnLet = [Test10357.hs:10:23-25])
+
+(AK Test10357.hs:10:23-44 AnnVbar = [Test10357.hs:11:5])
+
+(AK Test10357.hs:10:27-44 AnnEqual = [Test10357.hs:10:30])
+
+(AK Test10357.hs:10:27-44 AnnFunId = [Test10357.hs:10:27-28])
+
+(AK Test10357.hs:11:7-29 AnnLarrow = [Test10357.hs:11:13-14])
+
+(AK Test10357.hs:11:7-29 AnnVbar = [Test10357.hs:12:5])
+
+(AK Test10357.hs:12:7-24 AnnLarrow = [Test10357.hs:12:13-14])
+
+(AK <no location info> AnnEofPos = [Test10357.hs:14:1])
+]
+
