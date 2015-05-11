@@ -334,6 +334,8 @@
 
 (AK Test10312.hs:68:28-51 AnnRarrow = [Test10312.hs:68:37-38])
 
+(AK Test10312.hs:68:29 AnnRarrow = [Test10312.hs:68:31-32])
+
 (AK Test10312.hs:68:29-34 AnnRarrow = [Test10312.hs:68:31-32])
 
 (AK Test10312.hs:68:40-42 AnnCloseS = [Test10312.hs:68:42])

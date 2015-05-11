@@ -1488,7 +1488,8 @@ type :: { LHsType RdrName }
         : btype                         { $1 }
         | btype qtyconop type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype '->'     ctype          {% ams (sLL $1 $> $ HsFunTy $1 $3)
+        | btype '->'     ctype          {% ams $1 [mj AnnRarrow $2]
+                                        >> ams (sLL $1 $> $ HsFunTy $1 $3)
                                                [mj AnnRarrow $2] }
         | btype '~'      btype          {% ams (sLL $1 $> $ HsEqTy $1 $3)
                                                [mj AnnTilde $2] }
