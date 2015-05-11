@@ -1,0 +1,163 @@
+---Problems---------------------
+[
+]
+
+--------------------------------
+[
+(AK TestBoolFormula.hs:1:1 AnnModule = [TestBoolFormula.hs:1:1-6])
+
+(AK TestBoolFormula.hs:1:1 AnnWhere = [TestBoolFormula.hs:1:24-28])
+
+(AK TestBoolFormula.hs:(3,1)-(13,9) AnnClass = [TestBoolFormula.hs:3:1-5])
+
+(AK TestBoolFormula.hs:(3,1)-(13,9) AnnSemi = [TestBoolFormula.hs:15:1])
+
+(AK TestBoolFormula.hs:(3,1)-(13,9) AnnWhere = [TestBoolFormula.hs:3:17-21])
+
+(AK TestBoolFormula.hs:4:5-25 AnnDcolon = [TestBoolFormula.hs:4:9-10])
+
+(AK TestBoolFormula.hs:4:5-25 AnnSemi = [TestBoolFormula.hs:5:5])
+
+(AK TestBoolFormula.hs:4:12-25 AnnRarrow = [TestBoolFormula.hs:4:14-15])
+
+(AK TestBoolFormula.hs:4:17-25 AnnRarrow = [TestBoolFormula.hs:4:19-20])
+
+(AK TestBoolFormula.hs:5:5-25 AnnDcolon = [TestBoolFormula.hs:5:9-10])
+
+(AK TestBoolFormula.hs:5:5-25 AnnSemi = [TestBoolFormula.hs:6:5])
+
+(AK TestBoolFormula.hs:5:12-25 AnnRarrow = [TestBoolFormula.hs:5:14-15])
+
+(AK TestBoolFormula.hs:5:17-25 AnnRarrow = [TestBoolFormula.hs:5:19-20])
+
+(AK TestBoolFormula.hs:6:5-25 AnnDcolon = [TestBoolFormula.hs:6:9-10])
+
+(AK TestBoolFormula.hs:6:5-25 AnnSemi = [TestBoolFormula.hs:7:5])
+
+(AK TestBoolFormula.hs:6:12-25 AnnRarrow = [TestBoolFormula.hs:6:14-15])
+
+(AK TestBoolFormula.hs:6:17-25 AnnRarrow = [TestBoolFormula.hs:6:19-20])
+
+(AK TestBoolFormula.hs:7:5-25 AnnDcolon = [TestBoolFormula.hs:7:9-10])
+
+(AK TestBoolFormula.hs:7:5-25 AnnSemi = [TestBoolFormula.hs:8:5])
+
+(AK TestBoolFormula.hs:7:12-25 AnnRarrow = [TestBoolFormula.hs:7:14-15])
+
+(AK TestBoolFormula.hs:7:17-25 AnnRarrow = [TestBoolFormula.hs:7:19-20])
+
+(AK TestBoolFormula.hs:8:5-25 AnnDcolon = [TestBoolFormula.hs:8:9-10])
+
+(AK TestBoolFormula.hs:8:5-25 AnnSemi = [TestBoolFormula.hs:9:5])
+
+(AK TestBoolFormula.hs:8:12-25 AnnRarrow = [TestBoolFormula.hs:8:14-15])
+
+(AK TestBoolFormula.hs:8:17-25 AnnRarrow = [TestBoolFormula.hs:8:19-20])
+
+(AK TestBoolFormula.hs:9:5-25 AnnDcolon = [TestBoolFormula.hs:9:9-10])
+
+(AK TestBoolFormula.hs:9:5-25 AnnSemi = [TestBoolFormula.hs:10:5])
+
+(AK TestBoolFormula.hs:9:12-25 AnnRarrow = [TestBoolFormula.hs:9:14-15])
+
+(AK TestBoolFormula.hs:9:17-25 AnnRarrow = [TestBoolFormula.hs:9:19-20])
+
+(AK TestBoolFormula.hs:(10,5)-(13,9) AnnClose = [TestBoolFormula.hs:13:7-9])
+
+(AK TestBoolFormula.hs:(10,5)-(13,9) AnnCloseP = [TestBoolFormula.hs:10:23, TestBoolFormula.hs:11:31,
+ TestBoolFormula.hs:12:38, TestBoolFormula.hs:12:31])
+
+(AK TestBoolFormula.hs:(10,5)-(13,9) AnnComma = [TestBoolFormula.hs:11:26, TestBoolFormula.hs:12:33])
+
+(AK TestBoolFormula.hs:(10,5)-(13,9) AnnOpen = [TestBoolFormula.hs:10:5-15])
+
+(AK TestBoolFormula.hs:(10,5)-(13,9) AnnOpenP = [TestBoolFormula.hs:10:18, TestBoolFormula.hs:11:18,
+ TestBoolFormula.hs:12:18, TestBoolFormula.hs:12:19])
+
+(AK TestBoolFormula.hs:(10,5)-(13,9) AnnVbar = [TestBoolFormula.hs:11:16, TestBoolFormula.hs:12:16,
+ TestBoolFormula.hs:12:25])
+
+(AK TestBoolFormula.hs:(15,1)-(21,47) AnnClass = [TestBoolFormula.hs:15:1-5])
+
+(AK TestBoolFormula.hs:(15,1)-(21,47) AnnSemi = [TestBoolFormula.hs:23:1])
+
+(AK TestBoolFormula.hs:(15,1)-(21,47) AnnWhere = [TestBoolFormula.hs:15:13-17])
+
+(AK TestBoolFormula.hs:16:5-25 AnnDcolon = [TestBoolFormula.hs:16:9-10])
+
+(AK TestBoolFormula.hs:16:5-25 AnnSemi = [TestBoolFormula.hs:17:5])
+
+(AK TestBoolFormula.hs:16:12-25 AnnRarrow = [TestBoolFormula.hs:16:14-15])
+
+(AK TestBoolFormula.hs:16:17-25 AnnRarrow = [TestBoolFormula.hs:16:19-20])
+
+(AK TestBoolFormula.hs:17:5-25 AnnDcolon = [TestBoolFormula.hs:17:9-10])
+
+(AK TestBoolFormula.hs:17:5-25 AnnSemi = [TestBoolFormula.hs:18:5])
+
+(AK TestBoolFormula.hs:17:12-25 AnnRarrow = [TestBoolFormula.hs:17:14-15])
+
+(AK TestBoolFormula.hs:17:17-25 AnnRarrow = [TestBoolFormula.hs:17:19-20])
+
+(AK TestBoolFormula.hs:18:5-25 AnnDcolon = [TestBoolFormula.hs:18:9-10])
+
+(AK TestBoolFormula.hs:18:5-25 AnnSemi = [TestBoolFormula.hs:19:5])
+
+(AK TestBoolFormula.hs:18:12-25 AnnRarrow = [TestBoolFormula.hs:18:14-15])
+
+(AK TestBoolFormula.hs:18:17-25 AnnRarrow = [TestBoolFormula.hs:18:19-20])
+
+(AK TestBoolFormula.hs:19:5-25 AnnDcolon = [TestBoolFormula.hs:19:9-10])
+
+(AK TestBoolFormula.hs:19:5-25 AnnSemi = [TestBoolFormula.hs:20:5])
+
+(AK TestBoolFormula.hs:19:12-25 AnnRarrow = [TestBoolFormula.hs:19:14-15])
+
+(AK TestBoolFormula.hs:19:17-25 AnnRarrow = [TestBoolFormula.hs:19:19-20])
+
+(AK TestBoolFormula.hs:20:5-26 AnnDcolon = [TestBoolFormula.hs:20:10-11])
+
+(AK TestBoolFormula.hs:20:5-26 AnnSemi = [TestBoolFormula.hs:21:5])
+
+(AK TestBoolFormula.hs:20:13-26 AnnRarrow = [TestBoolFormula.hs:20:15-16])
+
+(AK TestBoolFormula.hs:20:18-26 AnnRarrow = [TestBoolFormula.hs:20:20-21])
+
+(AK TestBoolFormula.hs:21:5-47 AnnClose = [TestBoolFormula.hs:21:45-47])
+
+(AK TestBoolFormula.hs:21:5-47 AnnCloseP = [TestBoolFormula.hs:21:43])
+
+(AK TestBoolFormula.hs:21:5-47 AnnComma = [TestBoolFormula.hs:21:20, TestBoolFormula.hs:21:26,
+ TestBoolFormula.hs:21:37])
+
+(AK TestBoolFormula.hs:21:5-47 AnnOpen = [TestBoolFormula.hs:21:5-15])
+
+(AK TestBoolFormula.hs:21:5-47 AnnOpenP = [TestBoolFormula.hs:21:22])
+
+(AK TestBoolFormula.hs:21:5-47 AnnVbar = [TestBoolFormula.hs:21:32])
+
+(AK TestBoolFormula.hs:(23,1)-(26,20) AnnInstance = [TestBoolFormula.hs:23:1-8])
+
+(AK TestBoolFormula.hs:(23,1)-(26,20) AnnSemi = [TestBoolFormula.hs:27:1])
+
+(AK TestBoolFormula.hs:(23,1)-(26,20) AnnWhere = [TestBoolFormula.hs:23:18-22])
+
+(AK TestBoolFormula.hs:24:5-19 AnnEqual = [TestBoolFormula.hs:24:9])
+
+(AK TestBoolFormula.hs:24:5-19 AnnFunId = [TestBoolFormula.hs:24:5-7])
+
+(AK TestBoolFormula.hs:24:5-19 AnnSemi = [TestBoolFormula.hs:25:5])
+
+(AK TestBoolFormula.hs:25:5-19 AnnEqual = [TestBoolFormula.hs:25:9])
+
+(AK TestBoolFormula.hs:25:5-19 AnnFunId = [TestBoolFormula.hs:25:5-7])
+
+(AK TestBoolFormula.hs:25:5-19 AnnSemi = [TestBoolFormula.hs:26:5])
+
+(AK TestBoolFormula.hs:26:5-20 AnnEqual = [TestBoolFormula.hs:26:10])
+
+(AK TestBoolFormula.hs:26:5-20 AnnFunId = [TestBoolFormula.hs:26:5-8])
+
+(AK <no location info> AnnEofPos = [TestBoolFormula.hs:27:1])
+]
+

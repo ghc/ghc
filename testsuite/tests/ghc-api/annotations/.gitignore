@@ -10,6 +10,7 @@ t10269
 t10280
 t10312
 t10307
+boolFormula
 *.hi
 *.o
 *.run.*
