@@ -1,7 +1,7 @@
 
-T9858b.hs:7:8: error:
+T9858b.hs:7:8:
     No instance for (Typeable (Eq Int => Int))
-      (maybe you haven't applied a function to enough arguments?)
+      (maybe you haven't applied enough arguments to a function?)
       arising from a use of ‘typeRep’
     In the expression: typeRep (Proxy :: Proxy (Eq Int => Int))
     In an equation for ‘test’:
