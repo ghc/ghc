@@ -14,7 +14,7 @@ module TcEvidence (
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
                  lookupEvBind, evBindMapBinds, foldEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvTupleSelectors, mkEvScSelectors,
+  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvScSelectors,
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
@@ -712,10 +712,6 @@ data EvTerm
   | EvDFunApp DFunId             -- Dictionary instance application
        [Type] [EvId]
 
-  | EvTupleSel EvTerm Int        -- n'th component of the tuple, 0-indexed
-
-  | EvTupleMk [EvId]             -- tuple built from this stuff
-
   | EvDelayedError Type FastString  -- Used with Opt_DeferTypeErrors
                                -- See Note [Deferring coercion errors to runtime]
                                -- in TcSimplify
@@ -975,11 +971,6 @@ mkEvCast ev lco
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 
-mkEvTupleSelectors :: EvTerm -> [TcPredType] -> [(TcPredType, EvTerm)]
-mkEvTupleSelectors ev preds = zipWith mk_pr preds [0..]
-  where
-    mk_pr pred i = (pred, EvTupleSel ev i)
-
 mkEvScSelectors :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
 mkEvScSelectors ev cls tys
    = zipWith mk_pr (immSuperClasses cls tys) [0..]
@@ -1006,10 +997,8 @@ evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvId v)             = unitVarSet v
 evVarsOfTerm (EvCoercion co)      = coVarsOfTcCo co
 evVarsOfTerm (EvDFunApp _ _ evs)  = mkVarSet evs
-evVarsOfTerm (EvTupleSel ev _)    = evVarsOfTerm ev
 evVarsOfTerm (EvSuperClass v _)   = evVarsOfTerm v
 evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo co
-evVarsOfTerm (EvTupleMk evs)      = mkVarSet evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
@@ -1089,8 +1078,6 @@ instance Outputable EvTerm where
   ppr (EvId v)              = ppr v
   ppr (EvCast v co)         = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
   ppr (EvCoercion co)       = ptext (sLit "CO") <+> ppr co
-  ppr (EvTupleSel v n)      = ptext (sLit "tupsel") <> parens (ppr (v,n))
-  ppr (EvTupleMk vs)        = ptext (sLit "tupmk") <+> ppr vs
   ppr (EvSuperClass d n)    = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
   ppr (EvLit l)             = ppr l

@@ -40,19 +40,18 @@ import Digraph
 
 import PrelNames
 import TysPrim ( mkProxyPrimTy )
-import TyCon      ( isTupleTyCon, tyConDataCons_maybe
-                  , tyConName, isPromotedTyCon, isPromotedDataCon, tyConKind )
+import TyCon
 import TcEvidence
 import TcType
 import Type
 import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
-import TysWiredIn ( eqBoxDataCon, coercibleDataCon, tupleCon, mkListTy
+import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
                   , mkBoxedTupleTy, stringTy )
 import Id
 import MkId(proxyHashId)
 import Class
-import DataCon  ( dataConTyCon, dataConWorkId )
+import DataCon  ( dataConTyCon )
 import Name
 import MkId     ( seqId )
 import IdInfo   ( IdDetails(..) )
@@ -70,7 +69,6 @@ import BasicTypes hiding ( TopLevel )
 import DynFlags
 import FastString
 import ErrUtils( MsgDoc )
-import ListSetOps( getNth )
 import Util
 import Control.Monad( when )
 import MonadUtils
@@ -853,23 +851,6 @@ dsEvTerm (EvCast tm co)
 dsEvTerm (EvDFunApp df tys tms)     = return (Var df `mkTyApps` tys `mkApps` (map Var tms))
 dsEvTerm (EvCoercion (TcCoVarCo v)) = return (Var v)  -- See Note [Simple coercions]
 dsEvTerm (EvCoercion co)            = dsTcCoercion co mkEqBox
-
-dsEvTerm (EvTupleSel tm n)
-   = do { tup <- dsEvTerm tm
-        ; let scrut_ty  = exprType tup
-              (tc, tys) = splitTyConApp scrut_ty
-              Just [dc] = tyConDataCons_maybe tc
-              xs = mkTemplateLocals tys
-              the_x = getNth xs n
-        ; ASSERT( isTupleTyCon tc )
-          return $
-          Case tup (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
-
-dsEvTerm (EvTupleMk tms)
-  = return (Var (dataConWorkId dc) `mkTyApps` map idType tms `mkApps` map Var tms)
-  where
-    dc = tupleCon ConstraintTuple (length tms)
-
 dsEvTerm (EvSuperClass d n)
   = do { d' <- dsEvTerm d
        ; let (cls, tys) = getClassPredTys (exprType d')

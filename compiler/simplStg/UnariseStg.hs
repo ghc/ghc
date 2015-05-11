@@ -59,7 +59,7 @@ import BasicTypes
 type UnariseEnv = VarEnv [Id]
 
 ubxTupleId0 :: Id
-ubxTupleId0 = dataConWorkId (tupleCon UnboxedTuple 0)
+ubxTupleId0 = dataConWorkId (tupleDataCon Unboxed 0)
 
 unarise :: UniqSupply -> [StgBinding] -> [StgBinding]
 unarise us binds = zipWith (\us -> unariseBinding us init_env) (listSplitUniqSupply us) binds
@@ -88,7 +88,7 @@ unariseExpr _ rho (StgApp f args)
   , UbxTupleRep tys <- repType (idType f)
   =  -- Particularly important where (##) is concerned
      -- See Note [Nullary unboxed tuple]
-    StgConApp (tupleCon UnboxedTuple (length tys))
+    StgConApp (tupleDataCon Unboxed (length tys))
               (map StgVarArg (unariseId rho f))
 
   | otherwise
@@ -98,7 +98,7 @@ unariseExpr _ _ (StgLit l)
   = StgLit l
 
 unariseExpr _ rho (StgConApp dc args)
-  | isUnboxedTupleCon dc = StgConApp (tupleCon UnboxedTuple (length args')) args'
+  | isUnboxedTupleCon dc = StgConApp (tupleDataCon Unboxed (length args')) args'
   | otherwise            = StgConApp dc args'
   where
     args' = unariseArgs rho args
@@ -139,14 +139,14 @@ unariseAlts us rho alt_ty _ (UnaryRep _) alts
   = (alt_ty, zipWith (\us alt -> unariseAlt us rho alt) (listSplitUniqSupply us) alts)
 
 unariseAlts us rho _ bndr (UbxTupleRep tys) ((DEFAULT, [], [], e) : _)
-  = (UbxTupAlt n, [(DataAlt (tupleCon UnboxedTuple n), ys, uses, unariseExpr us2' rho' e)])
+  = (UbxTupAlt n, [(DataAlt (tupleDataCon Unboxed n), ys, uses, unariseExpr us2' rho' e)])
   where
     (us2', rho', ys) = unariseIdBinder us rho bndr
     uses = replicate (length ys) (not (isDeadBinder bndr))
     n = length tys
 
 unariseAlts us rho _ bndr (UbxTupleRep _) [(DataAlt _, ys, uses, e)]
-  = (UbxTupAlt n, [(DataAlt (tupleCon UnboxedTuple n), ys', uses', unariseExpr us2' rho'' e)])
+  = (UbxTupAlt n, [(DataAlt (tupleDataCon Unboxed n), ys', uses', unariseExpr us2' rho'' e)])
   where
     (us2', rho', ys', uses') = unariseUsedIdBinders us rho ys uses
     rho'' = extendVarEnv rho' bndr ys'

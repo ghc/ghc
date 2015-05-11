@@ -17,6 +17,9 @@ mAX_TUPLE_SIZE :: Int
 mAX_TUPLE_SIZE = 62 -- Should really match the number
                     -- of decls in Data.Tuple
 
+mAX_CTUPLE_SIZE :: Int   -- Constraint tuples
+mAX_CTUPLE_SIZE = 8      -- Should match the number of decls in GHC.Classes
+
 -- | Default maximum depth for both class instance search and type family
 -- reduction. See also Trac #5395.
 mAX_REDUCTION_DEPTH :: Int

@@ -1016,6 +1016,10 @@ checkTc :: Bool -> MsgDoc -> TcM ()         -- Check that the boolean is true
 checkTc True  _   = return ()
 checkTc False err = failWithTc err
 
+failIfTc :: Bool -> MsgDoc -> TcM ()         -- Check that the boolean is false
+failIfTc False _   = return ()
+failIfTc True  err = failWithTc err
+
 --         Warnings have no 'M' variant, nor failure
 
 warnTc :: Bool -> MsgDoc -> TcM ()

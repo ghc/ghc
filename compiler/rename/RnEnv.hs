@@ -53,6 +53,7 @@ import RdrName
 import HscTypes
 import TcEnv            ( tcLookupDataCon, tcLookupField, isBrackStage )
 import TcRnMonad
+import RdrHsSyn         ( setRdrNameSpace )
 import Id               ( isRecordSelector )
 import Name
 import NameSet

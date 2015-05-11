@@ -722,7 +722,7 @@ tidy_pat (PArrPat ps ty)
                            [ty]
 
 tidy_pat (TuplePat ps boxity tys)
-  = unLoc $ mkPrefixConPat (tupleCon (boxityNormalTupleSort boxity) arity)
+  = unLoc $ mkPrefixConPat (tupleDataCon boxity arity)
                            (map tidy_lpat ps) tys
   where
     arity = length ps

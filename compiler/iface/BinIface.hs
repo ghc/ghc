@@ -24,7 +24,7 @@ import TcRnMonad
 import TyCon
 import ConLike
 import DataCon    (dataConName, dataConWorkId, dataConTyCon)
-import PrelInfo   (wiredInThings, basicKnownKeyNames)
+import PrelInfo   ( knownKeyNames )
 import Id         (idName, isDataConWorkId_maybe)
 import TysWiredIn
 import IfaceEnv
@@ -303,14 +303,11 @@ serialiseName bh name _ = do
 
 knownKeyNamesMap :: UniqFM Name
 knownKeyNamesMap = listToUFM_Directly [(nameUnique n, n) | n <- knownKeyNames]
-  where
-    knownKeyNames :: [Name]
-    knownKeyNames = map getName wiredInThings ++ basicKnownKeyNames
 
 
 -- See Note [Symbol table representation of names]
 putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
-putName _dict BinSymbolTable{ 
+putName _dict BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }    bh name
   | name `elemUFM` knownKeyNamesMap
@@ -349,7 +346,7 @@ putTupleName_ bh tc tup_sort thing_tag
     sort_tag = case tup_sort of
                  BoxedTuple      -> 0
                  UnboxedTuple    -> 1
-                 ConstraintTuple -> 2
+                 ConstraintTuple -> pprPanic "putTupleName:ConstraintTuple" (ppr tc)
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: NameCacheUpdater
@@ -370,11 +367,10 @@ getSymtabName _ncu _dict symtab bh = do
                         2 -> idName (dataConWorkId dc)
                         _ -> pprPanic "getSymtabName:unknown tuple thing" (ppr i)
           where
-            dc = tupleCon sort arity
+            dc = tupleDataCon sort arity
             sort = case (i .&. 0x30000000) `shiftR` 28 of
-                     0 -> BoxedTuple
-                     1 -> UnboxedTuple
-                     2 -> ConstraintTuple
+                     0 -> Boxed
+                     1 -> Unboxed
                      _ -> pprPanic "getSymtabName:unknown tuple sort" (ppr i)
             thing_tag = (i .&. 0x0CFFFFFF) `shiftR` 26
             arity = fromIntegral (i .&. 0x03FFFFFF)

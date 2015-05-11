@@ -21,6 +21,7 @@ module RdrHsSyn (
         mkPatSynMatchGroup,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyClD, mkInstD,
+        setRdrNameSpace,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -65,24 +66,24 @@ module RdrHsSyn (
 
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
+import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
+import DataCon          ( DataCon, dataConTyCon )
+import ConLike          ( ConLike(..) )
 import CoAxiom          ( Role, fsFromRole )
-import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
-                          isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace,
-                          rdrNameSpace )
-import OccName          ( tcClsName, isVarNameSpace )
-import Name             ( Name )
-import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
-                          InlinePragma(..), InlineSpec(..), Origin(..),
-                          SourceText )
+import RdrName
+import Name
+import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
-import TysWiredIn       ( unitTyCon, unitDataCon )
+import Type             ( TyThing(..) )
+import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
+                          nilDataConName, nilDataConKey,
+                          listTyConName, listTyConKey )
 import ForeignCall
-import OccName          ( srcDataName, varName, isDataOcc, isTcOcc,
-                          occNameString )
 import PrelNames        ( forall_tv_RDR, allNameStrings )
 import DynFlags
 import SrcLoc
+import Unique           ( hasKey )
 import OrdList          ( OrdList, fromOL )
 import Bag              ( emptyBag, consBag )
 import Outputable
@@ -137,7 +138,7 @@ mkClassDecl :: SrcSpan
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
   = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
-       ; (cls, tparams,ann) <- checkTyClHdr tycl_hdr
+       ; (cls, tparams,ann) <- checkTyClHdr True tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        -- Partial type signatures are not allowed in a class definition
        ; checkNoPartialSigs sigs cls
@@ -271,7 +272,7 @@ mkTyData :: SrcSpan
          -> Maybe (Located [LHsType RdrName])
          -> P (LTyClDecl RdrName)
 mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
-  = do { (tc, tparams,ann) <- checkTyClHdr tycl_hdr
+  = do { (tc, tparams,ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
@@ -306,7 +307,7 @@ mkTySynonym :: SrcSpan
             -> LHsType RdrName  -- RHS
             -> P (LTyClDecl RdrName)
 mkTySynonym loc lhs rhs
-  = do { (tc, tparams,ann) <- checkTyClHdr lhs
+  = do { (tc, tparams,ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ptext (sLit "type")) equalsDots tc tparams
        ; let err = text "In type synonym" <+> quotes (ppr tc) <>
@@ -319,7 +320,7 @@ mkTyFamInstEqn :: LHsType RdrName
                -> LHsType RdrName
                -> P (TyFamInstEqn RdrName,[AddAnn])
 mkTyFamInstEqn lhs rhs
-  = do { (tc, tparams,ann) <- checkTyClHdr lhs
+  = do { (tc, tparams,ann) <- checkTyClHdr False lhs
        ; let err xhs = hang (text "In type family instance equation of" <+>
                              quotes (ppr tc) <> colon)
                        2 (ppr xhs)
@@ -339,7 +340,7 @@ mkDataFamInst :: SrcSpan
          -> Maybe (Located [LHsType RdrName])
          -> P (LInstDecl RdrName)
 mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
-  = do { (tc, tparams,ann) <- checkTyClHdr tycl_hdr
+  = do { (tc, tparams,ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD (
@@ -359,7 +360,7 @@ mkFamDecl :: SrcSpan
           -> Maybe (LHsKind RdrName) -- Optional kind signature
           -> P (LTyClDecl RdrName)
 mkFamDecl loc info lhs ksig
-  = do { (tc, tparams,ann) <- checkTyClHdr lhs
+  = do { (tc, tparams,ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams
        ; return (L loc (FamDecl (FamilyDecl { fdInfo = info, fdLName = tc
@@ -545,9 +546,9 @@ splitCon ty
    split (L _ (HsAppTy t u)) ts    = split t (u : ts)
    split (L l (HsTyVar tc))  ts    = do data_con <- tyConToDataCon l tc
                                         return (data_con, mk_rest ts)
-   split (L l (HsTupleTy _ [])) [] = return (L l (getRdrName unitDataCon), PrefixCon [])
-                                         -- See Note [Unit tuples] in HsTypes
-   split (L l _) _                 = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
+   split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
+      = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
+   split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
 
    mk_rest [L l (HsRecTy flds)] = RecCon (L l flds)
    mk_rest ts                   = PrefixCon ts
@@ -662,6 +663,91 @@ tyConToDataCon loc tc
           = text "Perhaps you intended to use ExistentialQuantification"
           | otherwise = empty
 
+setRdrNameSpace :: RdrName -> NameSpace -> RdrName
+-- ^ This rather gruesome function is used mainly by the parser.
+-- When parsing:
+--
+-- > data T a = T | T1 Int
+--
+-- we parse the data constructors as /types/ because of parser ambiguities,
+-- so then we need to change the /type constr/ to a /data constr/
+--
+-- The exact-name case /can/ occur when parsing:
+--
+-- > data [] a = [] | a : [a]
+--
+-- For the exact-name case we return an original name.
+setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
+setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
+setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
+setRdrNameSpace (Exact n)    ns
+  | Just thing <- wiredInNameTyThing_maybe n
+  = setWiredInNameSpace thing ns
+    -- Preserve Exact Names for wired-in things,
+    -- notably tuples and lists
+
+  | isExternalName n
+  = Orig (nameModule n) occ
+
+  | otherwise   -- This can happen when quoting and then
+                -- splicing a fixity declaration for a type
+  = Exact (mkSystemNameAt (nameUnique n) occ (nameSrcSpan n))
+  where
+    occ = setOccNameSpace ns (nameOccName n)
+
+setWiredInNameSpace :: TyThing -> NameSpace -> RdrName
+setWiredInNameSpace (ATyCon tc) ns
+  | isDataConNameSpace ns
+  = ty_con_data_con tc
+  | isTcClsNameSpace ns
+  = Exact (getName tc)      -- No-op
+
+setWiredInNameSpace (AConLike (RealDataCon dc)) ns
+  | isTcClsNameSpace ns
+  = data_con_ty_con dc
+  | isDataConNameSpace ns
+  = Exact (getName dc)      -- No-op
+
+setWiredInNameSpace thing ns
+  = pprPanic "setWiredinNameSpace" (pprNameSpace ns <+> ppr thing)
+
+ty_con_data_con :: TyCon -> RdrName
+ty_con_data_con tc
+  | isTupleTyCon tc
+  , Just dc <- tyConSingleDataCon_maybe tc
+  = Exact (getName dc)
+
+  | tc `hasKey` listTyConKey
+  = Exact nilDataConName
+
+  | otherwise  -- See Note [setRdrNameSpace for wired-in names]
+  = Unqual (setOccNameSpace srcDataName (getOccName tc))
+
+data_con_ty_con :: DataCon -> RdrName
+data_con_ty_con dc
+  | let tc = dataConTyCon dc
+  , isTupleTyCon tc
+  = Exact (getName tc)
+
+  | dc `hasKey` nilDataConKey
+  = Exact listTyConName
+
+  | otherwise  -- See Note [setRdrNameSpace for wired-in names]
+  = Unqual (setOccNameSpace tcClsName (getOccName dc))
+
+
+{- Note [setRdrNameSpace for wired-in names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC.Types, which declares (:), we have
+  infixr 5 :
+The ambiguity about which ":" is meant is resolved by parsing it as a
+data constructor, but then using dataTcOccs to try the type constructor too;
+and that in turn calls setRdrNameSpace to change the name-space of ":" to
+tcClsName.  There isn't a corresponding ":" type constructor, but it's painful
+to make setRdrNameSpace partial, so we just make an Unqual name instead. It
+really doesn't matter!
+-}
+
 -- | Note [Sorting out the result type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In a GADT declaration which is not a record, we put the whole constr
@@ -738,7 +824,9 @@ checkRecordSyntax lr@(L loc r)
                       (text "Illegal record syntax (use TraditionalRecordSyntax):" <+>
                        ppr r)
 
-checkTyClHdr :: LHsType RdrName
+checkTyClHdr :: Bool               -- True  <=> class header
+                                   -- False <=> type header
+             -> LHsType RdrName
              -> P (Located RdrName,          -- the head symbol (type or class name)
                    [LHsType RdrName],        -- parameters of head symbol
                    [AddAnn]) -- API Annotation for HsParTy when stripping parens
@@ -746,22 +834,28 @@ checkTyClHdr :: LHsType RdrName
 -- Decomposes   T ty1 .. tyn   into    (T, [ty1, ..., tyn])
 --              Int :*: Bool   into    (:*:, [Int, Bool])
 -- returning the pieces
-checkTyClHdr ty
+checkTyClHdr is_cls ty
   = goL ty [] []
   where
     goL (L l ty) acc ann = go l ty acc ann
 
     go l (HsTyVar tc) acc ann
-        | isRdrTc tc             = return (L l tc, acc, ann)
+      | isRdrTc tc               = return (L l tc, acc, ann)
     go _ (HsOpTy t1 (_, ltc@(L _ tc)) t2) acc ann
-        | isRdrTc tc             = return (ltc, t1:t2:acc, ann)
+      | isRdrTc tc               = return (ltc, t1:t2:acc, ann)
     go l (HsParTy ty)    acc ann = goL ty acc (ann ++ mkParensApiAnn l)
     go _ (HsAppTy t1 t2) acc ann = goL t1 (t2:acc) ann
-    go l (HsTupleTy _ []) [] ann = return (L l (getRdrName unitTyCon), [],ann)
-                                   -- See Note [Unit tuples] in HsTypes
-    go l _               _   _
-         = parseErrorSDoc l (text "Malformed head of type or class declaration:"
-                             <+> ppr ty)
+
+    go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann
+      = return (L l (nameRdrName tup_name), ts, ann)
+      where
+        arity = length ts
+        tup_name | is_cls    = cTupleTyConName arity
+                 | otherwise = getName (tupleTyCon Boxed arity)
+                 -- See Note [Unit tuples] in HsTypes  (TODO: is this still relevant?)
+    go l _  _  _
+      = parseErrorSDoc l (text "Malformed head of type or class declaration:"
+                          <+> ppr ty)
 
 checkContext :: LHsType RdrName -> P (LHsContext RdrName)
 checkContext (L l orig_t)
@@ -1481,14 +1575,12 @@ mkModuleImpExp n@(L l name) subs =
   case subs of
     ImpExpAbs
       | isVarNameSpace (rdrNameSpace name) -> IEVar       n
-      | otherwise                          -> IEThingAbs  (L l nameT)
-    ImpExpAll                              -> IEThingAll  (L l nameT)
-    ImpExpList xs                          -> IEThingWith (L l nameT) xs
+      | otherwise                          -> IEThingAbs  (L l name)
+    ImpExpAll                              -> IEThingAll  (L l name)
+    ImpExpList xs                          -> IEThingWith (L l name) xs
 
-  where
-    nameT = setRdrNameSpace name tcClsName
-
-mkTypeImpExp :: Located RdrName -> P (Located RdrName)
+mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
+             -> P (Located RdrName)
 mkTypeImpExp name =
   do allowed <- extension explicitNamespacesEnabled
      if allowed

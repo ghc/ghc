@@ -61,7 +61,8 @@ module TyCon(
         tyConTyVars,
         tyConCType, tyConCType_maybe,
         tyConDataCons, tyConDataCons_maybe,
-        tyConSingleDataCon_maybe, tyConSingleAlgDataCon_maybe,
+        tyConSingleDataCon_maybe, tyConSingleDataCon,
+        tyConSingleAlgDataCon_maybe,
         tyConFamilySize,
         tyConStupidTheta,
         tyConArity,
@@ -1038,7 +1039,7 @@ mkClassTyCon :: Name -> Kind -> [TyVar] -> [Role] -> AlgTyConRhs -> Class
 mkClassTyCon name kind tyvars roles rhs clas is_rec
   = mkAlgTyCon name kind tyvars roles Nothing [] rhs (ClassTyCon clas)
                is_rec False
-               Nothing    -- Class TyCons are not pormoted
+               Nothing    -- Class TyCons are not promoted
 
 mkTupleTyCon :: Name
              -> Kind    -- ^ Kind of the resulting 'TyCon'
@@ -1047,8 +1048,9 @@ mkTupleTyCon :: Name
              -> DataCon
              -> TupleSort    -- ^ Whether the tuple is boxed or unboxed
              -> Maybe TyCon  -- ^ Promoted version
+             -> TyConParent
              -> TyCon
-mkTupleTyCon name kind arity tyvars con sort prom_tc
+mkTupleTyCon name kind arity tyvars con sort prom_tc parent
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
@@ -1059,7 +1061,7 @@ mkTupleTyCon name kind arity tyvars con sort prom_tc
         tyConCType       = Nothing,
         algTcStupidTheta = [],
         algTcRhs         = TupleTyCon { data_con = con, tup_sort = sort },
-        algTcParent      = NoParentTyCon,
+        algTcParent      = parent,
         algTcRec         = NonRecursive,
         algTcGadtSyntax  = False,
         tcPromoted       = prom_tc
@@ -1470,17 +1472,23 @@ isPromotedDataCon_maybe _ = Nothing
 --
 -- * Family instances are /not/ implicit as they represent the instance body
 --   (similar to a @dfun@ does that for a class instance).
+--
+-- * Tuples are implicit iff they have a wired-in name
+--   (namely: boxed and unboxed tupeles are wired-in and implicit,
+--            but constraint tuples are not)
 isImplicitTyCon :: TyCon -> Bool
 isImplicitTyCon (FunTyCon {})        = True
 isImplicitTyCon (PrimTyCon {})       = True
 isImplicitTyCon (PromotedDataCon {}) = True
 isImplicitTyCon (PromotedTyCon {})   = True
-isImplicitTyCon (AlgTyCon { algTcRhs = TupleTyCon {} })             = True
-isImplicitTyCon (AlgTyCon { algTcParent = AssocFamilyTyCon {} })    = True
-isImplicitTyCon (AlgTyCon {})                                       = False
-isImplicitTyCon (FamilyTyCon { famTcParent = AssocFamilyTyCon {} }) = True
-isImplicitTyCon (FamilyTyCon {})                                    = False
-isImplicitTyCon (SynonymTyCon {})                                   = False
+isImplicitTyCon (AlgTyCon { algTcRhs = rhs, algTcParent = parent, tyConName = name })
+  | TupleTyCon {} <- rhs             = isWiredInName name
+  | AssocFamilyTyCon {} <- parent    = True
+  | otherwise                        = False
+isImplicitTyCon (FamilyTyCon { famTcParent = parent })
+  | AssocFamilyTyCon {} <- parent    = True
+  | otherwise                        = False
+isImplicitTyCon (SynonymTyCon {})    = False
 
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
@@ -1547,6 +1555,12 @@ tyConSingleDataCon_maybe (AlgTyCon { algTcRhs = rhs })
       NewTyCon { data_con = c }     -> Just c
       _                             -> Nothing
 tyConSingleDataCon_maybe _           = Nothing
+
+tyConSingleDataCon :: TyCon -> DataCon
+tyConSingleDataCon tc
+  = case tyConSingleDataCon_maybe tc of
+      Just c  -> c
+      Nothing -> pprPanic "tyConDataCon" (ppr tc)
 
 tyConSingleAlgDataCon_maybe :: TyCon -> Maybe DataCon
 -- Returns (Just con) for single-constructor

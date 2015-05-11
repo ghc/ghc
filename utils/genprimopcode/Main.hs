@@ -813,7 +813,7 @@ ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
 
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 
-ppType (TyUTup ts) = "(mkTupleTy UnboxedTuple " 
+ppType (TyUTup ts) = "(mkTupleTy Unboxed " 
                      ++ listify (map ppType ts) ++ ")"
 
 ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"

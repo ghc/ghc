@@ -164,7 +164,6 @@ Library
         IdInfo
         Lexeme
         Literal
-        DsMeta
         Llvm
         Llvm.AbsSyn
         Llvm.MetaData
@@ -422,6 +421,8 @@ Library
         TcSplice
         Class
         Coercion
+        DsMeta
+        THNames
         FamInstEnv
         FunDeps
         InstEnv

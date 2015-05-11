@@ -80,7 +80,7 @@ import TcEvidence       ( emptyTcEvBinds )
 -- compiler/prelude
 import ForeignCall
 import TysPrim          ( liftedTypeKindTyConName, eqPrimTyCon )
-import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
+import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 
@@ -728,10 +728,9 @@ qcname_ext :: { Located RdrName }       -- Variable or data constructor
         |  'type' qcname            {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
                                             [mj AnnType $1,mj AnnVal $2] }
 
--- Cannot pull into qcname_ext, as qcname is also used in expression.
-qcname  :: { Located RdrName }  -- Variable or data constructor
+qcname  :: { Located RdrName }  -- Variable or type constructor
         :  qvar                         { $1 }
-        |  qcon                         { $1 }
+        |  oqtycon                      { $1 }
 
 -----------------------------------------------------------------------------
 -- Import Declarations
@@ -2277,8 +2276,9 @@ aexp1   :: { LHsExpr RdrName }
         | aexp2                { $1 }
 
 aexp2   :: { LHsExpr RdrName }
-        : ipvar                         { sL1 $1 (HsIPVar $! unLoc $1) }
-        | qcname                        { sL1 $1 (HsVar   $! unLoc $1) }
+        : qvar                          { sL1 $1 (HsVar   $! unLoc $1) }
+        | qcon                          { sL1 $1 (HsVar   $! unLoc $1) }
+        | ipvar                         { sL1 $1 (HsIPVar $! unLoc $1) }
         | literal                       { sL1 $1 (HsLit   $! unLoc $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
@@ -2803,10 +2803,10 @@ con_list : con                  { sL1 $1 [$1] }
 
 sysdcon_nolist :: { Located DataCon }  -- Wired in data constructors
         : '(' ')'               {% ams (sLL $1 $> unitDataCon) [mop $1,mcp $2] }
-        | '(' commas ')'        {% ams (sLL $1 $> $ tupleCon BoxedTuple (snd $2 + 1))
+        | '(' commas ')'        {% ams (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
                                        (mop $1:mcp $3:(mcommas (fst $2))) }
         | '(#' '#)'             {% ams (sLL $1 $> $ unboxedUnitDataCon) [mo $1,mc $2] }
-        | '(#' commas '#)'      {% ams (sLL $1 $> $ tupleCon UnboxedTuple (snd $2 + 1))
+        | '(#' commas '#)'      {% ams (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
 
 sysdcon :: { Located DataCon }
@@ -2840,10 +2840,10 @@ gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tu
 
 ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit tuples
         : oqtycon               { $1 }
-        | '(' commas ')'        {% ams (sLL $1 $> $ getRdrName (tupleTyCon BoxedTuple
+        | '(' commas ')'        {% ams (sLL $1 $> $ getRdrName (tupleTyCon Boxed
                                                         (snd $2 + 1)))
                                        (mop $1:mcp $3:(mcommas (fst $2))) }
-        | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon UnboxedTuple
+        | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
         | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)

@@ -320,8 +320,6 @@ reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
        ; (_, leftovers) <- tryReporters ctxt2' reporters (insols2 ++ tidy_simples)
        ; MASSERT2( null leftovers, ppr leftovers )
 
-            -- TuplePreds should have been expanded away by the constraint
-            -- simplifier, so they shouldn't show up at this point
             -- All the Derived ones have been filtered out of simples
             -- by the constraint solver. This is ok; we don't want
             -- to report unsolved Derived goals as errors

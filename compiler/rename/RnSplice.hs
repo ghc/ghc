@@ -37,15 +37,15 @@ import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
 import PrelNames        ( isUnboundName )
 import TcEnv            ( checkWellStaged )
-import DsMeta           ( liftName )
+import THNames          ( liftName )
 
 #ifdef GHCI
 import ErrUtils         ( dumpIfSet_dyn_printer )
-import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 import TcEnv            ( tcMetaTy )
 import Hooks
 import Var              ( Id )
-import DsMeta           ( quoteExpName, quotePatName, quoteDecName, quoteTypeName )
+import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
+                        , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 import Util
 
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
