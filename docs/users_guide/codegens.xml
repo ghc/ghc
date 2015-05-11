@@ -32,14 +32,14 @@
       much faster code. This is especially true for numeric, array heavy
       code using packages like vector. The penalty is a significant increase in
       compilation times. Select the LLVM backend with the
-      <option>-fllvm</option> flag. Currently <emphasis>LLVM 2.8</emphasis> and
-      later are supported.
+      <option>-fllvm</option> flag. Currently <emphasis>only LLVM 3.5</emphasis>
+      is supported.
     </para>
        
     <para>You must install and have LLVM available on your PATH for the LLVM
       code generator to work. Specifically GHC needs to be able to call the
       <command>opt</command> and <command>llc</command> tools.  Secondly, if you
-      are running Mac OS X with LLVM 3.0 or greater then
+      are running Mac OS X with LLVM 3.5 or greater then
       you also need the <ulink url="http://clang.llvm.org">Clang c
         compiler</ulink> compiler available on your PATH.
     </para>
@@ -54,7 +54,7 @@
         order to use the LLVM based code generator, you should install
         the <ulink
         url="http://mxcl.github.com/homebrew/">Homebrew</ulink>
-        package manager for OS X. Alternatively you can download
+        package manager for OS X and then install LLVM 3.5. Alternatively you can download
         binaries for LLVM and Clang from <ulink
         url="http://llvm.org/releases/download.html">here</ulink>.
         </listitem>

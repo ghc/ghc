@@ -884,6 +884,12 @@ echo "[]" > package.conf
        </listitem>
         <listitem>
             <para>
+                GHC's LLVM backend does not support LLVM 3.4 (<ulink
+		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>)
+           </para>
+       </listitem>
+        <listitem>
+            <para>
                 On Mac OS X, the <literal>-threaded</literal> Garbage
                 Collector currently suffers from a large performance
                 penalty due to a lack of system-specific optimization
