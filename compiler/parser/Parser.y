@@ -50,7 +50,7 @@ import DynFlags
 
 -- compiler/utils
 import OrdList
-import BooleanFormula   ( BooleanFormula, mkAnd, mkOr, mkTrue, mkVar )
+import BooleanFormula   ( BooleanFormula(..), mkTrue )
 import FastString
 import Maybes           ( orElse )
 import Outputable
@@ -2617,16 +2617,16 @@ name_boolformula :: { ([AddAnn],BooleanFormula (Located RdrName)) }
         : name_boolformula_and                      { $1 }
         | name_boolformula_and '|' name_boolformula
                                              { ((mj AnnVbar $2:fst $1)++(fst $3)
-                                                ,mkOr [snd $1,snd $3]) }
+                                                ,Or [snd $1,snd $3]) }
 
 name_boolformula_and :: { ([AddAnn],BooleanFormula (Located RdrName)) }
         : name_boolformula_atom                             { $1 }
         | name_boolformula_atom ',' name_boolformula_and
-                  { ((mj AnnComma $2:fst $1)++(fst $3), mkAnd [snd $1,snd $3]) }
+                  { ((mj AnnComma $2:fst $1)++(fst $3), And [snd $1,snd $3]) }
 
 name_boolformula_atom :: { ([AddAnn],BooleanFormula (Located RdrName)) }
-        : '(' name_boolformula ')'  { ([mop $1,mcp $3],snd $2) }
-        | name_var                  { ([],mkVar $1) }
+        : '(' name_boolformula ')'  { ((mop $1:mcp $3:(fst $2)),snd $2) }
+        | name_var                  { ([],Var $1) }
 
 namelist :: { Located [Located RdrName] }
 namelist : name_var              { sL1 $1 [$1] }
