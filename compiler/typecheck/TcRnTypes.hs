@@ -463,18 +463,18 @@ data TcGblEnv
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
         -- For the latter, see Note [The interactive package] in HscTypes
-        tcg_binds     :: LHsBinds Id,       -- Value bindings in this module
-        tcg_sigs      :: NameSet,           -- ...Top-level names that *lack* a signature
-        tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids
-        tcg_warns     :: Warnings,          -- ...Warnings and deprecations
-        tcg_anns      :: [Annotation],      -- ...Annotations
-        tcg_tcs       :: [TyCon],           -- ...TyCons and Classes
-        tcg_insts     :: [ClsInst],         -- ...Instances
-        tcg_fam_insts :: [FamInst],         -- ...Family instances
-        tcg_rules     :: [LRuleDecl Id],    -- ...Rules
-        tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
-        tcg_vects     :: [LVectDecl Id],    -- ...Vectorisation declarations
-        tcg_patsyns   :: [PatSyn],          -- ...Pattern synonyms
+        tcg_binds     :: LHsBinds Id,        -- Value bindings in this module
+        tcg_sigs      :: NameSet,            -- ...Top-level names that *lack* a signature
+        tcg_imp_specs :: [LTcSpecPrag],      -- ...SPECIALISE prags for imported Ids
+        tcg_warns     :: Warnings,           -- ...Warnings and deprecations
+        tcg_anns      :: [Annotation],       -- ...Annotations
+        tcg_tcs       :: [TyCon],            -- ...TyCons and Classes
+        tcg_insts     :: [ClsInst],          -- ...Instances
+        tcg_fam_insts :: [FamInst],          -- ...Family instances
+        tcg_rules     :: [LRuleDecl Id],     -- ...Rules
+        tcg_fords     :: [LForeignDecl Id],  -- ...Foreign import & exports
+        tcg_vects     :: [LVectDecl Id],     -- ...Vectorisation declarations
+        tcg_patsyns   :: [PatSyn],           -- ...Pattern synonyms
 
         tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
@@ -483,12 +483,14 @@ data TcGblEnv
         tcg_main      :: Maybe Name,         -- ^ The Name of the main
                                              -- function, if this module is
                                              -- the main module.
-        tcg_safeInfer :: TcRef Bool,         -- Has the typechecker
-                                             -- inferred this module
-                                             -- as -XSafe (Safe Haskell)
 
-        -- | A list of user-defined plugins for the constraint solver.
+        tcg_safeInfer :: TcRef (Bool, WarningMessages),
+        -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
+        -- See Note [Safe Haskell Overlapping Instances Implementation],
+        -- although this is used for more than just that failure case.
+
         tcg_tc_plugins :: [TcPluginSolver],
+        -- ^ A list of user-defined plugins for the constraint solver.
 
         tcg_static_wc :: TcRef WantedConstraints
           -- ^ Wanted constraints of static forms.

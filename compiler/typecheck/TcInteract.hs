@@ -1343,6 +1343,7 @@ kickOutRewritable new_flavour new_eq_rel new_tv
 kick_out :: CtFlavour -> EqRel -> TcTyVar -> InertCans -> (WorkList, InertCans)
 kick_out new_flavour new_eq_rel new_tv (IC { inert_eqs      = tv_eqs
                                            , inert_dicts    = dictmap
+                                           , inert_safehask = safehask
                                            , inert_funeqs   = funeqmap
                                            , inert_irreds   = irreds
                                            , inert_insols   = insols })
@@ -1354,6 +1355,7 @@ kick_out new_flavour new_eq_rel new_tv (IC { inert_eqs      = tv_eqs
                 -- take the substitution into account
     inert_cans_in = IC { inert_eqs      = tv_eqs_in
                        , inert_dicts    = dicts_in
+                       , inert_safehask = safehask
                        , inert_funeqs   = feqs_in
                        , inert_irreds   = irs_in
                        , inert_insols   = insols_in }
@@ -1569,19 +1571,23 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                   -- It's easy because no evidence is involved
    = do { lkup_inst_res <- matchClassInst inerts cls xis dict_loc
          ; case lkup_inst_res of
-               GenInst preds _ -> do { mapM_ (emitNewDerived dict_loc) preds
-                                     ; stopWith fl "Dict/Top (solved)" }
+               GenInst preds _ s -> do { mapM_ (emitNewDerived dict_loc) preds
+                                       ; unless s $
+                                           insertSafeOverlapFailureTcS work_item
+                                       ; stopWith fl "Dict/Top (solved)" }
 
-               NoInstance      -> do { -- If there is no instance, try improvement
-                                       try_fundep_improvement
-                                     ; continueWith work_item } }
+               NoInstance        -> do { -- If there is no instance, try improvement
+                                         try_fundep_improvement
+                                       ; continueWith work_item } }
 
   | otherwise  -- Wanted, but not cached
    = do { lkup_inst_res <- matchClassInst inerts cls xis dict_loc
          ; case lkup_inst_res of
-               NoInstance          -> continueWith work_item
-               GenInst theta mk_ev -> do { addSolvedDict fl cls xis
-                                         ; solve_from_instance theta mk_ev } }
+               GenInst theta mk_ev s -> do { addSolvedDict fl cls xis
+                                           ; unless s $
+                                               insertSafeOverlapFailureTcS work_item
+                                           ; solve_from_instance theta mk_ev }
+               NoInstance            -> continueWith work_item }
    where
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc fl
@@ -1632,7 +1638,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
     -- Look up in top-level instances, or built-in axiom
     do { match_res <- matchFam fam_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
-           Nothing -> do { try_improvement
+           Nothing -> do { try_improve
                          ; continueWith work_item } ;
            Just (ax_co, rhs_ty)
 
@@ -1680,7 +1686,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
     loc = ctEvLoc old_ev
     deeper_loc = bumpCtLocDepth loc
 
-    try_improvement
+    try_improve
       | not (isWanted old_ev)  -- Try improvement only for Given/Derived constraints
                                -- See Note [When improvement happens during solving]
       , Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
@@ -1961,13 +1967,21 @@ So the inner binding for ?x::Bool *overrides* the outer one.
 Hence a work-item Given overrides an inert-item Given.
 -}
 
+-- | Indicates if Instance met the Safe Haskell overlapping instances safety
+-- check.
+--
+-- See Note [Safe Haskell Overlapping Instances] in TcSimplify
+-- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
+type SafeOverlapping = Bool
+
 data LookupInstResult
   = NoInstance
-  | GenInst [TcPredType] ([EvId] -> EvTerm)
+  | GenInst [TcPredType] ([EvId] -> EvTerm) SafeOverlapping
 
 instance Outputable LookupInstResult where
-  ppr NoInstance = text "NoInstance"
-  ppr (GenInst ev _) = text "GenInst" <+> ppr ev
+  ppr NoInstance       = text "NoInstance"
+  ppr (GenInst ev _ s) = text "GenInst" <+> ppr ev <+> ss
+    where ss = text $ if s then "[safe]" else "[unsafe]"
 
 
 matchClassInst :: InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
@@ -2002,7 +2016,7 @@ matchClassInst _ clas [ ty ] _
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
     , let ev_tm = mkEvCast (EvLit evLit) (mkTcSymCo (mkTcTransCo co_dict co_rep))
-    = return (GenInst [] $ (\_ -> ev_tm))
+    = return $ GenInst [] (\_ -> ev_tm) True
 
     | otherwise
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
@@ -2016,19 +2030,27 @@ matchClassInst inerts clas tys loc
         ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
                                            , text "inerts=" <+> ppr inerts ]
         ; instEnvs <- getInstEnvs
-        ; case lookupInstEnv instEnvs clas tys of
-            ([], _, _)               -- Nothing matches
+        ; safeOverlapCheck <- (`elem` [Sf_Safe, Sf_Trustworthy])
+            <$> safeHaskell <$> getDynFlags
+        ; let (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
+              safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
+        ; case (matches, unify, safeHaskFail) of
+
+            -- Nothing matches
+            ([], _, _)
                 -> do { traceTcS "matchClass not matching" $
                         vcat [ text "dict" <+> ppr pred ]
                       ; return NoInstance }
 
-            ([(ispec, inst_tys)], [], _) -- A single match
+            -- A single match (& no safe haskell failure)
+            ([(ispec, inst_tys)], [], False)
                 | not (xopt Opt_IncoherentInstances dflags)
                 , not (isEmptyBag unifiable_givens)
                 -> -- See Note [Instance and Given overlap]
                    do { traceTcS "Delaying instance application" $
                           vcat [ text "Work item=" <+> pprType (mkClassPred clas tys)
-                               , text "Relevant given dictionaries=" <+> ppr unifiable_givens ]
+                               , text "Relevant given dictionaries="
+                                     <+> ppr unifiable_givens ]
                       ; return NoInstance  }
 
                 | otherwise
@@ -2038,11 +2060,11 @@ matchClassInst inerts clas tys loc
                                 text "witness" <+> ppr dfun_id
                                                <+> ppr (idType dfun_id) ]
                                   -- Record that this dfun is needed
-                        ; match_one dfun_id inst_tys }
+                        ; match_one (null unsafeOverlaps) dfun_id inst_tys }
 
-            (matches, _, _)    -- More than one matches
-                               -- Defer any reactions of a multitude
-                               -- until we learn more about the reagent
+            -- More than one matches (or Safe Haskell fail!). Defer any
+            -- reactions of a multitude until we learn more about the reagent
+            (matches, _, _)
                 -> do   { traceTcS "matchClass multiple matches, deferring choice" $
                           vcat [text "dict" <+> ppr pred,
                                 text "matches" <+> ppr matches]
@@ -2050,12 +2072,12 @@ matchClassInst inerts clas tys loc
    where
      pred = mkClassPred clas tys
 
-     match_one :: DFunId -> [DFunInstType] -> TcS LookupInstResult
+     match_one :: SafeOverlapping -> DFunId -> [DFunInstType] -> TcS LookupInstResult
                   -- See Note [DFunInstType: instantiating types] in InstEnv
-     match_one dfun_id mb_inst_tys
+     match_one so dfun_id mb_inst_tys
        = do { checkWellStagedDFun pred dfun_id loc
             ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
-            ; return $ GenInst theta (EvDFunApp dfun_id tys) }
+            ; return $ GenInst theta (EvDFunApp dfun_id tys) so }
 
      unifiable_givens :: Cts
      unifiable_givens = filterBag matchable $
@@ -2196,6 +2218,7 @@ matchTypeableClass clas _k t
     | otherwise
     = return $ GenInst [mk_typeable_pred f, mk_typeable_pred tk]
                        (\[t1,t2] -> EvTypeable $ EvTypeableTyApp (EvId t1,f) (EvId t2,tk))
+                       True
 
   -- Representation for concrete kinds.  We just use the kind itself,
   -- but first check to make sure that it is "simple" (i.e., made entirely
@@ -2207,7 +2230,7 @@ matchTypeableClass clas _k t
   -- Emit a `Typeable` constraint for the given type.
   mk_typeable_pred ty = mkClassPred clas [ typeKind ty, ty ]
 
-  mkSimpEv ev = return (GenInst [] (\_ -> EvTypeable ev))
+  mkSimpEv ev = return $ GenInst [] (\_ -> EvTypeable ev) True
 
 {- Note [No Typeable for polytype or for constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

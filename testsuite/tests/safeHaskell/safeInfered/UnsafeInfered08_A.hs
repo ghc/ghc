@@ -1,8 +1,6 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# OPTIONS_GHC -w #-}  -- Turn off deprecation for OverlappingInstances
--- | Unsafe as uses overlapping instances
--- Although it isn't defining any so can we mark safe
--- still?
+-- | Safe, as we now check at overlap occurence, not defenition.
 module UnsafeInfered08_A where
 
 g :: Int

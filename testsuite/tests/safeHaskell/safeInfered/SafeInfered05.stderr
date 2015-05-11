@@ -1,19 +1,8 @@
 
-SafeInfered05.hs:2:14: Warning:
+SafeInfered05.hs:2:14: warning:
     -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
 [1 of 2] Compiling SafeInfered05_A  ( SafeInfered05_A.hs, SafeInfered05_A.o )
 
-SafeInfered05_A.hs:2:16: Warning:
+SafeInfered05_A.hs:2:16: warning:
     ‘SafeInfered05_A’ has been inferred as safe!
 [2 of 2] Compiling SafeInfered05    ( SafeInfered05.hs, SafeInfered05.o )
-
-SafeInfered05.hs:31:9:
-    Unsafe overlapping instances for C [Int] arising from a use of ‘f’
-    The matching instance is:
-      instance [safe] C [Int] -- Defined at SafeInfered05_A.hs:8:10
-    It is compiled in a Safe module and as such can only
-    overlap instances from the same module, however it
-    overlaps the following instances from different modules:
-      instance [overlap ok] C [a] -- Defined at SafeInfered05.hs:27:10
-    In the expression: f ([1, 2, 3, 4] :: [Int])
-    In an equation for ‘test2’: test2 = f ([1, 2, 3, 4] :: [Int])

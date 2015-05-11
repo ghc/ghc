@@ -452,7 +452,7 @@ checkForeignRes non_io_result_ok check_safe pred_res_ty ty
 
            -- handle safe infer fail
            _ | check_safe && safeInferOn dflags
-               -> recordUnsafeInfer
+               -> recordUnsafeInfer emptyBag
 
            -- handle safe language typecheck fail
            _ | check_safe && safeLanguageOn dflags

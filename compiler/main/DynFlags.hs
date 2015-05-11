@@ -1858,15 +1858,7 @@ unsafeFlags = [ ("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
                     xopt Opt_TemplateHaskell,
                     flip xopt_unset Opt_TemplateHaskell)
               ]
-unsafeFlagsForInfer = unsafeFlags ++
-              -- TODO: Can we do better than this for inference?
-              [ ("-XOverlappingInstances", overlapInstLoc,
-                  xopt Opt_OverlappingInstances,
-                  flip xopt_unset Opt_OverlappingInstances)
-              , ("-XIncoherentInstances", incoherentOnLoc,
-                  xopt Opt_IncoherentInstances,
-                  flip xopt_unset Opt_IncoherentInstances)
-              ]
+unsafeFlagsForInfer = unsafeFlags
 
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
@@ -2183,9 +2175,8 @@ safeFlagCheck cmdl dflags =
                     "-fpackage-trust ignored;" ++
                     " must be specified with a Safe Haskell flag"]
 
+    -- Have we inferred Unsafe? See Note [HscMain . Safe Haskell Inference]
     safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
-    -- Have we inferred Unsafe?
-    -- See Note [HscMain . Safe Haskell Inference]
 
 
 {- **********************************************************************

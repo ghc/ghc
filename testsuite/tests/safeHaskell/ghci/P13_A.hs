@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module P13_A where
 
 class Pos a where { res :: a -> Bool }

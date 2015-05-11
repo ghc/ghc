@@ -413,8 +413,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
        -- As above but for Safe Inference mode.
        ; when (safeInferOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | genInstCheck x -> recordUnsafeInfer
-             _ | overlapCheck x -> recordUnsafeInfer
+             _ | genInstCheck x -> recordUnsafeInfer emptyBag
              _ -> return ()
 
        ; return ( gbl_env
@@ -426,10 +425,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     bad_typeable_instance i
       = typeableClassName == is_cls_nm (iSpec i)
 
-
-    overlapCheck ty = case overlapMode (is_flag $ iSpec ty) of
-                        NoOverlap _ -> False
-                        _           -> True
+    -- Check for hand-written Generic instances (disallowed in Safe Haskell)
     genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
     genInstErr i = hang (ptext (sLit $ "Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$
@@ -1094,7 +1090,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
 
       | otherwise
       = do { inst_envs <- tcGetInstEnvs
-           ; case lookupInstEnv inst_envs cls tys of
+           ; case lookupInstEnv False inst_envs cls tys of
                ([(ispec, dfun_inst_tys)], [], _) -- A single match
                  -> do { let dfun_id = instanceDFunId ispec
                        ; (inst_tys, inst_theta) <- instDFunType dfun_id dfun_inst_tys

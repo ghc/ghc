@@ -407,19 +407,21 @@ tcRnModule' hsc_env sum save_rn_syntax mod = do
                ioMsgMaybe $
                    tcRnModule hsc_env (ms_hsc_src sum) save_rn_syntax mod
 
-    tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_res)
+    -- See Note [Safe Haskell Overlapping Instances Implementation]
+    -- although this is used for more than just that failure case.
+    (tcSafeOK, whyUnsafe) <- liftIO $ readIORef (tcg_safeInfer tcg_res)
     dflags   <- getDynFlags
     let allSafeOK = safeInferred dflags && tcSafeOK
 
     -- end of the safe haskell line, how to respond to user?
     if not (safeHaskellOn dflags) || (safeInferOn dflags && not allSafeOK)
         -- if safe Haskell off or safe infer failed, mark unsafe
-        then markUnsafeInfer tcg_res emptyBag
+        then markUnsafeInfer tcg_res whyUnsafe
 
         -- module (could be) safe, throw warning if needed
         else do
             tcg_res' <- hscCheckSafeImports tcg_res
-            safe <- liftIO $ readIORef (tcg_safeInfer tcg_res')
+            safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
             when safe $ do
               case wopt Opt_WarnSafe dflags of
                 True -> (logWarnings $ unitBag $ mkPlainWarnMsg dflags
@@ -778,8 +780,8 @@ hscFileFrontEnd mod_summary = do
 --
 -- It used to be that we only did safe inference on modules that had no Safe
 -- Haskell flags, but now we perform safe inference on all modules as we want
--- to allow users to set the `--fwarn-safe`, `--fwarn-unsafe` and
--- `--fwarn-trustworthy-safe` flags on Trustworthy and Unsafe modules so that a
+-- to allow users to set the `-fwarn-safe`, `-fwarn-unsafe` and
+-- `-fwarn-trustworthy-safe` flags on Trustworthy and Unsafe modules so that a
 -- user can ensure their assumptions are correct and see reasons for why a
 -- module is safe or unsafe.
 --
@@ -1057,7 +1059,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
          (logWarnings $ unitBag $
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
-    liftIO $ writeIORef (tcg_safeInfer tcg_env) False
+    liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicity safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.

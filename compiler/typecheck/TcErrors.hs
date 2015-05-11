@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module TcErrors(
-       reportUnsolved, reportAllUnsolved,
+       reportUnsolved, reportAllUnsolved, warnAllUnsolved,
        warnDefaulting,
 
        solverDepthErrorTcS
@@ -95,10 +95,12 @@ and does not fail if -fdefer-type-errors is on, so that we can continue
 compilation. The errors are turned into warnings in `reportUnsolved`.
 -}
 
+-- | Report unsolved goals as errors or warnings. We may also turn some into
+-- deferred run-time errors if `-fdefer-type-errors` is on.
 reportUnsolved :: WantedConstraints -> TcM (Bag EvBind)
 reportUnsolved wanted
-  = do { binds_var <- newTcEvBinds
-       ; defer_errors <- goptM Opt_DeferTypeErrors
+  = do { binds_var  <- newTcEvBinds
+       ; defer_errs <- goptM Opt_DeferTypeErrors
 
        ; defer_holes <- goptM Opt_DeferTypedHoles
        ; warn_holes  <- woptM Opt_WarnTypedHoles
@@ -112,21 +114,30 @@ reportUnsolved wanted
                         | warn_partial_sigs = HoleWarn
                         | otherwise         = HoleDefer
 
-       ; report_unsolved (Just binds_var) defer_errors expr_holes type_holes wanted
+       ; report_unsolved (Just binds_var) False defer_errs expr_holes type_holes wanted
        ; getTcEvBinds binds_var }
 
-reportAllUnsolved :: WantedConstraints -> TcM ()
--- Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
+-- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- See Note [Deferring coercion errors to runtime]
+reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
-  = report_unsolved Nothing False HoleError HoleError wanted
+  = report_unsolved Nothing False False HoleError HoleError wanted
 
+-- | Report all unsolved goals as warnings (but without deferring any errors to
+-- run-time). See Note [Safe Haskell Overlapping Instances Implementation] in
+-- TcSimplify
+warnAllUnsolved :: WantedConstraints -> TcM ()
+warnAllUnsolved wanted
+  = report_unsolved Nothing True False HoleWarn HoleWarn wanted
+
+-- | Report unsolved goals as errors or warnings.
 report_unsolved :: Maybe EvBindsVar  -- cec_binds
+                -> Bool              -- Errors as warnings
                 -> Bool              -- cec_defer_type_errors
                 -> HoleChoice        -- Expression holes
                 -> HoleChoice        -- Type holes
                 -> WantedConstraints -> TcM ()
-report_unsolved mb_binds_var defer_errors expr_holes type_holes wanted
+report_unsolved mb_binds_var err_as_warn defer_errs expr_holes type_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
@@ -146,7 +157,8 @@ report_unsolved mb_binds_var defer_errors expr_holes type_holes wanted
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
        ; let err_ctxt = CEC { cec_encl  = []
                             , cec_tidy  = tidy_env
-                            , cec_defer_type_errors = defer_errors
+                            , cec_defer_type_errors = defer_errs
+                            , cec_errors_as_warns = err_as_warn
                             , cec_expr_holes = expr_holes
                             , cec_type_holes = type_holes
                             , cec_suppress = False -- See Note [Suppressing error messages]
@@ -175,6 +187,10 @@ data ReportErrCtxt
                          --              into warnings, and emit evidence bindings
                          --              into 'ev' for unsolved constraints
 
+          , cec_errors_as_warns :: Bool   -- Turn all errors into warnings
+                                          -- (except for Holes, which are
+                                          -- controlled by cec_type_holes and
+                                          -- cec_expr_holes)
           , cec_defer_type_errors :: Bool -- True <=> -fdefer-type-errors
                                           -- Defer type errors until runtime
                                           -- Irrelevant if cec_binds = Nothing
@@ -463,7 +479,7 @@ maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
   -- See Note [Always warn with -fdefer-type-errors]
-  | cec_defer_type_errors ctxt
+  | cec_defer_type_errors ctxt || cec_errors_as_warns ctxt
   = reportWarning err
   | cec_suppress ctxt
   = return ()
@@ -1254,7 +1270,7 @@ mkDictErr ctxt cts
     lookup_cls_inst inst_envs ct
       = do { tys_flat <- mapM quickFlattenTy tys
                 -- Note [Flattening in error message generation]
-           ; return (ct, lookupInstEnv inst_envs clas tys_flat) }
+           ; return (ct, lookupInstEnv True inst_envs clas tys_flat) }
       where
         (clas, tys) = getClassPredTys (ctPred ct)
 
@@ -1271,25 +1287,26 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Left clas), otherwise return (Right pred)
-mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
+mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
   | null matches  -- No matches but perhaps several unifiers
   = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
        ; (ctxt, binds_msg, _) <- relevantBindings True ctxt ct
        ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg)
        ; return (ctxt, cannot_resolve_msg is_ambig binds_msg ambig_msg) }
 
-  | not safe_haskell   -- Some matches => overlap errors
+  | null unsafe_overlapped   -- Some matches => overlap errors
   = return (ctxt, overlap_msg)
 
   | otherwise
   = return (ctxt, safe_haskell_msg)
   where
-    orig        = ctLocOrigin (ctLoc ct)
-    pred        = ctPred ct
-    (clas, tys) = getClassPredTys pred
-    ispecs      = [ispec | (ispec, _) <- matches]
-    givens      = getUserGivens ctxt
-    all_tyvars  = all isTyVarTy tys
+    orig          = ctLocOrigin (ctLoc ct)
+    pred          = ctPred ct
+    (clas, tys)   = getClassPredTys pred
+    ispecs        = [ispec | (ispec, _) <- matches]
+    unsafe_ispecs = [ispec | (ispec, _) <- unsafe_overlapped]
+    givens        = getUserGivens ctxt
+    all_tyvars    = all isTyVarTy tys
 
     cannot_resolve_msg has_ambig_tvs binds_msg ambig_msg
       = vcat [ addArising orig no_inst_msg
@@ -1381,8 +1398,6 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                                     , ptext (sLit "when compiling the other instance declarations")]
                         ])]
         where
-            ispecs = [ispec | (ispec, _) <- matches]
-
             givens = getUserGivens ctxt
             matching_givens = mapMaybe matchable givens
 
@@ -1405,7 +1420,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-      = ASSERT( length matches > 1 )
+      = ASSERT( length matches == 1 && not (null unsafe_ispecs) )
         vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for")
                         <+> pprType (mkClassPred clas tys))
              , sep [ptext (sLit "The matching instance is:"),
@@ -1413,7 +1428,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
              , vcat [ ptext $ sLit "It is compiled in a Safe module and as such can only"
                     , ptext $ sLit "overlap instances from the same module, however it"
                     , ptext $ sLit "overlaps the following instances from different modules:"
-                    , nest 2 (vcat [pprInstances $ tail ispecs])
+                    , nest 2 (vcat [pprInstances $ unsafe_ispecs])
                     ]
              ]
 

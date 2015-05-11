@@ -86,7 +86,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_rdr_var <- newIORef Set.empty ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        infer_var    <- newIORef True ;
+        infer_var    <- newIORef (True, emptyBag) ;
         lie_var      <- newIORef emptyWC ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
@@ -1292,13 +1292,16 @@ setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
 -}
 
 -- | Mark that safe inference has failed
-recordUnsafeInfer :: TcM ()
-recordUnsafeInfer = getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) False
+-- See Note [Safe Haskell Overlapping Instances Implementation]
+-- although this is used for more than just that failure case.
+recordUnsafeInfer :: WarningMessages -> TcM ()
+recordUnsafeInfer warns =
+    getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) (False, warns)
 
 -- | Figure out the final correct safe haskell mode
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
-    safeInf <- readIORef (tcg_safeInfer tcg_env)
+    safeInf <- fst <$> readIORef (tcg_safeInfer tcg_env)
     return $ case safeHaskell dflags of
         Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
                 | otherwise                     -> Sf_None

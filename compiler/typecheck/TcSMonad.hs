@@ -34,7 +34,7 @@ module TcSMonad (
     getTopEnv, getGblEnv, getTcEvBinds, getTcLevel,
     getTcEvBindsMap,
 
-        -- Inerts
+    -- Inerts
     InertSet(..), InertCans(..),
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans, getInertEqs, getInertCans, getInertGivens,
@@ -45,6 +45,10 @@ module TcSMonad (
     addInertCan, insertInertItemTcS, insertFunEq,
     emitInsoluble, emitWorkNC, emitWorkCt,
     EqualCtList,
+
+    -- Inert Safe Haskell safe-overlap failures
+    addInertSafehask, insertSafeOverlapFailureTcS, updInertSafehask,
+    getSafeOverlapFailures,
 
     -- Inert CDictCans
     lookupInertDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
@@ -474,6 +478,15 @@ data InertCans
               -- NB: index is /not/ the whole type because FD reactions
               -- need to match the class but not necessarily the whole type.
 
+       , inert_safehask :: DictMap Ct
+              -- Failed dictionary resolution due to Safe Haskell overlapping
+              -- instances restriction. We keep this seperate from inert_dicts
+              -- as it doesn't cause compilation failure, just safe inference
+              -- failure.
+              --
+              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
+              -- in TcSimplify
+
        , inert_irreds :: Cts
               -- Irreducible predicates
 
@@ -527,6 +540,8 @@ instance Outputable InertCans where
                    <+> pprCts (funEqsToBag (inert_funeqs ics))
                  , ptext (sLit "Dictionaries:")
                    <+> pprCts (dictsToBag (inert_dicts ics))
+                 , ptext (sLit "Safe Haskell unsafe overlap:")
+                   <+> pprCts (dictsToBag (inert_safehask ics))
                  , ptext (sLit "Irreds:")
                    <+> pprCts (inert_irreds ics)
                  , text "Insolubles =" <+> -- Clearly print frozen errors
@@ -541,6 +556,7 @@ emptyInert :: InertSet
 emptyInert
   = IS { inert_cans = IC { inert_eqs      = emptyVarEnv
                          , inert_dicts    = emptyDicts
+                         , inert_safehask = emptyDicts
                          , inert_funeqs   = emptyFunEqs
                          , inert_irreds   = emptyCts
                          , inert_insols   = emptyCts
@@ -589,6 +605,24 @@ insertInertItemTcS item
 
        ; traceTcS "insertInertItemTcS }" $ empty }
 
+--------------
+addInertSafehask :: InertCans -> Ct -> InertCans
+addInertSafehask ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
+  = ics { inert_safehask = addDict (inert_dicts ics) cls tys item }
+
+addInertSafehask _ item
+  = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
+
+insertSafeOverlapFailureTcS :: Ct -> TcS ()
+insertSafeOverlapFailureTcS item
+  = updInertCans (\ics -> addInertSafehask ics item)
+
+getSafeOverlapFailures :: TcS Cts
+getSafeOverlapFailures
+ = do { IC { inert_safehask = safehask } <- getInertCans
+      ; return $ foldDicts consCts safehask emptyCts }
+
+--------------
 addSolvedDict :: CtEvidence -> Class -> [Type] -> TcS ()
 -- Add a new item in the solved set of the monad
 -- See Note [Solved dictionaries]
@@ -633,6 +667,11 @@ updInertDicts :: (DictMap Ct -> DictMap Ct) -> TcS ()
 updInertDicts upd_fn
   = updInertCans $ \ ics -> ics { inert_dicts = upd_fn (inert_dicts ics) }
 
+updInertSafehask :: (DictMap Ct -> DictMap Ct) -> TcS ()
+-- Modify the inert set with the supplied function
+updInertSafehask upd_fn
+  = updInertCans $ \ ics -> ics { inert_safehask = upd_fn (inert_safehask ics) }
+
 updInertFunEqs :: (FunEqMap Ct -> FunEqMap Ct) -> TcS ()
 -- Modify the inert set with the supplied function
 updInertFunEqs upd_fn
@@ -653,11 +692,13 @@ prepareInertsForImplications is@(IS { inert_cans = cans })
     getGivens (IC { inert_eqs      = eqs
                   , inert_irreds   = irreds
                   , inert_funeqs   = funeqs
-                  , inert_dicts    = dicts })
+                  , inert_dicts    = dicts
+                  , inert_safehask = safehask })
       = IC { inert_eqs      = filterVarEnv  is_given_ecl eqs
            , inert_funeqs   = filterFunEqs  isGivenCt funeqs
            , inert_irreds   = Bag.filterBag isGivenCt irreds
            , inert_dicts    = filterDicts   isGivenCt dicts
+           , inert_safehask = filterDicts   isGivenCt safehask
            , inert_insols   = emptyCts }
 
     is_given_ecl :: EqualCtList -> Bool
@@ -723,7 +764,8 @@ getUnsolvedInerts :: TcS ( Bag Implication
 getUnsolvedInerts
  = do { IC { inert_eqs    = tv_eqs
            , inert_funeqs = fun_eqs
-           , inert_irreds = irreds, inert_dicts = idicts
+           , inert_irreds = irreds
+           , inert_dicts  = idicts
            , inert_insols = insols } <- getInertCans
 
       ; let unsolved_tv_eqs  = foldVarEnv (\cts rest ->
@@ -1343,8 +1385,15 @@ nestTcS (TcS thing_inside)
        ; res <- thing_inside nest_env
 
        ; new_inerts <- TcM.readTcRef new_inert_var
+
+       -- we want to propogate the safe haskell failures
+       ; let old_ic = inert_cans inerts
+             new_ic = inert_cans new_inerts
+             nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
+
        ; TcM.writeTcRef inerts_var  -- See Note [Propagate the solved dictionaries]
-                        (inerts { inert_solved_dicts = inert_solved_dicts new_inerts })
+                        (inerts { inert_solved_dicts = inert_solved_dicts new_inerts
+                                , inert_cans = nxt_ic })
 
        ; return res }
 

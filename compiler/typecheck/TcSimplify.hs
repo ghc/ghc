@@ -14,39 +14,40 @@ module TcSimplify(
 
 #include "HsVersions.h"
 
-import TcRnTypes
-import TcRnMonad
-import TcErrors
-import TcMType as TcM
-import TcType
-import TcSMonad as TcS
-import TcInteract
-import Kind     ( isKind, defaultKind_maybe )
-import Inst
-import Unify    ( tcMatchTy )
-import Type     ( classifyPredType, isIPClass, PredTree(..)
-                , getClassPredTys_maybe, EqRel(..) )
-import TyCon    ( isTypeFamilyTyCon )
-import Class    ( Class )
-import Id       ( idType )
-import Var
-import Unique
-import VarSet
-import TcEvidence
-import Name
 import Bag
+import Class         ( classKey )
+import Class         ( Class )
+import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes
+                                    , Opt_FlexibleContexts ) )
+import ErrUtils      ( emptyMessages )
+import FastString
+import Id            ( idType )
+import Inst
+import Kind          ( isKind, defaultKind_maybe )
 import ListSetOps
-import Util
+import Maybes        ( isNothing )
+import Name
+import Outputable
 import PrelInfo
 import PrelNames
-import Control.Monad    ( unless )
-import DynFlags         ( ExtensionFlag( Opt_AllowAmbiguousTypes, Opt_FlexibleContexts ) )
-import Class            ( classKey )
-import Maybes           ( isNothing )
-import Outputable
-import FastString
-import TrieMap () -- DV: for now
-import Data.List( partition )
+import TcErrors
+import TcEvidence
+import TcInteract
+import TcMType   as TcM
+import TcRnMonad as TcRn
+import TcSMonad  as TcS
+import TcType
+import TrieMap       () -- DV: for now
+import TyCon         ( isTypeFamilyTyCon )
+import Type          ( classifyPredType, isIPClass, PredTree(..)
+                     , getClassPredTys_maybe, EqRel(..) )
+import Unify         ( tcMatchTy )
+import Util
+import Var
+import VarSet
+
+import Control.Monad ( unless )
+import Data.List     ( partition )
 
 {-
 *********************************************************************************
@@ -63,21 +64,47 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds
   = do { traceTc "simplifyTop {" $ text "wanted = " <+> ppr wanteds
-       ; (final_wc, binds1) <- runTcS (simpl_top wanteds)
+       ; ((final_wc, unsafe_ol), binds1) <- runTcS $ simpl_top wanteds
        ; traceTc "End simplifyTop }" empty
 
        ; traceTc "reportUnsolved {" empty
        ; binds2 <- reportUnsolved final_wc
        ; traceTc "reportUnsolved }" empty
 
+       ; traceTc "reportUnsolved (unsafe overlapping) {" empty
+       ; unless (isEmptyCts unsafe_ol) $ do {
+           -- grab current error messages and clear, warnAllUnsolved will
+           -- update error messages which we'll grab and then restore saved
+           -- messges.
+           ; errs_var  <- getErrsVar
+           ; saved_msg <- TcRn.readTcRef errs_var
+           ; TcRn.writeTcRef errs_var emptyMessages
+
+           ; warnAllUnsolved $ WC { wc_simple = unsafe_ol
+                                  , wc_insol = emptyCts
+                                  , wc_impl = emptyBag }
+
+           ; whyUnsafe <- fst <$> TcRn.readTcRef errs_var
+           ; TcRn.writeTcRef errs_var saved_msg
+           ; recordUnsafeInfer whyUnsafe
+           }
+       ; traceTc "reportUnsolved (unsafe overlapping) }" empty
+
        ; return (binds1 `unionBags` binds2) }
 
-simpl_top :: WantedConstraints -> TcS WantedConstraints
+type SafeOverlapFailures = Cts
+-- ^ See Note [Safe Haskell Overlapping Instances Implementation]
+
+type FinalConstraints = (WantedConstraints, SafeOverlapFailures)
+
+simpl_top :: WantedConstraints -> TcS FinalConstraints
     -- See Note [Top-level Defaulting Plan]
 simpl_top wanteds
   = do { wc_first_go <- nestTcS (solveWantedsAndDrop wanteds)
                             -- This is where the main work happens
-       ; try_tyvar_defaulting wc_first_go }
+       ; wc_final <- try_tyvar_defaulting wc_first_go
+       ; unsafe_ol <- getSafeOverlapFailures
+       ; return (wc_final, unsafe_ol) }
   where
     try_tyvar_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_tyvar_defaulting wc
@@ -186,13 +213,114 @@ defaulting. Again this is done at the top-level and the plan is:
      - Apply defaulting to their kinds
 
 More details in Note [DefaultTyVar].
+
+Note [Safe Haskell Overlapping Instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Safe Haskell, we apply an extra restriction to overlapping instances. The
+motive is to prevent untrusted code provided by a third-party, changing the
+behavior of trusted code through type-classes. This is due to the global and
+implicit nature of type-classes that can hide the source of the dictionary.
+
+Another way to state this is: if a module M compiles without importing another
+module N, changing M to import N shouldn't change the behavior of M.
+
+Overlapping instances with type-classes can violate this principle. However,
+overlapping instances aren't always unsafe. They are just unsafe when the most
+selected dictionary comes from untrusted code (code compiled with -XSafe) and
+overlaps instances provided by other modules.
+
+In particular, in Safe Haskell at a call site with overlapping instances, we
+apply the following rule to determine if it is a 'unsafe' overlap:
+
+ 1) Most specific instance, I1, defined in an `-XSafe` compiled module.
+ 2) I1 is an orphan instance or a MPTC.
+ 3) At least one overlapped instance, Ix, is both:
+    A) from a different module than I1
+    B) Ix is not marked `OVERLAPPABLE`
+
+This is a slightly involved heuristic, but captures the situation of an
+imported module N changing the behavior of existing code. For example, if
+condition (2) isn't violated, then the module author M must depend either on a
+type-class or type defined in N.
+
+Secondly, when should these heuristics be enforced? We enforced them when the
+type-class method call site is in a module marked `-XSafe` or `-XTrustworthy`.
+This allows `-XUnsafe` modules to operate without restriction, and for Safe
+Haskell inferrence to infer modules with unsafe overlaps as unsafe.
+
+One alternative design would be to also consider if an instance was imported as
+a `safe` import or not and only apply the restriction to instances imported
+safely. However, since instances are global and can be imported through more
+than one path, this alternative doesn't work.
+
+Note [Safe Haskell Overlapping Instances Implementation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+How is this implemented? It's compilcated! So we'll step through it all:
+
+ 1) `InstEnv.lookupInstEnv` -- Performs instance resolution, so this is where
+ we check if a particular type-class method call is safe or unsafe. We do this
+ through the return type, `ClsInstLookupResult`, where the last parameter is a
+ list of instances that are unsafe to overlap. When the method call is safe,
+ the list is null.
+
+ 2) `TcInteract.matchClassInst` -- This module drives the instance resolution /
+ dictionary generation. The return type is `LookupInstResult`, which either
+ says no instance matched, or one found and if it was a safe or unsafe overlap.
+
+ 3) `TcInteract.doTopReactDict` -- Takes a dictionary / class constraint and
+ tries to resolve it by calling (in part) `matchClassInst`. The resolving
+ mechanism has a work list (of constraints) that it process one at a time. If
+ the constraint can't be resolved, it's added to an inert set. When compiling
+ an `-XSafe` or `-XTrustworthy` module we follow this approach as we know
+ compilation should fail. These are handled as normal constraint resolution
+ failures from here-on (see step 6).
+
+ Otherwise, we may be inferring safety (or using `-fwarn-unsafe`) and
+ compilation should succeed, but print warnings and/or mark the compiled module
+ as `-XUnsafe`. In this case, we call `insertSafeOverlapFailureTcS` which adds
+ the unsafe (but resolved!) constraint to the `inert_safehask` field of
+ `InertCans`.
+
+ 4) `TcSimplify.simpl_top` -- Top-level function for driving the simplifier for
+ constraint resolution. Once finished, we call `getSafeOverlapFailures` to
+ retrieve the list of overlapping instances that were successfully resolved,
+ but unsafe. Remember, this is only applicable for generating warnings
+ (`-fwarn-unsafe`) or inferring a module unsafe. `-XSafe` and `-XTrustworthy`
+ cause compilation failure by not resolving the unsafe constraint at all.
+ `simpl_top` returns a list of unresolved constraints (all types), and resolved
+ (but unsafe) resolved dictionary constraints.
+
+ 5) `TcSimplify.simplifyTop` -- Is the caller of `simpl_top`. For unresolved
+ constraints, it calls `TcErrors.reportUnsolved`, while for unsafe overlapping
+ instance constraints, it calls `TcErrors.warnAllUnsolved`. Both functions
+ convert constraints into a warning message for the user.
+
+ 6) `TcErrors.*Unsolved` -- Generates error messages for conastraints by
+ actually calling `InstEnv.lookupInstEnv` again! Yes, confusing, but all we
+ know is the constraint that is unresolved or unsafe. For dictionary, this is
+ know we need a dictionary of type C, but not what instances are available and
+ how they overlap. So we once again call `lookupInstEnv` to figure that out so
+ we can generate a helpful error message.
+
+ 7) `TcSimplify.simplifyTop` -- In the case of `warnAllUnsolved` for resolved,
+ but unsafe dictionary constraints, we collect the generated warning message
+ (pop it) and call `TcRnMonad.recordUnsafeInfer` to mark the module we are
+ compiling as unsafe, passing the warning message along as the reason.
+
+ 8) `TcRnMonad.recordUnsafeInfer` -- Save the unsafe result and reason in an
+ IORef called `tcg_safeInfer`.
+
+ 9) `HscMain.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
+ `HscMain.markUnsafeInfer` (passing the reason along) when safe-inferrence
+ failed.
 -}
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
   = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; (final_wc, _binds) <- runTcS (simpl_top wanteds)
+       ; ((final_wc, _), _binds) <- runTcS $ simpl_top wanteds
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
        -- Normally report all errors; but with -XAllowAmbiguousTypes
@@ -305,7 +433,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
               -- NB: We do not do any defaulting when inferring a type, this can lead
               -- to less polymorphic types, see Note [Default while Inferring]
 
-       ; tc_lcl_env <- TcRnMonad.getLclEnv
+       ; tc_lcl_env <- TcRn.getLclEnv
        ; null_ev_binds_var <- TcM.newTcEvBinds
        ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
        ; quant_pred_candidates   -- Fully zonked
@@ -376,7 +504,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
          -- we don't quantify over beta (since it is fixed by envt)
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta
-       ; outer_tclvl    <- TcRnMonad.getTcLevel
+       ; outer_tclvl    <- TcRn.getTcLevel
        ; zonked_tau_tvs <- TcM.zonkTyVarsAndFV zonked_tau_tvs
               -- decideQuantification turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
