@@ -173,9 +173,9 @@ pprIdDetails other     = brackets (pp other)
 -- 'Unique' (and are hence the same 'Id'); for example, one might lack
 -- the properties attached to the other.
 --
--- The 'IdInfo' gives information about the value, or definition, of the
--- 'Id'.  It does not contain information about the 'Id''s usage,
--- except for 'demandInfo' and 'oneShotInfo'.
+-- Most of the 'IdInfo' gives information about the value, or definition, of
+-- the 'Id', independent of its usage. Exceptions to this
+-- are 'demandInfo', 'occInfo', 'oneShotInfo' and 'callArityInfo'.
 data IdInfo
   = IdInfo {
         arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
