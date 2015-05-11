@@ -23,6 +23,7 @@ import Name
 import Var
 import Class
 import Type
+import TcType( immSuperClasses )
 import Unify
 import InstEnv
 import VarSet
@@ -445,32 +446,29 @@ oclose :: [PredType] -> TyVarSet -> TyVarSet
 -- See Note [The liberal coverage condition]
 oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = loop fixed_tvs
+  | otherwise   = fixVarSet extend fixed_tvs
   where
-    loop fixed_tvs
-      | new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
-      | otherwise                           = loop new_fixed_tvs
-      where new_fixed_tvs = foldl extend fixed_tvs tv_fds
-
-    extend fixed_tvs (ls,rs)
-        | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
-        | otherwise                = fixed_tvs
+    extend fixed_tvs = foldl add fixed_tvs tv_fds
+       where
+          add fixed_tvs (ls,rs)
+            | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
+            | otherwise                = fixed_tvs
 
     tv_fds  :: [(TyVarSet,TyVarSet)]
     tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-              | (xs, ys) <- concatMap determined preds
-              ]
+              | (xs, ys) <- concatMap determined preds ]
 
     determined :: PredType -> [([Type],[Type])]
     determined pred
        = case classifyPredType pred of
-            ClassPred cls tys ->
-               do let (cls_tvs, cls_fds) = classTvsFds cls
-                  fd <- cls_fds
-                  return (instFD fd cls_tvs tys)
             EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
-            TuplePred ts       -> concatMap determined ts
-            _                  -> []
+            ClassPred cls tys -> local_fds ++ concatMap determined superclasses
+              where
+               local_fds = [ instFD fd cls_tvs tys
+                           | fd <- cls_fds ]
+               (cls_tvs, cls_fds) = classTvsFds cls
+               superclasses = immSuperClasses cls tys
+            _ -> []
 
 {-
 ************************************************************************

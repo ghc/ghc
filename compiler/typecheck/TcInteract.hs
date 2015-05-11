@@ -27,6 +27,7 @@ import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
 import Id( idType )
 import Class
 import TyCon
+import DataCon( dataConWrapId )
 import FunDeps
 import FamInst
 import Inst( tyVarsOfCt )
@@ -2022,8 +2023,16 @@ matchClassInst _ clas [ ty ] _
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
 
+matchClassInst _ clas ts _
+  | isCTupleClass clas
+  , let data_con = tyConSingleDataCon (classTyCon clas)
+        tuple_ev = EvDFunApp (dataConWrapId data_con) ts
+  = return (GenInst ts tuple_ev True)
+            -- The dfun is the data constructor!
+
 matchClassInst _ clas [k,t] _
-  | className clas == typeableClassName = matchTypeableClass clas k t
+  | className clas == typeableClassName
+  = matchTypeableClass clas k t
 
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags

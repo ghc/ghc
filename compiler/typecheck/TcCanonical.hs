@@ -173,39 +173,8 @@ canEvNC ev
                                   canClassNC ev cls tys
       EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
                                   canEqNC    ev eq_rel ty1 ty2
-      TuplePred tys         -> do traceTcS "canEvNC:tup" (ppr tys)
-                                  canTuple   ev tys
       IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr (ctEvPred ev))
                                   canIrred   ev
-{-
-************************************************************************
-*                                                                      *
-*                      Tuple Canonicalization
-*                                                                      *
-************************************************************************
--}
-
-canTuple :: CtEvidence -> [PredType] -> TcS (StopOrContinue Ct)
-canTuple ev preds
-  | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
-  = do { new_evars <- mapM (newWantedEvVar loc) preds
-       ; setWantedEvBind evar (EvTupleMk (map (ctEvId . fst) new_evars))
-       ; emitWorkNC (freshGoals new_evars)
-         -- Note the "NC": these are fresh goals, not necessarily canonical
-       ; stopWith ev "Decomposed tuple constraint" }
-
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
-  = do { given_evs <- newGivenEvVars loc (mkEvTupleSelectors (EvId evar) preds)
-       ; emitWorkNC given_evs
-       ; stopWith ev "Decomposed tuple constraint" }
-
-  | CtDerived { ctev_loc = loc } <- ev
-  = do { mapM_ (emitNewDerived loc) preds
-       ; stopWith ev "Decomposed tuple constraint" }
-
-  | otherwise = panic "canTuple"
-
-
 {-
 ************************************************************************
 *                                                                      *
@@ -384,7 +353,6 @@ canIrred old_ev
     do { -- Re-classify, in case flattening has improved its shape
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
-           TuplePred tys         -> canTuple   new_ev tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
            _                     -> continueWith $
                                     CIrredEvCan { cc_ev = new_ev } } }

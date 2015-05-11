@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             RoleAnnotations #-}
+             MultiParamTypeClasses, RoleAnnotations #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types

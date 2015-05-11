@@ -379,7 +379,7 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 mkCoreTup :: [CoreExpr] -> CoreExpr
 mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
-mkCoreTup cs  = mkConApp (tupleCon BoxedTuple (length cs))
+mkCoreTup cs  = mkConApp (tupleDataCon Boxed (length cs))
                          (map (Type . exprType) cs ++ cs)
 
 -- | Build a big tuple holding the specified variables
@@ -484,7 +484,7 @@ mkSmallTupleSelector [var] should_be_the_same_var _ scrut
 mkSmallTupleSelector vars the_var scrut_var scrut
   = ASSERT( notNull vars )
     Case scrut scrut_var (idType the_var)
-         [(DataAlt (tupleCon BoxedTuple (length vars)), vars, Var the_var)]
+         [(DataAlt (tupleDataCon Boxed (length vars)), vars, Var the_var)]
 
 -- | A generalization of 'mkTupleSelector', allowing the body
 -- of the case to be an arbitrary expression.
@@ -537,7 +537,8 @@ mkSmallTupleCase [var] body _scrut_var scrut
   = bindNonRec var scrut body
 mkSmallTupleCase vars body scrut_var scrut
 -- One branch no refinement?
-  = Case scrut scrut_var (exprType body) [(DataAlt (tupleCon BoxedTuple (length vars)), vars, body)]
+  = Case scrut scrut_var (exprType body)
+         [(DataAlt (tupleDataCon Boxed (length vars)), vars, body)]
 
 {-
 ************************************************************************

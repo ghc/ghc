@@ -24,13 +24,13 @@ import TypeRep
 import TcType
 import TcMType
 import TysWiredIn ( coercibleClass, eqTyConName )
+import PrelNames
 import Type
 import Unify( tcMatchTyX )
 import Kind
 import CoAxiom
 import Class
 import TyCon
-import PrelNames( eqTyConKey )
 
 -- others:
 import HsSyn            -- HsType
@@ -45,7 +45,6 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
-import Unique           ( hasKey )
 import BasicTypes       ( IntWithInf, infinity )
 import FastString
 
@@ -396,7 +395,11 @@ check_type ctxt rank ty
   = do  { checkTc (forAllAllowed rank) (forAllTyErr rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
-        ; check_valid_theta ctxt theta
+
+        ; check_valid_theta SigmaCtxt theta
+                -- Allow     type T = ?x::Int => Int -> Int
+                -- but not   type T = ?x::Int
+
         ; check_type ctxt rank tau }      -- Allow foralls to right of arrow
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
@@ -617,15 +620,16 @@ check_pred_help :: Bool    -- True <=> under a type synonym
 check_pred_help under_syn dflags ctxt pred
   | Just pred' <- coreView pred  -- Switch on under_syn when going under a
                                  -- synonym (Trac #9838, yuk)
-  = check_pred_help True dflags ctxt pred'  
+  = check_pred_help True dflags ctxt pred'
   | otherwise
   = case splitTyConApp_maybe pred of
-      Just (tc, tys) | Just cls <- tyConClass_maybe tc
-                     -> check_class_pred dflags ctxt pred cls tys  -- Includes Coercible
-                     | tc `hasKey` eqTyConKey
-                     -> check_eq_pred dflags pred tys
-                     | isTupleTyCon tc
-                     -> check_tuple_pred under_syn dflags ctxt pred tys
+      Just (tc, tys)
+        | isTupleTyCon tc
+        -> check_tuple_pred under_syn dflags ctxt pred tys
+        | Just cls <- tyConClass_maybe tc
+        -> check_class_pred dflags ctxt pred cls tys  -- Includes Coercible
+        | tc `hasKey` eqTyConKey
+        -> check_eq_pred dflags pred tys
       _ -> check_irred_pred under_syn dflags ctxt pred
 
 check_eq_pred :: DynFlags -> PredType -> [TcType] -> TcM ()
@@ -656,16 +660,22 @@ check_irred_pred under_syn dflags ctxt pred
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
          -- at the definition site (Trac #9838)
-        checkTc (under_syn || xopt Opt_ConstraintKinds dflags || not (hasTyVarHead pred))
-                (predIrredErr pred)
+        failIfTc (not under_syn && not (xopt Opt_ConstraintKinds dflags)
+                                && hasTyVarHead pred)
+                 (predIrredErr pred)
 
          -- Make sure it is OK to have an irred pred in this context
          -- See Note [Irreducible predicates in superclasses]
-       ; checkTc (xopt Opt_UndecidableInstances dflags || not (dodgy_superclass ctxt))
-                 (predIrredBadCtxtErr pred) }
+       ; failIfTc (is_superclass ctxt
+                   && not (xopt Opt_UndecidableInstances dflags)
+                   && has_tyfun_head pred)
+                  (predSuperClassErr pred) }
   where
-    dodgy_superclass ctxt
-       = case ctxt of { ClassSCCtxt _ -> True; InstDeclCtxt -> True; _ -> False }
+    is_superclass ctxt = case ctxt of { ClassSCCtxt _ -> True; _ -> False }
+    has_tyfun_head ty
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, _) -> isTypeFamilyTyCon tc
+          Nothing      -> False
 
 {- Note [ConstraintKinds in predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -679,7 +689,7 @@ e.g.   module A where
 
 Note [Irreducible predicates in superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Allowing irreducible predicates in class superclasses is somewhat dangerous
+Allowing type-family calls in class superclasses is somewhat dangerous
 because we can write:
 
  type family Fooish x :: * -> Constraint
@@ -688,10 +698,7 @@ because we can write:
 
 This will cause the constraint simplifier to loop because every time we canonicalise a
 (Foo a) class constraint we add a (Fooish () a) constraint which will be immediately
-solved to add+canonicalise another (Foo a) constraint.
-
-It is equally dangerous to allow them in instance heads because in that case the
-Paterson conditions may not detect duplication of a type variable or size change. -}
+solved to add+canonicalise another (Foo a) constraint.  -}
 
 -------------------------
 check_class_pred :: DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
@@ -722,10 +729,25 @@ check_class_pred dflags ctxt pred cls tys
 -------------------------
 okIPCtxt :: UserTypeCtxt -> Bool
   -- See Note [Implicit parameters in instance decls]
+okIPCtxt (FunSigCtxt {})    = True
+okIPCtxt (InfSigCtxt {})    = True
+okIPCtxt ExprSigCtxt        = True
+okIPCtxt PatSigCtxt         = True
+okIPCtxt ResSigCtxt         = True
+okIPCtxt GenSigCtxt         = True
+okIPCtxt (ConArgCtxt {})    = True
+okIPCtxt (ForSigCtxt {})    = True  -- ??
+okIPCtxt ThBrackCtxt        = True
+okIPCtxt GhciCtxt           = True
+okIPCtxt SigmaCtxt          = True
+okIPCtxt (DataTyCtxt {})    = True
+
 okIPCtxt (ClassSCCtxt {})  = False
 okIPCtxt (InstDeclCtxt {}) = False
 okIPCtxt (SpecInstCtxt {}) = False
-okIPCtxt _                 = True
+okIPCtxt (TySynCtxt {})    = False
+okIPCtxt (RuleSigCtxt {})  = False
+okIPCtxt DefaultDeclCtxt   = False
 
 badIPPred :: PredType -> SDoc
 badIPPred pred = ptext (sLit "Illegal implicit parameter") <+> quotes (ppr pred)
@@ -756,10 +778,9 @@ checkThetaCtxt ctxt theta
   = vcat [ptext (sLit "In the context:") <+> pprTheta theta,
           ptext (sLit "While checking") <+> pprUserTypeCtxt ctxt ]
 
-eqPredTyErr, predTyVarErr, predTupleErr, predIrredErr, predIrredBadCtxtErr :: PredType -> SDoc
-eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprType pred
-                    $$
-                    parens (ptext (sLit "Use GADTs or TypeFamilies to permit this"))
+eqPredTyErr, predTyVarErr, predTupleErr, predIrredErr, predSuperClassErr :: PredType -> SDoc
+eqPredTyErr  pred  = vcat [ ptext (sLit "Illegal equational constraint") <+> pprType pred
+                          , parens (ptext (sLit "Use GADTs or TypeFamilies to permit this")) ]
 predTyVarErr pred  = vcat [ hang (ptext (sLit "Non type-variable argument"))
                                2 (ptext (sLit "in the constraint:") <+> pprType pred)
                           , parens (ptext (sLit "Use FlexibleContexts to permit this")) ]
@@ -767,9 +788,10 @@ predTupleErr pred  = hang (ptext (sLit "Illegal tuple constraint:") <+> pprType 
                         2 (parens constraintKindsMsg)
 predIrredErr pred  = hang (ptext (sLit "Illegal constraint:") <+> pprType pred)
                         2 (parens constraintKindsMsg)
-predIrredBadCtxtErr pred = hang (ptext (sLit "Illegal constraint") <+> quotes (pprType pred)
-                                 <+> ptext (sLit "in a superclass/instance context"))
-                               2 (parens undecidableMsg)
+predSuperClassErr pred
+  = hang (ptext (sLit "Illegal constraint") <+> quotes (pprType pred)
+          <+> ptext (sLit "in a superclass context"))
+       2 (parens undecidableMsg)
 
 constraintSynErr :: Type -> SDoc
 constraintSynErr kind = hang (ptext (sLit "Illegal constraint synonym of kind:") <+> quotes (ppr kind))
@@ -886,10 +908,9 @@ not converge.  See Trac #5287.
 validDerivPred :: TyVarSet -> PredType -> Bool
 validDerivPred tv_set pred
   = case classifyPredType pred of
-       ClassPred _ tys       -> check_tys tys
-       TuplePred ps          -> all (validDerivPred tv_set) ps
-       EqPred {}             -> False  -- reject equality constraints
-       _                     -> True   -- Non-class predicates are ok
+       ClassPred _ tys -> check_tys tys
+       EqPred {}       -> False  -- reject equality constraints
+       _               -> True   -- Non-class predicates are ok
   where
     check_tys tys = hasNoDups fvs
                     && sizeTypes tys == fromIntegral (length fvs)
@@ -963,6 +984,9 @@ The underlying idea is that
     context has fewer type constructors than the head.
 -}
 
+leafTyConKeys :: [Unique]
+leafTyConKeys = [eqTyConKey, coercibleTyConKey, ipClassNameKey]
+
 checkInstTermination :: [TcType] -> ThetaType -> TcM ()
 -- See Note [Paterson conditions]
 checkInstTermination tys theta
@@ -976,36 +1000,45 @@ checkInstTermination tys theta
 
    check :: PredType -> TcM ()
    check pred
-     = case classifyPredType pred of
-         TuplePred preds -> check_preds preds  -- Look inside tuple predicates; Trac #8359
-         EqPred {}       -> return ()          -- You can't get from equalities
-                                               -- to class predicates, so this is safe
-         _other      -- ClassPred, IrredPred
-           | not (null bad_tvs)
-           -> addErrTc (predUndecErr pred (nomoreMsg bad_tvs) $$ parens undecidableMsg)
-           | sizePred pred >= size
-           -> addErrTc (predUndecErr pred smallerMsg $$ parens undecidableMsg)
-           | otherwise
-           -> return ()
+     = case tcSplitTyConApp_maybe pred of
+         Just (tc, tys)
+           | getUnique tc `elem` leafTyConKeys
+           -> return ()  -- You can't get from equalities or implicit
+                         -- params to class predicates, so this is safe
+
+           | isTupleTyCon tc
+           -> check_preds tys
+              -- Look inside tuple predicates; Trac #8359
+
+         _other      -- All others: other ClassPreds, IrredPred
+           | not (null bad_tvs)    -> addErrTc (noMoreMsg bad_tvs what)
+           | sizePred pred >= size -> addErrTc (smallerMsg what)
+           | otherwise             -> return ()
      where
+        what    = ptext (sLit "constraint") <+> quotes (ppr pred)
         bad_tvs = filterOut isKindVar (fvType pred \\ fvs)
              -- Rightly or wrongly, we only check for
              -- excessive occurrences of *type* variables.
              -- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
 
-predUndecErr :: PredType -> SDoc -> SDoc
-predUndecErr pred msg = sep [msg,
-                        nest 2 (ptext (sLit "in the constraint:") <+> pprType pred)]
+smallerMsg :: SDoc -> SDoc
+smallerMsg what
+  = vcat [ hang (ptext (sLit "The") <+> what)
+              2 (ptext (sLit "is no smaller than the instance head"))
+         , parens undecidableMsg ]
 
-nomoreMsg :: [TcTyVar] -> SDoc
-nomoreMsg tvs
-  = sep [ ptext (sLit "Variable") <> plural tvs <+> quotes (pprWithCommas ppr tvs)
-        , (if isSingleton tvs then ptext (sLit "occurs")
-                                  else ptext (sLit "occur"))
-          <+> ptext (sLit "more often than in the instance head") ]
+noMoreMsg :: [TcTyVar] -> SDoc -> SDoc
+noMoreMsg tvs what
+  = vcat [ hang (ptext (sLit "Variable") <> plural tvs <+> quotes (pprWithCommas ppr tvs)
+                <+> occurs <+> ptext (sLit "more often"))
+              2 (sep [ ptext (sLit "in the") <+> what
+                     , ptext (sLit "than in the instance head") ])
+         , parens undecidableMsg ]
+  where
+   occurs = if isSingleton tvs then ptext (sLit "occurs")
+                               else ptext (sLit "occur")
 
-smallerMsg, undecidableMsg, constraintKindsMsg :: SDoc
-smallerMsg         = ptext (sLit "Constraint is no smaller than the instance head")
+undecidableMsg, constraintKindsMsg :: SDoc
 undecidableMsg     = ptext (sLit "Use UndecidableInstances to permit this")
 constraintKindsMsg = ptext (sLit "Use ConstraintKinds to permit this")
 
@@ -1192,16 +1225,12 @@ checkFamInstRhs lhsTys famInsts
    size = sizeTypes lhsTys
    fvs  = fvTypes lhsTys
    check (tc, tys)
-      | not (all isTyFamFree tys)
-      = Just (famInstUndecErr famInst nestedMsg $$ parens undecidableMsg)
-      | not (null bad_tvs)
-      = Just (famInstUndecErr famInst (nomoreMsg bad_tvs) $$ parens undecidableMsg)
-      | size <= sizeTypes tys
-      = Just (famInstUndecErr famInst smallerAppMsg $$ parens undecidableMsg)
-      | otherwise
-      = Nothing
+      | not (all isTyFamFree tys) = Just (nestedMsg what)
+      | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what)
+      | size <= sizeTypes tys     = Just (smallerMsg what)
+      | otherwise                 = Nothing
       where
-        famInst = TyConApp tc tys
+        what    = ptext (sLit "type family application") <+> quotes (pprType (TyConApp tc tys))
         bad_tvs = filterOut isKindVar (fvTypes tys \\ fvs)
              -- Rightly or wrongly, we only check for
              -- excessive occurrences of *type* variables.
@@ -1247,11 +1276,10 @@ tyFamInstIllegalErr ty
          colon) 2 $
       ppr ty
 
-famInstUndecErr :: Type -> SDoc -> SDoc
-famInstUndecErr ty msg
-  = sep [msg,
-         nest 2 (ptext (sLit "in the type family application:") <+>
-                 pprType ty)]
+nestedMsg :: SDoc -> SDoc
+nestedMsg what
+  = sep [ ptext (sLit "Illegal nested") <+> what
+        , parens undecidableMsg ]
 
 famPatErr :: TyCon -> [TyVar] -> [Type] -> SDoc
 famPatErr fam_tc tvs pats
@@ -1259,10 +1287,6 @@ famPatErr fam_tc tvs pats
           <+> pprQuotedList tvs)
        2 (hang (ptext (sLit "but the real LHS (expanding synonyms) is:"))
              2 (pprTypeApp fam_tc (map expandTypeSynonyms pats) <+> ptext (sLit "= ...")))
-
-nestedMsg, smallerAppMsg :: SDoc
-nestedMsg     = ptext (sLit "Nested type family application")
-smallerAppMsg = ptext (sLit "Application is no smaller than the instance head")
 
 {-
 ************************************************************************
@@ -1331,14 +1355,14 @@ sizeTypes xs = sum (map sizeType tys)
 -- "local instances" in expressions).
 -- See Trac #4200.
 sizePred :: PredType -> TypeSize
-sizePred p = go (classifyPredType p)
-  where
-    go (ClassPred cls tys')
-      | isIPClass cls     = 0  -- See Note [Size of a predicate]
-      | otherwise         = sizeTypes tys'
-    go (EqPred {})        = 0  -- See Note [Size of a predicate]
-    go (TuplePred ts)     = sum (map sizePred ts)
-    go (IrredPred ty)     = sizeType ty
+sizePred p
+  = case classifyPredType p of
+      ClassPred cls tys
+        | isIPClass cls     -> 0  -- See Note [Size of a predicate]
+        | isCTupleClass cls -> maximum (0 : map sizePred tys)
+        | otherwise         -> sizeTypes tys
+      EqPred {}             -> 0  -- See Note [Size of a predicate]
+      IrredPred ty          -> sizeType ty
 
 {-
 ************************************************************************

@@ -56,7 +56,7 @@ import BasicTypes
 import Outputable
 import FastString
 import Type(mkStrLitTy)
-import PrelNames(ipClassName)
+import PrelNames( ipClassName, gHC_PRIM )
 import TcValidity (checkValidType)
 
 import Control.Monad
@@ -1710,13 +1710,13 @@ checkStrictBinds :: TopLevelFlag -> RecFlag
 --      c) not a multiple-binding group (more or less implied by (a))
 
 checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
-  | unlifted_bndrs || any_strict_pat   -- This binding group must be matched strictly
-  = do  { checkTc (isNotTopLevel top_lvl)
-                  (strictBindErr "Top-level" unlifted_bndrs orig_binds)
-        ; checkTc (isNonRec rec_group)
-                  (strictBindErr "Recursive" unlifted_bndrs orig_binds)
+  | any_unlifted_bndr || any_strict_pat   -- This binding group must be matched strictly
+  = do  { check (isNotTopLevel top_lvl)
+                (strictBindErr "Top-level" any_unlifted_bndr orig_binds)
+        ; check (isNonRec rec_group)
+                (strictBindErr "Recursive" any_unlifted_bndr orig_binds)
 
-        ; checkTc (all is_monomorphic (bagToList tc_binds))
+        ; check (all is_monomorphic (bagToList tc_binds))
                   (polyBindErr orig_binds)
             -- data Ptr a = Ptr Addr#
             -- f x = let p@(Ptr y) = ... in ...
@@ -1724,8 +1724,8 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
             -- not mix with an unlifted binding for 'y'.  You should
             -- use a bang pattern.  Trac #6078.
 
-        ; checkTc (isSingleton orig_binds)
-                  (strictBindErr "Multiple" unlifted_bndrs orig_binds)
+        ; check (isSingleton orig_binds)
+                (strictBindErr "Multiple" any_unlifted_bndr orig_binds)
 
         -- Complain about a binding that looks lazy
         --    e.g.    let I# y = x in ...
@@ -1733,13 +1733,13 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
         -- matching, so (for software engineering reasons) we insist
         -- that the strictness is manifest on each binding
         -- However, lone (unboxed) variables are ok
-        ; checkTc (not any_pat_looks_lazy)
+        ; check (not any_pat_looks_lazy)
                   (unliftedMustBeBang orig_binds) }
   | otherwise
   = traceTc "csb2" (ppr [(id, idType id) | id <- poly_ids]) >>
     return ()
   where
-    unlifted_bndrs     = any is_unlifted poly_ids
+    any_unlifted_bndr  = any is_unlifted poly_ids
     any_strict_pat     = any (isStrictHsBind   . unLoc) orig_binds
     any_pat_looks_lazy = any (looksLazyPatBind . unLoc) orig_binds
 
@@ -1754,6 +1754,13 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
                      = null tvs && null evs
     is_monomorphic _ = True
 
+    check :: Bool -> MsgDoc -> TcM ()
+    -- Just like checkTc, but with a special case for module GHC.Prim:
+    --      see Note [Compiling GHC.Prim]
+    check True  _   = return ()
+    check False err = do { mod <- getModule
+                         ; checkTc (mod == gHC_PRIM) err }
+
 unliftedMustBeBang :: [LHsBind Name] -> SDoc
 unliftedMustBeBang binds
   = hang (text "Pattern bindings containing unlifted types should use an outermost bang pattern:")
@@ -1766,12 +1773,29 @@ polyBindErr binds
                 ptext (sLit "Probable fix: use a bang pattern")])
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc
-strictBindErr flavour unlifted_bndrs binds
+strictBindErr flavour any_unlifted_bndr binds
   = hang (text flavour <+> msg <+> ptext (sLit "aren't allowed:"))
        2 (vcat (map ppr binds))
   where
-    msg | unlifted_bndrs = ptext (sLit "bindings for unlifted types")
-        | otherwise      = ptext (sLit "bang-pattern or unboxed-tuple bindings")
+    msg | any_unlifted_bndr = ptext (sLit "bindings for unlifted types")
+        | otherwise         = ptext (sLit "bang-pattern or unboxed-tuple bindings")
+
+
+{- Note [Compiling GHC.Prim]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Module GHC.Prim has no source code: it is the host module for
+primitive, built-in functions and types.  However, for Haddock-ing
+purposes we generate (via utils/genprimopcode) a fake source file
+GHC/Prim.hs, and give it to Haddock, so that it can generate
+documentation.  It contains definitions like
+    nullAddr# :: NullAddr#
+which would normally be rejected as a top-level unlifted binding. But
+we don't want to complain, because we are only "compiling" this fake
+mdule for documentation purposes.  Hence this hacky test for gHC_PRIM
+in checkStrictBinds.
+
+(We only make the test if things look wrong, so there is no cost in
+the common case.) -}
 
 
 {- *********************************************************************

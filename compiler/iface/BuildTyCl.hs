@@ -21,6 +21,7 @@ module BuildTyCl (
 
 import IfaceEnv
 import FamInstEnv( FamInstEnvs )
+import TysWiredIn( isCTupleTyConName )
 import DataCon
 import PatSyn
 import Var
@@ -282,6 +283,9 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
 
         ; rhs <- if use_newtype
                  then mkNewTyConRhs tycon_name rec_tycon dict_con
+                 else if isCTupleTyConName tycon_name
+                 then return (TupleTyCon { data_con = dict_con
+                                         , tup_sort = ConstraintTuple })
                  else return (mkDataTyConRhs [dict_con])
 
         ; let { clas_kind = mkPiKinds tvs constraintKind

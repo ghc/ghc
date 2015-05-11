@@ -1015,7 +1015,6 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
     super_classes ev_pair
       = case classifyPredType pred of
           ClassPred cls tys -> (pred, ev_tm) : super_classes_help ev_tm cls tys
-          TuplePred preds   -> concatMap super_classes (mkEvTupleSelectors ev_tm preds)
           _                 -> []
       where
         (pred, ev_tm) = normalise_pr ev_pair
@@ -1023,7 +1022,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
     ------------
     super_classes_help :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
     super_classes_help ev_tm cls tys  -- ev_tm :: cls tys
-      | sizeTypes tys >= head_size  -- Here is where we test for
+      | not (isCTupleClass cls)
+      , sizeTypes tys >= head_size  -- Here is where we test for
       = []                          -- a smaller dictionary
       | otherwise
       = concatMap super_classes (mkEvScSelectors ev_tm cls tys)

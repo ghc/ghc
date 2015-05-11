@@ -121,7 +121,6 @@ import Module
 import OccName
 import RdrName
 import Unique
-import BasicTypes
 import Name
 import SrcLoc
 import FastString
@@ -516,19 +515,6 @@ mkMainModule m = mkModule mainPackageKey (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
 mkMainModule_ m = mkModule mainPackageKey m
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Constructing the names of tuples
-*                                                                      *
-************************************************************************
--}
-
-mkTupleModule :: TupleSort -> Module
-mkTupleModule BoxedTuple      = gHC_TUPLE
-mkTupleModule ConstraintTuple = gHC_TUPLE
-mkTupleModule UnboxedTuple    = gHC_PRIM
 
 {-
 ************************************************************************
@@ -1571,9 +1557,6 @@ typeRepTyConKey = mkPreludeTyConUnique 183
 -----------------------------------------------------
 
 #include "primop-vector-uniques.hs-incl"
-
-unitTyConKey :: Unique
-unitTyConKey = mkTupleTyConUnique BoxedTuple 0
 
 {-
 ************************************************************************

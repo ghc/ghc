@@ -192,7 +192,7 @@ initBuiltinVars (Builtins { })
     preludeDataCons
       = [mk_tup n (mkFastString $ "tup" ++ show n) | n <- [2..5]]
       where
-        mk_tup n name = (tupleCon BoxedTuple n, name)
+        mk_tup n name = (tupleDataCon Boxed n, name)
 
 
 -- Auxilliary look up functions -----------------------------------------------

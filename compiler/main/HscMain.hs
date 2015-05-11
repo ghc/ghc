@@ -90,9 +90,7 @@ import BasicTypes       ( HValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
-import Type             ( Type )
-import PrelNames
-import {- Kind parts of -} Type         ( Kind )
+import Type             ( Type, Kind )
 import CoreLint         ( lintInteractiveExpr )
 import VarEnv           ( emptyTidyEnv )
 import Panic
@@ -101,7 +99,6 @@ import ConLike
 import GHC.Exts
 #endif
 
-import DsMeta           ( templateHaskellNames )
 import Module
 import Packages
 import RdrName
@@ -191,12 +188,6 @@ newHscEnv dflags = do
                      hsc_FC           = fc_var,
                      hsc_type_env_var = Nothing }
 
-
-knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
-knownKeyNames =              -- where templateHaskellNames are defined
-    map getName wiredInThings
-        ++ basicKnownKeyNames
-        ++ templateHaskellNames
 
 -- -----------------------------------------------------------------------------
 
