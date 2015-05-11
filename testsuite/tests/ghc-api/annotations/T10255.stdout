@@ -29,6 +29,8 @@
 
 (AK Test10255.hs:6:11-26 AnnOpenP = [Test10255.hs:6:11])
 
+(AK Test10255.hs:6:12-18 AnnRarrow = [Test10255.hs:6:20-21])
+
 (AK Test10255.hs:6:12-25 AnnRarrow = [Test10255.hs:6:20-21])
 
 (AK <no location info> AnnEofPos = [Test10255.hs:8:1])

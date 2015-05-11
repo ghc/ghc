@@ -1,0 +1,38 @@
+---Problems---------------------
+[
+(AK Test10309.hs:(5,20)-(6,34) AnnRarrow = [Test10309.hs:6:22-23])
+]
+
+--------------------------------
+[
+(AK Test10309.hs:1:1 AnnModule = [Test10309.hs:2:1-6])
+
+(AK Test10309.hs:1:1 AnnWhere = [Test10309.hs:2:18-22])
+
+(AK Test10309.hs:(4,1)-(6,34) AnnData = [Test10309.hs:4:1-4])
+
+(AK Test10309.hs:(4,1)-(6,34) AnnSemi = [Test10309.hs:7:1])
+
+(AK Test10309.hs:(4,1)-(6,34) AnnWhere = [Test10309.hs:4:13-17])
+
+(AK Test10309.hs:(5,3)-(6,34) AnnDcolon = [Test10309.hs:5:6-7])
+
+(AK Test10309.hs:5:9-15 AnnCloseP = [Test10309.hs:5:15])
+
+(AK Test10309.hs:5:9-15 AnnDarrow = [Test10309.hs:5:17-18])
+
+(AK Test10309.hs:5:9-15 AnnOpenP = [Test10309.hs:5:9])
+
+(AK Test10309.hs:(5,20)-(6,20) AnnCloseC = [Test10309.hs:6:20])
+
+(AK Test10309.hs:(5,20)-(6,20) AnnOpenC = [Test10309.hs:5:20])
+
+(AK Test10309.hs:(5,20)-(6,20) AnnRarrow = [Test10309.hs:6:22-23])
+
+(AK Test10309.hs:(5,20)-(6,34) AnnRarrow = [Test10309.hs:6:22-23])
+
+(AK Test10309.hs:5:22-31 AnnDcolon = [Test10309.hs:5:28-29])
+
+(AK <no location info> AnnEofPos = [Test10309.hs:7:1])
+]
+
