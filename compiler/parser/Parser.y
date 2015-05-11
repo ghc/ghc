@@ -830,8 +830,9 @@ inst_decl :: { LInstDecl RdrName }
 
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
-                {% amms (mkTyFamInst (comb2 $1 $3) $3)
-                    [mj AnnType $1,mj AnnInstance $2] }
+                {% ams $3 (fst $ unLoc $3)
+                >> amms (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3))
+                    (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)) }
 
           -- data/newtype instance declaration
         | data_or_newtype 'instance' capi_ctype tycl_hdr constrs deriving
@@ -881,18 +882,20 @@ ty_fam_inst_eqn_list :: { Located ([AddAnn],[LTyFamInstEqn RdrName]) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn RdrName] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
-                                      {% asl (unLoc $1) $2 $3
-                                         >> return (sLL $1 $> ($3 : unLoc $1)) }
+                                      {% asl (unLoc $1) $2 (snd $ unLoc $3)
+                                         >> ams $3 (fst $ unLoc $3)
+                                         >> return (sLL $1 $> ((snd $ unLoc $3) : unLoc $1)) }
         | ty_fam_inst_eqns ';'        {% addAnnotation (gl $1) AnnSemi (gl $2)
                                          >> return (sLL $1 $>  (unLoc $1)) }
-        | ty_fam_inst_eqn             { sLL $1 $> [$1] }
+        | ty_fam_inst_eqn             {% ams $1 (fst $ unLoc $1)
+                                         >> return (sLL $1 $> [snd $ unLoc $1]) }
 
-ty_fam_inst_eqn :: { LTyFamInstEqn RdrName }
+ty_fam_inst_eqn :: { Located ([AddAnn],LTyFamInstEqn RdrName) }
         : type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
               {% do { (eqn,ann) <- mkTyFamInstEqn $1 $3
-                    ; ams (sLL $1 $> eqn) (mj AnnEqual $2:ann) } }
+                    ; return (sLL $1 $> (mj AnnEqual $2:ann, sLL $1 $> eqn))  } }
 
 -- Associated type family declarations
 --
@@ -923,11 +926,13 @@ at_decl_cls :: { LHsDecl RdrName }
 
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
-                {% amms (liftM mkInstD (mkTyFamInst (comb2 $1 $2) $2))
-                        [mj AnnType $1] }
+                {% ams $2 (fst $ unLoc $2) >>
+                   amms (liftM mkInstD (mkTyFamInst (comb2 $1 $2) (snd $ unLoc $2)))
+                        (mj AnnType $1:(fst $ unLoc $2)) }
         | 'type' 'instance' ty_fam_inst_eqn
-                {% amms (liftM mkInstD (mkTyFamInst (comb2 $1 $3) $3))
-                        [mj AnnType $1,mj AnnInstance $2] }
+                {% ams $3 (fst $ unLoc $3) >>
+                   amms (liftM mkInstD (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3)))
+                        (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)) }
 
 opt_family   :: { [AddAnn] }
               : {- empty -}   { [] }
@@ -940,8 +945,9 @@ at_decl_inst :: { LInstDecl RdrName }
         : 'type' ty_fam_inst_eqn
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% amms (mkTyFamInst (comb2 $1 $2) $2)
-                        [mj AnnType $1] }
+                {% ams $2 (fst $ unLoc $2) >>
+                   amms (mkTyFamInst (comb2 $1 $2) (snd $ unLoc $2))
+                        (mj AnnType $1:(fst $ unLoc $2)) }
 
         -- data/newtype instance declaration
         | data_or_newtype capi_ctype tycl_hdr constrs deriving
