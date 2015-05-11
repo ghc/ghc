@@ -1,0 +1,30 @@
+
+Test10357.hs:4:13: error: Not in scope: ‘one’
+
+Test10357.hs:4:19: error: Not in scope: ‘x’
+
+Test10357.hs:5:7: error: Not in scope: ‘multPoly’
+
+Test10357.hs:6:10: error: Not in scope: ‘poly’
+
+Test10357.hs:6:15: error:
+    Not in scope: data constructor ‘LE’
+    Perhaps you meant ‘LT’ (imported from Prelude)
+
+Test10357.hs:7:10: error: Not in scope: ‘addPoly’
+
+Test10357.hs:7:19: error: Not in scope: ‘poly’
+
+Test10357.hs:7:24: error:
+    Not in scope: data constructor ‘LE’
+    Perhaps you meant ‘LT’ (imported from Prelude)
+
+Test10357.hs:7:43: error: Not in scope: ‘multPoly’
+
+Test10357.hs:8:19: error: Not in scope: ‘poly’
+
+Test10357.hs:8:24: error:
+    Not in scope: data constructor ‘LE’
+    Perhaps you meant ‘LT’ (imported from Prelude)
+
+Test10357.hs:8:43: error: Not in scope: ‘multPoly’
