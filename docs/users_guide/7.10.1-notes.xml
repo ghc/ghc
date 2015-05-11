@@ -24,7 +24,7 @@
                 is a breaking change and your programs will need to be
                 updated.
                 Please see the <ulink
-                href="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
+                url="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
                 7.10 Migration Guide</ulink> on the GHC wiki.
            </para>
        </listitem>
@@ -38,7 +38,7 @@
                 custom, less-generic versions. This is a change that
                 may require updates to your program.
                 Please see the <ulink
-                href="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
+                url="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
                 7.10 Migration Guide</ulink> on the GHC wiki.
            </para>
        </listitem>
@@ -878,7 +878,7 @@ echo "[]" > package.conf
             <para>
                 For issues dealing with language changes, please see
                 the <ulink
-                href="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
+                url="https://ghc.haskell.org/trac/ghc/wiki/Migration/7.10">GHC
                 7.10 Migration Guide</ulink> on the GHC wiki.
            </para>
        </listitem>
@@ -888,21 +888,21 @@ echo "[]" > package.conf
                 Collector currently suffers from a large performance
                 penalty due to a lack of system-specific optimization
                 (<ulink
-		href="https://ghc.haskell.org/trac/ghc/ticket/7602">issue #7602</ulink>).
+		url="https://ghc.haskell.org/trac/ghc/ticket/7602">issue #7602</ulink>).
            </para>
        </listitem>
         <listitem>
             <para>
                 GHC's LLVM backend is currently incompatible with LLVM
                 3.4 (<ulink
-		href="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>).
+		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>).
            </para>
        </listitem>
         <listitem>
             <para>
                 GHCi fails to appropriately load
                 <literal>.dyn_o</literal> files (<ulink
-		href="https://ghc.haskell.org/trac/ghc/ticket/8736">issue #8736</ulink>).
+		url="https://ghc.haskell.org/trac/ghc/ticket/8736">issue #8736</ulink>).
            </para>
 	</listitem>
 	<listitem>
@@ -912,13 +912,13 @@ echo "[]" > package.conf
 	  means that GHC might hang, but it should do so only when the program
 	  is ill-typed (due to non-terminating type-level features). The bugs
 	  are reported as <ulink
-	  href="https://ghc.haskell.org/trac/ghc/ticket/7788">#7788</ulink>
+	  url="https://ghc.haskell.org/trac/ghc/ticket/7788">#7788</ulink>
 	  and <ulink
-	  href="https://ghc.haskell.org/trac/ghc/ticket/10139">#10139</ulink>.
+	  url="https://ghc.haskell.org/trac/ghc/ticket/10139">#10139</ulink>.
 	  There also remain certain obscure scenarios where the solver for
 	  <literal>Coercible</literal> instances is known to be still
 	  incomplete. See comments in <ulink
-	  href="https://ghc.haskell.org/trac/ghc/ticket/10079">#10079</ulink>.
+	  url="https://ghc.haskell.org/trac/ghc/ticket/10079">#10079</ulink>.
 	  </para>
 	</listitem>
    </itemizedlist>
