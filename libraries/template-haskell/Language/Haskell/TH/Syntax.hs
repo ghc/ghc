@@ -1,5 +1,12 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
-             RoleAnnotations, DeriveGeneric, FlexibleInstances #-}
+             DeriveGeneric, FlexibleInstances #-}
+
+#if __GLASGOW_HASKELL__ >= 707
+{-# LANGUAGE RoleAnnotations #-}
+{-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
+#else
+{-# OPTIONS_GHC -w #-} -- -fno-warn-inline-rule-shadowing doesn't exist
+#endif
 
 #if MIN_VERSION_base(4,8,0)
 #define HAS_NATURAL
@@ -170,7 +177,9 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
+#if __GLASGOW_HASKELL__ >= 707
 type role TExp nominal   -- See Note [Role of TExp]
+#endif
 newtype TExp a = TExp { unType :: Exp }
 
 unTypeQ :: Q (TExp a) -> Q Exp
