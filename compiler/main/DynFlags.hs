@@ -52,6 +52,7 @@ module DynFlags (
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
         SigOf, getSigOf,
+        checkOptLevel,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -2563,11 +2564,11 @@ dynamic_flags = [
   , defGhcFlag "fplugin"     (hasArg addPluginModuleName)
 
         ------ Optimisation flags ------------------------------------------
-  , defGhcFlag "O"      (noArgM (setOptLevel 1))
+  , defGhcFlag "O"      (noArgM (updOptLevel 1))
   , defGhcFlag "Onot"   (noArgM (\dflags -> do deprecate "Use -O0 instead"
-                                               setOptLevel 0 dflags))
+                                               updOptLevel 0 dflags))
   , defGhcFlag "Odph"   (noArgM setDPHOpt)
-  , defGhcFlag "O"      (optIntSuffixM (\mb_n -> setOptLevel (mb_n `orElse` 1)))
+  , defGhcFlag "O"      (optIntSuffixM (\mb_n -> updOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
 
 
@@ -3862,14 +3863,12 @@ setObjTarget l = updM set
        = return $ dflags { hscTarget = l }
      | otherwise = return dflags
 
-setOptLevel :: Int -> DynFlags -> DynP DynFlags
-setOptLevel n dflags
+checkOptLevel :: Int -> DynFlags -> Either String DynFlags
+checkOptLevel n dflags
    | hscTarget dflags == HscInterpreted && n > 0
-        = do addWarn "-O conflicts with --interactive; -O ignored."
-             return dflags
+     = Left "-O conflicts with --interactive; -O ignored."
    | otherwise
-        = return (updOptLevel n dflags)
-
+     = Right dflags
 
 -- -Odph is equivalent to
 --
@@ -3878,7 +3877,7 @@ setOptLevel n dflags
 --    -fsimplifier-phases=3             we use an additional simplifier phase for fusion
 --
 setDPHOpt :: DynFlags -> DynP DynFlags
-setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
+setDPHOpt dflags = updOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , simplPhases         = 3
                                          })
 
