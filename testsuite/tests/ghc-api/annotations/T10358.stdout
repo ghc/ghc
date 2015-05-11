@@ -1,0 +1,58 @@
+---Problems---------------------
+[
+(AK <no location info> AnnEofPos = [Test10358.hs:9:1])
+]
+
+---Problems'--------------------
+[(AnnEofPos, Test10358.hs:9:1)]
+--------------------------------
+[
+(AK Test10358.hs:1:1 AnnModule = [Test10358.hs:2:1-6])
+
+(AK Test10358.hs:1:1 AnnWhere = [Test10358.hs:2:18-22])
+
+(AK Test10358.hs:(4,1)-(8,6) AnnEqual = [Test10358.hs:4:13])
+
+(AK Test10358.hs:(4,1)-(8,6) AnnFunId = [Test10358.hs:4:1-7])
+
+(AK Test10358.hs:(4,1)-(8,6) AnnSemi = [Test10358.hs:9:1])
+
+(AK Test10358.hs:(5,3)-(8,6) AnnIn = [Test10358.hs:8:3-4])
+
+(AK Test10358.hs:(5,3)-(8,6) AnnLet = [Test10358.hs:5:3-5])
+
+(AK Test10358.hs:5:7-10 AnnBang = [Test10358.hs:5:7])
+
+(AK Test10358.hs:5:7-16 AnnEqual = [Test10358.hs:5:12])
+
+(AK Test10358.hs:5:7-16 AnnSemi = [Test10358.hs:5:17])
+
+(AK Test10358.hs:5:14-16 AnnVal = [Test10358.hs:5:15])
+
+(AK Test10358.hs:5:19-22 AnnBang = [Test10358.hs:5:19])
+
+(AK Test10358.hs:5:19-32 AnnEqual = [Test10358.hs:5:24])
+
+(AK Test10358.hs:5:19-32 AnnSemi = [Test10358.hs:6:7])
+
+(AK Test10358.hs:5:26-32 AnnVal = [Test10358.hs:5:29])
+
+(AK Test10358.hs:6:7-16 AnnEqual = [Test10358.hs:6:10])
+
+(AK Test10358.hs:6:7-16 AnnFunId = [Test10358.hs:6:7-8])
+
+(AK Test10358.hs:6:7-16 AnnSemi = [Test10358.hs:7:7])
+
+(AK Test10358.hs:6:12-14 AnnVal = [Test10358.hs:6:13])
+
+(AK Test10358.hs:6:12-16 AnnVal = [Test10358.hs:6:15])
+
+(AK Test10358.hs:7:7-17 AnnEqual = [Test10358.hs:7:10])
+
+(AK Test10358.hs:7:7-17 AnnFunId = [Test10358.hs:7:7-8])
+
+(AK Test10358.hs:7:12-17 AnnVal = [Test10358.hs:7:14])
+
+(AK <no location info> AnnEofPos = [Test10358.hs:9:1])
+]
+

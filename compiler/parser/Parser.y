@@ -1986,10 +1986,10 @@ docdecld :: { LDocDecl }
 decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% do { let { e = sLL $1 $> (SectionR (sL1 $1 (HsVar bang_RDR)) $2) };
+        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar bang_RDR)) $2) };
                                         pat <- checkPattern empty e;
                                         _ <- ams (sLL $1 $> ())
-                                               (mj AnnBang $1:(fst $ unLoc $3));
+                                               (fst $ unLoc $3);
                                         return $ sLL $1 $> $ unitOL $ sLL $1 $> $ ValD $
                                             PatBind pat (snd $ unLoc $3)
                                                     placeHolderType

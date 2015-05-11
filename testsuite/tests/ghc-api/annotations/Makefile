@@ -37,6 +37,13 @@ listcomps:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc listcomps
 	./listcomps "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
+t10358:
+	rm -f t10358.o t10358.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t10358
+	./t10358 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
+.PHONY: t10358
+
 t10255:
 	rm -f t10255.o t10255.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t10255
