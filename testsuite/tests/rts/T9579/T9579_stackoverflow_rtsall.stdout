@@ -1,0 +1,3 @@
+T9579_stackoverflow_rtsall: Stack space overflow: current size NUM bytes.
+T9579_stackoverflow_rtsall: Use `+RTS -Ksize -RTS' to increase it.
+2

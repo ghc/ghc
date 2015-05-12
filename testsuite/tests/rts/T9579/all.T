@@ -1,64 +1,31 @@
-test('T9579_stackoverflow_rtsnone',
-     [exit_code(2),
-      extra_clean([ 'tmp_T9579_stackoverflow_rtsnone/Main.hi',
-                    'tmp_T9579_stackoverflow_rtsnone/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_stackoverflow_rtsnone \
-       && ./T9579_stackoverflow_rtsnone'])
+# some numbers like "(1 MB)" would still remain.
+# but let's just assume the actual difference in bytes
+# is too small to have an effect on the rounded megabyte value.
 
-test('T9579_stackoverflow_rtssome',
-     [exit_code(2),
-      extra_clean([ 'tmp_T9579_stackoverflow_rtssome/Main.hi',
-                    'tmp_T9579_stackoverflow_rtssome/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_stackoverflow_rtssome \
-       && ./T9579_stackoverflow_rtssome'])
+def T9579_run_test(binName, expExitCode):
+    fmt = lambda s: s.format(binName=binName)
+    # 1. compile the binary using MAKE
+    # 2. redirect stderr to stdout
+    # 3. capture exitcode using echo
+    # 4. replace actual number with NUM
+    testCommandTemplate = """
+          $MAKE -s --no-print-directory T9579_{binName} \
+        && ( ( ./T9579_{binName} 2>&1; echo $?) \
+           | sed -e 's/[0-9]\+ bytes/NUM bytes/g' ) \
+    """
 
-test('T9579_stackoverflow_rtsall',
-     [exit_code(2),
-      extra_clean([ 'tmp_T9579_stackoverflow_rtsall/Main.hi',
-                    'tmp_T9579_stackoverflow_rtsall/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_stackoverflow_rtsall \
-       && ./T9579_stackoverflow_rtsall'])
+    test(fmt('T9579_{binName}'),
+         [extra_clean([ fmt('tmp_T9579_{binName}/Main.hi'),
+                        fmt('tmp_T9579_{binName}/Main.o') ])],
+          run_command,
+          [fmt(testCommandTemplate)])
 
-test('T9579_stackoverflow_rtsall_no_suggestions',
-     [exit_code(2),
-      extra_clean([ 'tmp_T9579_stackoverflow_rtsall_no_suggestions/Main.hi',
-                    'tmp_T9579_stackoverflow_rtsall_no_suggestions/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_stackoverflow_rtsall_no_suggestions \
-       && ./T9579_stackoverflow_rtsall_no_suggestions'])
+T9579_run_test('stackoverflow_rtsnone',2)
+T9579_run_test('stackoverflow_rtssome',2)
+T9579_run_test('stackoverflow_rtsall',2)
+T9579_run_test('stackoverflow_rtsall_no_suggestions',2)
 
-test('T9579_outofheap_rtsnone',
-     [exit_code(251),
-      extra_clean([ 'tmp_T9579_outofheap_rtsnone/Main.hi',
-                    'tmp_T9579_outofheap_rtsnone/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_outofheap_rtsnone \
-      && ./T9579_outofheap_rtsnone'])
-
-test('T9579_outofheap_rtssome',
-     [exit_code(251),
-      extra_clean([ 'tmp_T9579_outofheap_rtssome/Main.hi',
-                    'tmp_T9579_outofheap_rtssome/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_outofheap_rtssome \
-       && ./T9579_outofheap_rtssome'])
-
-test('T9579_outofheap_rtsall',
-     [exit_code(251),
-      extra_clean([ 'tmp_T9579_outofheap_rtsall/Main.hi',
-                    'tmp_T9579_outofheap_rtsall/Main.o' ])],
-
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_outofheap_rtsall \
-       && ./T9579_outofheap_rtsall'])
-
-test('T9579_outofheap_rtsall_no_suggestions',
-     [exit_code(251),
-      extra_clean([ 'tmp_T9579_outofheap_rtsall_no_suggestions/Main.hi',
-                    'tmp_T9579_outofheap_rtsall_no_suggestions/Main.o' ])],
-       run_command,
-     ['$MAKE -s --no-print-directory T9579_outofheap_rtsall_no_suggestions \
-       && ./T9579_outofheap_rtsall_no_suggestions'])
+T9579_run_test('outofheap_rtsnone',251)
+T9579_run_test('outofheap_rtssome',251)
+T9579_run_test('outofheap_rtsall',251)
+T9579_run_test('outofheap_rtsall_no_suggestions',251)
