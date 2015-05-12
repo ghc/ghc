@@ -1,2 +1,2 @@
 data Foo = Foo 	-- Defined at ghci019.hs:8:1
-instance Eq Foo -- Defined at ghci019.hs:9:10
+instance [safe] Eq Foo -- Defined at ghci019.hs:9:10

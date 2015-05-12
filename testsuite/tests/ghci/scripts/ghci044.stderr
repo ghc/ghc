@@ -1,8 +1,8 @@
 
-<interactive>:10:1:
+<interactive>:10:1: error:
     Overlapping instances for C [Int] arising from a use of ‘f’
     Matching instances:
-      instance C [Int] -- Defined at <interactive>:7:10
-      instance C a => C [a] -- Defined at <interactive>:9:10
+      instance [safe] C [Int] -- Defined at <interactive>:7:10
+      instance [safe] C a => C [a] -- Defined at <interactive>:9:10
     In the expression: f [4 :: Int]
     In an equation for ‘it’: it = f [4 :: Int]
