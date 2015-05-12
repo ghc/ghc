@@ -463,7 +463,7 @@ runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
   dflags <- getDynFlags
   let
-   read_dot_files = not (gopt Opt_IgnoreDotGhci dflags)
+   ignore_dot_ghci = gopt Opt_IgnoreDotGhci dflags
 
    current_dir = return (Just ".ghci")
 
@@ -481,45 +481,35 @@ runGHCi paths maybe_exprs = do
    canonicalizePath' fp = liftM Just (canonicalizePath fp)
                 `catchIO` \_ -> return Nothing
 
-   sourceConfigFile :: (FilePath, Bool) -> GHCi ()
-   sourceConfigFile (file, check_perms) = do
+   sourceConfigFile :: FilePath -> GHCi ()
+   sourceConfigFile file = do
      exists <- liftIO $ doesFileExist file
      when exists $ do
-       perms_ok <-
-         if not check_perms
-            then return True
-            else do
-              dir_ok  <- liftIO $ checkPerms (getDirectory file)
-              file_ok <- liftIO $ checkPerms file
-              return (dir_ok && file_ok)
-       when perms_ok $ do
-         either_hdl <- liftIO $ tryIO (openFile file ReadMode)
-         case either_hdl of
-           Left _e   -> return ()
-           -- NOTE: this assumes that runInputT won't affect the terminal;
-           -- can we assume this will always be the case?
-           -- This would be a good place for runFileInputT.
-           Right hdl ->
-               do runInputTWithPrefs defaultPrefs defaultSettings $
-                            runCommands $ fileLoop hdl
-                  liftIO (hClose hdl `catchIO` \_ -> return ())
-     where
-      getDirectory f = case takeDirectory f of "" -> "."; d -> d
+       either_hdl <- liftIO $ tryIO (openFile file ReadMode)
+       case either_hdl of
+         Left _e   -> return ()
+         -- NOTE: this assumes that runInputT won't affect the terminal;
+         -- can we assume this will always be the case?
+         -- This would be a good place for runFileInputT.
+         Right hdl ->
+             do runInputTWithPrefs defaultPrefs defaultSettings $
+                          runCommands $ fileLoop hdl
+                liftIO (hClose hdl `catchIO` \_ -> return ())
+
   --
 
   setGHCContextFromGHCiState
 
-  when (read_dot_files) $ do
-    mcfgs0 <- catMaybes <$> sequence [ current_dir, app_user_dir, home_dir ]
-    let mcfgs1 = zip mcfgs0 (repeat True)
-              ++ zip (ghciScripts dflags) (repeat False)
-         -- False says "don't check permissions".  We don't
-         -- require that a script explicitly added by
-         -- -ghci-script is owned by the current user. (#6017)
-    mcfgs <- liftIO $ mapM (\(f, b) -> (,b) <$> canonicalizePath' f) mcfgs1
-    mapM_ sourceConfigFile $ nub $ [ (f,b) | (Just f, b) <- mcfgs ]
-        -- nub, because we don't want to read .ghci twice if the
-        -- CWD is $HOME.
+  dot_cfgs <- if ignore_dot_ghci then return [] else do
+    dot_files <- catMaybes <$> sequence [ current_dir, app_user_dir, home_dir ]
+    liftIO $ filterM checkDirAndFilePerms dot_files
+  let arg_cfgs = reverse $ ghciScripts dflags
+    -- -ghci-script are collected in reverse order
+  mcfgs <- liftIO $ mapM canonicalizePath' $ dot_cfgs ++ arg_cfgs
+    -- We don't require that a script explicitly added by -ghci-script
+    -- is owned by the current user. (#6017)
+  mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
+    -- nub, because we don't want to read .ghci twice if the CWD is $HOME.
 
   -- Perform a :load for files given on the GHCi command line
   -- When in -e mode, if the load fails then we want to stop
@@ -540,7 +530,7 @@ runGHCi paths maybe_exprs = do
   let show_prompt = verbosity dflags > 0 || is_tty
 
   -- reset line number
-  getGHCiState >>= \st -> setGHCiState st{line_number=1}
+  modifyGHCiState $ \st -> st{line_number=1}
 
   case maybe_exprs of
         Nothing ->
@@ -599,13 +589,23 @@ nextInputLine show_prompt is_tty
 -- don't need to check .. and ../.. etc. because "."  always refers to
 -- the same directory while a process is running.
 
-checkPerms :: String -> IO Bool
+checkDirAndFilePerms :: FilePath -> IO Bool
+checkDirAndFilePerms file = do
+  dir_ok <- checkPerms $ getDirectory file
+  file_ok <- checkPerms file
+  return (dir_ok && file_ok)
+  where
+  getDirectory f = case takeDirectory f of
+    "" -> "."
+    d -> d
+
+checkPerms :: FilePath -> IO Bool
 #ifdef mingw32_HOST_OS
 checkPerms _ = return True
 #else
-checkPerms name =
+checkPerms file =
   handleIO (\_ -> return False) $ do
-    st <- getFileStatus name
+    st <- getFileStatus file
     me <- getRealUserID
     let mode = System.Posix.fileMode st
         ok = (fileOwner st == me || fileOwner st == 0) &&
@@ -613,9 +613,9 @@ checkPerms name =
              otherWriteMode /= mode `intersectFileModes` otherWriteMode
     unless ok $
       -- #8248: Improving warning to include a possible fix.
-      putStrLn $ "*** WARNING: " ++ name ++
+      putStrLn $ "*** WARNING: " ++ file ++
                  " is writable by someone else, IGNORING!" ++
-                 "\nSuggested fix: execute 'chmod 644 " ++ name ++ "'"
+                 "\nSuggested fix: execute 'chmod 644 " ++ file ++ "'"
     return ok
 #endif
 

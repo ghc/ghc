@@ -840,6 +840,8 @@ data DynFlags = DynFlags {
   flushErr              :: FlushErr,
 
   haddockOptions        :: Maybe String,
+
+  -- | GHCi scripts specified by -ghci-script, in reverse order
   ghciScripts           :: [String],
 
   -- Output style options
