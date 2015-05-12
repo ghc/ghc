@@ -100,7 +100,8 @@ t10309:
 
 boolFormula:
 	rm -f boolFormula.o boolFormula.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc boolFormula
+  # Disable all warnings to make sure boolFormula.stderr is repeatable
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -w -v0 -package ghc boolFormula
 	./boolFormula "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: clean annotations parseTree comments exampleTest listcomps boolFormula
