@@ -37,6 +37,7 @@
 
 % remember to use [htp] or [htpb] for placement
 
+\newcommand{\I}[1]{\ensuremath{\mathit{#1}}}
 
 \newcommand{\optionrule}{\noindent\rule{1.0\textwidth}{0.75pt}}
 
@@ -963,16 +964,132 @@ is \emph{not} enough information.
 
 \section{Type checking}
 
-Type checking computes, for every \verb|Module|, a \verb|ModIface|
-representing the type of the module in question:
+\begin{figure}[htpb]
+$$
+\begin{array}{rcll}
+\I{PkgType} & ::= & \I{ModIface}_0 \verb|;|\, \ldots\verb|;|\, \I{ModIface}_n \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Module interface}} \\
+\I{ModIface} & ::= & \verb|module| \; \I{Module} \; \verb|(| \I{mi\_exports} \verb|)| \; \verb|where| \\
+& & \qquad \I{mi\_decls} \\
+& & \qquad \I{mi\_insts} \\
+\I{mi\_exports} & ::= & \I{AvailInfo}_0 \verb|,|\, \ldots \verb|,|\, \I{AvailInfo}_n \\
+\I{mi\_decls} & ::= & \I{IfaceDecl}_0 \verb|;|\, \ldots \verb|;|\, \I{IfaceDecl}_n \\
+\I{mi\_insts} & ::= & \I{IfaceClsInst}_0 \verb|;|\, \ldots \verb|;|\, \I{IfaceClsInst}_n \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Interface declarations}} \\
+\I{IfaceDecl} & ::= & \I{OccName} \; \verb|::| \; \I{IfaceId} \\
+              & |   & \verb|data| \; \I{OccName} \; \verb|=| \;\ \I{IfaceData} \\
+              & |   & \ldots \\
+\I{IfaceClsInst} & & \mbox{A type-class instance} \\
+\I{IfaceId} & & \mbox{Interface of top-level binder} \\
+\I{IfaceData} & & \mbox{Interface of type constructor} \\
+\end{array}
+$$
+\caption{Module interfaces in GHC} \label{fig:typecheck}
+\end{figure}
+
+Type checking an indefinite package (a package with holes) involves
+calculating, for every module, a \I{ModIface} representing the
+type/interface of the module in question (which is serialized
+to disk).  The general form of these
+interface files are described in Figure~\ref{fig:typecheck}; notably,
+the interfaces \I{IfaceId}, \I{IfaceData}, etc. contain \I{Name} references,
+which must be resolved by
+looking up a \I{ModIface} corresponding to the \I{Module} associated
+with the \I{Name}. (We will say more about this lookup process shortly.)
+For example, given:
 
 \begin{verbatim}
-Type ::= { Module "->" ModIface }
+    package p where
+        signature H where
+            data T
+        module A(S, T) where
+            import H
+            data S = S T
 \end{verbatim}
+%
+the \I{PkgType} is:
+
+\begin{verbatim}
+    module HOLE:H (HOLE:H.T) where
+        data T -- abstract type constructor
+    module THIS:A (THIS:A.S, HOLE:H.T) where
+        data S = S HOLE:H.T
+    -- where THIS = p(H -> HOLE:H)
+\end{verbatim}
+%
+However, a \I{PkgType} of \I{ModIface}s is not the whole story:
+when a package has holes, a \I{PkgType} specified in this manner
+defines a family of possible types, based on how the holes are
+shaped and instantiated.  A package which writes \verb|include p requires (H as S)|
+and has a sharing constraint of \verb|H.T| with \verb|q():B.T| may
+end up with this ``type'':
+
+\begin{verbatim}
+    module HOLE:S (q():B.T) where
+    module THIS:A (THIS:A.S, q():B.T) where
+        data S = S q():B.T
+    -- where THIS = p(H -> HOLE:S)
+\end{verbatim}
+%
+Furthermore, for ease of implementation, GHC prefers to resolve all
+indirect \I{Name} references (which are just strings) into a
+\I{ModIface} into direct \I{TyThing} references (which are data
+structures that have type information).  This resolution is done lazily
+with some hackery!
+
+Thus, given a shaping and a hole instantiation, a \I{ModIface} can be
+converted into an in-memory \I{ModDetails}, described in
+Figure~\ref{fig:typecheck-more}.  (Technically, the \I{Module} does not
+have to be recorded as it is recorded in the \I{Name} associated with a
+\I{TyThing}; so you can think of a \I{ModDetails} as a big bag of type-checkable
+entities which GHC knows about; in the source code this
+is referred to as the \emph{external package state (EPT)}).
+
+\begin{figure}[htpb]
+$$
+\begin{array}{rcll}
+\I{ModDetails} & ::= & \langle\I{md\_types} \verb|;|\; \I{md\_insts}\rangle \\
+\I{md\_types}  & ::= & \I{TyThing}_0 \verb|,|\, \ldots\verb|,|\, \I{TyThing}_n \\
+\I{md\_insts}  & ::= & \I{ClsInst}_0 \verb|,|\, \ldots\verb|,|\, \I{ClsInst}_n \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Type-checked declarations}} \\
+\I{TyThing}    &     & \mbox{Type-checked thing with a \I{Name}} \\
+\I{ClsInst}    &     & \mbox{Type-checked type class instance} \\
+\end{array}
+$$
+\caption{Semantic objects in GHC} \label{fig:typecheck-more}
+\end{figure}
+
+Type checking, thus, is a delicate balancing act between module
+interfaces and our semantic objects.  Given a shaping, here
+are some important operations we have to do in type checking:
+
+\paragraph{Imports}  When a module/signature imports a module name,
+we must consult the exports of \I{ModIface}s associated with this
+module name, modulo what we calculated into the shaping pass.
+(In fact, we can get all of this information directly from the
+shaping pass.)
+
+\paragraph{Includes and name lookups}  When we include a package,
+take all of the \I{ModIface}s it brings into scope, type-check
+them with respect to the instantiation of holes and shaping, and add
+them to the EPT.
+
+Even better, this process should be done lazily on name lookup.
+When we have a renamed identifier, e.g. a \I{Name},
+we first check if we know about this object in EPT, and if not,
+we must find the \I{ModIface}(s) (plural!) that would have brought the object into
+scope, add them to EPT and try again.  The process of adding semantic
+objects to the EPT may cause us to learn \emph{more} information
+about an object than we knew previously.
+
+\paragraph{Cross-package compilation}  When we begin type-checking a new
+indefinite package, we must \emph{clear} all \I{ModDetails} which depend on
+holes.  This is because shaping may cause the type-checked entities to refer
+to different semantic objects.
 
 \subsection{The basic plan}
 
-Given a module or signature, we can type check given these two assumptions:
+Given a module or signature of a package, we can type check given these two assumptions:
 
 \begin{itemize}
     \item We have a renamed syntax tree, whose identifiers have been
@@ -983,30 +1100,11 @@ Given a module or signature, we can type check given these two assumptions:
 \end{itemize}
 
 The result of type checking is a \verb|ModDetails| which can then be
-converted into a \verb|ModIface|.
+converted into a \verb|ModIface|, because we assumed each signature
+to serve as an uninstantiated hole (thus, the computed \verb|ModDetails| is
+in its most general form).
 Arranging for these two assumptions to be true is the bulk of the
 complexity of type checking.
-
-\subsection{A little bit of night music}
-
-A little bit of background about the relationship of GHC \verb|ModIface| and
-\verb|ModDetails|.
-
-A \verb|ModIface| corresponds to an interface file, it is essentially a
-big pile of \verb|Name|s which have not been resolved to their locations
-yet.  Once a \verb|ModIface| is loaded, we type check it
-(\verb|tcIface|), which turns them into \verb|TyThing|s and \verb|Type|s
-(linked up against their true locations.) Conversely, once we finish
-type checking a module, we have a \verb|ModDetails|, which we then
-serialize into a \verb|ModIface|.
-
-One very important (non-obvious) distinction is that a \verb|ModDetails|
-does \emph{not} contain the information for handling renaming.
-(Actually, it does carry along a \verb|md_exports|, but this is only a
-hack to transmit this information when we're creating an interface;
-no code actually uses it.)  So any information about reexports is
-recorded in the \verb|ModIface| and used by the renamer, at which point
-we don't need it anymore and can drop it from \verb|ModDetails|.
 
 \subsection{Loading modules from indefinite packages}
 
