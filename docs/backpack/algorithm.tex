@@ -77,19 +77,19 @@ $$
 p,q,r && \mbox{Package names} \\
 m,n   && \mbox{Module names} \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Packages}} \\
-  pkg & ::= & \verb|package|\; p\; [provreq]\; \verb|where {| d_1 \verb|;| \ldots \verb|;| d_n \verb|}| \\[1em]
+  \I{pkg} & ::= & \verb|package|\; p\; [\I{provreq}]\; \verb|where {| d_1 \verb|;| \ldots \verb|;| d_n \verb|}| \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Declarations}} \\
-  d & ::= & \verb|module|\;    m \; [exports]\; \verb|where|\; body \\
-    & |   & \verb|signature|\; m \; [exports]\; \verb|where|\; body \\
+  d & ::= & \verb|module|\;    m \; [exports]\; \verb|where|\; \I{body} \\
+    & |   & \verb|signature|\; m \; [exports]\; \verb|where|\; \I{body} \\
     & |   & \verb|include|\; p \; [provreq] \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Provides/requires specification}} \\
-provreq & ::= & \verb|(| \, rns \, \verb|)| \; 
-        [ \verb|requires(|\, rns \, \verb|)| ] \\
-rns & ::= & rn_0 \verb|,| \, \ldots \verb|,| \, rn_n [\verb|,|] & \mbox{Renamings} \\
-rn & ::= & m\; \verb|as| \; n & \mbox{Renaming} \\[1em] 
+\I{provreq} & ::= & \verb|(| \, \I{rns} \, \verb|)| \; 
+        [ \verb|requires(|\, \I{rns} \, \verb|)| ] \\
+\I{rns} & ::= & \I{rn}_0 \verb|,| \, \ldots \verb|,| \, \I{rn}_n [\verb|,|] & \mbox{Renamings} \\
+\I{rn} & ::= & m\; \verb|as| \; n & \mbox{Renaming} \\[1em] 
 \multicolumn{3}{l}{\mbox{\bf Haskell code}} \\
-exports & & \mbox{A Haskell module export list} \\
-body    & & \mbox{A Haskell module body} \\
+\I{exports} & & \mbox{A Haskell module export list} \\
+\I{body}    & & \mbox{A Haskell module body} \\
 \end{array}
 $$
 \caption{Syntax of Backpack} \label{fig:syntax}
@@ -106,18 +106,18 @@ syntactic sugar (e.g., a bare $m$ in a renaming is simply $m\; \verb|as|\; m$.)
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-Shape & ::= & \verb|provides:|\; m \; \verb|->|\; Module\; \verb|{|\, Name \verb|,|\, \ldots \, \verb|};| \ldots \\
-      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{Module}\; \verb|{| \, Name \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
-PkgKey & ::= & p \verb|(| \, m \; \verb|->| \; Module \verb|,|\, \ldots\, \verb|)| \\
-Module & ::= & PkgKey \verb|:| m \\
-Name   & ::= & Module \verb|.| OccName \\
-OccName & & \mbox{Unqualified name in a namespace}
+\I{Shape} & ::= & \verb|provides:|\; m \; \verb|->|\; \I{Module}\; \verb|{|\, \I{Name} \verb|,|\, \ldots \, \verb|};| \ldots \\
+      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{\I{Module}}\; \verb|{| \, \I{Name} \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
+\I{PkgKey} & ::= & p \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)| \\
+\I{Module} & ::= & \I{PkgKey} \verb|:| m \\
+\I{Name}   & ::= & \I{Module} \verb|.| \I{OccName} \\
+\I{OccName} & & \mbox{Unqualified name in a namespace}
 \end{array}
 $$
 \caption{Semantic entities in Backpack} \label{fig:semantic}
 \end{figure}
 
-Shaping computes a $Shape$, whose form is described in Figure~\ref{fig:semantic}.
+Shaping computes a \I{Shape}, whose form is described in Figure~\ref{fig:semantic}.
 Initializing the shape context to the empty shape, we incrementally
 build the context as follows:
 
@@ -147,15 +147,15 @@ In the description below, we'll assume \verb|THIS| is the package key
 of the package being processed.
 
 \begin{aside}
-\textbf{\texttt{OccName} is implied by \texttt{Name}.}
+\textbf{\textit{OccName} is implied by \textit{Name}.}
 In Haskell, the following is not valid syntax:
 
 \begin{verbatim}
     import A (foobar as baz)
 \end{verbatim}
-In particular, a \verb|Name| which is in scope will always have the same
-\verb|OccName| (even if it may be qualified.)  You might imagine relaxing
-this restriction so that declarations can be used under different \verb|OccName|s;
+In particular, a \I{Name} which is in scope will always have the same
+\I{OccName} (even if it may be qualified.)  You might imagine relaxing
+this restriction so that declarations can be used under different \I{OccName}s;
 in such a world, we need a different definition of shape:
 
 \begin{verbatim}
@@ -163,12 +163,12 @@ in such a world, we need a different definition of shape:
         provided: ModName -> { OccName -> Name }
         required: ModName -> { OccName -> Name }
 \end{verbatim}
-Presently, however, such an \verb|OccName| annotation would be redundant: it can be inferred from the \verb|Name|.
+Presently, however, such an \I{OccName} annotation would be redundant: it can be inferred from the \I{Name}.
 \end{aside}
 
 \begin{aside}
-\textbf{Holes of a package are a mapping, not a set.} Why can't the \verb|PkgKey| just record a
-set of \verb|Module|s, e.g. \verb|PkgKey ::= SrcPkgKey { Module }|?  Consider:
+\textbf{Holes of a package are a mapping, not a set.} Why can't the \I{PkgKey} just record a
+set of \I{Module}s, e.g. $\I{PkgKey} ::= \I{SrcPkgKey} \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
 
 \begin{verbatim}
     package p (A) requires (H1, H2) where
@@ -209,19 +209,19 @@ e.g., \verb|required: { ModName -> { OccName } }|?  Consider:
             import T
 \end{verbatim}
 The requirements of this package specify that \verb|A.T| $=$ \verb|B.T|; this
-can be expressed with \verb|Name|s as
+can be expressed with \I{Name}s as
 
 \begin{verbatim}
     A -> { HOLE:A.T }
     B -> { HOLE:A.T }
 \end{verbatim}
-But, without \verb|Name|s, the sharing constraint is impossible:  \verb|A -> { T }; B -> { T }|. (NB: \verb|A| and \verb|B| don't have to be implemented with the same module.)
+But, without \I{Name}s, the sharing constraint is impossible:  \verb|A -> { T }; B -> { T }|. (NB: \verb|A| and \verb|B| don't have to be implemented with the same module.)
 \end{aside}
 
 \begin{aside}
-\textbf{The \texttt{Name} of a value is used to avoid
+\textbf{The \textit{Name} of a value is used to avoid
 ambiguous identifier errors.}  We state that two types
-are equal when their \texttt{Name}s are the same; however,
+are equal when their \I{Name}s are the same; however,
 for values, it is less clear why we care.  But consider this example:
 
 \begin{verbatim}
@@ -237,15 +237,15 @@ for values, it is less clear why we care.  But consider this example:
 \end{verbatim}
 The reference to \verb|x| in \verb|A| is unambiguous, because it is known
 that \verb|x| from \verb|H1| and \verb|x| from \verb|H2| are the same (have
-the same \verb|Name|.)  If they were not the same, it would be ambiguous and
-should cause an error.  Knowing the \verb|Name| of a value distinguishes
+the same \I{Name}.)  If they were not the same, it would be ambiguous and
+should cause an error.  Knowing the \I{Name} of a value distinguishes
 between these two cases.
 \end{aside}
 
 \begin{aside}
-\textbf{Absence of \texttt{Module} in \texttt{requires} implies holes are linear}
-Because the requirements do not record a \verb|Module| representing
-the identity of a requirement, it means that it's not possible to assert
+\textbf{Holes are linear}
+Requirements do not record what \I{Module} represents
+the identity of a requirement, which means that it's not possible to assert
 that hole \verb|A| and hole \verb|B| should be implemented with the same module,
 as might occur with aliasing:
 
@@ -378,7 +378,7 @@ shape is transformed by:
           be thinned, so non-mentioned requirements are implicitly passed through.)
           For each renamed requirement from \verb|Y| to \verb|Y'|,
           substitute \verb|HOLE:Y| with \verb|HOLE:Y'| in the
-          \verb|Module|s and \verb|Name|s of the provides and requires.
+          \I{Module}s and \I{Name}s of the provides and requires.
 \end{itemize}
 %
 If there are no thinnings/renamings, you just merge the
@@ -429,7 +429,7 @@ After merging this in, the final shape of \verb|q| is:
 
 The shapes we've given for individual declarations have been quite
 simple.  Merging combines two shapes, filling requirements with
-implementations, unifying \verb|Name|s, and unioning requirements; it is
+implementations, unifying \I{Name}s, and unioning requirements; it is
 the most complicated part of the shaping process.
 
 The best way to think about merging is that we take two packages with
@@ -447,18 +447,18 @@ proceeds as follows:
     \item \emph{Fill every requirement of $q$ with provided modules from
         $p$.} For each requirement $M$ of $q$ that is provided by $p$ (in particular,
         all of its required \verb|Name|s are provided),
-        substitute each \verb|Module| occurrence of \verb|HOLE:M| with the
+        substitute each \I{Module} occurrence of \verb|HOLE:M| with the
         provided $p(M)$, unify the names, and remove the requirement from $q$.
         If the names of the provision are not a superset of the required names, error.
     \item If mutual recursion is supported, \emph{fill every requirement of $p$ with provided modules from $q$.}
     \item \emph{Merge leftover requirements.}  For each requirement $M$ of $q$ that is not
         provided by $p$ but required by $p$, unify the names, and union them together to form the new requirement.  (It's not
-        necessary to substitute \verb|Module|s, since they are guaranteed to be the same.)
+        necessary to substitute \I{Module}s, since they are guaranteed to be the same.)
     \item \emph{Add provisions of $q$.} Union the provisions of $p$ and $q$, erroring
         if there is a duplicate that doesn't have the same identity.
 \end{enumerate}
 %
-To unify two sets of names, find each pair of names with matching \verb|OccName|s $n$ and $m$ and do the following:
+To unify two sets of names, find each pair of names with matching \I{OccName}s $n$ and $m$ and do the following:
 
 \begin{enumerate}
     \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$.
@@ -466,8 +466,8 @@ To unify two sets of names, find each pair of names with matching \verb|OccName|
     \item Otherwise, error if the names are not the same.
 \end{enumerate}
 %
-It is important to note that substitutions on \verb|Module|s and substitutions on
-\verb|Name|s are disjoint: a substitution from \verb|HOLE:A| to \verb|HOLE:B|
+It is important to note that substitutions on \I{Module}s and substitutions on
+\I{Name}s are disjoint: a substitution from \verb|HOLE:A| to \verb|HOLE:B|
 does \emph{not} substitute inside the name \verb|HOLE:A.T|.
 
 Since merging is the most complicated step of shaping, here are a big
@@ -568,7 +568,7 @@ they are also an instructive example for signature merging.
     --           B -> { HOLE:A.T }
 \end{verbatim}
 %
-\Red{I'm pretty sure any choice of \texttt{Name} is OK, since the
+\Red{I'm pretty sure any choice of \textit{Name} is OK, since the
 subsequent substitution will make it alpha-equivalent.}
 
 %   \subsubsection{Leaky requirements}
@@ -677,7 +677,7 @@ however, it can be substituted at the end easily.
 
 \section{Type constructor exports}
 
-In the previous section, we described the \verb|Name|s of a
+In the previous section, we described the \I{Name}s of a
 module as a flat namespace; but actually, there is one level of
 hierarchy associated with type-constructors.  The type:
 
@@ -685,7 +685,7 @@ hierarchy associated with type-constructors.  The type:
     data A = B { foo :: Int }
 \end{verbatim}
 %
-brings three \verb|OccName|s into scope, \verb|A|, \verb|B|
+brings three \I{OccName}s into scope, \verb|A|, \verb|B|
 and \verb|foo|, but the constructors and record selectors are
 considered \emph{children}
 of \verb|A|: in an import list, they can be implicitly brought
@@ -704,16 +704,16 @@ semantic representation seen in Figure~\ref{fig:semantic2}:
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-Shape & ::= & \verb|provides:|\; m \; \verb|->|\; Module\; \verb|{|\, AvailInfo \verb|,|\, \ldots \, \verb|};| \ldots \\
-      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{Module}\; \verb|{| \, AvailInfo \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
-AvailInfo & ::= & Name & \mbox{Plain identifiers} \\
-          & |   & Name \, \verb|{| \, Name_0\verb|,| \, \ldots\verb|,| \, Name_n \, \verb|}| & \mbox{Type constructors} \\
+\I{Shape} & ::= & \verb|provides:|\; m \; \verb|->|\; \I{Module}\; \verb|{|\, \I{AvailInfo} \verb|,|\, \ldots \, \verb|};| \ldots \\
+      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{\I{Module}}\; \verb|{| \, \I{AvailInfo} \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
+\I{AvailInfo} & ::= & \I{Name} & \mbox{Plain identifiers} \\
+          & |   & \I{Name} \, \verb|{| \, \I{Name}_0\verb|,| \, \ldots\verb|,| \, \I{Name}_n \, \verb|}| & \mbox{Type constructors} \\
 \end{array}
 $$
 \caption{Enriched semantic entities in Backpack} \label{fig:semantic2}
 \end{figure}
 %
-For type constructors, the outer $Name$ identifies the \emph{parent}
+For type constructors, the outer \I{Name} identifies the \emph{parent}
 identifier, which may not necessarily be in scope (define this to be the \texttt{availName}); the inner list consists
 of the children identifiers that are actually in scope.  If a wildcard
 is written, all of the child identifiers are brought into scope.
@@ -747,37 +747,37 @@ key from the identifiers.
     -- A.T and B.T to be both exported from C!
 \end{verbatim}
 %
-Previously, we stated that we simply merged $Name$s based on their
-$OccName$s.  We now must consider what it means to merge $AvailInfo$s.
+Previously, we stated that we simply merged \I{Name}s based on their
+\I{OccName}s.  We now must consider what it means to merge \I{AvailInfo}s.
 
 \subsection{Algorithm}
 
-Our merging algorithm takes two sets of $AvailInfo$s and merges them
-into one set.  In the degenerate case where every $AvailInfo$ is a
+Our merging algorithm takes two sets of \I{AvailInfo}s and merges them
+into one set.  In the degenerate case where every \I{AvailInfo} is a
 $Name$, this algorithm operates the same as the original algorithm.
 Merging proceeds in two steps: unification and then simple union.
 
-Unification proceeds as follows: for each pair of $Name$s with
-matching $OccName$s, unify the names.  For each pair of $Name\, \verb|{|\,
-Name_0\verb|,|\, \ldots\verb|,|\, Name_n\, \verb|}|$, where there
-exists some pair of child names with matching $OccName$s, unify the
-parent $Name$s.  (A single $AvailInfo$ may participate in multiple such
-pairs.)  A simple identifier and a type constructor $AvailInfo$ with
+Unification proceeds as follows: for each pair of \I{Name}s with
+matching \I{OccName}s, unify the names.  For each pair of $\I{Name}\, \verb|{|\,
+\I{Name}_0\verb|,|\, \ldots\verb|,|\, \I{Name}_n\, \verb|}|$, where there
+exists some pair of child names with matching \I{OccName}s, unify the
+parent \I{Name}s.  (A single \I{AvailInfo} may participate in multiple such
+pairs.)  A simple identifier and a type constructor \I{AvailInfo} with
 overlapping in-scope names fails to unify.  After unification,
 the simple union combines entries with matching \verb|availName|s (parent
 name in the case of a type constructor), recursively unioning the child
-names of type constructor $AvailInfo$s.
+names of type constructor \I{AvailInfo}s.
 
-Unification of $Name$s results in a substitution, and a $Name$ substitution
-on $AvailInfo$ is a little unconventional.  Specifically, substitution on $Name\, \verb|{|\,
-Name_0\verb|,|\, \ldots\verb|,|\, Name_n\, \verb|}|$ proceeds specially:
-a substitution from $Name$ to $Name'$ induces a substitution from
-$Module$ to $Module'$ (as the $OccName$s of the $Name$s are guaranteed
-to be equal), so for each child $Name_i$, perform the $Module$
+Unification of \I{Name}s results in a substitution, and a \I{Name} substitution
+on \I{AvailInfo} is a little unconventional.  Specifically, substitution on $\I{Name}\, \verb|{|\,
+\I{Name}_0\verb|,|\, \ldots\verb|,|\, \I{Name}_n\, \verb|}|$ proceeds specially:
+a substitution from \I{Name} to $\I{Name}'$ induces a substitution from
+\I{Module} to $Module'$ (as the \I{OccName}s of the \I{Name}s are guaranteed
+to be equal), so for each child $\I{Name}_i$, perform the \I{Module}
 substitution.  So for example, the substitution \verb|HOLE:A.T| to \verb|THIS:A.T|
-takes the $AvailInfo$ \verb|HOLE:A.T { HOLE:A.B, HOLE:A.foo }| to
+takes the \I{AvailInfo} \verb|HOLE:A.T { HOLE:A.B, HOLE:A.foo }| to
 \verb|THIS:A.T { THIS:A.B, THIS:A.foo }|.  In particular, substitution
-on children $Name$s is \emph{only} carried out by substituting on the outer name;
+on children \I{Name}s is \emph{only} carried out by substituting on the outer name;
 we will never directly substitute children.
 
 \subsection{Examples}
@@ -813,7 +813,7 @@ The answer is no!  Consider these implementations:
 Here, \verb|module A1| implements \verb|signature A1|, \verb|module A2| implements \verb|signature A2|,
 and \verb|module A| implements \verb|signature A1| and \verb|signature A2| individually
 and should certainly implement their merge.  This is why we cannot simply
-merge type constructors based on the $OccName$ of their top-level type;
+merge type constructors based on the \I{OccName} of their top-level type;
 merging only occurs between in-scope identifiers.
 
 \paragraph{Does merging a selector merge the type constructor?}
@@ -890,7 +890,7 @@ in the definition.
 
 So what if we actually want to write the original signature \verb|H|?
 The technical difficulty is that we now need to unify a plain identifier
-$AvailInfo$ (from the signature) with a type constructor $AvailInfo$
+\I{AvailInfo} (from the signature) with a type constructor \I{AvailInfo}
 (from a module.)  It is not clear what this should mean.
 Consider this situation:
 
@@ -957,7 +957,7 @@ considered a child of \verb|A|, and even though in the sharing constraint
 we \emph{only} unified \verb|bar| (and its parent \verb|A|).  To know that
 \verb|foo| from \verb|M1| should also be unified, we have to know a bit
 more about \verb|A| when the sharing constraint performs unification;
-however, the $AvailInfo$ will only tell us about what is in-scope, which
+however, the \I{AvailInfo} will only tell us about what is in-scope, which
 is \emph{not} enough information.
 
 %\newpage
@@ -1094,14 +1094,14 @@ Given a module or signature of a package, we can type check given these two assu
 \begin{itemize}
     \item We have a renamed syntax tree, whose identifiers have been
           resolved as according to the result of the shaping pass.
-    \item For any \verb|Name| in the renamed tree, the corresponding
-          \verb|ModDetails| for the \verb|Module| has been loaded
+    \item For any \I{Name} in the renamed tree, the corresponding
+          \I{ModDetails} for the \I{Module} has been loaded
           (or can be lazily loaded).
 \end{itemize}
 
-The result of type checking is a \verb|ModDetails| which can then be
-converted into a \verb|ModIface|, because we assumed each signature
-to serve as an uninstantiated hole (thus, the computed \verb|ModDetails| is
+The result of type checking is a \I{ModDetails} which can then be
+converted into a \I{ModIface}, because we assumed each signature
+to serve as an uninstantiated hole (thus, the computed \I{ModDetails} is
 in its most general form).
 Arranging for these two assumptions to be true is the bulk of the
 complexity of type checking.
@@ -1130,7 +1130,7 @@ signature for \verb|H|, it is completely wrong to try to create
 a definition for \verb|HOLE:H.T|, since we know that it refers
 to \verb|THIS:A.T| via the requirements of the shape.  This applies
 even if \verb|H| is included from another package.  Thus, when
-we are loading \verb|ModDetails| into memory, it is always done
+we are loading \I{ModDetails} into memory, it is always done
 \emph{with respect to some shaping}.  Whenever you reshape,
 you must clear the module environment.
 
@@ -1149,7 +1149,7 @@ package p (A) requires (S) where
         data A = A S T
 \end{verbatim}
 
-giving us the following \verb|ModIface|s:
+giving us the following \I{ModIface}s:
 
 \begin{verbatim}
 module HOLE:S.S where
@@ -1204,9 +1204,9 @@ module THIS:B where
 \end{verbatim}
 
 This type information does \emph{not} match the pre-existing
-type information from \verb|p|: when we translate the \verb|ModIface| for
-\verb|A| in the context into a \verb|ModDetails| from this typechecking,
-we need to substitute \verb|Name|s and \verb|Module|s
+type information from \verb|p|: when we translate the \I{ModIface} for
+\verb|A| in the context into a \I{ModDetails} from this typechecking,
+we need to substitute \I{Name}s and \I{Module}s
 as specified by shaping.  Specifically, when we load \verb|p(S -> HOLE:H):A|
 to find out the type of \verb|p(S -> HOLE:H):A.A|,
 we need to take \verb|HOLE:S.S| to \verb|HOLE:H.S| and \verb|HOLE:S.T| to \verb|THIS:T.T|.
@@ -1215,7 +1215,7 @@ instantiated in the package key for \verb|p| (it is instantiated with \verb|HOLE
 and then consulting the shape in the requirements.
 
 This process is done lazily, as we may not have typechecked the original
-\verb|Name| in question when doing this.  \verb|hs-boot| considerations apply
+\I{Name} in question when doing this.  \verb|hs-boot| considerations apply
 if things are loopy: we have to treat the type abstractly and re-typecheck it
 to the right type later.
 
@@ -1232,12 +1232,12 @@ around renamed syntax trees, because this could result in very large
 memory use; additionally, whenever a substitution occurs, we would have
 to substitute over all of the renamed syntax trees.  Thus, while
 type-checking, we'll also re-compute what is in scope (i.e.,  just the
-\verb|OccName| bits of \verb|provided|). Nota bene: we still use the
-\verb|Name|s from the shape as the destinations of these
-\verb|OccName|s!  Note that we can't just use the final shape, because
+\I{OccName} bits of \verb|provided|). Nota bene: we still use the
+\I{Name}s from the shape as the destinations of these
+\I{OccName}s!  Note that we can't just use the final shape, because
 this may report more things in scope than we actually want.  (It's also
 worth noting that if we could reduce the set of provided things in
-scope in a single package, just the \verb|Shape| would not be enough.)
+scope in a single package, just the \I{Shape} would not be enough.)
 
 \subsection{Merging \texttt{ModDetails}}
 
