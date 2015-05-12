@@ -610,7 +610,7 @@ selectNextWorkItem
           (Nothing,_)
               -> (NoWorkRemaining,wl)           -- No more work
           (Just ct, new_wl)
-              | subGoalDepthExceeded dflags (ctLocDepth (ctLoc ct)) 
+              | subGoalDepthExceeded dflags (ctLocDepth (ctLoc ct))
               -> (MaxDepthExceeded ct,new_wl)   -- Depth exceeded
 
               | otherwise
@@ -2030,8 +2030,8 @@ matchClassInst inerts clas tys loc
         ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
                                            , text "inerts=" <+> ppr inerts ]
         ; instEnvs <- getInstEnvs
-        ; safeOverlapCheck <- (`elem` [Sf_Safe, Sf_Trustworthy])
-            <$> safeHaskell <$> getDynFlags
+        ; safeOverlapCheck <- ((`elem` [Sf_Safe, Sf_Trustworthy]) . safeHaskell)
+                            `fmap` getDynFlags
         ; let (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
               safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
         ; case (matches, unify, safeHaskFail) of
