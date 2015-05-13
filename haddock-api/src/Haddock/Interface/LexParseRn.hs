@@ -28,7 +28,8 @@ import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
 import Name
-import Outputable (showPpr)
+import RdrHsSyn   ( setRdrNameSpace )
+import Outputable ( showPpr )
 import RdrName
 import RnEnv (dataTcOccs)
 
