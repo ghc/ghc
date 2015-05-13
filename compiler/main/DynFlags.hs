@@ -52,7 +52,6 @@ module DynFlags (
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
         SigOf, getSigOf,
-        checkOptLevel,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -3838,14 +3837,13 @@ setObjTarget l = updM set
      | otherwise = return dflags
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
-setOptLevel n dflags = return (updOptLevel n dflags)
-
-checkOptLevel :: Int -> DynFlags -> Either String DynFlags
-checkOptLevel n dflags
+setOptLevel n dflags
    | hscTarget dflags == HscInterpreted && n > 0
-     = Left "-O conflicts with --interactive; -O ignored."
+        = do addWarn "-O conflicts with --interactive; -O ignored."
+             return dflags
    | otherwise
-     = Right dflags
+        = return (updOptLevel n dflags)
+
 
 -- -Odph is equivalent to
 --
