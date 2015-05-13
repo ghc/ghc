@@ -1451,6 +1451,9 @@ checkValidTyCl thing
 
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc
+  | isPrimTyCon tc   -- Happens when Haddock'ing GHC.Prim
+  = return ()
+
   | Just cl <- tyConClass_maybe tc
   = checkValidClass cl
 
