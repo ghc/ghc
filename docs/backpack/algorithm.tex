@@ -43,7 +43,7 @@
 
 \newenvironment{aside}
   {\begin{figure}\def\FrameCommand{\hspace{2em}}
-   \MakeFramed {\advance\hsize-\width}\optionrule\small}
+   \MakeFramed{\advance\hsize-\width}\optionrule\small}
 {\par\vskip-\smallskipamount\optionrule\endMakeFramed\end{figure}}
 
 \setlength{\droptitle}{-6em}
@@ -168,7 +168,7 @@ Presently, however, such an \I{OccName} annotation would be redundant: it can be
 
 \begin{aside}
 \textbf{Holes of a package are a mapping, not a set.} Why can't the \I{PkgKey} just record a
-set of \I{Module}s, e.g. $\I{PkgKey} ::= \I{SrcPkgKey} \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
+set of \I{Module}s, e.g. $\I{PkgKey}\;::= \; \I{SrcPkgKey} \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
 
 \begin{verbatim}
     package p (A) requires (H1, H2) where
@@ -273,7 +273,7 @@ A module declaration provides a module \verb|THIS:M| at module name \verb|M|. It
 has the shape:
 
 \begin{verbatim}
-    provides: M -> THIS:M { exports of renamed M }
+    provides: M -> THIS:M { exports of renamed M under THIS:M }
     requires: (nothing)
 \end{verbatim}
 Example:
@@ -293,7 +293,7 @@ A signature declaration creates a requirement at module name \verb|M|.  It has t
 
 \begin{verbatim}
     provides: (nothing)
-    requires: M -> { exports of renamed M }
+    requires: M -> { exports of renamed M under HOLE:M }
 \end{verbatim}
 
 \noindent Example:
@@ -448,7 +448,7 @@ proceeds as follows:
         $p$.} For each requirement $M$ of $q$ that is provided by $p$ (in particular,
         all of its required \verb|Name|s are provided),
         substitute each \I{Module} occurrence of \verb|HOLE:M| with the
-        provided $p(M)$, unify the names, and remove the requirement from $q$.
+        provided $p\verb|(|M\verb|)|$, unify the names, and remove the requirement from $q$.
         If the names of the provision are not a superset of the required names, error.
     \item If mutual recursion is supported, \emph{fill every requirement of $p$ with provided modules from $q$.}
     \item \emph{Merge leftover requirements.}  For each requirement $M$ of $q$ that is not
@@ -972,9 +972,11 @@ $$
 \I{ModIface} & ::= & \verb|module| \; \I{Module} \; \verb|(| \I{mi\_exports} \verb|)| \; \verb|where| \\
 & & \qquad \I{mi\_decls} \\
 & & \qquad \I{mi\_insts} \\
-\I{mi\_exports} & ::= & \I{AvailInfo}_0 \verb|,|\, \ldots \verb|,|\, \I{AvailInfo}_n \\
-\I{mi\_decls} & ::= & \I{IfaceDecl}_0 \verb|;|\, \ldots \verb|;|\, \I{IfaceDecl}_n \\
-\I{mi\_insts} & ::= & \I{IfaceClsInst}_0 \verb|;|\, \ldots \verb|;|\, \I{IfaceClsInst}_n \\[1em]
+& & \qquad \I{dep\_orphs} \\
+\I{mi\_exports} & ::= & \I{AvailInfo}_0 \verb|,|\, \ldots \verb|,|\, \I{AvailInfo}_n & \mbox{Export list} \\
+\I{mi\_decls} & ::= & \I{IfaceDecl}_0 \verb|;|\, \ldots \verb|;|\, \I{IfaceDecl}_n & \mbox{Defined declarations} \\
+\I{mi\_insts} & ::= & \I{IfaceClsInst}_0 \verb|;|\, \ldots \verb|;|\, \I{IfaceClsInst}_n & \mbox{Defined instances} \\
+\I{dep\_orphs} & ::= & \I{Module}_0 \verb|;|\, \ldots \verb|;|\, \I{Module}_n & \mbox{Transitive orphan dependencies} \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Interface declarations}} \\
 \I{IfaceDecl} & ::= & \I{OccName} \; \verb|::| \; \I{IfaceId} \\
               & |   & \verb|data| \; \I{OccName} \; \verb|=| \;\ \I{IfaceData} \\
@@ -987,7 +989,8 @@ $$
 \caption{Module interfaces in GHC} \label{fig:typecheck}
 \end{figure}
 
-Type checking an indefinite package (a package with holes) involves
+In general terms,
+type checking an indefinite package (a package with holes) involves
 calculating, for every module, a \I{ModIface} representing the
 type/interface of the module in question (which is serialized
 to disk).  The general form of these
@@ -1017,33 +1020,16 @@ the \I{PkgType} is:
     -- where THIS = p(H -> HOLE:H)
 \end{verbatim}
 %
-However, a \I{PkgType} of \I{ModIface}s is not the whole story:
-when a package has holes, a \I{PkgType} specified in this manner
-defines a family of possible types, based on how the holes are
-shaped and instantiated.  A package which writes \verb|include p requires (H as S)|
-and has a sharing constraint of \verb|H.T| with \verb|q():B.T| may
-end up with this ``type'':
-
-\begin{verbatim}
-    module HOLE:S (q():B.T) where
-    module THIS:A (THIS:A.S, q():B.T) where
-        data S = S q():B.T
-    -- where THIS = p(H -> HOLE:S)
-\end{verbatim}
-%
-Furthermore, for ease of implementation, GHC prefers to resolve all
-indirect \I{Name} references (which are just strings) into a
-\I{ModIface} into direct \I{TyThing} references (which are data
-structures that have type information).  This resolution is done lazily
-with some hackery!
-
-Thus, given a shaping and a hole instantiation, a \I{ModIface} can be
-converted into an in-memory \I{ModDetails}, described in
-Figure~\ref{fig:typecheck-more}.  (Technically, the \I{Module} does not
-have to be recorded as it is recorded in the \I{Name} associated with a
-\I{TyThing}; so you can think of a \I{ModDetails} as a big bag of type-checkable
-entities which GHC knows about; in the source code this
-is referred to as the \emph{external package state (EPT)}).
+However, while it is true that the \I{ModIface} is the final result
+of type checking, we actually are conflating two distinct concepts: the user-visible
+notion of a \I{ModuleName}, which, when imported, brings some \I{Name}s
+into scope (or could trigger a deprecation warning, or pull in some
+orphan instances\ldots), versus the actual declarations, which, while recorded
+in the \I{ModIface}, have an independent existence: even if a declaration
+is not visible for an import, we may internally refer to its \I{Name}, and
+need to look it up to find out type information.  (A simple case when
+this can occur is if a module exports a function with type \verb|T -> T|,
+but doesn't export \verb|T|).
 
 \begin{figure}[htpb]
 $$
@@ -1059,191 +1045,230 @@ $$
 \caption{Semantic objects in GHC} \label{fig:typecheck-more}
 \end{figure}
 
-Type checking, thus, is a delicate balancing act between module
-interfaces and our semantic objects.  Given a shaping, here
-are some important operations we have to do in type checking:
+Thus, a \I{ModIface} can be type-checked into a \I{ModDetails}, described in
+Figure~\ref{fig:typecheck-more}.  Notice that a \I{ModDetails} is just
+a bag of type-checkable entities which GHC knows about.  We
+define the \emph{external package state (EPT)} to
+simply be the union of the \I{ModDetails}
+of all external modules.
 
-\paragraph{Imports}  When a module/signature imports a module name,
-we must consult the exports of \I{ModIface}s associated with this
-module name, modulo what we calculated into the shaping pass.
-(In fact, we can get all of this information directly from the
-shaping pass.)
+Type checking is a delicate balancing act between module
+interfaces and our semantic objects.  A \I{ModIface} may get
+type-checked multiple times with different hole instantiations
+to provide multiple \I{ModDetails}.
+Furthermore complicating matters
+is that GHC does this resolution \emph{lazily}: a \I{ModIface}
+is only converted to a \I{ModDetails} when we are looking up
+the type of a \I{Name} that is described by the interface;
+thus, unlike usual theoretical treatments of type checking, we can't
+eagerly go ahead and perform substitutions on \I{ModIface}s when
+they get included.
 
-\paragraph{Includes and name lookups}  When we include a package,
-take all of the \I{ModIface}s it brings into scope, type-check
-them with respect to the instantiation of holes and shaping, and add
-them to the EPT.
+In a separate compiler like GHC, there are two primary functions we must provide:
 
-Even better, this process should be done lazily on name lookup.
-When we have a renamed identifier, e.g. a \I{Name},
-we first check if we know about this object in EPT, and if not,
-we must find the \I{ModIface}(s) (plural!) that would have brought the object into
-scope, add them to EPT and try again.  The process of adding semantic
-objects to the EPT may cause us to learn \emph{more} information
-about an object than we knew previously.
+\paragraph{\textit{ModuleName} to \textit{ModIface}}  Given a \I{ModuleName} which
+was explicitly imported by a user, we must produce a \I{ModIface}
+that, among other things, specifies what \I{Name}s are brought
+into scope.  This is used by the renamer to resolve plain references
+to identifiers to real \I{Name}s.  (By the way, if shaping produced
+renamed trees, it would not be necessary to do this step!)
 
-\paragraph{Cross-package compilation}  When we begin type-checking a new
-indefinite package, we must \emph{clear} all \I{ModDetails} which depend on
-holes.  This is because shaping may cause the type-checked entities to refer
-to different semantic objects.
+\paragraph{\textit{Module} to \textit{ModDetails}/EPT}  Given a \I{Module} which may be
+a part of a \I{Name}, we must be able to type check it into
+a \I{ModDetails} (usually by reading and typechecking the \I{ModIface}
+associated with the \I{Module}, but this process is involved).  This
+is used by the type checker to find out type information on things. \\
 
-\subsection{The basic plan}
+There are two points in the type checker where these capabilities are exercised:
 
-Given a module or signature of a package, we can type check given these two assumptions:
+\paragraph{Source-level imports}  When a user explicitly imports a
+module, the \textit{ModuleName} is mapped to a \textit{ModIface}
+to find out what exports are brought into scope (\I{mi\_exports})
+and what orphan instances must be loaded (\I{dep\_orphs}).  Additionally,
+the \textit{Module} is loaded to the EPT to bring instances from
+the module into scope.
 
-\begin{itemize}
-    \item We have a renamed syntax tree, whose identifiers have been
-          resolved as according to the result of the shaping pass.
-    \item For any \I{Name} in the renamed tree, the corresponding
-          \I{ModDetails} for the \I{Module} has been loaded
-          (or can be lazily loaded).
-\end{itemize}
+\paragraph{Internal name lookup}  During type checking, we may have
+a \I{Name} for which we need type information (\I{TyThing}).  If it's not already in the
+EPT, we type check and load
+into the EPT the \I{ModDetails} of the \I{Module} in the \I{Name},
+and then check the EPT again. (\verb|importDecl|)
 
-The result of type checking is a \I{ModDetails} which can then be
-converted into a \I{ModIface}, because we assumed each signature
-to serve as an uninstantiated hole (thus, the computed \I{ModDetails} is
-in its most general form).
-Arranging for these two assumptions to be true is the bulk of the
-complexity of type checking.
+\subsection{\textit{ModName} to \textit{ModIface}}
 
-\subsection{Loading modules from indefinite packages}
+In all cases, the \I{mi\_exports} can be calculated directly from the
+shaping process, which specifies exactly for each \I{ModName} in scope
+what will be brought into scope.
 
-\paragraph{Everything is done modulo a shape}  Consider
-this package:
+\paragraph{Modules} Modules are straightforward, as for any
+\I{Module} there is only one possibly \I{ModIface} associated
+with it (the \I{ModIface} for when we type-checked the (unique) \verb|module|
+declaration.)
+
+\paragraph{Signatures} For signatures, there may be multiple \I{ModIface}s
+associated with a \I{ModName} in scope, e.g. in this situation:
 
 \begin{verbatim}
-package p where
-    signature H(T) where
-        data T = T
-    module A(T) where
-        data T = T
-    signature H(T) where
-        import A(T)
+    package p where
+        signature S where
+            data A
+    package q where
+        include p
+        signature S where
+            data B
+        module M where
+            import S
+\end{verbatim}
+%
+Each literal \verb|signature| has a \I{ModIface} associated with it; and
+the import of \verb|S| in \verb|M|, we want to see the \emph{merged}
+\I{ModIface}s.  We can determine the \I{mi\_exports} from the shape,
+but we also need to pull in orphan instances for each signature, and
+produce a warning for each deprecated signature.
 
--- provides: A -> THIS:A { THIS:A.T }
---           H -> HOLE:H { THIS:A.T }
--- requires: H ->        { THIS:A.T }
+\begin{aside}
+\textbf{Does hiding a signature hide its orphans.} Suppose that we have
+extended Backpack to allow hiding signatures from import.
+
+\begin{verbatim}
+    package p requires (H) where -- H is hidden from import
+        module A where
+            instance Eq (a -> b) where -- orphan
+        signature H {-# DEPRECATED "Don't use me" #-} where
+            import A
+
+    package q where
+        include p
+        signature H where
+            data T
+        module M where
+            import H                -- warn deprecated?
+            instance Eq (a -> b)    -- overlap?
 \end{verbatim}
 
-With this shaping information, when we are type-checking the first
-signature for \verb|H|, it is completely wrong to try to create
-a definition for \verb|HOLE:H.T|, since we know that it refers
-to \verb|THIS:A.T| via the requirements of the shape.  This applies
-even if \verb|H| is included from another package.  Thus, when
-we are loading \I{ModDetails} into memory, it is always done
-\emph{with respect to some shaping}.  Whenever you reshape,
-you must clear the module environment.
+It is probably the most consistent to not pull in orphan instances
+and not give the deprecated warning: this corresponds to merging
+visible \I{ModIface}s, and ignoring invisible ones.
+\end{aside}
 
-\paragraph{Figuring out where to consult for shape information}
+\subsection{\textit{Module} to \textit{ModDetails}}
 
-For this example, let's suppose we have already type-checked
-this package \verb|p|:
+\paragraph{Modules}  For modules, we have a \I{Module} of
+the form $\I{p}\verb|(|m\; \verb|->|\; \I{Module}\verb|,|\, \ldots\verb|)|$,
+and we also have a unique \I{ModIface}, where each hole instantiation
+is $\verb|HOLE:|m$.
+
+To generate the \I{ModDetails} associated with the specific instantiation,
+we have to type-check the \I{ModIface} with the following adjustments:
+
+\begin{enumerate}
+    \item Perform a \I{Module} substitution according to the instantiation
+          of the \I{ModIface}'s \I{Module}. (NB: we \emph{do}
+          substitute \verb|HOLE:A.x| to \verb|HOLE:B.x| if we instantiated
+          \verb|A -> HOLE:B|, \emph{unlike} the disjoint
+          substitutions applied by shaping.)
+    \item Perform a \I{Name} substitution as follows: for any name
+          with a package key that is a $\verb|HOLE|$,
+          substitute with the recorded \I{Name} in the requirements of the shape.
+          Otherwise, look up the (unique) \I{ModIface} for the \I{Module},
+          and subsitute with the corresponding \I{Name} in the \I{mi\_exports}.
+\end{enumerate}
+
+\paragraph{Signatures}  For signatures, we have a \I{Module} of the form
+$\verb|HOLE:|m$.  Unlike modules, there are multiple \I{ModIface}s associated with a hole.
+We distinguish each separate \I{ModIface} by considering the full \I{PkgKey}
+it was defined in, e.g. \verb|p(A -> HOLE:C, B -> q():B)|; call this
+the hole's \emph{defining package key}; the set of \I{ModIface}s for a hole
+and their defining package keys can easily be calculated during shaping.
+
+To generate the \I{ModDetails} associated with a hole, we type-check each
+\I{ModIface}, with the following adjustments:
+
+\begin{enumerate}
+    \item Perform a \I{Module} substitution according to the instantiation
+        of the defining package key.  (NB: This may rename the hole itself!)
+    \item Perform a \I{Name} substitution as follows, in the same manner
+        as would be done in the case of modules.
+    \item When these \I{ModDetails} are merged into the EPT, some merging
+        of duplicate types may occur; a type
+        may be defined multiple times, in which case we check that each
+        definition is compatible with the previous ones.  A concrete
+        type is always compatible with an abstract type.
+\end{enumerate}
+
+\paragraph{Invariants} When we perform \I{Name} substitutions, we must be
+sure that we can always find out the correct \I{Name} to substitute to.
+This isn't obviously true, consider:
 
 \begin{verbatim}
-package p (A) requires (S) where
-    signature S where
-        data S
+    package p where
+        signature S(foo) where
+            data T
+            foo :: T
+        module M(bar) where
+            import S
+            bar = foo
+    package q where
+        module A(T(..)) where
+            data T = T
+            foo = T
+        module S(foo) where
+            import A
+        include p
+        module A where
+            import M
+            ... bar ...
+\end{verbatim}
+%
+When we type check \verb|p|, we get the \I{ModIface}s:
+
+\begin{verbatim}
+    module HOLE:S(HOLE:S.foo) where
         data T
-    module A(A) where
-        import S
-        data A = A S T
+        foo :: HOLE:S.T
+    module THIS:M(THIS:M.bar) where
+        bar :: HOLE:S.T
 \end{verbatim}
+%
+Now, when we type check \verb|A|, we pull on the \I{Name} \verb|p(S -> q():S):M.bar|,
+which means we have to type check the \I{ModIface} for \verb|p(S -> q():S):M|.
+The un-substituted type of \verb|bar| has a reference to \verb|HOLE:S.T|;
+this should be substituted to \verb|q():S.T|.  But how do we discover this?
+We know that \verb|HOLE:S| was instantiated to \verb|q():S|, so we might try
+and look for \verb|q():S.T|.  However, this \I{Name} does not exist because
+the \verb|module S| reexports the selector from \verb|A|!  Nor can we consult
+the (unique) \I{ModIface} for the module, as it doesn't reexport the relevant
+type.
 
-giving us the following \I{ModIface}s:
+The conclusion, then, is that a module written this way should be disallowed.
+Specifically, the correctness condition for a signature is this: \emph{Any \I{Name}
+mentioned in the \I{ModIface} of a signature must either be from an external module, or be
+exported by the signature}.
 
+\begin{aside}
+\textbf{Special case export rule for record selectors.}  Here is the analogous case for
+record selectors:
 \begin{verbatim}
-module HOLE:S.S where
-    data S
-    data T
-module THIS:A where
-    data A = A HOLE:S.S HOLE:S.T
--- where THIS = p(S -> HOLE:S)
+    package p where
+        signature S(foo) where
+            data T = T { foo :: Int }
+        module M(bar) where
+            import S
+            bar = foo
+    package q where
+        module A(T(..)) where
+            data T = T { foo :: Int }
+        module S(foo) where
+            import A
+        include p
+        module A where
+            import M
+            ... bar ...
 \end{verbatim}
 
-Next, we'd like to type check a package which includes \verb|p|:
+We could reject this, but technically we can find the right substitution
+for \verb|T|, because the export of \verb|foo| is an \I{AvailTC} which
+does mention \verb|T|.
+\end{aside}
 
-\begin{verbatim}
-package q (T, A, B) requires (H) where
-    include p (A) requires (S as H)
-    module T(T) where
-        data T = T
-    signature H(T) where
-        import T(T)
-    module B(B) where
-        import A
-        data B = B A
-\end{verbatim}
-
-%   package r where
-%       include q
-%       module H(S,T) where
-%           import T(T)
-%           data S = S
-%       module C where
-%           import A
-%           import B
-%           ...
-
-Prior to typechecking, we compute its shape:
-
-\begin{verbatim}
-provides: (elided)
-requires: H -> { HOLE:H.S, THIS:T.T }
--- where THIS = q(H -> HOLE:H)
-\end{verbatim}
-
-Our goal is to get the following type:
-
-\begin{verbatim}
-module THIS:T where
-    data T = T
-module THIS:B where
-    data B = B p(S -> HOLE:H):A.A
-        -- where data A = A HOLE:H.S THIS:T.T
--- where THIS = q(H -> HOLE:H)
-\end{verbatim}
-
-This type information does \emph{not} match the pre-existing
-type information from \verb|p|: when we translate the \I{ModIface} for
-\verb|A| in the context into a \I{ModDetails} from this typechecking,
-we need to substitute \I{Name}s and \I{Module}s
-as specified by shaping.  Specifically, when we load \verb|p(S -> HOLE:H):A|
-to find out the type of \verb|p(S -> HOLE:H):A.A|,
-we need to take \verb|HOLE:S.S| to \verb|HOLE:H.S| and \verb|HOLE:S.T| to \verb|THIS:T.T|.
-In both cases, we can determine the right translation by looking at how \verb|S| is
-instantiated in the package key for \verb|p| (it is instantiated with \verb|HOLE:H|),
-and then consulting the shape in the requirements.
-
-This process is done lazily, as we may not have typechecked the original
-\I{Name} in question when doing this.  \verb|hs-boot| considerations apply
-if things are loopy: we have to treat the type abstractly and re-typecheck it
-to the right type later.
-
-
-\subsection{Re-renaming}
-
-Theoretically, the cleanest way to do shaping and typechecking is to have shaping
-result in a fully renamed syntax tree, which we then typecheck: when done this way,
-we don't have to worry about logical contexts (i.e., what is in scope) because
-shaping will already have complained if things were not in scope.
-
-However, for practical purposes, it's better if we don't try to keep
-around renamed syntax trees, because this could result in very large
-memory use; additionally, whenever a substitution occurs, we would have
-to substitute over all of the renamed syntax trees.  Thus, while
-type-checking, we'll also re-compute what is in scope (i.e.,  just the
-\I{OccName} bits of \verb|provided|). Nota bene: we still use the
-\I{Name}s from the shape as the destinations of these
-\I{OccName}s!  Note that we can't just use the final shape, because
-this may report more things in scope than we actually want.  (It's also
-worth noting that if we could reduce the set of provided things in
-scope in a single package, just the \I{Shape} would not be enough.)
-
-\subsection{Merging \texttt{ModDetails}}
-
-After type-checking a signature, we may turn to add it to our module
-environment and discover there is already an entry for it!  In that case,
-we simply merge it with the existing entry, erroring if there are incompatible
-entries.
-
-\end{document}
+\end{document} % chktex 16
