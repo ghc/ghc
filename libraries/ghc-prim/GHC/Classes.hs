@@ -6,7 +6,12 @@
   -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
--- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
+-- -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
+
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
+-- -fno-warn-unused-top-binds is there (I hope) to stop Haddock complaining
+-- about the constraint tuples being defined but not used
+
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

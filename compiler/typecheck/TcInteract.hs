@@ -2026,7 +2026,8 @@ matchClassInst _ clas [ ty ] _
 matchClassInst _ clas ts _
   | isCTupleClass clas
   , let data_con = tyConSingleDataCon (classTyCon clas)
-  = return (GenInst ts (EvDFunApp (dataConWrapId data_con) ts))
+        tuple_ev = EvDFunApp (dataConWrapId data_con) ts
+  = return (GenInst ts tuple_ev True)
             -- The dfun is the data constructor!
 
 matchClassInst _ clas [k,t] _
