@@ -46,3 +46,4 @@ test('SomethingShowable', normal, compile, ['-ddump-types -fno-warn-partial-type
 test('Uncurry', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('UncurryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('WarningWildcardInstantiations', normal, compile, ['-ddump-types'])
+test('T10403', normal, compile, [''])
