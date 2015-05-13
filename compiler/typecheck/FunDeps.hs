@@ -446,7 +446,7 @@ oclose :: [PredType] -> TyVarSet -> TyVarSet
 -- See Note [The liberal coverage condition]
 oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = transCloVarSet extend fixed_tvs
+  | otherwise   = fixVarSet extend fixed_tvs
   where
     extend fixed_tvs = foldl add fixed_tvs tv_fds
        where
