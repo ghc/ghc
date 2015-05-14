@@ -502,7 +502,7 @@ runGHCi paths maybe_exprs = do
 
   dot_cfgs <- if ignore_dot_ghci then return [] else do
     dot_files <- catMaybes <$> sequence [ current_dir, app_user_dir, home_dir ]
-    liftIO $ filterM checkDirAndFilePerms dot_files
+    liftIO $ filterM checkFileAndDirPerms dot_files
   let arg_cfgs = reverse $ ghciScripts dflags
     -- -ghci-script are collected in reverse order
   mcfgs <- liftIO $ mapM canonicalizePath' $ dot_cfgs ++ arg_cfgs
@@ -589,11 +589,10 @@ nextInputLine show_prompt is_tty
 -- don't need to check .. and ../.. etc. because "."  always refers to
 -- the same directory while a process is running.
 
-checkDirAndFilePerms :: FilePath -> IO Bool
-checkDirAndFilePerms file = do
-  dir_ok <- checkPerms $ getDirectory file
+checkFileAndDirPerms :: FilePath -> IO Bool
+checkFileAndDirPerms file = do
   file_ok <- checkPerms file
-  return (dir_ok && file_ok)
+  if file_ok then checkPerms (getDirectory file) else return False
   where
   getDirectory f = case takeDirectory f of
     "" -> "."
