@@ -22,7 +22,6 @@ import Kind
 import RnEnv
 import RnSource         ( rnSrcDecls, findSplice )
 import RnPat            ( rnPat )
-import LoadIface        ( loadInterfaceForName )
 import BasicTypes       ( TopLevelFlag, isTopLevel )
 import Outputable
 import Module
@@ -98,10 +97,8 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
   = do { name <- lookupOccRn rdr_name
        ; this_mod <- getModule
 
-       ; case flg of
-           { -- Type variables can be quoted in TH. See #5721.
-             False -> return ()
-           ; True | nameIsLocalOrFrom this_mod name ->
+       ; when (flg && nameIsLocalOrFrom this_mod name) $
+             -- Type variables can be quoted in TH. See #5721.
                  do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
                     ; case mb_bind_lvl of
                         { Nothing -> return ()      -- Can happen for data constructors,
@@ -116,15 +113,7 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
                                              (quotedNameStageErr br) }
                         }
                     }
-           ; True | otherwise ->  -- Imported thing
-                 discardResult (loadInterfaceForName msg name)
-                     -- Reason for loadInterface: deprecation checking
-                     -- assumes that the home interface is loaded, and
-                     -- this is the only way that is going to happen
-           }
        ; return (VarBr flg name, unitFV name) }
-  where
-    msg = ptext (sLit "Need interface for Template Haskell quoted Name")
 
 rn_bracket _ (ExpBr e) = do { (e', fvs) <- rnLExpr e
                             ; return (ExpBr e', fvs) }
