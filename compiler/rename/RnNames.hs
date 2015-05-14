@@ -32,7 +32,6 @@ import NameSet
 import Avail
 import HscTypes
 import RdrName
-import RdrHsSyn        ( setRdrNameSpace )
 import Outputable
 import Maybes
 import SrcLoc
@@ -653,13 +652,9 @@ Then M's export_avails are (recall the AvailTC invariant from Avails.hs)
   C(C,T), T(T,T1,T2,T3)
 Notice that T appears *twice*, once as a child and once as a parent.
 From this we construct the imp_occ_env
-   C  -> (C,  C(C,T),        Nothing)
+   C  -> (C,  C(C,T),        Nothing
    T  -> (T,  T(T,T1,T2,T3), Just C)
    T1 -> (T1, T(T1,T2,T3),   Nothing)   -- similarly T2,T3
-
-If we say
-   import M( T(T1,T2) )
-then we get *two* Avails:  C(T), T(T1,T2)
 
 Note that the imp_occ_env will have entries for data constructors too,
 although we never look up data constructors.
@@ -768,30 +763,19 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
             return ([(IEVar (L l name), trimAvail avail name)], [])
 
         IEThingAll (L l tc) -> do
-            (name, avail, mb_parent) <- lookup_name tc
-            let warns = case avail of
-                          Avail {}                     -- e.g. f(..)
-                            -> [DodgyImport tc]
-
-                          AvailTC _ subs
-                            | null (drop 1 subs)       -- e.g. T(..) where T is a synonym
-                            -> [DodgyImport tc]
-
-                            | not (is_qual decl_spec)  -- e.g. import M( T(..) )
-                            -> [MissingImportList]
-
-                            | otherwise
-                            -> []
-
-                renamed_ie = IEThingAll (L l name)
-                sub_avails = case avail of
-                               Avail {}           -> []
-                               AvailTC name2 subs -> [(renamed_ie, AvailTC name2 (subs \\ [name]))]
+            (name, avail@(AvailTC name2 subs), mb_parent) <- lookup_name tc
+            let warns | null (drop 1 subs)      = [DodgyImport tc]
+                      | not (is_qual decl_spec) = [MissingImportList]
+                      | otherwise               = []
             case mb_parent of
-              Nothing     -> return ([(renamed_ie, avail)], warns)
-                             -- non-associated ty/cls
-              Just parent -> return ((renamed_ie, AvailTC parent [name]) : sub_avails, warns)
-                             -- associated type
+              -- non-associated ty/cls
+              Nothing     -> return ([(IEThingAll (L l name), avail)], warns)
+              -- associated ty
+              Just parent -> return ([(IEThingAll (L l name),
+                                       AvailTC name2 (subs \\ [name])),
+                                      (IEThingAll (L l name),
+                                       AvailTC parent [name])],
+                                     warns)
 
         IEThingAbs (L l tc)
             | want_hiding   -- hiding ( C )

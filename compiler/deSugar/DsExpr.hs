@@ -23,6 +23,7 @@ import DsMonad
 import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
+
 import DsMeta
 import HsSyn
 
@@ -292,7 +293,7 @@ dsExpr (ExplicitTuple tup_args boxity)
                 -- The reverse is because foldM goes left-to-right
 
        ; return $ mkCoreLams lam_vars $
-                  mkCoreConApps (tupleDataCon boxity (length tup_args))
+                  mkCoreConApps (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
                                 (map (Type . exprType) args ++ args) }
 
 dsExpr (HsSCC _ cc expr@(L loc _)) = do
@@ -427,7 +428,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
                             , srcLocCol  $ realSrcSpanStart r
                             )
            _             -> (0, 0)
-        srcLoc = mkCoreConApps (tupleDataCon Boxed 2)
+        srcLoc = mkCoreConApps (tupleCon BoxedTuple 2)
                      [ Type intTy              , Type intTy
                      , mkIntExprInt dflags line, mkIntExprInt dflags col
                      ]

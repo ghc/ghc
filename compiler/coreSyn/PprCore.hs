@@ -131,7 +131,7 @@ ppr_expr add_par expr@(App {})
     let
         pp_args     = sep (map pprArg args)
         val_args    = dropWhile isTypeArg args   -- Drop the type arguments for tuples
-        pp_tup_args = pprWithCommas pprCoreExpr val_args
+        pp_tup_args = sep (punctuate comma (map pprCoreExpr val_args))
     in
     case fun of
         Var f -> case isDataConWorkId_maybe f of
@@ -230,7 +230,7 @@ pprCoreAlt (con, args, rhs)
 ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
 ppr_case_pat (DataAlt dc) args
   | Just sort <- tyConTuple_maybe tc
-  = tupleParens sort (pprWithCommas ppr_bndr args)
+  = tupleParens sort (hsep (punctuate comma (map ppr_bndr args)))
   where
     ppr_bndr = pprBndr CaseBind
     tc = dataConTyCon dc

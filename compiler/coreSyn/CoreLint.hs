@@ -1570,7 +1570,7 @@ lookupIdInScope id
 
 
 oneTupleDataConId :: Id -- Should not happen
-oneTupleDataConId = dataConWorkId (tupleDataCon Boxed 1)
+oneTupleDataConId = dataConWorkId (tupleCon BoxedTuple 1)
 
 checkBndrIdInScope :: Var -> Var -> LintM ()
 checkBndrIdInScope binder id

@@ -10,7 +10,7 @@ module PrelInfo (
         primOpRules, builtinRules,
 
         ghcPrimExports,
-        wiredInThings, knownKeyNames,
+        wiredInThings, basicKnownKeyNames,
         primOpId,
 
         -- Random other things
@@ -30,7 +30,6 @@ import PrimOp
 import DataCon
 import Id
 import MkId
-import Name( Name, getName )
 import TysPrim
 import TysWiredIn
 import HscTypes
@@ -39,31 +38,12 @@ import TyCon
 import Util
 import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
 
-#ifdef GHCI
-import THNames
-#endif
-
 import Data.Array
 
-
-{- *********************************************************************
+{-
+************************************************************************
 *                                                                      *
-                Known key things
-*                                                                      *
-********************************************************************* -}
-
-knownKeyNames :: [Name]
-knownKeyNames
-  = map getName wiredInThings
-    ++ cTupleTyConNames
-    ++ basicKnownKeyNames
-#ifdef GHCI
-    ++ templateHaskellNames
-#endif
-
-{- *********************************************************************
-*                                                                      *
-                Wired in things
+\subsection[builtinNameInfo]{Lookup built-in names}
 *                                                                      *
 ************************************************************************
 

@@ -50,7 +50,6 @@ module Type (
         mkClassPred,
         isClassPred, isEqPred,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
-        isCTupleClass,
 
         -- Deconstructing predicate types
         PredTree(..), EqRel(..), eqRelRole, classifyPredType,
@@ -914,9 +913,6 @@ isIPClass :: Class -> Bool
 isIPClass cls = cls `hasKey` ipClassNameKey
   -- Class and it corresponding TyCon have the same Unique
 
-isCTupleClass :: Class -> Bool
-isCTupleClass cls = isTupleTyCon (classTyCon cls)
-
 isIPPred_maybe :: Type -> Maybe (FastString, Type)
 isIPPred_maybe ty =
   do (tc,[t1,t2]) <- splitTyConApp_maybe ty
@@ -1024,6 +1020,7 @@ eqRelRole ReprEq = Representational
 
 data PredTree = ClassPred Class [Type]
               | EqPred EqRel Type Type
+              | TuplePred [PredType]
               | IrredPred PredType
 
 classifyPredType :: PredType -> PredTree
@@ -1038,6 +1035,8 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
      -- the Coercible check
     Just (tc, tys) | Just clas <- tyConClass_maybe tc
                    -> ClassPred clas tys
+    Just (tc, tys) | isTupleTyCon tc
+                   -> TuplePred tys
     _ -> IrredPred ev_ty
 
 getClassPredTys :: PredType -> (Class, [Type])

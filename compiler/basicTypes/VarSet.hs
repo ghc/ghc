@@ -16,8 +16,8 @@ module VarSet (
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
-        minusVarSet, foldVarSet, filterVarSet,
-        transCloVarSet, fixVarSet,
+        minusVarSet, foldVarSet, filterVarSet, 
+        transCloVarSet,
         lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet
     ) where
@@ -110,28 +110,13 @@ intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 
-fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
-          -> VarSet -> VarSet
--- (fixVarSet f s) repeatedly applies f to the set s, 
--- until it reaches a fixed point.
-fixVarSet fn vars
-  | new_vars `subVarSet` vars = vars
-  | otherwise                 = fixVarSet fn new_vars
-  where
-    new_vars = fn vars
-
 transCloVarSet :: (VarSet -> VarSet)
                   -- Map some variables in the set to
                   -- extra variables that should be in it
                -> VarSet -> VarSet
--- (transCloVarSet f s) repeatedly applies f to new candidates, adding any
--- new variables to s that it finds thereby, until it reaches a fixed point.
---
--- The function fn could be (Var -> VarSet), but we use (VarSet -> VarSet)
--- for efficiency, so that the test can be batched up.
--- It's essential that fn will work fine if given new candidates
--- one at at time; ie  fn {v1,v2} = fn v1 `union` fn v2
--- Use fixVarSet if the function needs to see the whole set all at once
+-- (transCloVarSet f s) repeatedly applies f to the set s, adding any
+-- new variables to s that it finds thereby, until it reaches a fixed
+-- point.  The actual algorithm is a bit more efficient.
 transCloVarSet fn seeds
   = go seeds seeds
   where
@@ -139,7 +124,7 @@ transCloVarSet fn seeds
        -> VarSet  -- Work-list; un-processed subset of accumulating result
        -> VarSet
     -- Specification: go acc vs = acc `union` transClo fn vs
-
+   
     go acc candidates
        | isEmptyVarSet new_vs = acc
        | otherwise            = go (acc `unionVarSet` new_vs) new_vs

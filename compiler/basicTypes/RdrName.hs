@@ -32,7 +32,7 @@ module RdrName (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName,
+        rdrNameOcc, rdrNameSpace, setRdrNameSpace, demoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
@@ -152,6 +152,32 @@ rdrNameOcc (Exact name) = nameOccName name
 
 rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
+
+setRdrNameSpace :: RdrName -> NameSpace -> RdrName
+-- ^ This rather gruesome function is used mainly by the parser.
+-- When parsing:
+--
+-- > data T a = T | T1 Int
+--
+-- we parse the data constructors as /types/ because of parser ambiguities,
+-- so then we need to change the /type constr/ to a /data constr/
+--
+-- The exact-name case /can/ occur when parsing:
+--
+-- > data [] a = [] | a : [a]
+--
+-- For the exact-name case we return an original name.
+setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
+setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
+setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
+setRdrNameSpace (Exact n)    ns
+  | isExternalName n
+  = Orig (nameModule n) occ
+  | otherwise   -- This can happen when quoting and then splicing a fixity
+                -- declaration for a type
+  = Exact $ mkSystemNameAt (nameUnique n) occ (nameSrcSpan n)
+  where
+    occ = setOccNameSpace ns (nameOccName n)
 
 -- demoteRdrName lowers the NameSpace of RdrName.
 -- see Note [Demotion] in OccName

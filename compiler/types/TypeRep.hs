@@ -78,7 +78,6 @@ import Outputable
 import FastString
 import Util
 import DynFlags
-import StaticFlags( opt_PprStyle_Debug )
 
 -- libraries
 import Data.List( mapAccumL, partition )
@@ -744,7 +743,8 @@ pprTcApp p pp tc tys
         ty_args = drop arity tys    -- Drop the kind args
   , ty_args `lengthIs` arity        -- Result is saturated
   = pprPromotionQuote tc <>
-    (tupleParens tup_sort $ pprWithCommas (pp TopPrec) ty_args)
+    (tupleParens tup_sort $
+     sep (punctuate comma (map (pp TopPrec) ty_args)))
 
   | otherwise
   = sdocWithDynFlags (pprTcApp_help p pp tc tys)
@@ -754,12 +754,11 @@ pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> TupleSort -> [a] -> S
 pprTupleApp p pp tc sort tys
   | null tys
   , ConstraintTuple <- sort
-  = if opt_PprStyle_Debug then ptext (sLit "(%%)")
-                          else maybeParen p FunPrec $
-                               ptext (sLit "() :: Constraint")
+  = maybeParen p TopPrec $
+    ppr tc <+> dcolon <+> ppr (tyConKind tc)
   | otherwise
   = pprPromotionQuote tc <>
-    tupleParens sort (pprWithCommas (pp TopPrec) tys)
+    tupleParens sort (sep (punctuate comma (map (pp TopPrec) tys)))
 
 pprTcApp_help :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
 -- This one has accss to the DynFlags

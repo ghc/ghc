@@ -16,7 +16,7 @@ module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
 #include "HsVersions.h"
 
 import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
-import THNames( liftStringName, liftName )
+import DsMeta( liftStringName, liftName )
 
 import HsSyn
 import TcHsSyn
@@ -373,7 +373,7 @@ tcExpr (SectionL arg1 op) res_ty
 
 tcExpr (ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
-  = do { let tup_tc = tupleTyCon boxity (length tup_args)
+  = do { let tup_tc = tupleTyCon (boxityNormalTupleSort boxity) (length tup_args)
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
        ; tup_args1 <- tcTupArgs tup_args arg_tys
        ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
@@ -383,7 +383,7 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
     do { let kind = case boxity of { Boxed   -> liftedTypeKind
                                    ; Unboxed -> openTypeKind }
              arity = length tup_args
-             tup_tc = tupleTyCon boxity arity
+             tup_tc = tupleTyCon (boxityNormalTupleSort boxity) arity
 
        ; arg_tys <- newFlexiTyVarTys (tyConArity tup_tc) kind
        ; let actual_res_ty
@@ -1273,14 +1273,14 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
                -- just going to flag an error for now
 
         ; lift <- if isStringTy id_ty then
-                     do { sid <- tcLookupId THNames.liftStringName
+                     do { sid <- tcLookupId DsMeta.liftStringName
                                      -- See Note [Lifting strings]
                         ; return (HsVar sid) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
                      newMethodFromName (OccurrenceOf (idName id))
-                                       THNames.liftName id_ty
+                                       DsMeta.liftName id_ty
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var

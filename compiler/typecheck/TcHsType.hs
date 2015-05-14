@@ -476,8 +476,8 @@ tc_hs_type hs_ty@(HsExplicitListTy _k tys) exp_kind
 tc_hs_type hs_ty@(HsExplicitTupleTy _ tys) exp_kind
   = do { tks <- mapM tc_infer_lhs_type tys
        ; let n          = length tys
-             kind_con   = promotedTupleTyCon   Boxed n
-             ty_con     = promotedTupleDataCon Boxed n
+             kind_con   = promotedTupleTyCon   BoxedTuple n
+             ty_con     = promotedTupleDataCon BoxedTuple n
              (taus, ks) = unzip tks
              tup_k      = mkTyConApp kind_con ks
        ; checkExpectedKind hs_ty tup_k exp_kind
@@ -568,15 +568,10 @@ finish_tuple :: HsType Name -> TupleSort -> [TcType] -> ExpKind -> TcM TcType
 finish_tuple hs_ty tup_sort tau_tys exp_kind
   = do { traceTc "finish_tuple" (ppr res_kind $$ ppr exp_kind $$ ppr exp_kind)
        ; checkExpectedKind hs_ty res_kind exp_kind
-       ; tycon <- case tup_sort of
-           ConstraintTuple -> tcLookupTyCon (cTupleTyConName arity)
-           BoxedTuple      -> do { let tc = tupleTyCon Boxed arity
-                                 ; checkWiredInTyCon tc
-                                 ; return tc }
-           UnboxedTuple    -> return (tupleTyCon Unboxed arity)
+       ; checkWiredInTyCon tycon
        ; return (mkTyConApp tycon tau_tys) }
   where
-    arity = length tau_tys
+    tycon = tupleTyCon tup_sort (length tau_tys)
     res_kind = case tup_sort of
                  UnboxedTuple    -> unliftedTypeKind
                  BoxedTuple      -> liftedTypeKind
@@ -1563,7 +1558,7 @@ tc_hs_kind (HsTupleTy _ kis) =
      checkWiredInTyCon tycon
      return $ mkTyConApp tycon kappas
   where
-     tycon = promotedTupleTyCon Boxed (length kis)
+     tycon = promotedTupleTyCon BoxedTuple (length kis)
 
 -- Argument not kind-shaped
 tc_hs_kind k = pprPanic "tc_hs_kind" (ppr k)

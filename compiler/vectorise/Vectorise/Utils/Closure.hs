@@ -22,7 +22,7 @@ import TyCon
 import DataCon
 import MkId
 import TysWiredIn
-import BasicTypes( Boxity(..) )
+import BasicTypes( TupleSort(..) )
 import FastString
 
 
@@ -128,13 +128,13 @@ buildEnv []
       void  <- builtin voidVar
       pvoid <- builtin pvoidVar
       return (ty, vVar (void, pvoid), \_ body -> body)
-buildEnv [v]
+buildEnv [v] 
  = return (vVarType v, vVar v,
            \env body -> vLet (vNonRec v env) body)
 buildEnv vs
  = do (lenv_tc, lenv_tyargs) <- pdataReprTyCon ty
 
-      let venv_con   = tupleDataCon Boxed (length vs)
+      let venv_con   = tupleCon BoxedTuple (length vs) 
           [lenv_con] = tyConDataCons lenv_tc
 
           venv       = mkCoreTup (map Var vvs)

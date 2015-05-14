@@ -1,17 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns,
-             KindSignatures, DataKinds, ConstraintKinds,
-              MultiParamTypeClasses, FunctionalDependencies #-}
+             KindSignatures, DataKinds, MultiParamTypeClasses, FunctionalDependencies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
   -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
--- -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
-
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
--- -fno-warn-unused-top-binds is there (I hope) to stop Haddock complaining
--- about the constraint tuples being defined but not used
-
+-- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -320,37 +314,3 @@ x# `modInt#` y#
       else r#
     where
     !r# = x# `remInt#` y#
-
-
-{- *************************************************************
-*                                                              *
-*               Constraint tuples                              *
-*                                                              *
-************************************************************* -}
-
-class ()
-class (c1, c2)     => (c1, c2)
-class (c1, c2, c3) => (c1, c2, c3)
-class (c1, c2, c3, c4) => (c1, c2, c3, c4)
-class (c1, c2, c3, c4, c5) => (c1, c2, c3, c4, c5)
-class (c1, c2, c3, c4, c5, c6) => (c1, c2, c3, c4, c5, c6)
-class (c1, c2, c3, c4, c5, c6, c7) => (c1, c2, c3, c4, c5, c6, c7)
-class (c1, c2, c3, c4, c5, c6, c7, c8) => (c1, c2, c3, c4, c5, c6, c7, c8)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15)
-class (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16)
-   => (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16)
-
-

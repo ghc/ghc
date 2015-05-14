@@ -38,7 +38,7 @@ import Outputable
 import TcExpr
 import SrcLoc
 import FastString
-import THNames
+import DsMeta
 import TcUnify
 import TcEnv
 

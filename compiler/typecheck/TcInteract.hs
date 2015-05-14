@@ -27,7 +27,6 @@ import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
 import Id( idType )
 import Class
 import TyCon
-import DataCon( dataConWrapId )
 import FunDeps
 import FamInst
 import Inst( tyVarsOfCt )
@@ -1531,12 +1530,13 @@ emitFunDepDeriveds fd_eqns
 
 topReactionsStage :: WorkItem -> TcS (StopOrContinue Ct)
 topReactionsStage wi
- = do { tir <- doTopReact wi
+ = do { inerts <- getTcSInerts
+      ; tir <- doTopReact inerts wi
       ; case tir of
           ContinueWith wi -> return (ContinueWith wi)
           Stop ev s       -> return (Stop ev (ptext (sLit "Top react:") <+> s)) }
 
-doTopReact :: WorkItem -> TcS (StopOrContinue Ct)
+doTopReact :: InertSet -> WorkItem -> TcS (StopOrContinue Ct)
 -- The work item does not react with the inert set, so try interaction with top-level
 -- instances. Note:
 --
@@ -1544,11 +1544,10 @@ doTopReact :: WorkItem -> TcS (StopOrContinue Ct)
 --       Instead superclasses are added in the worklist as part of the
 --       canonicalization process. See Note [Adding superclasses].
 
-doTopReact work_item
+doTopReact inerts work_item
   = do { traceTcS "doTopReact" (ppr work_item)
        ; case work_item of
-           CDictCan {}  -> do { inerts <- getTcSInerts
-                              ; doTopReactDict inerts work_item }
+           CDictCan {}  -> doTopReactDict inerts work_item
            CFunEqCan {} -> doTopReactFunEq work_item
            _  -> -- Any other work item does not react with any top-level equations
                  return (ContinueWith work_item)  }
@@ -1570,9 +1569,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                   -- of generating some improvements
                   -- C.f. Example 3 of Note [The improvement story]
                   -- It's easy because no evidence is involved
-   = do { dflags <- getDynFlags
-        ; lkup_inst_res <- matchClassInst dflags inerts cls xis dict_loc
-        ; case lkup_inst_res of
+   = do { lkup_inst_res <- matchClassInst inerts cls xis dict_loc
+         ; case lkup_inst_res of
                GenInst preds _ s -> do { mapM_ (emitNewDerived dict_loc) preds
                                        ; unless s $
                                            insertSafeOverlapFailureTcS work_item
@@ -1583,9 +1581,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                                        ; continueWith work_item } }
 
   | otherwise  -- Wanted, but not cached
-   = do { dflags <- getDynFlags
-        ; lkup_inst_res <- matchClassInst dflags inerts cls xis dict_loc
-        ; case lkup_inst_res of
+   = do { lkup_inst_res <- matchClassInst inerts cls xis dict_loc
+         ; case lkup_inst_res of
                GenInst theta mk_ev s -> do { addSolvedDict fl cls xis
                                            ; unless s $
                                                insertSafeOverlapFailureTcS work_item
@@ -1987,41 +1984,9 @@ instance Outputable LookupInstResult where
     where ss = text $ if s then "[safe]" else "[unsafe]"
 
 
-matchClassInst :: DynFlags -> InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+matchClassInst :: InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
 
--- First check whether there is an in-scope Given that could
--- match this constraint.  In that case, do not use top-level
--- instances.  See Note [Instance and Given overlap]
-matchClassInst dflags inerts clas tys _
-  | not (xopt Opt_IncoherentInstances dflags)
-  , not (isEmptyBag matchable_givens)
-  = do { traceTcS "Delaying instance application" $
-              vcat [ text "Work item=" <+> pprType (mkClassPred clas tys)
-                   , text "Relevant given dictionaries="
-                           <+> ppr matchable_givens ]
-       ; return NoInstance }
-  where
-     matchable_givens :: Cts
-     matchable_givens = filterBag matchable_given $
-                        findDictsByClass (inert_dicts $ inert_cans inerts) clas
-
-     matchable_given ct
-       | CDictCan { cc_class = clas_g, cc_tyargs = sys, cc_ev = fl } <- ct
-       , isGiven fl
-       , Just {} <- tcUnifyTys bind_meta_tv tys sys
-       = ASSERT( clas_g == clas ) True
-     matchable_given _ = False
-
-     bind_meta_tv :: TcTyVar -> BindFlag
-     -- Any meta tyvar may be unified later, so we treat it as
-     -- bindable when unifying with givens. That ensures that we
-     -- conservatively assume that a meta tyvar might get unified with
-     -- something that matches the 'given', until demonstrated
-     -- otherwise.
-     bind_meta_tv tv | isMetaTyVar tv = BindMe
-                     | otherwise      = Skolem
-
-matchClassInst _ _ clas [ ty ] _
+matchClassInst _ clas [ ty ] _
   | className clas == knownNatClassName
   , Just n <- isNumLitTy ty = makeDict (EvNum n)
 
@@ -2057,22 +2022,17 @@ matchClassInst _ _ clas [ ty ] _
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
 
-matchClassInst _ _ clas ts _
-  | isCTupleClass clas
-  , let data_con = tyConSingleDataCon (classTyCon clas)
-        tuple_ev = EvDFunApp (dataConWrapId data_con) ts
-  = return (GenInst ts tuple_ev True)
-            -- The dfun is the data constructor!
+matchClassInst _ clas [k,t] _
+  | className clas == typeableClassName = matchTypeableClass clas k t
 
-matchClassInst _ _ clas [k,t] _
-  | className clas == typeableClassName
-  = matchTypeableClass clas k t
-
-matchClassInst dflags _ clas tys loc
-   = do { traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred ]
+matchClassInst inerts clas tys loc
+   = do { dflags <- getDynFlags
+        ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
+                                           , text "inerts=" <+> ppr inerts ]
         ; instEnvs <- getInstEnvs
-        ; let safeOverlapCheck = safeHaskell dflags `elem` [Sf_Safe, Sf_Trustworthy]
-              (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
+        ; safeOverlapCheck <- ((`elem` [Sf_Safe, Sf_Trustworthy]) . safeHaskell)
+                            `fmap` getDynFlags
+        ; let (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
               safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
         ; case (matches, unify, safeHaskFail) of
 
@@ -2084,6 +2044,16 @@ matchClassInst dflags _ clas tys loc
 
             -- A single match (& no safe haskell failure)
             ([(ispec, inst_tys)], [], False)
+                | not (xopt Opt_IncoherentInstances dflags)
+                , not (isEmptyBag unifiable_givens)
+                -> -- See Note [Instance and Given overlap]
+                   do { traceTcS "Delaying instance application" $
+                          vcat [ text "Work item=" <+> pprType (mkClassPred clas tys)
+                               , text "Relevant given dictionaries="
+                                     <+> ppr unifiable_givens ]
+                      ; return NoInstance  }
+
+                | otherwise
                 -> do   { let dfun_id = instanceDFunId ispec
                         ; traceTcS "matchClass success" $
                           vcat [text "dict" <+> ppr pred,
@@ -2109,6 +2079,26 @@ matchClassInst dflags _ clas tys loc
             ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
             ; return $ GenInst theta (EvDFunApp dfun_id tys) so }
 
+     unifiable_givens :: Cts
+     unifiable_givens = filterBag matchable $
+                        findDictsByClass (inert_dicts $ inert_cans inerts) clas
+
+     matchable (CDictCan { cc_class = clas_g, cc_tyargs = sys, cc_ev = fl })
+       | isGiven fl
+       , Just {} <- tcUnifyTys bind_meta_tv tys sys
+       = ASSERT( clas_g == clas ) True
+       | otherwise = False -- No overlap with a solved, already been taken care of
+                           -- by the overlap check with the instance environment.
+     matchable ct = pprPanic "Expecting dictionary!" (ppr ct)
+
+     bind_meta_tv :: TcTyVar -> BindFlag
+     -- Any meta tyvar may be unified later, so we treat it as
+     -- bindable when unifying with givens. That ensures that we
+     -- conservatively assume that a meta tyvar might get unified with
+     -- something that matches the 'given', until demonstrated
+     -- otherwise.
+     bind_meta_tv tv | isMetaTyVar tv = BindMe
+                     | otherwise      = Skolem
 
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2144,18 +2134,12 @@ Trac #4981 and #5002.
 
 Other notes:
 
-* The check is done *first*, so that it also covers classes
-  with built-in instance solving, such as
-     - constraint tuples
-     - natural numbers
-     - Typeable
-
-* The given-overlap problem is arguably not easy to appear in practice
-  due to our aggressive prioritization of equality solving over other
+* This is arguably not easy to appear in practice due to our
+  aggressive prioritization of equality solving over other
   constraints, but it is possible. I've added a test case in
   typecheck/should-compile/GivenOverlapping.hs
 
-* Another "live" example is Trac #10195; another is #10177.
+* Another "live" example is Trac #10195
 
 * We ignore the overlap problem if -XIncoherentInstances is in force:
   see Trac #6002 for a worked-out example where this makes a

@@ -589,7 +589,7 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
         }
 
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
-  = do  { let tc = tupleTyCon boxity (length pats)
+  = do  { let tc = tupleTyCon (boxityNormalTupleSort boxity) (length pats)
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
         ; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 

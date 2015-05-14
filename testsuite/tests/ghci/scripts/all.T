@@ -216,4 +216,3 @@ test('T10408A', normal, run_command,
     ['$MAKE -s --no-print-directory T10408A'])
 test('T10408B', normal, run_command,
     ['$MAKE -s --no-print-directory T10408B'])
-test('T10248', normal, ghci_script, ['T10248.script'])

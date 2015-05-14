@@ -1377,6 +1377,7 @@ mkMinimalBySCs ptys = [ ploc |  ploc <- ptys
    trans_super_classes pred   -- Superclasses of pred, excluding pred itself
      = case classifyPredType pred of
          ClassPred cls tys -> transSuperClasses cls tys
+         TuplePred ts      -> concatMap trans_super_classes ts
          _                 -> []
 
 transSuperClasses :: Class -> [Type] -> [PredType]
@@ -1386,9 +1387,10 @@ transSuperClasses cls tys    -- Superclasses of (cls tys),
 
 transSuperClassesPred :: PredType -> [PredType]
 -- (transSuperClassesPred p) returns (p : p's superclasses)
-transSuperClassesPred p
+transSuperClassesPred p 
   = case classifyPredType p of
       ClassPred cls tys -> p : transSuperClasses cls tys
+      TuplePred ps      -> concatMap transSuperClassesPred ps
       _                 -> [p]
 
 immSuperClasses :: Class -> [Type] -> [PredType]
@@ -1404,6 +1406,7 @@ isImprovementPred ty
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
       ClassPred cls _    -> classHasFds cls
+      TuplePred ts       -> any isImprovementPred ts
       IrredPred {}       -> True -- Might have equalities after reduction?
 
 {-

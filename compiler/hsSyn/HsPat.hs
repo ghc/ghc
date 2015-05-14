@@ -302,24 +302,17 @@ pprParendPat p | hsPatNeedsParens p = parens (pprPat p)
                | otherwise          = pprPat p
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
-pprPat (VarPat var)           = pprPatBndr var
-pprPat (WildPat _)            = char '_'
-pprPat (LazyPat pat)          = char '~' <> pprParendLPat pat
-pprPat (BangPat pat)          = char '!' <> pprParendLPat pat
-pprPat (AsPat name pat)       = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
-pprPat (ViewPat expr pat _)   = hcat [pprLExpr expr, text " -> ", ppr pat]
-pprPat (ParPat pat)           = parens (ppr pat)
-pprPat (LitPat s)             = ppr s
-pprPat (NPat l Nothing  _)    = ppr l
-pprPat (NPat l (Just _) _)    = char '-' <> ppr l
-pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
-pprPat (SplicePat splice)     = pprSplice splice
-pprPat (CoPat co pat _)       = pprHsWrapper (ppr pat) co
-pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
-pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
+pprPat (VarPat var)       = pprPatBndr var
+pprPat (WildPat _)        = char '_'
+pprPat (LazyPat pat)      = char '~' <> pprParendLPat pat
+pprPat (BangPat pat)      = char '!' <> pprParendLPat pat
+pprPat (AsPat name pat)   = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
+pprPat (ViewPat expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
+pprPat (ParPat pat)         = parens (ppr pat)
 pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
-pprPat (PArrPat pats _)       = paBrackets (interpp'SP pats)
-pprPat (TuplePat pats bx _)   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
+pprPat (PArrPat pats _)     = paBrackets (interpp'SP pats)
+pprPat (TuplePat pats bx _) = tupleParens (boxityNormalTupleSort bx) (interpp'SP pats)
+
 pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
 pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                     pat_binds = binds, pat_args = details })
@@ -332,6 +325,14 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
 
+pprPat (LitPat s)           = ppr s
+pprPat (NPat l Nothing  _)  = ppr l
+pprPat (NPat l (Just _) _)  = char '-' <> ppr l
+pprPat (NPlusKPat n k _ _)  = hcat [ppr n, char '+', ppr k]
+pprPat (SplicePat splice)   = pprSplice splice
+pprPat (CoPat co pat _)     = pprHsWrapper (ppr pat) co
+pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPatOut pat ty)   = ppr pat <+> dcolon <+> ppr ty
 
 pprUserCon :: (OutputableBndr con, OutputableBndr id) => con -> HsConPatDetails id -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2

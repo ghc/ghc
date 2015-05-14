@@ -1725,7 +1725,8 @@ mkCallUDs' env f args
 
     type_determines_value pred    -- See Note [Type determines value]
         = case classifyPredType pred of
-            ClassPred cls _ -> not (isIPClass cls)  -- Superclasses can't be IPs
+            ClassPred cls _ -> not (isIPClass cls)
+            TuplePred ps    -> all type_determines_value ps
             EqPred {}       -> True
             IrredPred {}    -> True   -- Things like (D []) where D is a
                                       -- Constraint-ranged family; Trac #7785

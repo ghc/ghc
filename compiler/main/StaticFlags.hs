@@ -43,6 +43,7 @@ import CmdLineParser
 import FastString
 import SrcLoc
 import Util
+-- import Maybes                ( firstJusts )
 import Panic
 
 import Control.Monad

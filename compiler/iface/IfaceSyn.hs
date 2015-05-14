@@ -911,7 +911,7 @@ pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceCoercion co
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
-pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
+pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -1136,10 +1136,11 @@ freeNamesIfTcArgs ITC_Nil         = emptyNameSet
 freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
-freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfTcArgs ts
-freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfTcArgs ts
+freeNamesIfType (IfaceTyConApp tc ts) =
+   freeNamesIfTc tc &&& freeNamesIfTcArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
-freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfTvBndr tv &&& freeNamesIfType t
+freeNamesIfType (IfaceForAllTy tv t)  =
+   freeNamesIfTvBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceDFunTy s t)     = freeNamesIfType s &&& freeNamesIfType t
 

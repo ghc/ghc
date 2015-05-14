@@ -1,10 +1,2 @@
 
-mod89.hs:5:1: warning:
-    The import item ‘map(..)’ suggests that
-    ‘map’ has (in-scope) constructors or class methods,
-    but it has none
-
-mod89.hs:5:1: warning:
-    The import of ‘Prelude’ is redundant
-      except perhaps to import instances from ‘Prelude’
-    To import instances alone, use: import Prelude()
+mod89.hs:3:16: Module ‘Prelude’ does not export ‘map(..)’

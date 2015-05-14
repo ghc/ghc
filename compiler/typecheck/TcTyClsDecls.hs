@@ -581,24 +581,13 @@ Then:
 This fancy footwork (with two bindings for T) is only necesary for the
 TyCons or Classes of this recursive group.  Earlier, finished groups,
 live in the global env only.
-
-Note [Declarations for wired-in things]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For wired-in things we simply ignore the declaration
-and take the wired-in information.  That avoids complications.
-e.g. the need to make the data constructor worker name for
-     a constraint tuple match the wired-in one
 -}
 
 tcTyClDecl :: RecTyInfo -> LTyClDecl Name -> TcM [TyThing]
 tcTyClDecl rec_info (L loc decl)
-  | Just thing <- wiredInNameTyThing_maybe (tcdName decl)
-  = return [thing]  -- See Note [Declarations for wired-in things]
-
-  | otherwise
   = setSrcSpan loc $ tcAddDeclCtxt decl $
-    do { traceTc "tcTyAndCl-x" (ppr decl)
-       ; tcTyClDecl1 NoParentTyCon rec_info decl }
+    traceTc "tcTyAndCl-x" (ppr decl) >>
+    tcTyClDecl1 NoParentTyCon rec_info decl
 
   -- "type family" declarations
 tcTyClDecl1 :: TyConParent -> RecTyInfo -> TyClDecl Name -> TcM [TyThing]
@@ -799,7 +788,7 @@ tcDataDefn rec_info tc_name tvs kind
                  else case new_or_data of
                    DataType -> return (mkDataTyConRhs data_cons)
                    NewType  -> ASSERT( not (null data_cons) )
-                               mkNewTyConRhs tc_name tycon (head data_cons)
+                                    mkNewTyConRhs tc_name tycon (head data_cons)
              ; return (buildAlgTyCon tc_name final_tvs roles (fmap unLoc cType)
                                      stupid_theta tc_rhs
                                      (rti_is_rec rec_info tc_name)
@@ -1451,9 +1440,6 @@ checkValidTyCl thing
 
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc
-  | isPrimTyCon tc   -- Happens when Haddock'ing GHC.Prim
-  = return ()
-
   | Just cl <- tyConClass_maybe tc
   = checkValidClass cl
 

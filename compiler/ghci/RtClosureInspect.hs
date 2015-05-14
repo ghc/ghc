@@ -48,7 +48,7 @@ import Name
 import VarEnv
 import Util
 import VarSet
-import BasicTypes       ( Boxity(..) )
+import BasicTypes       ( TupleSort(UnboxedTuple) )
 import TysPrim
 import PrelNames
 import TysWiredIn
@@ -832,9 +832,8 @@ extractSubTerms recurse clos = liftM thirdOf3 . go 0 (nonPtrs clos)
         let (ws0, ws1) = splitAt (primRepSizeW dflags rep) ws
         return (ptr_i, ws1, Prim ty ws0)
 
-    unboxedTupleTerm ty terms
-      = Term ty (Right (tupleDataCon Unboxed (length terms)))
-                (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
+    unboxedTupleTerm ty terms = Term ty (Right (tupleCon UnboxedTuple (length terms)))
+                                        (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
 
 
 -- Fast, breadth-first Type reconstruction

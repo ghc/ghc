@@ -907,7 +907,7 @@ seqRule :: RuleM CoreExpr
 seqRule = do
   [ty_a, Type ty_s, a, s] <- getArgs
   guard $ exprIsHNF a
-  return $ mkConApp (tupleDataCon Unboxed 2)
+  return $ mkConApp (tupleCon UnboxedTuple 2)
     [Type (mkStatePrimTy ty_s), ty_a, s, a]
 
 -- spark# :: forall a s . a -> State# s -> (# State# s, a #)
@@ -1224,7 +1224,7 @@ match_Integer_divop_both divop _ id_unf _ [xl,yl]
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   , (r,s) <- x `divop` y
-  = Just $ mkConApp (tupleDataCon Unboxed 2)
+  = Just $ mkConApp (tupleCon UnboxedTuple 2)
                     [Type t,
                      Type t,
                      Lit (LitInteger r t),
@@ -1300,7 +1300,7 @@ match_decodeDouble _ id_unf fn [xl]
     FunTy _ (TyConApp _ [integerTy, intHashTy]) ->
         case decodeFloat (fromRational x :: Double) of
         (y, z) ->
-            Just $ mkConApp (tupleDataCon Unboxed 2)
+            Just $ mkConApp (tupleCon UnboxedTuple 2)
                             [Type integerTy,
                              Type intHashTy,
                              Lit (LitInteger y integerTy),
