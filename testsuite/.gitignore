@@ -1197,6 +1197,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/plugins/plugins01
 /tests/plugins/plugins05
 /tests/plugins/plugins06
+/tests/plugins/plugins07
 /tests/plugins/simple-plugin/dist/
 /tests/plugins/simple-plugin/install/
 /tests/plugins/simple-plugin/local.package.conf
@@ -1204,6 +1205,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/plugins/simple-plugin/pkg.plugins02/
 /tests/plugins/simple-plugin/pkg.plugins03/
 /tests/plugins/simple-plugin/setup
+/tests/plugins/rule-defining-plugin/pkg.plugins07/
 /tests/polykinds/Freeman
 /tests/polykinds/MonoidsFD
 /tests/polykinds/MonoidsTF

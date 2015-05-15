@@ -38,3 +38,9 @@ test('plugins06',
        only_ways([config.ghc_plugin_way]) ],
      multimod_compile_and_run, ['plugins06', '-package ghc'])
 
+test('plugins07',
+     [pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.plugins07'),
+      clean_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin clean.plugins07'),
+      expect_broken(10420)],
+     run_command,
+     ['$MAKE -s --no-print-directory plugins07'])
