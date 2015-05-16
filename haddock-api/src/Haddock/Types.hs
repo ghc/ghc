@@ -442,6 +442,7 @@ instance (NFData a, NFData mod)
     DocHyperlink a            -> a `deepseq` ()
     DocPic a                  -> a `deepseq` ()
     DocMathInline a           -> a `deepseq` ()
+    DocMathDisplay a          -> a `deepseq` ()
     DocAName a                -> a `deepseq` ()
     DocProperty a             -> a `deepseq` ()
     DocExamples a             -> a `deepseq` ()
@@ -490,6 +491,7 @@ data DocMarkup id a = Markup
   , markupAName                :: String -> a
   , markupPic                  :: Picture -> a
   , markupMathInline           :: String -> a
+  , markupMathDisplay          :: String -> a
   , markupProperty             :: String -> a
   , markupExample              :: [Example] -> a
   , markupHeader               :: Header a -> a
@@ -528,7 +530,6 @@ emptyHaddockModInfo = HaddockModInfo
 -----------------------------------------------------------------------------
 
 
-{-! for DocOption derive: Binary !-}
 -- | Source-level options for controlling the documentation.
 data DocOption
   = OptHide            -- ^ This module should not appear in the docs.

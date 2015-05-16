@@ -1108,6 +1108,7 @@ parLatexMarkup ppId = Markup {
   markupUnorderedList        = \p v -> itemizedList (map ($v) p) $$ text "",
   markupPic                  = \p _ -> markupPic p,
   markupMathInline           = \p _ -> markupMathInline p,
+  markupMathDisplay          = \p _ -> markupMathDisplay p,
   markupOrderedList          = \p v -> enumeratedList (map ($v) p) $$ text "",
   markupDefList              = \l v -> descriptionList (map (\(a,b) -> (a v, b v)) l),
   markupCodeBlock            = \p _ -> quote (verb (p Verb)) $$ text "",
@@ -1140,7 +1141,9 @@ parLatexMarkup ppId = Markup {
 
         beg = text "image: " <> text uri
 
-    markupMathInline mathjax = text "$" <> text mathjax <> text "$"
+    markupMathInline mathjax = text "\\(" <> text mathjax <> text "\\)"
+
+    markupMathDisplay mathjax = text "\\[" <> text mathjax <> text "\\]"
 
     markupId ppId_ id v =
       case v of
