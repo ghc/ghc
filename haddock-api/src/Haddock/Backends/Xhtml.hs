@@ -114,6 +114,7 @@ headHtml docTitle miniPage themes =
     thetitle << docTitle,
     styleSheet themes,
     script ! [src jsFile, thetype "text/javascript"] << noHtml,
+    script ! [src "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML", thetype "text/javascript"] << noHtml,
     script ! [thetype "text/javascript"]
         -- NB: Within XHTML, the content of script tags needs to be
         -- a <![CDATA[ section. Will break if the miniPage name could

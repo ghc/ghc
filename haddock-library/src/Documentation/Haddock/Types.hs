@@ -71,6 +71,7 @@ data DocH mod id
   | DocCodeBlock (DocH mod id)
   | DocHyperlink Hyperlink
   | DocPic Picture
+  | DocMathInline String
   | DocAName String
   | DocProperty String
   | DocExamples [Example]
