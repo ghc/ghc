@@ -379,7 +379,7 @@ test('T783',
             # 2014-04-04: 319179104 (x86 Windows, 64 bit machine)
             # 2014-09-03: 223377364 (Windows, better specialisation, raft of core-to-core optimisations)
 
-           (wordsize(64), 441932632, 10)]),
+           (wordsize(64), 452933048, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -394,6 +394,8 @@ test('T783',
             #   (general round of updates)
             # 2014-08-29: 441932632  (amd64/Linux)
             #   (better specialisation, raft of core-to-core optimisations)
+            # 2015-05-16: 452933048  (amd64/Linux)
+	    #   (improved sequenceBlocks in nativeCodeGen, #10422)
       extra_hc_opts('-static')
       ],
       compile,[''])
