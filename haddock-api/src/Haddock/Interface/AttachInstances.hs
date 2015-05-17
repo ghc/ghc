@@ -38,6 +38,7 @@ import MonadUtils (liftIO)
 import Name
 import Outputable (text, sep, (<+>))
 import PrelNames
+import SrcLoc
 import TcRnDriver (tcRnGetInfo)
 import TcType (tcSplitSigmaTy)
 import TyCon
@@ -68,11 +69,11 @@ attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap
                    -> Ghc (ExportItem Name)
 attachToExportItem expInfo iface ifaceMap instIfaceMap export =
   case attachFixities export of
-    e@ExportDecl { expItemDecl = L _ (TyClD d) } -> do
+    e@ExportDecl { expItemDecl = L eSpan (TyClD d) } -> do
       mb_info <- getAllInfo (tcdName d)
       insts <- case mb_info of
         Just (_, _, cls_instances, fam_instances) ->
-          let fam_insts = [ (L (getSrcSpan n) $ synifyFamInst i opaque, doc)
+          let fam_insts = [ (synifyFamInst i opaque, doc,spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d)) )
                           | i <- sortBy (comparing instFam) fam_instances
                           , let n = getName i
                           , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
@@ -80,14 +81,14 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
                           , not $ any (isTypeHidden expInfo) (fi_tys i)
                           , let opaque = isTypeHidden expInfo (fi_rhs i)
                           ]
-              cls_insts = [ (L (getSrcSpan n) $ synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
+              cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L eSpan (tcdName d)))
                           | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
                           , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                           , not $ isInstanceHidden expInfo cls tys
                           ]
               -- fam_insts but with failing type fams filtered out
-              cleanFamInsts = [ (L l fi, n) | (L l (Right fi), n) <- fam_insts ]
-              famInstErrs = [ errm | (L _ (Left errm), _) <- fam_insts ]
+              cleanFamInsts = [ (fi, n, L l r) | (Right fi, n, L l (Right r)) <- fam_insts ]
+              famInstErrs = [ errm | (Left errm, _, _) <- fam_insts ]
           in do
             dfs <- getDynFlags
             let mkBug = (text "haddock-bug:" <+>) . text
@@ -106,6 +107,18 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
       ] }
 
     attachFixities e = e
+    -- spanName: attach the location to the name that is the same file as the instance location
+    spanName s (clsn,_,_,_) (L instL instn) =
+        let s1 = getSrcSpan s
+            sn = if srcSpanFileName_maybe s1 == srcSpanFileName_maybe instL
+                    then instn
+                    else clsn
+        in L (getSrcSpan s) sn
+    -- spanName on Either
+    spanNameE s (Left e) _ =  L (getSrcSpan s) (Left e)
+    spanNameE s (Right ok) linst =
+      let L l r = spanName s ok linst
+      in L l (Right r)
 
 
 instLookup :: (InstalledInterface -> Map.Map Name a) -> Name

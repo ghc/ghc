@@ -497,12 +497,12 @@ ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppS
 
 ppInstances :: LinksInfo -> [DocInstance DocName] -> DocName -> Unicode -> Qualification -> Html
 ppInstances links instances baseName unicode qual
-  = subInstances qual instName links True baseName (map instDecl instances)
+  = subInstances qual instName links True (map instDecl instances)
   -- force Splice = True to use line URLs
   where
     instName = getOccString $ getName baseName
-    instDecl :: DocInstance DocName -> (SubDecl,SrcSpan)
-    instDecl (L l inst, maybeDoc) = ((instHead inst, maybeDoc, []),l)
+    instDecl :: DocInstance DocName -> (SubDecl,Located DocName)
+    instDecl (inst, maybeDoc,l) = ((instHead inst, maybeDoc, []),l)
     instHead (n, ks, ts, ClassInst cs) = ppContextNoLocs cs unicode qual
         <+> ppAppNameTypes n ks ts unicode qual
     instHead (n, ks, ts, TypeInst rhs) = keyword "type"

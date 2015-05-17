@@ -544,14 +544,14 @@ ppDocInstances unicode (i : rest)
     (is, rest') = spanWith isUndocdInstance rest
 
 isUndocdInstance :: DocInstance a -> Maybe (InstHead a)
-isUndocdInstance (L _ i,Nothing) = Just i
+isUndocdInstance (i,Nothing,_) = Just i
 isUndocdInstance _ = Nothing
 
 -- | Print a possibly commented instance. The instance header is printed inside
 -- an 'argBox'. The comment is printed to the right of the box in normal comment
 -- style.
 ppDocInstance :: Bool -> DocInstance DocName -> LaTeX
-ppDocInstance unicode (L _ instHead, doc) =
+ppDocInstance unicode (instHead, doc, _) =
   declWithDoc (ppInstDecl unicode instHead) (fmap docToLaTeX $ fmap _doc doc)
 
 

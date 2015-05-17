@@ -44,7 +44,6 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils (makeAnchorId)
-
 import qualified Data.Map as Map
 import Text.XHtml hiding ( name, title, p, quote )
 
@@ -148,20 +147,21 @@ subTable qual decls = Just $ table << aboves (concatMap subRow decls)
        docElement td << fmap (docToHtml Nothing qual) mdoc)
       : map (cell . (td <<)) subs
 
+
 -- | Sub table with source information (optional).
-subTableSrc :: Qualification -> LinksInfo -> Bool -> DocName -> [(SubDecl,SrcSpan)] -> Maybe Html
-subTableSrc _ _  _ _ [] = Nothing
-subTableSrc qual lnks splice dn decls = Just $ table << aboves (concatMap subRow decls)
+subTableSrc :: Qualification -> LinksInfo -> Bool -> [(SubDecl,Located DocName)] -> Maybe Html
+subTableSrc _ _  _ [] = Nothing
+subTableSrc qual lnks splice decls = Just $ table << aboves (concatMap subRow decls)
   where
-    subRow ((decl, mdoc, subs),loc) =
+    subRow ((decl, mdoc, subs),L loc dn) =
       (td ! [theclass "src"] << decl
-      <+> linkHtml loc
+      <+> linkHtml loc dn
       <->
       docElement td << fmap (docToHtml Nothing qual) mdoc
       )
       : map (cell . (td <<)) subs
-    linkHtml loc@(RealSrcSpan _) = links lnks loc splice dn
-    linkHtml _ = noHtml
+    linkHtml loc@(RealSrcSpan _) dn = links lnks loc splice dn
+    linkHtml _ _ = noHtml
 
 subBlock :: [Html] -> Maybe Html
 subBlock [] = Nothing
@@ -191,12 +191,12 @@ subEquations qual = divSubDecls "equations" "Equations" . subTable qual
 -- | Generate sub table for instance declarations, with source
 subInstances :: Qualification
              -> String -- ^ Class name, used for anchor generation
-             -> LinksInfo -> Bool -> DocName
-             -> [(SubDecl,SrcSpan)] -> Html
-subInstances qual nm lnks splice dn = maybe noHtml wrap . instTable
+             -> LinksInfo -> Bool
+             -> [(SubDecl,Located DocName)] -> Html
+subInstances qual nm lnks splice = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice dn
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice
     subSection = thediv ! [theclass "subs instances"]
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
