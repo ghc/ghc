@@ -10,6 +10,7 @@ import Cmm
 import CmmUtils
 import CmmSwitch (eqSwitchTargetWith)
 import CmmContFlowOpt
+-- import PprCmm ()
 import Prelude hiding (iterate, succ, unzip, zip)
 
 import Hoopl hiding (ChangeFlag)
@@ -44,8 +45,8 @@ import Control.Arrow (first, second)
 -- The hash is invariant under relabeling, so we only ever compare within
 -- the same group of blocks.
 --
--- The list of outgoing labels is updated as we merge blocks, and only blocks
--- that had different labels before are compared.
+-- The list of outgoing labels is updated as we merge blocks (that is why they
+-- are not included in the hash, which we want to calculate only once).
 --
 -- All in all, two blocks should never be compared if they have different
 -- hashes, and at most once otherwise. Previously, we were slower, and people
@@ -56,7 +57,7 @@ elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate mapEmpty blocks_with_key
-     groups = groupBy hash_block (postorderDfs g)
+     groups = groupByInt hash_block (postorderDfs g)
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 
 -- Invariant: The blocks in the list are pairwise distinct
@@ -111,9 +112,13 @@ mergeBlockList subst (b:bs) = go mapEmpty b bs
 -- Below here is mostly boilerplate: hashing blocks ignoring labels,
 -- and comparing blocks modulo a label mapping.
 
--- To speed up comparisons, we hash each basic block modulo labels.
+-- To speed up comparisons, we hash each basic block modulo jump labels.
 -- The hashing is a bit arbitrary (the numbers are completely arbitrary),
 -- but it should be fast and good enough.
+
+-- We want to get as many small buckets as possible, as comparing blocks is
+-- expensive. So include as much as possible in the hash. Ideally everything
+-- that is compared with (==) in eqBlockBodyWith.
 
 type HashCode = Int
 
@@ -139,7 +144,7 @@ hash_block block =
         hash_node _ = error "hash_node: unknown Cmm node!"
 
         hash_reg :: CmmReg -> Word32
-        hash_reg   (CmmLocal _) = 117
+        hash_reg   (CmmLocal localReg) = hash_unique localReg -- important for performance, see #10397
         hash_reg   (CmmGlobal _)    = 19
 
         hash_e :: CmmExpr -> Word32
@@ -166,6 +171,9 @@ hash_block block =
         hash_list f = foldl (\z x -> f x + z) (0::Word32)
 
         cvt = fromInteger . toInteger
+
+        hash_unique :: Uniquable a => a -> Word32
+        hash_unique = cvt . getKey . getUnique
 
 -- | Ignore these node types for equality
 dont_care :: CmmNode O x -> Bool
@@ -223,13 +231,18 @@ eqExprWith eqBid = eq
 -- IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
 eqBlockBodyWith eqBid block block'
-  = and (zipWith (eqMiddleWith eqBid) nodes nodes') &&
-    eqLastWith eqBid l l'
+  {-
+  | equal     = pprTrace "equal" (vcat [ppr block, ppr block']) True
+  | otherwise = pprTrace "not equal" (vcat [ppr block, ppr block']) False
+  -}
+  = equal
   where (_,m,l)   = blockSplit block
         nodes     = filter (not . dont_care) (blockToList m)
         (_,m',l') = blockSplit block'
         nodes'    = filter (not . dont_care) (blockToList m')
 
+        equal = and (zipWith (eqMiddleWith eqBid) nodes nodes') &&
+                eqLastWith eqBid l l'
 
 
 eqLastWith :: (BlockId -> BlockId -> Bool) -> CmmNode O C -> CmmNode O C -> Bool
@@ -272,47 +285,15 @@ copyTicks env g
 
 -- Group by [Label]
 groupByLabel :: [(Key, a)] -> [(Key, [a])]
-groupByLabel = go emptyILM
+groupByLabel = go M.empty
   where
-    go !m [] = elemsILM m
-    go !m ((k,v) : entries) = go (alterILM adjust m k') entries
+    go !m [] = M.elems m
+    go !m ((k,v) : entries) = go (M.alter adjust k' m) entries
       where k' = map getUnique k
             adjust Nothing       = Just (k,[v])
             adjust (Just (_,vs)) = Just (k,v:vs)
 
-groupBy :: (a -> Int) -> [a] -> [[a]]
-groupBy f xs = eltsUFM $ List.foldl' go emptyUFM xs
+
+groupByInt :: (a -> Int) -> [a] -> [[a]]
+groupByInt f xs = eltsUFM $ List.foldl' go emptyUFM xs
   where go m x = alterUFM (Just . maybe [x] (x:)) m (f x)
-
--- Efficient lookup into [([Unique], a)]
-data IntListMap a = ILM (Maybe a) (UniqFM (IntListMap a))
-
-emptyILM :: IntListMap a
-emptyILM = ILM Nothing emptyUFM
-
-unitILM :: [Unique] -> a -> IntListMap a
-unitILM [] a     = ILM (Just a) emptyUFM
-unitILM (l:ls) a = ILM Nothing  (unitUFM l (unitILM ls a))
-
-
-alterILM :: (Maybe a -> Maybe a) -> IntListMap a -> [Unique] ->  IntListMap a
-alterILM f (ILM ma m)  []    = ILM (f ma) m
-alterILM f (ILM ma m) (l:ls) = ILM ma (alterUFM go m l)
-  where go Nothing    = fmap (unitILM ls) (f Nothing)
-        go (Just ilm) = Just $ alterILM f ilm ls
-
-{- currently unused
-addToILM :: IntListMap a -> [Unique] -> a -> IntListMap a
-addToILM (ILM _ m)  []     a = ILM (Just a) m
-addToILM (ILM ma m) (l:ls) a = ILM ma $ alterUFM go m l
-  where go Nothing    = Just $ unitILM ls a
-        go (Just ilm) = Just $ addToILM ilm ls a
-
-lookupILM :: IntListMap a -> [Unique] -> Maybe a
-lookupILM (ILM ma _) [] = ma
-lookupILM (ILM _ m) (l:ls) = lookupUFM m l >>= (\m -> lookupILM m ls)
--}
-
-elemsILM :: IntListMap a -> [a]
-elemsILM (ILM ma m) = maybe id (:) ma $ concatMap elemsILM $ eltsUFM m
-
