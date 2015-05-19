@@ -374,6 +374,11 @@ store_load_barrier(void) {
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
 #elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv7)
+    // TODO FIXME: This case probably isn't totally correct - just because we
+    // use a pre-ARMv7 toolchain (e.g. to target an old Android device), doesn't
+    // mean the binary won't run on a newer ARMv7 system - in which case it
+    // needs a proper barrier. So we should rethink this
+    //  - Reid
     __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
