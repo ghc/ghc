@@ -453,13 +453,13 @@ openBinaryTempFile tmp_dir template
 openTempFileWithDefaultPermissions :: FilePath -> String
                                    -> IO (FilePath, Handle)
 openTempFileWithDefaultPermissions tmp_dir template
-    = openTempFile' "openBinaryTempFile" tmp_dir template False 0o666
+    = openTempFile' "openTempFileWithDefaultPermissions" tmp_dir template False 0o666
 
 -- | Like 'openBinaryTempFile', but uses the default file permissions
 openBinaryTempFileWithDefaultPermissions :: FilePath -> String
                                          -> IO (FilePath, Handle)
 openBinaryTempFileWithDefaultPermissions tmp_dir template
-    = openTempFile' "openBinaryTempFile" tmp_dir template True 0o666
+    = openTempFile' "openBinaryTempFileWithDefaultPermissions" tmp_dir template True 0o666
 
 openTempFile' :: String -> FilePath -> String -> Bool -> CMode
               -> IO (FilePath, Handle)
