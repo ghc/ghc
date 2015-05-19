@@ -1088,14 +1088,15 @@ test.hs:(5,4)-(6,7):
           suspicious code.  The warnings that are
           <emphasis>not</emphasis> enabled by <option>-Wall</option>
           are
-            <option>-fwarn-type-defaults</option>,
-            <option>-fwarn-name-shadowing</option>,
-            <option>-fwarn-missing-signatures</option>,
-            <option>-fwarn-warn-hi-shadowing</option>,
-            <option>-fwarn-orphans</option>,
-            <option>-fwarn-unused-do-bind</option>, and
-            <option>-fwarn-trustworthy-safe</option>,
-            <option>-fwarn-unticked-promoted-constructors</option>.</para>
+            <option>-fwarn-incomplete-uni-patterns</option>,
+            <option>-fwarn-incomplete-record-updates</option>,
+            <option>-fwarn-monomorphism-restriction</option>,
+            <option>-fwarn-auto-orphans</option>,
+            <option>-fwarn-implicit-prelude</option>,
+            <option>-fwarn-missing-local-sigs</option>,
+            <option>-fwarn-missing-exported-sigs</option>,
+            <option>-fwarn-missing-import-lists</option> and
+            <option>-fwarn-identities</option>.</para>
         </listitem>
       </varlistentry>
 
