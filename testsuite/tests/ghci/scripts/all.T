@@ -208,3 +208,4 @@ test('T9878b',
     ghci_script, ['T9878b.script'])
 
 test('T10321', normal, ghci_script, ['T10321.script'])
+test('T10110', normal, ghci_script, ['T10110.script'])
