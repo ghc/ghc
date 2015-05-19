@@ -7,6 +7,8 @@
 Aaron Tomb              <atomb@galois.com>                  <atomb@soe.ucsc.edu>
 Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> areid <unknown>
 Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> reid <unknown>
+Alexander Lukyanov      <alex.dontexist@gmail.com>          # Ticket #9360.
+Alexander Vershilov     <alexander.vershilov@gmail.com>     <alexander.vershilov@tweag.io>
 Alexey Rodriguez        <mrchebas@gmail.com>
 Alexey Rodriguez        <mrchebas@gmail.com>                mrchebas@gmail.com <unknown>
 Andrew Farmer           <afarmer@ittc.ku.edu>               <anfarmer@ku.edu>
@@ -30,6 +32,7 @@ Bas van Dijk            <v.dijk.bas@gmail.com>              v.dijk.bas@gmail.com
 Ben Chan                <usrbincc@yahoo.com>                # See Note [usrbincc].
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda.(none)>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda1.milkyway>
+Ben Gamari              <bgamari.foss@gmail.com>            <ben@smart-cactus.org>
 Ben Lippmeier           <benl@ouroborus.net>
 Ben Lippmeier           <benl@ouroborus.net>                <Ben.Lippmeier@anu.edu.au>
 Ben Lippmeier           <benl@ouroborus.net>                Ben.Lippmeier.anu.edu.au <unknown>
@@ -48,6 +51,7 @@ Cain Norris             <ghc@cainnorris.net>                ghc@cainnorris.net <
 Chris Catalfo           <foxnorth@gmail.com>                # https://github.com/ccatalfo
 Chris Rodrigues         <red5_2@hotmail.com>                red5_2@hotmail.com <unknown>
 Chris Smith             <cdsmith@twu.net>                   cdsmith@twu.net <unknown>
+Christiaan Baaij        <christiaan.baaij@gmail.com>
 Christoph Bauer         <ich@christoph-bauer.net>           ich@christoph-bauer.net <unknown>
 Claus Reinke            <claus.reinke@talk21.com>
 Claus Reinke            <claus.reinke@talk21.com>           claus.reinke@talk21.com <unknown>
@@ -122,6 +126,7 @@ John Dias               <dias@cs.tufts.edu>                 dias@eecs.harvard.ed
 John Dias               <dias@cs.tufts.edu>                 dias@eecs.tufts.edu <unknown>
 John McCall             <rjmccall@gmail.com>                rjmccall@gmail.com <unknown>
 Jon Fairbairn           <jon.fairbairn@cl.cam.ac.uk>        jon.fairbairn@cl.cam.ac.uk <unknown>
+Jose Pedro Magalhaes    <jpm@cs.ox.ac.uk>                   <dreixel@gmail.com>
 Jose Pedro Magalhaes    <jpm@cs.ox.ac.uk>                   <jpm@cs.uu.nl>
 Jose Pedro Magalhaes    <jpm@cs.ox.ac.uk>                   jpm@cs.uu.nl <unknown>
 Josef Svenningsson      <josef.svenningsson@gmail.com>      josefs <unknown>
@@ -155,7 +160,9 @@ Malcolm Wallace         <Malcolm.Wallace@cs.york.ac.uk>     malcolm <unknown>
 Manuel M T Chakravarty  <chak@cse.unsw.edu.au>              chak <unknown>
 Marc Weber              <marco-oweber@gmx.de>               marco-oweber@gmx.de <unknown>
 Marcin 'Qrczak' Kowalczyk <qrczak@knm.org.pl>               qrczak <unknown>
+Marco Túlio Gontijo e Silva <marcot@marcot.eti.br>
 Marco Túlio Gontijo e Silva <marcot@marcot.eti.br>          <marcot@debian.org>
+Marios Titas            <redneb@gmx.com>                    <geopoul@gmail.com>
 Matt Chapman            <matthewc@cse.unsw.edu.au>          matthewc <unknown>
 Matthias Kilian         <kili@outback.escape.de>            kili@outback.escape.de <unknown>
 Michael D. Adams        <t-madams@microsoft.com>            <adamsmd@cs.indiana.edu>
@@ -190,6 +197,7 @@ Ryan Lortie             <desrt@desrt.ca>                    desrt <unknown>
 Sam Anklesaria          <amsay@amsay.net>
 Sam Anklesaria          <amsay@amsay.net>                   amsay@amsay.net <unknown>
 Sean Seefried           <sean.seefried@gmail.com>           sseefried <unknown>
+Sergei Trofimovich      <slyfox@gentoo.org>                 <siarheit@google.com>
 Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox at gentoo.org>
 Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox@community.haskell.org>
 Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox@inbox.ru>
@@ -200,6 +208,7 @@ Simon Hengel            <sol@typeful.net>                   <simon.hengel@wiktor
 Simon Marlow            <marlowsd@gmail.com>                <simonmar-work@simonmar-laptop.(none)>
 Simon Marlow            <marlowsd@gmail.com>                <simonmar@microsoft.com>
 Simon Marlow            <marlowsd@gmail.com>                <simonmarhaskell@gmail.com>
+Simon Marlow            <marlowsd@gmail.com>                <smarlow@fb.com>
 Simon Marlow            <marlowsd@gmail.com>                simonm <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar@microsoft.com <unknown>
@@ -239,6 +248,8 @@ Wolfgang Thaller        <wolfgang.thaller@gmx.net>          wolfgang <unknown>
 Wolfgang Thaller        <wolfgang.thaller@gmx.net>          wolfgang.thaller@gmx.net <unknown>
 Yorick Laupa            <yo.eight@gmail.com>                # https://github.com/yoeight
 Yuri de Wit             <admin@rodlogic.net>                # Commit 37d64a.
+Yusuke Matsushita       <y.skm24t@gmail.com>                # https://github.com/Kinokkory
+Zejun Wu                <watashi@watashi.ws>                <zejun.wu@gmail.com>
 gwern                   <gwern0@gmail.com>                  gwern0@gmail.com <unknown> # Uses this name online.
 shelarcy                <shelarcy@gmail.com>                # Uses this name online.
 Ömer Sinan Ağacan       <omeragacan@gmail.com>              # https://github.com/osa1
