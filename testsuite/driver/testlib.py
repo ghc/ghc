@@ -123,6 +123,10 @@ def _reqlib( name, opts, lib ):
     if not got_it:
         opts.expect = 'missing-lib'
 
+def req_haddock( name, opts ):
+    if not config.haddock:
+        opts.expect = 'missing-lib'
+
 def req_profiling( name, opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
@@ -1115,7 +1119,10 @@ def checkStats(name, way, stats_file, range_fields):
 
     result = passed()
     if len(range_fields) > 0:
-        f = open(in_testdir(stats_file))
+        try:
+            f = open(in_testdir(stats_file))
+        except IOError as e:
+            return failBecause(str(e))
         contents = f.read()
         f.close()
 

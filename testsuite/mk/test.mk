@@ -205,15 +205,17 @@ RUNTEST_OPTS +=  \
 	-e 'config.exeext="$(exeext)"' \
 	-e 'config.top="$(TOP_ABS)"'
 
-# Put an extra pair of quotes around program paths,
+# Put an extra pair of quotes around non-empty program paths,
 # so we don't have to in .T scripts or driver/testlib.py.
+quote_path = $(if $1,"\"$1\"","")
 RUNTEST_OPTS +=  \
-	-e 'config.compiler="\"$(TEST_HC)\""' \
-	-e 'config.ghc_pkg="\"$(GHC_PKG)\""' \
-	-e 'config.hp2ps="\"$(HP2PS_ABS)\""' \
-	-e 'config.hpc="\"$(HPC)\""' \
-	-e 'config.gs="\"$(GS)\""' \
-	-e 'config.timeout_prog="\"$(TIMEOUT_PROGRAM)\""'
+	-e 'config.compiler=$(call quote_path,$(TEST_HC))' \
+	-e 'config.ghc_pkg=$(call quote_path,$(GHC_PKG))' \
+	-e 'config.haddock=$(call quote_path,$(HADDOCK))' \
+	-e 'config.hp2ps=$(call quote_path,$(HP2PS_ABS))' \
+	-e 'config.hpc=$(call quote_path,$(HPC))' \
+	-e 'config.gs=$(call quote_path,$(GS))' \
+	-e 'config.timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))'
 
 ifneq "$(OUTPUT_SUMMARY)" ""
 RUNTEST_OPTS +=  \
