@@ -207,8 +207,6 @@ test('T9878b',
       extra_clean(['T9878b.hi','T9878b.o'])],
     ghci_script, ['T9878b.script'])
 test('T10122', normal, ghci_script, ['T10122.script'])
-test('T10322', when(opsys('darwin'), expect_broken(10322)),
-    ghci_script, ['T10322.script'])
 
 test('T10321', normal, ghci_script, ['T10321.script'])
 
@@ -218,3 +216,4 @@ test('T10408B', normal, run_command,
     ['$MAKE -s --no-print-directory T10408B'])
 test('T10248', normal, ghci_script, ['T10248.script'])
 test('T10110', normal, ghci_script, ['T10110.script'])
+test('T10322', normal, ghci_script, ['T10322.script'])
