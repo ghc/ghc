@@ -118,8 +118,12 @@ $$
 \end{figure}
 
 Shaping computes a \I{Shape}, whose form is described in Figure~\ref{fig:semantic}.
-Initializing the shape context to the empty shape, we incrementally
-build the context as follows:
+A shape describes what modules a package implements and exports (the \emph{provides})
+and what signatures a package needs to have filled in (the \emph{requires}).  Both
+provisions and requires can be imported after a package is included.
+
+We incrementally build a shape by starting with an empty
+shape context and adding to it as follows:
 
 \begin{enumerate}
     \item Calculate the shape of a declaration, with respect to the
@@ -740,8 +744,8 @@ key from the identifiers.
     module B where
         data T = S { baz :: Bool }
     module C(bar, baz) where
-        import A
-        import B
+        import A(bar)
+        import B(baz)
     -- A.T{ A.bar }, B.T{ B.baz }
     -- NB: it would be illegal for the type constructors
     -- A.T and B.T to be both exported from C!
@@ -806,8 +810,8 @@ The answer is no!  Consider these implementations:
         data A = A { foo :: Int, bar :: Bool }
 
     module A(foo, bar) where
-        import A1
-        import A2
+        import A1(foo)
+        import A2(bar)
 \end{verbatim}
 
 Here, \verb|module A1| implements \verb|signature A1|, \verb|module A2| implements \verb|signature A2|,
@@ -864,31 +868,36 @@ equivalent to the shapes for these which should merge:
 \subsection{Subtyping record selectors as functions}
 
 \begin{verbatim}
-    signature H(foo) where
+    signature H(A, foo) where
         data A
         foo :: A -> Int
 
-    module M(foo) where
+    module M(A, foo) where
         data A = A { foo :: Int, bar :: Bool }
 \end{verbatim}
 %
 Does \verb|M| successfully fill \verb|H|?  If so, it means that anywhere
 a signature requests a function \verb|foo|, we can instead validly
-provide a record selector.  This capability seems quite attractive
-but actually it is quite complicated, because we can no longer assume
-that every child name is associated with a parent name.
+provide a record selector.  This capability seems quite attractive,
+although in practice record selectors rarely seem to be abstracted this
+way: one reason is that \verb|M.foo| still \emph{is} a record selector,
+and can be used to modify a record.  (Many library authors find this
+suprising!)
 
-As a workaround, \verb|H| can equivalently be written as:
+Nor does this seem to be an insurmountable instance of the avoidance
+problem:
+as a workaround, \verb|H| can equivalently be written as:
 
 \begin{verbatim}
     signature H(foo) where
         data A = A { foo :: Int, bar :: Bool }
 \end{verbatim}
 %
-This is suboptimal, however, as the otherwise irrelevant \verb|bar| must be mentioned
+However, you might not like this, as the otherwise irrelevant \verb|bar| must be mentioned
 in the definition.
 
-So what if we actually want to write the original signature \verb|H|?
+In any case, actually implementing this `subtyping' is quite complicated, because we can no
+longer assume that every child name is associated with a parent name.
 The technical difficulty is that we now need to unify a plain identifier
 \I{AvailInfo} (from the signature) with a type constructor \I{AvailInfo}
 (from a module.)  It is not clear what this should mean.
@@ -910,8 +919,11 @@ Consider this situation:
             import X(A(..)) -- ???
 \end{verbatim}
 
-Should the wildcard import on \verb|X| be allowed?  Probably not?
-How about this situation:
+Should the wildcard import on \verb|X| be allowed?
+This question is equivalent to whether or not shaping discovers
+whether or not a function is a record selector and propagates this
+information elsewhere.
+If the wildcard is not allowed, here is another situation:
 
 \begin{verbatim}
     package p where
