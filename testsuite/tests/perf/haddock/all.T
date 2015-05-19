@@ -3,7 +3,7 @@
 # detect outliers, as described in Note [residency]. See #9556.
 
 test('haddock.base',
-     [unless(in_tree_compiler(), skip)
+     [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 9014511528,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
@@ -43,7 +43,7 @@ test('haddock.base',
      ['../../../../libraries/base/dist-install/doc/html/base/base.haddock.t'])
 
 test('haddock.Cabal',
-     [unless(in_tree_compiler(), skip)
+     [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 6710234312, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
@@ -84,7 +84,7 @@ test('haddock.Cabal',
      ['../../../../libraries/Cabal/Cabal/dist-install/doc/html/Cabal/Cabal.haddock.t'])
 
 test('haddock.compiler',
-     [unless(in_tree_compiler(), skip)
+     [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 33562468736, 10)
             # 2012P-08-14: 26070600504 (amd64/Linux)

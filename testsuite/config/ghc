@@ -9,6 +9,7 @@ config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ghc_compiler_always_flags.split()
 
+config.haddock               = 'haddock'
 config.hp2ps                 = 'hp2ps'
 config.hpc                   = 'hpc'
 config.gs                    = 'gs'

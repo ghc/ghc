@@ -108,6 +108,10 @@ ifeq "$(RUNGHC)" ""
 RUNGHC := $(call find_tool,runghc)
 endif
 
+ifeq "$(HADDOCK)" ""
+HADDOCK := $(call find_tool,haddock)
+endif
+
 ifeq "$(HSC2HS)" ""
 HSC2HS := $(call find_tool,hsc2hs)
 endif
@@ -128,6 +132,12 @@ endif
 $(eval $(call canonicaliseExecutable,GHC_PKG))
 ifeq "$(shell test -x '$(GHC_PKG)' && echo exists)" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
+endif
+
+$(eval $(call canonicaliseExecutable,HADDOCK))
+ifeq "$(shell test -x '$(HADDOCK)' && echo exists)" ""
+# haddock is optional.
+HADDOCK :=
 endif
 
 $(eval $(call canonicaliseExecutable,HSC2HS))
