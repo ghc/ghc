@@ -157,13 +157,40 @@ real_handler exit se = do
            Just (ExitFailure n) -> exit n
 
            -- EPIPE errors received for stdout are ignored (#2699)
-           _ -> case fromException se of
+           _ -> catch (case fromException se of
                 Just IOError{ ioe_type = ResourceVanished,
                               ioe_errno = Just ioe,
                               ioe_handle = Just hdl }
                    | Errno ioe == ePIPE, hdl == stdout -> exit 0
                 _ -> do reportError se
                         exit 1
+                ) (disasterHandler exit) -- See Note [Disaster with iconv]
+
+-- don't use errorBelch() directly, because we cannot call varargs functions
+-- using the FFI.
+foreign import ccall unsafe "HsBase.h errorBelch2"
+   errorBelch :: CString -> CString -> IO ()
+
+disasterHandler :: (Int -> IO a) -> IOError -> IO a
+disasterHandler exit _ =
+  withCAString "%s" $ \fmt ->
+    withCAString msgStr $ \msg ->
+      errorBelch fmt msg >> exit 1
+  where msgStr = "encountered an exception while trying to report an exception"
+
+{- Note [Disaster with iconv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When using iconv, it's possible for things like iconv_open to fail in
+restricted environments (like an initram or restricted container), but
+when this happens the error raised inevitably calls `peekCString`,
+which depends on the users locale, which depends on using
+`iconv_open`... which causes an infinite loop.
+
+This occurrence is also known as tickets #10298 and #7695. So to work
+around it we just set _another_ error handler and bail directly by
+calling the RTS, without iconv at all.
+-}
 
 
 -- try to flush stdout/stderr, but don't worry if we fail

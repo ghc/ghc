@@ -235,7 +235,14 @@ mkTextEncoding e = case mb_coding_failure_mode of
         _             -> Nothing
 
 mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
-mkTextEncoding' cfm enc = case [toUpper c | c <- enc, c /= '-'] of
+mkTextEncoding' cfm enc
+  -- First, specifically match on ASCII encodings directly using
+  -- several possible aliases (specified by RFC 1345 & co), which
+  -- allows us to handle ASCII conversions without iconv at all (see
+  -- trac #10298).
+  | any (== enc) ansiEncNames = return (UTF8.mkUTF8 cfm)
+  -- Otherwise, handle other encoding needs via iconv.
+  | otherwise = case [toUpper c | c <- enc, c /= '-'] of
     "UTF8"    -> return $ UTF8.mkUTF8 cfm
     "UTF16"   -> return $ UTF16.mkUTF16 cfm
     "UTF16LE" -> return $ UTF16.mkUTF16le cfm
@@ -249,6 +256,11 @@ mkTextEncoding' cfm enc = case [toUpper c | c <- enc, c /= '-'] of
 #else
     _ -> Iconv.mkIconvEncoding cfm enc
 #endif
+  where
+    ansiEncNames = -- ASCII aliases
+      [ "ANSI_X3.4-1968", "iso-ir-6", "ANSI_X3.4-1986", "ISO_646.irv:1991"
+      , "US-ASCII", "us", "IBM367", "cp367", "csASCII", "ASCII", "ISO646-US"
+      ]
 
 latin1_encode :: CharBuffer -> Buffer Word8 -> IO (CharBuffer, Buffer Word8)
 latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_encode input output -- unchecked, used for char8
