@@ -29,7 +29,7 @@ module ErrUtils (
         --  * Messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
-        errorMsg, warningMsg,
+        errorMsg,
         fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
         compilationProgressMsg,
         showPass,
@@ -350,10 +350,6 @@ ifVerbose dflags val act
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
    = log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
-
-warningMsg :: DynFlags -> MsgDoc -> IO ()
-warningMsg dflags msg
-   = log_action dflags dflags SevWarning noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg

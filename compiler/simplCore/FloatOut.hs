@@ -257,32 +257,6 @@ floatBody lvl arg       -- Used rec rhss, and case-alternative rhss
     (fsa, floats', install heres arg') }}
 
 -----------------
-
-{- Note [Floating past breakpoints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Notes from Peter Wortmann (re: #10052)
-
-"This case clearly means we're trying to float past a breakpoint..."
-
-Further:
-
-"Breakpoints as they currently exist are the only Tikish that is not
-scoped, counting, and not splittable.
-
-This means that we can't:
-  - Simply float code out of it, because the payload must still be covered (scoped)
-  - Copy the tick, because it would change entry counts (here: duplicate breakpoints)"
-
-While this seems like an odd case, it can apparently occur in real
-life: through the combination of optimizations + GHCi usage. For an
-example, see #10052 as mentioned above. So not only does the
-interpreter not like some compiler-generated things (like unboxed
-tuples), the compiler doesn't like interpreter-introduced things!
-
-Also see Note [GHCi and -O] in GHC.hs.
--}
-
 floatExpr :: LevelledExpr
           -> (FloatStats, FloatBinds, CoreExpr)
 floatExpr (Var v)   = (zeroStats, emptyFloats, Var v)
@@ -318,7 +292,6 @@ floatExpr (Tick tickish expr)
     in
     (fs, annotated_defns, Tick tickish expr') }
 
-  -- Note [Floating past breakpoints]
   | otherwise
   = pprPanic "floatExpr tick" (ppr tickish)
 
