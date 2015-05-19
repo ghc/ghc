@@ -564,11 +564,11 @@ resumeExec canLogSpan step
                 handleRunStatus step expr bindings final_ids
                                 breakMVar statusMVar status hist'
 
-back :: GhcMonad m => m ([Name], Int, SrcSpan)
-back  = moveHist (+1)
+back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
+back n = moveHist (+n)
 
-forward :: GhcMonad m => m ([Name], Int, SrcSpan)
-forward  = moveHist (subtract 1)
+forward :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
+forward n = moveHist (subtract n)
 
 moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan)
 moveHist fn = do

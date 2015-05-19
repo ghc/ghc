@@ -96,6 +96,11 @@
                     <literal>Main</literal> with an explicit module header but
                     without <literal>main</literal> is now an error (#7765).
                </para>
+               <para>
+                    The <literal>:back</literal> and <literal>:forward</literal>
+                    commands now take an optional count allowing the user to move forward or
+                    backward in history several steps at a time.
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>

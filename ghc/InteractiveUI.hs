@@ -268,14 +268,14 @@ defFullHelpText =
   " -- Commands for debugging:\n" ++
   "\n" ++
   "   :abandon                    at a breakpoint, abandon current computation\n" ++
-  "   :back                       go back in the history (after :trace)\n" ++
+  "   :back [<n>]                 go back in the history N steps (after :trace)\n" ++
   "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
   "   :break <name>               set a breakpoint on the specified function\n" ++
   "   :continue                   resume after a breakpoint\n" ++
   "   :delete <number>            delete the specified breakpoint\n" ++
   "   :delete *                   delete all breakpoints\n" ++
   "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
-  "   :forward                    go forward in the history (after :back)\n" ++
+  "   :forward [<n>]              go forward in the history N step s(after :back)\n" ++
   "   :history [<n>]              after :trace, show the execution history\n" ++
   "   :list                       show the source code around current breakpoint\n" ++
   "   :list <identifier>          show the source code for <identifier>\n" ++
@@ -2747,24 +2747,34 @@ bold c | do_bold   = text start_bold <> c <> text end_bold
        | otherwise = c
 
 backCmd :: String -> GHCi ()
-backCmd = noArgs $ withSandboxOnly ":back" $ do
-  (names, _, pan) <- GHC.back
-  printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr pan
-  printTypeOfNames names
-   -- run the command set with ":set stop <cmd>"
-  st <- getGHCiState
-  enqueueCommands [stop st]
+backCmd arg
+  | null arg        = back 1
+  | all isDigit arg = back (read arg)
+  | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
+  where
+  back num = withSandboxOnly ":back" $ do
+      (names, _, pan) <- GHC.back num
+      printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr pan
+      printTypeOfNames names
+       -- run the command set with ":set stop <cmd>"
+      st <- getGHCiState
+      enqueueCommands [stop st]
 
 forwardCmd :: String -> GHCi ()
-forwardCmd = noArgs $ withSandboxOnly ":forward" $ do
-  (names, ix, pan) <- GHC.forward
-  printForUser $ (if (ix == 0)
-                    then ptext (sLit "Stopped at")
-                    else ptext (sLit "Logged breakpoint at")) <+> ppr pan
-  printTypeOfNames names
-   -- run the command set with ":set stop <cmd>"
-  st <- getGHCiState
-  enqueueCommands [stop st]
+forwardCmd arg
+  | null arg        = forward 1
+  | all isDigit arg = forward (read arg)
+  | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
+  where
+  forward num = withSandboxOnly ":forward" $ do
+      (names, ix, pan) <- GHC.forward num
+      printForUser $ (if (ix == 0)
+                        then ptext (sLit "Stopped at")
+                        else ptext (sLit "Logged breakpoint at")) <+> ppr pan
+      printTypeOfNames names
+       -- run the command set with ":set stop <cmd>"
+      st <- getGHCiState
+      enqueueCommands [stop st]
 
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
