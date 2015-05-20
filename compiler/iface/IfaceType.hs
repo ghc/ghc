@@ -748,10 +748,8 @@ instance Binary IfaceType where
                       ; return (IfaceTyConApp tc tys) }
               6 -> do { s <- get bh; i <- get bh; tys <- get bh
                       ; return (IfaceTupleTy s i tys) }
-              30 -> do n <- get bh
+              _  -> do n <- get bh
                        return (IfaceLitTy n)
-
-              _  -> panic ("get IfaceType " ++ show h)
 
 instance Binary IfaceCoercion where
   put_ bh (IfaceReflCo a b) = do
