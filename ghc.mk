@@ -107,12 +107,6 @@ nothing=
 space=$(nothing) $(nothing)
 comma=,
 
-# Cancel all suffix rules.  Ideally we'd like to have 'make -r' turned on
-# by default, because that disables all the implicit rules, but there doesn't
-# seem to be a good way to do that.  This turns off all the old-style suffix
-# rules, which does half the job and speeds up make quite a bit:
-.SUFFIXES:
-
 # -----------------------------------------------------------------------------
 # Makefile debugging
 #

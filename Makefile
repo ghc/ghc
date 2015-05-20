@@ -10,6 +10,14 @@
 #
 # -----------------------------------------------------------------------------
 
+# Eliminate use of the built-in implicit rules, and clear out the default list
+# of suffixes for suffix rules. Speeds up make quite a bit. Both are needed
+# for the shortest `make -d` output.
+# Don't set --no-builtin-variables; some rules might stop working if you do
+# (e.g. 'make clean' in testsuite/ currently relies on an implicit $RM).
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:
+
 ifeq "$(wildcard distrib/)" ""
 
 # We're in a bindist
@@ -21,7 +29,7 @@ default:
 
 .PHONY: install show
 install show:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
+	$(MAKE) --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
 
 else
 
@@ -70,14 +78,14 @@ REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framewor
 $(REALGOALS) all: mk/config.mk.old mk/project.mk.old compiler/ghc.cabal.old
 ifneq "$(OMIT_PHASE_0)" "YES"
 	@echo "===--- building phase 0"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 phase_0_builds
+	$(MAKE) --no-print-directory -f ghc.mk phase=0 phase_0_builds
 endif
 ifneq "$(OMIT_PHASE_1)" "YES"
 	@echo "===--- building phase 1"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 phase_1_builds
+	$(MAKE) --no-print-directory -f ghc.mk phase=1 phase_1_builds
 endif
 	@echo "===--- building final phase"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=final $@
+	$(MAKE) --no-print-directory -f ghc.mk phase=final $@
 
 .PHONY: binary-dist
 binary-dist: binary-dist-prep
@@ -86,25 +94,25 @@ binary-dist: binary-dist-prep
 .PHONY: binary-dist-prep
 binary-dist-prep:
 ifeq "$(mingw32_TARGET_OS)" "1"
-	$(MAKE) -r --no-print-directory -f ghc.mk windows-binary-dist-prep
+	$(MAKE) --no-print-directory -f ghc.mk windows-binary-dist-prep
 else
 	rm -f bindist-list
-	$(MAKE) -r --no-print-directory -f ghc.mk bindist BINDIST=YES
-	$(MAKE) -r --no-print-directory -f ghc.mk unix-binary-dist-prep
+	$(MAKE) --no-print-directory -f ghc.mk bindist BINDIST=YES
+	$(MAKE) --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
 
 .PHONY: clean distclean maintainer-clean
 clean distclean maintainer-clean:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
+	$(MAKE) --no-print-directory -f ghc.mk $@ CLEANING=YES
 	test ! -d testsuite || $(MAKE) -C testsuite $@
 
 .PHONY: $(filter clean_%,$(MAKECMDGOALS))
 $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
-	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
+	$(MAKE) --no-print-directory -f ghc.mk $@ CLEANING=YES
 
 .PHONY: bootstrapping-files show echo
 bootstrapping-files show echo:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@
+	$(MAKE) --no-print-directory -f ghc.mk $@
 
 ifeq "$(darwin_TARGET_OS)" "1"
 .PHONY: framework-pkg
