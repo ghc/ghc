@@ -1,0 +1,90 @@
+---Problems---------------------
+[
+(AK Test10354.hs:4:7-15 AnnCloseP = [Test10354.hs:4:15])
+
+(AK Test10354.hs:4:7-15 AnnOpenP = [Test10354.hs:4:7])
+]
+
+---Problems'--------------------
+[]
+--------------------------------
+[
+(AK Test10354.hs:1:1 AnnModule = [Test10354.hs:2:1-6])
+
+(AK Test10354.hs:1:1 AnnWhere = [Test10354.hs:2:18-22])
+
+(AK Test10354.hs:4:1-34 AnnDcolon = [Test10354.hs:4:3-4])
+
+(AK Test10354.hs:4:1-34 AnnSemi = [Test10354.hs:5:1])
+
+(AK Test10354.hs:4:6-16 AnnCloseP = [Test10354.hs:4:16, Test10354.hs:4:15])
+
+(AK Test10354.hs:4:6-16 AnnDarrow = [Test10354.hs:4:18-19])
+
+(AK Test10354.hs:4:6-16 AnnOpenP = [Test10354.hs:4:6, Test10354.hs:4:7])
+
+(AK Test10354.hs:4:7-15 AnnCloseP = [Test10354.hs:4:15])
+
+(AK Test10354.hs:4:7-15 AnnOpenP = [Test10354.hs:4:7])
+
+(AK Test10354.hs:4:8-11 AnnComma = [Test10354.hs:4:12])
+
+(AK Test10354.hs:4:21-34 AnnRarrow = [Test10354.hs:4:23-24])
+
+(AK Test10354.hs:4:26-34 AnnRarrow = [Test10354.hs:4:28-29])
+
+(AK Test10354.hs:5:1-14 AnnEqual = [Test10354.hs:5:7])
+
+(AK Test10354.hs:5:1-14 AnnFunId = [Test10354.hs:5:1])
+
+(AK Test10354.hs:5:1-14 AnnSemi = [Test10354.hs:7:1])
+
+(AK Test10354.hs:5:9-14 AnnVal = [Test10354.hs:5:11-12])
+
+(AK Test10354.hs:7:1-24 AnnDcolon = [Test10354.hs:7:5-6])
+
+(AK Test10354.hs:7:1-24 AnnSemi = [Test10354.hs:8:1])
+
+(AK Test10354.hs:7:8-12 AnnCloseP = [Test10354.hs:7:12, Test10354.hs:7:12])
+
+(AK Test10354.hs:7:8-12 AnnDarrow = [Test10354.hs:7:14-15])
+
+(AK Test10354.hs:7:8-12 AnnOpenP = [Test10354.hs:7:8, Test10354.hs:7:8])
+
+(AK Test10354.hs:7:8-12 AnnUnit = [Test10354.hs:7:8-12])
+
+(AK Test10354.hs:7:17-24 AnnRarrow = [Test10354.hs:7:18-19])
+
+(AK Test10354.hs:8:1-15 AnnEqual = [Test10354.hs:8:5])
+
+(AK Test10354.hs:8:1-15 AnnFunId = [Test10354.hs:8:1-3])
+
+(AK Test10354.hs:8:1-15 AnnSemi = [Test10354.hs:10:1])
+
+(AK Test10354.hs:10:1-23 AnnDcolon = [Test10354.hs:10:5-6])
+
+(AK Test10354.hs:10:1-23 AnnSemi = [Test10354.hs:11:1])
+
+(AK Test10354.hs:10:8 AnnDarrow = [Test10354.hs:10:10-11])
+
+(AK Test10354.hs:10:13-23 AnnRarrow = [Test10354.hs:10:15-16])
+
+(AK Test10354.hs:11:1-15 AnnEqual = [Test10354.hs:11:5])
+
+(AK Test10354.hs:11:1-15 AnnFunId = [Test10354.hs:11:1-3])
+
+(AK Test10354.hs:11:1-15 AnnSemi = [Test10354.hs:13:1])
+
+(AK Test10354.hs:13:1-17 AnnDcolon = [Test10354.hs:13:5-6])
+
+(AK Test10354.hs:13:1-17 AnnSemi = [Test10354.hs:14:1])
+
+(AK Test10354.hs:14:1-15 AnnEqual = [Test10354.hs:14:5])
+
+(AK Test10354.hs:14:1-15 AnnFunId = [Test10354.hs:14:1-3])
+
+(AK Test10354.hs:14:1-15 AnnSemi = [Test10354.hs:15:1])
+
+(AK <no location info> AnnEofPos = [Test10354.hs:15:1])
+]
+

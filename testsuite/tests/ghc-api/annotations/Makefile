@@ -12,6 +12,7 @@ clean:
 	rm -f listcomps boolFormula
 	rm -f t10357
 	rm -f t10278
+	rm -f t10354
 
 annotations: 
 	rm -f annotations.o annotations.hi
@@ -113,3 +114,10 @@ T10278:
 	./t10278 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: T10278
+
+T10354:
+	rm -f t10354.o t10354.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t10354
+	./t10354 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
+.PHONY: t10354

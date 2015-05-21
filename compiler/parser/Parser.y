@@ -1474,14 +1474,14 @@ ctypedoc :: { LHsType RdrName }
 -- Thus for some reason we allow    f :: a~b => blah
 -- but not                          f :: ?x::Int => blah
 context :: { LHsContext RdrName }
-        : btype '~'      btype          {% amms (checkContext
-                                             (sLL $1 $> $ HsEqTy $1 $3))
-                                             [mj AnnTilde $2] }
-        | btype                         {% do { ctx <- checkContext $1
+        : btype '~'      btype          {% do { (anns,ctx) <- checkContext
+                                                 (sLL $1 $> $ HsEqTy $1 $3)
+                                              ; ams ctx (mj AnnTilde $2:anns) } }
+        | btype                         {% do { (anns,ctx) <- checkContext $1
                                               ; if null (unLoc ctx)
                                                  then addAnnotation (gl $1) AnnUnit (gl $1)
                                                  else return ()
-                                              ; return ctx
+                                              ; ams ctx anns
                                               } }
 
 type :: { LHsType RdrName }

@@ -772,18 +772,20 @@ checkTyClHdr ty
          = parseErrorSDoc l (text "Malformed head of type or class declaration:"
                              <+> ppr ty)
 
-checkContext :: LHsType RdrName -> P (LHsContext RdrName)
+checkContext :: LHsType RdrName -> P ([AddAnn],LHsContext RdrName)
 checkContext (L l orig_t)
-  = check orig_t
+  = check [] (L l orig_t)
  where
-  check (HsTupleTy _ ts)        -- (Eq a, Ord b) shows up as a tuple type
-    = return (L l ts)           -- Ditto ()
+  check anns (L lp (HsTupleTy _ ts))   -- (Eq a, Ord b) shows up as a tuple type
+    = return (anns ++ mkParensApiAnn lp,L l ts)                -- Ditto ()
 
-  check (HsParTy ty)    -- to be sure HsParTy doesn't get into the way
-    = check (unLoc ty)
+  check anns (L lp1 (HsParTy ty))-- to be sure HsParTy doesn't get into the way
+       = check anns' ty
+         where anns' = if l == lp1 then anns
+                                   else (anns ++ mkParensApiAnn lp1)
 
-  check _
-    = return (L l [L l orig_t])
+  check _anns _
+    = return ([],L l [L l orig_t]) -- no need for anns, returning original
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
