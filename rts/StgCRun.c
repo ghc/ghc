@@ -692,7 +692,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #endif
         /*
          * allocate some space for Stg machine's temporary storage.
-         * Note: RESERVER_C_STACK_BYTES has to be a round number here or
+         * Note: RESERVED_C_STACK_BYTES has to be a round number here or
          * the assembler can't assemble it.
          */
         "sub sp, sp, %3\n\t"
@@ -776,7 +776,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
         /*
          * allocate some space for Stg machine's temporary storage.
-         * Note: RESERVER_C_STACK_BYTES has to be a round number here or
+         * Note: RESERVED_C_STACK_BYTES has to be a round number here or
          * the assembler can't assemble it.
          */
         "sub sp, sp, %3\n\t"
