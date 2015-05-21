@@ -1523,11 +1523,11 @@ opt_asig :: { ([AddAnn],Maybe (LHsType RdrName)) }
 
 sigtype :: { LHsType RdrName }          -- Always a HsForAllTy,
                                         -- to tell the renamer where to generalise
-        : ctype                         { sL1 $1 (mkImplicitHsForAllTy (noLoc []) $1) }
+        : ctype                         { sL1 $1 (mkImplicitHsForAllTy $1) }
         -- Wrap an Implicit forall if there isn't one there already
 
 sigtypedoc :: { LHsType RdrName }       -- Always a HsForAllTy
-        : ctypedoc                      { sL1 $1 (mkImplicitHsForAllTy (noLoc []) $1) }
+        : ctypedoc                      { sL1 $1 (mkImplicitHsForAllTy $1) }
         -- Wrap an Implicit forall if there isn't one there already
 
 sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order

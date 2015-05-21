@@ -74,7 +74,8 @@ rnLHsInstType doc_str ty
        ; return (ty', fvs) }
   where
     good_inst_ty
-      | Just (_, _, L _ cls, _) <- splitLHsInstDeclTy_maybe ty
+      | Just (_, _, L _ cls, _) <-
+                        splitLHsInstDeclTy_maybe (flattenTopLevelLHsForAllTy ty)
       , isTcOcc (rdrNameOcc cls) = True
       | otherwise                = False
 
@@ -133,52 +134,8 @@ rnHsKind = rnHsTyKi False
 
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
-rnHsTyKi isType doc (HsForAllTy Implicit extra _ lctxt@(L _ ctxt) ty)
-  = ASSERT( isType ) do
-        -- Implicit quantifiction in source code (no kinds on tyvars)
-        -- Given the signature  C => T  we universally quantify
-        -- over FV(T) \ {in-scope-tyvars}
-    rdr_env <- getLocalRdrEnv
-    loc <- getSrcSpanM
-    let
-        (forall_kvs, forall_tvs) = filterInScope rdr_env $
-                                   extractHsTysRdrTyVars (ty:ctxt)
-           -- In for-all types we don't bring in scope
-           -- kind variables mentioned in kind signatures
-           -- (Well, not yet anyway....)
-           --    f :: Int -> T (a::k)    -- Not allowed
-
-           -- The filterInScope is to ensure that we don't quantify over
-           -- type variables that are in scope; when GlasgowExts is off,
-           -- there usually won't be any, except for class signatures:
-           --   class C a where { op :: a -> a }
-        tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
-
-    rnForAll doc Implicit extra forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
-
-rnHsTyKi isType doc fulltype@(HsForAllTy Qualified extra _ lctxt@(L _ ctxt) ty)
-  = ASSERT( isType ) do
-    rdr_env <- getLocalRdrEnv
-    loc <- getSrcSpanM
-    let
-        (forall_kvs, forall_tvs) = filterInScope rdr_env $
-                                   extractHsTysRdrTyVars (ty:ctxt)
-        tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
-        in_type_doc = ptext (sLit "In the type") <+> quotes (ppr fulltype)
-
-    -- See Note [Context quantification]
-    warnContextQuantification (in_type_doc $$ docOfHsDocContext doc) tyvar_bndrs
-    rnForAll doc Implicit extra forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
-
-rnHsTyKi isType doc ty@(HsForAllTy Explicit extra forall_tyvars lctxt@(L _ ctxt) tau)
-  = ASSERT( isType ) do {      -- Explicit quantification.
-         -- Check that the forall'd tyvars are actually
-         -- mentioned in the type, and produce a warning if not
-         let (kvs, mentioned) = extractHsTysRdrTyVars (tau:ctxt)
-             in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
-       ; warnUnusedForAlls (in_type_doc $$ docOfHsDocContext doc) forall_tyvars mentioned
-
-       ; rnForAll doc Explicit extra kvs forall_tyvars lctxt tau }
+rnHsTyKi isType doc ty@HsForAllTy{}
+  = rnHsTyKiForAll isType doc (flattenTopLevelHsForAllTy ty)
 
 rnHsTyKi isType _ (HsTyVar rdr_name)
   = do { name <- rnTyVar isType rdr_name
@@ -325,6 +282,62 @@ rnHsTyKi isType _doc (HsNamedWildcardTy rdr_name)
     do { name <- rnTyVar isType rdr_name
        ; return (HsNamedWildcardTy name, unitFV name) }
 
+--------------
+rnHsTyKiForAll :: Bool -> HsDocContext -> HsType RdrName
+               -> RnM (HsType Name, FreeVars)
+rnHsTyKiForAll isType doc (HsForAllTy Implicit extra _ lctxt@(L _ ctxt) ty)
+  = ASSERT( isType ) do
+        -- Implicit quantifiction in source code (no kinds on tyvars)
+        -- Given the signature  C => T  we universally quantify
+        -- over FV(T) \ {in-scope-tyvars}
+    rdr_env <- getLocalRdrEnv
+    loc <- getSrcSpanM
+    let
+        (forall_kvs, forall_tvs) = filterInScope rdr_env $
+                                   extractHsTysRdrTyVars (ty:ctxt)
+           -- In for-all types we don't bring in scope
+           -- kind variables mentioned in kind signatures
+           -- (Well, not yet anyway....)
+           --    f :: Int -> T (a::k)    -- Not allowed
+
+           -- The filterInScope is to ensure that we don't quantify over
+           -- type variables that are in scope; when GlasgowExts is off,
+           -- there usually won't be any, except for class signatures:
+           --   class C a where { op :: a -> a }
+        tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
+
+    rnForAll doc Implicit extra forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
+
+rnHsTyKiForAll isType doc
+               fulltype@(HsForAllTy Qualified extra _ lctxt@(L _ ctxt) ty)
+  = ASSERT( isType ) do
+    rdr_env <- getLocalRdrEnv
+    loc <- getSrcSpanM
+    let
+        (forall_kvs, forall_tvs) = filterInScope rdr_env $
+                                   extractHsTysRdrTyVars (ty:ctxt)
+        tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
+        in_type_doc = ptext (sLit "In the type") <+> quotes (ppr fulltype)
+
+    -- See Note [Context quantification]
+    warnContextQuantification (in_type_doc $$ docOfHsDocContext doc) tyvar_bndrs
+    rnForAll doc Implicit extra forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
+
+rnHsTyKiForAll isType doc
+               ty@(HsForAllTy Explicit extra forall_tyvars lctxt@(L _ ctxt) tau)
+  = ASSERT( isType ) do {      -- Explicit quantification.
+         -- Check that the forall'd tyvars are actually
+         -- mentioned in the type, and produce a warning if not
+         let (kvs, mentioned) = extractHsTysRdrTyVars (tau:ctxt)
+             in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
+       ; warnUnusedForAlls (in_type_doc $$ docOfHsDocContext doc)
+                           forall_tyvars mentioned
+       ; traceRn (text "rnHsTyKiForAll:Exlicit" <+> vcat
+            [ppr forall_tyvars, ppr lctxt,ppr tau ])
+       ; rnForAll doc Explicit extra kvs forall_tyvars lctxt tau }
+
+-- The following should never happen but keeps the completeness checker happy
+rnHsTyKiForAll isType doc ty = rnHsTyKi isType doc ty
 --------------
 rnTyVar :: Bool -> RdrName -> RnM Name
 rnTyVar is_type rdr_name

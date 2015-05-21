@@ -595,7 +595,8 @@ getLocalNonValBinders fixity_env
     new_assoc (L _ (ClsInstD { cid_inst = ClsInstDecl
                              { cid_poly_ty = inst_ty
                              , cid_datafam_insts = adts } }))
-      | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
+      | Just (_, _, L loc cls_rdr, _) <-
+                   splitLHsInstDeclTy_maybe (flattenTopLevelLHsForAllTy inst_ty)
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
            ; mapM (new_di (Just cls_nm) . unLoc) adts }
       | otherwise
