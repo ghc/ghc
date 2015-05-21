@@ -1,0 +1,43 @@
+---Problems---------------------
+[
+]
+
+---Problems'--------------------
+[]
+--------------------------------
+[
+(AK Test10396.hs:1:1 AnnModule = [Test10396.hs:2:1-6])
+
+(AK Test10396.hs:1:1 AnnWhere = [Test10396.hs:2:18-22])
+
+(AK Test10396.hs:4:1-15 AnnDcolon = [Test10396.hs:4:8-9])
+
+(AK Test10396.hs:4:1-15 AnnSemi = [Test10396.hs:5:1])
+
+(AK Test10396.hs:4:14-15 AnnCloseP = [Test10396.hs:4:15])
+
+(AK Test10396.hs:4:14-15 AnnOpenP = [Test10396.hs:4:14])
+
+(AK Test10396.hs:(5,1)-(7,11) AnnEqual = [Test10396.hs:5:7])
+
+(AK Test10396.hs:(5,1)-(7,11) AnnFunId = [Test10396.hs:5:1-6])
+
+(AK Test10396.hs:(5,1)-(7,11) AnnSemi = [Test10396.hs:8:1])
+
+(AK Test10396.hs:(5,9)-(7,11) AnnDo = [Test10396.hs:5:9-10])
+
+(AK Test10396.hs:6:3-27 AnnLet = [Test10396.hs:6:3-5])
+
+(AK Test10396.hs:6:3-27 AnnSemi = [Test10396.hs:7:3])
+
+(AK Test10396.hs:6:7-15 AnnDcolon = [Test10396.hs:6:10-11])
+
+(AK Test10396.hs:6:7-27 AnnEqual = [Test10396.hs:6:17])
+
+(AK Test10396.hs:7:10-11 AnnCloseP = [Test10396.hs:7:11])
+
+(AK Test10396.hs:7:10-11 AnnOpenP = [Test10396.hs:7:10])
+
+(AK <no location info> AnnEofPos = [Test10396.hs:8:1])
+]
+

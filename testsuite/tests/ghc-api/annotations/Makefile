@@ -13,6 +13,7 @@ clean:
 	rm -f t10357
 	rm -f t10278
 	rm -f t10354
+	rm -f t10396
 
 annotations: 
 	rm -f annotations.o annotations.hi
@@ -45,6 +46,13 @@ t10358:
 	./t10358 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: t10358
+
+T10396:
+	rm -f T10396.o T10396.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t10396
+	./t10396 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
+.PHONY: t10396
 
 t10255:
 	rm -f t10255.o t10255.hi
