@@ -13,6 +13,7 @@ module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 thRdrNameGuesses ) where
 
 import HsSyn as Hs
+import HsTypes  ( mkHsForAllTy )
 import qualified Class
 import RdrName
 import qualified Name
@@ -244,7 +245,7 @@ cvtDec (InstanceD ctxt ty decs)
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
         ; ctxt' <- cvtContext ctxt
         ; L loc ty' <- cvtType ty
-        ; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
+        ; let inst_ty' = L loc $ mkHsForAllTy Implicit [] ctxt' $ L loc ty'
         ; returnJustL $ InstD $ ClsInstD $
           ClsInstDecl inst_ty' binds' sigs' ats' adts' Nothing }
 
@@ -313,7 +314,7 @@ cvtDec (TH.RoleAnnotD tc roles)
 cvtDec (TH.StandaloneDerivD cxt ty)
   = do { cxt' <- cvtContext cxt
        ; L loc ty'  <- cvtType ty
-       ; let inst_ty' = L loc $ mkImplicitHsForAllTy cxt' $ L loc ty'
+       ; let inst_ty' = L loc $ mkHsForAllTy Implicit [] cxt' $ L loc ty'
        ; returnJustL $ DerivD $
          DerivDecl { deriv_type = inst_ty', deriv_overlap_mode = Nothing } }
 

@@ -1,0 +1,12 @@
+
+Test10278.hs:9:27: Not in scope: type constructor or class ‘Tower’
+
+Test10278.hs:9:39: Not in scope: type constructor or class ‘Tower’
+
+Test10278.hs:10:34: Not in scope: type constructor or class ‘Tower’
+
+Test10278.hs:10:46: Not in scope: type constructor or class ‘Tower’
+
+Test10278.hs:12:24: Not in scope: ‘zeroNewton’
+
+Test10278.hs:12:36: Not in scope: ‘diffUU’

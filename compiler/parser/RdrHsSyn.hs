@@ -624,15 +624,22 @@ mkSimpleConDecl name qvars cxt details
 mkGadtDecl :: [Located RdrName]
            -> LHsType RdrName     -- Always a HsForAllTy
            -> P (ConDecl RdrName)
+mkGadtDecl names (L l ty)
+  = mkGadtDecl' names (L l (flattenTopLevelHsForAllTy ty))
+
+mkGadtDecl' :: [Located RdrName]
+           -> LHsType RdrName     -- Always a HsForAllTy
+           -> P (ConDecl RdrName)
+
 -- We allow C,D :: ty
 -- and expand it as if it had been
 --    C :: ty; D :: ty
 -- (Just like type signatures in general.)
-mkGadtDecl _ ty@(L _ (HsForAllTy _ (Just l) _ _ _))
+mkGadtDecl' _ ty@(L _ (HsForAllTy _ (Just l) _ _ _))
   = parseErrorSDoc l $
     text "A constructor cannot have a partial type:" $$
     ppr ty
-mkGadtDecl names (L ls (HsForAllTy imp Nothing qvars cxt tau))
+mkGadtDecl' names (L ls (HsForAllTy imp Nothing qvars cxt tau))
   = return $ mk_gadt_con names
   where
     (details, res_ty)           -- See Note [Sorting out the result type]
@@ -650,7 +657,7 @@ mkGadtDecl names (L ls (HsForAllTy imp Nothing qvars cxt tau))
                  , con_details  = details
                  , con_res      = ResTyGADT ls res_ty
                  , con_doc      = Nothing }
-mkGadtDecl _ other_ty = pprPanic "mkGadtDecl" (ppr other_ty)
+mkGadtDecl' _ other_ty = pprPanic "mkGadtDecl" (ppr other_ty)
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 tyConToDataCon loc tc
