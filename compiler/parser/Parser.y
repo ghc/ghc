@@ -1870,8 +1870,9 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
                                         case r of {
                                           (FunBind n _ _ _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
-                                          _ -> return () } ;
-                                        _ <- ams (L l ()) (ann ++ (fst $2) ++ (fst $ unLoc $3));
+                                          (PatBind (L lh _lhs) _rhs _ _ _) ->
+                                                ams (L lh ()) (fst $2) >> return () } ;
+                                        _ <- ams (L l ()) (ann ++ (fst $ unLoc $3));
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | pattern_synonym_decl  { sLL $1 $> $ unitOL $1 }
         | docdecl               { sLL $1 $> $ unitOL $1 }

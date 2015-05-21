@@ -149,7 +149,7 @@
 
 (AK AnnotationTuple.hs:23:9-24 AnnLarrow = [AnnotationTuple.hs:23:16-17])
 
-(AK AnnotationTuple.hs:26:1-14 AnnDcolon = [AnnotationTuple.hs:26:5-6])
+(AK AnnotationTuple.hs:26:1-10 AnnDcolon = [AnnotationTuple.hs:26:5-6])
 
 (AK AnnotationTuple.hs:26:1-14 AnnEqual = [AnnotationTuple.hs:26:12])
 
