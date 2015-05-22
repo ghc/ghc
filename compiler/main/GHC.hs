@@ -544,19 +544,17 @@ checkBrokenTablesNextToCode' dflags
 --
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [PackageKey]
 setSessionDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  (dflags'', preload) <- liftIO $ initPackages dflags'
-  modifySession $ \h -> h{ hsc_dflags = dflags''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags'' } }
+  (dflags', preload) <- liftIO $ initPackages dflags
+  modifySession $ \h -> h{ hsc_dflags = dflags'
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags' } }
   invalidateModSummaryCache
   return preload
 
 -- | Sets the program 'DynFlags'.
 setProgramDynFlags :: GhcMonad m => DynFlags -> m [PackageKey]
 setProgramDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  (dflags'', preload) <- liftIO $ initPackages dflags'
-  modifySession $ \h -> h{ hsc_dflags = dflags'' }
+  (dflags', preload) <- liftIO $ initPackages dflags
+  modifySession $ \h -> h{ hsc_dflags = dflags' }
   invalidateModSummaryCache
   return preload
 
@@ -595,8 +593,7 @@ getProgramDynFlags = getSessionDynFlags
 -- 'pkgState' into the interactive @DynFlags@.
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  modifySession $ \h -> h{ hsc_IC = (hsc_IC h) { ic_dflags = dflags' }}
+  modifySession $ \h -> h{ hsc_IC = (hsc_IC h) { ic_dflags = dflags }}
 
 -- | Get the 'DynFlags' used to evaluate interactive expressions.
 getInteractiveDynFlags :: GhcMonad m => m DynFlags
@@ -608,32 +605,6 @@ parseDynamicFlags :: MonadIO m =>
                   -> m (DynFlags, [Located String], [Located String])
 parseDynamicFlags = parseDynamicFlagsCmdLine
 
-{- Note [GHCi and -O]
-~~~~~~~~~~~~~~~~~~~~~
-When using optimization, the compiler can introduce several things
-(such as unboxed tuples) into the intermediate code, which GHCi later
-chokes on since the bytecode interpreter can't handle this (and while
-this is arguably a bug these aren't handled, there are no plans to fix
-it.)
-
-While the driver pipeline always checks for this particular erroneous
-combination when parsing flags, we also need to check when we update
-the flags; this is because API clients may parse flags but update the
-DynFlags afterwords, before finally running code inside a session (see
-T10052 and #10052).
--}
-
--- | Checks the set of new DynFlags for possibly erroneous option
--- combinations when invoking 'setSessionDynFlags' and friends, and if
--- found, returns a fixed copy (if possible).
-checkNewDynFlags :: MonadIO m => DynFlags -> m DynFlags
-checkNewDynFlags dflags
-  -- See Note [GHCi and -O]
-  | Left e <- checkOptLevel (optLevel dflags) dflags
-    = do liftIO $ warningMsg dflags (text e)
-         return (dflags { optLevel = 0 })
-  | otherwise
-    = return dflags
 
 -- %************************************************************************
 -- %*                                                                      *
