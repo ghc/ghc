@@ -3,7 +3,7 @@ T7848.hs:6:57:
     Occurs check: cannot construct the infinite type:
       t2 ~ t0 -> t -> t1 -> A -> A -> A -> A -> t2
     Relevant bindings include
-      y :: forall t3. t3 -> t -> t1 -> A -> A -> A -> A -> t2
+      y :: forall t4. t4 -> t -> t1 -> A -> A -> A -> A -> t2
         (bound at T7848.hs:8:9)
       (&) :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:11:9)
       z :: t1 (bound at T7848.hs:6:12)

@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, BangPatterns #-}
 
 -- |
 -- #name_types#
@@ -793,6 +793,29 @@ type TidyOccEnv = UniqFM Int
 
 * When looking for a renaming for "foo2" we strip off the "2" and start
   with "foo".  Otherwise if we tidy twice we get silly names like foo23.
+
+  However, if it started with digits at the end, we always make a name
+  with digits at the end, rather than shortening "foo2" to just "foo",
+  even if "foo" is unused.  Reasons:
+     - Plain "foo" might be used later
+     - We use trailing digits to subtly indicate a unification variable
+       in typechecker error message; see TypeRep.tidyTyVarBndr
+
+We have to take care though! Consider a machine-generated module (Trac #10370)
+  module Foo where
+     a1 = e1
+     a2 = e2
+     ...
+     a2000 = e2000
+Then "a1", "a2" etc are all marked taken.  But now if we come across "a7" again,
+we have to do a linear search to find a free one, "a20001".  That might just be
+acceptable once.  But if we now come across "a8" again, we don't want to repeat
+that search.
+
+So we use the TidyOccEnv mapping for "a" (not "a7" or "a8") as our base for
+starting the search; and we make sure to update the starting point for "a"
+after we allocate a new one.
+
 -}
 
 type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
@@ -809,24 +832,32 @@ initTidyOccEnv = foldl add emptyUFM
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
   = case lookupUFM env fs of
-        Just n  -> find n
-        Nothing -> (addToUFM env fs 1, occ)
+      Nothing -> (addToUFM env fs 1, occ)   -- Desired OccName is free
+      Just {} -> case lookupUFM env base1 of
+                   Nothing -> (addToUFM env base1 2, OccName occ_sp base1)
+                   Just n  -> find 1 n
   where
     base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
-    base = dropWhileEndLE isDigit (unpackFS fs)
+    base  = dropWhileEndLE isDigit (unpackFS fs)
+    base1 = mkFastString (base ++ "1")
 
-    find n
+    find !k !n
       = case lookupUFM env new_fs of
-          Just n' -> find (n1 `max` n')
-                     -- The max ensures that n increases, avoiding loops
-          Nothing -> (addToUFM (addToUFM env fs n1) new_fs n1,
-                      OccName occ_sp new_fs)
-                     -- We update only the beginning and end of the
-                     -- chain that find explores; it's a little harder to
-                     -- update the middle and there's no real need.
+          Just {} -> find (k+1 :: Int) (n+k)
+                       -- By using n+k, the n arguemt to find goes
+                       --    1, add 1, add 2, add 3, etc which
+                       -- moves at quadratic speed through a dense patch
+
+          Nothing -> (if k>5 then pprTrace "tidyOccName" (ppr k $$ ppr occ $$ ppr new_fs)
+                             else \x -> x)
+                     (new_env, OccName occ_sp new_fs)
        where
-         n1 = n+1
          new_fs = mkFastString (base ++ show n)
+         new_env = addToUFM (addToUFM env new_fs 1) base1 (n+1)
+                     -- Update:  base_fs, so that next time we'll start whwere we left off
+                     --          new_fs,  so that we know it is taken
+                     -- If they are the same (n==1), the former wins
+                     -- See Note [TidyOccEnv]
 
 {-
 ************************************************************************

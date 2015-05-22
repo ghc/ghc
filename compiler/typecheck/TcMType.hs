@@ -349,8 +349,6 @@ cloneMetaTyVar tv
         ; return (mkTcTyVar name' (tyVarKind tv) details') }
 
 mkTcTyVarName :: Unique -> FastString -> Name
--- Make sure that fresh TcTyVar names finish with a digit
--- leaving the un-cluttered names free for user names
 mkTcTyVarName uniq str = mkSysTvName uniq str
 
 -- Works for both type and kind variables
