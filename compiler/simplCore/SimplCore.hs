@@ -12,7 +12,6 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 import DynFlags
 import CoreSyn
-import CoreSubst
 import HscTypes
 import CSE              ( cseProgram )
 import Rules            ( emptyRuleBase, mkRuleBase, unionRuleBase,
@@ -24,7 +23,7 @@ import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize,
                           mkTicks, stripTicksTop )
 import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
-import Simplify         ( simplTopBinds, simplExpr )
+import Simplify         ( simplTopBinds, simplExpr, simplRule )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
@@ -640,20 +639,20 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            eps <- hscEPS hsc_env ;
            let  { rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
                 ; rule_base2 = extendRuleBaseList rule_base1 rules
-                ; simpl_binds = {-# SCC "SimplTopBinds" #-}
-                                simplTopBinds simpl_env tagged_binds
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
 
                 -- Simplify the program
-           (env1, counts1) <- initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds ;
+           ((binds1, rules1), counts1) <- initSmpl dflags rule_base2 fam_envs us1 sz $
+               do { env1 <- {-# SCC "SimplTopBinds" #-}
+                            simplTopBinds simpl_env tagged_binds
 
-                -- Apply the substitution to rules defined in this module
-                -- for imported Ids.  Eg  RULE map my_f = blah
-                -- If we have a substitution my_f :-> other_f, we'd better
-                -- apply it to the rule to, or it'll never match
-           let  { binds1 = getFloatBinds env1
-                ; rules1 = substRulesForImportedIds (mkCoreSubst (text "imp-rules") env1) rules
-                } ;
+                      -- Apply the substitution to rules defined in this module
+                      -- for imported Ids.  Eg  RULE map my_f = blah
+                      -- If we have a substitution my_f :-> other_f, we'd better
+                      -- apply it to the rule to, or it'll never match
+                  ; rules1 <- mapM (simplRule env1 Nothing) rules
+
+                  ; return (getFloatBinds env1, rules1) } ;
 
                 -- Stop if nothing happened; don't dump output
            if isZeroSimplCount counts1 then

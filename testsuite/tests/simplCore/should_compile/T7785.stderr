@@ -4,5 +4,7 @@
     forall ($dMyFunctor :: MyFunctor []) (irred :: Domain [] Int).
       shared @ [] $dMyFunctor irred
       = bar_$sshared
+"SPEC/Foo myfmap @ []" [ALWAYS]
+    forall (tpl :: MyFunctor []). myfmap @ [] tpl = $cmyfmap
 
 
