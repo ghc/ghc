@@ -10,7 +10,7 @@ module Main where
 f x = not x
 
 {-# RULES 
-     "f/seq" forall n e.  seq (f n) e = True
+     "f/seq" forall n.  seq (f n) = const True
  #-}
 
 main = print (seq (f True) False)

@@ -21,13 +21,12 @@ module SimplEnv (
         getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
 
-        SimplSR(..), mkContEx, substId, lookupRecBndr,
+        SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
 
-        simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs,
-        simplBinder, simplBinders, addBndrRules,
-        substExpr, substTy, substTyVar, getTvSubst,
+        simplNonRecBndr, simplRecBndrs,
+        simplBinder, simplBinders,
+        substTy, substTyVar, getTvSubst,
         getCvSubst, substCo, substCoVar,
-        mkCoreSubst,
 
         -- Floats
         Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
@@ -39,7 +38,6 @@ module SimplEnv (
 
 import SimplMonad
 import CoreMonad        ( SimplifierMode(..) )
-import IdInfo
 import CoreSyn
 import CoreUtils
 import Var
@@ -49,7 +47,6 @@ import OrdList
 import Id
 import MkCore                   ( mkWildValBinder )
 import TysWiredIn
-import qualified CoreSubst
 import qualified Type
 import Type hiding              ( substTy, substTyVarBndr, substTyVar )
 import qualified Coercion
@@ -516,16 +513,16 @@ substId :: SimplEnv -> InId -> SimplSR
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of  -- Note [Global Ids in the substitution]
-        Nothing               -> DoneId (refine in_scope v)
-        Just (DoneId v)       -> DoneId (refine in_scope v)
-        Just (DoneEx (Var v)) -> DoneId (refine in_scope v)
+        Nothing               -> DoneId (refineFromInScope in_scope v)
+        Just (DoneId v)       -> DoneId (refineFromInScope in_scope v)
+        Just (DoneEx (Var v)) -> DoneId (refineFromInScope in_scope v)
         Just res              -> res    -- DoneEx non-var, or ContEx
 
         -- Get the most up-to-date thing from the in-scope set
         -- Even though it isn't in the substitution, it may be in
         -- the in-scope set with better IdInfo
-refine :: InScopeSet -> Var -> Var
-refine in_scope v
+refineFromInScope :: InScopeSet -> Var -> Var
+refineFromInScope in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'
                   Nothing -> WARN( True, ppr v ) v  -- This is an error!
@@ -538,7 +535,7 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of
         Just (DoneId v) -> v
         Just _ -> pprPanic "lookupRecBndr" (ppr v)
-        Nothing -> refine in_scope v
+        Nothing -> refineFromInScope in_scope v
 
 {-
 ************************************************************************
@@ -551,10 +548,8 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 These functions are in the monad only so that they can be made strict via seq.
 -}
 
-simplBinders, simplLamBndrs
-        :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
+simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
-simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -568,23 +563,6 @@ simplBinder env bndr
                         ; seqTyVar tv `seq` return (env', tv) }
   | otherwise     = do  { let (env', id) = substIdBndr env bndr
                         ; seqId id `seq` return (env', id) }
-
--------------
-simplLamBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
--- Used for lambda binders.  These sometimes have unfoldings added by
--- the worker/wrapper pass that must be preserved, because they can't
--- be reconstructed from context.  For example:
---      f x = case x of (a,b) -> fw a b x
---      fw a b x{=(a,b)} = ...
--- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
-simplLamBndr env bndr
-  | isId bndr && hasSomeUnfolding old_unf = seqId id2 `seq` return (env2, id2)  -- Special case
-  | otherwise                             = simplBinder env bndr                -- Normal case
-  where
-    old_unf = idUnfolding bndr
-    (env1, id1) = substIdBndr env bndr
-    id2  = id1 `setIdUnfolding` substUnfolding env old_unf
-    env2 = modifyInScope env1 id2
 
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -696,29 +674,8 @@ Note [Robust OccInfo]
 It's important that we *do* retain the loop-breaker OccInfo, because
 that's what stops the Id getting inlined infinitely, in the body of
 the letrec.
-
-
-Note [Rules in a letrec]
-~~~~~~~~~~~~~~~~~~~~~~~~
-After creating fresh binders for the binders of a letrec, we
-substitute the RULES and add them back onto the binders; this is done
-*before* processing any of the RHSs.  This is important.  Manuel found
-cases where he really, really wanted a RULE for a recursive function
-to apply in that function's own right-hand side.
-
-See Note [Loop breaking and RULES] in OccAnal.
 -}
 
-addBndrRules :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
--- Rules are added back into the bin
-addBndrRules env in_id out_id
-  | isEmptySpecInfo old_rules = (env, out_id)
-  | otherwise = (modifyInScope env final_id, final_id)
-  where
-    subst     = mkCoreSubst (text "local rules") env
-    old_rules = idSpecialisation in_id
-    new_rules = CoreSubst.substSpec subst out_id old_rules
-    final_id  = out_id `setIdSpecialisation` new_rules
 
 {-
 ************************************************************************
@@ -760,22 +717,6 @@ substCoVarBndr env cv
 substCo :: SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getCvSubst env) co
 
--- When substituting in rules etc we can get CoreSubst to do the work
--- But CoreSubst uses a simpler form of IdSubstEnv, so we must impedence-match
--- here.  I think the this will not usually result in a lot of work;
--- the substitutions are typically small, and laziness will avoid work in many cases.
-
-mkCoreSubst  :: SDoc -> SimplEnv -> CoreSubst.Subst
-mkCoreSubst doc (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env, seIdSubst = id_env })
-  = mk_subst tv_env cv_env id_env
-  where
-    mk_subst tv_env cv_env id_env = CoreSubst.mkSubst in_scope tv_env cv_env (mapVarEnv fiddle id_env)
-
-    fiddle (DoneEx e)          = e
-    fiddle (DoneId v)          = Var v
-    fiddle (ContEx tv cv id e) = CoreSubst.substExpr (text "mkCoreSubst" <+> doc) (mk_subst tv cv id) e
-                                                -- Don't shortcut here
-
 ------------------
 substIdType :: SimplEnv -> Id -> Id
 substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env }) id
@@ -786,16 +727,3 @@ substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env }) id
                 -- in a Note in the id's type itself
   where
     old_ty = idType id
-
-------------------
-substExpr :: SDoc -> SimplEnv -> CoreExpr -> CoreExpr
-substExpr doc env
-  = CoreSubst.substExpr (text "SimplEnv.substExpr1" <+> doc)
-                        (mkCoreSubst (text "SimplEnv.substExpr2" <+> doc) env)
-  -- Do *not* short-cut in the case of an empty substitution
-  -- See Note [SimplEnv invariants]
-
-substUnfolding :: SimplEnv -> Unfolding -> Unfolding
-substUnfolding env unf = CoreSubst.substUnfolding (mkCoreSubst (text "subst-unfolding") env) unf
-  -- Do *not* short-cut in the case of an empty substitution
-  -- See Note [SimplEnv invariants]

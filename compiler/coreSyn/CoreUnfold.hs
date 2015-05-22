@@ -27,7 +27,7 @@ module CoreUnfold (
         mkCompulsoryUnfolding, mkDFunUnfolding,
         specUnfolding,
 
-        interestingArg, ArgSummary(..),
+        ArgSummary(..),
 
         couldBeSmallEnoughToInline, inlineBoringOk,
         certainlyWillInline, smallEnoughToInline,
@@ -986,10 +986,19 @@ callSiteInline :: DynFlags
                -> CallCtxt              -- True <=> continuation is interesting
                -> Maybe CoreExpr        -- Unfolding, if any
 
+data ArgSummary = TrivArg       -- Nothing interesting
+                | NonTrivArg    -- Arg has structure
+                | ValueArg      -- Arg is a con-app or PAP
+                                -- ..or con-like. Note [Conlike is interesting]
+
 instance Outputable ArgSummary where
   ppr TrivArg    = ptext (sLit "TrivArg")
   ppr NonTrivArg = ptext (sLit "NonTrivArg")
   ppr ValueArg   = ptext (sLit "ValueArg")
+
+nonTriv ::  ArgSummary -> Bool
+nonTriv TrivArg = False
+nonTriv _       = True
 
 data CallCtxt
   = BoringCtxt
@@ -1358,80 +1367,3 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
                 -- But we want to aovid inlining large functions that return
                 -- constructors into contexts that are simply "interesting"
 
-{-
-************************************************************************
-*                                                                      *
-        Interesting arguments
-*                                                                      *
-************************************************************************
-
-Note [Interesting arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An argument is interesting if it deserves a discount for unfoldings
-with a discount in that argument position.  The idea is to avoid
-unfolding a function that is applied only to variables that have no
-unfolding (i.e. they are probably lambda bound): f x y z There is
-little point in inlining f here.
-
-Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
-we must look through lets, eg (let x = e in C a b), because the let will
-float, exposing the value, if we inline.  That makes it different to
-exprIsHNF.
-
-Before 2009 we said it was interesting if the argument had *any* structure
-at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see Trac #3016.
-
-But we don't regard (f x y) as interesting, unless f is unsaturated.
-If it's saturated and f hasn't inlined, then it's probably not going
-to now!
-
-Note [Conlike is interesting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-        f d = ...((*) d x y)...
-        ... f (df d')...
-where df is con-like. Then we'd really like to inline 'f' so that the
-rule for (*) (df d) can fire.  To do this
-  a) we give a discount for being an argument of a class-op (eg (*) d)
-  b) we say that a con-like argument (eg (df d)) is interesting
--}
-
-data ArgSummary = TrivArg       -- Nothing interesting
-                | NonTrivArg    -- Arg has structure
-                | ValueArg      -- Arg is a con-app or PAP
-                                -- ..or con-like. Note [Conlike is interesting]
-
-interestingArg :: CoreExpr -> ArgSummary
--- See Note [Interesting arguments]
-interestingArg e = go e 0
-  where
-    -- n is # value args to which the expression is applied
-    go (Lit {}) _          = ValueArg
-    go (Var v)  n
-       | isConLikeId v     = ValueArg   -- Experimenting with 'conlike' rather that
-                                        --    data constructors here
-       | idArity v > n     = ValueArg   -- Catches (eg) primops with arity but no unfolding
-       | n > 0             = NonTrivArg -- Saturated or unknown call
-       | conlike_unfolding = ValueArg   -- n==0; look for an interesting unfolding
-                                        -- See Note [Conlike is interesting]
-       | otherwise         = TrivArg    -- n==0, no useful unfolding
-       where
-         conlike_unfolding = isConLikeUnfolding (idUnfolding v)
-
-    go (Type _)          _ = TrivArg
-    go (Coercion _)      _ = TrivArg
-    go (App fn (Type _)) n = go fn n
-    go (App fn (Coercion _)) n = go fn n
-    go (App fn _)        n = go fn (n+1)
-    go (Tick _ a)      n = go a n
-    go (Cast e _)        n = go e n
-    go (Lam v e)         n
-       | isTyVar v         = go e n
-       | n>0               = go e (n-1)
-       | otherwise         = ValueArg
-    go (Let _ e)         n = case go e n of { ValueArg -> ValueArg; _ -> NonTrivArg }
-    go (Case {})         _ = NonTrivArg
-
-nonTriv ::  ArgSummary -> Bool
-nonTriv TrivArg = False
-nonTriv _       = True
