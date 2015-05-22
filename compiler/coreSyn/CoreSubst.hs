@@ -954,6 +954,7 @@ simple_app subst (Lam b e) (a:as)
     b2 = add_info subst' b b'
 simple_app subst (Var v) as
   | isCompulsoryUnfolding (idUnfolding v)
+  , isAlwaysActive (idInlineActivation v)
   -- See Note [Unfold compulsory unfoldings in LHSs]
   =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
 simple_app subst (Tick t e) as
@@ -1108,10 +1109,16 @@ to remain visible until Phase 1
 
 Note [Unfold compulsory unfoldings in LHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the user writes `map coerce = coerce` as a rule, the rule will only ever
-match if we replace coerce by its unfolding on the LHS, because that is the
-core that the rule matching engine will find. So do that for everything that
-has a compulsory unfolding. Also see Note [Desugaring coerce as cast] in Desugar
+When the user writes `RULES map coerce = coerce` as a rule, the rule
+will only ever match if simpleOptExpr replaces coerce by its unfolding
+on the LHS, because that is the core that the rule matching engine
+will find. So do that for everything that has a compulsory
+unfolding. Also see Note [Desugaring coerce as cast] in Desugar.
+
+However, we don't want to inline 'seq', which happens to also have a
+compulsory unfolding, so we only do this unfolding only for things
+that are always-active.  See Note [User-defined RULES for seq] in MkId.
+
 
 ************************************************************************
 *                                                                      *

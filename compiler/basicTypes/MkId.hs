@@ -1074,10 +1074,15 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
 seqId :: Id     -- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
-    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+    info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setSpecInfo`       mkSpecInfo [seq_cast_rule]
 
+    inline_prag = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter 0
+                  -- Make 'seq' not inline-always, so that simpleOptExpr
+                  -- (see CoreSubst.simple_app) won't inline 'seq' on the
+                  -- LHS of rules.  That way we can have rules for 'seq';
+                  -- see Note [seqId magic]
 
     ty  = mkForAllTys [alphaTyVar,betaTyVar]
                       (mkFunTy alphaTy (mkFunTy betaTy betaTy))
@@ -1087,17 +1092,18 @@ seqId = pcMiscPrelId seqName ty info
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
 
     -- See Note [Built-in RULES for seq]
+    -- NB: ru_nargs = 3, not 4, to match the code in
+    --     Simplify.rebuildCase which tries to apply this rule
     seq_cast_rule = BuiltinRule { ru_name  = fsLit "seq of cast"
                                 , ru_fn    = seqName
-                                , ru_nargs = 4
-                                , ru_try   = match_seq_of_cast
-                                }
+                                , ru_nargs = 3
+                                , ru_try   = match_seq_of_cast }
 
 match_seq_of_cast :: RuleFun
     -- See Note [Built-in RULES for seq]
-match_seq_of_cast _ _ _ [Type _, Type res_ty, Cast scrut co, expr]
+match_seq_of_cast _ _ _ [Type _, Type res_ty, Cast scrut co]
   = Just (Var seqId `mkApps` [Type (pFst (coercionKind co)), Type res_ty,
-                              scrut, expr])
+                              scrut])
 match_seq_of_cast _ _ _ _ = Nothing
 
 ------------------------------------------------
@@ -1203,16 +1209,24 @@ transform to
 Rather than attempt some general analysis to support this, I've added
 enough support that you can do this using a rewrite rule:
 
-  RULE "f/seq" forall n.  seq (f n) e = seq n e
+  RULE "f/seq" forall n.  seq (f n) = seq n
 
 You write that rule.  When GHC sees a case expression that discards
 its result, it mentally transforms it to a call to 'seq' and looks for
 a RULE.  (This is done in Simplify.rebuildCase.)  As usual, the
 correctness of the rule is up to you.
 
-To make this work, we need to be careful that the magical desugaring
-done in Note [seqId magic] item (c) is *not* done on the LHS of a rule.
-Or rather, we arrange to un-do it, in DsBinds.decomposeRuleLhs.
+VERY IMPORTANT: to make this work, we give the RULE an arity of 1, not 2.
+If we wrote
+  RULE "f/seq" forall n e.  seq (f n) e = seq n e
+with rule arity 2, then two bad things would happen:
+
+  - The magical desugaring done in Note [seqId magic] item (c)
+    for saturated application of 'seq' would turn the LHS into
+    a case expression!
+
+  - The code in Simplify.rebuildCase would need to actually supply
+    the value argument, which turns out to be awkward.
 
 Note [Built-in RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
