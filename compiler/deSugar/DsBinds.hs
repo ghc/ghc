@@ -53,7 +53,6 @@ import MkId(proxyHashId)
 import Class
 import DataCon  ( dataConWorkId )
 import Name
-import MkId     ( seqId )
 import IdInfo   ( IdDetails(..) )
 import Var
 import VarSet
@@ -637,11 +636,6 @@ decomposeRuleLhs orig_bndrs orig_lhs
    decompose (Var fn_id) args
       | not (fn_id `elemVarSet` orig_bndr_set)
       = Just (fn_id, args)
-
-   decompose (Case scrut bndr ty [(DEFAULT, _, body)]) args
-      | isDeadBinder bndr   -- Note [Matching seqId]
-      , let args' = [Type (idType bndr), Type ty, scrut, body]
-      = Just (seqId, args' ++ args)
 
    decompose _ _ = Nothing
 
