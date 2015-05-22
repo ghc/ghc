@@ -868,6 +868,8 @@ tidyTyVarBndr tidy_env@(occ_env, subst) tyvar
     -- System Names are for unification variables;
     -- when we tidy them we give them a trailing "0" (or 1 etc)
     -- so that they don't take precedence for the un-modified name
+    -- Plus, indicating a unification variable in this way is a
+    -- helpful clue for users
     occ1 | isSystemName name = mkTyVarOcc (occNameString occ ++ "0")
          | otherwise         = occ
 
