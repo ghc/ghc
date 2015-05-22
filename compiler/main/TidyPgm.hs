@@ -1039,25 +1039,25 @@ tidyTopName mod nc_var maybe_ref occ_env id
     loc         = nameSrcSpan name
 
     old_occ     = nameOccName name
-    new_occ
-      | Just ref <- maybe_ref, ref /= id =
-          mkOccName (occNameSpace old_occ) $
-             let
-                 ref_str = occNameString (getOccName ref)
-                 occ_str = occNameString old_occ
-             in
-             case occ_str of
-               '$':'w':_ -> occ_str
-                  -- workers: the worker for a function already
-                  -- includes the occname for its parent, so there's
-                  -- no need to prepend the referrer.
-               _other | isSystemName name -> ref_str
-                      | otherwise         -> ref_str ++ '_' : occ_str
-                  -- If this name was system-generated, then don't bother
-                  -- to retain its OccName, just use the referrer.  These
-                  -- system-generated names will become "f1", "f2", etc. for
-                  -- a referrer "f".
-      | otherwise = old_occ
+    new_occ | Just ref <- maybe_ref
+            , ref /= id
+            = mkOccName (occNameSpace old_occ) $
+                   let
+                       ref_str = occNameString (getOccName ref)
+                       occ_str = occNameString old_occ
+                   in
+                   case occ_str of
+                     '$':'w':_ -> occ_str
+                        -- workers: the worker for a function already
+                        -- includes the occname for its parent, so there's
+                        -- no need to prepend the referrer.
+                     _other | isSystemName name -> ref_str
+                            | otherwise         -> ref_str ++ '_' : occ_str
+                        -- If this name was system-generated, then don't bother
+                        -- to retain its OccName, just use the referrer.  These
+                        -- system-generated names will become "f1", "f2", etc. for
+                        -- a referrer "f".
+            | otherwise = old_occ
 
     (occ_env', occ') = tidyOccName occ_env new_occ
 
