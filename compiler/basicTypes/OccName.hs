@@ -853,9 +853,7 @@ tidyOccName env occ@(OccName occ_sp fs)
                        --    1, add 1, add 2, add 3, etc which
                        -- moves at quadratic speed through a dense patch
 
-          Nothing -> (if k>5 then pprTrace "tidyOccName" (ppr k $$ ppr occ $$ ppr new_fs)
-                             else \x -> x)
-                     (new_env, OccName occ_sp new_fs)
+          Nothing -> (new_env, OccName occ_sp new_fs)
        where
          new_fs = mkFastString (base ++ show n)
          new_env = addToUFM (addToUFM env new_fs 1) base1 (n+1)
