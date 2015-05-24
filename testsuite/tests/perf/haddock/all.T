@@ -40,7 +40,7 @@ test('haddock.base',
             # 2014-08-05: XXX TODO UPDATE ME XXX
       ],
      stats,
-     ['../../../../libraries/base/dist-install/doc/html/base/base.haddock.t'])
+     ['../../../../libraries/base/dist-install/haddock.t'])
 
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
@@ -81,7 +81,7 @@ test('haddock.Cabal',
             # 2014-08-05: XXX TODO UPDATE ME XXX
       ],
      stats,
-     ['../../../../libraries/Cabal/Cabal/dist-install/doc/html/Cabal/Cabal.haddock.t'])
+     ['../../../../libraries/Cabal/Cabal/dist-install/haddock.t'])
 
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip), req_haddock
@@ -109,4 +109,4 @@ test('haddock.compiler',
             # 2014-06-29: 15110426000 (x86/Linux)
       ],
      stats,
-     ['../../../../compiler/stage2/doc/html/ghc/ghc.haddock.t'])
+     ['../../../../compiler/stage2/haddock.t'])
