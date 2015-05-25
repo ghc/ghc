@@ -110,7 +110,7 @@ OK:
 
 <programlisting>
 foreign import ccall interruptible
-   "sleep" :: CUint -> IO CUint
+   "sleep" sleepBlock :: CUint -> IO CUint
 </programlisting>
 
           <literal>interruptible</literal> behaves exactly as
