@@ -164,7 +164,7 @@ mkAliasMap dflags mRenamedSource =
         return $
           (lookupModuleDyn dflags
              (fmap Module.fsToPackageKey $
-              ideclPkgQual impDecl)
+              fmap snd $ ideclPkgQual impDecl)
              (case ideclName impDecl of SrcLoc.L _ name -> name),
            alias))
         impDecls
@@ -200,8 +200,8 @@ moduleWarning dflags gre (WarnAll w) = Just $ parseWarning dflags gre w
 
 parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> Doc Name
 parseWarning dflags gre w = force $ case w of
-  DeprecatedTxt _ msg -> format "Deprecated: " (concatFS $ map unLoc msg)
-  WarningTxt    _ msg -> format "Warning: "    (concatFS $ map unLoc msg)
+  DeprecatedTxt _ msg -> format "Deprecated: " (concatFS $ map (snd . unLoc) msg)
+  WarningTxt    _ msg -> format "Warning: "    (concatFS $ map (snd . unLoc) msg)
   where
     format x xs = DocWarning . DocParagraph . DocAppend (DocString x)
                   . processDocString dflags gre $ HsDocString xs
