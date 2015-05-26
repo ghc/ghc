@@ -100,10 +100,6 @@ else
 $(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug? See http://ghc.haskell.org/trac/ghc/wiki/Building/Troubleshooting#Makehasrestarteditself3timesisthereamakefilebug for details)
 endif
 
-ifneq "$(CLEANING)" "YES"
-CLEANING = NO
-endif
-
 # -----------------------------------------------------------------------------
 # Misc GNU make utils
 
@@ -263,15 +259,13 @@ include rules/cmm-objs.mk
 # Suffix rules cause "make clean" to fail on Windows (trac #3233)
 # so we don't make any when cleaning.
 ifneq "$(CLEANING)" "YES"
-
 include rules/hs-suffix-rules-srcdir.mk
 include rules/hs-suffix-way-rules-srcdir.mk
 include rules/hs-suffix-way-rules.mk
 include rules/hi-rule.mk
 include rules/c-suffix-rules.mk
 include rules/cmm-suffix-rules.mk
-
-endif # CLEANING=YES
+endif
 
 # -----------------------------------------------------------------------------
 # Building package-data.mk files from .cabal files
