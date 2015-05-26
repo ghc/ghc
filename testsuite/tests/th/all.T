@@ -308,7 +308,9 @@ test('T8577',
      ['T8577', '-v0 ' + config.ghc_th_way_flags])
 test('T8625', normal, ghci_script, ['T8625.script'])
 test('TH_StaticPointers',
-     [ when(compiler_lt('ghc', '7.9'), skip) ],
+     [ when(compiler_lt('ghc', '7.9'), skip)
+     , when(doing_ghci(), extra_hc_opts('-fobject-code'))
+     ],
      compile_and_run, [''])
 test('TH_StaticPointers02',
      [ when(compiler_lt('ghc', '7.9'), skip) ],

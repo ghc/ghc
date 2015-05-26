@@ -115,7 +115,9 @@ test('T7953', reqlib('random'), compile_and_run, [''])
 test('T8256', normal, compile_and_run, ['-dcore-lint -O1'])
 test('T6084',normal, compile_and_run, ['-O2'])
 test('CgStaticPointers',
-     [ when(compiler_lt('ghc', '7.9'), skip) ],
+     [ when(compiler_lt('ghc', '7.9'), skip)
+     , when(doing_ghci(), extra_hc_opts('-fobject-code'))
+     ],
      compile_and_run, [''])
 test('StaticArraySize', normal, compile_and_run, ['-O2'])
 test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
