@@ -140,7 +140,7 @@ echo:
 
 include mk/tree.mk
 
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$(CLEANING)" "YES"
 include mk/config.mk
 ifeq "$(ProjectVersion)" ""
 $(error Please run ./configure first)
@@ -155,7 +155,7 @@ include mk/custom-settings.mk
 SRC_CC_OPTS     += $(WERROR)
 SRC_HC_OPTS     += $(WERROR)
 
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$(CLEANING)" "YES"
 ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 ifeq "$(findstring dyn,$(GhcLibWays))" ""
 $(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_GHC_PROGRAMS) is YES)
@@ -203,7 +203,7 @@ $(eval $(call clean-target,root,inplace,inplace/bin inplace/lib))
 # When we're just doing 'make clean' or 'make show', then we don't need
 # to build dependencies.
 
-ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifeq "$(CLEANING)" "YES"
 NO_INCLUDE_DEPS = YES
 NO_INCLUDE_PKGDATA = YES
 endif
@@ -650,7 +650,7 @@ endif
 
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 BUILD_DIRS += libraries/integer-gmp/gmp
-else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+else ifeq "$(CLEANING)" "YES"
 BUILD_DIRS += libraries/integer-gmp/gmp
 endif
 

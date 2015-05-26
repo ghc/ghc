@@ -46,7 +46,7 @@ endif
 
 ifeq "$(phase)" "final"
 
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$(CLEANING)" "YES"
 include libraries/integer-gmp/gmp/config.mk
 endif
 

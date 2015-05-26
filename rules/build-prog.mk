@@ -81,13 +81,13 @@ endif
 $1_$2_depfile_base = $1/$2/build/.depend
 
 ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$(CLEANING)" "YES"
 $1_$2_INPLACE = $$(error $1_$2 should not be installed inplace, but INPLACE var evaluated)
 else
 $1_$2_INPLACE =
 endif
 else
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$(CLEANING)" "YES"
 ifneq "$$($$($1_$2_PROGNAME)_INPLACE)" ""
 $$(error $$($1_$2_PROGNAME)_INPLACE defined twice)
 endif
@@ -279,7 +279,7 @@ endif
 endif
 
 # INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$(CLEANING)" "YES"
 ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
 	$$(INSTALL) -m 755 $$< $$@

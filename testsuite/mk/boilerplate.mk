@@ -187,6 +187,7 @@ $(ghc-config-mk) : $(TOP)/mk/ghc-config
 	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
 # If the ghc-config fails, remove $@, and fail
 
+# Note: $(CLEANING) is not defined in the testsuite.
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include $(ghc-config-mk)
 endif
