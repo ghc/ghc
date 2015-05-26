@@ -20,6 +20,7 @@ ifeq "$$($1_$2_SHELL_WRAPPER_NAME)" ""
 $1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROGNAME).wrapper
 endif
 
+
 ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
 
 $1_$2_INPLACE_SHELL_WRAPPER_NAME = $$($1_$2_PROG)
@@ -56,7 +57,8 @@ else
 endif
 	$$(EXECUTABLE_FILE)                                                     $$@
 
-endif
+endif # $1_$2_WANT_INPLACE_WRAPPER
+
 
 ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 
@@ -88,7 +90,8 @@ install_$1_$2_wrapper:
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"
 	$$(EXECUTABLE_FILE)                                         "$$(WRAPPER)"
 
-endif
+endif # $1_$2_WANT_INSTALLED_WRAPPER
+
 
 ifeq "$$($1_$2_WANT_BINDIST_WRAPPER)" "YES"
 ifneq "$$(TargetOS_CPP)" "mingw32"
@@ -109,7 +112,7 @@ endif
 	$$(EXECUTABLE_FILE)                                                   $$@
 
 endif
-endif
+endif # $1_$2_WANT_BINDIST_WRAPPER
 
 $(call profEnd, shell-wrapper($1,$2))
 endef
