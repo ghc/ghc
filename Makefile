@@ -79,9 +79,11 @@ endif
 	@echo "===--- building final phase"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=final $@
 
+.PHONY: binary-dist
 binary-dist: binary-dist-prep
 	mv bindistprep/*.tar.$(TAR_COMP_EXT) .
 
+.PHONY: binary-dist-prep
 binary-dist-prep:
 ifeq "$(mingw32_TARGET_OS)" "1"
 	$(MAKE) -r --no-print-directory -f ghc.mk windows-binary-dist-prep
@@ -91,17 +93,21 @@ else
 	$(MAKE) -r --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
 
+.PHONY: clean distclean maintainer-clean
 clean distclean maintainer-clean:
 	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
 	test ! -d testsuite || $(MAKE) -C testsuite $@
 
+.PHONY: $(filter clean_%,$(MAKECMDGOALS))
 $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
 
+.PHONY: bootstrapping-files show echo
 bootstrapping-files show echo:
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 ifeq "$(darwin_TARGET_OS)" "1"
+.PHONY: framework-pkg
 framework-pkg:
 	$(MAKE) -C distrib/MacOS $@
 endif
