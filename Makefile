@@ -34,7 +34,7 @@ default : all
 help:
 	@cat MAKEHELP.md
 
-ifneq "$(filter maintainer-clean distclean clean help,$(MAKECMDGOALS))" ""
+ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
 else
 include mk/config.mk
