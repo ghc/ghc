@@ -330,7 +330,9 @@ rnExpr e@(HsStatic expr) = do
              ]
       _ -> do
        let isTopLevelName n = isExternalName n || isWiredInName n
-       case nameSetElems $ filterNameSet (not . isTopLevelName) fvExpr of
+       case nameSetElems $ filterNameSet
+                             (\n -> not (isTopLevelName n || isUnboundName n))
+                             fvExpr                                           of
          [] -> return ()
          fvNonGlobal -> addErr $ cat
              [ text $ "Only identifiers of top-level bindings can "
