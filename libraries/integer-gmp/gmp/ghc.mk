@@ -101,6 +101,8 @@ endif
 
 libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
 
+ifneq "$(CLEANING)" "YES"
+# When running `make clean` before `./configure`, CC_STAGE1 is undefined.
 CLANG = $(findstring clang, $(shell $(CC_STAGE1) --version))
 
 ifeq "$(CLANG)" "clang"
@@ -136,4 +138,5 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	cd libraries/integer-gmp/gmp/objs && $(AR_STAGE1) x ../libgmp.a
 	$(RANLIB_CMD) libraries/integer-gmp/gmp/libgmp.a
 
-endif
+endif # CLEANING
+endif # phase
