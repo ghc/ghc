@@ -51,8 +51,6 @@ $(call clean-target,$1,$2,$1/$2 $$($1_$2_INPLACE))
 .PHONY: clean_$1
 clean_$1 : clean_$1_$2
 
-# INPLACE_BIN etc. might be empty if we're cleaning
-ifneq "$$(CLEANING)" "YES"
 ifneq "$$(BINDIST)" "YES"
 $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$$$(unlit_INPLACE) | $$$$(dir $$$$@)/.
 	"$$(unlit_INPLACE)" $$(UNLIT_OPTS) $$< $$@
@@ -67,8 +65,6 @@ $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
 $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
 	"$$(CP)" $$< $$@
 	$$(EXECUTABLE_FILE) $$@
-
-endif
 endif
 
 ifeq "$$($1_$2_INSTALL)" "YES"

@@ -287,12 +287,9 @@ endif
 endif
 endif
 
-# INPLACE_BIN might be empty if we're distcleaning
-ifneq "$$(CLEANING)" "YES"
 ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
 	$$(INSTALL) -m 755 $$< $$@
-endif
 endif
 
 endif # BINDIST=YES
