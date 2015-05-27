@@ -1459,7 +1459,7 @@ ctypedoc :: { LHsType RdrName }
                                          >> return (sLL $1 $> $
                                                   mkQualifiedHsForAllTy $1 $3) }
         | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
-                                             [mj AnnDcolon $2] }
+                                             [mj AnnVal $1,mj AnnDcolon $2] }
         | typedoc                     { $1 }
 
 ----------------------
@@ -1556,9 +1556,10 @@ atype :: { LHsType RdrName }
                                              [mop $1,mj AnnDcolon $3,mcp $5] }
         | quasiquote                  { sL1 $1 (HsQuasiQuoteTy (unLoc $1)) }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy $2)
-                                             [mo $1,mc $3] }
-        | TH_ID_SPLICE                { sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
-                                        mkUnqual varName (getTH_ID_SPLICE $1) }
+                                             [mj AnnOpenPE $1,mj AnnCloseP $3] }
+        | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
+                                             mkUnqual varName (getTH_ID_SPLICE $1))
+                                             [mj AnnThIdSplice $1] }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar $ unLoc $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
@@ -1731,9 +1732,9 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 gadt_constr :: { LConDecl RdrName }
                    -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
-                {% do { gadtDecl <- mkGadtDecl (unLoc $1) $3
+                {% do { (anns,gadtDecl) <- mkGadtDecl (unLoc $1) $3
                       ; ams (sLL $1 $> $ gadtDecl)
-                            [mj AnnDcolon $2] } }
+                            (mj AnnDcolon $2:anns) } }
 
                 -- Deprecated syntax for GADT record declarations
         | oqtycon '{' fielddecls '}' '::' sigtype
@@ -2180,8 +2181,8 @@ aexp2   :: { LHsExpr RdrName }
 
         | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThIdSplice $1,mj AnnName $2] }
-        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThIdSplice $1,mj AnnName $2] }
+        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2)) [mo $1,mc $3] }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2)) [mo $1,mc $3]}
         | '[t|' ctype '|]'    {% checkNoPartialType
@@ -2205,12 +2206,14 @@ splice_exp :: { LHsExpr RdrName }
                                         (sL1 $1 $ HsVar (mkUnqual varName
                                                         (getTH_ID_SPLICE $1))))
                                        [mj AnnThIdSplice $1] }
-        | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE $2) [mo $1,mc $3] }
+        | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE $2)
+                                       [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE
                                         (sL1 $1 $ HsVar (mkUnqual varName
                                                      (getTH_ID_TY_SPLICE $1))))
                                        [mj AnnThIdTySplice $1] }
-        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE $2) [mo $1,mc $3] }
+        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE $2)
+                                       [mj AnnOpenPTE $1,mj AnnCloseP $3] }
 
 cmdargs :: { [LHsCmdTop RdrName] }
         : cmdargs acmd                  { $2 : $1 }
@@ -2279,7 +2282,7 @@ commas_tup_tail : commas tup_tail
                     then [L (last $ fst $1) missingTupArg]
                     else $2
          in (head $ fst $1
-            ,(map (\l -> L l missingTupArg) (init $ fst $1)) ++ tt)) } }
+            ,(map (\l -> L l missingTupArg) (tail $ fst $1)) ++ tt)) } }
 
 -- Always follows a comma
 tup_tail :: { [LHsTupArg RdrName] }

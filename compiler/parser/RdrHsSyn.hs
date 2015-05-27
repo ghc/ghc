@@ -623,9 +623,12 @@ mkSimpleConDecl name qvars cxt details
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType RdrName     -- Always a HsForAllTy
-           -> P (ConDecl RdrName)
-mkGadtDecl names (L l ty)
-  = mkGadtDecl' names (L l (flattenTopLevelHsForAllTy ty))
+           -> P ([AddAnn], ConDecl RdrName)
+mkGadtDecl names (L l ty) = do
+  let
+    (anns,ty') = flattenHsForAllTyKeepAnns ty
+  gadt <- mkGadtDecl' names (L l ty')
+  return (anns,gadt)
 
 mkGadtDecl' :: [Located RdrName]
            -> LHsType RdrName     -- Always a HsForAllTy
@@ -858,8 +861,7 @@ checkAPat msg loc e0 = do
                                         L _ (HsForAllTy Implicit _ _
                                              (L _ []) ty) -> ty
                                         other -> other
-                             return (SigPatIn e (mkHsWithBndrs
-                                                   (L (getLoc t) (HsParTy t'))))
+                             return (SigPatIn e (mkHsWithBndrs t'))
 
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _

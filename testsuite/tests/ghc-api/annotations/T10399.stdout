@@ -1,0 +1,154 @@
+---Problems---------------------
+[
+(AK Test10399.hs:(13,27)-(14,69) AnnCloseP = [Test10399.hs:14:69])
+
+(AK Test10399.hs:(13,27)-(14,69) AnnOpenP = [Test10399.hs:13:27])
+]
+
+---Problems'--------------------
+[]
+--------------------------------
+[
+(AK Test10399.hs:1:1 AnnModule = [Test10399.hs:5:1-6])
+
+(AK Test10399.hs:1:1 AnnWhere = [Test10399.hs:5:18-22])
+
+(AK Test10399.hs:7:1-35 AnnEqual = [Test10399.hs:7:10])
+
+(AK Test10399.hs:7:1-35 AnnSemi = [Test10399.hs:9:1])
+
+(AK Test10399.hs:7:1-35 AnnType = [Test10399.hs:7:1-4])
+
+(AK Test10399.hs:7:12-35 AnnDcolon = [Test10399.hs:7:24-25])
+
+(AK Test10399.hs:7:12-35 AnnVal = [Test10399.hs:7:12-22])
+
+(AK Test10399.hs:9:1-66 AnnEqual = [Test10399.hs:9:8])
+
+(AK Test10399.hs:9:1-66 AnnFunId = [Test10399.hs:9:1-6])
+
+(AK Test10399.hs:9:1-66 AnnSemi = [Test10399.hs:11:1])
+
+(AK Test10399.hs:9:10-66 AnnVal = [Test10399.hs:9:17])
+
+(AK Test10399.hs:9:23-66 AnnCloseP = [Test10399.hs:9:66])
+
+(AK Test10399.hs:9:23-66 AnnOpenP = [Test10399.hs:9:23])
+
+(AK Test10399.hs:9:24-33 AnnCloseP = [Test10399.hs:9:33])
+
+(AK Test10399.hs:9:24-33 AnnOpenP = [Test10399.hs:9:24])
+
+(AK Test10399.hs:9:24-44 AnnVal = [Test10399.hs:9:35-37])
+
+(AK Test10399.hs:9:24-54 AnnVal = [Test10399.hs:9:46-48])
+
+(AK Test10399.hs:9:24-65 AnnVal = [Test10399.hs:9:56-58])
+
+(AK Test10399.hs:9:25 AnnComma = [Test10399.hs:9:25])
+
+(AK Test10399.hs:9:26 AnnComma = [Test10399.hs:9:26])
+
+(AK Test10399.hs:9:27-28 AnnCloseP = [Test10399.hs:9:28])
+
+(AK Test10399.hs:9:27-28 AnnComma = [Test10399.hs:9:29])
+
+(AK Test10399.hs:9:27-28 AnnOpenP = [Test10399.hs:9:27])
+
+(AK Test10399.hs:9:30 AnnComma = [Test10399.hs:9:30])
+
+(AK Test10399.hs:9:31-32 AnnCloseP = [Test10399.hs:9:32])
+
+(AK Test10399.hs:9:31-32 AnnOpenP = [Test10399.hs:9:31])
+
+(AK Test10399.hs:(11,1)-(14,69) AnnData = [Test10399.hs:11:1-4])
+
+(AK Test10399.hs:(11,1)-(14,69) AnnSemi = [Test10399.hs:16:1])
+
+(AK Test10399.hs:(11,1)-(14,69) AnnWhere = [Test10399.hs:11:21-25])
+
+(AK Test10399.hs:12:5-64 AnnDcolon = [Test10399.hs:12:11-12])
+
+(AK Test10399.hs:12:5-64 AnnSemi = [Test10399.hs:13:5])
+
+(AK Test10399.hs:12:14-64 AnnDot = [Test10399.hs:12:23])
+
+(AK Test10399.hs:12:14-64 AnnForall = [Test10399.hs:12:14-19])
+
+(AK Test10399.hs:12:25-40 AnnCloseP = [Test10399.hs:12:40, Test10399.hs:12:40])
+
+(AK Test10399.hs:12:25-40 AnnDarrow = [Test10399.hs:12:42-43])
+
+(AK Test10399.hs:12:25-40 AnnOpenP = [Test10399.hs:12:25, Test10399.hs:12:25])
+
+(AK Test10399.hs:12:27-30 AnnComma = [Test10399.hs:12:31])
+
+(AK Test10399.hs:12:45-46 AnnBang = [Test10399.hs:12:45])
+
+(AK Test10399.hs:12:45-46 AnnRarrow = [Test10399.hs:12:48-49])
+
+(AK Test10399.hs:12:45-64 AnnRarrow = [Test10399.hs:12:48-49])
+
+(AK Test10399.hs:(13,5)-(14,69) AnnCloseP = [Test10399.hs:14:69])
+
+(AK Test10399.hs:(13,5)-(14,69) AnnDcolon = [Test10399.hs:13:12-13])
+
+(AK Test10399.hs:(13,5)-(14,69) AnnOpenP = [Test10399.hs:13:27])
+
+(AK Test10399.hs:(13,15)-(14,69) AnnDot = [Test10399.hs:13:25])
+
+(AK Test10399.hs:(13,15)-(14,69) AnnForall = [Test10399.hs:13:15-20])
+
+(AK Test10399.hs:(13,27)-(14,69) AnnCloseP = [Test10399.hs:14:69])
+
+(AK Test10399.hs:(13,27)-(14,69) AnnOpenP = [Test10399.hs:13:27])
+
+(AK Test10399.hs:13:28-43 AnnCloseP = [Test10399.hs:13:43, Test10399.hs:13:43])
+
+(AK Test10399.hs:13:28-43 AnnDarrow = [Test10399.hs:13:45-46])
+
+(AK Test10399.hs:13:28-43 AnnOpenP = [Test10399.hs:13:28, Test10399.hs:13:28])
+
+(AK Test10399.hs:13:30-33 AnnComma = [Test10399.hs:13:34])
+
+(AK Test10399.hs:13:48 AnnRarrow = [Test10399.hs:13:50-51])
+
+(AK Test10399.hs:(13,48)-(14,68) AnnRarrow = [Test10399.hs:13:50-51])
+
+(AK Test10399.hs:13:53-66 AnnRarrow = [Test10399.hs:14:45-46])
+
+(AK Test10399.hs:(13,53)-(14,68) AnnRarrow = [Test10399.hs:14:45-46])
+
+(AK Test10399.hs:14:48 AnnRarrow = [Test10399.hs:14:50-51])
+
+(AK Test10399.hs:14:48-68 AnnRarrow = [Test10399.hs:14:50-51])
+
+(AK Test10399.hs:14:66-68 AnnCloseS = [Test10399.hs:14:68])
+
+(AK Test10399.hs:14:66-68 AnnOpenS = [Test10399.hs:14:66])
+
+(AK Test10399.hs:16:1-25 AnnClose = [Test10399.hs:16:24-25])
+
+(AK Test10399.hs:16:1-25 AnnOpen = [Test10399.hs:16:1-3])
+
+(AK Test10399.hs:16:1-25 AnnSemi = [Test10399.hs:18:1])
+
+(AK Test10399.hs:16:20-22 AnnThIdSplice = [Test10399.hs:16:20-22])
+
+(AK Test10399.hs:18:1-21 AnnEqual = [Test10399.hs:18:19])
+
+(AK Test10399.hs:18:1-21 AnnFunId = [Test10399.hs:18:1-3])
+
+(AK Test10399.hs:18:1-21 AnnSemi = [Test10399.hs:19:1])
+
+(AK Test10399.hs:18:5-17 AnnCloseP = [Test10399.hs:18:17])
+
+(AK Test10399.hs:18:5-17 AnnOpenPE = [Test10399.hs:18:5-6])
+
+(AK Test10399.hs:18:8-15 AnnClose = [Test10399.hs:18:14-15])
+
+(AK Test10399.hs:18:8-15 AnnOpen = [Test10399.hs:18:8-10])
+
+(AK <no location info> AnnEofPos = [Test10399.hs:19:1])
+]
+

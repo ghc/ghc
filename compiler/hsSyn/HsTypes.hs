@@ -38,6 +38,7 @@ module HsTypes (
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
         mkHsForAllTy,
         flattenTopLevelLHsForAllTy,flattenTopLevelHsForAllTy,
+        flattenHsForAllTyKeepAnns,
         hsExplicitTvs,
         hsTyVarName, mkHsWithBndrs, hsLKiTyVarNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
@@ -67,6 +68,7 @@ import SrcLoc
 import StaticFlags
 import Outputable
 import FastString
+import Lexer ( AddAnn, mkParensApiAnn )
 import Maybes( isJust )
 
 import Data.Data hiding ( Fixity )
@@ -606,24 +608,30 @@ flattenTopLevelLHsForAllTy (L l ty) = L l (flattenTopLevelHsForAllTy ty)
 
 flattenTopLevelHsForAllTy :: HsType name -> HsType name
 flattenTopLevelHsForAllTy (HsForAllTy exp extra tvs (L l []) ty)
-  = mk_forall_ty l exp extra tvs ty
+  = snd $ mk_forall_ty [] l exp extra tvs ty
 flattenTopLevelHsForAllTy ty = ty
 
+flattenHsForAllTyKeepAnns :: HsType name -> ([AddAnn],HsType name)
+flattenHsForAllTyKeepAnns (HsForAllTy exp extra tvs (L l []) ty)
+  = mk_forall_ty [] l exp extra tvs ty
+flattenHsForAllTyKeepAnns ty = ([],ty)
+
 -- mk_forall_ty makes a pure for-all type (no context)
-mk_forall_ty :: SrcSpan -> HsExplicitFlag -> Maybe SrcSpan -> LHsTyVarBndrs name
-             -> LHsType name -> HsType name
-mk_forall_ty _ exp1 extra1 tvs1 (L _ (HsForAllTy exp2 extra qtvs2 ctxt ty)) =
-  HsForAllTy (exp1 `plus` exp2) (mergeExtra extra1 extra)
-             (tvs1 `mappend` qtvs2) ctxt ty
+mk_forall_ty :: [AddAnn] -> SrcSpan -> HsExplicitFlag -> Maybe SrcSpan
+             -> LHsTyVarBndrs name
+             -> LHsType name -> ([AddAnn],HsType name)
+mk_forall_ty ann _ exp1 extra1 tvs1 (L _ (HsForAllTy exp2 extra qtvs2 ctxt ty))
+  = (ann,HsForAllTy (exp1 `plus` exp2) (mergeExtra extra1 extra)
+                    (tvs1 `mappend` qtvs2) ctxt ty)
   where
         -- Bias the merging of extra's to the top level, so that a single
         -- wildcard context will prevail
         mergeExtra (Just s) _ = Just s
         mergeExtra _        e = e
-mk_forall_ty l exp  extra tvs  (L _ (HsParTy ty))
-  = mk_forall_ty l exp extra tvs ty
-mk_forall_ty l exp extra tvs  ty
-  = HsForAllTy exp extra tvs (L l []) ty
+mk_forall_ty ann l exp  extra tvs  (L lp (HsParTy ty))
+  = mk_forall_ty (ann ++ mkParensApiAnn lp) l exp extra tvs ty
+mk_forall_ty ann l exp extra tvs  ty
+  = (ann,HsForAllTy exp extra tvs (L l []) ty)
         -- Even if tvs is empty, we still make a HsForAll!
         -- In the Implicit case, this signals the place to do implicit quantification
         -- In the Explicit case, it prevents implicit quantification

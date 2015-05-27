@@ -233,6 +233,8 @@ data AnnKeywordId
     | AnnOpen   -- ^ '(\#' or '{-\# LANGUAGE' etc
     | AnnOpenC   -- ^ '{'
     | AnnOpenP   -- ^ '('
+    | AnnOpenPE   -- ^ '$('
+    | AnnOpenPTE   -- ^ '$$('
     | AnnOpenS   -- ^ '['
     | AnnPackageName
     | AnnPattern
@@ -248,6 +250,7 @@ data AnnKeywordId
     | AnnThen
     | AnnThIdSplice -- ^ '$'
     | AnnThIdTySplice -- ^ '$$'
+    | AnnThTyQuote -- ^ double '''
     | AnnTilde -- ^ '~'
     | AnnTildehsh -- ^ '~#'
     | AnnType

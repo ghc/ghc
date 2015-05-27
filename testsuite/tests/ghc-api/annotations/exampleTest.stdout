@@ -1,7 +1,5 @@
 ---Problems---------------------
 [
-(AK AnnotationTuple.hs:14:39 AnnComma = [AnnotationTuple.hs:14:39])
-
 (AK <no location info> AnnEofPos = [AnnotationTuple.hs:32:1])
 ]
 
