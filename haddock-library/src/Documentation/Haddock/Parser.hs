@@ -382,6 +382,15 @@ takeNonEmptyLine :: Parser String
 takeNonEmptyLine = do
     (++ "\n") . decodeUtf8 <$> (takeWhile1 (/= '\n') >>= nonSpace) <* "\n"
 
+-- | Takes indentation of first non-empty line.
+--
+-- More precisely: skips all whitespace-only lines and returns indentation
+-- (horizontal space, might be empty) of that non-empty line.
+takeIndent :: Parser BS.ByteString
+takeIndent = do
+  indent <- takeHorizontalSpace
+  "\n" *> takeIndent <|> return indent
+
 -- | Blocks of text of the form:
 --
 -- >> foo
