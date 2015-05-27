@@ -651,6 +651,9 @@ endif
 ifeq "$(HADDOCK_DOCS)" "YES"
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
+else ifeq "$(CLEANING)" "YES"
+BUILD_DIRS += utils/haddock
+BUILD_DIRS += utils/haddock/doc
 endif
 
 BUILD_DIRS += compiler
