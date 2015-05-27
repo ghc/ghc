@@ -205,7 +205,7 @@ schedule (Capability *initialCapability, Task *task)
           stg_exit(EXIT_FAILURE);
     }
 
-    // The interruption / shutdown sequence.
+    // Note [shutdown]: The interruption / shutdown sequence.
     //
     // In order to cleanly shut down the runtime, we want to:
     //   * make sure that all main threads return to their callers
@@ -213,21 +213,25 @@ schedule (Capability *initialCapability, Task *task)
     //   * clean up all OS threads assocated with the runtime
     //   * free all memory etc.
     //
-    // So the sequence for ^C goes like this:
+    // So the sequence goes like this:
     //
-    //   * ^C handler sets sched_state := SCHED_INTERRUPTING and
-    //     arranges for some Capability to wake up
+    //   * The shutdown sequence is initiated by calling hs_exit(),
+    //     interruptStgRts(), or running out of memory in the GC.
     //
-    //   * all threads in the system are halted, and the zombies are
-    //     placed on the run queue for cleaning up.  We acquire all
-    //     the capabilities in order to delete the threads, this is
-    //     done by scheduleDoGC() for convenience (because GC already
-    //     needs to acquire all the capabilities).  We can't kill
-    //     threads involved in foreign calls.
+    //   * Set sched_state = SCHED_INTERRUPTING
     //
-    //   * somebody calls shutdownHaskell(), which calls exitScheduler()
+    //   * The scheduler notices sched_state = SCHED_INTERRUPTING and calls
+    //     scheduleDoGC(), which halts the whole runtime by acquiring all the
+    //     capabilities, does a GC and then calls deleteAllThreads() to kill all
+    //     the remaining threads.  The zombies are left on the run queue for
+    //     cleaning up.  We can't kill threads involved in foreign calls.
     //
-    //   * sched_state := SCHED_SHUTTING_DOWN
+    //   * scheduleDoGC() sets sched_state = SCHED_SHUTTING_DOWN
+    //
+    //   * After this point, there can be NO MORE HASKELL EXECUTION.  This is
+    //     enforced by the scheduler, which won't run any Haskell code when
+    //     sched_state >= SCHED_INTERRUPTING, and we already sync'd with the
+    //     other capabilities by doing the GC earlier.
     //
     //   * all workers exit when the run queue on their capability
     //     drains.  All main threads will also exit when their TSO
@@ -237,7 +241,7 @@ schedule (Capability *initialCapability, Task *task)
     //     exit.
     //
     //   * We might be left with threads blocked in foreign calls,
-    //     we should really attempt to kill these somehow (TODO);
+    //     we should really attempt to kill these somehow (TODO).
 
     switch (sched_state) {
     case SCHED_RUNNING:
@@ -2564,8 +2568,8 @@ performMajorGC(void)
 }
 
 /* ---------------------------------------------------------------------------
-   Interrupt execution
-   - usually called inside a signal handler so it mustn't do anything fancy.
+   Interrupt execution.
+   Might be called inside a signal handler so it mustn't do anything fancy.
    ------------------------------------------------------------------------ */
 
 void

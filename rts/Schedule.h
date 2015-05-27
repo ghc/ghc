@@ -51,11 +51,10 @@ StgWord findRetryFrameHelper (Capability *cap, StgTSO *tso);
 void scheduleWorker (Capability *cap, Task *task);
 
 /* The state of the scheduler.  This is used to control the sequence
- * of events during shutdown, and when the runtime is interrupted
- * using ^C.
+ * of events during shutdown.  See Note [shutdown] in Schedule.c.
  */
 #define SCHED_RUNNING       0  /* running as normal */
-#define SCHED_INTERRUPTING  1  /* ^C detected, before threads are deleted */
+#define SCHED_INTERRUPTING  1  /* before threads are deleted */
 #define SCHED_SHUTTING_DOWN 2  /* final shutdown */
 
 extern volatile StgWord sched_state;
