@@ -1,0 +1,13 @@
+
+Test10399.hs:7:27: error:
+    Not in scope: type constructor or class ‘MPISecret’
+
+Test10399.hs:9:10: error: Not in scope: ‘mkBila’
+
+Test10399.hs:9:24: error: Illegal tuple section: use TupleSections
+
+Test10399.hs:9:39: error: Not in scope: ‘P.base’
+
+Test10399.hs:9:50: error: Not in scope: ‘P.pos’
+
+Test10399.hs:9:60: error: Not in scope: ‘P.form’
