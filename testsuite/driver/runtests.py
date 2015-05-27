@@ -40,7 +40,8 @@ config = getConfig() # get it from testglobals
 # cmd-line options
 
 long_options = [
-  "config=",  		# config file
+  "configfile=",	# config file
+  "config=",  		# config field
   "rootdir=", 		# root of tree containing tests (default: .)
   "output-summary=", 	# file in which to save the (human-readable) summary
   "only=",		# just this test (can be give multiple --only= flags)
@@ -55,13 +56,17 @@ long_options = [
 opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
        
 for opt,arg in opts:
-    if opt == '--config':
+    if opt == '--configfile':
         exec(open(arg).read())
 
     # -e is a string to execute from the command line.  For example:
     # testframe -e 'config.compiler=ghc-5.04'
     if opt == '-e':
         exec(arg)
+
+    if opt == '--config':
+        field, value = arg.split('=', 1)
+        setattr(config, field, value)
 
     if opt == '--rootdir':
         config.rootdirs.append(arg)
