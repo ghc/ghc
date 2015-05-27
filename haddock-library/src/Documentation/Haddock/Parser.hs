@@ -231,18 +231,20 @@ markdownImage = fromHyperlink <$> ("!" *> linkParser)
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
-paragraph = examples <|> skipSpace *> (
-      since
-  <|> unorderedList
-  <|> orderedList
-  <|> birdtracks
-  <|> codeblock
-  <|> property
-  <|> header
-  <|> textParagraphThatStartsWithMarkdownLink
-  <|> definitionList
-  <|> docParagraph <$> textParagraph
-  )
+paragraph = examples <|> do
+  indent <- takeIndent
+  choice
+    [ since
+    , unorderedList indent
+    , orderedList indent
+    , birdtracks
+    , codeblock
+    , property
+    , header
+    , textParagraphThatStartsWithMarkdownLink
+    , definitionList indent
+    , docParagraph <$> textParagraph
+    ]
 
 since :: Parser (DocH mod a)
 since = ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince >> return DocEmpty
@@ -283,16 +285,16 @@ textParagraphThatStartsWithMarkdownLink = docParagraph <$> (docAppend <$> markdo
           | otherwise = " "
 
 -- | Parses unordered (bullet) lists.
-unorderedList :: Parser (DocH mod Identifier)
-unorderedList = DocUnorderedList <$> p
+unorderedList :: BS.ByteString -> Parser (DocH mod Identifier)
+unorderedList indent = DocUnorderedList <$> p
   where
-    p = ("*" <|> "-") *> innerList p
+    p = ("*" <|> "-") *> innerList indent p
 
 -- | Parses ordered lists (numbered or dashed).
-orderedList :: Parser (DocH mod Identifier)
-orderedList = DocOrderedList <$> p
+orderedList :: BS.ByteString -> Parser (DocH mod Identifier)
+orderedList indent = DocOrderedList <$> p
   where
-    p = (paren <|> dot) *> innerList p
+    p = (paren <|> dot) *> innerList indent p
     dot = (decimal :: Parser Int) <* "."
     paren = "(" *> decimal <* ")"
 
@@ -301,23 +303,24 @@ orderedList = DocOrderedList <$> p
 -- same paragraph. Usually used as
 --
 -- > someListFunction = listBeginning *> innerList someListFunction
-innerList :: Parser [DocH mod Identifier] -> Parser [DocH mod Identifier]
-innerList item = do
+innerList :: BS.ByteString -> Parser [DocH mod Identifier]
+          -> Parser [DocH mod Identifier]
+innerList indent item = do
   c <- takeLine
-  (cs, items) <- more item
+  (cs, items) <- more indent item
   let contents = docParagraph . parseString . dropNLs . unlines $ c : cs
   return $ case items of
     Left p -> [contents `docAppend` p]
     Right i -> contents : i
 
 -- | Parses definition lists.
-definitionList :: Parser (DocH mod Identifier)
-definitionList = DocDefList <$> p
+definitionList :: BS.ByteString -> Parser (DocH mod Identifier)
+definitionList indent = DocDefList <$> p
   where
     p = do
       label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` ("]\n" :: String))) <* ("]" <* optional ":")
       c <- takeLine
-      (cs, items) <- more p
+      (cs, items) <- more indent p
       let contents = parseString . dropNLs . unlines $ c : cs
       return $ case items of
         Left x -> [(label, contents `docAppend` x)]
@@ -330,32 +333,40 @@ dropNLs = reverse . dropWhile (== '\n') . reverse
 -- | Main worker for 'innerList' and 'definitionList'.
 -- We need the 'Either' here to be able to tell in the respective functions
 -- whether we're dealing with the next list or a nested paragraph.
-more :: Monoid a => Parser a
+more :: Monoid a => BS.ByteString -> Parser a
      -> Parser ([String], Either (DocH mod Identifier) a)
-more item = innerParagraphs <|> moreListItems item
-            <|> moreContent item <|> pure ([], Right mempty)
+more indent item = innerParagraphs indent
+               <|> moreListItems indent item
+               <|> moreContent indent item
+               <|> pure ([], Right mempty)
 
 -- | Used by 'innerList' and 'definitionList' to parse any nested paragraphs.
-innerParagraphs :: Parser ([String], Either (DocH mod Identifier) a)
-innerParagraphs = (,) [] . Left <$> ("\n" *> indentedParagraphs)
+innerParagraphs :: BS.ByteString
+                -> Parser ([String], Either (DocH mod Identifier) a)
+innerParagraphs indent = (,) [] . Left <$> ("\n" *> indentedParagraphs indent)
 
 -- | Attempts to fetch the next list if possibly. Used by 'innerList' and
 -- 'definitionList' to recursively grab lists that aren't separated by a whole
 -- paragraph.
-moreListItems :: Parser a
+moreListItems :: BS.ByteString -> Parser a
               -> Parser ([String], Either (DocH mod Identifier) a)
-moreListItems item = (,) [] . Right <$> (skipSpace *> item)
+moreListItems indent item = (,) [] . Right <$> indentedItem
+  where
+    indentedItem = string indent *> skipSpace *> item
 
 -- | Helper for 'innerList' and 'definitionList' which simply takes
 -- a line of text and attempts to parse more list content with 'more'.
-moreContent :: Monoid a => Parser a
+moreContent :: Monoid a => BS.ByteString -> Parser a
             -> Parser ([String], Either (DocH mod Identifier) a)
-moreContent item = first . (:) <$> nonEmptyLine <*> more item
+moreContent indent item = first . (:) <$> nonEmptyLine <*> more indent item
 
 -- | Parses an indented paragraph.
 -- The indentation is 4 spaces.
-indentedParagraphs :: Parser (DocH mod Identifier)
-indentedParagraphs = (concat <$> dropFrontOfPara "    ") >>= parseParagraphs
+indentedParagraphs :: BS.ByteString -> Parser (DocH mod Identifier)
+indentedParagraphs indent =
+    (concat <$> dropFrontOfPara indent') >>= parseParagraphs
+  where
+    indent' = string $ BS.append indent "    "
 
 -- | Grab as many fully indented paragraphs as we can.
 dropFrontOfPara :: Parser BS.ByteString -> Parser [String]
