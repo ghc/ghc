@@ -1316,7 +1316,7 @@ distclean : clean
 	$(call removeFiles,libraries/directory/include/HsDirectoryConfig.h)
 	$(call removeFiles,libraries/process/include/HsProcessConfig.h)
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
-	$(call removeFiles,libraries/time/include/HsTimeConfig.h)
+	$(call removeFiles,libraries/time/lib/include/HsTimeConfig.h)
 
 # The library configure scripts also like creating autom4te.cache
 # directories, so clean them all up.
@@ -1344,7 +1344,7 @@ maintainer-clean : distclean
 	$(call removeFiles,libraries/directory/include/HsDirectoryConfig.h.in)
 	$(call removeFiles,libraries/process/include/HsProcessConfig.h.in)
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h.in)
-	$(call removeFiles,libraries/time/include/HsTimeConfig.h.in)
+	$(call removeFiles,libraries/time/lib/include/HsTimeConfig.h.in)
 
 .PHONY: all_libraries
 
