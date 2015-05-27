@@ -61,7 +61,29 @@ endif
 endif
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show echo help test fulltest fasttest,$(MAKECMDGOALS))
+# (the ones we're filtering out)
+REALGOALS=$(filter-out \
+    binary-dist \
+    binary-dist-prep \
+    sdist sdist-ghc \
+    sdist-ghc-prep \
+    sdist-windows-tarballs \
+    sdist-windows-tarballs-prep \
+    sdist-testsuite \
+    sdist-testsuite-prep \
+    bootstrapping-files \
+    framework-pkg \
+    clean \
+    clean_% \
+    distclean \
+    maintainer-clean \
+    show \
+    echo \
+    help \
+    test \
+    fulltest \
+    fasttest \
+  ,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -100,6 +122,12 @@ else
 	$(MAKE) --no-print-directory -f ghc.mk bindist BINDIST=YES
 	$(MAKE) --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
+
+.PHONY: sdist sdist-ghc sdist-ghc-prep sdist-windows-tarballs sdist-windows-tarballs-prep sdist-testsuite sdist-testsuite-prep
+# Just running `./boot && ./configure && make sdist` should work, so skip
+# phase 0 and 1 and don't build any dependency files.
+sdist sdist-ghc sdist-ghc-prep sdist-windows-tarballs sdist-windows-tarballs-prep sdist-testsuite sdist-testsuite-prep :
+	$(MAKE) --no-print-directory -f ghc.mk $@ NO_INCLUDE_DEPS=YES NO_INCLUDE_PKGDATA=YES
 
 .PHONY: clean distclean maintainer-clean
 clean distclean maintainer-clean:
