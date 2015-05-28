@@ -22,13 +22,11 @@ $(call profStart, build-prog($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
-ifneq "$$(CLEANING)" "YES"
 ifeq "$$($1_$2_PROGNAME)" ""
 $$(error $1_$2_PROGNAME is not set)
 endif
 ifneq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is set)
-endif
 endif
 $1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext$3)
 
@@ -91,10 +89,8 @@ else
 $1_$2_INPLACE =
 endif
 else
-ifneq "$$(CLEANING)" "YES"
 ifneq "$$($$($1_$2_PROGNAME)_INPLACE)" ""
 $$(error $$($1_$2_PROGNAME)_INPLACE defined twice)
-endif
 endif
 ifeq "$$($1_$2_TOPDIR)" "YES"
 $$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
