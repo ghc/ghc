@@ -33,6 +33,8 @@ endif
 
 all_$1_$2 : $$($1_$2_INPLACE_WRAPPER)
 
+$(call clean-target,$1,$2_inplace_wrapper,$$($1_$2_INPLACE_WRAPPER))
+
 $$($1_$2_INPLACE_WRAPPER): WRAPPER=$$@
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 $$($1_$2_INPLACE_WRAPPER): $$($1_$2_SHELL_WRAPPER_NAME)
