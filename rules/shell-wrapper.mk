@@ -26,18 +26,18 @@ ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
 $1_$2_INPLACE_SHELL_WRAPPER_NAME = $$($1_$2_PROG)
 
 ifeq "$$($1_$2_TOPDIR)" "YES"
-INPLACE_WRAPPER = $$(INPLACE_LIB)/$$($1_$2_INPLACE_SHELL_WRAPPER_NAME)
+$1_$2_INPLACE_WRAPPER = $$(INPLACE_LIB)/$$($1_$2_INPLACE_SHELL_WRAPPER_NAME)
 else
-INPLACE_WRAPPER = $$(INPLACE_BIN)/$$($1_$2_INPLACE_SHELL_WRAPPER_NAME)
+$1_$2_INPLACE_WRAPPER = $$(INPLACE_BIN)/$$($1_$2_INPLACE_SHELL_WRAPPER_NAME)
 endif
 
-all_$1_$2 : $$(INPLACE_WRAPPER)
+all_$1_$2 : $$($1_$2_INPLACE_WRAPPER)
 
-$$(INPLACE_WRAPPER): WRAPPER=$$@
+$$($1_$2_INPLACE_WRAPPER): WRAPPER=$$@
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
-$$(INPLACE_WRAPPER): $$($1_$2_SHELL_WRAPPER_NAME)
+$$($1_$2_INPLACE_WRAPPER): $$($1_$2_SHELL_WRAPPER_NAME)
 endif
-$$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
+$$($1_$2_INPLACE_WRAPPER): $$($1_$2_INPLACE)
 	$$(call removeFiles,                                                    $$@)
 	echo '#!$$(SHELL)'                                                   >> $$@
 	echo 'executablename="$$(TOP)/$$<"'                                  >> $$@
