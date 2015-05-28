@@ -17,13 +17,7 @@ import copy
 import glob
 from math import ceil, trunc
 import collections
-
-have_subprocess = False
-try:
-    import subprocess
-    have_subprocess = True
-except:
-    print("Warning: subprocess not found, will fall back to spawnv")
+import subprocess
 
 from testglobals import *
 from testutil import *
@@ -103,20 +97,14 @@ def _reqlib( name, opts, lib ):
     if lib in have_lib:
         got_it = have_lib[lib]
     else:
-        if have_subprocess:
-            # By preference we use subprocess, as the alternative uses
-            # /dev/null which mingw doesn't have.
-            cmd = strip_quotes(config.ghc_pkg)
-            p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-            # read from stdout and stderr to avoid blocking due to
-            # buffers filling
-            p.communicate()
-            r = p.wait()
-        else:
-            r = os.system(config.ghc_pkg + ' --no-user-package-db describe '
-                                         + lib + ' > /dev/null 2> /dev/null')
+        cmd = strip_quotes(config.ghc_pkg)
+        p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        # read from stdout and stderr to avoid blocking due to
+        # buffers filling
+        p.communicate()
+        r = p.wait()
         got_it = r == 0
         have_lib[lib] = got_it
 
@@ -1803,13 +1791,8 @@ def rawSystem(cmd_and_args):
     # with the Windows (non-cygwin) python. An argument "a b c"
     # turns into three arguments ["a", "b", "c"].
 
-    # However, subprocess is new in python 2.4, so fall back to
-    # using spawnv if we don't have it
     cmd = cmd_and_args[0]
-    if have_subprocess:
-        return subprocess.call([strip_quotes(cmd)] + cmd_and_args[1:])
-    else:
-        return os.spawnv(os.P_WAIT, cmd, cmd_and_args)
+    return subprocess.call([strip_quotes(cmd)] + cmd_and_args[1:])
 
 # When running under native msys Python, any invocations of non-msys binaries,
 # including timeout.exe, will have their arguments munged according to some
@@ -2292,21 +2275,6 @@ def printFailingTestInfosSummary(file, testInfos):
                           ' [' + reason + ']' + \
                           ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
     file.write('\n')
-
-def getStdout(cmd_and_args):
-    if have_subprocess:
-        p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        (stdout, stderr) = p.communicate()
-        r = p.wait()
-        if r != 0:
-            raise Exception("Command failed: " + str(cmd_and_args))
-        if stderr != '':
-            raise Exception("stderr from command: " + str(cmd_and_args))
-        return stdout
-    else:
-        raise Exception("Need subprocess to get stdout, but don't have it")
 
 def modify_lines(s, f):
     return '\n'.join([f(l) for l in s.splitlines()])

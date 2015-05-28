@@ -1,5 +1,5 @@
-import os
 import re
+import subprocess
 
 # Testsuite configuration setup for GHC
 #
@@ -159,16 +159,11 @@ llvm_ways     = [x[0] for x in config.way_flags('dummy_name').items()
                       if '-fflvm' in x[1]]
 
 def get_compiler_info():
-# This should really not go through the shell
-    h = os.popen(config.compiler + ' --info', 'r')
-    s = h.read()
+    s = getStdout([config.compiler, '--info']).decode('utf8')
     s = re.sub('[\r\n]', '', s)
-    h.close()
     compilerInfoDict = dict(eval(s))
-    h = os.popen(config.compiler + ' +RTS --info', 'r')
-    s = h.read()
+    s = getStdout([config.compiler, '+RTS', '--info']).decode('utf8')
     s = re.sub('[\r\n]', '', s)
-    h.close()
     rtsInfoDict = dict(eval(s))
 
     # We use a '/'-separated path for libdir, even on Windows

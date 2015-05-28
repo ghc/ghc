@@ -18,10 +18,7 @@ import re
 # * If we import ctypes before subprocess on cygwin, then sys.exit(0)
 #   says "Aborted" and we fail with exit code 134.
 # So we import it here first, so that the testsuite doesn't appear to fail.
-try:
-    import subprocess
-except:
-    pass
+import subprocess
 
 PYTHON3 = sys.version_info >= (3, 0)
 if PYTHON3:
