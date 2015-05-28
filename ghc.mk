@@ -661,7 +661,11 @@ BUILD_DIRS += utils/dll-split
 BUILD_DIRS += utils/ghc-pwd
 BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += utils/hpc
+ifeq "$(GhcWithInterpreter)" "YES"
 BUILD_DIRS += utils/runghc
+else ifeq "$(CLEANING)" "YES"
+BUILD_DIRS += utils/runghc
+endif
 BUILD_DIRS += ghc
 
 ifneq "$(BINDIST)" "YES"
