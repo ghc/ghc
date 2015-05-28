@@ -158,13 +158,11 @@ xchg(StgPtr p, StgWord w)
                           : "memory"
                           );
 #elif aarch64_HOST_ARCH
-    // Don't think we actually use tmp here, but leaving
-    // it for consistent numbering
     StgWord tmp; 
     __asm__ __volatile__ (
                           "1:    ldaxr  %0, [%3]\n"
-                          "      stlxr  %w0, %2, [%3]\n"
-                          "      cbnz   %w0, 1b\n"
+                          "      stlxr  %w1, %2, [%3]\n"
+                          "      cbnz   %w1, 1b\n"
                           "      dmb sy\n"
                           : "=&r" (result), "=&r" (tmp)
                           : "r" (w), "r" (p)
