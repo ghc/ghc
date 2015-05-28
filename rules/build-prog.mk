@@ -29,8 +29,8 @@ endif
 ifneq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is set)
 endif
-$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext$3)
 endif
+$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext$3)
 
 ifeq "$$(findstring $3,0 1 2)" ""
 $$(error $1/$2: stage argument to build-prog should be 0, 1, or 2)
