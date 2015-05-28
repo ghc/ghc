@@ -578,14 +578,14 @@ T2182:
 .PHONY: write_interface_oneshot
 write_interface_oneshot:
 	$(RM) -rf write_interface_oneshot/A011.hi
-	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir write_interface_oneshot -fno-code -fwrite-interface -c A011.hs
-	test -f write_interface_oneshot/A011.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir write_interface_oneshot_hidir -fno-code -fwrite-interface -c A011.hs
+	test -f write_interface_oneshot_hidir/A011.hi
 
 .PHONY: write_interface_make
 write_interface_make:
 	$(RM) -rf write_interface_make/A011.hi
-	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir write_interface_make -fno-code -fwrite-interface --make A011.hs
-	test -f write_interface_make/A011.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir write_interface_make_hidir -fno-code -fwrite-interface --make A011.hs
+	test -f write_interface_make_hidir/A011.hi
 
 .PHONY: T9938
 T9938:

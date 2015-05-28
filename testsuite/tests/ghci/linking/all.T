@@ -22,12 +22,15 @@ test('ghcilink003',
 
 test('ghcilink004',
      [unless(doing_ghci, skip),
-      extra_clean(['dir004/*','dir004'])],
+      extra_clean(['dir004/local.package.conf/*', 'dir004/*', 'dir004'])
+     ],
      run_command,
      ['$MAKE -s --no-print-directory ghcilink004'])
 
 test('ghcilink005',
-     [unless(doing_ghci, skip), extra_clean(['dir005/*','dir005'])],
+     [unless(doing_ghci, skip),
+      extra_clean(['dir005/ghcilink005.package.conf/*', 'dir005/*','dir005'])
+     ],
      run_command,
      ['$MAKE -s --no-print-directory ghcilink005'])
 
@@ -36,13 +39,13 @@ test('ghcilink006',
        # still cannot load libstdc++ on Windows.  See also #4468.
        when(opsys('mingw32'), expect_broken(5289)),
        unless(doing_ghci, skip),
-       extra_clean(['dir006/*','dir006'])
+       extra_clean(['dir006/ghcilink006.package.conf/*', 'dir006/*','dir006'])
      ],
      run_command,
      ['$MAKE -s --no-print-directory ghcilink006'])
 
 test('T3333',
-     [extra_clean('T3333.o'),
+     [extra_clean(['T3333.o']),
      unless(doing_ghci, skip),
      unless(opsys('linux') or ghci_dynamic(), expect_broken(3333))],
      run_command,

@@ -405,8 +405,15 @@ def build_T9050(name, way):
      return simple_build(name + '.cmm', way, '-outputdir=. ', 0, '', 0, 0, 0)
 test('T9050', normal, build_T9050, [])
 
-test('write_interface_oneshot', normal, run_command, ['$MAKE -s --no-print-directory write_interface_oneshot'])
-test('write_interface_make', normal, run_command, ['$MAKE -s --no-print-directory write_interface_make'])
+test('write_interface_oneshot',
+     extra_clean(['write_interface_oneshot_hidir/*']),
+     run_command,
+     ['$MAKE -s --no-print-directory write_interface_oneshot'])
+
+test('write_interface_make',
+     extra_clean(['write_interface_make_hidir/*']),
+     run_command,
+     ['$MAKE -s --no-print-directory write_interface_make'])
 
 test('T9776', normal, compile_fail, ['-frule-check'])
 

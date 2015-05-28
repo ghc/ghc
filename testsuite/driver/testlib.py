@@ -264,6 +264,7 @@ def _extra_hc_opts( name, opts, v ):
 # -----
 
 def extra_clean( files ):
+    assert not isinstance(files, str), files
     return lambda name, opts, v=files: _extra_clean(name, opts, v);
 
 def _extra_clean( name, opts, v ):
@@ -751,6 +752,11 @@ def test_common_work (name, opts, func, args):
 
 def clean(strs):
     for str in strs:
+        if (str.endswith('.package.conf') or
+            str.startswith('package.conf.') and not str.endswith('/*')):
+            # Package confs are directories now.
+            str += '/*'
+
         for name in glob.glob(in_testdir(str)):
             clean_full_path(name)
 
