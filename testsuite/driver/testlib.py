@@ -168,6 +168,11 @@ def record_broken(name, opts, bug):
     if not me in brokens:
         brokens.append(me)
 
+def _expect_pass(way):
+    # Helper function. Not intended for use in .T files.
+    opts = getTestOpts()
+    return opts.expect == 'pass' and way not in opts.expect_fail_for
+
 # -----
 
 def omit_ways( ways ):
@@ -817,8 +822,7 @@ def do_test(name, way, func, args):
             passFail = 'No passFail found'
 
         if passFail == 'pass':
-            if getTestOpts().expect == 'pass' \
-               and way not in getTestOpts().expect_fail_for:
+            if _expect_pass(way):
                 t.n_expected_passes = t.n_expected_passes + 1
                 if name in t.expected_passes:
                     t.expected_passes[name].append(way)
@@ -829,8 +833,7 @@ def do_test(name, way, func, args):
                 t.n_unexpected_passes = t.n_unexpected_passes + 1
                 addPassingTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
         elif passFail == 'fail':
-            if getTestOpts().expect == 'pass' \
-               and way not in getTestOpts().expect_fail_for:
+            if _expect_pass(way):
                 reason = result['reason']
                 tag = result.get('tag')
                 if tag == 'stat':
@@ -1248,8 +1251,9 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
-        if_verbose(1,'Compile failed (status ' + repr(result) + ') errors were:')
-        if_verbose_dump(1,actual_stderr)
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Compile failed (status ' + repr(result) + ') errors were:')
+            if_verbose_dump(1, actual_stderr)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
@@ -1332,9 +1336,10 @@ def simple_run( name, way, prog, args ):
 
     # check the exit code
     if exit_code != opts.exit_code:
-        print('Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')')
-        dump_stdout(name)
-        dump_stderr(name)
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')')
+            dump_stdout(name)
+            dump_stderr(name)
         return failBecause('bad exit code')
 
     check_hp = my_rts_flags.find("-h") != -1
@@ -1643,7 +1648,8 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file):
     if expected_str == actual_str:
         return 1
     else:
-        if_verbose(1, 'Actual ' + kind + ' output differs from expected:')
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Actual ' + kind + ' output differs from expected:')
 
         if expected_file_for_diff == '/dev/null':
             expected_normalised_file = '/dev/null'
@@ -1662,7 +1668,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file):
         # (including newlines) so the diff would be hard to read.
         # This does mean that the diff might contain changes that
         # would be normalised away.
-        if (config.verbose >= 1):
+        if config.verbose >= 1 and _expect_pass(way):
             r = os.system( 'diff -uw ' + expected_file_for_diff + \
                                    ' ' + actual_file )
 
