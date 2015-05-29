@@ -15,13 +15,11 @@ that is up to you.
 -}
 module Language.Haskell.TH.Quote(
         QuasiQuoter(..),
-        dataToQa, dataToExpQ, dataToPatQ,
-        liftData,
-        quoteFile
+        quoteFile,
+        -- * For backwards compatibility
+        dataToQa, dataToExpQ, dataToPatQ
     ) where
 
-import Data.Data
-import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax
 
 -- | The 'QuasiQuoter' type, a value @q@ of this type can be used
@@ -41,75 +39,6 @@ data QuasiQuoter = QuasiQuoter {
     -- | Quasi-quoter for declarations, invoked by top-level quotes
     quoteDec  :: String -> Q [Dec]
     }
-
--- | 'dataToQa' is a generic utility function for constructing generic
--- conversion functions from types with 'Data' instances to various
--- quasi-quoting representations.  It's used by 'dataToExpQ' and
--- 'dataToPatQ'
-dataToQa  ::  forall a k q. Data a
-          =>  (Name -> k)
-          ->  (Lit -> Q q)
-          ->  (k -> [Q q] -> Q q)
-          ->  (forall b . Data b => b -> Maybe (Q q))
-          ->  a
-          ->  Q q
-dataToQa mkCon mkLit appCon antiQ t =
-    case antiQ t of
-      Nothing ->
-          case constrRep constr of
-            AlgConstr _ ->
-                appCon (mkCon conName) conArgs
-              where
-                conName :: Name
-                conName =
-                    case showConstr constr of
-                      "(:)"       -> Name (mkOccName ":") (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Types"))
-                      con@"[]"    -> Name (mkOccName con) (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Types"))
-                      con@('(':_) -> Name (mkOccName con) (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Tuple"))
-                      con         -> mkNameG_d (tyConPackage tycon)
-                                               (tyConModule tycon)
-                                               con
-                  where
-                    tycon :: TyCon
-                    tycon = (typeRepTyCon . typeOf) t
-
-                conArgs :: [Q q]
-                conArgs = gmapQ (dataToQa mkCon mkLit appCon antiQ) t
-            IntConstr n ->
-                mkLit $ integerL n
-            FloatConstr n ->
-                mkLit $ rationalL n
-            CharConstr c ->
-                mkLit $ charL c
-        where
-          constr :: Constr
-          constr = toConstr t
-
-      Just y -> y
-
--- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the
--- same value, in the SYB style. It is generalized to take a function
--- override type-specific cases; see 'liftData' for a more commonly
--- used variant.
-dataToExpQ  ::  Data a
-            =>  (forall b . Data b => b -> Maybe (Q Exp))
-            ->  a
-            ->  Q Exp
-dataToExpQ = dataToQa conE litE (foldl appE)
-
--- | 'liftData' is a variant of 'lift' in the 'Lift' type class which
--- works for any type with a 'Data' instance.
-liftData :: Data a => a -> Q Exp
-liftData = dataToExpQ (const Nothing)
-
--- | 'dataToPatQ' converts a value to a 'Q Pat' representation of the same
--- value, in the SYB style. It takes a function to handle type-specific cases,
--- alternatively, pass @const Nothing@ to get default behavior.
-dataToPatQ  ::  Data a
-            =>  (forall b . Data b => b -> Maybe (Q Pat))
-            ->  a
-            ->  Q Pat
-dataToPatQ = dataToQa id litP conP
 
 -- | 'quoteFile' takes a 'QuasiQuoter' and lifts it into one that read
 -- the data out of a file.  For example, suppose 'asmq' is an 

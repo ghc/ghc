@@ -403,6 +403,18 @@
                     Version number XXXXX (was 2.9.0.0)
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    The <literal>Lift</literal> type class for lifting values
+                    into Template Haskell splices now has a default signature
+                    <literal>lift :: Data a => a -> Q Exp</literal>, which means
+                    that you do not have to provide an explicit implementation
+                    of <literal>lift</literal> for types which have a <literal>Data</literal>
+                    instance.  To manually use this default implementation, you
+                    can use the <literal>liftData</literal> function which is
+                    now exported from <literal>Language.Haskell.TH.Syntax</literal>.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
