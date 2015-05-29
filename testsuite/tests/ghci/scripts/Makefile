@@ -46,7 +46,7 @@ T9367:
 
 .PHONY: T9762_prep
 T9762_prep:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -fhpc -dynamic T9762B.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O -fhpc -dynamic T9762B.hs
 
 .PHONY: T10408A
 T10408A:
