@@ -19,7 +19,7 @@ import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
 import Distribution.Compat.ReadP hiding (get)
 import Distribution.ParseUtils
-import Distribution.Package hiding (depends, installedPackageId)
+import Distribution.Package hiding (installedPackageId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Simple.Utils (fromUTF8, toUTF8)

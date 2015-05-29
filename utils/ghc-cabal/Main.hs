@@ -118,6 +118,7 @@ doCheck directory
           []   -> return ()
           errs -> mapM_ print errs >> exitWith (ExitFailure 1)
     where isFailure (PackageDistSuspicious {}) = False
+          isFailure (PackageDistSuspiciousWarn {}) = False
           isFailure _ = True
 
 runHsColour :: FilePath -> FilePath -> [String] -> IO ()
@@ -256,7 +257,7 @@ updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
                           if relocatableBuild
                           then "$topdir"
                           else myLibdir,
-          libsubdir = toPathTemplate "$pkgkey",
+          libsubdir = toPathTemplate "$libname",
           docdir    = toPathTemplate $
                           if relocatableBuild
                           then "$topdir/../doc/html/libraries/$pkgid"
@@ -414,6 +415,12 @@ generate directory distdir dll0Modules config_args
             | packageKeySupported comp
                    = map (display . Installed.packageKey) dep_pkgs
             | otherwise = transitiveDeps
+          transitiveDepLibNames
+            | packageKeySupported comp
+                = map (\p -> packageKeyLibraryName
+                                (Installed.sourcePackageId p)
+                                (Installed.packageKey p)) dep_pkgs
+            | otherwise = transitiveDeps
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
           libraryDirs = forDeps Installed.libraryDirs
@@ -444,6 +451,7 @@ generate directory distdir dll0Modules config_args
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
                 variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords transitiveDeps,
                 variablePrefix ++ "_TRANSITIVE_DEP_KEYS = " ++ unwords transitiveDepKeys,
+                variablePrefix ++ "_TRANSITIVE_DEP_LIB_NAMES = " ++ unwords transitiveDepLibNames,
                 variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
