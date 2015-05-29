@@ -2186,10 +2186,15 @@ def findTFiles_(path):
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t, file):
+def summary(t, file, short=False):
 
     file.write('\n')
     printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures, t.unexpected_stat_failures])
+
+    if short:
+        # Only print the list of unexpected tests above.
+        return
+
     file.write('OVERALL SUMMARY for test run started at '
                + time.strftime("%c %Z", t.start_time) + '\n'
                + str(datetime.timedelta(seconds=

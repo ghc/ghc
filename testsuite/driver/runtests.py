@@ -43,7 +43,8 @@ long_options = [
   "configfile=",	# config file
   "config=",  		# config field
   "rootdir=", 		# root of tree containing tests (default: .)
-  "output-summary=", 	# file in which to save the (human-readable) summary
+  "summary-file=",      # file in which to save the (human-readable) summary
+  "no-print-summary=",  # should we print the summary?
   "only=",		# just this test (can be give multiple --only= flags)
   "way=",		# just this way
   "skipway=",		# skip this way
@@ -71,8 +72,11 @@ for opt,arg in opts:
     if opt == '--rootdir':
         config.rootdirs.append(arg)
 
-    if opt == '--output-summary':
-        config.output_summary = arg
+    if opt == '--summary-file':
+        config.summary_file = arg
+
+    if opt == '--no-print-summary':
+        config.no_print_summary = True
 
     if opt == '--only':
         config.only.append(arg)
@@ -306,10 +310,10 @@ else:
             break
         oneTest()
         
-    summary(t, sys.stdout)
+    summary(t, sys.stdout, config.no_print_summary)
 
-    if config.output_summary != '':
-        summary(t, open(config.output_summary, 'w'))
+    if config.summary_file != '':
+        summary(t, open(config.summary_file, 'w'))
 
 sys.exit(0)
 

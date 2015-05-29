@@ -223,9 +223,13 @@ RUNTEST_OPTS +=  \
 	--config 'gs=$(call quote_path,$(GS))' \
 	--config 'timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))'
 
-ifneq "$(OUTPUT_SUMMARY)" ""
+ifneq "$(SUMMARY_FILE)" ""
 RUNTEST_OPTS +=  \
-	--output-summary "$(OUTPUT_SUMMARY)"
+	--summary-file "$(SUMMARY_FILE)"
+endif
+ifeq "$(NO_PRINT_SUMMARY)" "YES"
+RUNTEST_OPTS +=  \
+	--no-print-summary 1
 endif
 
 RUNTEST_OPTS +=  \

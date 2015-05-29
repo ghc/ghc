@@ -83,14 +83,21 @@ do
 done
 
 check_packages () {
-    echo "== Start $1 package check"
     if [ "$bindistdir" = "" ]
     then
-        inplace/bin/ghc-pkg check -v
+        ghc_pkg=inplace/bin/ghc-pkg
     else
-        "$bindistdir"/bin/ghc-pkg check -v
+        ghc_pkg="$bindistdir"/bin/ghc-pkg
     fi
-    echo "== End $1 package check"
+
+    if [ $be_quiet -eq 1 ]
+    then
+        "$ghc_pkg" check
+    else
+        echo "== Start $1 package check"
+        "$ghc_pkg" check -v
+        echo "== End $1 package check"
+    fi
 }
 
 detect_cpu_count () {
@@ -133,17 +140,9 @@ fi
 
 if type gmake > /dev/null 2> /dev/null
 then
-    if [ $be_quiet -eq 1 ]; then
-        make="gmake -s"
-    else
-        make="gmake"
-    fi
+    make="gmake -s"
 else
-    if [ $be_quiet -eq 1 ]; then
-        make="make -s"
-    else
-        make="make"
-    fi
+    make="make -s"
 fi
 
 if [ $testsuite_only -eq 0 ]; then
@@ -170,10 +169,7 @@ thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 echo "Validating=YES"       >  mk/are-validating.mk
 echo "ValidateSpeed=$speed" >> mk/are-validating.mk
 echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
-
-if [ $be_quiet -eq 1 ]; then
-    echo "V=0"              >> mk/are-validating.mk # Less gunk
-fi
+echo "V=0"                  >> mk/are-validating.mk # Less gunk
 
 if [ $use_dph -eq 1 ]; then
     echo "BUILD_DPH=YES"    >> mk/are-validating.mk
@@ -238,12 +234,13 @@ FAST)
         ;;
 esac
 
-verbosity=3
 if [ $be_quiet -eq 1 ]; then
-   verbosity=2
+    TEST_VERBOSITY="VERBOSE=1 NO_PRINT_SUMMARY=YES"
+else
+    TEST_VERBOSITY="VERBOSE=2"
 fi
 
-$make $MAKE_TEST_TARGET stage=2 $BINDIST VERBOSE=$verbosity THREADS=$threads 2>&1 | tee testlog
+$make $MAKE_TEST_TARGET stage=2 $BINDIST $TEST_VERBOSITY THREADS=$threads 2>&1 | tee testlog
 
 check_packages post-testsuite
 
@@ -252,16 +249,16 @@ then
     utils/hpc/hpc markup --hpcdir=. --srcdir=compiler --srcdir=testsuite/hpc_output --destdir=testsuite/hpc_output testsuite/hpc_output/ghc.tix
 fi
 
-echo "-------------------------------------------------------------------"
 if
-    grep '\<0 caused framework failures' testlog >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected passes' testlog >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected failures' testlog >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected stat failures' testlog >/dev/null 2>/dev/null &&
-    ! grep 'Some files are written by multiple tests' testlog >/dev/null 2>/dev/null ; then
+    grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    ! grep 'Some files are written by multiple tests' testsuite_summary.txt >/dev/null 2>/dev/null ; then
     if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]
     then
         cat <<EOF
+-------------------------------------------------------------------
 Congratulations!  This tree has passed minimal testing.
 
 NOTE: If you have made changes that may cause failures not tested for by
@@ -283,6 +280,7 @@ EOF
 EOF
     else
         cat <<EOF
+-------------------------------------------------------------------
 I didn't find any problems, but this wasn't a complete validate run,
 so be careful!
 
@@ -292,10 +290,14 @@ the minimal testing procedure, please do further testing as necessary.
 EOF
    fi
 else
-    cat <<EOF
+    if [ $be_quiet -eq 0 ]
+    then
+       cat <<EOF
+-------------------------------------------------------------------
 Oops!  Looks like you have some unexpected test results or framework failures.
 Please fix them before pushing/sending patches.
 -------------------------------------------------------------------
 EOF
+    fi
     exit 1
 fi

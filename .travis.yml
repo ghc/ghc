@@ -34,5 +34,6 @@ script:
  - echo 'DYNAMIC_GHC_PROGRAMS = NO' >> mk/validate.mk
  - echo 'GhcLibWays = v' >> mk/validate.mk
  - if [ "$DEBUG_STAGE" = "YES" ]; then echo 'GhcStage2HcOpts += -DDEBUG' >> mk/validate.mk; fi
- # use --quiet, otherwise we hit log file limits on travis.
- - CPUS=2 SKIP_PERF_TESTS=YES ./validate --fast --quiet
+ # Don't use --quiet, as it might cause the testsuite to not print output for
+ # over 10 minutes, causing Travis to kill our job.
+ - CPUS=2 SKIP_PERF_TESTS=YES ./validate --fast
