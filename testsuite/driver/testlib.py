@@ -1868,7 +1868,7 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
             r = rawSystemWithTimeout(
                     ["strace", "-o", fn, "-fF",
                                "-e", "creat,open,chdir,clone,vfork",
-                     config.timeout_prog, str(timeout), cmd])
+                     strip_quotes(config.timeout_prog), str(timeout), cmd])
             addTestFilesWritten(name, fn)
             rm_no_fail(fn)
         else:
@@ -1885,7 +1885,10 @@ def runCmdExitCode( cmd ):
 # checking for files being written to by multiple tests
 
 re_strace_call_end = '(\) += ([0-9]+|-1 E.*)| <unfinished ...>)$'
-re_strace_unavailable       = re.compile('^\) += \? <unavailable>$')
+re_strace_unavailable_end ='\) += \? <unavailable>$'
+
+re_strace_unavailable_line  = re.compile('^' + re_strace_unavailable_end)
+re_strace_unavailable_cntnt = re.compile('^<\.\.\. .* resumed> ' + re_strace_unavailable_end)
 re_strace_pid               = re.compile('^([0-9]+) +(.*)')
 re_strace_clone             = re.compile('^(clone\(|<... clone resumed> ).*\) = ([0-9]+)$')
 re_strace_clone_unfinished  = re.compile('^clone\( <unfinished \.\.\.>$')
@@ -1896,7 +1899,10 @@ re_strace_chdir_resumed     = re.compile('^<\.\.\. chdir resumed> \) += 0$')
 re_strace_open              = re.compile('^open\("([^"]*)", ([A-Z_|]*)(, [0-9]+)?' + re_strace_call_end)
 re_strace_open_resumed      = re.compile('^<... open resumed> '                    + re_strace_call_end)
 re_strace_ignore_sigchild   = re.compile('^--- SIGCHLD \(Child exited\) @ 0 \(0\) ---$')
+re_strace_ignore_sigchild2  = re.compile('^--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, .*} ---$')
+re_strace_ignore_exited     = re.compile('^\+\+\+ exited with [0-9]* \+\+\+$')
 re_strace_ignore_sigvtalarm = re.compile('^--- SIGVTALRM \(Virtual timer expired\) @ 0 \(0\) ---$')
+re_strace_ignore_sigvtalarm2= re.compile('^--- SIGVTALRM {si_signo=SIGVTALRM, si_code=SI_TIMER, .*} ---$')
 re_strace_ignore_sigint     = re.compile('^--- SIGINT \(Interrupt\) @ 0 \(0\) ---$')
 re_strace_ignore_sigfpe     = re.compile('^--- SIGFPE \(Floating point exception\) @ 0 \(0\) ---$')
 re_strace_ignore_sigsegv    = re.compile('^--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
@@ -1942,7 +1948,7 @@ def addTestFilesWrittenHelper(name, fn):
             if m_pid:
                 pid = m_pid.group(1)
                 content = m_pid.group(2)
-            elif re_strace_unavailable.match(line):
+            elif re_strace_unavailable_line.match(line):
                 next
             else:
                 framework_fail(name, 'strace', "Can't find pid in strace line: " + line)
@@ -1994,7 +2000,13 @@ def addTestFilesWrittenHelper(name, fn):
                 pass
             elif re_strace_ignore_sigchild.match(content):
                 pass
+            elif re_strace_ignore_sigchild2.match(content):
+                pass
+            elif re_strace_ignore_exited.match(content):
+                pass
             elif re_strace_ignore_sigvtalarm.match(content):
+                pass
+            elif re_strace_ignore_sigvtalarm2.match(content):
                 pass
             elif re_strace_ignore_sigint.match(content):
                 pass
@@ -2003,6 +2015,8 @@ def addTestFilesWrittenHelper(name, fn):
             elif re_strace_ignore_sigsegv.match(content):
                 pass
             elif re_strace_ignore_sigpipe.match(content):
+                pass
+            elif re_strace_unavailable_cntnt.match(content):
                 pass
             else:
                 framework_fail(name, 'strace', "Can't understand strace line: " + line)
