@@ -334,14 +334,14 @@ handleRunStatus step expr bindings final_ids
              , resumeSpan = span, resumeHistory = toListBL history
              , resumeHistoryIx = 0 }
            hsc_env2 = pushResume hsc_env1 resume
-  
+
          modifySession (\_ -> hsc_env2)
          return (ExecBreak tid names mb_info)
-  
+
     -- Completed with an exception
     | Complete (Left e) alloc <- status
     = return (ExecComplete (Left e) alloc)
-  
+
     -- Completed successfully
     | Complete (Right hvals) allocs <- status
     = do hsc_env <- getSession
@@ -351,7 +351,7 @@ handleRunStatus step expr bindings final_ids
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          modifySession (\_ -> hsc_env')
          return (ExecComplete (Right final_names) allocs)
-  
+
     | otherwise
     = panic "handleRunStatus"  -- The above cases are in fact exhaustive
 
@@ -1104,4 +1104,3 @@ reconstructType hsc_env bound id = do
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
 #endif /* GHCI */
-

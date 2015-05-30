@@ -144,9 +144,9 @@ mkBootModDetailsTc hsc_env
         ; showPassIO dflags CoreTidy
 
         ; let { insts'     = map (tidyClsInstDFun globaliseAndTidyId) insts
+              ; pat_syns'  = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
-              ; pat_syns'  = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
               ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
               ; dfun_ids   = map instanceDFunId insts'
               ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
