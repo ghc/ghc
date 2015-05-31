@@ -30,7 +30,6 @@ install:
 # - sudo apt-get install haskell-platform autoconf libtool make ncurses-dev g++ dblatex docbook-xsl docbook-utils
 # - cabal update
 script:
- - echo 'V = 0' >> mk/validate.mk # otherwise we hit log file limits on travis.
  # do  not build docs
  - echo 'HADDOCK_DOCS       = NO' >> mk/validate.mk
  - echo 'BUILD_DOCBOOK_HTML = NO' >> mk/validate.mk
@@ -40,4 +39,5 @@ script:
  - echo 'DYNAMIC_GHC_PROGRAMS = NO' >> mk/validate.mk
  - echo 'GhcLibWays = v' >> mk/validate.mk
  - if [ "$DEBUG_STAGE" = "YES" ]; then echo 'GhcStage2HcOpts += -DDEBUG' >> mk/validate.mk; fi
- - CPUS=2 SKIP_PERF_TESTS=YES ./validate --fast
+ # use --quiet, otherwise we hit log file limits on travis.
+ - CPUS=2 SKIP_PERF_TESTS=YES ./validate --fast --quiet
