@@ -14,12 +14,21 @@ before_install:
  - travis_retry sudo apt-get install cabal-install-1.18 ghc-7.6.3 alex-3.1.3 happy-1.19.4
  - travis_retry sudo apt-get install llvm-3.6
  - export PATH=/opt/ghc/7.6.3/bin:/opt/cabal/1.18/bin:/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:/usr/lib/llvm-3.6/bin:$PATH
- - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
- - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
- - git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
- - git config --global url."ssh://git@github.com/ghc/packages-".insteadOf ssh://git@github.com/ghc/packages/
- - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
- - git submodule update --init --recursive
+
+# Be explicit about which protocol to use, such that we don't have to repeat the rewrite command for each.
+ - git config remote.origin.url git://github.com/${TRAVIS_REPO_SLUG}.git
+ - git config --global url."git://github.com/${TRAVIS_REPO_SLUG%/*}/packages-".insteadOf "git://github.com/${TRAVIS_REPO_SLUG%/*}/packages/"
+ - git submodule --quiet init # Be quiet about these urls, as we may override them later.
+
+# Check if submodule repositories exist.
+ - git config --get-regexp submodule.*.url | while read entry url; do git ls-remote "$url" dummyref 2>/dev/null && echo "$entry = $url" || git config --unset-all "$entry" ; done
+
+# Use github.com/ghc for those submodule repositories we couldn't connect to.
+ - git config remote.origin.url git://github.com/ghc/ghc.git
+ - git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/
+ - git submodule init # Don't be quiet, we want to show these urls.
+ - git submodule --quiet update --recursive # Now we can be quiet again.
+
 install:
 # - sudo apt-get update
 # - sudo apt-get install haskell-platform autoconf libtool make ncurses-dev g++ dblatex docbook-xsl docbook-utils
