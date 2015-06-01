@@ -164,3 +164,9 @@ T10399:
 		-outputdir tmp_T10399 \
     t10399
 	./t10399 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10399
+
+.PHONY: T10313
+T10313:
+	rm -f stringSource.o stringSource.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc stringSource
+	./stringSource "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10313

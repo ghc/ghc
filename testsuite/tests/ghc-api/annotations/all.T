@@ -17,3 +17,4 @@ test('T10278',      normal, run_command, ['$MAKE -s --no-print-directory T10278'
 test('T10354',      normal, run_command, ['$MAKE -s --no-print-directory T10354'])
 test('T10396',      normal, run_command, ['$MAKE -s --no-print-directory T10396'])
 test('T10399',      normal, run_command, ['$MAKE -s --no-print-directory T10399'])
+test('T10313',      normal, run_command, ['$MAKE -s --no-print-directory T10313'])

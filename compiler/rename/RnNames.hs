@@ -215,8 +215,8 @@ rnImportDecl this_mod
                            -- check that "<pkg>" is "this" (which is magic)
                            -- or the name of this_mod's package.  Yurgh!
                            -- c.f. GHC.findModule, and Trac #9997
-             Nothing     -> True
-             Just pkg_fs -> pkg_fs == fsLit "this" ||
+             Nothing         -> True
+             Just (_,pkg_fs) -> pkg_fs == fsLit "this" ||
                             fsToPackageKey pkg_fs == modulePackageKey this_mod))
          (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
 
@@ -229,7 +229,7 @@ rnImportDecl this_mod
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $
                            addWarn (missingImportListWarn imp_mod_name)
 
-    ifaces <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
+    ifaces <- loadSrcInterface doc imp_mod_name want_boot (fmap snd mb_pkg)
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
@@ -1596,7 +1596,7 @@ printMinimalImports imports_w_usage
       = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
                             , ideclPkgQual = mb_pkg } = decl
-           ; ifaces <- loadSrcInterface doc mod_name is_boot mb_pkg
+           ; ifaces <- loadSrcInterface doc mod_name is_boot (fmap snd mb_pkg)
            ; let lies = map (L l) (concatMap (to_ie ifaces) used)
            ; return (L l (decl { ideclHiding = Just (False, L l lies) })) }
       where

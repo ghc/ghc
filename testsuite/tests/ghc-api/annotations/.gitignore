@@ -17,6 +17,7 @@ t10357
 t10358
 t10396
 t10399
+stringSource
 *.hi
 *.o
 *.run.*

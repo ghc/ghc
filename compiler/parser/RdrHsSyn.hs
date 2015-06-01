@@ -1472,21 +1472,21 @@ mkInlinePragma src (inl, match_info) mb_act
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located FastString, Located RdrName, LHsType RdrName)
+         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkImport (L lc cconv) (L ls safety) (L loc entity, v, ty)
+mkImport (L lc cconv) (L ls safety) (L loc (esrc,entity), v, ty)
   | Just loc <- maybeLocation $ findWildcards ty
     = parseErrorSDoc loc $
       text "Wildcard not allowed" $$
       text "In foreign import declaration" <+>
       quotes (ppr v) $$ ppr ty
   | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (StaticTarget entity Nothing True)
+  let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
       importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
                            (L loc (unpackFS entity))
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
   | cconv == JavaScriptCallConv = do
-  let funcTarget = CFunction (StaticTarget entity Nothing True)
+  let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
       importSpec = CImport (L lc JavaScriptCallConv) (L ls safety) Nothing
                            funcTarget (L loc (unpackFS entity))
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
@@ -1515,7 +1515,7 @@ parseCImport cconv safety nm str sourceText =
              ((mk Nothing <$> cimp nm) +++
               (do h <- munch1 hdr_char
                   skipSpaces
-                  mk (Just (Header (mkFastString h))) <$> cimp nm))
+                  mk (Just (Header h (mkFastString h))) <$> cimp nm))
          ]
        skipSpaces
        return r
@@ -1544,7 +1544,8 @@ parseCImport cconv safety nm str sourceText =
                                              return False)
                               _ -> return True
                      cid' <- cid
-                     return (CFunction (StaticTarget cid' Nothing isFun)))
+                     return (CFunction (StaticTarget (unpackFS cid') cid'
+                                        Nothing isFun)))
           where
             cid = return nm +++
                   (do c  <- satisfy id_first_char
@@ -1555,13 +1556,13 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located FastString, Located RdrName, LHsType RdrName)
+         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkExport (L lc cconv) (L le entity, v, ty) = do
+mkExport (L lc cconv) (L le (esrc,entity), v, ty) = do
   checkNoPartialType (ptext (sLit "In foreign export declaration") <+>
                       quotes (ppr v) $$ ppr ty) ty
   return $ ForD (ForeignExport v ty noForeignExportCoercionYet
-                 (CExport (L lc (CExportStatic entity' cconv))
+                 (CExport (L lc (CExportStatic esrc entity' cconv))
                           (L le (unpackFS entity))))
   where
     entity' | nullFS entity = mkExtName (unLoc v)

@@ -268,14 +268,18 @@ initialVersion = 1
 
 -- reason/explanation from a WARNING or DEPRECATED pragma
 -- For SourceText usage, see note [Pragma source text]
-data WarningTxt = WarningTxt (Located SourceText) [Located FastString]
-                | DeprecatedTxt (Located SourceText) [Located FastString]
+data WarningTxt = WarningTxt (Located SourceText)
+                             [Located (SourceText,FastString)]
+                | DeprecatedTxt (Located SourceText)
+                                [Located (SourceText,FastString)]
     deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
-    ppr (WarningTxt    _ ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
-    ppr (DeprecatedTxt _ ds) = text "Deprecated:" <+>
-                               doubleQuotes (vcat (map (ftext . unLoc) ds))
+    ppr (WarningTxt    _ ws)
+                            = doubleQuotes (vcat (map (ftext . snd . unLoc) ws))
+    ppr (DeprecatedTxt _ ds)
+                            = text "Deprecated:" <+>
+                              doubleQuotes (vcat (map (ftext . snd . unLoc) ds))
 
 {-
 ************************************************************************

@@ -37,6 +37,7 @@ import TysPrim
 import TyCon
 import TysWiredIn
 import BasicTypes
+import FastString ( unpackFS )
 import Literal
 import PrelNames
 import VarSet
@@ -95,7 +96,7 @@ dsCCall lbl args may_gc result_ty
        uniq <- newUnique
        dflags <- getDynFlags
        let
-           target = StaticTarget lbl Nothing True
+           target = StaticTarget (unpackFS lbl) lbl Nothing True
            the_fcall    = CCall (CCallSpec target CCallConv may_gc)
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)

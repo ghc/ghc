@@ -344,15 +344,15 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsSCC       SourceText            -- Note [Pragma source text] in BasicTypes
-                FastString            -- "set cost centre" SCC pragma
-                (LHsExpr id)          -- expr whose cost is to be measured
+                (SourceText,FastString) -- "set cost centre" SCC pragma
+                (LHsExpr id)            -- expr whose cost is to be measured
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCoreAnn   SourceText            -- Note [Pragma source text] in BasicTypes
-                FastString            -- hdaume: core annotation
+                (SourceText,FastString) -- hdaume: core annotation
                 (LHsExpr id)
 
   -----------------------------------------------------------
@@ -458,7 +458,8 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsTickPragma                      -- A pragma introduced tick
      SourceText                       -- Note [Pragma source text] in BasicTypes
-     (FastString,(Int,Int),(Int,Int)) -- external span for this tick
+     ((SourceText,FastString),(Int,Int),(Int,Int))
+                                      -- external span for this tick
      (LHsExpr id)
 
   ---------------------------------------
@@ -587,7 +588,7 @@ ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
 ppr_expr (HsPar e)       = parens (ppr_lexpr e)
 
-ppr_expr (HsCoreAnn _ s e)
+ppr_expr (HsCoreAnn _ (_,s) e)
   = vcat [ptext (sLit "HsCoreAnn") <+> ftext s, ppr_lexpr e]
 
 ppr_expr (HsApp e1 e2)
@@ -708,7 +709,7 @@ ppr_expr (ELazyPat e)   = char '~' <> pprParendExpr e
 ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (EViewPat p e) = ppr p <+> ptext (sLit "->") <+> ppr e
 
-ppr_expr (HsSCC _ lbl expr)
+ppr_expr (HsSCC _ (_,lbl) expr)
   = sep [ ptext (sLit "{-# SCC") <+> doubleQuotes (ftext lbl) <+> ptext (sLit "#-}"),
           pprParendExpr expr ]
 

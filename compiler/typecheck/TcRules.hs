@@ -56,7 +56,7 @@ tcRuleDecls (HsRules src decls)
 
 tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
 tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
-  = addErrCtxt (ruleCtxt $ unLoc name)  $
+  = addErrCtxt (ruleCtxt $ snd $ unLoc name)  $
     do { traceTc "---- Rule ------" (ppr name)
 
         -- Note [Typechecking rules]
@@ -76,7 +76,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                   ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
-       ; (lhs_evs, other_lhs_wanted) <- simplifyRule (unLoc name) 
+       ; (lhs_evs, other_lhs_wanted) <- simplifyRule (snd $ unLoc name)
                                                      (bndr_wanted `andWC` lhs_wanted)
                                                      rhs_wanted
 
@@ -97,7 +97,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
        ; gbls  <- tcGetGlobalTyVars   -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
        ; qtkvs <- quantifyTyVars gbls forall_tvs
-       ; traceTc "tcRule" (vcat [ doubleQuotes (ftext $ unLoc name)
+       ; traceTc "tcRule" (vcat [ doubleQuotes (ftext $ snd $ unLoc name)
                                 , ppr forall_tvs
                                 , ppr qtkvs
                                 , ppr rule_ty
@@ -114,7 +114,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                   , ic_wanted   = rhs_wanted
                                   , ic_status   = IC_Unsolved
                                   , ic_binds    = rhs_binds_var
-                                  , ic_info     = RuleSkol (unLoc name)
+                                  , ic_info     = RuleSkol (snd $ unLoc name)
                                   , ic_env      = lcl_env }
 
            -- For the LHS constraints we must solve the remaining constraints
@@ -128,7 +128,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                   , ic_wanted   = other_lhs_wanted
                                   , ic_status   = IC_Unsolved
                                   , ic_binds    = lhs_binds_var
-                                  , ic_info     = RuleSkol (unLoc name)
+                                  , ic_info     = RuleSkol (snd $ unLoc name)
                                   , ic_env      = lcl_env }
 
        ; return (HsRule name act

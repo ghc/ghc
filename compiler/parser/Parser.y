@@ -776,10 +776,10 @@ maybe_safe :: { ([AddAnn],Bool) }
         : 'safe'                                { ([mj AnnSafe $1],True) }
         | {- empty -}                           { ([],False) }
 
-maybe_pkg :: { ([AddAnn],Maybe FastString) }
+maybe_pkg :: { ([AddAnn],Maybe (SourceText,FastString)) }
         : STRING  {% let pkgFS = getSTRING $1 in
                      if looksLikePackageName (unpackFS pkgFS)
-                        then return ([mj AnnPackageName $1], Just pkgFS)
+                        then return ([mj AnnPackageName $1], Just (getSTRINGs $1,pkgFS))
                         else parseErrorSDoc (getLoc $1) $ vcat [
                              text "parse error" <> colon <+> quotes (ppr pkgFS),
                              text "Version number or non-alphanumeric" <+>
@@ -1119,12 +1119,12 @@ tycl_hdr :: { Located (Maybe (LHsContext RdrName), LHsType RdrName) }
 
 capi_ctype :: { Maybe (Located CType) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
-                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRING $2)))
-                                        (getSTRING $3))))
+                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
+                                        (getSTRINGs $3,getSTRING $3))))
                               [mo $1,mj AnnHeader $2,mj AnnVal $3,mc $4] }
 
            | '{-# CTYPE'        STRING '#-}'
-                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) Nothing  (getSTRING $2))))
+                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) Nothing  (getSTRINGs $2, getSTRING $2))))
                               [mo $1,mj AnnVal $2,mc $3] }
 
            |           { Nothing }
@@ -1378,7 +1378,7 @@ rules   :: { OrdList (LRuleDecl RdrName) }
 
 rule    :: { LRuleDecl RdrName }
         : STRING rule_activation rule_forall infixexp '=' exp
-         {%ams (sLL $1 $> $ (HsRule (L (gl $1) (getSTRING $1))
+         {%ams (sLL $1 $> $ (HsRule (L (gl $1) (getSTRINGs $1,getSTRING $1))
                                   ((snd $2) `orElse` AlwaysActive)
                                   (snd $3) $4 placeHolderNames $6
                                   placeHolderNames))
@@ -1444,15 +1444,15 @@ deprecation :: { OrdList (LWarnDecl RdrName) }
              {% amsu (sLL $1 $> $ (Warning (unLoc $1) (DeprecatedTxt (noLoc "") $ snd $ unLoc $2)))
                      (fst $ unLoc $2) }
 
-strings :: { Located ([AddAnn],[Located FastString]) }
-    : STRING { sL1 $1 ([],[L (gl $1) (getSTRING $1)]) }
+strings :: { Located ([AddAnn],[Located (SourceText,FastString)]) }
+    : STRING { sL1 $1 ([],[L (gl $1) (getSTRINGs $1,getSTRING $1)]) }
     | '[' stringlist ']' { sLL $1 $> $ ([mos $1,mcs $3],fromOL (unLoc $2)) }
 
-stringlist :: { Located (OrdList (Located FastString)) }
+stringlist :: { Located (OrdList (Located (SourceText,FastString))) }
     : stringlist ',' STRING {% addAnnotation (oll $ unLoc $1) AnnComma (gl $2) >>
                                return (sLL $1 $> (unLoc $1 `snocOL`
-                                                  (L (gl $3) (getSTRING $3)))) }
-    | STRING                { sLL $1 $> (unitOL (L (gl $1) (getSTRING $1))) }
+                                                  (L (gl $3) (getSTRINGs $3,getSTRING $3)))) }
+    | STRING                { sLL $1 $> (unitOL (L (gl $1) (getSTRINGs $1,getSTRING $1))) }
 
 -----------------------------------------------------------------------------
 -- Annotations
@@ -1500,12 +1500,12 @@ safety :: { Located Safety }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
 fspec :: { Located ([AddAnn]
-                    ,(Located FastString, Located RdrName, LHsType RdrName)) }
+                    ,(Located (SourceText,FastString), Located RdrName, LHsType RdrName)) }
        : STRING var '::' sigtypedoc     { sLL $1 $> ([mj AnnDcolon $3]
                                              ,(L (getLoc $1)
-                                                    (getSTRING $1), $2, $4)) }
+                                                    (getSTRINGs $1,getSTRING $1), $2, $4)) }
        |        var '::' sigtypedoc     { sLL $1 $> ([mj AnnDcolon $2]
-                                             ,(noLoc nilFS, $1, $3)) }
+                                             ,(noLoc ("",nilFS), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -2191,7 +2191,7 @@ exp10 :: { LHsExpr RdrName }
                                             -- TODO: is LL right here?
                                [mj AnnProc $1,mj AnnRarrow $3] }
 
-        | '{-# CORE' STRING '#-}' exp  {% ams (sLL $1 $> $ HsCoreAnn (getCORE_PRAGs $1) (getSTRING $2) $4)
+        | '{-# CORE' STRING '#-}' exp  {% ams (sLL $1 $> $ HsCoreAnn (getCORE_PRAGs $1) (getSTRINGs $2,getSTRING $2) $4)
                                               [mo $1,mj AnnVal $2
                                               ,mc $3] }
                                           -- hdaume: core annotation
@@ -2232,16 +2232,16 @@ optSemi :: { ([Located a],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }
 
-scc_annot :: { Located (([AddAnn],SourceText),FastString) }
+scc_annot :: { Located (([AddAnn],SourceText),(SourceText,FastString)) }
         : '{-# SCC' STRING '#-}'      {% do scc <- getSCC $2
                                             ; return $ sLL $1 $>
                                                (([mo $1,mj AnnValStr $2
-                                                ,mc $3],getSCC_PRAGs $1),scc) }
+                                                ,mc $3],getSCC_PRAGs $1),(getSTRINGs $2,scc)) }
         | '{-# SCC' VARID  '#-}'      { sLL $1 $> (([mo $1,mj AnnVal $2
                                          ,mc $3],getSCC_PRAGs $1)
-                                        ,(getVARID $2)) }
+                                        ,(unpackFS $ getVARID $2,getVARID $2)) }
 
-hpc_annot :: { Located (([AddAnn],SourceText),(FastString,(Int,Int),(Int,Int))) }
+hpc_annot :: { Located (([AddAnn],SourceText),((SourceText,FastString),(Int,Int),(Int,Int))) }
       : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
                                       { sLL $1 $> $ (([mo $1,mj AnnVal $2
                                               ,mj AnnVal $3,mj AnnColon $4
@@ -2249,7 +2249,7 @@ hpc_annot :: { Located (([AddAnn],SourceText),(FastString,(Int,Int),(Int,Int))) 
                                               ,mj AnnVal $7,mj AnnColon $8
                                               ,mj AnnVal $9,mc $10],
                                                 getGENERATED_PRAGs $1)
-                                              ,(getSTRING $2
+                                              ,((getSTRINGs $2,getSTRING $2)
                                                ,( fromInteger $ getINTEGER $3
                                                 , fromInteger $ getINTEGER $5
                                                 )

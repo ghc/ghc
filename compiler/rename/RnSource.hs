@@ -431,8 +431,9 @@ patchCImportSpec packageKey spec
 patchCCallTarget :: PackageKey -> CCallTarget -> CCallTarget
 patchCCallTarget packageKey callTarget =
   case callTarget of
-  StaticTarget label Nothing isFun -> StaticTarget label (Just packageKey) isFun
-  _                                -> callTarget
+  StaticTarget src label Nothing isFun
+                              -> StaticTarget src label (Just packageKey) isFun
+  _                           -> callTarget
 
 {-
 *********************************************************
@@ -727,10 +728,10 @@ rnHsRuleDecl (HsRule rule_name act vars lhs _fv_lhs rhs _fv_rhs)
        ; checkDupRdrNames rdr_names_w_loc
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc
-       ; bindHsRuleVars (unLoc rule_name) vars names $ \ vars' ->
+       ; bindHsRuleVars (snd $ unLoc rule_name) vars names $ \ vars' ->
     do { (lhs', fv_lhs') <- rnLExpr lhs
        ; (rhs', fv_rhs') <- rnLExpr rhs
-       ; checkValidRule (unLoc rule_name) names lhs' fv_lhs'
+       ; checkValidRule (snd $ unLoc rule_name) names lhs' fv_lhs'
        ; return (HsRule rule_name act vars' lhs' fv_lhs' rhs' fv_rhs',
                  fv_lhs' `plusFV` fv_rhs') } }
   where

@@ -44,7 +44,7 @@ data ImportDecl name
       ideclSourceSrc :: Maybe SourceText,
                                  -- Note [Pragma source text] in BasicTypes
       ideclName      :: Located ModuleName, -- ^ Module name.
-      ideclPkgQual   :: Maybe FastString,  -- ^ Package qualifier.
+      ideclPkgQual   :: Maybe (SourceText,FastString),  -- ^ Package qualifier.
       ideclSource    :: Bool,              -- ^ True <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,               -- ^ True => safe import
       ideclQualified :: Bool,               -- ^ True => qualified
@@ -96,8 +96,8 @@ instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) 
         pp_implicit False = empty
         pp_implicit True = ptext (sLit ("(implicit)"))
 
-        pp_pkg Nothing  = empty
-        pp_pkg (Just p) = doubleQuotes (ftext p)
+        pp_pkg Nothing      = empty
+        pp_pkg (Just (_,p)) = doubleQuotes (ftext p)
 
         pp_qual False   = empty
         pp_qual True    = ptext (sLit "qualified")

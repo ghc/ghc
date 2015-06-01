@@ -321,7 +321,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
       case target of
-          StaticTarget _ _ False
+          StaticTarget _ _ _ False
            | not (null arg_tys) ->
               addErrTc (text "`value' imports cannot have function types")
           _ -> return ()
@@ -331,7 +331,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
-checkCTarget (StaticTarget str _ _) = do
+checkCTarget (StaticTarget _ str _ _) = do
     checkCg checkCOrAsmOrLlvmOrInterp
     checkTc (isCLabelString str) (badCName str)
 
@@ -397,13 +397,13 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 -- ------------ Checking argument types for foreign export ----------------------
 
 tcCheckFEType :: Type -> ForeignExport -> TcM ForeignExport
-tcCheckFEType sig_ty (CExport (L l (CExportStatic str cconv)) src) = do
+tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
     checkCg checkCOrAsmOrLlvm
     checkTc (isCLabelString str) (badCName str)
     cconv' <- checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
     checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
-    return (CExport (L l (CExportStatic str cconv')) src)
+    return (CExport (L l (CExportStatic esrc str cconv')) src)
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.

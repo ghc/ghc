@@ -491,7 +491,8 @@ cvtForD (ImportF callconv safety from nm ty)
 cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType ty
-        ; let e = CExport (noLoc (CExportStatic (mkFastString as)
+        ; let e = CExport (noLoc (CExportStatic as
+                                                (mkFastString as)
                                                 (cvt_conv callconv)))
                                                 (noLoc as)
         ; return $ ForeignExport nm' ty' noForeignExportCoercionYet e }
@@ -542,7 +543,7 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
        ; returnJustL $ Hs.RuleD
-            $ HsRules "{-# RULES" [noLoc $ HsRule (noLoc nm') act bndrs'
+            $ HsRules "{-# RULES" [noLoc $ HsRule (noLoc (nm,nm')) act bndrs'
                                                   lhs' placeHolderNames
                                                   rhs' placeHolderNames]
        }

@@ -483,15 +483,17 @@ repForD (L loc (ForeignImport name typ _ (CImport (L _ cc) (L _ s) mch cis _)))
  where
     conv_cimportspec (CLabel cls) = notHandled "Foreign label" (doubleQuotes (ppr cls))
     conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
-    conv_cimportspec (CFunction (StaticTarget fs _ True)) = return (unpackFS fs)
-    conv_cimportspec (CFunction (StaticTarget _  _ False)) = panic "conv_cimportspec: values not supported yet"
+    conv_cimportspec (CFunction (StaticTarget _ fs _ True))
+                            = return (unpackFS fs)
+    conv_cimportspec (CFunction (StaticTarget _ _  _ False))
+                            = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
     static = case cis of
-                 CFunction (StaticTarget _ _ _) -> "static "
+                 CFunction (StaticTarget _ _ _ _) -> "static "
                  _ -> ""
     chStr = case mch of
             Nothing -> ""
-            Just (Header h) -> unpackFS h ++ " "
+            Just (Header _ h) -> unpackFS h ++ " "
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
@@ -525,7 +527,7 @@ repRuleD (L loc (HsRule n act bndrs lhs _ rhs _))
        ; ss <- mkGenSyms bndr_names
        ; rule1 <- addBinds ss $
                   do { bndrs' <- repList ruleBndrQTyConName repRuleBndr bndrs
-                     ; n'   <- coreStringLit $ unpackFS $ unLoc n
+                     ; n'   <- coreStringLit $ unpackFS $ snd $ unLoc n
                      ; act' <- repPhases act
                      ; lhs' <- repLE lhs
                      ; rhs' <- repLE rhs

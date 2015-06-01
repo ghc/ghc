@@ -372,7 +372,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
               fn_name   = idName fn_id
               final_rhs = simpleOptExpr rhs''    -- De-crap it
               rule      = mkRule False {- Not auto -} is_local
-                                 (unLoc name) act fn_name final_bndrs args
+                                 (snd $ unLoc name) act fn_name final_bndrs args
                                  final_rhs
 
               inline_shadows_rule   -- Function can be inlined before rule fires
@@ -391,7 +391,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 
         ; when inline_shadows_rule $
           warnDs (vcat [ hang (ptext (sLit "Rule")
-                               <+> doubleQuotes (ftext $ unLoc name)
+                               <+> doubleQuotes (ftext $ snd $ unLoc name)
                                <+> ptext (sLit "may never fire"))
                             2 (ptext (sLit "because") <+> quotes (ppr fn_id)
                                <+> ptext (sLit "might inline first"))

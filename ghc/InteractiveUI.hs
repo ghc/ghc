@@ -1534,7 +1534,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: InteractiveImport -> GHCi Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do e <- gtry $ GHC.findModule mod_name (ideclPkgQual d)
+         = do e <- gtry $ GHC.findModule mod_name (fmap snd $ ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isHomeModule m))
@@ -1709,7 +1709,8 @@ guessCurrentModule cmd
           CmdLineError (':' : cmd ++ ": no current module")
        case (head imports) of
           IIModule m -> GHC.findModule m Nothing
-          IIDecl d   -> GHC.findModule (unLoc (ideclName d)) (ideclPkgQual d)
+          IIDecl d   -> GHC.findModule (unLoc (ideclName d))
+                                       (fmap snd $ ideclPkgQual d)
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -1906,7 +1907,7 @@ checkAdd ii = do
     IIDecl d -> do
        let modname = unLoc (ideclName d)
            pkgqual = ideclPkgQual d
-       m <- GHC.lookupModule modname pkgqual
+       m <- GHC.lookupModule modname (fmap snd pkgqual)
        when safe $ do
            t <- GHC.isModuleTrusted m
            when (not t) $ throwGhcException $ ProgramError $ ""
