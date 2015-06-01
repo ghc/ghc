@@ -114,11 +114,9 @@ doCheck directory
  $ do let verbosity = normal
       gpdFile <- defaultPackageDesc verbosity
       gpd <- readPackageDescription verbosity gpdFile
-      case partition isFailure $ checkPackage gpd Nothing of
-          ([],   [])       -> return ()
-          ([],   warnings) -> mapM_ print warnings
-          (errs, _)        -> do mapM_ print errs
-                                 exitWith (ExitFailure 1)
+      case filter isFailure $ checkPackage gpd Nothing of
+          []   -> return ()
+          errs -> mapM_ print errs >> exitWith (ExitFailure 1)
     where isFailure (PackageDistSuspicious {}) = False
           isFailure _ = True
 
