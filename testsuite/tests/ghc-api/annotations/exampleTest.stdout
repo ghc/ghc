@@ -3,6 +3,8 @@
 (AK <no location info> AnnEofPos = [AnnotationTuple.hs:32:1])
 ]
 
+---Problems'--------------------
+[(AnnEofPos, AnnotationTuple.hs:32:1)]
 --------------------------------
 [
 (AK AnnotationTuple.hs:1:1 AnnCloseC = [AnnotationTuple.hs:27:1])

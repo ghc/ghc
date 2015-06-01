@@ -11,7 +11,7 @@
 
 (AK Test10358.hs:1:1 AnnWhere = [Test10358.hs:2:18-22])
 
-(AK Test10358.hs:(4,1)-(8,6) AnnEqual = [Test10358.hs:4:13])
+(AK Test10358.hs:(4,1)-(8,6) AnnEqual = [Test10358.hs:4:15])
 
 (AK Test10358.hs:(4,1)-(8,6) AnnFunId = [Test10358.hs:4:1-7])
 
