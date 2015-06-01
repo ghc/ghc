@@ -73,7 +73,13 @@ OK:
    foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
 </programlisting>
          This is used to import functions written in Cmm code that follow an
-         internal GHC calling convention. This feature is not intended for
+         internal GHC calling convention.  The arguments and results must
+         be unboxed types, except that an argument may be of type
+         <literal>Any</literal> (by way of <literal>unsafeCoerce#</literal>)
+         and the result type is allowed to be an unboxed tuple
+       </para>
+       <para>
+         This feature is not intended for
          use outside of the core libraries that come with GHC. For more
          details see the <ulink linkend="http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps">
           GHC developer wiki</ulink>.
