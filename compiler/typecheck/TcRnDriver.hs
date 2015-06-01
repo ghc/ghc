@@ -2157,13 +2157,13 @@ withTcPlugins hsc_env m =
                 -- error occurs during compilation (Fix of #10078)
                 eitherRes <- tryM $ do
                   updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
-                mapM_ runTcPluginM stops
+                mapM_ (flip runTcPluginM Nothing) stops
                 case eitherRes of
                   Left _ -> failM
                   Right res -> return res
   where
   startPlugin (TcPlugin start solve stop) =
-    do s <- runTcPluginM start
+    do s <- runTcPluginM start Nothing
        return (solve s, stop s)
 
 loadTcPlugins :: HscEnv -> IO [TcPlugin]

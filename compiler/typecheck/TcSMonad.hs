@@ -1241,7 +1241,7 @@ traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 
 runTcPluginTcS :: TcPluginM a -> TcS a
-runTcPluginTcS = wrapTcS . runTcPluginM
+runTcPluginTcS m = wrapTcS . runTcPluginM m . Just =<< getTcEvBinds
 
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags

@@ -84,6 +84,7 @@ module TcRnTypes(
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
         TcPluginM, runTcPluginM, unsafeTcPluginTcM,
+        getEvBindsTcPluginM_maybe,
 
         CtFlavour(..), ctEvFlavour,
 
@@ -2209,7 +2210,7 @@ type TcPluginSolver = [Ct]    -- given
                    -> [Ct]    -- wanted
                    -> TcPluginM TcPluginResult
 
-newtype TcPluginM a = TcPluginM (TcM a)
+newtype TcPluginM a = TcPluginM (Maybe EvBindsVar -> TcM a)
 
 instance Functor     TcPluginM where
   fmap = liftM
@@ -2219,21 +2220,27 @@ instance Applicative TcPluginM where
   (<*>) = ap
 
 instance Monad TcPluginM where
-  return x = TcPluginM (return x)
-  fail x   = TcPluginM (fail x)
+  return x = TcPluginM (const $ return x)
+  fail x   = TcPluginM (const $ fail x)
   TcPluginM m >>= k =
-    TcPluginM (do a <- m
-                  let TcPluginM m1 = k a
-                  m1)
+    TcPluginM (\ ev -> do a <- m ev
+                          runTcPluginM (k a) ev)
 
-runTcPluginM :: TcPluginM a -> TcM a
+runTcPluginM :: TcPluginM a -> Maybe EvBindsVar -> TcM a
 runTcPluginM (TcPluginM m) = m
 
 -- | This function provides an escape for direct access to
 -- the 'TcM` monad.  It should not be used lightly, and
 -- the provided 'TcPluginM' API should be favoured instead.
 unsafeTcPluginTcM :: TcM a -> TcPluginM a
-unsafeTcPluginTcM = TcPluginM
+unsafeTcPluginTcM = TcPluginM . const
+
+-- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
+-- constraint solving.  Returns 'Nothing' if invoked during
+-- 'tcPluginInit' or 'tcPluginStop'.
+getEvBindsTcPluginM_maybe :: TcPluginM (Maybe EvBindsVar)
+getEvBindsTcPluginM_maybe = TcPluginM return
+
 
 data TcPlugin = forall s. TcPlugin
   { tcPluginInit  :: TcPluginM s
