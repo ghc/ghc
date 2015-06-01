@@ -739,9 +739,13 @@ match_co renv subst (TyConAppCo r1 tc1 cos1) co2
          | r1 == r2 && tc1 == tc2
          -> match_cos renv subst cos1 cos2
        _ -> Nothing
-match_co _ _ co1 co2
-  = pprTrace "match_co: needs more cases" (ppr co1 $$ ppr co2) Nothing
+match_co _ _ _co1 _co2
     -- Currently just deals with CoVarCo, TyConAppCo and Refl
+#ifdef DEBUG
+  = pprTrace "match_co: needs more cases" (ppr _co1 $$ ppr _co2) Nothing
+#else
+  = Nothing
+#endif
 
 match_cos :: RuleMatchEnv
          -> RuleSubst
