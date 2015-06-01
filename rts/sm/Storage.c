@@ -738,7 +738,8 @@ move_STACK (StgStack *src, StgStack *dest)
    that operation fails, then the whole process will be killed.
    -------------------------------------------------------------------------- */
 
-StgPtr allocate (Capability *cap, W_ n)
+StgPtr
+allocate (Capability *cap, W_ n)
 {
     bdescr *bd;
     StgPtr p;
