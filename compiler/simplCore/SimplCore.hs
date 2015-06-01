@@ -599,7 +599,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
       | let sz = coreBindsSize binds
-      , sz == sz     -- Force it
+      , () <- sz `seq` ()     -- Force it
       = do {
                 -- Occurrence analysis
            let {   -- Note [Vectorisation declarations and occurrences]
