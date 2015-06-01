@@ -18,6 +18,17 @@ $(call profStart, build-package-data($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
+ifeq "$(V)" "0"
+$1_$2_CONFIGURE_OPTS += -v0 --configure-option=--quiet
+
+# Cabal always passes --with-compiler and --with-gcc to library configure
+# scripts, resulting in the following useless (for us) warning in the logs:
+# "configure: WARNING: unrecognized options: --with-compiler, --with-gcc"
+$1_$2_CONFIGURE_OPTS += --configure-option=--disable-option-checking
+
+$1_$2_GHC_PKG_OPTS += -v0
+endif
+
 $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
 ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
 $1_$2_CONFIGURE_OPTS += --enable-library-vanilla
