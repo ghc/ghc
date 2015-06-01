@@ -132,14 +132,21 @@ We call checkAmbiguity
    (b) in checkValidType
 
 Conncerning (b), you might wonder about nested foralls.  What about
-    f :: (forall a. Eq a => Int) -> Int
+    f :: forall b. (forall a. Eq a => b) -> b
 The nested forall is ambiguous.  Originally we called checkAmbiguity
-in the forall case of check_type, but that had a bad consequence:
-we got two error messages about (Eq b) in a nested forall like this:
-    g :: forall a. Eq a => forall b. Eq b => a -> a
-To avoid this, we call checkAmbiguity once, at the top, in checkValidType.
+in the forall case of check_type, but that had two bad consequences:
+  * We got two error messages about (Eq b) in a nested forall like this:
+       g :: forall a. Eq a => forall b. Eq b => a -> a
+  * If we try to check for ambiguity of an nested forall like
+    (forall a. Eq a => b), the implication constraint doesn't bind
+    all the skolems, which results in "No skolem info" in error
+    messages (see Trac #10432).
 
-In fact, because of the co/contra-variance implemented in tcSubType, 
+To avoid this, we call checkAmbiguity once, at the top, in checkValidType.
+(I'm still a bit worried about unbound skolems when the type mentions
+in-scope type variables.)
+
+In fact, because of the co/contra-variance implemented in tcSubType,
 this *does* catch function f above. too.
 
 Concerning (a) the ambiguity check is only used for *user* types, not
