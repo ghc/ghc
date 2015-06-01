@@ -1159,7 +1159,7 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 {-
 ************************************************************************
 *                                                                      *
-\subsection{The interactive context}
+                The interactive context
 *                                                                      *
 ************************************************************************
 
@@ -1235,28 +1235,40 @@ The details are a bit tricky though:
 Note [Interactively-bound Ids in GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Ids bound by previous Stmts in GHCi are currently
-        a) GlobalIds
-        b) with an Internal Name (not External)
-        c) and a tidied type
+        a) GlobalIds, with
+        b) An External Name, like Ghci4.foo
+           See Note [The interactive package] above
+        c) A tidied type
 
  (a) They must be GlobalIds (not LocalIds) otherwise when we come to
      compile an expression using these ids later, the byte code
      generator will consider the occurrences to be free rather than
      global.
 
- (b) They start with an Internal Name because a Stmt is a local
-     construct, so the renamer naturally builds an Internal name for
-     each of its binders.  It would be possible subsequently to give
-     them an External Name (in a GhciN module) but then we'd have
-     to substitute it out.  So for now they stay Internal.
+ (b) Having an External Name is important because of Note
+     [GlobalRdrEnv shadowing] in RdrName
 
  (c) Their types are tidied. This is important, because :info may ask
      to look at them, and :info expects the things it looks up to have
      tidy types
 
-However note that TyCons, Classes, and even Ids bound by other top-level
-declarations in GHCi (eg foreign import, record selectors) currently get
-External Names, with Ghci9 (or 8, or 7, etc) as the module name.
+Where do interactively-bound Ids come from?
+
+  - GHCi REPL Stmts   e.g.
+         ghci> let foo x = x+1
+    These start with an Internal Name because a Stmt is a local
+    construct, so the renamer naturally builds an Internal name for
+    each of its binders.  Then in tcRnStmt they are externalised via
+    TcRnDriver.externaliseAndTidyId, so they get Names like Ghic4.foo.
+
+  - Ids bound by the debugger etc have Names constructed by
+    IfaceEnv.newInteractiveBinder; at the call sites it is followed by
+    mkVanillaGlobal or mkVanillaGlobalWithInfo.  So again, they are
+    all Global, External.
+
+  - TyCons, Classes, and Ids bound by other top-level declarations in
+    GHCi (eg foreign import, record selectors) also get External
+    Names, with Ghci9 (or 8, or 7, etc) as the module name.
 
 
 Note [ic_tythings]
@@ -1462,9 +1474,11 @@ icExtendGblRdrEnv env tythings
   = foldr add env tythings  -- Foldr makes things in the front of
                             -- the list shadow things at the back
   where
-    add thing env = extendGlobalRdrEnv True {- Shadowing please -} env
-                                       [tyThingAvailInfo thing]
-       -- One at a time, to ensure each shadows the previous ones
+    -- One at a time, to ensure each shadows the previous ones
+    add thing env = foldl extendGlobalRdrEnv env1 (localGREsFromAvail avail)
+       where
+          env1  = shadowNames env (availNames avail)
+          avail = tyThingAvailInfo thing
 
 substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst

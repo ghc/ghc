@@ -2,17 +2,15 @@
 <interactive>:3:10: warning:
     Found hole ‘_’ with type: IO ()
     In the second argument of ‘(<$>)’, namely ‘_’
-    In the first argument of ‘ghciStepIO ::
-                                IO a_alT -> IO a_alT’, namely
+    In the first argument of ‘ghciStepIO :: IO a -> IO a’, namely
       ‘Just <$> _’
     In a stmt of an interactive GHCi command:
-      it <- ghciStepIO :: IO a_alT -> IO a_alT (Just <$> _)
+      it <- ghciStepIO :: IO a -> IO a (Just <$> _)
 *** Exception: <interactive>:3:10: error:
     Found hole ‘_’ with type: IO ()
     In the second argument of ‘(<$>)’, namely ‘_’
-    In the first argument of ‘ghciStepIO ::
-                                IO a_alT -> IO a_alT’, namely
+    In the first argument of ‘ghciStepIO :: IO a -> IO a’, namely
       ‘Just <$> _’
     In a stmt of an interactive GHCi command:
-      it <- ghciStepIO :: IO a_alT -> IO a_alT (Just <$> _)
+      it <- ghciStepIO :: IO a -> IO a (Just <$> _)
 (deferred type error)

@@ -28,6 +28,17 @@ module TcRnDriver (
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runQuasi )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
+import IfaceEnv( externaliseName )
+import TcType   ( isUnitTy, isTauTy )
+import TcHsType
+import TcMatches
+import RnTypes
+import RnExpr
+import MkId
+import TidyPgm    ( globaliseAndTidyId )
+import TysWiredIn ( unitTy, mkListTy )
+import DynamicLoading ( loadPlugins )
+import Plugins ( tcPlugin )
 #endif
 
 import DynFlags
@@ -58,6 +69,7 @@ import MkIface
 import TcSimplify
 import TcTyClsDecls
 import LoadIface
+import TidyPgm    ( mkBootModDetailsTc )
 import RnNames
 import RnEnv
 import RnSource
@@ -80,25 +92,11 @@ import ConLike
 import DataCon
 import Type
 import Class
+import BasicTypes hiding( SuccessFlag(..) )
 import CoAxiom
 import Annotations
 import Data.List ( sortBy )
 import Data.Ord
-#ifdef GHCI
-import BasicTypes hiding( SuccessFlag(..) )
-import TcType   ( isUnitTy, isTauTy )
-import TcHsType
-import TcMatches
-import RnTypes
-import RnExpr
-import MkId
-import TidyPgm    ( globaliseAndTidyId )
-import TysWiredIn ( unitTy, mkListTy )
-import DynamicLoading ( loadPlugins )
-import Plugins ( tcPlugin )
-#endif
-import TidyPgm    ( mkBootModDetailsTc )
-
 import FastString
 import Maybes
 import Util
@@ -1420,7 +1418,7 @@ runTcInteractive hsc_env thing_inside
             case i of
                 IIModule n -> getOrphans n
                 IIDecl i -> getOrphans (unLoc (ideclName i))
-       ; gbl_env <- getGblEnv
+       ; (gbl_env, lcl_env) <- getEnvs
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt
                          , tcg_type_env     = type_env
@@ -1444,25 +1442,64 @@ runTcInteractive hsc_env thing_inside
                               -- TODO: Cache this
                          }
 
-       ; setGblEnv gbl_env' $
-         tcExtendGhciIdEnv ty_things $   -- See Note [Initialising the type environment for GHCi]
-         thing_inside }                  -- in TcEnv
+       ; lcl_env' <- tcExtendLocalTypeEnv lcl_env lcl_ids
+       ; setEnvs (gbl_env', lcl_env') thing_inside }
   where
     (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
 
-    icxt                  = hsc_IC hsc_env
-    (ic_insts, ic_finsts) = ic_instances icxt
-    ty_things             = ic_tythings icxt
+    icxt                     = hsc_IC hsc_env
+    (ic_insts, ic_finsts)    = ic_instances icxt
+    (lcl_ids, top_ty_things) = partitionWith is_closed (ic_tythings icxt)
 
-    type_env1 = mkTypeEnvWithImplicits ty_things
+    is_closed :: TyThing -> Either (Name, TcTyThing) TyThing
+    -- Put Ids with free type variables (always RuntimeUnks)
+    -- in the *local* type environment
+    -- See Note [Initialising the type environment for GHCi]
+    is_closed thing
+      | AnId id <- thing
+      , NotTopLevel <- isClosedLetBndr id
+      = Left (idName id, ATcId { tct_id = id, tct_closed = NotTopLevel })
+      | otherwise
+      = Right thing
+
+    type_env1 = mkTypeEnvWithImplicits top_ty_things
     type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId ic_insts)
                 -- Putting the dfuns in the type_env
                 -- is just to keep Core Lint happy
 
     con_fields = [ (dataConName c, dataConFieldLabels c)
-                 | ATyCon t <- ty_things
+                 | ATyCon t <- top_ty_things
                  , c <- tyConDataCons t ]
 
+
+{- Note [Initialising the type environment for GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most of the the Ids in ic_things, defined by the user in 'let' stmts,
+have closed types. E.g.
+   ghci> let foo x y = x && not y
+
+However the GHCi debugger creates top-level bindings for Ids whose
+types have free RuntimeUnk skolem variables, standing for unknown
+types.  If we don't register these free TyVars as global TyVars then
+the typechecker will try to quantify over them and fall over in
+zonkQuantifiedTyVar. so we must add any free TyVars to the
+typechecker's global TyVar set.  That is most conveniently by using
+tcExtendLocalTypeEnv, which automatically extends the global TyVar
+set.
+
+We do this by splitting out the Ids with open types, using 'is_closed'
+to do the partition.  The top-level things go in the global TypeEnv;
+the open, NotTopLevel, Ids, with free RuntimeUnk tyvars, go in the
+local TypeEnv.
+
+Note that we don't extend the local RdrEnv (tcl_rdr); all the in-scope
+things are already in the interactive context's GlobalRdrEnv.
+Extending the local RdrEnv isn't terrible, but it means there is an
+entry for the same Name in both global and local RdrEnvs, and that
+lead to duplicate "perhaps you meant..." suggestions (e.g. T5564).
+
+We don't bother with the tcl_th_bndrs environment either.
+-}
 
 #ifdef GHCI
 -- | The returned [Id] is the list of new Ids bound by this statement. It can
@@ -1485,7 +1522,8 @@ tcRnStmt hsc_env rdr_stmt
     mapM_ bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
 
     traceTc "tcs 1" empty ;
-    let { global_ids = map globaliseAndTidyId zonked_ids } ;
+    this_mod <- getModule ;
+    global_ids <- mapM (externaliseAndTidyId this_mod) zonked_ids ;
         -- Note [Interactively-bound Ids in GHCi] in HscTypes
 
 {- ---------------------------------------------
@@ -1715,7 +1753,8 @@ getGhciStepIO :: TcM (LHsExpr Name)
 getGhciStepIO = do
     ghciTy <- getGHCiMonad
     fresh_a <- newUnique
-    let a_tv   = mkTcTyVarName fresh_a (fsLit "a")
+    loc     <- getSrcSpanM
+    let a_tv   = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
         ghciM  = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM    = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
@@ -1901,8 +1940,7 @@ tcRnDeclsi hsc_env local_decls =
         <- zonkTopDecls all_ev_binds binds Nothing sig_ns rules vects
                         imp_specs fords
 
-    let --global_ids = map globaliseAndTidyId bind_ids
-        final_type_env = extendTypeEnvWithIds type_env bind_ids --global_ids
+    let final_type_env = extendTypeEnvWithIds type_env bind_ids
         tcg_env' = tcg_env { tcg_binds     = binds',
                              tcg_ev_binds  = ev_binds',
                              tcg_imp_specs = imp_specs',
@@ -1911,6 +1949,12 @@ tcRnDeclsi hsc_env local_decls =
                              tcg_fords     = fords' }
 
     setGlobalTypeEnv tcg_env' final_type_env
+
+
+externaliseAndTidyId :: Module -> Id -> TcM Id
+externaliseAndTidyId this_mod id
+  = do { name' <- externaliseName this_mod (idName id)
+       ; return (globaliseAndTidyId (setIdName id name')) }
 
 #endif /* GHCi */
 

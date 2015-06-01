@@ -52,6 +52,7 @@ import HsSyn
 import HscTypes
 import BasicTypes ( HValue )
 import InstEnv
+import IfaceEnv   ( newInteractiveBinder )
 import FamInstEnv ( FamInst, orphNamesOfFamInst )
 import TyCon
 import Type     hiding( typeKind )
@@ -69,6 +70,7 @@ import Linker
 import DynFlags
 import Unique
 import UniqSupply
+import MonadUtils
 import Module
 import Panic
 import UniqFM
@@ -187,7 +189,7 @@ execStmt stmt ExecOptions{..} = do
       -- empty statement / comment
       Nothing -> return (ExecComplete (Right []) 0)
 
-      Just (tyThings, hval, fix_env) -> do
+      Just (ids, hval, fix_env) -> do
         updateFixityEnv fix_env
 
         status <-
@@ -201,7 +203,7 @@ execStmt stmt ExecOptions{..} = do
 
             size = ghciHistSize idflags'
 
-        handleRunStatus execSingleStep stmt bindings tyThings
+        handleRunStatus execSingleStep stmt bindings ids
                         breakMVar statusMVar status (emptyHistory size)
 
 -- | The type returned by the deprecated 'runStmt' and
@@ -626,17 +628,18 @@ bindLocalsAtBreakpoint
 -- bind, all we can do is bind a local variable to the exception
 -- value.
 bindLocalsAtBreakpoint hsc_env apStack Nothing = do
-   let exn_fs    = fsLit "_exception"
-       exn_name  = mkInternalName (getUnique exn_fs) (mkVarOccFS exn_fs) span
-       e_fs      = fsLit "e"
-       e_name    = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
-       e_tyvar   = mkRuntimeUnkTyVar e_name liftedTypeKind
-       exn_id    = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
+   let exn_occ = mkVarOccFS (fsLit "_exception")
+       span    = mkGeneralSrcSpan (fsLit "<exception thrown>")
+   exn_name <- newInteractiveBinder hsc_env exn_occ span
+
+   let e_fs    = fsLit "e"
+       e_name  = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
+       e_tyvar = mkRuntimeUnkTyVar e_name liftedTypeKind
+       exn_id  = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
 
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
 
-       span = mkGeneralSrcSpan (fsLit "<exception thrown>")
    --
    Linker.extendLinkEnv [(exn_name, unsafeCoerce# apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span)
@@ -673,37 +676,28 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
    mb_hValues <- mapM (getIdValFromApStack apStack) (map fromIntegral offsets)
-   let filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_dflags hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
 
-   us <- mkSplitUniqSupply 'I'
-   let (us1, us2) = splitUniqSupply us
-       tv_subst   = newTyVars us1 free_tvs
-       new_ids    = zipWith3 (mkNewId tv_subst) occs filtered_ids (uniqsFromSupply us2)
-       names      = map idName new_ids
 
-   -- make an Id for _result.  We use the Unique of the FastString "_result";
-   -- we don't care about uniqueness here, because there will only be one
-   -- _result in scope at any time.
-   let result_name = mkInternalName (getUnique result_fs)
-                          (mkVarOccFS result_fs) span
-       result_id   = Id.mkVanillaGlobal result_name (substTy tv_subst result_ty)
+   us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
+   let tv_subst     = newTyVars us free_tvs
+       filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
+       (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
+                      map (substTy tv_subst . idType) filtered_ids
 
-   -- for each Id we're about to bind in the local envt:
-   --    - tidy the type variables
-   --    - globalise the Id (Ids are supposed to be Global, apparently).
-   --
-   let result_ok = isPointer result_id
+   new_ids     <- zipWith3M mkNewId occs tidy_tys filtered_ids
+   result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
-       all_ids | result_ok = result_id : new_ids
-               | otherwise = new_ids
-       id_tys = map idType all_ids
-       (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
-       final_ids = zipWith setIdType all_ids tidy_tys
+   let result_id = Id.mkVanillaGlobal result_name (substTy tv_subst result_ty)
+       result_ok = isPointer result_id
+
+       final_ids | result_ok = result_id : new_ids
+                 | otherwise = new_ids
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
+       names  = map idName new_ids
 
    Linker.extendLinkEnv [ (name,hval) | (name, Just hval) <- zip names mb_hValues ]
    when result_ok $ Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
@@ -714,13 +708,10 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
         -- state is single-threaded and otherwise we'd spam old bindings
         -- whenever we stop at a breakpoint.  The InteractveContext is properly
         -- saved/restored, but not the linker state.  See #1743, test break026.
-   mkNewId :: TvSubst -> OccName -> Id -> Unique -> Id
-   mkNewId tv_subst occ id uniq
-     = Id.mkVanillaGlobalWithInfo name ty (idInfo id)
-     where
-         loc    = nameSrcSpan (idName id)
-         name   = mkInternalName uniq occ loc
-         ty     = substTy tv_subst (idType id)
+   mkNewId :: OccName -> Type -> Id -> IO Id
+   mkNewId occ ty old_id
+     = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
+          ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
 
    newTyVars :: UniqSupply -> TcTyVarSet -> TvSubst
      -- Similarly, clone the type variables mentioned in the types

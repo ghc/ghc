@@ -263,8 +263,7 @@ rnImportDecl this_mod
     -- filter the imports according to the import declaration
     (new_imp_details, gres) <- filterImports ifaces imp_spec imp_details
 
-    let gbl_env = mkGlobalRdrEnv (filterOut from_this_mod gres)
-        from_this_mod gre = nameModule (gre_name gre) == this_mod
+    let gbl_env = mkGlobalRdrEnv gres
 
         -- True <=> import M ()
         import_all = case imp_details of
@@ -410,6 +409,7 @@ created by its bindings.
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also: Note [Interactively-bound Ids in GHCi] in HscTypes
+          Note [Looking up Exact RdrNames] in RnEnv
 
 Consider a Template Haskell declaration quotation like this:
       module M where
@@ -417,31 +417,11 @@ Consider a Template Haskell declaration quotation like this:
 When renaming the declarations inside [d| ...|], we treat the
 top level binders specially in two ways
 
-1.  We give them an Internal name, not (as usual) an External one.
-    Otherwise the NameCache gets confused by a second allocation of
-    M.f.  (We used to invent a fake module ThFake to avoid this, but
-    that had other problems, notably in getting the correct answer for
-    nameIsLocalOrFrom in lookupFixity. So we now leave tcg_module
-    unaffected.)
+1.  We give them an Internal Name, not (as usual) an External one.
+    This is done by RnEnv.newTopSrcBinder.
 
-2.  We make them *shadow* the outer bindings. If we don't do that,
-    we'll get a complaint when extending the GlobalRdrEnv, saying that
-    there are two bindings for 'f'.  There are several tricky points:
-
-    * This shadowing applies even if the binding for 'f' is in a
-      where-clause, and hence is in the *local* RdrEnv not the *global*
-      RdrEnv.
-
-    * The *qualified* name M.f from the enclosing module must certainly
-      still be available.  So we don't nuke it entirely; we just make
-      it seem like qualified import.
-
-    * We only shadow *External* names (which come from the main module)
-      Do not shadow *Inernal* names because in the bracket
-          [d| class C a where f :: a
-              f = 4 |]
-      rnSrcDecls will first call extendGlobalRdrEnvRn with C[f] from the
-      class decl, and *separately* extend the envt with the value binding.
+2.  We make them *shadow* the outer bindings.
+    See Note [GlobalRdrEnv shadowing]
 
 3. We find out whether we are inside a [d| ... |] by testing the TH
    stage. This is a slight hack, because the stage field was really
@@ -469,31 +449,28 @@ extendGlobalRdrEnvRn avails new_fixities
               -- Delete new_occs from global and local envs
               -- If we are in a TemplateHaskell decl bracket,
               --    we are going to shadow them
-              -- See Note [Top-level Names in Template Haskell decl quotes]
+              -- See Note [GlobalRdrEnv shadowing]
               inBracket = isBrackStage stage
+
               lcl_env_TH = lcl_env { tcl_rdr = delLocalRdrEnvList (tcl_rdr lcl_env) new_occs }
+                           -- See Note [GlobalRdrEnv shadowing]
 
               lcl_env2 | inBracket = lcl_env_TH
                        | otherwise = lcl_env
 
-              rdr_env2  = extendGlobalRdrEnv (isGHCi && not inBracket) rdr_env avails
-                 -- Shadowing only applies for GHCi decls outside brackets
-                 -- e.g. (Trac #4127a)
-                 --   ghci> runQ [d| class C a where f :: a
-                 --                  f = True
-                 --                  instance C Int where f = 2 |]
-                 --   We don't want the f=True to shadow the f class-op
+              -- Deal with shadowing: see Note [GlobalRdrEnv shadowing]
+              want_shadowing = isGHCi || inBracket
+              rdr_env1 | want_shadowing = shadowNames rdr_env new_names
+                       | otherwise      = rdr_env
 
               lcl_env3 = lcl_env2 { tcl_th_bndrs = extendNameEnvList th_bndrs
                                                        [ (n, (TopLevel, th_lvl))
                                                        | n <- new_names ] }
-              fix_env' = foldl extend_fix_env fix_env new_names
-              dups = findLocalDupsRdrEnv rdr_env2 new_names
 
+        ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
+
+        ; let fix_env' = foldl extend_fix_env fix_env new_names
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
-
-        ; traceRn (text "extendGlobalRdrEnvRn 1" <+> (ppr avails $$ (ppr dups)))
-        ; mapM_ (addDupDeclErr . map gre_name) dups
 
         ; traceRn (text "extendGlobalRdrEnvRn 2" <+> (pprGlobalRdrEnv True rdr_env2))
         ; return (gbl_env', lcl_env3) }
@@ -510,12 +487,34 @@ extendGlobalRdrEnvRn avails new_fixities
       where
         occ  = nameOccName name
 
-{-
-@getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
-used for source code.
+    new_gres :: [GlobalRdrElt]  -- New LocalDef GREs, derived from avails
+    new_gres = concatMap localGREsFromAvail avails
+
+    add_gre :: GlobalRdrEnv -> GlobalRdrElt -> RnM GlobalRdrEnv
+    -- Extend the GlobalRdrEnv with a LocalDef GRE
+    -- If there is already a LocalDef GRE with the same OccName,
+    --    report an error and discard the new GRE
+    -- This establishes INVARIANT 1 of GlobalRdrEnvs
+    add_gre env gre
+      | not (null dups)    -- Same OccName defined twice
+      = do { addDupDeclErr (gre : dups); return env }
+
+      | otherwise
+      = return (extendGlobalRdrEnv env gre)
+      where
+        name = gre_name gre
+        occ  = nameOccName name
+        dups = filter isLocalGRE (lookupGlobalRdrEnv env occ)
+
+
+{- *********************************************************************
+*                                                                      *
+    getLocalDeclBindersd@ returns the names for an HsDecl
+             It's used for source code.
 
         *** See "THE NAMING STORY" in HsDecls ****
--}
+*                                                                      *
+********************************************************************* -}
 
 getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
                       -> RnM ((TcGblEnv, TcLclEnv), NameSet)
@@ -877,15 +876,6 @@ catIELookupM ms = [ a | Succeeded a <- ms ]
 ************************************************************************
 -}
 
-greExportAvail :: GlobalRdrElt -> AvailInfo
-greExportAvail gre
-  = case gre_par gre of
-      ParentIs p                  -> AvailTC p [me]
-      NoParent   | isTyConName me -> AvailTC me [me]
-                 | otherwise      -> Avail   me
-  where
-    me = gre_name gre
-
 plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
 plusAvail a1 a2
   | debugIsOn && availName a1 /= availName a2
@@ -1088,7 +1078,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
  = -- The same as (module M) where M is the current module name,
    -- so that's how we handle it.
    let
-       avails = [ greExportAvail gre
+       avails = [ availFromGRE gre
                 | gre <- globalRdrEnvElts rdr_env
                 , isLocalGRE gre ]
    in
@@ -1125,7 +1115,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                 || (moduleName this_mod == mod)
                    ; gres = filter (isModuleExported implicit_prelude mod)
                                    (globalRdrEnvElts rdr_env)
-                   ; new_exports = map greExportAvail gres
+                   ; new_exports = map availFromGRE gres
                    ; names       = map gre_name gres }
 
              ; checkErr exportValid (moduleNotImported mod)
@@ -1167,13 +1157,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     -------------
     lookup_ie :: IE RdrName -> RnM (IE Name, AvailInfo)
     lookup_ie (IEVar (L l rdr))
-        = do gre <- lookupGreRn rdr
-             return (IEVar (L l (gre_name gre)), greExportAvail gre)
+        = do (name, avail) <- lookupGreAvailRn rdr
+             return (IEVar (L l name), avail)
 
     lookup_ie (IEThingAbs (L l rdr))
-        = do gre <- lookupGreRn rdr
-             let name = gre_name gre
-                 avail = greExportAvail gre
+        = do (name, avail) <- lookupGreAvailRn rdr
              return (IEThingAbs (L l name), avail)
 
     lookup_ie ie@(IEThingAll (L l rdr))
@@ -1495,7 +1483,7 @@ extendImportMap rdr_env rdr imp_map
         add _ avails = avail : avails -- add is really just a specialised (++)
         decl_loc = srcSpanEnd (is_dloc imp_decl_spec)
                    -- For srcSpanEnd see Note [The ImportMap]
-        avail    = greExportAvail gre
+        avail    = availFromGRE gre
 
     bestImport :: [ImportSpec] -> ImportSpec
     bestImport iss
@@ -1762,10 +1750,9 @@ greSrcSpan gre
   where
     name_span = nameSrcSpan (gre_name gre)
 
-addDupDeclErr :: [Name] -> TcRn ()
-addDupDeclErr []
-  = panic "addDupDeclErr: empty list"
-addDupDeclErr names@(name : _)
+addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
+addDupDeclErr [] = panic "addDupDeclErr: empty list"
+addDupDeclErr gres@(gre : _)
   = addErrAt (getSrcSpan (last sorted_names)) $
     -- Report the error at the later location
     vcat [ptext (sLit "Multiple declarations of") <+>
@@ -1776,7 +1763,8 @@ addDupDeclErr names@(name : _)
           ptext (sLit "Declared at:") <+>
                    vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
-    sorted_names = sortWith nameSrcLoc names
+    name = gre_name gre
+    sorted_names = sortWith nameSrcLoc (map gre_name gres)
 
 dupExportWarn :: OccName -> IE RdrName -> IE RdrName -> SDoc
 dupExportWarn occ_name ie1 ie2

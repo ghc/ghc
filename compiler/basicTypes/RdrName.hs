@@ -44,13 +44,13 @@ module RdrName (
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
-        lookupGlobalRdrEnv, extendGlobalRdrEnv,
+        lookupGlobalRdrEnv, extendGlobalRdrEnv, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
-        transformGREs, findLocalDupsRdrEnv, pickGREs,
+        transformGREs, pickGREs,
 
         -- * GlobalRdrElts
-        gresFromAvails, gresFromAvail,
+        gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
@@ -400,14 +400,14 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 -- The list in the codomain is required because there may be name clashes
 -- These only get reported on lookup, not on construction
 --
--- INVARIANT: All the members of the list have distinct
---            'gre_name' fields; that is, no duplicate Names
+-- INVARIANT 1: All the members of the list have distinct
+--              'gre_name' fields; that is, no duplicate Names
 --
--- INVARIANT: Imported provenance => Name is an ExternalName
---            However LocalDefs can have an InternalName.  This
---            happens only when type-checking a [d| ... |] Template
---            Haskell quotation; see this note in RnNames
---            Note [Top-level Names in Template Haskell decl quotes]
+-- INVARIANT 2: Imported provenance => Name is an ExternalName
+--              However LocalDefs can have an InternalName.  This
+--              happens only when type-checking a [d| ... |] Template
+--              Haskell quotation; see this note in RnNames
+--              Note [Top-level Names in Template Haskell decl quotes]
 
 -- | An element of the 'GlobalRdrEnv'
 data GlobalRdrElt
@@ -473,7 +473,7 @@ So: in an export list
 Module M exports everything, so its exports will be
    AvailTC C [C,T,op]
    AvailTC T [T,TInt,TBool]
-On import we convert to GlobalRdrElt and the combine
+On import we convert to GlobalRdrElt and then combine
 those.  For T that will mean we have
   one GRE with Parent C
   one GRE with NoParent
@@ -493,12 +493,24 @@ gresFromAvail prov_fn avail
            gre_par = mkParent n avail,
            gre_prov = prov_fn n}
     | n <- availNames avail ]
-  where
+
+localGREsFromAvail :: AvailInfo -> [GlobalRdrElt]
+-- Turn an Avail into a list of LocalDef GlobalRdrElts
+localGREsFromAvail = gresFromAvail (const LocalDef)
 
 mkParent :: Name -> AvailInfo -> Parent
 mkParent _ (Avail _)                 = NoParent
 mkParent n (AvailTC m _) | n == m    = NoParent
                          | otherwise = ParentIs m
+
+availFromGRE :: GlobalRdrElt -> AvailInfo
+availFromGRE gre
+  = case gre_par gre of
+      ParentIs p                  -> AvailTC p [me]
+      NoParent   | isTyConName me -> AvailTC me [me]
+                 | otherwise      -> Avail   me
+  where
+    me = gre_name gre
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
@@ -583,20 +595,9 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- the locally-defined @f@, and a GRE for the imported @f@, with a /single/
 -- provenance, namely the one for @Baz(f)@.
 pickGREs rdr_name gres
-  | (_ : _ : _) <- candidates  -- This is usually false, so we don't have to
-                               -- even look at internal_candidates
-  , (gre : _)   <- internal_candidates
-  = [gre]  -- For this internal_candidate stuff,
-           -- see Note [Template Haskell binders in the GlobalRdrEnv]
-           -- If there are multiple Internal candidates, pick the
-           -- first one (ie with the (innermost binding)
-  | otherwise
   = ASSERT2( isSrcRdrName rdr_name, ppr rdr_name )
-    candidates
+    mapMaybe pick gres
   where
-    candidates = mapMaybe pick gres
-    internal_candidates = filter (isInternalName . gre_name) candidates
-
     rdr_is_unqual = isUnqual rdr_name
     rdr_is_qual   = isQual_maybe rdr_name
 
@@ -664,45 +665,62 @@ transformGREs trans_gre occs rdr_env
            Just gres -> extendOccEnv env occ (map trans_gre gres)
            Nothing   -> env
 
-extendGlobalRdrEnv :: Bool -> GlobalRdrEnv -> [AvailInfo] -> GlobalRdrEnv
--- Extend with new LocalDef GREs from the AvailInfos.
---
--- If do_shadowing is True, first remove name clashes between the new
--- AvailInfos and the existing GlobalRdrEnv.
--- This is used by the GHCi top-level
---
--- E.g.  Adding a LocalDef "x" when there is an existing GRE for Q.x
---       should remove any unqualified import of Q.x,
---       leaving only the qualified one
---
--- However do *not* remove name clashes between the AvailInfos themselves,
--- so that (say)   data T = A | A
--- will still give a duplicate-binding error.
--- Same thing if there are multiple AvailInfos (don't remove clashes),
--- though I'm not sure this ever happens with do_shadowing=True
+extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
+extendGlobalRdrEnv env gre
+  = extendOccEnv_Acc insertGRE singleton env
+                     (nameOccName (gre_name gre)) gre
 
-extendGlobalRdrEnv do_shadowing env avails
-  = foldl add_avail env1 avails
-  where
-    names = concatMap availNames avails
-    env1 | do_shadowing = foldl shadow_name env names
-         | otherwise    = env
-         -- By doing the removal first, we ensure that the new AvailInfos
-         -- don't shadow each other; that would conceal genuine errors
-         -- E.g. in GHCi   data T = A | A
+shadowNames :: GlobalRdrEnv -> [Name] -> GlobalRdrEnv
+shadowNames = foldl shadowName
 
-    add_avail env avail = foldl (add_name avail) env (availNames avail)
+{- Note [GlobalRdrEnv shadowing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before adding new names to the GlobalRdrEnv we nuke some existing entries;
+this is "shadowing".  The actual work is done by RdrEnv.shadowNames.
+There are two reasons for shadowing:
 
-    add_name avail env name
-       = extendOccEnv_Acc (:) singleton env occ gre
-       where
-         occ = nameOccName name
-         gre = GRE { gre_name = name
-                   , gre_par = mkParent name avail
-                   , gre_prov = LocalDef }
+* The GHCi REPL
 
-shadow_name :: GlobalRdrEnv -> Name -> GlobalRdrEnv
-shadow_name env name
+  - Ids bought into scope on the command line (eg let x = True) have
+    External Names, like Ghci4.x.  We want a new binding for 'x' (say)
+    to override the existing binding for 'x'.
+    See Note [Interactively-bound Ids in GHCi] in HscTypes
+
+  - Data types also have Extenal Names, like Ghci4.T; but we still want
+    'T' to mean the newly-declared 'T', not an old one.
+
+* Nested Template Haskell declaration brackets
+  See Note [Top-level Names in Template Haskell decl quotes] in RnNames
+
+  Consider a TH decl quote:
+      module M where
+        f x = h [d| f = 3 |]
+  We must shadow the outer declaration of 'f', else we'll get a
+  complaint when extending the GlobalRdrEnv, saying that there are two
+  bindings for 'f'.  There are several tricky points:
+
+    - This shadowing applies even if the binding for 'f' is in a
+      where-clause, and hence is in the *local* RdrEnv not the *global*
+      RdrEnv.  This is done in lcl_env_TH in extendGlobalRdrEnvRn.
+
+    - The External Name M.f from the enclosing module must certainly
+      still be available.  So we don't nuke it entirely; we just make
+      it seem like qualified import.
+
+    - We only shadow *External* names (which come from the main module),
+      or from earlier GHCi commands. Do not shadow *Internal* names
+      because in the bracket
+          [d| class C a where f :: a
+              f = 4 |]
+      rnSrcDecls will first call extendGlobalRdrEnvRn with C[f] from the
+      class decl, and *separately* extend the envt with the value binding.
+      At that stage, the class op 'f' will have an Internal name.
+-}
+
+shadowName :: GlobalRdrEnv -> Name -> GlobalRdrEnv
+-- Remove certain old LocalDef GREs that share the same OccName as this new Name.
+-- See Note [GlobalRdrEnv shadowing] for details
+shadowName env name
   = alterOccEnv (fmap alter_fn) env (nameOccName name)
   where
     alter_fn :: [GlobalRdrElt] -> [GlobalRdrElt]
@@ -710,22 +728,29 @@ shadow_name env name
 
     shadow_with :: Name -> GlobalRdrElt -> Maybe GlobalRdrElt
     shadow_with new_name old_gre@(GRE { gre_name = old_name, gre_prov = LocalDef })
-       = case (nameModule_maybe old_name, nameModule_maybe new_name) of
-           (Nothing,      _)                                 -> Nothing
-           (Just old_mod, Just new_mod) | new_mod == old_mod -> Nothing
-           (Just old_mod, _) -> Just (old_gre { gre_prov = Imported [fake_imp_spec] })
-              where
-                 fake_imp_spec = ImpSpec id_spec ImpAll  -- Urgh!
-                 old_mod_name = moduleName old_mod
-                 id_spec = ImpDeclSpec { is_mod = old_mod_name
-                                       , is_as = old_mod_name
-                                       , is_qual = True
-                                       , is_dloc = nameSrcSpan old_name }
+       = case nameModule_maybe old_name of
+           Nothing -> Just old_gre
+           Just old_mod
+              | Just new_mod <- nameModule_maybe new_name
+              , new_mod == old_mod
+              -> Nothing
+              | otherwise
+              -> Just (old_gre { gre_prov = Imported [mk_fake_imp_spec old_name old_mod] })
+
     shadow_with new_name old_gre@(GRE { gre_prov = Imported imp_specs })
        | null imp_specs' = Nothing
        | otherwise       = Just (old_gre { gre_prov = Imported imp_specs' })
        where
          imp_specs' = mapMaybe (shadow_is new_name) imp_specs
+
+    mk_fake_imp_spec old_name old_mod    -- Urgh!
+      = ImpSpec id_spec ImpAll
+      where
+        old_mod_name = moduleName old_mod
+        id_spec      = ImpDeclSpec { is_mod = old_mod_name
+                                   , is_as = old_mod_name
+                                   , is_qual = True
+                                   , is_dloc = nameSrcSpan old_name }
 
     shadow_is :: Name -> ImportSpec -> Maybe ImportSpec
     shadow_is new_name is@(ImpSpec { is_decl = id_spec })
@@ -735,41 +760,6 @@ shadow_name env name
        | otherwise -- Shadow unqualified only
        = Just (is { is_decl = id_spec { is_qual = True } })
 
-{-
-Note [Template Haskell binders in the GlobalRdrEnv]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For reasons described in Note [Top-level Names in Template Haskell decl quotes]
-in RnNames, a GRE with an Internal gre_name (i.e. one generated by a TH decl
-quote) should *shadow* a GRE with an External gre_name.  Hence some faffing
-around in pickGREs and findLocalDupsRdrEnv
--}
-
-findLocalDupsRdrEnv :: GlobalRdrEnv -> [Name] -> [[GlobalRdrElt]]
--- ^ For each 'OccName', see if there are multiple local definitions
--- for it; return a list of all such
--- and return a list of the duplicate bindings
-findLocalDupsRdrEnv rdr_env occs
-  = go rdr_env [] occs
-  where
-    go _       dups [] = dups
-    go rdr_env dups (name:names)
-      = case filter (pick name) gres of
-          []       -> go rdr_env  dups              names
-          [_]      -> go rdr_env  dups              names   -- The common case
-          dup_gres -> go rdr_env' (dup_gres : dups) names
-      where
-        occ      = nameOccName name
-        gres     = lookupOccEnv rdr_env occ `orElse` []
-        rdr_env' = delFromOccEnv rdr_env occ
-            -- The delFromOccEnv avoids repeating the same
-            -- complaint twice, when names itself has a duplicate
-            -- which is a common case
-
-    -- See Note [Template Haskell binders in the GlobalRdrEnv]
-    pick name (GRE { gre_name = n, gre_prov = LocalDef })
-      | isInternalName name = isInternalName n
-      | otherwise           = True
-    pick _ _ = False
 
 {-
 ************************************************************************
