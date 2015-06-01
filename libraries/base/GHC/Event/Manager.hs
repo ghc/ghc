@@ -456,19 +456,34 @@ onFdEvent mgr fd evs
 
   | otherwise = do
     fdds <- withMVar (callbackTableVar mgr fd) $ \tbl ->
-        IT.delete (fromIntegral fd) tbl >>= maybe (return []) selectCallbacks
+        IT.delete (fromIntegral fd) tbl >>= maybe (return []) (selectCallbacks tbl)
     forM_ fdds $ \(FdData reg _ cb) -> cb reg evs
   where
     -- | Here we look through the list of registrations for the fd of interest
-    -- and sort out which match the events that were triggered. We re-arm
-    -- the fd as appropriate and return this subset.
-    selectCallbacks :: [FdData] -> IO [FdData]
-    selectCallbacks fdds = do
-        let matches :: FdData -> Bool
+    -- and sort out which match the events that were triggered. We,
+    --
+    --   1. re-arm the fd as appropriate
+    --   2. reinsert registrations that weren't triggered and multishot
+    --      registrations
+    --   3. return a list containing the callbacks that should be invoked.
+    selectCallbacks :: IntTable [FdData] -> [FdData] -> IO [FdData]
+    selectCallbacks tbl fdds = do
+        let -- figure out which registrations have been triggered
+            matches :: FdData -> Bool
             matches fd' = evs `I.eventIs` I.elEvent (fdEvents fd')
-            (triggered, saved) = partition matches fdds
+            (triggered, notTriggered) = partition matches fdds
+
+            -- sort out which registrations we need to retain
+            isMultishot :: FdData -> Bool
+            isMultishot fd' = I.elLifetime (fdEvents fd') == MultiShot
+            saved = notTriggered ++ filter isMultishot triggered
+
             savedEls = eventsOf saved
             allEls = eventsOf fdds
+
+        -- Reinsert multishot registrations.
+        -- We deleted the table entry for this fd above so we there isn't a preexisting entry
+        _ <- IT.insertWith (\_ _ -> saved) (fromIntegral fd) saved tbl
 
         case I.elLifetime allEls of
           -- we previously armed the fd for multiple shots, no need to rearm
@@ -477,17 +492,18 @@ onFdEvent mgr fd evs
 
           -- either we previously registered for one shot or the
           -- events of interest have changed, we must re-arm
-          _ -> do
+          _ ->
             case I.elLifetime savedEls of
               OneShot | haveOneShot ->
-                -- if there are no saved events there is no need to re-arm
-                unless (OneShot == I.elLifetime (eventsOf triggered)
-                        && mempty == savedEls) $
+                -- if there are no saved events and we registered with one-shot
+                -- semantics then there is no need to re-arm
+                unless (OneShot == I.elLifetime allEls
+                        && mempty == I.elEvent savedEls) $ do
                   void $ I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
               _ ->
+                -- we need to re-arm with multi-shot semantics
                 void $ I.modifyFd (emBackend mgr) fd
                                   (I.elEvent allEls) (I.elEvent savedEls)
-            return ()
 
         return triggered
 
