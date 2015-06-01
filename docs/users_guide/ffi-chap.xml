@@ -76,7 +76,8 @@ OK:
          internal GHC calling convention.  The arguments and results must
          be unboxed types, except that an argument may be of type
          <literal>Any</literal> (by way of <literal>unsafeCoerce#</literal>)
-         and the result type is allowed to be an unboxed tuple.
+         and the result type is allowed to be an unboxed tuple or the
+         type <literal>Any</literal>.
        </para>
        <para>
          This feature is not intended for

@@ -1658,9 +1658,11 @@ isFFIPrimArgumentTy dflags ty
 
 isFFIPrimResultTy :: DynFlags -> Type -> Validity
 -- Checks for valid result type for a 'foreign import prim'
--- Currently it must be an unlifted type, including unboxed tuples.
+-- Currently it must be an unlifted type, including unboxed tuples,
+-- or the well-known type Any.
 isFFIPrimResultTy dflags ty
-   = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
+  | isAnyTy ty = IsValid
+  | otherwise = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
 
 isFunPtrTy :: Type -> Bool
 isFunPtrTy ty
