@@ -1245,6 +1245,9 @@ editFile str =
      when (null cmd)
        $ throwGhcException (CmdLineError "editor not set, use :set editor")
      lineOpt <- liftIO $ do
+         let sameFile p1 p2 = liftA2 (==) (canonicalizePath p1) (canonicalizePath p2)
+              `catchIO` (\_ -> return False)
+
          curFileErrs <- filterM (\(f, _) -> unpackFS f `sameFile` file) errs
          return $ case curFileErrs of
              (_, line):_ -> " +" ++ show line
@@ -3221,12 +3224,6 @@ expandPathIO p =
         return (tilde ++ '/':d)
    other ->
         return other
-
-sameFile :: FilePath -> FilePath -> IO Bool
-sameFile path1 path2 = do
-    absPath1 <- canonicalizePath path1
-    absPath2 <- canonicalizePath path2
-    return $ absPath1 == absPath2
 
 wantInterpretedModule :: GHC.GhcMonad m => String -> m Module
 wantInterpretedModule str = wantInterpretedModuleName (GHC.mkModuleName str)

@@ -6,3 +6,7 @@
 :e ./Bad.hs
 :l Good.hs
 :e
++
+:e foo
+:l Bad.hs
+:e bar
