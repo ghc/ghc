@@ -340,7 +340,7 @@ pprIdBndrInfo info
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_SuppressIdInfo dflags
     then empty
-    else megaSeqIdInfo info `seq` doc -- The seq is useful for poking on black holes
+    else info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info

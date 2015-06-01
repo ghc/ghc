@@ -198,7 +198,7 @@ lazySetIdInfo :: Id -> IdInfo -> Id
 lazySetIdInfo = Var.lazySetIdInfo
 
 setIdInfo :: Id -> IdInfo -> Id
-setIdInfo id info = seqIdInfo info `seq` (lazySetIdInfo id info)
+setIdInfo id info = info `seq` (lazySetIdInfo id info)
         -- Try to avoid spack leaks by seq'ing
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id

@@ -58,9 +58,6 @@ module CoreSyn (
         isClosedUnfolding, hasSomeUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
-        -- * Strictness
-        seqExpr, seqExprs, seqUnfolding,
-
         -- * Annotated expression data types
         AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt,
 
@@ -75,7 +72,7 @@ module CoreSyn (
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
 
         -- ** Operations on 'CoreRule's
-        seqRules, ruleArity, ruleName, ruleIdName, ruleActivation,
+        ruleArity, ruleName, ruleIdName, ruleActivation,
         setRuleIdName,
         isBuiltinRule, isLocalRule, isAutoRule,
 
@@ -1023,19 +1020,6 @@ evaldUnfolding = OtherCon []
 mkOtherCon :: [AltCon] -> Unfolding
 mkOtherCon = OtherCon
 
-seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
-                uf_is_value = b1, uf_is_work_free = b2,
-                uf_expandable = b3, uf_is_conlike = b4,
-                uf_guidance = g})
-  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
-
-seqUnfolding _ = ()
-
-seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
-seqGuidance _                      = ()
-
 isStableSource :: UnfoldingSource -> Bool
 -- Keep the unfolding template
 isStableSource InlineCompulsory   = True
@@ -1570,61 +1554,6 @@ valBndrCount = count isId
 -- | The number of argument expressions that are values rather than types at their top level
 valArgCount :: [Arg b] -> Int
 valArgCount = count isValArg
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Seq stuff}
-*                                                                      *
-************************************************************************
--}
-
-seqExpr :: CoreExpr -> ()
-seqExpr (Var v)         = v `seq` ()
-seqExpr (Lit lit)       = lit `seq` ()
-seqExpr (App f a)       = seqExpr f `seq` seqExpr a
-seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
-seqExpr (Let b e)       = seqBind b `seq` seqExpr e
-seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
-seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
-seqExpr (Tick n e)      = seqTickish n `seq` seqExpr e
-seqExpr (Type t)        = seqType t
-seqExpr (Coercion co)   = seqCo co
-
-seqExprs :: [CoreExpr] -> ()
-seqExprs [] = ()
-seqExprs (e:es) = seqExpr e `seq` seqExprs es
-
-seqTickish :: Tickish Id -> ()
-seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
-seqTickish HpcTick{} = ()
-seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids
-seqTickish SourceNote{} = ()
-
-seqBndr :: CoreBndr -> ()
-seqBndr b = b `seq` ()
-
-seqBndrs :: [CoreBndr] -> ()
-seqBndrs [] = ()
-seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
-
-seqBind :: Bind CoreBndr -> ()
-seqBind (NonRec b e) = seqBndr b `seq` seqExpr e
-seqBind (Rec prs)    = seqPairs prs
-
-seqPairs :: [(CoreBndr, CoreExpr)] -> ()
-seqPairs [] = ()
-seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
-
-seqAlts :: [CoreAlt] -> ()
-seqAlts [] = ()
-seqAlts ((c,bs,e):alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
-
-seqRules :: [CoreRule] -> ()
-seqRules [] = ()
-seqRules (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs } : rules)
-  = seqBndrs bndrs `seq` seqExprs (rhs:args) `seq` seqRules rules
-seqRules (BuiltinRule {} : rules) = seqRules rules
 
 {-
 ************************************************************************

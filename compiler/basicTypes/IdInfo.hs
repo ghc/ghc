@@ -15,7 +15,6 @@ module IdInfo (
         -- * The IdInfo type
         IdInfo,         -- Abstract
         vanillaIdInfo, noCafIdInfo,
-        seqIdInfo, megaSeqIdInfo,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
@@ -56,7 +55,7 @@ module IdInfo (
         SpecInfo(..),
         emptySpecInfo,
         isEmptySpecInfo, specInfoFreeVars,
-        specInfoRules, seqSpecInfo, setSpecInfoHead,
+        specInfoRules, setSpecInfoHead,
         specInfo, setSpecInfo,
 
         -- ** The CAFInfo type
@@ -193,35 +192,6 @@ data IdInfo
         callArityInfo :: !ArityInfo    -- ^ How this is called.
                                          -- n <=> all calls have at least n arguments
     }
-
--- | Just evaluate the 'IdInfo' to WHNF
-seqIdInfo :: IdInfo -> ()
-seqIdInfo (IdInfo {}) = ()
-
--- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
--- compiler
-megaSeqIdInfo :: IdInfo -> ()
-megaSeqIdInfo info
-  = seqSpecInfo (specInfo info)                 `seq`
-
--- Omitting this improves runtimes a little, presumably because
--- some unfoldings are not calculated at all
---    seqUnfolding (unfoldingInfo info)         `seq`
-
-    seqDemandInfo (demandInfo info)             `seq`
-    seqStrictnessInfo (strictnessInfo info)     `seq`
-    seqCaf (cafInfo info)                       `seq`
-    seqOneShot (oneShotInfo info)               `seq`
-    seqOccInfo (occInfo info)
-
-seqOneShot :: OneShotInfo -> ()
-seqOneShot l = l `seq` ()
-
-seqStrictnessInfo :: StrictSig -> ()
-seqStrictnessInfo ty = seqStrictSig ty
-
-seqDemandInfo :: Demand -> ()
-seqDemandInfo dmd = seqDemand dmd
 
 -- Setters
 
@@ -400,9 +370,6 @@ setSpecInfoHead :: Name -> SpecInfo -> SpecInfo
 setSpecInfoHead fn (SpecInfo rules fvs)
   = SpecInfo (map (setRuleIdName fn) rules) fvs
 
-seqSpecInfo :: SpecInfo -> ()
-seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
-
 {-
 ************************************************************************
 *                                                                      *
@@ -433,9 +400,6 @@ vanillaCafInfo = MayHaveCafRefs
 mayHaveCafRefs :: CafInfo -> Bool
 mayHaveCafRefs  MayHaveCafRefs = True
 mayHaveCafRefs _               = False
-
-seqCaf :: CafInfo -> ()
-seqCaf c = c `seq` ()
 
 instance Outputable CafInfo where
    ppr = ppCafInfo
