@@ -61,6 +61,8 @@ import TysWiredIn
 import BasicTypes
 import SrcLoc
 import DynFlags ( ExtensionFlag( Opt_DataKinds ), getDynFlags )
+import Constants ( mAX_CTUPLE_SIZE )
+import ErrUtils( MsgDoc )
 import Unique
 import UniqSupply
 import Outputable
@@ -569,11 +571,14 @@ finish_tuple hs_ty tup_sort tau_tys exp_kind
   = do { traceTc "finish_tuple" (ppr res_kind $$ ppr exp_kind $$ ppr exp_kind)
        ; checkExpectedKind hs_ty res_kind exp_kind
        ; tycon <- case tup_sort of
-           ConstraintTuple -> tcLookupTyCon (cTupleTyConName arity)
-           BoxedTuple      -> do { let tc = tupleTyCon Boxed arity
-                                 ; checkWiredInTyCon tc
-                                 ; return tc }
-           UnboxedTuple    -> return (tupleTyCon Unboxed arity)
+           ConstraintTuple
+             | arity > mAX_CTUPLE_SIZE
+                         -> failWith (bigConstraintTuple arity)
+             | otherwise -> tcLookupTyCon (cTupleTyConName arity)
+           BoxedTuple    -> do { let tc = tupleTyCon Boxed arity
+                               ; checkWiredInTyCon tc
+                               ; return tc }
+           UnboxedTuple  -> return (tupleTyCon Unboxed arity)
        ; return (mkTyConApp tycon tau_tys) }
   where
     arity = length tau_tys
@@ -581,6 +586,12 @@ finish_tuple hs_ty tup_sort tau_tys exp_kind
                  UnboxedTuple    -> unliftedTypeKind
                  BoxedTuple      -> liftedTypeKind
                  ConstraintTuple -> constraintKind
+
+bigConstraintTuple :: Arity -> MsgDoc
+bigConstraintTuple arity
+  = hang (ptext (sLit "Constraint tuple arity too large:") <+> int arity
+          <+> parens (ptext (sLit "max arity =") <+> int mAX_CTUPLE_SIZE))
+       2 (ptext (sLit "Instead, use a nested tuple"))
 
 ---------------------------
 tcInferApps :: Outputable a
