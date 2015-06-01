@@ -1855,14 +1855,14 @@ seqCo :: Coercion -> ()
 seqCo (Refl eq ty)              = eq `seq` seqType ty
 seqCo (TyConAppCo eq tc cos)    = eq `seq` tc `seq` seqCos cos
 seqCo (AppCo co1 co2)           = seqCo co1 `seq` seqCo co2
-seqCo (ForAllCo tv co)          = tv `seq` seqCo co
+seqCo (ForAllCo tv co)          = seqType (tyVarKind tv) `seq` seqCo co
 seqCo (CoVarCo cv)              = cv `seq` ()
 seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
 seqCo (UnivCo s r ty1 ty2)      = s `seq` r `seq` seqType ty1 `seq` seqType ty2
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
-seqCo (NthCo _ co)              = seqCo co
-seqCo (LRCo _ co)               = seqCo co
+seqCo (NthCo n co)              = n `seq` seqCo co
+seqCo (LRCo lr co)              = lr `seq` seqCo co
 seqCo (InstCo co ty)            = seqCo co `seq` seqType ty
 seqCo (SubCo co)                = seqCo co
 seqCo (AxiomRuleCo _ ts cs)     = seqTypes ts `seq` seqCos cs
