@@ -43,7 +43,16 @@ runAllCFinalizers(StgWeak *list)
     }
 
     for (w = list; w; w = w->link) {
-        runCFinalizers((StgCFinalizerList *)w->cfinalizers);
+        // We need to filter out DEAD_WEAK objects, because it's not guaranteed
+        // that the list will not have them when shutting down.
+        // They only get filtered out during GC for the generation they
+        // belong to.
+        // If there's no major GC between the time that the finalizer for the
+        // object from the oldest generation is manually called and shutdown
+        // we end up running the same finalizer twice. See #7170.
+        if (w->header.info != &stg_DEAD_WEAK_info) {
+            runCFinalizers((StgCFinalizerList *)w->cfinalizers);
+        }
     }
 
     if (task != NULL) {
