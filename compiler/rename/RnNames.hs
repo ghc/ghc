@@ -526,8 +526,7 @@ getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
 --      * class decls (including class ops)
 --      * associated types
 --      * foreign imports
---      * pattern synonyms
---      * value signatures (in hs-boot files)
+--      * value signatures (in hs-boot files only)
 
 getLocalNonValBinders fixity_env
      (HsGroup { hs_valds  = binds,
@@ -551,7 +550,7 @@ getLocalNonValBinders fixity_env
           --    type sigs in case of a hs-boot file only
         ; is_boot <- tcIsHsBootOrSig
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
-                        | otherwise = for_hs_bndrs ++ patsyn_hs_bndrs
+                        | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = nti_avails ++ val_avails
@@ -561,13 +560,10 @@ getLocalNonValBinders fixity_env
         ; envs <- extendGlobalRdrEnvRn avails fixity_env
         ; return (envs, new_bndrs) } }
   where
-    ValBindsIn val_binds val_sigs = binds
+    ValBindsIn _val_binds val_sigs = binds
 
     for_hs_bndrs :: [Located RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
-
-    patsyn_hs_bndrs :: [Located RdrName]
-    patsyn_hs_bndrs = hsPatSynBinders val_binds
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders

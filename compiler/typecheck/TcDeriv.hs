@@ -523,7 +523,7 @@ renameDeriv is_boot inst_infos bagBinds
         ; let bndrs = collectHsValBinders rn_aux_lhs
         ; envs <- extendGlobalRdrEnvRn (map Avail bndrs) emptyFsEnv ;
         ; setEnvs envs $
-    do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs) False) rn_aux_lhs
+    do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs)) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
         ; return (listToBag rn_inst_infos, rn_aux,
                   dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }

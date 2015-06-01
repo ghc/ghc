@@ -176,7 +176,7 @@ rnTopBindsRHS bound_names binds
   = do { is_boot <- tcIsHsBootOrSig
        ; if is_boot
          then rnTopBindsBoot binds
-         else rnValBindsRHS (TopSigCtxt bound_names False) binds }
+         else rnValBindsRHS (TopSigCtxt bound_names) binds }
 
 rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
 -- A hs-boot file has no bindings.
@@ -442,7 +442,7 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocM checkConName rdrname
-       ; name <- lookupLocatedTopBndrRn rdrname   -- Should be bound at top level already
+       ; name <- lookupLocatedTopBndrRn rdrname   -- Should be in scope already
        ; return (PatSynBind psb{ psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level

@@ -780,10 +780,11 @@ hsForeignDeclsBinders foreign_decls
     | L decl_loc (ForeignImport (L _ n) _ _ _) <- foreign_decls]
 
 -------------------
-hsPatSynBinders :: LHsBindsLR idL idR -> [Located idL]
+hsPatSynBinders :: HsValBinds RdrName -> [Located RdrName]
 -- Collect pattern-synonym binders only, not Ids
 -- See Note [SrcSpan for binders]
-hsPatSynBinders binds = foldrBag addPatSynBndr [] binds
+hsPatSynBinders (ValBindsIn binds _) = foldrBag addPatSynBndr [] binds
+hsPatSynBinders _ = panic "hsPatSynBinders"
 
 addPatSynBndr :: LHsBindLR idL idR -> [Located idL] -> [Located idL]
 -- See Note [SrcSpan for binders]

@@ -1038,7 +1038,7 @@ correctly report "misplaced type sig".
 
 Note [Signatures for top level things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
+data HsSigCtxt = ... | TopSigCtxt NameSet | ....
 
 * The NameSet says what is bound in this group of bindings.
   We can't use isLocalGRE from the GlobalRdrEnv, because of this:
@@ -1049,8 +1049,10 @@ data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
   will be in the GlobalRdrEnv, and will be a LocalDef. Yet the
   signature is mis-placed
 
-* The Bool says whether the signature is ok for a class method
-  or record selector.  Consider
+* For type signatures the NameSet should be the names bound by the
+  value bindings; for fixity declarations, the NameSet should also
+  include class sigs and record selectors
+
       infix 3 `f`          -- Yes, ok
       f :: C a => a -> a   -- No, not ok
       class C a where
@@ -1058,10 +1060,8 @@ data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
 -}
 
 data HsSigCtxt
-  = TopSigCtxt NameSet Bool  -- At top level, binding these names
+  = TopSigCtxt NameSet       -- At top level, binding these names
                              -- See Note [Signatures for top level things]
-                             -- Bool <=> ok to give sig for
-                             --          class method or record selctor
   | LocalBindCtxt NameSet    -- In a local binding, binding these names
   | ClsDeclCtxt   Name       -- Class decl for this class
   | InstDeclCtxt  Name       -- Intsance decl for this class
@@ -1107,12 +1107,12 @@ lookupBindGroupOcc ctxt what rdr_name
 
   | otherwise
   = case ctxt of
-      HsBootCtxt            -> lookup_top (const True)       True
-      TopSigCtxt ns meth_ok -> lookup_top (`elemNameSet` ns) meth_ok
-      RoleAnnotCtxt ns      -> lookup_top (`elemNameSet` ns) False
-      LocalBindCtxt ns      -> lookup_group ns
-      ClsDeclCtxt  cls      -> lookup_cls_op cls
-      InstDeclCtxt cls      -> lookup_cls_op cls
+      HsBootCtxt       -> lookup_top (const True)
+      TopSigCtxt ns    -> lookup_top (`elemNameSet` ns)
+      RoleAnnotCtxt ns -> lookup_top (`elemNameSet` ns)
+      LocalBindCtxt ns -> lookup_group ns
+      ClsDeclCtxt  cls -> lookup_cls_op cls
+      InstDeclCtxt cls -> lookup_cls_op cls
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv
@@ -1126,18 +1126,13 @@ lookupBindGroupOcc ctxt what rdr_name
       where
         doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
-    lookup_top keep_me meth_ok
+    lookup_top keep_me
       = do { env <- getGlobalRdrEnv
            ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
            ; case filter (keep_me . gre_name) all_gres of
                [] | null all_gres -> bale_out_with Outputable.empty
-                  | otherwise -> bale_out_with local_msg
-               (gre:_)
-                  | ParentIs {} <- gre_par gre
-                  , not meth_ok
-                  -> bale_out_with sub_msg
-                  | otherwise
-                  -> return (Right (gre_name gre)) }
+                  | otherwise     -> bale_out_with local_msg
+               (gre:_)            -> return (Right (gre_name gre)) }
 
     lookup_group bound_names  -- Look in the local envt (not top level)
       = do { local_env <- getLocalRdrEnv
@@ -1155,9 +1150,6 @@ lookupBindGroupOcc ctxt what rdr_name
 
     local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
                            <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
-
-    sub_msg = parens $ ptext (sLit "You cannot give a") <+> what
-                       <+> ptext (sLit "for a record selector or class method")
 
 
 ---------------

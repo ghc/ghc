@@ -100,9 +100,6 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --          because they do not have value declarations.
    --          Aso step (C) depends on datacons and record fields
    --
-   --        * Pattern synonyms, because they (and data constructors)
-   --          are needed for rnTopBindLHS (Trac #9889)
-   --
    --        * For hs-boot files, include the value signatures
    --          Again, they have no value declarations
    --
@@ -117,20 +114,25 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --     scope from (B) above
    inNewEnv (extendRecordFieldEnv tycl_decls inst_decls) $ \ _ -> do {
 
-   -- (D) Rename the left-hand sides of the value bindings.
+   -- (D1) Bring pattern synonyms into scope.
+   --      Need to do this before (D2) because rnTopBindsLHS
+   --      looks up those pattern synonyms (Trac #9889)
+   pat_syn_bndrs <- mapM newTopSrcBinder (hsPatSynBinders val_decls) ;
+   tc_envs <- extendGlobalRdrEnvRn (map Avail pat_syn_bndrs) local_fix_env ;
+   setEnvs tc_envs $ do {
+
+   -- (D2) Rename the left-hand sides of the value bindings.
    --     This depends on everything from (B) being in scope,
    --     and on (C) for resolving record wild cards.
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
-   -- bind the LHSes (and their fixities) in the global rdr environment
-   let { val_binders = collectHsIdBinders new_lhs ;
-                       -- Not pattern-synonym binders, because we did
-                       -- them in step (B)
-         all_bndrs   = extendNameSetList tc_bndrs val_binders ;
-         val_avails  = map Avail val_binders  } ;
-   traceRn (text "rnSrcDecls" <+> ppr val_avails) ;
-   (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
-   setEnvs (tcg_env, tcl_env) $ do {
+
+   -- Bind the LHSes (and their fixities) in the global rdr environment
+   let { id_bndrs = collectHsIdBinders new_lhs } ;  -- Excludes pattern-synonym binders
+                                                    -- They are already in scope
+   traceRn (text "rnSrcDecls" <+> ppr id_bndrs) ;
+   tc_envs <- extendGlobalRdrEnvRn (map Avail id_bndrs) local_fix_env ;
+   setEnvs tc_envs $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
 
@@ -149,13 +151,15 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
-   (rn_val_decls, bind_dus) <- rnTopBindsRHS all_bndrs new_lhs ;
+   let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
+   (rn_val_decls, bind_dus) <- rnTopBindsRHS val_bndr_set new_lhs ;
    traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
 
    -- Rename fixity declarations and error if we try to
    -- fix something from another module (duplicates were checked in (A))
+   let { all_bndrs = tc_bndrs `unionNameSet` val_bndr_set } ;
    rn_fix_decls <- rnSrcFixityDecls all_bndrs fix_decls ;
 
    -- Rename deprec decls;
@@ -214,7 +218,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    traceRn (text "finish rnSrc" <+> ppr rn_group) ;
    traceRn (text "finish Dus" <+> ppr src_dus ) ;
    return (final_tcg_env, rn_group)
-                    }}}}
+                    }}}}}
 
 -- some utils because we do this a bunch above
 -- compute and install the new env
@@ -271,8 +275,7 @@ rnSrcFixityDecls bndr_set fix_decls
   = do fix_decls <- mapM rn_decl fix_decls
        return (concat fix_decls)
   where
-    sig_ctxt = TopSigCtxt bndr_set True
-       -- True <=> can give fixity for class decls and record selectors
+    sig_ctxt = TopSigCtxt bndr_set
 
     rn_decl :: LFixitySig RdrName -> RnM [LFixitySig Name]
         -- GHC extension: look up both the tycon and data con
@@ -321,8 +324,7 @@ rnSrcWarnDecls bndr_set decls'
  where
    decls = concatMap (\(L _ d) -> wd_warnings d) decls'
 
-   sig_ctxt = TopSigCtxt bndr_set True
-      -- True <=> Can give deprecations for class ops and record sels
+   sig_ctxt = TopSigCtxt bndr_set
 
    rn_deprec (Warning rdr_names txt)
        -- ensures that the names are defined locally
