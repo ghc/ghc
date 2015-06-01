@@ -899,7 +899,9 @@ simplExprF1 env expr@(Lam {}) cont
           | otherwise = zapLamIdInfo b
 
 simplExprF1 env (Case scrut bndr _ alts) cont
-  = simplExprF env scrut (Select NoDup bndr alts env cont)
+  = simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
+                                 , sc_alts = alts
+                                 , sc_env = env, sc_cont = cont })
 
 simplExprF1 env (Let (Rec pairs) body) cont
   = do  { env' <- simplRecBndrs env (map fst pairs)
@@ -1095,14 +1097,15 @@ rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplEnv, OutExpr)
 -- only the in-scope set and floats should matter
 rebuild env expr cont
   = case cont of
-      Stop {}                       -> return (env, expr)
-      TickIt t cont                 -> rebuild env (mkTick t expr) cont
-      CastIt co cont                -> rebuild env (mkCast expr co) cont
-                                    -- NB: mkCast implements the (Coercion co |> g) optimisation
+      Stop {}          -> return (env, expr)
+      TickIt t cont    -> rebuild env (mkTick t expr) cont
+      CastIt co cont   -> rebuild env (mkCast expr co) cont
+                       -- NB: mkCast implements the (Coercion co |> g) optimisation
 
-      Select _ bndr alts se cont    -> rebuildCase (se `setFloats` env) expr bndr alts cont
+      Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
+        -> rebuildCase (se `setFloats` env) expr bndr alts cont
+
       StrictArg info _ cont         -> rebuildCall env (info `addValArgTo` expr) cont
-
       StrictBind b bs body se cont  -> do { env' <- simplNonRecX (se `setFloats` env) b expr
                                                -- expr satisfies let/app since it started life
                                                -- in a call to simplNonRecE
@@ -2384,7 +2387,7 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_env = se, sc_cont
                                     , sc_dup = OkToDup, sc_cont = dup_cont }
         ; return (env'', app_cont, nodup_cont) }
 
-mkDupableCont env cont@(Select _ case_bndr [(_, bs, _rhs)] _ _)
+mkDupableCont env cont@(Select { sc_bndr = case_bndr, sc_alts = [(_, bs, _rhs)] })
 --  See Note [Single-alternative case]
 --  | not (exprIsDupable rhs && contIsDupable case_cont)
 --  | not (isDeadBinder case_bndr)
@@ -2393,7 +2396,8 @@ mkDupableCont env cont@(Select _ case_bndr [(_, bs, _rhs)] _ _)
     -- Note [Single-alternative-unlifted]
   = return (env, mkBoringStop (contHoleType cont), cont)
 
-mkDupableCont env (Select _ case_bndr alts se cont)
+mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
+                          , sc_env = se, sc_cont = cont })
   =     -- e.g.         (case [...hole...] of { pi -> ei })
         --      ===>
         --              let ji = \xij -> ei
@@ -2425,8 +2429,10 @@ mkDupableCont env (Select _ case_bndr alts se cont)
 
         ; (env'', alts'') <- mkDupableAlts env' case_bndr' alts'
         ; return (env'',  -- Note [Duplicated env]
-                  Select OkToDup case_bndr' alts'' (zapSubstEnv env'')
-                         (mkBoringStop (contHoleType nodup_cont)),
+                  Select { sc_dup = OkToDup
+                         , sc_bndr = case_bndr', sc_alts = alts''
+                         , sc_env = zapSubstEnv env''
+                         , sc_cont = mkBoringStop (contHoleType nodup_cont) },
                   nodup_cont) }
 
 

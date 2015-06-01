@@ -123,10 +123,12 @@ data SimplCont
                                    -- See Note [The hole type in ApplyToTy]
         sc_cont    :: SimplCont }
 
-  | Select              -- case <hole> of alts
-        DupFlag                 -- See Note [DupFlag invariants]
-        InId [InAlt] StaticEnv  -- The case binder, alts type, alts, and subst-env
-        SimplCont
+  | Select {           -- case <hole> of alts
+        sc_dup  :: DupFlag,                 -- See Note [DupFlag invariants]
+        sc_bndr :: InId,                    -- case binder
+        sc_alts :: [InAlt],                 -- Alternatives
+        sc_env  ::  StaticEnv,              --   and their static environment
+        sc_cont :: SimplCont }
 
   -- The two strict forms have no DupFlag, because we never duplicate them
   | StrictBind                  -- (\x* \xs. e) <hole>
@@ -175,19 +177,19 @@ instance Outputable DupFlag where
   ppr Simplified = ptext (sLit "simpl")
 
 instance Outputable SimplCont where
-  ppr (Stop ty interesting)           = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
-  ppr (ApplyToTy  { sc_arg_ty = ty
-                  , sc_cont = cont }) = (ptext (sLit "ApplyToTy") <+> pprParendType ty) $$ ppr cont
-  ppr (ApplyToVal { sc_arg = arg
-                  , sc_dup = dup
-                  , sc_cont = cont }) = (ptext (sLit "ApplyToVal") <+> ppr dup <+> pprParendExpr arg)
+  ppr (Stop ty interesting) = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
+  ppr (CastIt co cont  )    = (ptext (sLit "CastIt") <+> ppr co) $$ ppr cont
+  ppr (TickIt t cont)       = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
+  ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
+    = (ptext (sLit "ApplyToTy") <+> pprParendType ty) $$ ppr cont
+  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont })
+    = (ptext (sLit "ApplyToVal") <+> ppr dup <+> pprParendExpr arg)
                                         $$ ppr cont
   ppr (StrictBind b _ _ _ cont)       = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
   ppr (StrictArg ai _ cont)           = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select dup bndr alts se cont)  = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$
-                                        ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
-  ppr (CastIt co cont  )              = (ptext (sLit "CastIt") <+> ppr co) $$ ppr cont
-  ppr (TickIt t cont)                 = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
+  ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
+    = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$
+       ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
 
 
 {- Note [The hole type in ApplyToTy]
@@ -323,7 +325,7 @@ contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop {})                         = True
 contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
 contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag invariants]
-contIsDupable (Select   OkToDup _ _ _ _)        = True -- ...ditto...
+contIsDupable (Select { sc_dup = OkToDup })     = True -- ...ditto...
 contIsDupable (CastIt _ k)                      = contIsDupable k
 contIsDupable _                                 = False
 
@@ -341,7 +343,7 @@ contResultType (Stop ty _)                  = ty
 contResultType (CastIt _ k)                 = contResultType k
 contResultType (StrictBind _ _ _ _ k)       = contResultType k
 contResultType (StrictArg _ _ k)            = contResultType k
-contResultType (Select _ _ _ _ k)           = contResultType k
+contResultType (Select { sc_cont = k })     = contResultType k
 contResultType (ApplyToTy  { sc_cont = k }) = contResultType k
 contResultType (ApplyToVal { sc_cont = k }) = contResultType k
 contResultType (TickIt _ k)                 = contResultType k
@@ -350,13 +352,14 @@ contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _)                      = ty
 contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
-contHoleType (Select d b _ se _)              = perhapsSubstTy d se (idType b)
 contHoleType (StrictBind b _ _ se _)          = substTy se (idType b)
 contHoleType (StrictArg ai _ _)               = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
   = mkFunTy (perhapsSubstTy dup se (exprType e))
             (contHoleType k)
+contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
+  = perhapsSubstTy d se (idType b)
 
 -------------------
 countValArgs :: SimplCont -> Int
@@ -522,8 +525,8 @@ interestingCallContext :: SimplCont -> CallCtxt
 interestingCallContext cont
   = interesting cont
   where
-    interesting (Select _ _bndr _ _ _) = CaseCtxt
-    interesting (ApplyToVal {})        = ValAppCtxt
+    interesting (Select {})     = CaseCtxt
+    interesting (ApplyToVal {}) = ValAppCtxt
         -- Can happen if we have (f Int |> co) y
         -- If f has an INLINE prag we need to give it some
         -- motivation to inline. See Note [Cast then apply]
