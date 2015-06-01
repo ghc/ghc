@@ -3,7 +3,7 @@
 test('T10359',
      [stats_num_field('bytes allocated',
           [(wordsize(64), 499512, 5),
-           (wordsize(32), 250000, 5)]),
+           (wordsize(32), 374056, 5)]),
       only_ways(['normal'])
       ],
      compile_and_run,
