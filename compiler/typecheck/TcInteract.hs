@@ -8,7 +8,7 @@ module TcInteract (
 
 #include "HsVersions.h"
 
-import BasicTypes ()
+import BasicTypes ( infinity )
 import HsTypes ( hsIPNameFS )
 import FastString
 import TcCanonical
@@ -762,11 +762,21 @@ solveOneFromTheOther ev_i ev_w
                    -- so it's safe to continue on from this point
   = return (IRDelete, False)
 
-  | CtWanted { ctev_evar = ev_id } <- ev_w
+  | CtWanted { ctev_loc = loc_w } <- ev_w
+  , prohibitedSuperClassSolve (ctEvLoc ev_i) loc_w
+  = return (IRDelete, False)
+
+  | CtWanted { ctev_evar = ev_id } <- ev_w   -- Inert is Given or Wanted
   = do { setWantedEvBind ev_id (ctEvTerm ev_i)
        ; return (IRKeep, True) }
 
-  | CtWanted { ctev_evar = ev_id } <- ev_i
+  | CtWanted { ctev_loc = loc_i } <- ev_i   -- Work item is Given
+  , prohibitedSuperClassSolve (ctEvLoc ev_w) loc_i
+  = return (IRKeep, False)  -- Just discard the un-usable Given
+                            -- This never actually happens because
+                            -- Givens get processed first
+
+  | CtWanted { ctev_evar = ev_id } <- ev_i   -- Work item is Given
   = do { setWantedEvBind ev_id (ctEvTerm ev_w)
        ; return (IRReplace, True) }
 
@@ -774,51 +784,84 @@ solveOneFromTheOther ev_i ev_w
   -- See Note [Replacement vs keeping]
   | lvl_i == lvl_w
   = do { binds <- getTcEvBindsMap
-       ; if has_binding binds ev_w && not (has_binding binds ev_i)
-         then return (IRReplace, True)
-         else return (IRKeep,    True) }
+       ; return (same_level_strategy binds, True) }
 
-   | otherwise   -- Both are Given
-   = return (if use_replacement then IRReplace else IRKeep, True)
-   where
+  | otherwise   -- Both are Given, levels differ
+  = return (different_level_strategy, True)
+  where
      pred  = ctEvPred ev_i
      loc_i = ctEvLoc ev_i
      loc_w = ctEvLoc ev_w
      lvl_i = ctLocLevel loc_i
      lvl_w = ctLocLevel loc_w
 
+     different_level_strategy
+       | isIPPred pred, lvl_w > lvl_i = IRReplace
+       | lvl_w < lvl_i                = IRReplace
+       | otherwise                    = IRKeep
+
+     same_level_strategy binds        -- Both Given
+       | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
+       = case ctLocOrigin loc_w of
+            GivenOrigin (InstSC s_w) | s_w < s_i -> IRReplace
+                                     | otherwise -> IRKeep
+            _                                    -> IRReplace
+
+       | GivenOrigin (InstSC {}) <- ctLocOrigin loc_w
+       = IRKeep
+
+       | has_binding binds ev_w
+       , not (has_binding binds ev_i)
+       = IRReplace
+
+       | otherwise = IRKeep
+
      has_binding binds ev = isJust (lookupEvBind binds (ctEvId ev))
 
-     use_replacement
-       | isIPPred pred = lvl_w > lvl_i
-       | otherwise     = lvl_w < lvl_i
+prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
+-- See Note [Solving superclass constraints] in TcInstDcls
+prohibitedSuperClassSolve from_loc solve_loc
+  | GivenOrigin (InstSC given_size) <- ctLocOrigin from_loc
+  , ScOrigin wanted_size <- ctLocOrigin solve_loc
+  = given_size >= wanted_size
+  | otherwise
+  = False
 
 {-
 Note [Replacement vs keeping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we have two Given constraints both of type (C tys), say, which should
-we keep?
+we keep?  More subtle than you might think!
 
-  * For implicit parameters we want to keep the innermost (deepest)
-    one, so that it overrides the outer one.
-    See Note [Shadowing of Implicit Parameters]
+  * Constraints come from different levels (different_level_strategy)
 
-  * For everything else, we want to keep the outermost one.  Reason: that
-    makes it more likely that the inner one will turn out to be unused,
-    and can be reported as redundant.  See Note [Tracking redundant constraints]
-    in TcSimplify.
+      - For implicit parameters we want to keep the innermost (deepest)
+        one, so that it overrides the outer one.
+        See Note [Shadowing of Implicit Parameters]
 
-    It transpires that using the outermost one is reponsible for an
-    8% performance improvement in nofib cryptarithm2, compared to
-    just rolling the dice.  I didn't investigate why.
+      - For everything else, we want to keep the outermost one.  Reason: that
+        makes it more likely that the inner one will turn out to be unused,
+        and can be reported as redundant.  See Note [Tracking redundant constraints]
+        in TcSimplify.
 
-  * If there is no "outermost" one, we keep the one that has a non-trivial
-    evidence binding.  Note [Tracking redundant constraints] again.
-    Example:  f :: (Eq a, Ord a) => blah
-    then we may find [G] sc_sel (d1::Ord a) :: Eq a
-                     [G] d2 :: Eq a
-    We want to discard d2 in favour of the superclass selection from
-    the Ord dictionary.
+        It transpires that using the outermost one is reponsible for an
+        8% performance improvement in nofib cryptarithm2, compared to
+        just rolling the dice.  I didn't investigate why.
+
+  * Constaints coming from the same level (i.e. same implication)
+
+       - Always get rid of InstSC ones if possible, since they are less
+         useful for solving.  If both are InstSC, choose the one with
+         the smallest TypeSize
+         See Note [Solving superclass constraints] in TcInstDcls
+
+       - Keep the one that has a non-trivial evidence binding.
+         Note [Tracking redundant constraints] again.
+            Example:  f :: (Eq a, Ord a) => blah
+            then we may find [G] sc_sel (d1::Ord a) :: Eq a
+                             [G] d2 :: Eq a
+            We want to discard d2 in favour of the superclass selection from
+            the Ord dictionary.
 
   * Finally, when there is still a choice, use IRKeep rather than
     IRReplace, to avoid unnecesary munging of the inert set.
@@ -1595,7 +1638,14 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc fl
      dict_origin = ctLocOrigin dict_loc
-     deeper_loc  = bumpCtLocDepth dict_loc
+     deeper_loc  = zap_origin (bumpCtLocDepth dict_loc)
+
+     zap_origin loc  -- After applying an instance we can set ScOrigin to
+                     -- infinity, so that prohibitedSuperClassSolve never fires
+       | ScOrigin {} <- dict_origin
+       = setCtLocOrigin loc (ScOrigin infinity)
+       | otherwise
+       = loc
 
      solve_from_instance :: [TcPredType] -> ([EvId] -> EvTerm) -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
@@ -1992,7 +2042,7 @@ matchClassInst :: DynFlags -> InertSet -> Class -> [Type] -> CtLoc -> TcS Lookup
 -- First check whether there is an in-scope Given that could
 -- match this constraint.  In that case, do not use top-level
 -- instances.  See Note [Instance and Given overlap]
-matchClassInst dflags inerts clas tys _
+matchClassInst dflags inerts clas tys loc
   | not (xopt Opt_IncoherentInstances dflags)
   , not (isEmptyBag matchable_givens)
   = do { traceTcS "Delaying instance application" $
@@ -2007,8 +2057,9 @@ matchClassInst dflags inerts clas tys _
 
      matchable_given ct
        | CDictCan { cc_class = clas_g, cc_tyargs = sys, cc_ev = fl } <- ct
-       , isGiven fl
+       , CtGiven { ctev_loc = loc_g } <- fl
        , Just {} <- tcUnifyTys bind_meta_tv tys sys
+       , not (prohibitedSuperClassSolve loc_g loc)
        = ASSERT( clas_g == clas ) True
      matchable_given _ = False
 

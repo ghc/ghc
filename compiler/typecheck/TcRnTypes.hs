@@ -1966,7 +1966,13 @@ data SkolemInfo
 
         -- The rest are for non-scoped skolems
   | ClsSkol Class       -- Bound at a class decl
+
   | InstSkol            -- Bound at an instance decl
+  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection
+                        -- from an InstSkol, giving the largest class from
+                        -- which we made a superclass selection in the chain
+                        -- See Note [Solving superclass constraints] in TcInstDcls
+
   | DataSkol            -- Bound at a data type declaration
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
@@ -2006,6 +2012,7 @@ pprSkolInfo (IPSkol ips)      = ptext (sLit "the implicit-parameter binding") <>
                                 <+> pprWithCommas ppr ips
 pprSkolInfo (ClsSkol cls)     = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
 pprSkolInfo InstSkol          = ptext (sLit "the instance declaration")
+pprSkolInfo (InstSC n)        = ptext (sLit "the instance declaration") <> ifPprDebug (parens (ppr n))
 pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
 pprSkolInfo FamInstSkol       = ptext (sLit "a family instance declaration")
 pprSkolInfo BracketSkol       = ptext (sLit "a Template Haskell bracket")
@@ -2087,7 +2094,10 @@ data CtOrigin
   | RecordUpdOrigin
   | ViewPatOrigin
 
-  | ScOrigin            -- Typechecking superclasses of an instance declaration
+  | ScOrigin TypeSize   -- Typechecking superclasses of an instance declaration
+                        -- whose head has the given size
+                        -- See Note [Solving superclass constraints] in TcInstDcls
+
   | DerivOrigin         -- Typechecking deriving
   | DerivOriginDC DataCon Int
                         -- Checking constraints arising from this data con and field index
@@ -2186,7 +2196,8 @@ pprCtO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"),
 pprCtO SectionOrigin         = ptext (sLit "an operator section")
 pprCtO TupleOrigin           = ptext (sLit "a tuple")
 pprCtO NegateOrigin          = ptext (sLit "a use of syntactic negation")
-pprCtO ScOrigin              = ptext (sLit "the superclasses of an instance declaration")
+pprCtO (ScOrigin n)          = ptext (sLit "the superclasses of an instance declaration") 
+                               <> ifPprDebug (parens (ppr n))
 pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
 pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprCtO DefaultOrigin         = ptext (sLit "a 'default' declaration")

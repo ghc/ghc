@@ -320,7 +320,17 @@ newSCWorkFromFlavored flavor cls xis
   = return ()
 
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { given_evs <- newGivenEvVars loc (mkEvScSelectors (EvId evar) cls xis)
+  = do { let size = sizePred (mkClassPred cls xis)
+             loc' = case ctLocOrigin loc of
+                       GivenOrigin InstSkol
+                         -> loc { ctl_origin = GivenOrigin (InstSC size) }
+                       GivenOrigin (InstSC n)
+                         -> loc { ctl_origin = GivenOrigin (InstSC (n `max` size)) }
+                       _ -> loc
+                    -- See Note [Solving superclass constraints] in TcInstDcls
+                    -- for explantation of loc'
+
+       ; given_evs <- newGivenEvVars loc' (mkEvScSelectors (EvId evar) cls xis)
        ; emitWorkNC given_evs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)

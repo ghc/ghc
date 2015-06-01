@@ -1074,8 +1074,8 @@ warnRedundantGivens (SigSkol ctxt _)
        FunSigCtxt _ warn_redundant -> warn_redundant
        ExprSigCtxt                 -> True
        _                           -> False
-warnRedundantGivens InstSkol = True
-warnRedundantGivens _        = False
+warnRedundantGivens (InstSkol {}) = True
+warnRedundantGivens _             = False
 
 neededEvVars :: EvBindMap -> VarSet -> VarSet
 -- Find all the evidence variables that are "needed",

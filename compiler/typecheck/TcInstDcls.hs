@@ -32,7 +32,7 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import Coercion   ( pprCoAxiom, isReflCo, mkSymCo, mkSubCo )
+import Coercion   ( pprCoAxiom {- , isReflCo, mkSymCo, mkSubCo -} )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
@@ -43,8 +43,8 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import PrelNames  ( typeableClassName, genericClassNames
-                  , knownNatClassName, knownSymbolClassName )
+import PrelNames  ( typeableClassName, genericClassNames )
+--                   , knownNatClassName, knownSymbolClassName )
 import Bag
 import BasicTypes
 import DynFlags
@@ -993,55 +993,15 @@ tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
 -- See Note [Recursive superclasses] for why this is so hard!
 -- In effect, be build a special-purpose solver for the first step
 -- of solving each superclass constraint
-tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_theta
-  = do { traceTc "tcSuperClasses" (ppr cls $$ ppr inst_tys $$ ppr given_cls_preds)
-       ; (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
+tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_theta
+  = do { (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
        ; return (ids, listToBag binds, listToBag implics) }
   where
-    loc     = getSrcSpan dfun_id
-    head_size = sizeTypes inst_tys
-
-    ------------
-    given_cls_preds :: [(TcPredType, EvTerm)] -- (type of that ev_term, ev_term)
-    -- given_cls_preds is the list of (type, ev_term) that can be derived
-    -- from the dfun_evs, using the rules (sc1) and (sc2) of
-    -- Note [Recursive superclasses] below
-    -- When solving for superclasses, we search this list
-    given_cls_preds
-      = [ ev_pr | dfun_ev <- dfun_evs
-                , ev_pr <- super_classes (idType dfun_ev, EvId dfun_ev) ]
-
-    ------------
-    super_classes ev_pair
-      = case classifyPredType pred of
-          ClassPred cls tys -> (pred, ev_tm) : super_classes_help ev_tm cls tys
-          _                 -> []
-      where
-        (pred, ev_tm) = normalise_pr ev_pair
-
-    ------------
-    super_classes_help :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
-    super_classes_help ev_tm cls tys  -- ev_tm :: cls tys
-      | not (isCTupleClass cls)
-      , sizeTypes tys >= head_size  -- Here is where we test for
-      = []                          -- a smaller dictionary
-      | otherwise
-      = concatMap super_classes (mkEvScSelectors ev_tm cls tys)
-
-    ------------
-    normalise_pr :: (TcPredType, EvTerm) -> (TcPredType, EvTerm)
-    -- Normalise type functions as much as possible
-    normalise_pr (pred, ev_tm)
-      | isReflCo norm_co = (pred,      ev_tm)
-      | otherwise        = (norm_pred, mkEvCast ev_tm tc_co)
-      where
-        (norm_co, norm_pred) = normaliseType fam_envs Nominal pred
-        tc_co = TcCoercion (mkSubCo norm_co)
-
-    ------------
+    loc = getSrcSpan dfun_id
+    size = sizePred (mkClassPred cls inst_tys)
     tc_super (sc_pred, n)
-      = do { (sc_implic, sc_ev_id) <- checkInstConstraints $
-                                      emit_sc_pred fam_envs sc_pred
+      = do { (sc_implic, sc_ev_id) <- checkInstConstraints $ \_ ->
+                                      emitWanted (ScOrigin size) sc_pred
 
            ; sc_top_name <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; let sc_top_ty = mkForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
@@ -1056,68 +1016,6 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
                                  , abs_binds    = emptyBag }
            ; return (sc_top_id, L loc bind, sc_implic) }
-
-    -------------------
-    emit_sc_pred fam_envs sc_pred ev_binds
-      | (sc_co, norm_sc_pred) <- normaliseType fam_envs Nominal sc_pred
-                                 -- sc_co :: sc_pred ~ norm_sc_pred
-      , ClassPred cls tys <- classifyPredType norm_sc_pred
-      , not (usesCustomSolver cls)
-        -- Some classes (e.g., `Typeable`, `KnownNat`) have custom solving
-        -- rules, which is why we exclude it from the short cut,
-        -- and fall through to calling the solver.
-
-      = do { sc_ev_tm <- emit_sc_cls_pred norm_sc_pred cls tys
-           ; sc_ev_id <- newEvVar sc_pred
-           ; let tc_co = TcCoercion (mkSubCo (mkSymCo sc_co))
-           ; addTcEvBind ev_binds (mkWantedEvBind sc_ev_id (mkEvCast sc_ev_tm tc_co))
-               -- This is where we set the evidence for the superclass, and do so
-               -- (very unusually) *outside the solver*.  That's why
-               -- checkInstConstraints passes in the evidence bindings
-           ; return sc_ev_id }
-
-      | otherwise
-      = do { sc_ev_id <- emitWanted ScOrigin sc_pred
-           ; traceTc "tcSuperClass 4" (ppr sc_pred $$ ppr sc_ev_id)
-           ; return sc_ev_id }
-
-    -------------------
-    emit_sc_cls_pred sc_pred cls tys
-      | (ev_tm:_) <- [ ev_tm | (ev_ty, ev_tm) <- given_cls_preds
-                             , ev_ty `tcEqType` sc_pred ]
-      = do { traceTc "tcSuperClass 1" (ppr sc_pred $$ ppr ev_tm)
-           ; return ev_tm }
-
-      | otherwise
-      = do { inst_envs <- tcGetInstEnvs
-           ; case lookupInstEnv False inst_envs cls tys of
-               ([(ispec, dfun_inst_tys)], [], _) -- A single match
-                 -> do { let dfun_id = instanceDFunId ispec
-                       ; (inst_tys, inst_theta) <- instDFunType dfun_id dfun_inst_tys
-                       ; arg_evs  <- emitWanteds ScOrigin inst_theta
-                       ; let dict_app = EvDFunApp dfun_id inst_tys arg_evs
-                       ; traceTc "tcSuperClass 2" (ppr sc_pred $$ ppr dict_app)
-                       ; return dict_app }
-
-               _ -> -- No instance, so we want to report an error
-                    -- Emitting it as an 'insoluble' prevents the solver
-                    -- attempting to solve it (which might, wrongly, succeed)
-                    do { sc_ev <- newWanted ScOrigin sc_pred
-                       ; emitInsoluble (mkNonCanonical sc_ev)
-                       ; traceTc "tcSuperClass 3" (ppr sc_pred $$ ppr sc_ev)
-                       ; return (ctEvTerm sc_ev) } }
-
-
-
--- | Do we use a custom solver, which is safe to use when solving super-class
--- constraints.
-usesCustomSolver :: Class -> Bool
-usesCustomSolver cls = name == typeableClassName
-                    || name == knownNatClassName
-                    || name == knownSymbolClassName
-  where
-  name = className cls
-
 
 -------------------
 checkInstConstraints :: (EvBindsVar -> TcM result)
@@ -1152,7 +1050,6 @@ describe somewhat more complicated situations, but ones
 encountered in practice.
 
 See also tests tcrun020, tcrun021, tcrun033
-
 
 ----- THE PROBLEM --------
 The problem is that it is all too easy to create a class whose
@@ -1239,8 +1136,39 @@ that is *not* smaller than the target so we can't take *its*
 superclasses.  As a result the program is rightly rejected, unless you
 add (Super (Fam a)) to the context of (i3).
 
-Note [Silent superclass arguments] (historical interest)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Solving superclass constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How do we ensure that every superclass witness is generated by
+one of (sc1) (sc2) or (sc3) in Note [Recursive superclases].
+Answer:
+
+  * Superclass "wanted" constraints have CtOrigin of (ScOrigin size)
+    where 'size' is the size of the instance declaration. e.g.
+          class C a => D a where...
+          instance blah => D [a] where ...
+    The wanted superclass constraint for C [a] has origin
+    ScOrigin size, where size = size( D [a] ).
+
+  * (sc1) When we rewrite such a wanted constraint, it retains its
+    origin.  But if we apply an instance declaration, we can set the
+    origin to (ScOrigin infinity), thus lifting any restrictions by
+    making prohibitedSuperClassSolve return False.
+
+  * (sc2) ScOrigin wanted constraints can't be solved from a
+    superclass selection, except at a smaller type.  This test is
+    implemented by TcInteract.prohibitedSuperClassSolve
+
+  * The "given" constraints of an instance decl have CtOrigin
+    GivenOrigin InstSkol.
+
+  * When we make a superclass selection from InstSkol we use
+    a SkolemInfo of (InstSC size), where 'size' is the size of
+    the constraint whose superclass we are taking.  An similarly
+    when taking the superclass of an InstSC.  This is implemented
+    in TcCanonical.newSCWorkFromFlavored
+
+Note [Silent superclass arguments] (historical interest only)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 NB1: this note describes our *old* solution to the
      recursive-superclass problem. I'm keeping the Note
      for now, just as institutional memory.

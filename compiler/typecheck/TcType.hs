@@ -146,7 +146,9 @@ module TcType (
 
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
-  pprTheta, pprThetaArrowTy, pprClassPred
+  pprTheta, pprThetaArrowTy, pprClassPred,
+
+  TypeSize, sizePred, sizeType, sizeTypes
 
   ) where
 
@@ -1793,3 +1795,80 @@ In turn that means you can't write
 Reason: the back end falls over with panic "primRepHint:VoidRep";
         and there is no compelling reason to permit it
 -}
+
+{-
+************************************************************************
+*                                                                      *
+        The "Paterson size" of a type
+*                                                                      *
+************************************************************************
+-}
+
+{-
+Note [Paterson conditions on PredTypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are considering whether *class* constraints terminate
+(see Note [Paterson conditions]). Precisely, the Paterson conditions
+would have us check that "the constraint has fewer constructors and variables
+(taken together and counting repetitions) than the head.".
+
+However, we can be a bit more refined by looking at which kind of constraint
+this actually is. There are two main tricks:
+
+ 1. It seems like it should be OK not to count the tuple type constructor
+    for a PredType like (Show a, Eq a) :: Constraint, since we don't
+    count the "implicit" tuple in the ThetaType itself.
+
+    In fact, the Paterson test just checks *each component* of the top level
+    ThetaType against the size bound, one at a time. By analogy, it should be
+    OK to return the size of the *largest* tuple component as the size of the
+    whole tuple.
+
+ 2. Once we get into an implicit parameter or equality we
+    can't get back to a class constraint, so it's safe
+    to say "size 0".  See Trac #4200.
+
+NB: we don't want to detect PredTypes in sizeType (and then call
+sizePred on them), or we might get an infinite loop if that PredType
+is irreducible. See Trac #5581.
+-}
+
+type TypeSize = IntWithInf
+
+sizeType :: Type -> TypeSize
+-- Size of a type: the number of variables and constructors
+sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
+sizeType (TyVarTy {})      = 1
+sizeType (TyConApp tc tys)
+  | isTypeFamilyTyCon tc   = infinity  -- Type-family applications can
+                                       -- expand to any arbitrary size
+  | otherwise              = sizeTypes tys + 1
+sizeType (LitTy {})        = 1
+sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
+sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
+sizeType (ForAllTy _ ty)   = sizeType ty
+
+sizeTypes :: [Type] -> TypeSize
+-- IA0_NOTE: Avoid kinds.
+sizeTypes xs = sum (map sizeType tys)
+  where tys = filter (not . isKind) xs
+
+-- Note [Size of a predicate]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We are considering whether class constraints terminate.
+-- Equality constraints and constraints for the implicit
+-- parameter class always termiante so it is safe to say "size 0".
+-- (Implicit parameter constraints always terminate because
+-- there are no instances for them---they are only solved by
+-- "local instances" in expressions).
+-- See Trac #4200.
+sizePred :: PredType -> TypeSize
+sizePred p
+  = case classifyPredType p of
+      ClassPred cls tys
+        | isIPClass cls     -> 0  -- See Note [Size of a predicate]
+        | isCTupleClass cls -> maximum (0 : map sizePred tys)
+        | otherwise         -> sizeTypes tys
+      EqPred {}             -> 0  -- See Note [Size of a predicate]
+      IrredPred ty          -> sizeType ty
+
