@@ -1,17 +1,17 @@
 
-Bad.hs:3:8: error:
+Bad.hs:3:8:
     lexical error in string/character literal at character '\n'
 
-Bad.hs:3:8: error:
+Bad.hs:3:8:
     lexical error in string/character literal at character '\n'
 
-Bad.hs:3:8: error:
+Bad.hs:3:8:
     lexical error in string/character literal at character '\n'
 
-<interactive>:10:1: error: parse error on input ‘+’
+<interactive>:10:1: parse error on input ‘+’
 
-Bad.hs:3:8: error:
+Bad.hs:3:8:
     lexical error in string/character literal at character '\n'
 
-Bad.hs:3:8: error:
+Bad.hs:3:8:
     lexical error in string/character literal at character '\n'
