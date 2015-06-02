@@ -24,7 +24,6 @@ import IfaceEnv( newInteractiveBinder )
 import Name
 import Var hiding ( varName )
 import VarSet
-import UniqSupply
 import Type
 import Kind
 import GHC
