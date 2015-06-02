@@ -217,3 +217,4 @@ test('T10408B', normal, run_command,
 test('T10248', normal, ghci_script, ['T10248.script'])
 test('T10110', normal, ghci_script, ['T10110.script'])
 test('T10322', normal, ghci_script, ['T10322.script'])
+test('T10466', normal, ghci_script, ['T10466.script'])
