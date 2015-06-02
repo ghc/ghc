@@ -181,7 +181,7 @@ import Maybes
 import ListSetOps
 import Outputable
 import FastString
-import ErrUtils( Validity(..), isValid )
+import ErrUtils( Validity(..), MsgDoc, isValid )
 
 import Data.IORef
 import Control.Monad (liftM, ap)
@@ -1603,23 +1603,23 @@ tcSplitIOType_maybe ty
 
 isFFITy :: Type -> Bool
 -- True for any TyCon that can possibly be an arg or result of an FFI call
-isFFITy ty = isValid (checkRepTyCon legalFFITyCon ty empty)
+isFFITy ty = isValid (checkRepTyCon legalFFITyCon ty)
 
 isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity
 -- Checks for valid argument type for a 'foreign import'
 isFFIArgumentTy dflags safety ty
-   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty empty
+   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty
 
 isFFIExternalTy :: Type -> Validity
 -- Types that are allowed as arguments of a 'foreign export'
-isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty empty
+isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty
 
 isFFIImportResultTy :: DynFlags -> Type -> Validity
 isFFIImportResultTy dflags ty
-  = checkRepTyCon (legalFIResultTyCon dflags) ty empty
+  = checkRepTyCon (legalFIResultTyCon dflags) ty
 
 isFFIExportResultTy :: Type -> Validity
-isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty empty
+isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
 isFFIDynTy :: Type -> Type -> Validity
 -- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
@@ -1640,10 +1640,12 @@ isFFIDynTy expected ty
 
 isFFILabelTy :: Type -> Validity
 -- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
-isFFILabelTy ty = checkRepTyCon ok ty extra
+isFFILabelTy ty = checkRepTyCon ok ty
   where
-    ok tc = tc `hasKey` funPtrTyConKey || tc `hasKey` ptrTyConKey
-    extra = ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)")
+    ok tc | tc `hasKey` funPtrTyConKey || tc `hasKey` ptrTyConKey
+          = IsValid
+          | otherwise
+          = NotValid (ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)"))
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Validity
 -- Checks for valid argument type for a 'foreign import prim'
@@ -1652,28 +1654,33 @@ isFFIPrimArgumentTy :: DynFlags -> Type -> Validity
 -- the foreign function.
 isFFIPrimArgumentTy dflags ty
   | isAnyTy ty = IsValid
-  | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty empty
+  | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
 
 isFFIPrimResultTy :: DynFlags -> Type -> Validity
 -- Checks for valid result type for a 'foreign import prim'
 -- Currently it must be an unlifted type, including unboxed tuples.
 isFFIPrimResultTy dflags ty
-   = checkRepTyCon (legalFIPrimResultTyCon dflags) ty empty
+   = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
 
 isFunPtrTy :: Type -> Bool
-isFunPtrTy ty = isValid (checkRepTyCon (`hasKey` funPtrTyConKey) ty empty)
+isFunPtrTy ty
+  | Just (tc, [_]) <- splitTyConApp_maybe ty
+  = tc `hasKey` funPtrTyConKey
+  | otherwise
+  = False
 
 -- normaliseFfiType gets run before checkRepTyCon, so we don't
 -- need to worry about looking through newtypes or type functions
 -- here; that's already been taken care of.
-checkRepTyCon :: (TyCon -> Bool) -> Type -> SDoc -> Validity
-checkRepTyCon check_tc ty extra
+checkRepTyCon :: (TyCon -> Validity) -> Type -> Validity
+checkRepTyCon check_tc ty
   = case splitTyConApp_maybe ty of
       Just (tc, tys)
         | isNewTyCon tc -> NotValid (hang msg 2 (mk_nt_reason tc tys $$ nt_fix))
-        | check_tc tc   -> IsValid
-        | otherwise     -> NotValid (msg $$ extra)
-      Nothing -> NotValid (quotes (ppr ty) <+> ptext (sLit "is not a data type") $$ extra)
+        | otherwise     -> case check_tc tc of
+                             IsValid        -> IsValid
+                             NotValid extra -> NotValid (msg $$ extra)
+      Nothing -> NotValid (quotes (ppr ty) <+> ptext (sLit "is not a data type"))
   where
     msg = quotes (ppr ty) <+> ptext (sLit "cannot be marshalled in a foreign call")
     mk_nt_reason tc tys
@@ -1703,47 +1710,46 @@ These chaps do the work; they are not exported
 ----------------------------------------------
 -}
 
-legalFEArgTyCon :: TyCon -> Bool
+legalFEArgTyCon :: TyCon -> Validity
 legalFEArgTyCon tc
   -- It's illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
   = boxedMarshalableTyCon tc
 
-legalFIResultTyCon :: DynFlags -> TyCon -> Bool
+legalFIResultTyCon :: DynFlags -> TyCon -> Validity
 legalFIResultTyCon dflags tc
-  | tc == unitTyCon         = True
+  | tc == unitTyCon         = IsValid
   | otherwise               = marshalableTyCon dflags tc
 
-legalFEResultTyCon :: TyCon -> Bool
+legalFEResultTyCon :: TyCon -> Validity
 legalFEResultTyCon tc
-  | tc == unitTyCon         = True
+  | tc == unitTyCon         = IsValid
   | otherwise               = boxedMarshalableTyCon tc
 
-legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
+legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Validity
 -- Checks validity of types going from Haskell -> external world
 legalOutgoingTyCon dflags _ tc
   = marshalableTyCon dflags tc
 
-legalFFITyCon :: TyCon -> Bool
+legalFFITyCon :: TyCon -> Validity
 -- True for any TyCon that can possibly be an arg or result of an FFI call
 legalFFITyCon tc
-  | isUnLiftedTyCon tc = True
-  | tc == unitTyCon    = True
+  | isUnLiftedTyCon tc = IsValid
+  | tc == unitTyCon    = IsValid
   | otherwise          = boxedMarshalableTyCon tc
 
-marshalableTyCon :: DynFlags -> TyCon -> Bool
+marshalableTyCon :: DynFlags -> TyCon -> Validity
 marshalableTyCon dflags tc
-  |  (xopt Opt_UnliftedFFITypes dflags
-      && isUnLiftedTyCon tc
-      && not (isUnboxedTupleTyCon tc)
-      && case tyConPrimRep tc of        -- Note [Marshalling VoidRep]
-           VoidRep -> False
-           _       -> True)
-  = True
+  | isUnLiftedTyCon tc
+  , not (isUnboxedTupleTyCon tc)
+  , case tyConPrimRep tc of        -- Note [Marshalling VoidRep]
+       VoidRep -> False
+       _       -> True
+  = validIfUnliftedFFITypes dflags
   | otherwise
   = boxedMarshalableTyCon tc
 
-boxedMarshalableTyCon :: TyCon -> Bool
+boxedMarshalableTyCon :: TyCon -> Validity
 boxedMarshalableTyCon tc
    | getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
                          , int32TyConKey, int64TyConKey
@@ -1755,35 +1761,42 @@ boxedMarshalableTyCon tc
                          , stablePtrTyConKey
                          , boolTyConKey
                          ]
-  = True
+  = IsValid
 
-  | otherwise = False
+  | otherwise = NotValid empty
 
-legalFIPrimArgTyCon :: DynFlags -> TyCon -> Bool
+legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity
 -- Check args of 'foreign import prim', only allow simple unlifted types.
 -- Strictly speaking it is unnecessary to ban unboxed tuples here since
 -- currently they're of the wrong kind to use in function args anyway.
 legalFIPrimArgTyCon dflags tc
-  | xopt Opt_UnliftedFFITypes dflags
-    && isUnLiftedTyCon tc
-    && not (isUnboxedTupleTyCon tc)
-  = True
+  | isUnLiftedTyCon tc
+  , not (isUnboxedTupleTyCon tc)
+  = validIfUnliftedFFITypes dflags
   | otherwise
-  = False
+  = NotValid unlifted_only
 
-legalFIPrimResultTyCon :: DynFlags -> TyCon -> Bool
+legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
 -- Check result type of 'foreign import prim'. Allow simple unlifted
 -- types and also unboxed tuple result types '... -> (# , , #)'
 legalFIPrimResultTyCon dflags tc
-  | xopt Opt_UnliftedFFITypes dflags
-    && isUnLiftedTyCon tc
-    && (isUnboxedTupleTyCon tc
-        || case tyConPrimRep tc of      -- Note [Marshalling VoidRep]
+  | isUnLiftedTyCon tc
+  , (isUnboxedTupleTyCon tc
+     || case tyConPrimRep tc of      -- Note [Marshalling VoidRep]
            VoidRep -> False
            _       -> True)
-  = True
+  = validIfUnliftedFFITypes dflags
+
   | otherwise
-  = False
+  = NotValid unlifted_only
+
+unlifted_only :: MsgDoc
+unlifted_only = ptext (sLit "foreign import prim only accepts simple unlifted types")
+
+validIfUnliftedFFITypes :: DynFlags -> Validity
+validIfUnliftedFFITypes dflags
+  | xopt Opt_UnliftedFFITypes dflags =  IsValid
+  | otherwise = NotValid (ptext (sLit "To marshal unlifted types, use UnliftedFFITypes"))
 
 {-
 Note [Marshalling VoidRep]

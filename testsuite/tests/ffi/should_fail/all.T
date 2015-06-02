@@ -17,4 +17,5 @@ test('capi_value_function', normal, compile_fail, [''])
 test('T5664', normal, compile_fail, ['-v0'])
 test('T7506', normal, compile_fail, [''])
 test('T7243', normal, compile_fail, [''])
+test('T10461', normal, compile_fail, [''])
 
