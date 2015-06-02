@@ -1083,8 +1083,7 @@ newTempSuffix dflags = atomicModifyIORef (nextTempSuffix dflags) $ \n -> (n+1,n)
 newTempName :: DynFlags -> Suffix -> IO FilePath
 newTempName dflags extn
   = do d <- getTempDir dflags
-       x <- getProcessID
-       findTempName (d </> "ghc" ++ show x ++ "_")
+       findTempName (d </> "ghc_") -- See Note [Deterministic base name]
   where
     findTempName :: FilePath -> IO FilePath
     findTempName prefix
@@ -1099,12 +1098,11 @@ newTempName dflags extn
 newTempLibName :: DynFlags -> Suffix -> IO (FilePath, FilePath, String)
 newTempLibName dflags extn
   = do d <- getTempDir dflags
-       x <- getProcessID
-       findTempName d ("ghc" ++ show x ++ "_")
+       findTempName d ("ghc_")
   where
     findTempName :: FilePath -> String -> IO (FilePath, FilePath, String)
     findTempName dir prefix
-      = do n <- newTempSuffix dflags
+      = do n <- newTempSuffix dflags -- See Note [Deterministic base name]
            let libname = prefix ++ show n
                filename = dir </> "lib" ++ libname <.> extn
            b <- doesFileExist filename
@@ -1156,6 +1154,17 @@ getTempDir dflags = do
                 return dir
       `catchIO` \e -> if isAlreadyExistsError e
                       then mkTempDir prefix else ioError e
+
+-- Note [Deterministic base name]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The filename of temporary files, especially the basename of C files, can end
+-- up in the output in some form, e.g. as part of linker debug information. In the
+-- interest of bit-wise exactly reproducible compilation (#4012), the basename of
+-- the temporary file no longer contains random information (it used to contain
+-- the process id).
+--
+-- This is ok, as the temporary directory used contains the pid (see getTempDir).
 
 addFilesToClean :: DynFlags -> [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
