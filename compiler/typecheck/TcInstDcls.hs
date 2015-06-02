@@ -1498,7 +1498,7 @@ that the type variables bound in the signature will scope over the body.
 What about the check that the instance method signature is more
 polymorphic than the instantiated class method type?  We just do a
 tcSubType call in mkMethIds, and use the HsWrapper thus generated in
-the method AbsBind.  It's very like the tcSubType impedence-matching
+the method AbsBind.  It's very like the tcSubType impedance-matching
 call in mkExport.  We have to pass the HsWrapper into
 tcMethodBody.
 -}

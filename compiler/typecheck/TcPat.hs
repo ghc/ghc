@@ -397,7 +397,7 @@ Two cases, dealt with by the LetPat case of tcPatBndr
    we want to bind a cloned, local version of the variable, with the
    type given by the pattern context, *not* by the signature (even if
    there is one; see Trac #7268). The mkExport part of the
-   generalisation step will do the checking and impedence matching
+   generalisation step will do the checking and impedance matching
    against the signature.
 
  * If for some some reason we are not generalising (plan = NoGen), the

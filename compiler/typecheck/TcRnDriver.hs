@@ -734,7 +734,7 @@ checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
 -- Variant which doesn't require a full TcGblEnv; you could get the
 -- local components from another ModDetails.
 --
--- We return a list of "impedence-matching" bindings for the dfuns
+-- We return a list of "impedance-matching" bindings for the dfuns
 -- defined in the hs-boot file, such as
 --           $fxEqT = $fEqT
 -- We need these because the module and hi-boot file might differ in
@@ -759,7 +759,7 @@ checkHiBootIface'
             --        instances?  We can't easily equate tycons...
 
                 -- Check instance declarations
-                -- and generate an impedence-matching binding
+                -- and generate an impedance-matching binding
         ; mb_dfun_prs <- mapM check_inst boot_insts
 
         ; failIfErrsM

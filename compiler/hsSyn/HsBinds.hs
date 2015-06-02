@@ -333,7 +333,7 @@ This ultimately desugars to something like this:
                (fm::a->a,gm:Any->Any) -> fm
    ...similarly for g...
 
-The abe_wrap field deals with impedence-matching between
+The abe_wrap field deals with impedance-matching between
     (/\a b. case tup a b of { (f,g) -> f })
 and the thing we really want, which may have fewer type
 variables.  The action happens in TcBinds.mkExport.
