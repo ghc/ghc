@@ -71,7 +71,7 @@
 
 <programlisting>
 main = do args &lt;- getArgs
-	  if null args then return [] else do
+          if null args then return [] else do
           ps &lt;- mapM process args
           mapM print ps</programlisting>
 
