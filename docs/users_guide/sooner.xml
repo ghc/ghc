@@ -459,11 +459,15 @@ f (Wibble x y)  # ugly, and proud of it
           option</primary></indexterm> RTS option) indicate that it's
           doing lots of garbage-collection (say, more than 20&percnt;
           of execution time), more memory might help&mdash;with the
-          <option>-M&lt;size&gt;</option><indexterm><primary>-M&lt;size&gt;
+          <option>-H&lt;size&gt;</option><indexterm><primary>-H&lt;size&gt;
           RTS option</primary></indexterm> or
           <option>-A&lt;size&gt;</option><indexterm><primary>-A&lt;size&gt;
           RTS option</primary></indexterm> RTS options (see <xref
-          linkend="rts-options-gc"/>).</para>
+          linkend="rts-options-gc"/>).  As a rule of thumb, try
+          setting <option>-H&lt;size&gt;</option> to the amount of memory
+          you're willing to let your process consume, or perhaps try passing
+          <option>-H</option> without any argument to let GHC calculate
+          a value based on the amount of live data.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
