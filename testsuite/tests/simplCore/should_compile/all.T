@@ -63,8 +63,7 @@ test('T4908', only_ways(['optasm']),
               compile,
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
-test('T4930', [when(compiler_lt('ghc', '7.1'), expect_fail),
-               only_ways(['optasm'])],
+test('T4930', only_ways(['optasm']),
               compile,
               ['-O -ddump-simpl -dsuppress-uniques'])
 
@@ -108,7 +107,7 @@ test('T4918',
      ['$MAKE -s --no-print-directory T4918'])
 
 test('T4945',
-     when(compiler_lt('ghc', '7.1'), expect_fail),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 
