@@ -449,7 +449,7 @@ i.e. how the Name came to be in scope.  It can be in scope two ways:
   - gre_imp: a list of all the imports that brought it into scope
 
 It's an INVARIANT that you have one or the other; that is, either
-gre_lcl is Ture, or gre_imp is non-empty.
+gre_lcl is True, or gre_imp is non-empty.
 
 It is just possible to have *both* if there is a module loop: a Name
 is defined locally in A, and also brought into scope by importing a
