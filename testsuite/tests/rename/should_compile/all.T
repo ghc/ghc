@@ -212,7 +212,7 @@ test('T7167', normal, compile, [''])
 test('T7336', expect_broken(7336), compile, ['-Wall'])
 
 test('T2435', normal, multimod_compile, ['T2435','-v0'])
-test('T7672', expect_broken(7672), multimod_compile, ['T7672',''])
+test('T7672', normal, multimod_compile, ['T7672','-v0'])
 test('T7963',
      [extra_clean(['T7963a.hi', 'T7963a.o',
                    'T7963.imports'])],

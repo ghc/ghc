@@ -168,7 +168,7 @@ tcRnSignature dflags hsc_src
            | otherwise -> do
             { sig_iface <- initIfaceTcRn $ loadSysInterface (text "sig-of") sof
             ; let { gr = mkGlobalRdrEnv
-                              (gresFromAvails LocalDef (mi_exports sig_iface))
+                              (gresFromAvails Nothing (mi_exports sig_iface))
                   ; avails = calculateAvails dflags
                                     sig_iface False{- safe -} False{- boot -} }
             ; return (tcg_env
@@ -1212,13 +1212,8 @@ tcTopSrcDecls boot_details
         -- make sure that at least one of the imports for them is used
         -- See Note [Newtype constructor usage in foreign declarations]
     gre_to_rdr_name gre rdrs
-      = case gre_prov gre of
-           LocalDef          -> rdrs
-           Imported []       -> panic "gre_to_rdr_name: Imported []"
-           Imported (is : _) -> mkRdrQual modName occName : rdrs
-              where
-                modName = is_as (is_decl is)
-                occName = nameOccName (gre_name gre)
+      | isLocalGRE gre = rdrs
+      | otherwise      = greUsedRdrName gre : rdrs
 
 ---------------------------
 tcTyClsInstDecls :: ModDetails

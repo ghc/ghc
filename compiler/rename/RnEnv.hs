@@ -21,7 +21,6 @@ module RnEnv (
 
         lookupFixityRn, lookupTyFixityRn,
         lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
-        greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreAvailRn,
@@ -228,6 +227,7 @@ newTopSrcBinder (L loc rdr_name)
             Nothing ->
                 -- Normal case
              do { this_mod <- getModule
+                ; traceRn (text "newTopSrcBinder" <+> (ppr this_mod $$ ppr rdr_name $$ ppr loc))
                 ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc } }
 
 {-
@@ -490,26 +490,7 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
     -- Note [Usage for sub-bndrs]
     used_rdr_name gre
       | isQual rdr_name = rdr_name
-      | otherwise       = greRdrName gre
-
-greRdrName :: GlobalRdrElt -> RdrName
-greRdrName gre
-  = case gre_prov gre of
-      LocalDef    -> unqual_rdr
-      Imported is -> used_rdr_name_from_is is
-
-  where
-    occ = nameOccName (gre_name gre)
-    unqual_rdr = mkRdrUnqual occ
-
-    used_rdr_name_from_is imp_specs     -- rdr_name is unqualified
-      | not (all (is_qual . is_decl) imp_specs)
-      = unqual_rdr  -- An unqualified import is available
-      | otherwise
-      =             -- Only qualified imports available, so make up
-                    -- a suitable qualifed name from the first imp_spec
-        ASSERT( not (null imp_specs) )
-        mkRdrQual (is_as (is_decl (head imp_specs))) occ
+      | otherwise       = greUsedRdrName gre
 
 lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
 -- If Parent = NoParent, just do a normal lookup
@@ -912,13 +893,14 @@ Note [Handling of deprecations]
 
 addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
-addUsedRdrName warnIfDeprec gre rdr
-  | isLocalGRE gre = return ()  -- No call to warnIfDeprecated
-                                -- See Note [Handling of deprecations]
-  | otherwise      = do { env <- getGblEnv
-                        ; when warnIfDeprec $ warnIfDeprecated gre
-                        ; updMutVar (tcg_used_rdrnames env)
-                                    (\s -> Set.insert rdr s) }
+addUsedRdrName warn_if_deprec gre rdr
+  = do { unless (isLocalGRE gre) $
+         do { env <- getGblEnv
+            ; updMutVar (tcg_used_rdrnames env)
+                        (\s -> Set.insert rdr s) }
+
+       ; when warn_if_deprec $
+         warnIfDeprecated gre }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders
@@ -931,29 +913,34 @@ addUsedRdrNames rdrs
                    (\s -> foldr Set.insert s rdrs) }
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
-warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported (imp_spec : _) })
+warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
+  | (imp_spec : _) <- iss
   = do { dflags <- getDynFlags
-       ; when (wopt Opt_WarnWarningsDeprecations dflags) $
+       ; this_mod <- getModule
+       ; when (wopt Opt_WarnWarningsDeprecations dflags &&
+               not (nameIsLocalOrFrom this_mod name)) $
+                   -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addWarn (mk_msg txt)
+                Just txt -> addWarn (mk_msg imp_spec txt)
                 Nothing  -> return () } }
+  | otherwise
+  = return ()
   where
-    mk_msg txt = sep [ sep [ ptext (sLit "In the use of")
-                             <+> pprNonVarNameSpace (occNameSpace (nameOccName name))
-                             <+> quotes (ppr name)
-                           , parens imp_msg <> colon ]
-                     , ppr txt ]
-
     name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    imp_mod  = importSpecModule imp_spec
-    imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
-    extra | imp_mod == moduleName name_mod = Outputable.empty
-          | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
-
     doc = ptext (sLit "The name") <+> quotes (ppr name) <+> ptext (sLit "is mentioned explicitly")
 
-warnIfDeprecated _ = return ()   -- No deprecations for things defined locally
+    mk_msg imp_spec txt
+      = sep [ sep [ ptext (sLit "In the use of")
+                    <+> pprNonVarNameSpace (occNameSpace (nameOccName name))
+                    <+> quotes (ppr name)
+                  , parens imp_msg <> colon ]
+            , ppr txt ]
+      where
+        imp_mod  = importSpecModule imp_spec
+        imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
+        extra | imp_mod == moduleName name_mod = Outputable.empty
+              | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
 
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
@@ -1670,18 +1657,17 @@ unknownNameSuggestErr where_look tried_rdr_name
                         , let name = gre_name gre
                               occ  = nameOccName name
                         , correct_name_space occ
-                        , (mod, how) <- quals_in_scope name (gre_prov gre)
+                        , (mod, how) <- quals_in_scope gre
                         , let rdr_qual = mkRdrQual mod occ ]
 
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
                     , gre_ok gre
                     , let name = gre_name gre
-                          prov = gre_prov gre
                           occ  = nameOccName name
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
-                    , pair <- case (unquals_in_scope name prov, quals_only occ prov) of
+                    , pair <- case (unquals_in_scope gre, quals_only gre) of
                                 (how:_, _)    -> [ (rdr_unqual, how) ]
                                 ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
                                 ([],    [])   -> [] ]
@@ -1697,27 +1683,29 @@ unknownNameSuggestErr where_look tried_rdr_name
               -- then we suggest @Map.Map@.
 
     --------------------
-    unquals_in_scope :: Name -> Provenance -> [HowInScope]
-    unquals_in_scope n LocalDef      = [ Left (nameSrcSpan n) ]
-    unquals_in_scope _ (Imported is) = [ Right ispec
-                                       | i <- is, let ispec = is_decl i
-                                       , not (is_qual ispec) ]
+    unquals_in_scope :: GlobalRdrElt -> [HowInScope]
+    unquals_in_scope (GRE { gre_name = n, gre_lcl = lcl, gre_imp = is })
+      | lcl       = [ Left (nameSrcSpan n) ]
+      | otherwise = [ Right ispec
+                    | i <- is, let ispec = is_decl i
+                    , not (is_qual ispec) ]
 
     --------------------
-    quals_in_scope :: Name -> Provenance -> [(ModuleName, HowInScope)]
+    quals_in_scope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
     -- Ones for which the qualified version is in scope
-    quals_in_scope n LocalDef      = case nameModule_maybe n of
-                                       Nothing -> []
-                                       Just m  -> [(moduleName m, Left (nameSrcSpan n))]
-    quals_in_scope _ (Imported is) = [ (is_as ispec, Right ispec)
-                                     | i <- is, let ispec = is_decl i ]
+    quals_in_scope (GRE { gre_name = n, gre_lcl = lcl, gre_imp = is })
+      | lcl = case nameModule_maybe n of
+                Nothing -> []
+                Just m  -> [(moduleName m, Left (nameSrcSpan n))]
+      | otherwise = [ (is_as ispec, Right ispec)
+                    | i <- is, let ispec = is_decl i ]
 
     --------------------
-    quals_only :: OccName -> Provenance -> [(RdrName, HowInScope)]
+    quals_only :: GlobalRdrElt -> [(RdrName, HowInScope)]
     -- Ones for which *only* the qualified version is in scope
-    quals_only _   LocalDef      = []
-    quals_only occ (Imported is) = [ (mkRdrQual (is_as ispec) occ, Right ispec)
-                                   | i <- is, let ispec = is_decl i, is_qual ispec ]
+    quals_only (GRE { gre_name = n, gre_imp = is })
+      = [ (mkRdrQual (is_as ispec) (nameOccName n), Right ispec)
+        | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 {-
 ************************************************************************
@@ -1789,36 +1777,34 @@ check_unused flag bound_names used_names
 -------------------------
 --      Helpers
 warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
-warnUnusedGREs gres
- = warnUnusedBinds [(n,p) | GRE {gre_name = n, gre_prov = p} <- gres]
+warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 
 warnUnusedLocals :: [Name] -> RnM ()
-warnUnusedLocals names
- = warnUnusedBinds [(n,LocalDef) | n<-names]
+warnUnusedLocals names = mapM_ warnUnusedLocal names
 
-warnUnusedBinds :: [(Name,Provenance)] -> RnM ()
-warnUnusedBinds names  = mapM_ warnUnusedName (filter reportable names)
- where reportable (name,_)
-        | isWiredInName name = False    -- Don't report unused wired-in names
-                                        -- Otherwise we get a zillion warnings
-                                        -- from Data.Tuple
-        | otherwise = not (startsWithUnderscore (nameOccName name))
-
--------------------------
-
-warnUnusedName :: (Name, Provenance) -> RnM ()
-warnUnusedName (name, LocalDef)
-  = addUnusedWarning name (nameSrcSpan name)
+warnUnusedLocal :: Name -> RnM ()
+warnUnusedLocal name
+  = when (reportable name) $
+    addUnusedWarning name (nameSrcSpan name)
                      (ptext (sLit "Defined but not used"))
 
-warnUnusedName (name, Imported is)
-  = mapM_ warn is
+warnUnusedGRE :: GlobalRdrElt -> RnM ()
+warnUnusedGRE (GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
+  | lcl       = warnUnusedLocal name
+  | otherwise = when (reportable name) (mapM_ warn is)
   where
     warn spec = addUnusedWarning name span msg
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
            msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
+
+reportable :: Name -> Bool
+reportable name
+  | isWiredInName name = False    -- Don't report unused wired-in names
+                                  -- Otherwise we get a zillion warnings
+                                  -- from Data.Tuple
+  | otherwise = not (startsWithUnderscore (nameOccName name))
 
 addUnusedWarning :: Name -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning name span msg

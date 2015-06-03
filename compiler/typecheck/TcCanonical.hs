@@ -23,7 +23,7 @@ import Coercion
 import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
-import Name( isSystemName, nameOccName )
+import Name( isSystemName )
 import OccName( OccName )
 import Outputable
 import DynFlags( DynFlags )
@@ -615,12 +615,10 @@ can_eq_newtype_nc rdr_env ev swapped co ty1 ty1' ty2 ps_ty2
 -- avoiding "redundant import" warnings.
 markDataConsAsUsed :: GlobalRdrEnv -> TyCon -> TcS ()
 markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
-  [ mkRdrQual (is_as (is_decl imp_spec)) occ
+  [ greUsedRdrName gre
   | dc <- tyConDataCons tc
-  , let dc_name = dataConName dc
-        occ  = nameOccName dc_name
-  , gre : _               <- return $ lookupGRE_Name rdr_env dc_name
-  , Imported (imp_spec:_) <- return $ gre_prov gre ]
+  , gre : _  <- return $ lookupGRE_Name rdr_env (dataConName dc)
+  , not (isLocalGRE gre) ]
 
 ---------
 -- ^ Decompose a type application. Nominal equality only!

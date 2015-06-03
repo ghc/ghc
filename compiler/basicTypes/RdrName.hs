@@ -51,10 +51,11 @@ module RdrName (
 
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
+        greUsedRdrName, greRdrNames, greSrcSpan, greQualModName,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
-        Provenance(..), pprNameProvenance,
+        pprNameProvenance,
         Parent(..),
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
         importSpecLoc, importSpecModule, isExplicitItem
@@ -411,10 +412,12 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 
 -- | An element of the 'GlobalRdrEnv'
 data GlobalRdrElt
-  = GRE { gre_name :: Name,
-          gre_par  :: Parent,
-          gre_prov :: Provenance        -- ^ Why it's in scope
-    }
+  = GRE { gre_name :: Name
+        , gre_par  :: Parent
+        , gre_lcl :: Bool          -- ^ True <=> the thing was defined locally
+        , gre_imp :: [ImportSpec]  -- ^ In scope through these imports
+    }    -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
+         -- See Note [GlobalRdrElt provenance]
 
 -- | The children of a Name are the things that are abbreviated by the ".."
 --   notation in export lists.  See Note [Parents]
@@ -438,7 +441,32 @@ hasParent n (ParentIs n')
 #endif
 hasParent n _  = ParentIs n
 
-{-
+{- Note [GlobalRdrElt provenance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The gre_lcl and gre_imp fields of a GlobalRdrElt describe its "provenance",
+i.e. how the Name came to be in scope.  It can be in scope two ways:
+  - gre_lcl = True: it is bound in this module
+  - gre_imp: a list of all the imports that brought it into scope
+
+It's an INVARIANT that you have one or the other; that is, either
+gre_lcl is Ture, or gre_imp is non-empty.
+
+It is just possible to have *both* if there is a module loop: a Name
+is defined locally in A, and also brought into scope by importing a
+module that SOURCE-imported A.  Exapmle (Trac #7672):
+
+ A.hs-boot   module A where
+               data T
+
+ B.hs        module B(Decl.T) where
+               import {-# SOURCE #-} qualified A as Decl
+
+ A.hs        module A where
+               import qualified B
+               data T = Z | S B.T
+
+In A.hs, 'T' is locally bound, *and* imported as B.T.
+
 Note [Parents]
 ~~~~~~~~~~~~~~~~~
   Parent           Children
@@ -481,22 +509,72 @@ That's why plusParent picks the "best" case.
 -}
 
 -- | make a 'GlobalRdrEnv' where all the elements point to the same
--- Provenance (useful for "hiding" imports, or imports with
--- no details).
-gresFromAvails :: Provenance -> [AvailInfo] -> [GlobalRdrElt]
+-- Provenance (useful for "hiding" imports, or imports with no details).
+gresFromAvails :: Maybe ImportSpec -> [AvailInfo] -> [GlobalRdrElt]
+-- prov = Nothing   => locally bound
+--        Just spec => imported as described by spec
 gresFromAvails prov avails
   = concatMap (gresFromAvail (const prov)) avails
 
-gresFromAvail :: (Name -> Provenance) -> AvailInfo -> [GlobalRdrElt]
-gresFromAvail prov_fn avail
-  = [ GRE {gre_name = n,
-           gre_par = mkParent n avail,
-           gre_prov = prov_fn n}
-    | n <- availNames avail ]
-
 localGREsFromAvail :: AvailInfo -> [GlobalRdrElt]
 -- Turn an Avail into a list of LocalDef GlobalRdrElts
-localGREsFromAvail = gresFromAvail (const LocalDef)
+localGREsFromAvail = gresFromAvail (const Nothing)
+
+gresFromAvail :: (Name -> Maybe ImportSpec) -> AvailInfo -> [GlobalRdrElt]
+gresFromAvail prov_fn avail
+  = map mk_gre (availNames avail)
+  where
+    mk_gre n
+      = case prov_fn n of  -- Nothing => bound locally
+                           -- Just is => imported from 'is'
+          Nothing -> GRE { gre_name = n, gre_par = mkParent n avail
+                         , gre_lcl = True, gre_imp = [] }
+          Just is -> GRE { gre_name = n, gre_par = mkParent n avail
+                         , gre_lcl = False, gre_imp = [is] }
+
+greQualModName :: GlobalRdrElt -> ModuleName
+-- Get a suitable module qualifier for the GRE
+-- (used in mkPrintUnqualified)
+-- Prerecondition: the gre_name is always External
+greQualModName gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
+ | lcl, Just mod <- nameModule_maybe name = moduleName mod
+ | (is:_) <- iss                          = is_as (is_decl is)
+ | otherwise                              = pprPanic "greQualModName" (ppr gre)
+
+greUsedRdrName :: GlobalRdrElt -> RdrName
+-- For imported things, return a RdrName to add to the
+-- used-RdrName set, which is used to generate
+-- unused-import-decl warnings
+-- Return an Unqual if possible, otherwise any Qual
+greUsedRdrName GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
+  | lcl                               = Unqual occ
+  | not (all (is_qual . is_decl) iss) = Unqual occ
+  | (is:_) <- iss                     = Qual (is_as (is_decl is)) occ
+  | otherwise                         = pprPanic "greRdrName" (ppr name)
+  where
+    occ = nameOccName name
+
+greRdrNames :: GlobalRdrElt -> [RdrName]
+greRdrNames GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
+  = (if lcl then [unqual] else []) ++ concatMap do_spec (map is_decl iss)
+  where
+    occ    = nameOccName name
+    unqual = Unqual occ
+    do_spec decl_spec
+        | is_qual decl_spec = [qual]
+        | otherwise         = [unqual,qual]
+        where qual = Qual (is_as decl_spec) occ
+
+-- the SrcSpan that pprNameProvenance prints out depends on whether
+-- the Name is defined locally or not: for a local definition the
+-- definition site is used, otherwise the location of the import
+-- declaration.  We want to sort the export locations in
+-- exportClashErr by this SrcSpan, we need to extract it:
+greSrcSpan :: GlobalRdrElt -> SrcSpan
+greSrcSpan gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss } )
+  | lcl           = nameSrcSpan name
+  | (is:_) <- iss = is_dloc (is_decl is)
+  | otherwise     = pprPanic "greSrcSpan" (ppr gre)
 
 mkParent :: Name -> AvailInfo -> Parent
 mkParent _ (Avail _)                 = NoParent
@@ -543,7 +621,6 @@ lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
 lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
                                   Nothing   -> []
                                   Just gres -> gres
-
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env
   = case lookupOccEnv env (rdrNameOcc rdr_name) of
@@ -560,19 +637,20 @@ getGRE_NameQualifier_maybes :: GlobalRdrEnv -> Name -> [Maybe [ModuleName]]
 -- Nothing means "the unqualified version is in scope"
 -- [] means the thing is not in scope at all
 getGRE_NameQualifier_maybes env
-  = map (qualifier_maybe . gre_prov) . lookupGRE_Name env
+  = map (qualifier_maybe) . lookupGRE_Name env
   where
-    qualifier_maybe LocalDef       = Nothing
-    qualifier_maybe (Imported iss) = Just $ map (is_as . is_decl) iss
+    qualifier_maybe (GRE { gre_lcl = lcl, gre_imp = iss })
+      | lcl       = Nothing
+      | otherwise = Just $ map (is_as . is_decl) iss
 
 isLocalGRE :: GlobalRdrElt -> Bool
-isLocalGRE (GRE {gre_prov = LocalDef}) = True
-isLocalGRE _                           = False
+isLocalGRE (GRE {gre_lcl = lcl }) = lcl
 
 unQualOK :: GlobalRdrElt -> Bool
 -- ^ Test if an unqualifed version of this thing would be in scope
-unQualOK (GRE {gre_prov = LocalDef})    = True
-unQualOK (GRE {gre_prov = Imported is}) = any unQualSpecOK is
+unQualOK (GRE {gre_lcl = lcl, gre_imp = iss })
+  | lcl = True
+  | otherwise = any unQualSpecOK iss
 
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- ^ Take a list of GREs which have the right OccName
@@ -593,7 +671,8 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- The export of @f@ is ambiguous because it's in scope from the local def
 -- and the import.  The lookup of @Unqual f@ should return a GRE for
 -- the locally-defined @f@, and a GRE for the imported @f@, with a /single/
--- provenance, namely the one for @Baz(f)@.
+-- provenance, namely the one for @Baz(f)@, so that the "ambiguous occurrence"
+-- message mentions the correct candidates
 pickGREs rdr_name gres
   = ASSERT2( isSrcRdrName rdr_name, ppr rdr_name )
     mapMaybe pick gres
@@ -602,28 +681,28 @@ pickGREs rdr_name gres
     rdr_is_qual   = isQual_maybe rdr_name
 
     pick :: GlobalRdrElt -> Maybe GlobalRdrElt
-    pick gre@(GRE {gre_prov = LocalDef, gre_name = n})  -- Local def
-        | rdr_is_unqual                    = Just gre
-        | Just (mod,_) <- rdr_is_qual        -- Qualified name
-        , Just n_mod <- nameModule_maybe n   -- Binder is External
-        , mod == moduleName n_mod          = Just gre
-        | otherwise                        = Nothing
-    pick gre@(GRE {gre_prov = Imported [is]})   -- Single import (efficiency)
-        | rdr_is_unqual,
-          not (is_qual (is_decl is))    = Just gre
-        | Just (mod,_) <- rdr_is_qual,
-          mod == is_as (is_decl is)     = Just gre
-        | otherwise                     = Nothing
-    pick gre@(GRE {gre_prov = Imported is})     -- Multiple import
-        | null filtered_is = Nothing
-        | otherwise        = Just (gre {gre_prov = Imported filtered_is})
+    pick gre@(GRE { gre_name = n, gre_lcl = lcl, gre_imp = iss })
+        | not lcl' && null iss'
+        = Nothing
+
+        | otherwise
+        = Just (gre { gre_lcl = lcl', gre_imp = iss' })
+
         where
-          filtered_is | rdr_is_unqual
-                      = filter (not . is_qual    . is_decl) is
-                      | Just (mod,_) <- rdr_is_qual
-                      = filter ((== mod) . is_as . is_decl) is
-                      | otherwise
-                      = []
+          lcl' | not lcl       = False
+               | rdr_is_unqual = True
+               | Just (mod,_) <- rdr_is_qual        -- Qualified name
+               , Just n_mod <- nameModule_maybe n   -- Binder is External
+               = mod == moduleName n_mod
+               | otherwise
+               = False
+
+          iss' | rdr_is_unqual
+               = filter (not . is_qual    . is_decl) iss
+               | Just (mod,_) <- rdr_is_qual
+               = filter ((== mod) . is_as . is_decl) iss
+               | otherwise
+               = []
 
 -- Building GlobalRdrEnvs
 
@@ -649,9 +728,10 @@ insertGRE new_g (old_g : old_gs)
 plusGRE :: GlobalRdrElt -> GlobalRdrElt -> GlobalRdrElt
 -- Used when the gre_name fields match
 plusGRE g1 g2
-  = GRE { gre_name = gre_name g1,
-          gre_prov = gre_prov g1 `plusProv`   gre_prov g2,
-          gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
+  = GRE { gre_name = gre_name g1
+        , gre_lcl  = gre_lcl g1 || gre_lcl g2
+        , gre_imp  = gre_imp g1 ++ gre_imp g2
+        , gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
 
 transformGREs :: (GlobalRdrElt -> GlobalRdrElt)
               -> [OccName]
@@ -718,7 +798,7 @@ There are two reasons for shadowing:
 -}
 
 shadowName :: GlobalRdrEnv -> Name -> GlobalRdrEnv
--- Remove certain old LocalDef GREs that share the same OccName as this new Name.
+-- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
 shadowName env name
   = alterOccEnv (fmap alter_fn) env (nameOccName name)
@@ -727,21 +807,25 @@ shadowName env name
     alter_fn gres = mapMaybe (shadow_with name) gres
 
     shadow_with :: Name -> GlobalRdrElt -> Maybe GlobalRdrElt
-    shadow_with new_name old_gre@(GRE { gre_name = old_name, gre_prov = LocalDef })
+    shadow_with new_name
+       old_gre@(GRE { gre_name = old_name, gre_lcl = lcl, gre_imp = iss })
        = case nameModule_maybe old_name of
-           Nothing -> Just old_gre
+           Nothing -> Just old_gre   -- Old name is Internal; do not shadow
            Just old_mod
               | Just new_mod <- nameModule_maybe new_name
-              , new_mod == old_mod
+              , new_mod == old_mod   -- Old name same as new name; shadow completely
               -> Nothing
-              | otherwise
-              -> Just (old_gre { gre_prov = Imported [mk_fake_imp_spec old_name old_mod] })
 
-    shadow_with new_name old_gre@(GRE { gre_prov = Imported imp_specs })
-       | null imp_specs' = Nothing
-       | otherwise       = Just (old_gre { gre_prov = Imported imp_specs' })
-       where
-         imp_specs' = mapMaybe (shadow_is new_name) imp_specs
+              | null iss'            -- Nothing remains
+              -> Nothing
+
+              | otherwise
+              -> Just (old_gre { gre_lcl = False, gre_imp = iss' })
+
+              where
+                iss' = lcl_imp ++ mapMaybe (shadow_is new_name) iss
+                lcl_imp | lcl       = [mk_fake_imp_spec old_name old_mod]
+                        | otherwise = []
 
     mk_fake_imp_spec old_name old_mod    -- Urgh!
       = ImpSpec id_spec ImpAll
@@ -769,15 +853,8 @@ shadowName env name
 ************************************************************************
 -}
 
--- | The 'Provenance' of something says how it came to be in scope.
+-- | The 'ImportSpec' of something says how it came to be imported
 -- It's quite elaborate so that we can give accurate unused-name warnings.
-data Provenance
-  = LocalDef            -- ^ The thing was defined locally
-  | Imported
-        [ImportSpec]    -- ^ The thing was imported.
-                        --
-                        -- INVARIANT: the list of 'ImportSpec' is non-empty
-
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
                             is_item :: ImpItemSpec }
                 deriving( Eq, Ord )
@@ -815,6 +892,19 @@ data ImpItemSpec
         -- Here the constructors of @T@ are not named explicitly;
         -- only @T@ is named explicitly.
 
+instance Eq ImpDeclSpec where
+  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
+
+instance Ord ImpDeclSpec where
+   compare is1 is2 = (is_mod is1 `compare` is_mod is2) `thenCmp`
+                     (is_dloc is1 `compare` is_dloc is2)
+
+instance Eq ImpItemSpec where
+  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
+
+instance Ord ImpItemSpec where
+   compare is1 is2 = is_iloc is1 `compare` is_iloc is2
+
 unQualSpecOK :: ImportSpec -> Bool
 -- ^ Is in scope unqualified?
 unQualSpecOK is = not (is_qual (is_decl is))
@@ -834,55 +924,34 @@ isExplicitItem :: ImpItemSpec -> Bool
 isExplicitItem ImpAll                        = False
 isExplicitItem (ImpSome {is_explicit = exp}) = exp
 
+{-
 -- Note [Comparing provenance]
 -- Comparison of provenance is just used for grouping
 -- error messages (in RnEnv.warnUnusedBinds)
 instance Eq Provenance where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
 
-instance Eq ImpDeclSpec where
-  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
-
-instance Eq ImpItemSpec where
-  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
-
 instance Ord Provenance where
-   compare LocalDef      LocalDef        = EQ
-   compare LocalDef      (Imported _)    = LT
-   compare (Imported _ ) LocalDef        = GT
-   compare (Imported is1) (Imported is2) = compare (head is1)
-        {- See Note [Comparing provenance] -}      (head is2)
-
-instance Ord ImpDeclSpec where
-   compare is1 is2 = (is_mod is1 `compare` is_mod is2) `thenCmp`
-                     (is_dloc is1 `compare` is_dloc is2)
-
-instance Ord ImpItemSpec where
-   compare is1 is2 = is_iloc is1 `compare` is_iloc is2
-
-plusProv :: Provenance -> Provenance -> Provenance
--- Choose LocalDef over Imported
--- There is an obscure bug lurking here; in the presence
--- of recursive modules, something can be imported *and* locally
--- defined, and one might refer to it with a qualified name from
--- the import -- but I'm going to ignore that because it makes
--- the isLocalGRE predicate so much nicer this way
-plusProv LocalDef        LocalDef        = panic "plusProv"
-plusProv LocalDef        _               = LocalDef
-plusProv _               LocalDef        = LocalDef
-plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
+   compare (Prov l1 i1) (Prov l2 i2)
+     = (l1 `compare` l2) `thenCmp` (i1 `cmp_is` i2)
+     where  -- See Note [Comparing provenance]
+       []     `cmp_is` []     = EQ
+       []     `cmp_is` _      = LT
+       (_:_)  `cmp_is` []     = GT
+       (i1:_) `cmp_is` (i2:_) = i1 `compare` i2
+-}
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
--- ^ Print out the place where the name was imported
-pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
-  = ptext (sLit "defined at") <+> ppr (nameSrcLoc name)
-pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
-  = case whys of
-        (why:_) | opt_PprStyle_Debug -> vcat (map pp_why whys)
-                | otherwise          -> pp_why why
-        [] -> panic "pprNameProvenance"
+-- ^ Print out one place where the name was define/imported
+-- (With -dppr-debug, print them all)
+pprNameProvenance (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
+  | opt_PprStyle_Debug = vcat pp_provs
+  | otherwise          = head pp_provs
   where
-    pp_why why = sep [ppr why, ppr_defn_site why name]
+    pp_provs = pp_lcl ++ map pp_is iss
+    pp_lcl = if lcl then [ptext (sLit "defined at") <+> ppr (nameSrcLoc name)]
+                    else []
+    pp_is is = sep [ppr is, ppr_defn_site is name]
 
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".

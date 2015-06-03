@@ -874,12 +874,10 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
 
              -- Make a Qual RdrName that will do for each DataCon
              -- so we can report it as used (Trac #7969)
-             data_con_rdrs = [ mkRdrQual (is_as (is_decl imp_spec)) occ
+             data_con_rdrs = [ greUsedRdrName gre
                              | dc_name <- data_con_names
-                             , let occ  = nameOccName dc_name
-                                   gres = lookupGRE_Name rdr_env dc_name
-                             , not (null gres)
-                             , Imported (imp_spec:_) <- [gre_prov (head gres)] ]
+                             , gre : _ <- [lookupGRE_Name rdr_env dc_name]
+                             , not (isLocalGRE gre) ]
 
        ; addUsedRdrNames data_con_rdrs
        ; unless (isNothing mtheta || not hidden_data_cons)

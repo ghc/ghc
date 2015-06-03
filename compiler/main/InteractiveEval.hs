@@ -895,11 +895,11 @@ findGlobalRdrEnv hsc_env imports
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
 availsToGlobalRdrEnv mod_name avails
-  = mkGlobalRdrEnv (gresFromAvails imp_prov avails)
+  = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) avails)
   where
       -- We're building a GlobalRdrEnv as if the user imported
       -- all the specified modules into the global interactive module
-    imp_prov = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
+    imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
     decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
@@ -972,23 +972,9 @@ getRdrNamesInScope = withSession $ \hsc_env -> do
   let
       ic = hsc_IC hsc_env
       gbl_rdrenv = ic_rn_gbl_env ic
-      gbl_names = concatMap greToRdrNames $ globalRdrEnvElts gbl_rdrenv
+      gbl_names = concatMap greRdrNames $ globalRdrEnvElts gbl_rdrenv
   return gbl_names
 
-
--- ToDo: move to RdrName
-greToRdrNames :: GlobalRdrElt -> [RdrName]
-greToRdrNames GRE{ gre_name = name, gre_prov = prov }
-  = case prov of
-     LocalDef -> [unqual]
-     Imported specs -> concat (map do_spec (map is_decl specs))
-  where
-    occ = nameOccName name
-    unqual = Unqual occ
-    do_spec decl_spec
-        | is_qual decl_spec = [qual]
-        | otherwise         = [unqual,qual]
-        where qual = Qual (is_as decl_spec) occ
 
 -- | Parses a string as an identifier, and returns the list of 'Name's that
 -- the identifier can refer to in the current interactive context.

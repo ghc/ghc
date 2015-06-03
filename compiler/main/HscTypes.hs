@@ -1575,7 +1575,7 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
                        -- the right one, then we can use the unqualified name
 
         | [gre] <- qual_gres
-        = NameQual (get_qual_mod (gre_prov gre))
+        = NameQual (greQualModName gre)
 
         | null qual_gres
         = if null (lookupGRE_RdrName (mkRdrQual (moduleName mod) occ) env)
@@ -1590,9 +1590,6 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 
         unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
         qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)
-
-        get_qual_mod LocalDef      = moduleName mod
-        get_qual_mod (Imported is) = ASSERT( not (null is) ) is_as (is_decl (head is))
 
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the

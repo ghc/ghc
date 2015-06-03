@@ -73,9 +73,11 @@ newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 
 newGlobalBinder mod occ loc
   = do { mod `seq` occ `seq` return ()    -- See notes with lookupOrig
---     ; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
-       ; updNameCacheTcRn $ \name_cache ->
-         allocateGlobalBinder name_cache mod occ loc }
+       ; name <- updNameCacheTcRn $ \name_cache ->
+                 allocateGlobalBinder name_cache mod occ loc
+       ; traceIf (text "newGlobalBinder" <+>
+                  (vcat [ ppr mod <+> ppr occ <+> ppr loc, ppr name]))
+       ; return name }
 
 newInteractiveBinder :: HscEnv -> OccName -> SrcSpan -> IO Name
 -- Works in the IO monad, and gets the Module

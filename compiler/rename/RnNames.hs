@@ -668,9 +668,9 @@ filterImports
     -> RnM (Maybe (Bool, Located [LIE Name]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
-  = return (Nothing, gresFromAvails prov (concatMap mi_exports iface))
+  = return (Nothing, gresFromAvails (Just imp_spec) (concatMap mi_exports iface))
   where
-    prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
+    imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
 
 filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
@@ -685,9 +685,9 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
             names  = availsToNameSet (map snd items2)
             keep n = not (n `elemNameSet` names)
             pruned_avails = filterAvails keep all_avails
-            hiding_prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
+            hiding_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
-            gres | want_hiding = gresFromAvails hiding_prov pruned_avails
+            gres | want_hiding = gresFromAvails (Just hiding_spec) pruned_avails
                  | otherwise   = concatMap (gresFromIE decl_spec) items2
 
         return (Just (want_hiding, L l (map fst items2)), gres)
@@ -917,10 +917,10 @@ gresFromIE decl_spec (L loc ie, avail)
     is_explicit = case ie of
                     IEThingAll (L _ name) -> \n -> n == name
                     _                     -> \_ -> True
-    prov_fn name = Imported [imp_spec]
-        where
-          imp_spec  = ImpSpec { is_decl = decl_spec, is_item = item_spec }
-          item_spec = ImpSome { is_explicit = is_explicit name, is_iloc = loc }
+    prov_fn name
+      = Just (ImpSpec { is_decl = decl_spec, is_item = item_spec })
+      where
+        item_spec = ImpSome { is_explicit = is_explicit name, is_iloc = loc }
 
 mkChildEnv :: [GlobalRdrElt] -> NameEnv [Name]
 mkChildEnv gres = foldr add emptyNameEnv gres
@@ -1221,7 +1221,8 @@ isDoc _ = False
 -------------------------------
 isModuleExported :: Bool -> ModuleName -> GlobalRdrElt -> Bool
 -- True if the thing is in scope *both* unqualified, *and* with qualifier M
-isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
+isModuleExported implicit_prelude mod
+                 (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
   | implicit_prelude && isBuiltInSyntax name = False
         -- Optimisation: filter out names for built-in syntax
         -- They just clutter up the environment (esp tuples), and the parser
@@ -1233,11 +1234,10 @@ isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
         -- It's worth doing because it makes the environment smaller for
         -- every module that imports the Prelude
   | otherwise
-  = case prov of
-        LocalDef | Just name_mod <- nameModule_maybe name
-                 -> moduleName name_mod == mod
-                 | otherwise -> False
-        Imported is -> any unQualSpecOK is && any (qualSpecOK mod) is
+  =  (lcl && (case nameModule_maybe name of
+               Just name_mod -> moduleName name_mod == mod
+               Nothing       -> False))
+  || (any unQualSpecOK iss && any (qualSpecOK mod) iss)
 
 -------------------------------
 check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
@@ -1471,7 +1471,8 @@ extendImportMap :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
 -- the RdrName in that import decl's entry in the ImportMap
 extendImportMap rdr_env rdr imp_map
   | [gre] <- lookupGRE_RdrName rdr rdr_env
-  , Imported imps <- gre_prov gre
+  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
+  , not lcl
   = add_imp gre (bestImport imps) imp_map
   | otherwise
   = imp_map
@@ -1737,18 +1738,6 @@ exportClashErr global_env name1 name2 ie1 ie2
     (name1', ie1', name2', ie2') = if get_loc name1 < get_loc name2
                                    then (name1, ie1, name2, ie2)
                                    else (name2, ie2, name1, ie1)
-
--- the SrcSpan that pprNameProvenance prints out depends on whether
--- the Name is defined locally or not: for a local definition the
--- definition site is used, otherwise the location of the import
--- declaration.  We want to sort the export locations in
--- exportClashErr by this SrcSpan, we need to extract it:
-greSrcSpan :: GlobalRdrElt -> SrcSpan
-greSrcSpan gre
-  | Imported (is:_) <- gre_prov gre = is_dloc (is_decl is)
-  | otherwise                       = name_span
-  where
-    name_span = nameSrcSpan (gre_name gre)
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
