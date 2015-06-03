@@ -133,7 +133,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
                 tcg_ann_env        = emptyAnnEnv,
-                tcg_visible_orphan_mods = mkModuleSet [mod],
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
                 tcg_exports        = [],

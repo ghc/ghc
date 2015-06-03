@@ -232,7 +232,7 @@ tcGetInstEnvs = do { eps <- getEps
                    ; env <- getGblEnv
                    ; return (InstEnvs { ie_global  = eps_inst_env eps
                                       , ie_local   = tcg_inst_env env
-                                      , ie_visible = tcg_visible_orphan_mods env }) }
+                                      , ie_visible = tcVisibleOrphanMods env }) }
 
 instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
