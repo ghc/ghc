@@ -696,6 +696,23 @@ spec = do
                            ]
           <> DocOrderedList [ DocParagraph "baz" ]
 
+      it "allows arbitrary initial indent of a list" $ do
+        unlines
+          [ "     * foo"
+          , "     * bar"
+          , ""
+          , "         * quux"
+          , ""
+          , "     * baz"
+          ]
+        `shouldParseTo`
+        DocUnorderedList
+          [ DocParagraph "foo"
+          , DocParagraph "bar"
+            <> DocUnorderedList [ DocParagraph "quux" ]
+          , DocParagraph "baz"
+          ]
+
       it "definition lists can come back to top level with a different list" $ do
         "[foo]: foov\n\n    [bar]: barv\n\n1. baz" `shouldParseTo`
           DocDefList [ ("foo", "foov"
