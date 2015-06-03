@@ -2029,7 +2029,18 @@ This belongs to the list above!
                     2. No newline separation even in indented lists.
 -}
 </programlisting>
+    <para>The indentation of the first list item is honoured. That is,
+    in the following example the items are on the same level. Before
+    Haddock 2.16.1, the second item would have been nested under the
+    first item which was unexpected.
+    </para>
+<programlisting>
+{-|
+    * foo
 
+    * bar
+-}
+</programlisting>
       </section>
 
       <section>
