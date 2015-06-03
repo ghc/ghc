@@ -12,7 +12,7 @@
 
 <book id="haddock">
   <bookinfo>
-    <date>2004-08-02</date>
+    <date>2015-06-02</date>
     <title>Haddock User Guide</title>
     <author>
       <firstname>Simon</firstname>
@@ -24,12 +24,21 @@
       <surname>Waern</surname>
     </author>
     <address><email>david.waern@gmail.com</email></address>
+    <author>
+      <firstname>Mateusz</firstname>
+      <surname>Kowalczyk</surname>
+    </author>
+    <address><email>fuuzetsu@fuuzetsu.co.uk</email></address>
     <copyright>
       <year>2010</year>
       <holder>Simon Marlow, David Waern</holder>
     </copyright>
+    <copyright>
+      <year>2013-2015</year>
+      <holder>Mateusz Kowalczyk</holder>
+    </copyright>
     <abstract>
-      <para>This document describes Haddock version 2.15.1, a Haskell
+      <para>This document describes Haddock version 2.16.1, a Haskell
       documentation tool.</para>
     </abstract>
   </bookinfo>
