@@ -317,7 +317,7 @@ else:
   only_darwin = skip
 
 test('static001',
-     [only_darwin, expect_fail,
+     [only_darwin, expect_broken(8127),
       extra_clean(['Static001.hi', 'Static001.o', 'liba.a', 'Static001_stub.h', 'Static001_stub.o'])],
      run_command,
      ['$MAKE -s --no-print-directory static001'])

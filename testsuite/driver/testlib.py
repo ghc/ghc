@@ -84,6 +84,9 @@ def skip( name, opts ):
     opts.skip = 1
 
 def expect_fail( name, opts ):
+    # The compiler, testdriver, OS or platform is missing a certain
+    # feature, and we don't plan to or can't fix it now or in the
+    # future.
     opts.expect = 'fail';
 
 def reqlib( lib ):
@@ -149,6 +152,8 @@ def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
 def expect_broken( bug ):
+    # This test is a expected not to work due to the indicated trac bug
+    # number.
     return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
 def _expect_broken( name, opts, bug ):

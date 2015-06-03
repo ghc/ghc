@@ -46,6 +46,8 @@ test('nbe', normal, compile, [''])
 test('while', normal, compile_and_run, [''])
 test('rw', normal, compile_fail, [''])
 test('lazypat', normal, compile_fail, [''])
+# Not marked as expect_broken, because it's not clear whether this test should
+# succeed or fail.
 test('lazypatok', expect_fail, compile, [''])
 test('tc', normal, compile_and_run, [''])
 test('arrow', normal, compile, [''])

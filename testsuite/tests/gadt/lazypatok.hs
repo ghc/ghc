@@ -2,7 +2,7 @@
 
 -- It's not clear whether this one should succed or fail,
 -- Arguably it should succeed because the type refinement on
--- T1 should make (y::Int).  Currently, though, it succeeds
+-- T1 should make (y::Int).  Currently, though, it fails.
 
 module ShouldFail where
 
