@@ -22,7 +22,7 @@ module SimplMonad (
 import Id               ( Id, mkSysLocal )
 import Type             ( Type )
 import FamInstEnv       ( FamInstEnv )
-import CoreSyn          ( RuleBase )
+import CoreSyn          ( RuleEnv(..) )
 import UniqSupply
 import DynFlags
 import CoreMonad
@@ -55,10 +55,10 @@ newtype SimplM result
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
         , st_max_ticks :: IntWithInf  -- Max #ticks in this simplifier run
-        , st_rules     :: RuleBase
+        , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv) }
 
-initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv)
+initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
@@ -168,7 +168,7 @@ instance MonadIO SimplM where
       x <- m
       return (x, us, sc)
 
-getSimplRules :: SimplM RuleBase
+getSimplRules :: SimplM RuleEnv
 getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)

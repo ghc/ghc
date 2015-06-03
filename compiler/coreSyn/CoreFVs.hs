@@ -24,7 +24,7 @@ module CoreFVs (
         idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
-        ruleLhsOrphNames, ruleLhsFreeIds,
+        ruleLhsOrphNames, ruleLhsFreeIds, exprsOrphNames,
         vectsFreeVars,
 
         -- * Core syntax tree annotation with free variables

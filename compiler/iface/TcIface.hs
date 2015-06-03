@@ -625,7 +625,7 @@ tcIfaceRules ignore_prags if_rules
 tcIfaceRule :: IfaceRule -> IfL CoreRule
 tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                         ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
-                        ifRuleAuto = auto })
+                        ifRuleAuto = auto, ifRuleOrph = orph })
   = do  { ~(bndrs', args', rhs') <-
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
                 forkM (ptext (sLit "Rule") <+> ftext name) $
@@ -634,10 +634,13 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                    ; rhs'  <- tcIfaceExpr rhs
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
+        ; this_mod <- getIfModule
         ; return (Rule { ru_name = name, ru_fn = fn, ru_act = act,
                           ru_bndrs = bndrs', ru_args = args',
                           ru_rhs = occurAnalyseExpr rhs',
                           ru_rough = mb_tcs,
+                          ru_origin = this_mod,
+                          ru_orphan = orph,
                           ru_auto = auto,
                           ru_local = False }) } -- An imported RULE is never for a local Id
                                                 -- or, even if it is (module loop, perhaps)

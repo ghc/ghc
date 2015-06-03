@@ -58,6 +58,7 @@ import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
 import PrelNames        ( specTyConName )
+import Module
 
 -- See Note [Forcing specialisation]
 #ifndef GHCI
@@ -686,9 +687,11 @@ specConstrProgram guts
       dflags <- getDynFlags
       us     <- getUniqueSupplyM
       annos  <- getFirstAnnotations deserializeWithData guts
+      this_mod <- getModule
       let binds' = reverse $ fst $ initUs us $ do
                     -- Note [Top-level recursive groups]
-                    (env, binds) <- goEnv (initScEnv dflags annos) (mg_binds guts)
+                    (env, binds) <- goEnv (initScEnv dflags this_mod annos)
+                                          (mg_binds guts)
                         -- binds is identical to (mg_binds guts), except that the
                         -- binders on the LHS have been replaced by extendBndr
                         --   (SPJ this seems like overkill; I don't think the binders
@@ -760,6 +763,7 @@ leave it for now.
 -}
 
 data ScEnv = SCE { sc_dflags    :: DynFlags,
+                   sc_module    :: !Module,
                    sc_size      :: Maybe Int,   -- Size threshold
                    sc_count     :: Maybe Int,   -- Max # of specialisations for any one fn
                                                 -- See Note [Avoiding exponential blowup]
@@ -811,9 +815,10 @@ instance Outputable Value where
    ppr LambdaVal         = ptext (sLit "<Lambda>")
 
 ---------------------
-initScEnv :: DynFlags -> UniqFM SpecConstrAnnotation -> ScEnv
-initScEnv dflags anns
+initScEnv :: DynFlags -> Module -> UniqFM SpecConstrAnnotation -> ScEnv
+initScEnv dflags this_mod anns
   = SCE { sc_dflags      = dflags,
+          sc_module      = this_mod,
           sc_size        = specConstrThreshold dflags,
           sc_count       = specConstrCount     dflags,
           sc_recursive   = specConstrRecursive dflags,
@@ -1650,7 +1655,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
               body_ty    = exprType spec_body
               rule_rhs   = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
-              rule       = mkRule True {- Auto -} True {- Local -}
+              this_mod   = sc_module spec_env
+              rule       = mkRule this_mod True {- Auto -} True {- Local -}
                                   rule_name inline_act fn_name qvars pats rule_rhs
                            -- See Note [Transfer activation]
         ; return (spec_usg, OS call_pat rule spec_id spec_rhs) }

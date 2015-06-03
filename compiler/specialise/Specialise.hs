@@ -13,7 +13,7 @@ import Id
 import TcType hiding( substTy, extendTvSubstList )
 import Type   hiding( substTy, extendTvSubstList )
 import Coercion( Coercion )
-import Module( Module )
+import Module( Module, HasModule(..) )
 import CoreMonad
 import qualified CoreSubst
 import CoreUnfold
@@ -578,7 +578,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
   = do { dflags <- getDynFlags
 
              -- Specialise the bindings of this module
-       ; (binds', uds) <- runSpecM dflags (go binds)
+       ; (binds', uds) <- runSpecM dflags this_mod (go binds)
 
              -- Specialise imported functions
        ; hpt_rules <- getRuleBase
@@ -652,10 +652,11 @@ specImport dflags this_mod done rb fn calls_for_fn
              -- more rules as we go along
        ; hsc_env <- getHscEnv
        ; eps <- liftIO $ hscEPS hsc_env
+       ; vis_orphs <- getVisibleOrphanMods
        ; let full_rb = unionRuleBase rb (eps_rule_base eps)
-             rules_for_fn = getRules full_rb fn
+             rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
 
-       ; (rules1, spec_pairs, uds) <- runSpecM dflags $
+       ; (rules1, spec_pairs, uds) <- runSpecM dflags this_mod $
               specCalls (Just this_mod) emptySpecEnv rules_for_fn calls_for_fn fn rhs
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
@@ -1187,6 +1188,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
            ; spec_f <- newSpecIdSM fn spec_id_ty
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_args body)
+           ; this_mod <- getModule
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
@@ -1202,7 +1204,10 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                             -- otherwise uniques end up there, making builds
                             -- less deterministic (See #4012 comment:61 ff)
 
-                spec_env_rule = mkRule True {- Auto generated -} is_local
+                spec_env_rule = mkRule
+                                  this_mod
+                                  True {- Auto generated -}
+                                  is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
@@ -1955,6 +1960,7 @@ newtype SpecM a = SpecM (State SpecState a)
 
 data SpecState = SpecState {
                      spec_uniq_supply :: UniqSupply,
+                     spec_module :: Module,
                      spec_dflags :: DynFlags
                  }
 
@@ -1989,11 +1995,15 @@ instance MonadUnique SpecM where
 instance HasDynFlags SpecM where
     getDynFlags = SpecM $ liftM spec_dflags get
 
-runSpecM :: DynFlags -> SpecM a -> CoreM a
-runSpecM dflags (SpecM spec)
+instance HasModule SpecM where
+    getModule = SpecM $ liftM spec_module get
+
+runSpecM :: DynFlags -> Module -> SpecM a -> CoreM a
+runSpecM dflags this_mod (SpecM spec)
     = do us <- getUniqueSupplyM
          let initialState = SpecState {
                                 spec_uniq_supply = us,
+                                spec_module = this_mod,
                                 spec_dflags = dflags
                             }
          return $ evalState spec initialState

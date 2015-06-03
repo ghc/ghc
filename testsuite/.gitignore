@@ -1202,7 +1202,11 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/plugins/simple-plugin/pkg.plugins02/
 /tests/plugins/simple-plugin/pkg.plugins03/
 /tests/plugins/simple-plugin/setup
+/tests/plugins/rule-defining-plugin/pkg.T10420/
 /tests/plugins/rule-defining-plugin/pkg.plugins07/
+/tests/plugins/annotation-plugin/pkg.T10294/
+/tests/plugins/annotation-plugin/pkg.T10294a/
+/tests/plugins/T10420
 /tests/polykinds/Freeman
 /tests/polykinds/MonoidsFD
 /tests/polykinds/MonoidsTF

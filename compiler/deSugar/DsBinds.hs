@@ -444,6 +444,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
            Right (rule_bndrs, _fn, args) -> do
 
        { dflags <- getDynFlags
+       ; this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
              unf_fvs   = stableUnfoldingVars fn_unf `orElse` emptyVarSet
              in_scope  = mkInScopeSet (unf_fvs `unionVarSet` exprsFreeVars args)
@@ -451,7 +452,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
-             rule =  mkRule False {- Not auto -} is_local_id
+             rule =  mkRule this_mod False {- Not auto -} is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
                         rule_bndrs args

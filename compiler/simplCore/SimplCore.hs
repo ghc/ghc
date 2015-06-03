@@ -14,7 +14,7 @@ import DynFlags
 import CoreSyn
 import HscTypes
 import CSE              ( cseProgram )
-import Rules            ( emptyRuleBase, mkRuleBase, unionRuleBase,
+import Rules            ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addSpecInfo, )
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
@@ -47,6 +47,7 @@ import Vectorise        ( vectorise )
 import FastString
 import SrcLoc
 import Util
+import Module
 
 import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
@@ -72,8 +73,10 @@ core2core hsc_env guts
        -- make sure all plugins are loaded
 
        ; let builtin_passes = getCoreToDo dflags
+             orph_mods = mkModuleSet (mg_module guts : dep_orphs (mg_deps guts))
        ;
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod print_unqual $
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
+                                    orph_mods print_unqual $
                            do { all_passes <- addPluginPasses builtin_passes
                               ; runCorePasses all_passes guts }
 
@@ -411,9 +414,11 @@ ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheckPass current_phase pat guts = do
     rb <- getRuleBase
     dflags <- getDynFlags
+    vis_orphs <- getVisibleOrphanMods
     liftIO $ Err.showPass dflags "RuleCheck"
     liftIO $ log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
-                 (ruleCheckProgram current_phase pat rb (mg_binds guts))
+                 (ruleCheckProgram current_phase pat
+                    (RuleEnv rb vis_orphs) (mg_binds guts))
     return guts
 
 
@@ -490,8 +495,9 @@ simplifyExpr dflags expr
 
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
-                                 simplExprGently (simplEnvForGHCi dflags) expr
+        ; (expr', counts) <- initSmpl dflags emptyRuleEnv
+                               emptyFamInstEnvs us sz
+                               (simplExprGently (simplEnvForGHCi dflags) expr)
 
         ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics" (pprSimplCount counts)
@@ -551,6 +557,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
               hsc_env us hpt_rule_base
               guts@(ModGuts { mg_module = this_mod
                             , mg_rdr_env = rdr_env
+                            , mg_deps = deps
                             , mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
@@ -639,10 +646,12 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            eps <- hscEPS hsc_env ;
            let  { rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
                 ; rule_base2 = extendRuleBaseList rule_base1 rules
-                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
+                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
+                ; vis_orphs = this_mod : dep_orphs deps } ;
 
                 -- Simplify the program
-           ((binds1, rules1), counts1) <- initSmpl dflags rule_base2 fam_envs us1 sz $
+           ((binds1, rules1), counts1) <-
+             initSmpl dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs us1 sz $
                do { env1 <- {-# SCC "SimplTopBinds" #-}
                             simplTopBinds simpl_env tagged_binds
 
