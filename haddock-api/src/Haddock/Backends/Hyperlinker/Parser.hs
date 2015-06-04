@@ -20,11 +20,18 @@ data Span = Span
     }
 
 data TokenType
-    = Identifier
-    | Comment
-    | Whitespace
-    | Operator
-    | Symbol
+    = TkIdentifier
+    | TkKeyword
+    | TkString
+    | TkChar
+    | TkNumber
+    | TkOperator
+    | TkGlyph
+    | TkSpecial
+    | TkSpace
+    | TkComment
+    | TkCpp
+    | TkUnknown
 
 parse :: String -> [Token]
 parse = tokenize . tag . chunk
@@ -66,4 +73,89 @@ tag =
         in (pos', (Span pos pos', c):cs)
 
 tokenize :: [(Span, String)] -> [Token]
-tokenize = undefined
+tokenize =
+    map aux
+  where
+    aux (sp, str) = Token
+        { tkType = classify str
+        , tkValue = str
+        , tkSpan = sp
+        }
+
+classify :: String -> TokenType
+classify (c:_)
+    | isSpace c = TkSpace
+    | isDigit c = TkNumber
+    | c `elem` special = TkSpecial
+    | c == '#' = TkCpp
+    | c == '"' = TkString
+    | c == '\'' = TkChar
+classify str
+    | str `elem` keywords = TkKeyword
+    | str `elem` glyphs = TkGlyph
+    | all (`elem` symbols) str = TkOperator
+    | "--" `isPrefixOf` str = TkComment
+    | "{-" `isPrefixOf` str = TkComment
+    | isIdentifier str = TkIdentifier
+    | otherwise = TkUnknown
+
+keywords :: [String]
+keywords =
+    [ "as"
+    , "case"
+    , "class"
+    , "data"
+    , "default"
+    , "deriving"
+    , "do"
+    , "else"
+    , "hiding"
+    , "if"
+    , "import"
+    , "in"
+    , "infix"
+    , "infixl"
+    , "infixr"
+    , "instance"
+    , "let"
+    , "module"
+    , "newtype"
+    , "of"
+    , "qualified"
+    , "then"
+    , "type"
+    , "where"
+    , "forall"
+    , "mdo"
+    ]
+
+glyphs :: [String]
+glyphs =
+    [ ".."
+    , ":"
+    , "::"
+    , "="
+    , "\\"
+    , "|"
+    , "<-"
+    , "->"
+    , "@"
+    , "~"
+    , "~#"
+    , "=>"
+    , "-"
+    , "!"
+    ]
+
+special :: [Char]
+special = "()[]{},;`"
+
+-- TODO: Add support for any Unicode symbol or punctuation.
+-- source: http://stackoverflow.com/questions/10548170/what-characters-are-permitted-for-haskell-operators
+symbols :: [Char]
+symbols = "!#$%&*+./<=>?@\\^|-~:"
+
+isIdentifier :: String -> Bool
+isIdentifier (c:str)
+    | isLetter c = all (\c' -> isAlphaNum c' || c == '\'') str
+isIdentifier _ = False
