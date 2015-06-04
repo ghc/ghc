@@ -1,4 +1,9 @@
-module Haddock.Backends.Hyperlinker.Parser (parse) where
+module Haddock.Backends.Hyperlinker.Parser
+    ( parse
+    , tkType, tkValue, tkSpan
+    , posRow, posCol
+    , spStart, spEnd
+    ) where
 
 import Data.Char
 import Data.List
