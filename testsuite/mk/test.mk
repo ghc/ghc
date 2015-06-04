@@ -213,6 +213,8 @@ RUNTEST_OPTS +=  \
 # function) would require another pair of (escaped) quotes, which interfers
 # with MinGW's magic path handling (see #10449, and
 # http://www.mingw.org/wiki/Posix_path_conversion).
+# We use double instead of single quotes, which may or may not be important
+# when using msys2 (#9626, #10441).
 quote_path = $(if $1,"$1")
 RUNTEST_OPTS +=  \
 	--config 'compiler=$(call quote_path,$(TEST_HC))' \

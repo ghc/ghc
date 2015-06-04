@@ -1786,25 +1786,9 @@ def rawSystem(cmd_and_args):
     else:
         return os.spawnv(os.P_WAIT, cmd, cmd_and_args)
 
-# When running under native msys Python, any invocations of non-msys binaries,
-# including timeout.exe, will have their arguments munged according to some
-# heuristics, which leads to malformed command lines (#9626).  The easiest way
-# to avoid problems is to invoke through /usr/bin/cmd which sidesteps argument
-# munging because it is a native msys application.
-def passThroughCmd(cmd_and_args):
-    args = []
-    # cmd needs a Windows-style path for its first argument.
-    args.append(cmd_and_args[0].replace('/', '\\'))
-    # Other arguments need to be quoted to deal with spaces.
-    args.extend(['"%s"' % arg for arg in cmd_and_args[1:]])
-    return ["cmd", "/c", " ".join(args)]
-
 # Note that this doesn't handle the timeout itself; it is just used for
 # commands that have timeout handling built-in.
 def rawSystemWithTimeout(cmd_and_args):
-    if config.os == 'mingw32' and sys.executable.startswith('/usr'):
-        # This is only needed when running under msys python.
-        cmd_and_args = passThroughCmd(cmd_and_args)
     r = rawSystem(cmd_and_args)
     if r == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
