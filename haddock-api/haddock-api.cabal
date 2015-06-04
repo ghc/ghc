@@ -79,6 +79,7 @@ library
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
     Haddock.Backends.Hoogle
+    Haddock.Backends.Hyperlinker.Parser
     Haddock.ModuleTree
     Haddock.Types
     Haddock.Doc
