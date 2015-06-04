@@ -1175,6 +1175,7 @@ sdist-testsuite-prep :
 	mkdir -p $(SRC_DIST_TESTSUITE_DIR)
 	mkdir -p $(SRC_DIST_TESTSUITE_DIR)/testsuite
 	cd $(SRC_DIST_TESTSUITE_DIR)/testsuite && lndir $(TOP)/testsuite
+	cd $(SRC_DIST_TESTSUITE_DIR) && $(MAKE) distclean
 
 .PHONY: sdist-ghc
 sdist-ghc: sdist-ghc-prep
