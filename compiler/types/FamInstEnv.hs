@@ -809,7 +809,7 @@ reduceTyFamApp_maybe envs role tc tys
   , FamInstMatch { fim_instance = fam_inst
                  , fim_tys =      inst_tys } : _ <- lookupFamInstEnv envs tc tys
       -- NB: Allow multiple matches because of compatible overlap
-                                                    
+
   = let ax     = famInstAxiom fam_inst
         co     = mkUnbranchedAxInstCo role ax inst_tys
         ty     = pSnd (coercionKind co)
@@ -1013,6 +1013,8 @@ coreFlattenTys in_scope = go []
 coreFlattenTy :: InScopeSet -> FlattenMap -> Type -> (FlattenMap, Type)
 coreFlattenTy in_scope = go
   where
+    go m ty | Just ty' <- coreView ty = go m ty'
+
     go m ty@(TyVarTy {}) = (m, ty)
     go m (AppTy ty1 ty2) = let (m1, ty1') = go m  ty1
                                (m2, ty2') = go m1 ty2 in
