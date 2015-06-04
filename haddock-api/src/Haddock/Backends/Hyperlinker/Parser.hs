@@ -67,10 +67,13 @@ tag =
     reverse . snd . foldl aux (Position 1 1, [])
   where
     aux (pos, cs) c =
-        let pos' = if c == "\n"
-                   then pos { posRow = posRow pos + 1, posCol = 1 }
-                   else pos { posCol = posCol pos + length c }
-        in (pos', (Span pos pos', c):cs)
+        let pos' = move pos c
+        in (pos', ((Span pos pos', c):cs))
+    move pos str@(c:_)
+        | isSpace c = foldl move' pos str
+    move pos str = pos { posCol = posCol pos + length str }
+    move' pos '\n' = pos { posRow = posRow pos + 1, posCol = 1 }
+    move' pos _ = pos { posCol = posCol pos + 1 }
 
 tokenize :: [(Span, String)] -> [Token]
 tokenize =
