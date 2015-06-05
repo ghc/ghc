@@ -497,14 +497,13 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
         pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
       ; stopWith ev "Discard given polytype equality" }
 
--- AppTys only decompose for nominal equality
 -- See Note [Canonicalising type applications] about why we require flat types
-can_eq_nc' True _rdr_env _envs ev NomEq (AppTy t1 s1) _ ty2 _
+can_eq_nc' True _rdr_env _envs ev eq_rel (AppTy t1 s1) _ ty2 _
   | Just (t2, s2) <- tcSplitAppTy_maybe ty2
-  = can_eq_app ev t1 s1 t2 s2
-can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ (AppTy t2 s2) _
+  = can_eq_app ev eq_rel t1 s1 t2 s2
+can_eq_nc' True _rdr_env _envs ev eq_rel ty1 _ (AppTy t2 s2) _
   | Just (t1, s1) <- tcSplitAppTy_maybe ty1
-  = can_eq_app ev t1 s1 t2 s2
+  = can_eq_app ev eq_rel t1 s1 t2 s2
 
 -- No similarity in type structure detected. Flatten and try again!
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
@@ -612,13 +611,21 @@ markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
   , not (isLocalGRE gre) ]
 
 ---------
--- ^ Decompose a type application. Nominal equality only!
+-- ^ Decompose a type application.
 -- All input types must be flat. See Note [Canonicalising type applications]
-can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
+can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
+           -> EqRel            -- r
            -> Xi -> Xi         -- s1 t1
            -> Xi -> Xi         -- s2 t2
            -> TcS (StopOrContinue Ct)
-can_eq_app ev s1 t1 s2 t2
+
+-- AppTys only decompose for nominal equality, so this case just leads
+-- to an irreducible constraint
+can_eq_app ev ReprEq _ _ _ _
+  = do { traceTcS "failing to decompose representational AppTy equality" (ppr ev)
+       ; continueWith (CIrredEvCan { cc_ev = ev }) }
+
+can_eq_app ev NomEq s1 t1 s2 t2
   | CtDerived { ctev_loc = loc } <- ev
   = do { emitNewDerivedEq loc (mkTcEqPred t1 t2)
        ; canEqNC ev NomEq s1 s2 }
