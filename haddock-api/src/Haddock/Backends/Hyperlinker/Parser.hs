@@ -35,6 +35,7 @@ data TokenType
     | TkSpace
     | TkComment
     | TkCpp
+    | TkPragma
     | TkUnknown
 
 parse :: String -> [Token]
@@ -92,6 +93,7 @@ tokenize =
 classify :: String -> TokenType
 classify str
     | "--" `isPrefixOf` str = TkComment
+    | "{-#" `isPrefixOf` str = TkPragma
     | "{-" `isPrefixOf` str = TkComment
 classify (c:_)
     | isSpace c = TkSpace
