@@ -90,6 +90,9 @@ tokenize =
         }
 
 classify :: String -> TokenType
+classify str
+    | "--" `isPrefixOf` str = TkComment
+    | "{-" `isPrefixOf` str = TkComment
 classify (c:_)
     | isSpace c = TkSpace
     | isDigit c = TkNumber
@@ -101,8 +104,6 @@ classify str
     | str `elem` keywords = TkKeyword
     | str `elem` glyphs = TkGlyph
     | all (`elem` symbols) str = TkOperator
-    | "--" `isPrefixOf` str = TkComment
-    | "{-" `isPrefixOf` str = TkComment
     | isIdentifier str = TkIdentifier
     | otherwise = TkUnknown
 
