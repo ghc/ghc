@@ -3,24 +3,39 @@ module Haddock.Backends.Hyperlinker.Renderer where
 import Haddock.Backends.Hyperlinker.Parser
 
 import Data.Monoid
-import Text.XHtml
+import Text.XHtml (Html, HtmlAttr, (!))
+import qualified Text.XHtml as Html
 
-render :: [Token] -> Html
-render = body . pre . foldr (<>) noHtml . map renderToken
+render :: Maybe FilePath -> [Token] -> Html
+render css tokens = header css <> body tokens
 
-renderToken :: Token -> Html
-renderToken (Token t v _) = thespan (toHtml v) ! tokenAttrs t
+body :: [Token] -> Html
+body = Html.body . Html.pre . mconcat . map token
+
+header :: Maybe FilePath -> Html
+header Nothing = Html.noHtml
+header (Just css) =
+    Html.header $ Html.thelink Html.noHtml ! attrs
+  where
+    attrs =
+        [ Html.rel "stylesheet"
+        , Html.href css
+        , Html.thetype "text/css"
+        ]
+
+token :: Token -> Html
+token (Token t v _) = Html.thespan (Html.toHtml v) ! tokenAttrs t
 
 tokenAttrs :: TokenType -> [HtmlAttr]
-tokenAttrs TkIdentifier = [theclass "hs-identifier"]
-tokenAttrs TkKeyword = [theclass "hs-keyword"]
-tokenAttrs TkString = [theclass "hs-string"]
-tokenAttrs TkChar = [theclass "hs-char"]
-tokenAttrs TkNumber = [theclass "hs-number"]
-tokenAttrs TkOperator = [theclass "hs-operator"]
-tokenAttrs TkGlyph = [theclass "hs-glyph"]
-tokenAttrs TkSpecial = [theclass "hs-special"]
+tokenAttrs TkIdentifier = [Html.theclass "hs-identifier"]
+tokenAttrs TkKeyword = [Html.theclass "hs-keyword"]
+tokenAttrs TkString = [Html.theclass "hs-string"]
+tokenAttrs TkChar = [Html.theclass "hs-char"]
+tokenAttrs TkNumber = [Html.theclass "hs-number"]
+tokenAttrs TkOperator = [Html.theclass "hs-operator"]
+tokenAttrs TkGlyph = [Html.theclass "hs-glyph"]
+tokenAttrs TkSpecial = [Html.theclass "hs-special"]
 tokenAttrs TkSpace = []
-tokenAttrs TkComment = [theclass "hs-comment"]
-tokenAttrs TkCpp = [theclass "hs-cpp"]
+tokenAttrs TkComment = [Html.theclass "hs-comment"]
+tokenAttrs TkCpp = [Html.theclass "hs-cpp"]
 tokenAttrs TkUnknown = []
