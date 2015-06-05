@@ -1,8 +1,7 @@
 module Haddock.Backends.Hyperlinker.Parser
     ( parse
-    , tkType, tkValue, tkSpan
-    , posRow, posCol
-    , spStart, spEnd
+    , Token(..), TokenType(..)
+    , Position(..), Span(..)
     ) where
 
 import Data.Char
