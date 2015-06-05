@@ -31,14 +31,13 @@ import HsSyn
 import Kind ( splitKindFunTys, synTyConResKind, isKind )
 import Name
 import PatSyn
-import PrelNames (ipClassName)
 import SrcLoc ( Located, noLoc, unLoc, noSrcSpan )
 import TcType ( tcSplitSigmaTy )
 import TyCon
 import Type (isStrLitTy, mkFunTys)
 import TypeRep
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName, eqTyCon )
+import TysWiredIn ( listTyConName, eqTyCon, ipTyCon )
 import Unique ( getUnique )
 import Var
 
@@ -349,7 +348,7 @@ synifyType _ (TyConApp tc tys)
   | getName tc == listTyConName, [ty] <- tys =
      noLoc $ HsListTy (synifyType WithinType ty)
   -- ditto for implicit parameter tycons
-  | tyConName tc == ipClassName
+  | tc == ipTyCon
   , [name, ty] <- tys
   , Just x <- isStrLitTy name
   = noLoc $ HsIParamTy (HsIPName x) (synifyType WithinType ty)
