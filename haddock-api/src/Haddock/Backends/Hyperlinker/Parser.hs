@@ -163,6 +163,9 @@ symbols :: [Char]
 symbols = "!#$%&*+./<=>?@\\^|-~:"
 
 isIdentifier :: String -> Bool
-isIdentifier (c:str)
-    | isLetter c = all (\c' -> isAlphaNum c' || c == '\'') str
+isIdentifier (s:str)
+    | (isLower' s || isUpper s) && all isAlphaNum' str = True
+  where
+    isLower' c = isLower c || c == '_'
+    isAlphaNum' c = isAlphaNum c || c == '_' || c == '\''
 isIdentifier _ = False
