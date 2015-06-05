@@ -1233,6 +1233,11 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
                           ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
+          -- class method-use deprecations (Trac #10071)
+          | '{-# DEPRECATED' deprecations '#-}'
+                    {% ams (sLL $1 $> $ unitOL $ sLL $1 $> $
+                       WarningD (Warnings (getDEPRECATED_PRAGs $1) (fromOL $2))) [mo $1,mc $3] }
+
 decls_cls :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
                                              then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
