@@ -432,7 +432,7 @@ can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | Just ty2' <- tcView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
 -- need to check for reflexivity in the ReprEq case.
--- See Note [AppTy reflexivity check] and Note [Eager reflexivity check]
+-- See Note [Eager reflexivity check]
 can_eq_nc' _flat _rdr_env _envs ev ReprEq ty1 _ ty2 _
   | ty1 `eqType` ty2
   = canEqReflexive ev ReprEq ty1
@@ -509,11 +509,6 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ (AppTy t2 s2) _
   | Just (t1, s1) <- tcSplitAppTy_maybe ty1
   = can_eq_app ev t1 s1 t2 s2
 
--- See Note [AppTy reflexivity check]
-can_eq_nc' _flat _rdr_env _envs ev ReprEq ty1@(AppTy {}) _ ty2@(AppTy {}) _
-  | ty1 `eqType` ty2
-  = canEqReflexive ev ReprEq ty1
-
 -- No similarity in type structure detected. Flatten and try again!
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
   = do { (xi1, co1) <- flatten FM_FlattenAll ev ps_ty1
@@ -571,8 +566,7 @@ equality because the flattener technology deals with the similar case
 Note that this check does not catch all cases, but it will catch the cases
 we're most worried about, types like X above that are actually inhabited.
 
-Note [AppTy reflexivity check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here's another place where this reflexivity check is key:
 Consider trying to prove (f a) ~R (f a). The AppTys in there can't
 be decomposed, because representational equality isn't congruent with respect
 to AppTy. So, when canonicalising the equality above, we get stuck and
