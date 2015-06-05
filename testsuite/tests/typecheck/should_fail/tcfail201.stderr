@@ -1,6 +1,6 @@
 
 tcfail201.hs:17:58: error:
-    Couldn't match expected type ‘a’ with actual type ‘HsDoc t0’
+    Couldn't match expected type ‘a’ with actual type ‘HsDoc id0’
       ‘a’ is a rigid type variable bound by
           the type signature for:
           gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)

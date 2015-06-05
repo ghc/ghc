@@ -316,9 +316,6 @@ situation can't happen.
 newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
-  | CtWanted {} <- flavor
-  = return ()
-
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
   = do { let size = sizePred (mkClassPred cls xis)
              loc' = case ctLocOrigin loc of
@@ -342,7 +339,7 @@ newSCWorkFromFlavored flavor cls xis
              impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
-       ; mapM_ (emitNewDerived loc) impr_theta }
+       ; emitNewDeriveds loc impr_theta }
 
 
 {-
@@ -629,7 +626,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
            -> TcS (StopOrContinue Ct)
 can_eq_app ev s1 t1 s2 t2
   | CtDerived { ctev_loc = loc } <- ev
-  = do { emitNewDerived loc (mkTcEqPred t1 t2)
+  = do { emitNewDerivedEq loc (mkTcEqPred t1 t2)
        ; canEqNC ev NomEq s1 s2 }
   | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
   = do { ev_s <- newWantedEvVarNC loc (mkTcEqPred s1 s2)
@@ -1058,7 +1055,7 @@ incompatibleKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible 
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
          -- Create a derived kind-equality, and solve it
-       ; emitNewDerived kind_co_loc (mkTcEqPred k1 k2)
+       ; emitNewDerivedEq kind_co_loc (mkTcEqPred k1 k2)
 
          -- Put the not-currently-soluble thing into the inert set
        ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
@@ -1477,7 +1474,7 @@ unify_derived loc role    orig_ty1 orig_ty2
                 Nothing   -> bale_out }
     go _ _ = bale_out
 
-    bale_out = emitNewDerived loc (mkTcEqPredRole role orig_ty1 orig_ty2)
+    bale_out = emitNewDerivedEq loc (mkTcEqPredRole role orig_ty1 orig_ty2)
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co

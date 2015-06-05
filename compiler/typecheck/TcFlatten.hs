@@ -6,7 +6,7 @@ module TcFlatten(
 
    unflatten,
 
-   eqCanRewrite, eqCanRewriteFR, canRewriteOrSame,
+   eqCanRewrite, eqCanRewriteFR, canDischarge,
    CtFlavourRole, ctEvFlavourRole, ctFlavourRole
  ) where
 
@@ -1052,10 +1052,10 @@ flatten_exact_fam_app_fully tc tys
 
         -- Now, look in the cache
        ; mb_ct <- liftTcS $ lookupFlatCache tc xis
-       ; flavour_role <- getFlavourRole
+       ; flavour <- getFlavour
        ; case mb_ct of
            Just (co, rhs_ty, flav)  -- co :: F xis ~ fsk
-             | (flav, NomEq) `canRewriteOrSameFR` flavour_role
+             | flav `canDischargeF` flavour
              ->  -- Usable hit in the flat-cache
                  -- We certainly *can* use a Wanted for a Wanted
                 do { traceFlat "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr rhs_ty)
@@ -1231,11 +1231,14 @@ guarantee that this recursive use will terminate.
       (T2) S(fw,t) = t     -- RHS of work-item is a fixpoint of S(fw,_)
       (T3) a not in t      -- No occurs check in the work item
 
-      (K1) if (a -fs-> s) is in S then not (fw >= fs)
-      (K2) if (b -fs-> s) is in S, where b /= a, then
+      (K1) for every (a -fs-> s) in S, then not (fw >= fs)
+
+      (K2) for every (b -fs-> s) in S, where b /= a, then
               (K2a) not (fs >= fs)
-           or (K2b) not (fw >= fs)
-           or (K2c) a not in s
+           or (K2b) fs >= fw
+           or (K2c) not (fw >= fs)
+           or (K2d) a not in s
+
       (K3) If (b -fs-> s) is in S with (fw >= fs), then
         (K3a) If the role of fs is nominal: s /= a
         (K3b) If the role of fs is representational: EITHER
@@ -1267,7 +1270,7 @@ The idea is that
   is a common case, hence good not to kick out.
 
 * Lemma (L1): The conditions of the Main Theorem imply that there is no
-              (a fs-> t) in S, s.t.  (fs >= fw).
+              (a -fs-> t) in S, s.t.  (fs >= fw).
   Proof. Suppose the contrary (fs >= fw).  Then because of (T1),
   S(fw,a)=a.  But since fs>=fw, S(fw,a) = s, hence s=a.  But now we
   have (a -fs-> a) in S, which contradicts (WF2).
@@ -1287,12 +1290,16 @@ The idea is that
 
     (NB: we could strengten K1) in this way too, but see K3.
 
-  - (K2b): If this holds, we can't pass through this triple infinitely
-    often, because if we did then fs>=f, fw>=f, hence fs>=fw,
-    contradicting (L1), or fw>=fs contradicting K2b.
+  - (K2b): If this holds then, by (T2), b is not in t.  So applying the
+    work item does not genenerate any new opportunities for applying S
 
-  - (K2c): if a not in s, we hae no further opportunity to apply the
-    work item.
+  - (K2c): If this holds, we can't pass through this triple infinitely
+    often, because if we did then fs>=f, fw>=f, hence by (R2)
+      * either fw>=fs, contradicting K2c
+      * or fs>=fw; so by the agument in K2b we can't have a loop
+
+  - (K2d): if a not in s, we hae no further opportunity to apply the
+    work item, similar to (K2b)
 
   NB: this reasoning isn't water tight.
 
@@ -1390,22 +1397,33 @@ flatten_tyvar :: TcTyVar
 
 flatten_tyvar tv
   | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
-  = Left `liftM` flattenTyVarFinal tv
-          -- So ty contains refernces to the non-TcTyVar a
+  = flatten_tyvar3 tv
+          -- So ty contains references to the non-TcTyVar a
 
   | otherwise
   = do { mb_ty <- liftTcS $ isFilledMetaTyVar_maybe tv
        ; role <- getRole
-       ; case mb_ty of {
+       ; case mb_ty of
            Just ty -> do { traceFlat "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
                          ; return (Right (ty, mkTcReflCo role ty)) } ;
-           Nothing ->
+           Nothing -> do { flavour_role <- getFlavourRole
+                         ; flatten_tyvar2  tv flavour_role } }
 
-    -- Try in the inert equalities
-    -- See Definition [Applying a generalised substitution]
-    do { ieqs <- liftTcS $ getInertEqs
-       ; flavour_role <- getFlavourRole
-       ; eq_rel <- getEqRel
+flatten_tyvar2 :: TcTyVar -> CtFlavourRole
+               -> FlatM (Either TyVar (TcType, TcCoercion))
+-- Try in the inert equalities
+-- See Definition [Applying a generalised substitution]
+
+flatten_tyvar2 tv (Derived, role)
+  = ASSERT( role == NomEq )    -- All derived equalities are nominal
+    do { model <- liftTcS $ getInertModel
+       ; case lookupVarEnv model tv of
+           Just (_,ty) -> return (Right (ty, pprTrace "flatten_tyvar2" (ppr tv $$ ppr ty) (mkTcReflCo Nominal ty)))
+                              -- Evidence is irrelevant for Derived contexts
+           Nothing -> flatten_tyvar3 tv }
+
+flatten_tyvar2 tv flavour_role@(_, eq_rel)
+  = do { ieqs <- liftTcS $ getInertEqs
        ; case lookupVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
@@ -1426,15 +1444,15 @@ flatten_tyvar tv
                     -- we are not going to touch the returned coercion
                     -- so ctEvCoercion is fine.
 
-           _other -> Left `liftM` flattenTyVarFinal tv
-    } } }
+           _other -> flatten_tyvar3 tv }
 
-flattenTyVarFinal :: TcTyVar -> FlatM TyVar
-flattenTyVarFinal tv
+flatten_tyvar3 :: TcTyVar -> FlatM (Either TyVar a)
+-- Always returns Left!
+flatten_tyvar3 tv
   = -- Done, but make sure the kind is zonked
-    do { let kind       = tyVarKind tv
+    do { let kind = tyVarKind tv
        ; (new_knd, _kind_co) <- setMode FM_SubstOnly $ flatten_one kind
-       ; return (setVarType tv new_knd) }
+       ; return (Left (setVarType tv new_knd)) }
 
 {-
 Note [An alternative story for the inert substitution]
@@ -1509,18 +1527,6 @@ casee, so we don't care.
 eqCanRewrite :: CtEvidence -> CtEvidence -> Bool
 eqCanRewrite ev1 ev2 = ctEvFlavourRole ev1 `eqCanRewriteFR` ctEvFlavourRole ev2
 
--- | Whether or not one 'Ct' can rewrite another is determined by its
--- flavour and its equality relation
-type CtFlavourRole = (CtFlavour, EqRel)
-
--- | Extract the flavour and role from a 'CtEvidence'
-ctEvFlavourRole :: CtEvidence -> CtFlavourRole
-ctEvFlavourRole ev = (ctEvFlavour ev, ctEvEqRel ev)
-
--- | Extract the flavour and role from a 'Ct'
-ctFlavourRole :: Ct -> CtFlavourRole
-ctFlavourRole = ctEvFlavourRole . cc_ev
-
 eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- Very important function!
 -- See Note [eqCanRewrite]
@@ -1531,13 +1537,16 @@ eqCanRewriteFR (Given,   ReprEq)  (_,       ReprEq) = True
 eqCanRewriteFR (Derived, NomEq)   (Derived, NomEq)  = True
 eqCanRewriteFR _                 _                  = False
 
-canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
+canDischarge :: CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewriteOrSame]
-canRewriteOrSame ev1 ev2 = ev1 `eqCanRewrite` ev2 ||
-                           ctEvFlavourRole ev1 == ctEvFlavourRole ev2
+canDischarge ev1 ev2 = ctEvFlavour ev1 `canDischargeF` ctEvFlavour ev2
 
-canRewriteOrSameFR :: CtFlavourRole -> CtFlavourRole -> Bool
-canRewriteOrSameFR fr1 fr2 = fr1 `eqCanRewriteFR` fr2 || fr1 == fr2
+canDischargeF :: CtFlavour -> CtFlavour -> Bool
+canDischargeF Given  _        = True
+canDischargeF Wanted Wanted   = True
+canDischargeF Wanted Derived  = True
+canDischargeF Derived Derived = True
+canDischargeF _       _       = False
 
 {- Note [eqCanRewrite]
 ~~~~~~~~~~~~~~~~~~~

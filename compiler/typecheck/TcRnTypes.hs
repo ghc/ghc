@@ -87,6 +87,7 @@ module TcRnTypes(
         getEvBindsTcPluginM_maybe,
 
         CtFlavour(..), ctEvFlavour,
+        CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -1802,6 +1803,19 @@ ctEvFlavour :: CtEvidence -> CtFlavour
 ctEvFlavour (CtWanted {})  = Wanted
 ctEvFlavour (CtGiven {})   = Given
 ctEvFlavour (CtDerived {}) = Derived
+
+-- | Whether or not one 'Ct' can rewrite another is determined by its
+-- flavour and its equality relation
+type CtFlavourRole = (CtFlavour, EqRel)
+
+-- | Extract the flavour and role from a 'CtEvidence'
+ctEvFlavourRole :: CtEvidence -> CtFlavourRole
+ctEvFlavourRole ev = (ctEvFlavour ev, ctEvEqRel ev)
+
+-- | Extract the flavour and role from a 'Ct'
+ctFlavourRole :: Ct -> CtFlavourRole
+ctFlavourRole = ctEvFlavourRole . cc_ev
+
 
 {-
 ************************************************************************
