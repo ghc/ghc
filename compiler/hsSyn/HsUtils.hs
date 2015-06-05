@@ -504,9 +504,10 @@ mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = CoPat co_fn p ty
 
+-- input coercion is Nominal
 mkHsWrapPatCo :: TcCoercion -> Pat id -> Type -> Pat id
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
-                        | otherwise     = CoPat (mkWpCast co) pat ty
+                        | otherwise     = CoPat (mkWpCast (mkTcSubCo co)) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
