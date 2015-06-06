@@ -59,6 +59,7 @@ library
     Documentation.Haddock
     Haddock.Backends.Hyperlinker.Parser
     Haddock.Backends.Hyperlinker.Renderer
+    Haddock.Backends.Hyperlinker.Ast
 
   other-modules:
     Haddock
