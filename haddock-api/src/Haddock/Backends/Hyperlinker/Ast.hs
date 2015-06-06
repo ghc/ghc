@@ -1,6 +1,9 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Haddock.Backends.Hyperlinker.Ast where
+module Haddock.Backends.Hyperlinker.Ast
+    ( enrich
+    , RichToken(..)
+    ) where
 
 import Haddock.Backends.Hyperlinker.Parser
 

@@ -1,4 +1,4 @@
-module Haddock.Backends.Hyperlinker.Renderer where
+module Haddock.Backends.Hyperlinker.Renderer (render) where
 
 import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Ast
