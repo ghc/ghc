@@ -29,6 +29,7 @@ $$(error $1_$2_PROGNAME is not set)
 endif
 ifneq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is set)
+endif
 $1_$2_PROG = $$($1_$2_PROGNAME)
 
 ifneq "$$($$($1_$2_PROG)_INPLACE)" ""
@@ -38,7 +39,6 @@ ifeq "$$($1_$2_TOPDIR)" "YES"
 $$($1_$2_PROG)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
 else
 $$($1_$2_PROG)_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
-endif
 endif
 
 $1_$2_INPLACE = $$($$($1_$2_PROG)_INPLACE)
