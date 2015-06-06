@@ -48,5 +48,5 @@ matches tspan (GHC.RealSrcSpan aspan)
     rs = (posRow . spStart) tspan == GHC.srcSpanStartLine aspan
     cs = (posCol . spStart) tspan == GHC.srcSpanStartCol aspan
     re = (posRow . spEnd) tspan == GHC.srcSpanEndLine aspan
-    ce = (posCol . spEnd) tspan == GHC.srcSpanStartLine aspan
+    ce = (posCol . spEnd) tspan == GHC.srcSpanEndCol aspan
 matches _ _ = False
