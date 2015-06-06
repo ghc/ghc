@@ -517,7 +517,7 @@ mkExportItems
       case findDecl t of
         ([L l (ValD _)], (doc, _)) -> do
           -- Top-level binding without type signature
-          export <- hiValExportItem dflags t doc (l `elem` splices) $ M.lookup t fixMap
+          export <- hiValExportItem dflags t l doc (l `elem` splices) $ M.lookup t fixMap
           return [export]
         (ds, docs_) | decl : _ <- filter (not . isValD . unLoc) ds ->
           let declNames = getMainDeclBinder (unL decl)
@@ -620,13 +620,19 @@ hiDecl dflags t = do
                    O.text "-- Please report this on Haddock issue tracker!"
       bugWarn = O.showSDoc dflags . warnLine
 
-hiValExportItem :: DynFlags -> Name -> DocForDecl Name -> Bool -> Maybe Fixity -> ErrMsgGhc (ExportItem Name)
-hiValExportItem dflags name doc splice fixity = do
+-- | This function is called for top-level bindings without type signatures.
+-- It gets the type signature from GHC and that means it's not going to
+-- have a meaningful 'SrcSpan'. So we pass down 'SrcSpan' for the
+-- declaration and use it instead - 'nLoc' here.
+hiValExportItem :: DynFlags -> Name -> SrcSpan -> DocForDecl Name -> Bool
+                -> Maybe Fixity -> ErrMsgGhc (ExportItem Name)
+hiValExportItem dflags name nLoc doc splice fixity = do
   mayDecl <- hiDecl dflags name
   case mayDecl of
     Nothing -> return (ExportNoDecl name [])
-    Just decl -> return (ExportDecl decl doc [] [] fixities splice)
+    Just decl -> return (ExportDecl (fixSpan decl) doc [] [] fixities splice)
   where
+    fixSpan (L l t) = L (SrcLoc.combineSrcSpans l nLoc) t
     fixities = case fixity of
       Just f  -> [(name, f)]
       Nothing -> []
@@ -737,7 +743,7 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
       | name:_ <- collectHsBindBinders d, Just [L _ (ValD _)] <- M.lookup name declMap =
           -- Top-level binding without type signature.
           let (doc, _) = lookupDocs name warnings docMap argMap subMap in
-          fmap Just (hiValExportItem dflags name doc (l `elem` splices) $ M.lookup name fixMap)
+          fmap Just (hiValExportItem dflags name l doc (l `elem` splices) $ M.lookup name fixMap)
       | otherwise = return Nothing
     mkExportItem decl@(L l (InstD d))
       | Just name <- M.lookup (getInstLoc d) instMap =
