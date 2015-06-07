@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Haddock.Backends.Hyperlinker.Ast
     ( enrich
@@ -26,6 +27,7 @@ data TokenDetails = TokenDetails
 data RichTokenType
     = RtkVar
     | RtkType
+    | RtkBind
 
 enrich :: GHC.RenamedSource -> [Token] -> [RichToken]
 enrich src =
@@ -34,7 +36,7 @@ enrich src =
         , rtkDetails = lookupBySpan (tkSpan token) detailsMap
         }
   where
-    detailsMap = variables src ++ types src
+    detailsMap = variables src ++ types src ++ binds src
 
 type DetailsMap = [(GHC.SrcSpan, TokenDetails)]
 
@@ -44,6 +46,9 @@ lookupBySpan tspan = listToMaybe . map snd . filter (matches tspan . fst)
 everything :: (r -> r -> r) -> (forall a. Data a => a -> r)
            -> (forall a. Data a => a -> r)
 everything k f x = foldl k (f x) (gmapQ (everything k f) x)
+
+combine :: Alternative f => (forall a. Data a => a -> f r) -> (forall a. Data a => a -> f r) -> (forall a. Data a => a -> f r)
+combine f g x = f x <|> g x
 
 variables :: GHC.RenamedSource -> DetailsMap
 variables =
@@ -61,6 +66,19 @@ types =
     ty term = case cast term of
         (Just (GHC.L sspan (GHC.HsTyVar name))) ->
             pure (sspan, TokenDetails RtkType name)
+        _ -> empty
+
+binds :: GHC.RenamedSource -> DetailsMap
+binds =
+    everything (<|>) (fun `combine` pat)
+  where
+    fun term = case cast term of
+        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name)) ->
+            pure (sspan, TokenDetails RtkBind name)
+        _ -> empty
+    pat term = case cast term of
+        (Just (GHC.L sspan (GHC.VarPat name))) ->
+            pure (sspan, TokenDetails RtkBind name)
         _ -> empty
 
 matches :: Span -> GHC.SrcSpan -> Bool

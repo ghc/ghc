@@ -48,6 +48,7 @@ tokenSpan = Html.thespan . Html.toHtml . tkValue
 richTokenStyle :: RichTokenType -> [StyleClass]
 richTokenStyle RtkVar = ["hs-var"]
 richTokenStyle RtkType = ["hs-type"]
+richTokenStyle RtkBind = ["hs-bind"]
 
 tokenStyle :: TokenType -> [StyleClass]
 tokenStyle TkIdentifier = ["hs-identifier"]
