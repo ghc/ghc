@@ -6,9 +6,13 @@ import Haddock.Backends.Hyperlinker.Ast
 import qualified GHC
 import qualified Name as GHC
 
+import Data.List
 import Data.Monoid
+
 import Text.XHtml (Html, HtmlAttr, (!))
 import qualified Text.XHtml as Html
+
+type StyleClass = String
 
 render :: Maybe FilePath -> [RichToken] -> Html
 render css tokens = header css <> body tokens
@@ -28,29 +32,43 @@ header (Just css) =
         ]
 
 richToken :: RichToken -> Html
-richToken (RichToken t Nothing) = token t
-richToken (RichToken t (Just name)) = Html.anchor (token t) ! nameAttrs name
+richToken (RichToken tok Nothing) =
+    tokenSpan tok ! attrs
+  where
+    attrs = [ multiclass . tokenStyle . tkType $ tok ]
+richToken (RichToken tok (Just det)) =
+    Html.anchor content ! (anchorAttrs . rtkName) det
+  where
+    content = tokenSpan tok ! [ multiclass style]
+    style = (tokenStyle . tkType) tok ++ (richTokenStyle . rtkType) det
 
-token :: Token -> Html
-token (Token t v _) = Html.thespan (Html.toHtml v) ! tokenAttrs t
+tokenSpan :: Token -> Html
+tokenSpan = Html.thespan . Html.toHtml . tkValue
 
-tokenAttrs :: TokenType -> [HtmlAttr]
-tokenAttrs TkIdentifier = [Html.theclass "hs-identifier"]
-tokenAttrs TkKeyword = [Html.theclass "hs-keyword"]
-tokenAttrs TkString = [Html.theclass "hs-string"]
-tokenAttrs TkChar = [Html.theclass "hs-char"]
-tokenAttrs TkNumber = [Html.theclass "hs-number"]
-tokenAttrs TkOperator = [Html.theclass "hs-operator"]
-tokenAttrs TkGlyph = [Html.theclass "hs-glyph"]
-tokenAttrs TkSpecial = [Html.theclass "hs-special"]
-tokenAttrs TkSpace = []
-tokenAttrs TkComment = [Html.theclass "hs-comment"]
-tokenAttrs TkCpp = [Html.theclass "hs-cpp"]
-tokenAttrs TkPragma = [Html.theclass "hs-pragma"]
-tokenAttrs TkUnknown = []
+richTokenStyle :: RichTokenType -> [StyleClass]
+richTokenStyle RtkVar = ["hs-var"]
+richTokenStyle RtkType = ["hs-type"]
 
-nameAttrs :: GHC.Name -> [HtmlAttr]
-nameAttrs name =
+tokenStyle :: TokenType -> [StyleClass]
+tokenStyle TkIdentifier = ["hs-identifier"]
+tokenStyle TkKeyword = ["hs-keyword"]
+tokenStyle TkString = ["hs-string"]
+tokenStyle TkChar = ["hs-char"]
+tokenStyle TkNumber = ["hs-number"]
+tokenStyle TkOperator = ["hs-operator"]
+tokenStyle TkGlyph = ["hs-glyph"]
+tokenStyle TkSpecial = ["hs-special"]
+tokenStyle TkSpace = []
+tokenStyle TkComment = ["hs-comment"]
+tokenStyle TkCpp = ["hs-cpp"]
+tokenStyle TkPragma = ["hs-pragma"]
+tokenStyle TkUnknown = []
+
+multiclass :: [StyleClass] -> HtmlAttr
+multiclass = Html.theclass . intercalate " "
+
+anchorAttrs :: GHC.Name -> [HtmlAttr]
+anchorAttrs name =
     [ Html.href (maybe "" id mmod ++ "#" ++ ident)
     , Html.theclass "varid-reference"
     ]

@@ -2,7 +2,7 @@
 
 module Haddock.Backends.Hyperlinker.Ast
     ( enrich
-    , RichToken(..)
+    , RichToken(..), RichTokenType(..), TokenDetails(..)
     ) where
 
 import Haddock.Backends.Hyperlinker.Parser
@@ -15,33 +15,52 @@ import Data.Maybe
 
 data RichToken = RichToken
     { rtkToken :: Token
-    , rtkName :: Maybe GHC.Name
+    , rtkDetails :: Maybe TokenDetails
     }
+
+data TokenDetails = TokenDetails
+    { rtkType :: RichTokenType
+    , rtkName :: GHC.Name
+    }
+
+data RichTokenType
+    = RtkVar
+    | RtkType
 
 enrich :: GHC.RenamedSource -> [Token] -> [RichToken]
 enrich src =
     map $ \token -> RichToken
         { rtkToken = token
-        , rtkName = lookupBySpan (tkSpan token) nameMap
+        , rtkDetails = lookupBySpan (tkSpan token) detailsMap
         }
   where
-    nameMap = variables src
+    detailsMap = variables src ++ types src
 
-type NameMap = [(GHC.SrcSpan, GHC.Name)]
+type DetailsMap = [(GHC.SrcSpan, TokenDetails)]
 
-lookupBySpan :: Span -> NameMap -> Maybe GHC.Name
+lookupBySpan :: Span -> DetailsMap -> Maybe TokenDetails
 lookupBySpan tspan = listToMaybe . map snd . filter (matches tspan . fst)
 
 everything :: (r -> r -> r) -> (forall a. Data a => a -> r)
            -> (forall a. Data a => a -> r)
 everything k f x = foldl k (f x) (gmapQ (everything k f) x)
 
-variables :: GHC.RenamedSource -> NameMap
+variables :: GHC.RenamedSource -> DetailsMap
 variables =
     everything (<|>) var
   where
     var term = case cast term of
-        (Just (GHC.L sspan (GHC.HsVar sid))) -> pure (sspan, sid)
+        (Just (GHC.L sspan (GHC.HsVar name))) ->
+            pure (sspan, TokenDetails RtkVar name)
+        _ -> empty
+
+types :: GHC.RenamedSource -> DetailsMap
+types =
+    everything (<|>) ty
+  where
+    ty term = case cast term of
+        (Just (GHC.L sspan (GHC.HsTyVar name))) ->
+            pure (sspan, TokenDetails RtkType name)
         _ -> empty
 
 matches :: Span -> GHC.SrcSpan -> Bool
