@@ -45,3 +45,22 @@ format.
 #### Contributing
 
 Please create issues when you have any problems and pull requests if you have some code.
+
+###### Hacking
+
+To get started you'll need a latest GHC release installed.
+
+  git clone https://github.com/haskell/haddock.git
+  cd haddock
+  cabal sandbox init
+  cabal sandbox add-source haddock-library
+  cabal sandbox add-source haddock-api
+  # adjust -j to the number of cores you want to use
+  cabal install -j4 --dependencies-only --enable-tests
+  cabal configure --enable-tests
+  cabal build -j4
+  # run the test suite
+  cabal test
+
+If you want to build against `GHC HEAD`, `ghc-head` is the corresponding branch.
+Note that it doesn't have to be up to date. 
