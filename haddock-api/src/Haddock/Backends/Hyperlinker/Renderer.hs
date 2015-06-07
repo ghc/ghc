@@ -5,6 +5,7 @@ import Haddock.Backends.Hyperlinker.Ast
 
 import qualified GHC
 import qualified Name as GHC
+import qualified Unique as GHC
 
 import Data.List
 import Data.Monoid
@@ -37,7 +38,7 @@ richToken (RichToken tok Nothing) =
   where
     attrs = [ multiclass . tokenStyle . tkType $ tok ]
 richToken (RichToken tok (Just det)) =
-    Html.anchor content ! (anchorAttrs . rtkName) det
+    internalAnchor det . hyperlink det $ content
   where
     content = tokenSpan tok ! [ multiclass style]
     style = (tokenStyle . tkType) tok ++ (richTokenStyle . rtkType) det
@@ -48,7 +49,7 @@ tokenSpan = Html.thespan . Html.toHtml . tkValue
 richTokenStyle :: RichTokenType -> [StyleClass]
 richTokenStyle RtkVar = ["hs-var"]
 richTokenStyle RtkType = ["hs-type"]
-richTokenStyle RtkBind = ["hs-bind"]
+richTokenStyle RtkBind = []
 
 tokenStyle :: TokenType -> [StyleClass]
 tokenStyle TkIdentifier = ["hs-identifier"]
@@ -68,11 +69,26 @@ tokenStyle TkUnknown = []
 multiclass :: [StyleClass] -> HtmlAttr
 multiclass = Html.theclass . intercalate " "
 
-anchorAttrs :: GHC.Name -> [HtmlAttr]
-anchorAttrs name =
-    [ Html.href (maybe "" id mmod ++ "#" ++ ident)
-    , Html.theclass "varid-reference"
-    ]
+internalAnchor :: TokenDetails -> Html -> Html
+internalAnchor (TokenDetails RtkBind name) content =
+    Html.anchor content ! [ Html.name $ internalAnchorIdent name ]
+internalAnchor _ content = content
+
+internalAnchorIdent :: GHC.Name -> String
+internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
+
+hyperlink :: TokenDetails -> Html -> Html
+hyperlink (TokenDetails _ name) = if GHC.isInternalName name
+    then internalHyperlink name
+    else externalHyperlink name
+
+internalHyperlink :: GHC.Name -> Html -> Html
+internalHyperlink name content =
+    Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
+
+externalHyperlink :: GHC.Name -> Html -> Html
+externalHyperlink name content =
+    Html.anchor content ! [ Html.href $ maybe "" id mmod ++ "#" ++ ident ]
   where
     mmod = GHC.moduleNameString . GHC.moduleName <$> GHC.nameModule_maybe name
     ident = GHC.occNameString . GHC.nameOccName $ name
