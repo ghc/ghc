@@ -50,6 +50,7 @@ Please create issues when you have any problems and pull requests if you have so
 
 To get started you'll need a latest GHC release installed.
 
+```bash
   git clone https://github.com/haskell/haddock.git
   cd haddock
   cabal sandbox init
@@ -61,6 +62,7 @@ To get started you'll need a latest GHC release installed.
   cabal build -j4
   # run the test suite
   cabal test
+```
 
 If you want to build against `GHC HEAD`, `ghc-head` is the corresponding branch.
 Note that it doesn't have to be up to date. 
