@@ -241,7 +241,7 @@ cmmLabelOff :: CLabel -> Int -> CmmLit
 cmmLabelOff lbl 0        = CmmLabel lbl
 cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
 
--- | Useful for creating an index into an array, with a staticaly known offset.
+-- | Useful for creating an index into an array, with a statically known offset.
 -- The type is the element type; used for making the multiplier
 cmmIndex :: DynFlags
          -> Width       -- Width w

@@ -1692,7 +1692,7 @@ initLinker_ (int retain_cafs)
         barf("ghciInsertSymbolTable failed");
     }
 
-    // Redurect newCAF to newRetainedCAF if retain_cafs is true.
+    // Redirect newCAF to newRetainedCAF if retain_cafs is true.
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
                                 MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
                                 retain_cafs ? newRetainedCAF : newGCdCAF,
