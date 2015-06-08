@@ -33,7 +33,7 @@ enrich :: GHC.RenamedSource -> [Token] -> [RichToken]
 enrich src =
     map $ \token -> RichToken
         { rtkToken = token
-        , rtkDetails = lookupBySpan (tkSpan token) detailsMap
+        , rtkDetails = enrichToken token detailsMap
         }
   where
     detailsMap = concat
@@ -44,6 +44,11 @@ enrich src =
         ]
 
 type DetailsMap = [(GHC.SrcSpan, TokenDetails)]
+
+enrichToken :: Token -> DetailsMap -> Maybe TokenDetails
+enrichToken (Token typ _ spn) dm
+    | typ `elem` [TkIdentifier, TkOperator] = lookupBySpan spn dm
+enrichToken _ _ = Nothing
 
 lookupBySpan :: Span -> DetailsMap -> Maybe TokenDetails
 lookupBySpan tspan = listToMaybe . map snd . filter (matches tspan . fst)

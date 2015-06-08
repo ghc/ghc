@@ -37,6 +37,7 @@ data TokenType
     | TkCpp
     | TkPragma
     | TkUnknown
+    deriving (Eq)
 
 parse :: String -> [Token]
 parse = tokenize . tag . chunk
