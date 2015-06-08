@@ -7,7 +7,6 @@ module Expression.Settings (
     arg, args,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
     -- argBuilderPath, argStagedBuilderPath,
-    -- argWithBuilder, argWithStagedBuilder,
     -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     -- argIncludeDirs, argDepIncludeDirs,
     -- argConcat, argConcatPath, argConcatSpace,
@@ -19,31 +18,31 @@ import Base hiding (Args, arg, args)
 import Oracles hiding (not)
 import Expression
 
-type Settings m = Expression m [String]
+type Settings = Expression [String]
 
 -- A single argument
-arg :: Monad m => String -> Settings m
+arg :: String -> Settings
 arg = return . return
 
 -- A list of arguments
-args :: Monad m => [String] -> Settings m
+args :: [String] -> Settings
 args = return
 
-argConfig :: String -> Settings Action
+argConfig :: String -> Settings
 argConfig = lift . fmap return . askConfig
 
-argConfigList :: String -> Settings Action
+argConfigList :: String -> Settings
 argConfigList = lift . fmap words . askConfig
 
 stagedKey :: Stage -> String -> String
 stagedKey stage key = key ++ "-stage" ++ show stage
 
-argStagedConfig :: String -> Settings Action
+argStagedConfig :: String -> Settings
 argStagedConfig key = do
     stage <- asks getStage
     argConfig (stagedKey stage key)
 
-argStagedConfigList :: String -> Settings Action
+argStagedConfigList :: String -> Settings
 argStagedConfigList key = do
     stage <- asks getStage
     argConfigList (stagedKey stage key)

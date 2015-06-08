@@ -6,11 +6,12 @@ module Settings (
 
 import Base hiding (arg, args, Args)
 import Rules.Data
-import Switches
 import Oracles.Builder
-import Expression.Base
+import Expression
+import Expression.Settings
 
 buildSettings :: Settings
-buildSettings = msum
-    [ builder       GhcCabal ? cabalSettings
-    , stagedBuilder GhcPkg   ? ghcPkgSettings ]
+buildSettings = do
+    stage <- asks getStage
+    mconcat [ builder GhcCabal ? cabalSettings
+            , builder (GhcPkg stage) ? ghcPkgSettings ]

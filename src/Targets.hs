@@ -1,5 +1,5 @@
 module Targets (
-    targetWays, targetPackages, targetDirectories,
+    targetWays, targetPackages, targetDirectory, packagePredicate,
     customConfigureSettings,
     array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
     directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
@@ -15,28 +15,42 @@ import Expression
 import Expression.Settings
 
 -- These are the packages we build
-targetPackages :: Packages Action
-targetPackages = mconcat
-    [ stage Stage0 ? packagesStage0
-    , stage Stage1 ? packagesStage1 ]
+targetPackages :: [Package]
+targetPackages =
+    [ array, base, binPackageDb, binary, bytestring, cabal, compiler
+    , containers, deepseq, directory, filepath, ghcPrim, haskeline
+    , hoopl, hpc, integerLibrary, parallel, pretty, primitive, process
+    , stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
 
-packagesStage0 :: Packages Action
-packagesStage0 = mconcat
-    [ return [ binPackageDb, binary, cabal, hoopl, hpc, transformers ]
-    , notWindowsHost ? notTargetOs "ios" ? return [terminfo] ]
-
-packagesStage1 :: Packages Action
-packagesStage1 = mconcat
-    [ packagesStage0
-    , return [ array, base, bytestring, containers, deepseq, directory
-             , filepath, ghcPrim, haskeline, integerLibrary, parallel
-             , pretty, primitive, process, stm, templateHaskell, time ]
-    , notWindowsHost ? return [unix]
-    , windowsHost    ? return [win32]
-    , buildHaddock   ? return [xhtml] ]
+-- Some packages are built conditionally
+-- TODO: make this function total (it only reads stage from the environment)
+packagePredicate :: Package -> Predicate
+packagePredicate pkg = do
+    stage   <- asks getStage
+    windows <- windowsHost
+    ios     <- targetOs "ios"
+    haddock <- buildHaddock
+    let result
+            | stage == Stage0 && pkg `notElem`
+                [ binPackageDb
+                , binary
+                , cabal
+                , compiler
+                , hoopl
+                , hpc
+                , terminfo
+                , transformers ] = False
+            | pkg == terminfo    = not windows && not ios
+            | pkg == unix        = not windows
+            | pkg == win32       = windows
+            | pkg == xhtml       = haddock
+            | stage == Stage0    = True
+            | stage == Stage1    = True
+            | otherwise          = False -- TODO: enable Stage2
+    return result
 
 -- Packages will be build these ways
-targetWays :: Ways Action
+targetWays :: Ways
 targetWays = mconcat
     [                              return [Ways.vanilla] -- always build vanilla
     , notStage Stage0            ? return [Ways.profiling]
@@ -47,15 +61,11 @@ targetWays = mconcat
 -- * build/           : contains compiled object code
 -- * doc/             : produced by haddock
 -- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
-targetDirectories :: Monad m => TargetDir m
-targetDirectories = do
-    stage   <- asks getStage
-    package <- asks getPackage
-    let targetDir
-            | package == compiler = "stage" ++ show (succ stage)
-            | stage   == Stage0   = "dist-boot"
-            | otherwise           = "dist-install"
-    return targetDir
+targetDirectory :: Stage -> Package -> FilePath
+targetDirectory stage package
+    | package == compiler = "stage" ++ show (1 + fromEnum stage)
+    | stage   == Stage0   = "dist-boot"
+    | otherwise           = "dist-install"
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
@@ -106,7 +116,7 @@ integerLibraryCabal = case integerLibraryImpl of
     IntegerSimple -> "integer-simple.cabal"
 
 -- Custom configure settings for packages
-customConfigureSettings :: Settings Action
+customConfigureSettings :: Settings
 customConfigureSettings = mconcat
     [ package base           ? arg ("--flags=" ++ integerLibraryName)
     , package ghcPrim        ? arg "--flag=include-ghc-prim"

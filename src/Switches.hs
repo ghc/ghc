@@ -8,14 +8,13 @@ module Switches (
     gccIsClang, gccLt46, windowsHost, notWindowsHost
     ) where
 
-import Base
 import Expression
 
 -- User-defined switches
-buildHaddock :: Monad m => Predicate m
+buildHaddock :: Predicate
 buildHaddock = return True
 
-validating :: Monad m => Predicate m
+validating :: Predicate
 validating = return False
 
 -- Support for multiple integer library implementations
@@ -25,28 +24,28 @@ integerLibraryImpl :: IntegerLibraryImpl
 integerLibraryImpl = IntegerGmp2
 
 -- Predicates based on configuration files
-supportsPackageKey :: Predicate Action
+supportsPackageKey :: Predicate
 supportsPackageKey = configKeyYes "supports-package-key"
 
-targetPlatforms :: [String] -> Predicate Action
+targetPlatforms :: [String] -> Predicate
 targetPlatforms = configKeyValues "target-platform-full"
 
-targetPlatform :: String -> Predicate Action
+targetPlatform :: String -> Predicate
 targetPlatform s = targetPlatforms [s]
 
-targetOss :: [String] -> Predicate Action
+targetOss :: [String] -> Predicate
 targetOss = configKeyValues "target-os"
 
-targetOs :: String -> Predicate Action
+targetOs :: String -> Predicate
 targetOs s = targetOss [s]
 
-notTargetOs :: String -> Predicate Action
-notTargetOs = fmap not . targetOs
+notTargetOs :: String -> Predicate
+notTargetOs = liftM not . targetOs
 
-targetArchs :: [String] -> Predicate Action
+targetArchs :: [String] -> Predicate
 targetArchs = configKeyValues "target-arch"
 
-platformSupportsSharedLibs :: Predicate Action
+platformSupportsSharedLibs :: Predicate
 platformSupportsSharedLibs = do
     badPlatform   <- targetPlatforms [ "powerpc-unknown-linux"
                                      , "x86_64-unknown-mingw32"
@@ -55,10 +54,10 @@ platformSupportsSharedLibs = do
     solarisBroken <- configKeyYes "solaris-broken-shld"
     return $ not (badPlatform || solaris && solarisBroken)
 
-dynamicGhcPrograms :: Predicate Action
+dynamicGhcPrograms :: Predicate
 dynamicGhcPrograms = configKeyYes "dynamic-ghc-programs"
 
-ghcWithInterpreter :: Predicate Action
+ghcWithInterpreter :: Predicate
 ghcWithInterpreter = do
     goodOs <- targetOss [ "mingw32", "cygwin32", "linux", "solaris2"
                         , "freebsd", "dragonfly", "netbsd", "openbsd"
@@ -67,17 +66,17 @@ ghcWithInterpreter = do
                             , "sparc64", "arm" ]
     return $ goodOs && goodArch
 
-crossCompiling :: Predicate Action
+crossCompiling :: Predicate
 crossCompiling = configKeyYes "cross-compiling"
 
-gccIsClang :: Predicate Action
+gccIsClang :: Predicate
 gccIsClang = configKeyYes "gcc-is-clang"
 
-gccLt46 :: Predicate Action
+gccLt46 :: Predicate
 gccLt46 = configKeyYes "gcc-lt-46"
 
-windowsHost :: Predicate Action
+windowsHost :: Predicate
 windowsHost = configKeyValues "host-os-cpp" ["mingw32", "cygwin32"]
 
-notWindowsHost :: Predicate Action
-notWindowsHost = fmap not windowsHost
+notWindowsHost :: Predicate
+notWindowsHost = liftM not windowsHost

@@ -1,4 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 module Rules.Data (
     cabalSettings, ghcPkgSettings, buildPackageData
     ) where
@@ -6,84 +5,116 @@ module Rules.Data (
 import qualified Ways
 import Base hiding (arg, args, Args)
 import Package
-import Expression
+import Expression hiding (when, liftIO)
+import Oracles.Base
 import Oracles.Flag (when)
 import Oracles.Builder
 import Targets
--- import Switches
+import Switches
+import Expression.Settings
 import Util
 
+-- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 librarySettings :: Ways -> Settings
-librarySettings ways = msum
-    [ whenExists Ways.vanilla ways     ?? ( arg  "--enable-library-vanilla"
-                                          , arg "--disable-library-vanilla" )
-    , (ghcWithInterpreter
-      && not dynamicGhcPrograms
-      && whenExists Ways.vanilla ways) ?? ( arg  "--enable-library-for-ghci"
-                                          , arg "--disable-library-for-ghci" )
-    , whenExists Ways.profiling ways   ?? ( arg  "--enable-library-profiling"
-                                          , arg "--disable-library-profiling" )
-    , whenExists Ways.dynamic ways     ?? ( arg  "--enable-shared"
-                                          , arg "--disable-shared" )]
+librarySettings waysExpression = do
+    ways        <- waysExpression
+    ghcInterp   <- ghcWithInterpreter
+    dynPrograms <- dynamicGhcPrograms
+    return $ [ if Ways.vanilla `elem` ways
+               then  "--enable-library-vanilla"
+               else "--disable-library-vanilla"
+             , if Ways.vanilla `elem` ways && ghcInterp && not dynPrograms
+               then  "--enable-library-for-ghci"
+               else "--disable-library-for-ghci"
+             , if Ways.profiling `elem` ways
+               then  "--enable-library-profiling"
+               else "--disable-library-profiling"
+             , if Ways.dynamic `elem` ways
+               then  "--enable-shared"
+               else "--disable-shared" ]
 
 configureSettings :: Settings
-configureSettings =
-    let conf key = argPrefix ("--configure-option=" ++ key ++ "=")
-                 . argConcatSpace
-    in
-    msum [ conf "CFLAGS"   ccSettings
-         , conf "LDFLAGS"  ldSettings
-         , conf "CPPFLAGS" cppSettings
-         , argPrefix "--gcc-options=" $
-           argConcatSpace (ccSettings <|> ldSettings)
-         -- TODO: drop if empty
-         , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
-         , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
-         , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
-         , conf "--with-gmp-libraries"   (argConfig "gmp-lib-dirs")
-         -- TODO: why TargetPlatformFull and not host?
-         , crossCompiling ?
-           conf "--host"    (argConfig "target-platform-full")
-         , conf "--with-cc" (argStagedBuilderPath Gcc) ]
+configureSettings = do
+    let conf key expr = do
+            value <- liftM unwords expr
+            return $ if value == ""
+                     then []
+                     else ["--configure-option=" ++ key ++ "=" ++ value]
+
+    stage <- asks getStage
+    gccPath <- lift $ showArg (Gcc stage)
+    gccSettings <- liftM unwords (ccSettings <> ldSettings)
+
+    mconcat [ conf "CFLAGS"   ccSettings
+            , conf "LDFLAGS"  ldSettings
+            , conf "CPPFLAGS" cppSettings
+            , arg $ "--gcc-options=" ++ gccSettings
+            , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
+            , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
+            , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
+            , conf "--with-gmp-libraries"   (argConfig "gmp-lib-dirs")
+            -- TODO: why TargetPlatformFull and not host?
+            , crossCompiling ?
+              conf "--host"    (argConfig "target-platform-full")
+            , conf "--with-cc" (arg gccPath) ]
 
 bootPackageDbSettings :: Settings
-bootPackageDbSettings =
-    argPrefix "--package-db="
-              (argConcatPath $ argConfig "ghc-source-path" |>
-                               argPath "libraries/bootstrapping.conf")
+bootPackageDbSettings = do
+    sourcePath <- lift $ askConfig "ghc-source-path"
+    return $ ["--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"]
 
 dllSettings :: Settings
 dllSettings = arg ""
 
+with' :: Builder -> Settings
+with' builder = lift $ with builder
+
+packageConstraints :: Settings
+packageConstraints = do
+    pkgs <- filterM packagePredicate targetPackages
+    constraints <- lift $ forM pkgs $ \pkg -> do
+        let cabal  = pkgPath pkg </> pkgCabal pkg
+            prefix = dropExtension (pkgCabal pkg) ++ " == "
+        need [cabal]
+        content <- lines <$> liftIO (readFile cabal)
+        let vs = filter (("ersion:" `isPrefixOf`) . drop 1) content
+        case vs of
+            [v] -> return $ prefix ++ dropWhile (not . isDigit) v
+            _   -> redError $ "Cannot determine package version in '"
+                            ++ cabal ++ "'."
+    return $ concatMap (\c -> ["--constraint", c]) $ constraints
+
 cabalSettings :: Settings
-cabalSettings =
-    mproduct
-    [ arg "configure" -- start with builder, e.g. argBuilderPath GhcCabal?
-    , argBuildPath
-    , argBuildDir
-    , dllSettings
-    , msum
-      [ argWithStagedBuilder Ghc -- TODO: used to be limited to max stage1 GHC
-      , argWithStagedBuilder GhcPkg
-      , customConfigureSettings
-      , stage Stage0 ? bootPackageDbSettings
-      , librarySettings targetWays
-      , configNonEmpty "hscolour" ? argWithBuilder HsColour -- TODO: generalise
-      , configureSettings
-      , stage Stage0 ? argPackageConstraints targetPackages
-      , argWithStagedBuilder Gcc
-      , notStage Stage0 ? argWithBuilder Ld
-      , argWithBuilder Ar
-      , argWithBuilder Alex
-      , argWithBuilder Happy ]] -- TODO: reorder with's
+cabalSettings = do
+    stage <- asks getStage
+    pkg   <- asks getPackage
+    mconcat [ arg "configure"
+            , arg $ pkgPath pkg
+            , arg $ targetDirectory stage pkg
+            , dllSettings
+            , with' $ Ghc stage
+            , with' $ GhcPkg stage
+            , customConfigureSettings
+            , Expression.stage Stage0 ? bootPackageDbSettings
+            , librarySettings targetWays
+            , configKeyNonEmpty "hscolour" ? with' HsColour -- TODO: generalise?
+            , configureSettings
+            , Expression.stage Stage0 ? packageConstraints
+            , with' $ Gcc stage
+            , notStage Stage0 ? with' Ld
+            , with' Ar
+            , with' Alex
+            , with' Happy ] -- TODO: reorder with's
 
 ghcPkgSettings :: Settings
-ghcPkgSettings =
-    arg "update" |> msum
-        [ arg "--force"
-        , argConcatPath $
-          msum [argBuildPath, argBuildDir, arg "inplace-pkg-config"]
-        , bootPackageDbSettings ]
+ghcPkgSettings = do
+    stage <- asks getStage
+    pkg   <- asks getPackage
+    let dir = pkgPath pkg </> targetDirectory stage pkg
+    mconcat [ arg "update"
+            , arg "--force"
+            , Expression.stage Stage0 ? bootPackageDbSettings
+            , arg $ dir </> "inplace-pkg-config" ]
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
@@ -121,24 +152,21 @@ buildPackageData stage pkg dir ways settings =
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
+            env = defaultEnvironment { getStage = stage, getPackage = pkg }
         need [pkgPath pkg </> pkgCabal pkg]
         -- GhcCabal will run the configure script, so we depend on it
         -- We still don't know who build the configure script from configure.ac
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        run' GhcCabal settings
+        run' env GhcCabal settings
         -- TODO: when (registerPackage settings) $
-        run' (GhcPkg stage) settings
+        run' env (GhcPkg stage) settings
         postProcessPackageData $ dir </> "package-data.mk"
 
-run' :: Builder -> Settings -> Action ()
-run' builder settings = do
-    settings' <- evaluate (project builder settings)
-    case fromSettings settings' of
-        Nothing   ->
-            redError $ "Cannot determine " ++ show builder ++ " settings."
-        Just args -> do
-            putColoured Green (show args)
-            run builder args
+run' :: Environment -> Builder -> Settings -> Action ()
+run' env builder settings = do
+    args <- interpret (env {getBuilder = builder}) settings
+    putColoured Green (show args)
+    run builder args
 
 --buildRule :: Package -> TodoItem -> Rules ()
 --buildRule pkg @ (Package name path cabal _) todo @ (stage, dist, settings) =
@@ -165,22 +193,24 @@ run' builder settings = do
 --            run (GhcPkg stage) $ ghcPkgArgs pkg todo
 --        postProcessPackageData $ pathDist </> "package-data.mk"
 
-buildSettings = + builder Gcc ? ccSettings
+-- buildSettings = + builder Gcc ? ccSettings
 
-builder Gcc ? "-tricky-flag"
+-- builder Gcc ? "-tricky-flag"
 
 ccSettings :: Settings
-ccSettings = msum
-    [ package integerLibrary ? argPath "-Ilibraries/integer-gmp2/gmp"
-    , builder GhcCabal ? argStagedConfig "conf-cc-args"
-    , validating ? msum
-        [ not (builder GhcCabal) ? arg "-Werror"
-        , arg "-Wall"
-        , gccIsClang ??
-          ( arg "-Wno-unknown-pragmas" <|>
-            not gccLt46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
-          , not gccLt46 ? arg "-Wno-error=inline" )]
-    ]
+ccSettings = do
+    let gccGe46 = liftM not gccLt46
+    mconcat
+        [ package integerLibrary ? arg "-Ilibraries/integer-gmp2/gmp"
+        , builder GhcCabal ? argStagedConfig "conf-cc-args"
+        , validating ? mconcat
+            [ notBuilder GhcCabal ? arg "-Werror"
+            , arg "-Wall"
+            , gccIsClang ??
+              ( arg "-Wno-unknown-pragmas" <>
+                gccGe46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
+              , gccGe46 ? arg "-Wno-error=inline" )]
+        ]
 
 ldSettings :: Settings
 ldSettings = builder GhcCabal ? argStagedConfig "conf-gcc-linker-args"
