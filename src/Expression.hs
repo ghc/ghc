@@ -2,13 +2,11 @@
 module Expression (
     module Control.Monad.Reader,
     Ways,
-    Packages,
-    TargetDir,
     Predicate,
     Expression,
-    Environment (..),
+    Environment (..), defaultEnvironment,
     interpret,
-    whenPredicate, (?), stage, notStage, package,
+    whenPredicate, (?), (??), stage, notStage, builder, notBuilder, package,
     configKeyValue, configKeyValues,
     configKeyYes, configKeyNo, configKeyNonEmpty
     ) where
@@ -34,51 +32,58 @@ defaultEnvironment = Environment
         getPackage = error "Package not set in the environment"
     }
 
-type Expression m a = ReaderT Environment m a
+type Expression a = ReaderT Environment Action a
 
-type Ways      m = Expression m [Way]
-type Packages  m = Expression m [Package]
-type Predicate m = Expression m Bool
-type TargetDir m = Expression m FilePath
+type Ways      = Expression [Way]
+type Predicate = Expression Bool
 
-instance (Monad m, Monoid a) => Monoid (Expression m a) where
+instance Monoid a => Monoid (Expression a) where
     mempty  = return mempty
     mappend = liftM2 mappend
 
-interpret :: (Monad m, Monoid a) => Expression m a -> Environment -> m a
-interpret = runReaderT
+interpret :: Environment -> Expression a -> Action a
+interpret = flip runReaderT
 
-whenPredicate :: (Monad m, Monoid a) => Predicate m -> Expression m a -> Expression m a
+whenPredicate :: Monoid a => Predicate -> Expression a -> Expression a
 whenPredicate predicate expr = do
     bool <- predicate
     if bool then expr else return mempty
 
-(?) :: (Monad m, Monoid a) => Predicate m -> Expression m a -> Expression m a
+(?) :: Monoid a => Predicate -> Expression a -> Expression a
 (?) = whenPredicate
+
+(??) :: Monoid a => Predicate -> (Expression a, Expression a) -> Expression a
+p ?? (t, f) = p ? t <> (liftM not p) ? f
 
 infixr 8 ?
 
-stage :: Monad m => Stage -> Predicate m
+stage :: Stage -> Predicate
 stage s = liftM (s ==) (asks getStage)
 
-notStage :: Monad m => Stage -> Predicate m
+notStage :: Stage -> Predicate
 notStage = liftM not . stage
 
-package :: Monad m => Package -> Predicate m
+builder :: Builder -> Predicate
+builder b = liftM (b ==) (asks getBuilder)
+
+notBuilder :: Builder -> Predicate
+notBuilder = liftM not . builder
+
+package :: Package -> Predicate
 package p = liftM (p ==) (asks getPackage)
 
-configKeyValue :: String -> String -> Predicate Action
+configKeyValue :: String -> String -> Predicate
 configKeyValue key value = liftM (value ==) (lift $ askConfig key)
 
 -- checks if there is at least one match
-configKeyValues :: String -> [String] -> Predicate Action
+configKeyValues :: String -> [String] -> Predicate
 configKeyValues key values = liftM (flip elem $ values) (lift $ askConfig key)
 
-configKeyYes :: String -> Predicate Action
+configKeyYes :: String -> Predicate
 configKeyYes key = configKeyValue key "YES"
 
-configKeyNo :: String -> Predicate Action
+configKeyNo :: String -> Predicate
 configKeyNo key = configKeyValue key "NO"
 
-configKeyNonEmpty :: String -> Predicate Action
-configKeyNonEmpty key = configKeyValue key ""
+configKeyNonEmpty :: String -> Predicate
+configKeyNonEmpty key = liftM not $ configKeyValue key ""
