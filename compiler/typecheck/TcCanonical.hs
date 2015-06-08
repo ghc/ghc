@@ -721,7 +721,7 @@ canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
-  | isDataFamilyTyCon tc1 || isDataFamilyTyCon tc2
+  | eq_rel == ReprEq && not (isDistinctTyCon tc1 && isDistinctTyCon tc2)
   = canEqFailure ev eq_rel ty1 ty2
   | otherwise
   = canEqHardFailure ev eq_rel ty1 ty2
@@ -734,7 +734,7 @@ Note [Use canEqFailure in canDecomposableTyConApp]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must use canEqFailure, not canEqHardFailure here, because there is
 the possibility of success if working with a representational equality.
-Here is the case:
+Here is one case:
 
   type family TF a where TF Char = Bool
   data family DF a
@@ -743,6 +743,13 @@ Here is the case:
 Suppose we are canonicalising (Int ~R DF (T a)), where we don't yet
 know `a`. This is *not* a hard failure, because we might soon learn
 that `a` is, in fact, Char, and then the equality succeeds.
+
+Here is another case:
+
+  [G] Coercible Age Int
+
+where Age's constructor is not in scope. We don't want to report
+an "inaccessible code" error in the context of this Given!
 
 Note [Decomposing newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

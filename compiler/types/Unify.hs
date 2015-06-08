@@ -280,8 +280,8 @@ to 'Bool', in which case x::T Int, so
 Suppose x::T X.  Then *in Haskell* it's impossible to construct a (non-bottom)
 value of type (T X) using T1.  But *in FC* it's quite possible.  The newtype
 gives a coercion
-        CoX :: X ~ Int
-So (T CoX) :: T X ~ T Int; hence (T1 `cast` sym (T CoX)) is a non-bottom value
+        CoX :: X ~R Int
+So (T CoX)_R :: T X ~R T Int; hence (T1 `cast` sym (T CoX)) is a non-bottom value
 of type (T X) constructed with T1.  Hence
         ANSWER = NO we can't prune the T1 branch (surprisingly)
 
@@ -317,6 +317,13 @@ drop more and more dead code.
 For now we implement a very simple test: type variables match
 anything, type functions (incl newtypes) match anything, and only
 distinct data types fail to match.  We can elaborate later.
+
+NB: typesCantMatch is subtly different than the apartness checks
+elsewhere in this module. It reasons over *representational* equality
+(saying that a newtype is not distinct from its representation) whereas
+the checks in, say, tcUnifyTysFG are about *nominal* equality. tcUnifyTysFG
+also assumes that its inputs are type-family-free, whereas no such assumption
+is in play here.
 -}
 
 typesCantMatch :: [(Type,Type)] -> Bool

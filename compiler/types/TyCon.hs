@@ -1220,7 +1220,7 @@ isDataTyCon (TupleTyCon {tyConTupleSort = sort}) = isBoxed (tupleSortBoxity sort
 isDataTyCon _ = False
 
 -- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to
--- themselves, even via coercions (except for unsafeCoerce).
+-- themselves, even via representational coercions (except for unsafeCoerce).
 -- This excludes newtypes, type functions, type synonyms.
 -- It relates directly to the FC consistency story:
 --     If the axioms are consistent,
