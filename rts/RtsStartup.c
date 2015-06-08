@@ -138,11 +138,15 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     stat_startInit();
 
     /* Set the RTS flags to default values. */
-
     initRtsFlagsDefaults();
 
     /* Call the user hook to reset defaults, if present */
     rts_config.defaultsHook();
+
+    /* Whether to GC CAFs */
+    if (rts_config.keep_cafs) {
+        setKeepCAFs();
+    }
 
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc == NULL || argv == NULL) {

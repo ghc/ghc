@@ -73,6 +73,9 @@ typedef struct {
     // True if GHC was not passed -no-hs-main
     HsBool rts_hs_main;
 
+    // Whether to retain CAFs (default: false)
+    HsBool keep_cafs;
+
     // Called before processing command-line flags, so that default
     // settings for RtsFlags can be provided.
     void (* defaultsHook) (void);

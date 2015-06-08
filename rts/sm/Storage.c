@@ -416,8 +416,8 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
     {
         // Note [dyn_caf_list]
         // If we are in GHCi _and_ we are using dynamic libraries,
-        // then we can't redirect newCAF calls to newDynCAF (see below),
-        // so we make newCAF behave almost like newDynCAF.
+        // then we can't redirect newCAF calls to newRetainedCAF (see below),
+        // so we make newCAF behave almost like newRetainedCAF.
         // The dynamic libraries might be used by both the interpreted
         // program and GHCi itself, so they must not be reverted.
         // This also means that in GHCi with dynamic libraries, CAFs are not
@@ -464,17 +464,17 @@ setKeepCAFs (void)
     keepCAFs = 1;
 }
 
-// An alternate version of newCaf which is used for dynamically loaded
+// An alternate version of newCAF which is used for dynamically loaded
 // object code in GHCi.  In this case we want to retain *all* CAFs in
 // the object code, because they might be demanded at any time from an
 // expression evaluated on the command line.
 // Also, GHCi might want to revert CAFs, so we add these to the
 // revertible_caf_list.
 //
-// The linker hackily arranges that references to newCaf from dynamic
-// code end up pointing to newDynCAF.
-StgInd *
-newDynCAF (StgRegTable *reg, StgIndStatic *caf)
+// The linker hackily arranges that references to newCAF from dynamic
+// code end up pointing to newRetainedCAF.
+//
+StgInd* newRetainedCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     StgInd *bh;
 
@@ -487,6 +487,33 @@ newDynCAF (StgRegTable *reg, StgIndStatic *caf)
     revertible_caf_list = caf;
 
     RELEASE_SM_LOCK;
+
+    return bh;
+}
+
+// If we are using loadObj/unloadObj in the linker, then we want to
+//
+//  - retain all CAFs in statically linked code (keepCAFs == rtsTrue),
+//    because we might link a new object that uses any of these CAFs.
+//
+//  - GC CAFs in dynamically-linked code, so that we can detect when
+//    a dynamically-linked object is unloadable.
+//
+// So for this case, we set keepCAFs to rtsTrue, and link newCAF to newGCdCAF
+// for dynamically-linked code.
+//
+StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
+{
+    StgInd *bh;
+
+    bh = lockCAF(reg, caf);
+    if (!bh) return NULL;
+
+    // Put this CAF on the mutable list for the old generation.
+    if (oldest_gen->no != 0) {
+        recordMutableCap((StgClosure*)caf,
+                         regTableToCapability(reg), oldest_gen->no);
+    }
 
     return bh;
 }

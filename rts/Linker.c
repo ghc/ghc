@@ -1512,7 +1512,7 @@ RTS_LIBFFI_SYMBOLS
 #define SymE_NeedsDataProto(vvv) SymE_HasDataProto(vvv)
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
-// another symbol.  See newCAF/newDynCAF for an example.
+// another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
 #define SymI_HasProto_redirect(vvv,xxx)   \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
       (void*)(&(xxx)) },
@@ -1692,10 +1692,10 @@ initLinker_ (int retain_cafs)
         barf("ghciInsertSymbolTable failed");
     }
 
-    // Redurect newCAF to newDynCAF if retain_cafs is true.
+    // Redurect newCAF to newRetainedCAF if retain_cafs is true.
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
                                 MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
-                                retain_cafs ? newDynCAF : newCAF,
+                                retain_cafs ? newRetainedCAF : newGCdCAF,
                                 HS_BOOL_FALSE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
