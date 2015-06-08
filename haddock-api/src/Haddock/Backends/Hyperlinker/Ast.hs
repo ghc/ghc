@@ -36,7 +36,12 @@ enrich src =
         , rtkDetails = lookupBySpan (tkSpan token) detailsMap
         }
   where
-    detailsMap = variables src ++ types src ++ binds src
+    detailsMap = concat
+        [ variables src
+        , types src
+        , binds src
+        , imports src
+        ]
 
 type DetailsMap = [(GHC.SrcSpan, TokenDetails)]
 
@@ -80,6 +85,19 @@ binds =
         (Just (GHC.L sspan (GHC.VarPat name))) ->
             pure (sspan, TokenDetails RtkBind name)
         _ -> empty
+
+imports :: GHC.RenamedSource -> DetailsMap
+imports =
+    everything (<|>) ie
+  where
+    ie term = case cast term of
+        (Just (GHC.IEVar v)) -> pure $ var v
+        (Just (GHC.IEThingAbs t)) -> pure $ typ t
+        (Just (GHC.IEThingAll t)) -> pure $ typ t
+        (Just (GHC.IEThingWith t vs)) -> [typ t] ++ map var vs
+        _ -> empty
+    typ (GHC.L sspan name) = (sspan, TokenDetails RtkType name)
+    var (GHC.L sspan name) = (sspan, TokenDetails RtkVar name)
 
 matches :: Span -> GHC.SrcSpan -> Bool
 matches tspan (GHC.RealSrcSpan aspan)
