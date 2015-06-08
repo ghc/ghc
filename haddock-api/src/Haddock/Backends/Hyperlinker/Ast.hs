@@ -101,10 +101,10 @@ imports =
 
 matches :: Span -> GHC.SrcSpan -> Bool
 matches tspan (GHC.RealSrcSpan aspan)
-    | rs && cs && re && ce = True
+    | saspan <= stspan && etspan <= easpan = True
   where
-    rs = (posRow . spStart) tspan == GHC.srcSpanStartLine aspan
-    cs = (posCol . spStart) tspan == GHC.srcSpanStartCol aspan
-    re = (posRow . spEnd) tspan == GHC.srcSpanEndLine aspan
-    ce = (posCol . spEnd) tspan == GHC.srcSpanEndCol aspan
+    stspan = (posRow . spStart $ tspan, posCol . spStart $ tspan)
+    etspan = (posRow . spEnd $ tspan, posCol . spEnd $ tspan)
+    saspan = (GHC.srcSpanStartLine aspan, GHC.srcSpanStartCol aspan)
+    easpan = (GHC.srcSpanEndLine aspan, GHC.srcSpanEndCol aspan)
 matches _ _ = False
