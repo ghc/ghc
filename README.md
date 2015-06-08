@@ -48,7 +48,8 @@ Please create issues when you have any problems and pull requests if you have so
 
 ###### Hacking
 
-To get started you'll need a latest GHC release installed.
+To get started you'll need a latest GHC release installed. Below is an
+example setup using cabal sandboxes.
 
 ```bash
   git clone https://github.com/haskell/haddock.git
@@ -64,5 +65,8 @@ To get started you'll need a latest GHC release installed.
   cabal test
 ```
 
-If you want to build against `GHC HEAD`, `ghc-head` is the corresponding branch.
-Note that it doesn't have to be up to date. 
+If you're a GHC developer and want to update Haddock to work with your
+changes, you should be working on `ghc-head` branch instead of master.
+See instructions at
+https://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/Git/Submodules
+for an example workflow.
