@@ -1,0 +1,6 @@
+
+T10495.hs:5:7: error:
+    Couldn't match representation of type ‘a0’ with that of ‘b0’
+    Relevant bindings include foo :: a0 -> b0 (bound at T10495.hs:5:1)
+    In the expression: coerce
+    In an equation for ‘foo’: foo = coerce
