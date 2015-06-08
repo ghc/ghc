@@ -919,6 +919,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
+  || ctEqRel ct == ReprEq  -- the cases below don't really apply to ReprEq
   = mkErrorMsgFromCt ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extraTyVarInfo ctxt tv1 ty2
                                    , extra ])
@@ -1042,13 +1043,19 @@ misMatchOrCND ctxt ct oriented ty1 ty2
     isGivenCt ct
        -- If the equality is unconditionally insoluble
        -- or there is no context, don't report the context
-  = misMatchMsg oriented (ctEqRel ct) ty1 ty2
+  = misMatchMsg oriented eq_rel ty1 ty2
   | otherwise
-  = couldNotDeduce givens ([mkTcEqPred ty1 ty2], orig)
+  = couldNotDeduce givens ([eq_pred], orig)
   where
+    eq_rel = ctEqRel ct
     givens = [ given | given@(_, _, no_eqs, _) <- getUserGivens ctxt, not no_eqs]
              -- Keep only UserGivens that have some equalities
-    orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
+
+    (eq_pred, orig) = case eq_rel of
+      NomEq  -> ( mkTcEqPred ty1 ty2
+                , TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 })
+      ReprEq -> ( mkCoerciblePred ty1 ty2
+                , CoercibleOrigin ty1 ty2 )
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
