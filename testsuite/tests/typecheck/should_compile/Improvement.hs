@@ -14,4 +14,5 @@ blug = error "Urk"
 
 foo :: Bool
 foo = blug undefined
+-- [W] C (F a0) a0, F a0 ~ Bool
 

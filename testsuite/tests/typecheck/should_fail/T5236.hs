@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts  #-}
 
-module Main where 
+module T5236 where
 
 data A
 data B
@@ -13,9 +13,5 @@ instance Id B B
 loop :: Id A B => Bool
 loop = True
 
-f :: Bool 
-f = loop
-
-
-main :: IO () 
-main = return ()
+-- f :: Bool
+-- f = loop

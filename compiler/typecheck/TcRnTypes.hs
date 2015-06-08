@@ -63,7 +63,7 @@ module TcRnTypes(
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
-        insolubleImplic, trulyInsoluble,
+        isDroppableDerivedLoc, insolubleImplic, trulyInsoluble,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
         SubGoalDepth, initialSubGoalDepth,
@@ -1294,17 +1294,18 @@ dropDerivedInsols :: Cts -> Cts
 dropDerivedInsols insols = filterBag keep insols
   where                    -- insols can include Given
     keep ct
-      | isDerivedCt ct = keep_orig (ctLocOrigin (ctLoc ct))
+      | isDerivedCt ct = not (isDroppableDerivedLoc (ctLoc ct))
       | otherwise      = True
 
-    keep_orig :: CtOrigin -> Bool
-    keep_orig (KindEqOrigin {})          = True
-    keep_orig (GivenOrigin {})           = True
-    keep_orig (FunDepOrigin1 {}) = True
-    keep_orig (FunDepOrigin2 {}) = True
---    keep_orig (FunDepOrigin1 _ loc _ _)  = keep_orig (ctLocOrigin loc)
---    keep_orig (FunDepOrigin2 _ orig _ _) = keep_orig orig
-    keep_orig _                          = False
+isDroppableDerivedLoc :: CtLoc -> Bool
+-- Note [Dropping derived constraints]
+isDroppableDerivedLoc loc
+  = case ctLocOrigin loc of
+      KindEqOrigin {}  -> False
+      GivenOrigin {}   -> False
+      FunDepOrigin1 {} -> False
+      FunDepOrigin2 {} -> False
+      _                -> True
 
 
 {- Note [Dropping derived constraints]
@@ -1331,6 +1332,14 @@ But (tiresomely) we do keep *some* Derived insolubles:
    - For Givens they reflect unreachable code
    - For Wanteds it is arguably better to get a fundep error than
      a no-instance error (Trac #9612)
+
+Moreover, we keep *all* derived insolubles under some circumstances:
+
+  * They are looked at by simplifyInfer, to decide whether to
+    generalise.  Example: [W] a ~ Int, [W] a ~ Bool
+    We get [D] Int ~ Bool, and indeed the constraints are insoluble,
+    and we want simplifyInfer to see that, even though we don't
+    ultimately want to generate an (inexplicable) error message from
 
 To distinguish these cases we use the CtOrigin.
 

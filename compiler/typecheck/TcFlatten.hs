@@ -1418,9 +1418,10 @@ flatten_tyvar2 tv (Derived, role)
   = ASSERT( role == NomEq )    -- All derived equalities are nominal
     do { model <- liftTcS $ getInertModel
        ; case lookupVarEnv model tv of
-           Just (_,ty) -> return (Right (ty, pprTrace "flatten_tyvar2" (ppr tv $$ ppr ty) (mkTcReflCo Nominal ty)))
+           Just (CTyEqCan { cc_rhs = rhs })
+             -> return (Right (rhs, pprPanic "flatten_tyvar2" (ppr tv $$ ppr rhs)))
                               -- Evidence is irrelevant for Derived contexts
-           Nothing -> flatten_tyvar3 tv }
+           _ -> flatten_tyvar3 tv }
 
 flatten_tyvar2 tv flavour_role@(_, eq_rel)
   = do { ieqs <- liftTcS $ getInertEqs

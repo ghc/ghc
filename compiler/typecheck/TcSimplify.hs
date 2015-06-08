@@ -888,10 +888,8 @@ simpl_loop n floated_eqs
   = do { traceTcS "simpl_loop, iteration" (int n)
 
        -- solveSimples may make progress if either float_eqs hold
-       ; (unifs1, wc1) <- if no_floated_eqs
-                          then return (0, emptyWC)
-                          else reportUnifications $
-                               solveSimpleWanteds (floated_eqs `unionBags` simples)
+       ; (unifs1, wc1) <- reportUnifications $
+                          solveSimpleWanteds (floated_eqs `unionBags` simples)
                                -- Put floated_eqs first so they get solved first
                                -- NB: the floated_eqs may include /derived/ equalities
                                --     arising from fundeps inside an implication
@@ -970,6 +968,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        ; (floated_eqs, residual_wanted)
              <- floatEqualities skols no_given_eqs residual_wanted
 
+       ; traceTcS "solveImplication 2" (ppr given_insols $$ ppr residual_wanted)
        ; let final_wanted = residual_wanted `addInsols` given_insols
 
        ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs

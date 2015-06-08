@@ -2,8 +2,8 @@
 tcfail122.hs:8:9: error:
     Couldn't match kind ‘* -> *’ with ‘*’
     When matching types
-      d0 :: * -> *
-      b :: *
+      c0 :: (* -> *) -> *
+      a :: * -> *
     Expected type: a b
       Actual type: c0 d0
     Relevant bindings include foo :: [a b] (bound at tcfail122.hs:7:1)

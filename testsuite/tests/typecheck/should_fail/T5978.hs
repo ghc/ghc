@@ -20,6 +20,9 @@ polyBar = undefined
 
 monoBar :: Double
 monoBar = polyBar id monoFoo
+-- fromA = Float, fromB = Double, toA = toB
+-- [W] C Float to, C Double to
+-- => [D] to ~ Char, [D] to ~ Bool
 
 monoFoo :: Float
 monoFoo = polyFoo

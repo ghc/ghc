@@ -1284,7 +1284,7 @@ as well as in old_pred; that is important for good error messages.
  -}
 
 
-rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
+rewriteEvidence old_ev@(CtDerived {}) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteEvidence to put the isTcReflCo test first!
@@ -1292,18 +1292,15 @@ rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvTerm c), which fails for Derived constraints.
     -- (Getting this wrong caused Trac #7384.)
-    do { mb_ev <- newDerived loc new_pred
-       ; case mb_ev of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
+    continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence old_ev new_pred co
   | isTcReflCo co -- See Note [Rewriting with Refl]
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+  = continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence ev@(CtGiven { ctev_evar = old_evar , ctev_loc = loc }) new_pred co
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
-       ; return (ContinueWith new_ev) }
+       ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
     new_tm = mkEvCast (EvId old_evar) (tcDowngradeRole Representational
@@ -1345,23 +1342,20 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 --
 -- It's all a form of rewwriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
+  | CtDerived {} <- old_ev  -- Don't force the evidence for a Derived
+  = continueWith (old_ev { ctev_pred = new_pred })
+
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
   , isTcReflCo rhs_co
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
-
-  | CtDerived {} <- old_ev
-  = do { mb <- newDerived loc' new_pred
-       ; case mb of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
+  = continueWith (old_ev { ctev_pred = new_pred })
 
   | CtGiven { ctev_evar = old_evar } <- old_ev
   = do { let new_tm = EvCoercion (lhs_co
                                   `mkTcTransCo` maybeSym swapped (mkTcCoVarCo old_evar)
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; new_ev <- newGivenEvVar loc' (new_pred, new_tm)
-       ; return (ContinueWith new_ev) }
+       ; continueWith new_ev }
 
   | CtWanted { ctev_evar = evar } <- old_ev
   = do { new_evar <- newWantedEvVarNC loc' new_pred
@@ -1371,7 +1365,7 @@ rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
                   `mkTcTransCo` rhs_co
        ; setWantedEvBind evar (EvCoercion co)
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
-       ; return (ContinueWith new_evar) }
+       ; continueWith new_evar }
 
   | otherwise
   = panic "rewriteEvidence"
