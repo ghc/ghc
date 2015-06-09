@@ -852,9 +852,11 @@ ppr_mono_ty :: Int -> HsType DocName -> Unicode -> Qualification -> Html
 ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $ ppForAllCon expl tvs ctxt' unicode qual
                                     <+> ppr_mono_lty pREC_TOP ty unicode qual
- where ctxt' = case extra of
-                 Just loc -> (++ [L loc HsWildcardTy]) `fmap` ctxt
-                 Nothing  -> ctxt
+ where
+   anonWC = HsWildCardTy (AnonWildCard PlaceHolder)
+   ctxt'
+     | Just loc <- extra = (++ [L loc anonWC]) `fmap` ctxt
+     | otherwise         = ctxt
 
 -- UnicodeSyntax alternatives
 ppr_mono_ty _ (HsTyVar name) True _
@@ -899,9 +901,9 @@ ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual
   = ppr_mono_lty ctxt_prec ty unicode qual
 
-ppr_mono_ty _ HsWildcardTy _ _ = char '_'
+ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ _ = char '_'
 
-ppr_mono_ty _ (HsNamedWildcardTy name) _ q = ppDocName q Prefix True name
+ppr_mono_ty _ (HsWildCardTy (NamedWildCard name)) _ q = ppDocName q Prefix True name
 
 ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
 

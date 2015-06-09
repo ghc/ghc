@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
 ----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Rename
@@ -21,8 +20,6 @@ import Haddock.Types
 import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
-import NameSet
-import Coercion
 
 import Control.Applicative
 import Control.Monad hiding (mapM)
@@ -234,8 +231,7 @@ renameType t = case t of
   HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
-  HsWildcardTy            -> pure HsWildcardTy
-  HsNamedWildcardTy a     -> HsNamedWildcardTy <$> rename a
+  HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
 
 renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
 renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
@@ -256,6 +252,10 @@ renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
   context' <- mapM renameLType context
   return (L loc context')
+
+renameWildCardInfo :: HsWildCardInfo Name -> RnM (HsWildCardInfo DocName)
+renameWildCardInfo (AnonWildCard  _)    = pure (AnonWildCard PlaceHolder)
+renameWildCardInfo (NamedWildCard name) = NamedWildCard <$> rename name
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
 renameInstHead (className, k, types, rest) = do
@@ -517,12 +517,3 @@ renameSub (n,doc) = do
   n' <- rename n
   doc' <- renameDocForDecl doc
   return (n', doc')
-
-type instance PostRn DocName NameSet  = PlaceHolder
-type instance PostRn DocName Fixity   = PlaceHolder
-type instance PostRn DocName Bool     = PlaceHolder
-type instance PostRn DocName [Name]   = PlaceHolder
-
-type instance PostTc DocName Kind     = PlaceHolder
-type instance PostTc DocName Type     = PlaceHolder
-type instance PostTc DocName Coercion = PlaceHolder

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -34,6 +34,8 @@ import GHC hiding (NoLink)
 import DynFlags (ExtensionFlag, Language)
 import OccName
 import Outputable
+import NameSet (NameSet)
+import Coercion (Coercion)
 import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
 
@@ -551,3 +553,18 @@ instance Monad ErrMsgGhc where
   return a = WriterGhc (return (a, []))
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
                fmap (second (msgs1 ++)) (runWriterGhc (k a))
+
+
+-----------------------------------------------------------------------------
+-- * Pass sensitive types
+-----------------------------------------------------------------------------
+
+type instance PostRn DocName NameSet  = PlaceHolder
+type instance PostRn DocName Fixity   = PlaceHolder
+type instance PostRn DocName Bool     = PlaceHolder
+type instance PostRn DocName Name     = PlaceHolder
+type instance PostRn DocName [Name]   = PlaceHolder
+
+type instance PostTc DocName Kind     = PlaceHolder
+type instance PostTc DocName Type     = PlaceHolder
+type instance PostTc DocName Coercion = PlaceHolder
