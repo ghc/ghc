@@ -1845,11 +1845,8 @@ tcRnType :: HscEnv
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM Opt_PolyKinds $   -- See Note [Kind-generalise in tcRnType]
-    do { (wcs, rdr_type') <- extractWildcards rdr_type
-       ; (rn_type, wcs)   <- bindLocatedLocalsRn wcs $ \wcs_new -> do {
-       ; (rn_type, _fvs)  <- rnLHsType GHCiCtx rdr_type'
+    do { (rn_type, _fvs, wcs) <- rnLHsTypeWithWildCards GHCiCtx rdr_type
        ; failIfErrsM
-       ; return (rn_type, wcs_new) }
 
         -- Now kind-check the type
         -- It can have any rank or kind

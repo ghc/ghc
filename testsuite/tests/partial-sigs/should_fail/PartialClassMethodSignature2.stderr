@@ -1,0 +1,5 @@
+
+PartialClassMethodSignature2.hs:5:17:
+    Unexpected wild card: ‘_’
+    In the type ‘(Eq a, _) => a -> a’
+    In the class declaration for ‘Foo’

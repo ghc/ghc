@@ -97,6 +97,7 @@ type DataId id =
   , Data (PostRn id NameSet)
   , Data (PostRn id Fixity)
   , Data (PostRn id Bool)
+  , Data (PostRn id Name)
   , Data (PostRn id [Name])
 
   , Data (PostTc id Type)

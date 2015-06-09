@@ -827,9 +827,16 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 notFound :: Name -> TcM TyThing
 notFound name
   = do { lcl_env <- getLclEnv
+       ; namedWildCardsEnabled <- xoptM Opt_NamedWildCards
        ; let stage = tcl_th_ctxt lcl_env
+             isWildCard = case getOccString name of
+               ('_':_:_) | namedWildCardsEnabled -> True
+               "_"                               -> True
+               _                                 -> False
        ; case stage of   -- See Note [Out of scope might be a staging error]
            Splice {} -> stageRestrictionError (quotes (ppr name))
+           _ | isWildCard -> failWithTc $
+                             text "Unexpected wild card:" <+> quotes (ppr name)
            _ -> failWithTc $
                 vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+>
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),

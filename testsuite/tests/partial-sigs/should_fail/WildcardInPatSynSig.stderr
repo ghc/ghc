@@ -1,5 +1,4 @@
 
 WildcardInPatSynSig.hs:4:37:
-    Wildcard not allowed
-    In pattern synonym type signature: 
-      pattern Single :: () => (Show a) => _ -> [a]
+    Unexpected wild card: ‘_’
+    In the type signature for ‘Single’: Single :: _ -> [a]

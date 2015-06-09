@@ -841,10 +841,9 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | inst_decl                             { unitOL (sL1 $1 (InstD (unLoc $1))) }
         | stand_alone_deriving                  { unitOL (sLL $1 $> (DerivD (unLoc $1))) }
         | role_annot                            { unitOL (sL1 $1 (RoleAnnotD (unLoc $1))) }
-        | 'default' '(' comma_types0 ')'    {% do { def <- checkValidDefaults $3
-                                                  ; amsu (sLL $1 $> (DefD def))
+        | 'default' '(' comma_types0 ')'    {% amsu (sLL $1 $> (DefD (DefaultDecl $3)))
                                                          [mj AnnDefault $1
-                                                         ,mop $2,mcp $4] }}
+                                                         ,mop $2,mcp $4] }
         | 'foreign' fdecl          {% amsu (sLL $1 $> (snd $ unLoc $2))
                                            (mj AnnForeign $1:(fst $ unLoc $2)) }
         | '{-# DEPRECATED' deprecations '#-}'   {% amsu (sLL $1 $> $ WarningD (Warnings (getDEPRECATED_PRAGs $1) (fromOL $2)))
@@ -950,12 +949,6 @@ inst_decl :: { LInstDecl RdrName }
                                      , cid_sigs = sigs, cid_tyfam_insts = ats
                                      , cid_overlap_mode = $2
                                      , cid_datafam_insts = adts }
-             ; let err = text "In instance head:" <+> ppr $3
-             ; checkNoPartialType err $3
-             ; sequence_ [ checkNoPartialType err ty
-                         | sig@(L _ (TypeSig _ ty _ )) <- sigs
-                         , let err = text "in instance signature" <> colon
-                                     <+> quotes (ppr sig) ]
              ; ams (L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid }))
                    (mj AnnInstance $1 : (fst $ unLoc $4)) } }
 
@@ -1138,7 +1131,6 @@ stand_alone_deriving :: { LDerivDecl RdrName }
                          {% do {
                                  let err = text "in the stand-alone deriving instance"
                                             <> colon <+> quotes (ppr $4)
-                               ; checkNoPartialType err $4
                                ; ams (sLL $1 $> (DerivDecl $4 $3))
                                      [mj AnnDeriving $1,mj AnnInstance $2] }}
 
@@ -1204,7 +1196,6 @@ pattern_synonym_sig :: { LSig RdrName }
         : 'pattern' con '::' ptype
             {% do { let (flag, qtvs, prov, req, ty) = snd $ unLoc $4
                   ; let sig = PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty
-                  ; checkValidPatSynSig sig
                   ; ams (sLL $1 $> $ sig)
                         (mj AnnPattern $1:mj AnnDcolon $3:(fst $ unLoc $4)) } }
 
@@ -1239,7 +1230,6 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
                     {% do { (TypeSig l ty _) <- checkValSig $2 $4
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr ty)
-                          ; checkNoPartialType err ty
                           ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
@@ -1657,10 +1647,10 @@ btype :: { LHsType RdrName }
 
 atype :: { LHsType RdrName }
         : ntgtycon                       { sL1 $1 (HsTyVar (unLoc $1)) }      -- Not including unit tuples
-        | tyvar                          {% do { nwc <- namedWildcardsEnabled -- (See Note [Unit tuples])
+        | tyvar                          {% do { nwc <- namedWildCardsEnabled -- (See Note [Unit tuples])
                                                ; let tv@(Unqual name) = unLoc $1
                                                ; return $ if (startsWithUnderscore name && nwc)
-                                                          then (sL1 $1 (HsNamedWildcardTy tv))
+                                                          then (sL1 $1 (mkNamedWildCardTy tv))
                                                           else (sL1 $1 (HsTyVar tv)) } }
 
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy (snd $ unLoc $1) $2))
@@ -1717,7 +1707,7 @@ atype :: { LHsType RdrName }
                                                                (getINTEGER $1) }
         | STRING               { sLL $1 $> $ HsTyLit $ HsStrTy (getSTRINGs $1)
                                                                (getSTRING  $1) }
-        | '_'                  { sL1 $1 $ HsWildcardTy }
+        | '_'                  { sL1 $1 $ mkAnonWildCardTy }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -2039,14 +2029,12 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp '::' sigtypedoc
-                        {% do ty <- checkPartialTypeSignature $3
-                        ; s <- checkValSig $1 ty
+                        {% do s <- checkValSig $1 $3
                         ; _ <- ams (sLL $1 $> ()) [mj AnnDcolon $2]
                         ; return (sLL $1 $> $ unitOL (sLL $1 $> $ SigD s)) }
 
         | var ',' sig_vars '::' sigtypedoc
-           {% do { ty <- checkPartialTypeSignature $5
-                 ; let sig = TypeSig ($1 : reverse (unLoc $3)) ty PlaceHolder
+           {% do { let sig = TypeSig ($1 : reverse (unLoc $3)) $5 PlaceHolder
                  ; addAnnotation (gl $1) AnnComma (gl $2)
                  ; ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD sig ])
                        [mj AnnDcolon $4] } }
@@ -2318,10 +2306,7 @@ aexp2   :: { LHsExpr RdrName }
         | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2)) [mo $1,mc $3] }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2)) [mo $1,mc $3]}
-        | '[t|' ctype '|]'    {% checkNoPartialType
-                                   (text "in type brackets" <> colon
-                                    <+> quotes (text "[t|" <+> ppr $2 <+> text "|]")) $2 >>
-                                 ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
+        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
                                       ams (sLL $1 $> $ HsBracket (PatBr p))
                                           [mo $1,mc $3] }
@@ -3301,8 +3286,8 @@ hintExplicitForall span = do
       , text "extension to enable explicit-forall syntax: \x2200 <tvs>. <type>"
       ]
 
-namedWildcardsEnabled :: P Bool
-namedWildcardsEnabled = liftM ((Opt_NamedWildCards `xopt`) . dflags) getPState
+namedWildCardsEnabled :: P Bool
+namedWildCardsEnabled = liftM ((Opt_NamedWildCards `xopt`) . dflags) getPState
 
 {-
 %************************************************************************

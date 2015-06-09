@@ -1,5 +1,5 @@
 
 UnnamedConstraintWildcard2.hs:4:8:
-    Invalid partial type signature:
-    _ a => a -> String
-    Wildcards are not allowed within the constraints
+    Invalid partial type: _ a => a -> String
+    Anonymous wild cards are not allowed in constraints
+    In the type signature for ‘foo’

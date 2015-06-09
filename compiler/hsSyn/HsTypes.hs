@@ -33,6 +33,9 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
+        HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
+        wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
+
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
         mkHsForAllTy,
@@ -45,7 +48,7 @@ module HsTypes (
         splitHsClassTy_maybe, splitLHsClassTy_maybe,
         splitHsFunType,
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
-        isWildcardTy, isNamedWildcardTy,
+        ignoreParens,
 
         -- Printing
         pprParendHsType, pprHsForAll, pprHsForAllExtra,
@@ -179,7 +182,7 @@ data HsWithBndrs name thing
   = HsWB { hswb_cts :: thing             -- Main payload (type or list of types)
          , hswb_kvs :: PostRn name [Name] -- Kind vars
          , hswb_tvs :: PostRn name [Name] -- Type vars
-         , hswb_wcs :: PostRn name [Name] -- Wildcards
+         , hswb_wcs :: PostRn name [Name] -- Wild cards
     }
   deriving (Typeable)
 deriving instance (Data name, Data thing, Data (PostRn name [Name]))
@@ -387,12 +390,7 @@ data HsType name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsWildcardTy           -- A type wildcard
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
-
-      -- For details on above see note [Api annotations] in ApiAnnotation
-
-  | HsNamedWildcardTy name -- A named wildcard
+  | HsWildCardTy (HsWildCardInfo name)  -- A type wildcard
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -415,6 +413,14 @@ type HsTyOp name = (HsTyWrapper, name)
 
 mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
 mkHsOpTy ty1 op ty2 = HsOpTy ty1 (WpKiApps [], op) ty2
+
+data HsWildCardInfo name
+    = AnonWildCard (PostRn name Name)
+      -- A anonymous wild card ('_'). A name is generated during renaming.
+    | NamedWildCard name
+      -- A named wild card ('_a').
+    deriving (Typeable)
+deriving instance (DataId name) => Data (HsWildCardInfo name)
 
 {-
 Note [HsForAllTy tyvar binders]
@@ -568,17 +574,8 @@ mkQualifiedHsForAllTy     ctxt ty = mkHsForAllTy Qualified []  ctxt ty
 -- |Smart constructor for HsForAllTy, which populates the extra-constraints
 -- field if a wildcard is present in the context.
 mkHsForAllTy :: HsExplicitFlag -> [LHsTyVarBndr RdrName] -> LHsContext RdrName -> LHsType RdrName -> HsType RdrName
-mkHsForAllTy exp tvs (L l []) ty
-  = HsForAllTy exp Nothing (mkHsQTvs tvs) (L l []) ty
-mkHsForAllTy exp tvs ctxt     ty
-  = HsForAllTy exp extra   (mkHsQTvs tvs) cleanCtxt        ty
-  where -- Separate the extra-constraints wildcard when present
-        (cleanCtxt, extra)
-          | (L l HsWildcardTy) <- ignoreParens (last (unLoc ctxt)) = (init `fmap` ctxt, Just l)
-          | otherwise = (ctxt, Nothing)
-        ignoreParens (L _ (HsParTy ty)) = ty
-        ignoreParens ty                 = ty
-
+mkHsForAllTy exp tvs ctxt ty
+  = HsForAllTy exp Nothing (mkHsQTvs tvs) ctxt ty
 
 -- |When a sigtype is parsed, the type found is wrapped in an Implicit
 -- HsForAllTy via mkImplicitHsForAllTy, to ensure that a signature always has a
@@ -659,13 +656,31 @@ hsLTyVarLocNames :: LHsTyVarBndrs name -> [Located name]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvBndrs qtvs)
 
 ---------------------
-isWildcardTy :: HsType a -> Bool
-isWildcardTy HsWildcardTy = True
-isWildcardTy _ = False
+mkAnonWildCardTy :: HsType RdrName
+mkAnonWildCardTy = HsWildCardTy (AnonWildCard PlaceHolder)
 
-isNamedWildcardTy :: HsType a -> Bool
-isNamedWildcardTy (HsNamedWildcardTy _) = True
-isNamedWildcardTy _ = False
+mkNamedWildCardTy :: n -> HsType n
+mkNamedWildCardTy = HsWildCardTy . NamedWildCard
+
+isAnonWildCard :: HsWildCardInfo name -> Bool
+isAnonWildCard (AnonWildCard _) = True
+isAnonWildCard _                = False
+
+isNamedWildCard :: HsWildCardInfo name -> Bool
+isNamedWildCard = not . isAnonWildCard
+
+wildCardName :: HsWildCardInfo Name -> Name
+wildCardName (NamedWildCard n) = n
+wildCardName (AnonWildCard  n) = n
+
+-- Two wild cards are the same when: they're both named and have the same
+-- name, or they're both anonymous and have the same location.
+sameWildCard :: Eq name
+             => Located (HsWildCardInfo name)
+             -> Located (HsWildCardInfo name) -> Bool
+sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
+sameWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
+sameWildCard _ _ = False
 
 splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)
@@ -761,6 +776,10 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
 
 splitHsFunType other = ([], other)
 
+ignoreParens :: LHsType name -> LHsType name
+ignoreParens (L _ (HsParTy ty)) = ignoreParens ty
+ignoreParens ty                 = ty
+
 {-
 ************************************************************************
 *                                                                      *
@@ -785,6 +804,10 @@ instance (OutputableBndr name) => Outputable (HsTyVarBndr name) where
 
 instance (Outputable thing) => Outputable (HsWithBndrs name thing) where
     ppr (HsWB { hswb_cts = ty }) = ppr ty
+
+instance (Outputable name) => Outputable (HsWildCardInfo name) where
+    ppr (AnonWildCard _)  = char '_'
+    ppr (NamedWildCard n) = ppr n
 
 pprHsForAll :: OutputableBndr name => HsExplicitFlag -> LHsTyVarBndrs name -> LHsContext name -> SDoc
 pprHsForAll exp = pprHsForAllExtra exp Nothing
@@ -889,8 +912,8 @@ ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
 ppr_mono_ty _    (HsTyLit t)         = ppr_tylit t
-ppr_mono_ty _    HsWildcardTy        = char '_'
-ppr_mono_ty _    (HsNamedWildcardTy name) = ppr name
+ppr_mono_ty _    (HsWildCardTy (AnonWildCard _))     = char '_'
+ppr_mono_ty _    (HsWildCardTy (NamedWildCard name)) = ppr name
 
 ppr_mono_ty ctxt_prec (HsWrapTy (WpKiApps _kis) ty)
   = ppr_mono_ty ctxt_prec ty

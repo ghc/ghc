@@ -1,5 +1,6 @@
 
 WildcardInForeignImport.hs:6:48:
-    Wildcard not allowed
-    In foreign import declaration ‘c_sin’
-    CDouble -> _
+    Unexpected wild card: ‘_’
+    In the foreign declaration for ‘c_sin’: c_sin :: CDouble -> _
+    When checking declaration:
+      foreign import ccall safe "static sin" c_sin :: CDouble -> _

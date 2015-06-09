@@ -1,4 +1,6 @@
 
 WildcardInTypeFamilyInstanceLHS.hs:8:13:
-    Wildcard not allowed
-    In type family instance equation of ‘Dual’: Dual _
+    Unexpected wild card: ‘_’
+    In the type ‘_’
+    In the type instance declaration for ‘Dual’
+    In the instance declaration for ‘Foo Int’

@@ -1,4 +1,5 @@
 
-WildcardInDefaultSignature.hs:4:30:
-    Wildcard not allowed
-    in default signature: ‘_’
+WildcardInDefaultSignature.hs:7:16:
+    Unexpected wild card: ‘_’
+    In the type ‘_’
+    In the class declaration for ‘C’

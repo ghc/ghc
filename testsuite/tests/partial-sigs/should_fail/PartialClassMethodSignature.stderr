@@ -1,5 +1,5 @@
 
-PartialClassMethodSignature.hs:6:17:
-    The type signature of a class method cannot be partial:
-    foo :: (Eq a, _) => a -> _
+PartialClassMethodSignature.hs:6:15:
+    Unexpected wild card: ‘_’
+    In the type ‘a -> _’
     In the class declaration for ‘Foo’

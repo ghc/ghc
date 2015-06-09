@@ -813,11 +813,17 @@ renameSig _ (IdSig x)
 
 renameSig ctxt sig@(TypeSig vs ty _)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        -- (named and anonymous) wildcards are bound here.
-        ; (wcs, ty') <- extractWildcards ty
-        ; bindLocatedLocalsFV wcs $ \wcs_new -> do {
-          (new_ty, fvs) <- rnHsSigType (ppr_sig_bndrs vs) ty'
-        ; return (TypeSig new_vs new_ty wcs_new, fvs) } }
+        ; let doc = ppr_sig_bndrs vs
+              wildCardsAllowed = case ctxt of
+                TopSigCtxt _    -> True
+                LocalBindCtxt _ -> True
+                _               -> False
+        ; (new_ty, fvs, wcs)
+            <- if wildCardsAllowed
+               then rnHsSigTypeWithWildCards doc ty
+               else do { (new_ty, fvs) <- rnHsSigType doc ty
+                       ; return (new_ty, fvs, []) }
+        ; return (TypeSig new_vs new_ty wcs, fvs) }
 
 renameSig ctxt sig@(GenericSig vs ty)
   = do  { defaultSigs_on <- xoptM Opt_DefaultSignatures

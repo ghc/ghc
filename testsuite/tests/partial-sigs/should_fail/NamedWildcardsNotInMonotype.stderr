@@ -1,6 +1,6 @@
 
 NamedWildcardsNotInMonotype.hs:4:21:
-    Invalid partial type signature:
-    (Show _a, Eq _c, Eq _b) => _a -> _b -> String
-    The named wildcard ‘_c’ is only allowed in the constraints
-    when it also occurs in the (mono)type
+    Invalid partial type: (Show _a, Eq _c, Eq _b) => _a -> _b -> String
+    The named wild card ‘_c’ is only allowed in the constraints
+    when it also occurs in the rest of the type
+    In the type signature for ‘foo’

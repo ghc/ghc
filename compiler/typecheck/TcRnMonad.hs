@@ -691,6 +691,9 @@ addErr msg = do { loc <- getSrcSpanM; addErrAt loc msg }
 failWith :: MsgDoc -> TcRn a
 failWith msg = addErr msg >> failM
 
+failAt :: SrcSpan -> MsgDoc -> TcRn a
+failAt loc msg = addErrAt loc msg >> failM
+
 addErrAt :: SrcSpan -> MsgDoc -> TcRn ()
 -- addErrAt is mainly (exclusively?) used by the renamer, where
 -- tidying is not an issue, but it's all lazy so the extra

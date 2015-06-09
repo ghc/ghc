@@ -3,5 +3,5 @@ WildcardInADTContext2.hs:1:53: Warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 WildcardInADTContext2.hs:4:10:
-    Wildcard not allowed
-    In the context: (Eq _a)
+    Unexpected wild card: ‘_a’
+    In the data type declaration for ‘Foo’

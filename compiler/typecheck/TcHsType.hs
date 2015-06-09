@@ -536,12 +536,9 @@ tc_hs_type hs_ty@(HsTyLit (HsStrTy _ s)) exp_kind
        ; checkWiredInTyCon typeSymbolKindCon
        ; return (mkStrLitTy s) }
 
-
-tc_hs_type HsWildcardTy _ = panic "tc_hs_type HsWildcardTy"
--- unnamed wildcards should have been replaced by named wildcards
-
-tc_hs_type hs_ty@(HsNamedWildcardTy name) exp_kind
-  = do { (ty, k) <- tcTyVar name
+tc_hs_type hs_ty@(HsWildCardTy wc) exp_kind
+  = do { let name = wildCardName wc
+       ; (ty, k) <- tcTyVar name
        ; checkExpectedKind hs_ty k exp_kind
        ; return ty }
 

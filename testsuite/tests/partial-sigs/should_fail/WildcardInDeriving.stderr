@@ -1,4 +1,4 @@
 
 WildcardInDeriving.hs:5:22:
-    Wildcard not allowed
-    In the deriving items: (_)
+    Unexpected wild card: ‘_’
+    In the data declaration for ‘Foo’

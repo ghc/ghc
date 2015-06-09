@@ -1,4 +1,5 @@
 
 WildcardInGADT2.hs:5:17:
-    A constructor cannot have a partial type:
-    (Eq a, _) => Maybe a -> Foo a
+    Unexpected wild card: ‘_’
+    In the definition of data constructor ‘Foo’
+    In the data declaration for ‘Foo’

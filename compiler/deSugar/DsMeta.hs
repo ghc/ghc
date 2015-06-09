@@ -909,7 +909,12 @@ repTy (HsExplicitTupleTy _ tys) = do
 repTy (HsTyLit lit) = do
                         lit' <- repTyLit lit
                         repTLit lit'
-                          
+repTy (HsWildCardTy wc) = do
+                            let name = HsSyn.wildCardName wc
+                            putSrcSpanDs (nameSrcSpan name) $
+                              failWithDs $ text "Unexpected wild card:" <+>
+                                           quotes (ppr name)
+
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> DsM (Core TH.TyLitQ)
