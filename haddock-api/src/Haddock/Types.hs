@@ -38,6 +38,7 @@ import Coercion
 import NameSet
 import OccName
 import Outputable
+import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
 
 import Haddock.Backends.Hyperlinker.Types
@@ -646,3 +647,18 @@ instance Monad ErrMsgGhc where
   return a = WriterGhc (return (a, []))
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
                fmap (second (msgs1 ++)) (runWriterGhc (k a))
+
+
+-----------------------------------------------------------------------------
+-- * Pass sensitive types
+-----------------------------------------------------------------------------
+
+type instance PostRn DocName NameSet  = PlaceHolder
+type instance PostRn DocName Fixity   = PlaceHolder
+type instance PostRn DocName Bool     = PlaceHolder
+type instance PostRn DocName Name     = PlaceHolder
+type instance PostRn DocName [Name]   = PlaceHolder
+
+type instance PostTc DocName Kind     = PlaceHolder
+type instance PostTc DocName Type     = PlaceHolder
+type instance PostTc DocName Coercion = PlaceHolder
