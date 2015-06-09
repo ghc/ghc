@@ -1193,8 +1193,6 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                              , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
                              , text "TcLevel =" <+> ppr tclvl ])
                  ; n_kicked <- kickOutRewritable (ctEvFlavour ev, eq_rel) tv
-                 ; when (isDerived ev) $
-                        (emitDerivedShadows tv)
                  ; addInertEq workItem
                  ; return (Stop ev (ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked)) } }
 
@@ -1266,40 +1264,6 @@ solveByUnification wd tv xi
 ppr_kicked :: Int -> SDoc
 ppr_kicked 0 = empty
 ppr_kicked n = parens (int n <+> ptext (sLit "kicked out"))
-
-emitDerivedShadows :: TcTyVar -> TcS ()
-emitDerivedShadows new_tv
-  = do { ics <- getInertCans
-       ; mapM_ emit_shadow (get_shadows ics) }
-  where
-    emit_shadow ct = emitNewDerived loc pred
-      where
-        ev = ctEvidence ct
-        pred = ctEvPred ev
-        loc  = ctEvLoc  ev
-
-    get_shadows (IC { inert_eqs      = tv_eqs
-                    , inert_dicts    = dicts
-                    , inert_safehask = safehask
-                    , inert_funeqs   = funeqs
-                    , inert_irreds   = irreds
-                    , inert_model    = model })
-      -- Ignore insolubles
-      = foldDicts get_ct dicts    $
-        foldDicts get_ct safehask $
-        foldFunEqs get_ct funeqs  $
-        foldIrreds get_ct irreds  $
-        foldTyEqs  get_ct tv_eqs []
-      where
-        get_ct ct cts | want_shadow model ct = ct:cts
-                      | otherwise            = cts
-
-    want_shadow model ct
-      =  not (isDerivedCt ct)
-      && not (modelCanRewrite model pred)
-      && (new_tv `elemVarSet` tyVarsOfType pred)
-      where
-         pred = ctPred ct
 
 kickOutAfterUnification :: TcTyVar -> TcS Int
 kickOutAfterUnification new_tv

@@ -951,8 +951,8 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
        ; stopWith ev "Equal tyvars" }
 
   | incompat_kind   = incompat
---   | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
---   | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
+  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
+  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
   | same_kind       = if swap_over then do_swap else no_swap
   | k1_sub_k2       = do_swap   -- Note [Kind orientation for CTyEqCan]
   | otherwise       = no_swap   -- k2_sub_k1
@@ -979,13 +979,20 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
         continueWith (CTyEqCan { cc_ev = new_ev, cc_tyvar = tv1
                                , cc_rhs = xi2, cc_eq_rel = eq_rel })
 
-{-
     -- See Note [Orient equalities with flatten-meta-vars on the left] in TcFlatten
+    -- tv1 is the flatten meta-var
     do_fmv swapped tv1 xi1 xi2 co1 co2
       | same_kind
       = canon_eq swapped tv1 xi1 xi2 co1 co2
-      | otherwise  -- Presumably tv1 `subKind` tv2, which is the wrong way round
-      = ASSERT2( tyVarKind tv1 `isSubKind` typeKind xi2,
+      | otherwise  -- Presumably tv1 :: *, since it is a flatten meta-var,
+                   -- at a kind that has some interesting sub-kind structure.
+                   -- Since the two kinds are not the same, we must have
+                   -- tv1 `subKind` tv2, which is the wrong way round
+                   --   e.g.  (fmv::*) ~ (a::OpenKind)
+                   -- So make a new meta-var and use that:
+                   --         fmv ~ (beta::*)
+                   --         (a::OpenKind) ~ (beta::*)
+      = ASSERT2( k1_sub_k2,
                  ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1) $$
                  ppr xi2 <+> dcolon <+> ppr (typeKind xi2) )
         ASSERT2( isWanted ev, ppr ev )  -- Only wanteds have flatten meta-vars
@@ -995,7 +1002,6 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
                                                         tv_ty xi2)
            ; emitWorkNC [new_ev]
            ; canon_eq swapped tv1 xi1 tv_ty co1 (ctEvCoercion new_ev) }
--}
 
     incompat = incompatibleKind ev xi1 k1 xi2 k2
 

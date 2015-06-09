@@ -1,12 +1,9 @@
 
-IPFail.hs:6:23: error:
-    Couldn't match type ‘Integer’ with ‘Bool’
-    arising from a functional dependency between constraints:
-      ‘?x::Bool’
-        arising from a use of implicit parameter ‘?x’ at IPFail.hs:6:23-24
-      ‘?x::Integer’
-        arising from the implicit-parameter binding for ?x
-        at IPFail.hs:6:9-24
-    In the expression: ?x
+IPFail.hs:6:18: error:
+    Could not deduce (Num Bool) arising from the literal ‘5’
+    from the context: ?x::Int
+      bound by the type signature for: f0 :: (?x::Int) => () -> Bool
+      at IPFail.hs:5:7-31
+    In the expression: 5
     In the expression: let ?x = 5 in ?x
     In an equation for ‘f0’: f0 () = let ?x = 5 in ?x

@@ -48,7 +48,7 @@ module TcSMonad (
     emitInsoluble, emitWorkNC, emitWorkCt,
 
     -- The Model
-    InertModel, modelCanRewrite,
+    InertModel,
 
     -- Inert Safe Haskell safe-overlap failures
     addInertSafehask, insertSafeOverlapFailureTcS, updInertSafehask,
@@ -532,6 +532,8 @@ data InertCans
 
        , inert_funeqs :: FunEqMap Ct
               -- All CFunEqCans; index is the whole family head type.
+              -- Hence (by CFunEqCan invariants),
+              -- all Nominal, and all Given/Wanted (no Derived)
 
        , inert_dicts :: DictMap Ct
               -- Dictionaries only, index is the class
@@ -634,36 +636,87 @@ emptyInert
 ---------------
 addInertEq :: Ct -> TcS ()
 -- Precondition: item /is/ canonical
-addInertEq item@(CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel, cc_tyvar = tv })
-  = do { ics@(IC { inert_count = n
-                 , inert_eqs = old_eqs
-                 , inert_model = old_model }) <- getInertCans
-       ; let new_eqs | isDerived ev = old_eqs
-                     | otherwise    = addTyEq old_eqs tv item
-             new_n = bumpUnsolvedCount ev n
-             new_ics = ics { inert_eqs   = new_eqs
-                           , inert_count = new_n }
-       ; final_ics <- case eq_rel of
-           ReprEq -> return new_ics
-           NomEq | isDerived ev
-                -> return (new_ics { inert_model = extendVarEnv old_model tv item })
-                 | not (modelCanRewrite old_model pred)
-                -> return (new_ics { inert_model = extendVarEnv old_model tv derived_item })
-                 | otherwise
-                 -> do { emitNewDerivedEq loc pred
-                       ; return new_ics }
-       ; setInertCans final_ics }
+addInertEq ct
+  = do { traceTcS "addInertEq {" $
+         text "Adding new inert equality:" <+> ppr ct
+       ; ics  <- getInertCans
+       ; ics' <- add_inert_eq ics ct
+       ; setInertCans ics'
+       ; traceTcS "addInertEq }" $ empty }
+
+add_inert_eq :: InertCans -> Ct -> TcS InertCans
+add_inert_eq ics@(IC { inert_count = n
+                     , inert_eqs = old_eqs
+                     , inert_model = old_model })
+             ct@(CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel, cc_tyvar = tv })
+  | isDerived ev
+  = do { emitDerivedShadows ics tv
+       ; return (ics { inert_model = extendVarEnv old_model tv ct }) }
+
+  | ReprEq <- eq_rel
+  = return (ics { inert_eqs   = addTyEq old_eqs tv ct
+                , inert_count = bumpUnsolvedCount ev n })
+
+  -- Nominal equality, Given/Wanted
+  | modelCanRewrite old_model rw_tvs  -- Shadow of new constraint is
+  = do { emitNewDerivedEq loc pred    -- not inert, so emit it
+       ; return new_ics }
+
+  | otherwise   -- Shadow of new constraint is inert wrt model
+                -- so extend model, and create shadows it can now rewrite
+  = do { emitDerivedShadows ics tv
+       ; return (new_ics { inert_model = new_model }) }
+
   where
-    loc  = ctEvLoc ev
-    pred = ctEvPred ev
-    derived_item = item { cc_ev = CtDerived { ctev_loc = loc, ctev_pred = pred } }
+    loc     = ctEvLoc ev
+    pred    = ctEvPred ev
+    rw_tvs  = tyVarsOfType pred
+    new_ics = ics { inert_eqs   = addTyEq old_eqs tv ct
+                  , inert_count = bumpUnsolvedCount ev n }
+    new_model = extendVarEnv old_model tv derived_ct
+    derived_ct = ct { cc_ev = CtDerived { ctev_loc = loc, ctev_pred = pred } }
 
-addInertEq item = pprPanic "addInertEq" (ppr item)
+add_inert_eq _ ct = pprPanic "addInertEq" (ppr ct)
 
-modelCanRewrite :: InertModel -> TcPredType -> Bool
+emitDerivedShadows :: InertCans -> TcTyVar -> TcS ()
+emitDerivedShadows IC { inert_eqs      = tv_eqs
+                      , inert_dicts    = dicts
+                      , inert_safehask = safehask
+                      , inert_funeqs   = funeqs
+                      , inert_irreds   = irreds
+                      , inert_model    = model } new_tv
+  = mapM_ emit_shadow shadows
+  where
+    emit_shadow ct = emitNewDerived loc pred
+      where
+        ev = ctEvidence ct
+        pred = ctEvPred ev
+        loc  = ctEvLoc  ev
+
+    shadows = foldDicts  get_ct dicts    $
+              foldDicts  get_ct safehask $
+              foldFunEqs get_ct funeqs   $
+              foldIrreds get_ct irreds   $
+              foldTyEqs  get_ct tv_eqs []
+      -- Ignore insolubles
+
+    get_ct ct cts | want_shadow ct = ct:cts
+                  | otherwise      = cts
+
+    want_shadow ct
+      =  not (isDerivedCt ct)               -- No need for a shadow of a Derived!
+      && (new_tv `elemVarSet` rw_tvs)       -- New tv can rewrite ct
+      && not (modelCanRewrite model rw_tvs) -- We have not alrady created a shadow
+      where
+        rw_tvs = rewritableTyVars ct
+
+modelCanRewrite :: InertModel -> TcTyVarSet -> Bool
 -- True if there is any intersection between dom(model) and pred
-modelCanRewrite model pred
-  = foldVarSet ((||) . (`elemVarEnv` model)) False (tyVarsOfType pred)
+modelCanRewrite model tvs = foldVarSet ((||) . (`elemVarEnv` model)) False tvs
+
+rewritableTyVars :: Ct -> TcTyVarSet
+rewritableTyVars (CFunEqCan { cc_tyargs = tys }) = tyVarsOfTypes tys
+rewritableTyVars ct                              = tyVarsOfType (ctPred ct)
 
 --------------
 addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
@@ -675,15 +728,15 @@ addInertCan ct
        ; setInertCans (add_item ics ct)
 
        -- Emit shadow derived if necessary
-       ; traceTcS "addInertCan" (vcat [ ppr ct, ppr (isDerived ev), ppr (inert_model ics), ppr (modelCanRewrite (inert_model ics) pred) ])
-       ; when (not (isDerived ev) && modelCanRewrite (inert_model ics) pred)
+       ; when (not (isDerived ev) && modelCanRewrite (inert_model ics) rw_tvs)
               (emitNewDerived (ctEvLoc ev) pred)
 
        ; traceTcS "addInertCan }" $ empty }
 
   where
-    ev   = ctEvidence ct
-    pred = ctEvPred ev
+    rw_tvs = rewritableTyVars ct
+    ev     = ctEvidence ct
+    pred   = ctEvPred ev
 
 add_item :: InertCans -> Ct -> InertCans
 add_item ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
