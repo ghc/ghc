@@ -1215,7 +1215,7 @@ isDataTyCon _ = False
 -- This excludes newtypes, type functions, type synonyms.
 -- It relates directly to the FC consistency story:
 --     If the axioms are consistent,
---     and  co : S tys ~ T tys, and S,T are "distinct" TyCons,
+--     and  co : S tys ~R T tys, and S,T are "distinct" TyCons,
 --     then S=T.
 -- Cf Note [Pruning dead case alternatives] in Unify
 isDistinctTyCon :: TyCon -> Bool
@@ -1319,10 +1319,8 @@ isTypeSynonymTyCon _                 = False
 
 isDecomposableTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
---   I.e. is it injective?
+--   I.e. is it injective and generative w.r.t nominal equality?
 -- Specifically NOT true of synonyms (open and otherwise)
--- Ultimately we may have injective associated types
--- in which case this test will become more interesting
 --
 -- It'd be unusual to call isDecomposableTyCon on a regular H98
 -- type synonym, because you should probably have expanded it first

@@ -621,10 +621,12 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
            -> TcS (StopOrContinue Ct)
 
 -- AppTys only decompose for nominal equality, so this case just leads
--- to an irreducible constraint
+-- to an irreducible constraint; see typecheck/should_compile/T10494
 can_eq_app ev ReprEq _ _ _ _
   = do { traceTcS "failing to decompose representational AppTy equality" (ppr ev)
        ; continueWith (CIrredEvCan { cc_ev = ev }) }
+          -- no need to call canEqFailure, because that flattens, and the
+          -- types involved here are already flat
 
 can_eq_app ev NomEq s1 t1 s2 t2
   | CtDerived { ctev_loc = loc } <- ev
@@ -697,18 +699,44 @@ that `a` is, in fact, Char, and then the equality succeeds.
 
 Here is another case:
 
-  [G] Coercible Age Int
+  [G] Age ~R Int
 
 where Age's constructor is not in scope. We don't want to report
 an "inaccessible code" error in the context of this Given!
 
+For example, see typecheck/should_compile/T10493, repeated here:
+
+  import Data.Ord (Down)  -- no constructor
+
+  foo :: Coercible (Down Int) Int => Down Int -> Int
+  foo = coerce
+
+That should compile, but only because we use canEqFailure and not
+canEqHardFailure.
+
 Note [Decomposing newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As explained in Note [NthCo and newtypes] in Coercion, we can't use
-NthCo on representational coercions over newtypes. So we avoid doing
-so.
+Decomposing newtypes is a dangerous business. Here is a representative example
+of why:
 
-But is it sensible to decompose *Wanted* constraints over newtypes? Yes, as
+  newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
+  type role Nt representational  -- but the user gives it an R role anyway
+
+If we have [W] Nt alpha ~R Nt beta, we *don't* want to decompose to
+[W] alpha ~R beta, because it's possible that alpha and beta aren't
+representationally equal. So we really want to unwrap newtypes first,
+which is what is done in can_eq_nc'.
+It all comes from the fact that newtypes aren't necessarily injective w.r.t.
+representational equality.
+
+Furthermore, as explained in Note [NthCo and newtypes] in Coercion, we can't use
+NthCo on representational coercions over newtypes. NthCo comes into play
+only when decomposing givens. So we avoid decomposing representational given
+equalities over newtypes.
+
+(NB: isNewTyCon tc == True  ===>   isDistinctTyCon tc == False)
+
+But is it ever sensible to decompose *Wanted* constraints over newtypes? Yes, as
 long as there are no Givens that might (later) influence Coercible solving.
 (See Note [Instance and Given overlap] in TcInteract.) By the time we reach
 canDecomposableTyConApp, we know that any newtypes that can be unwrapped have
@@ -717,6 +745,20 @@ forward other than decomposition. So we take the one route we have available.
 This *does* mean that importing a newtype's constructor might make code that
 previously compiled fail to do so. (If that newtype is perversely recursive,
 say.)
+
+Example of how a given might influence this decision-making:
+
+  [G] alpha ~R beta
+  [W] Nt Int ~R Nt gamma
+
+where Nt is a newtype whose constructor is not in scope, and its parameter
+is representational. Decomposing to [W] Int ~R gamma seems sensible, but it's
+just possible that the given above will become informative and that we shouldn't
+decompose. If we have `newtype Nt a = Mk Bool`, then there might be well-formed
+evidence that (Nt Int ~R Nt Char), even if we can't form that evidence in this
+module (because Mk is not in scope). Creating this scenario in source Haskell
+is challenging; there is no test case.
+
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
@@ -754,11 +796,9 @@ canEqFailure ev ReprEq ty1 ty2
        ; (xi2, co2) <- flatten FM_FlattenAll ev ty2
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
-       ; if isTcReflCo co1 && isTcReflCo co2
-         then continueWith (CIrredEvCan { cc_ev = ev })
-         else rewriteEqEvidence ev ReprEq NotSwapped xi1 xi2 co1 co2
-              `andWhenContinue` \ new_ev ->
-              can_eq_nc True new_ev ReprEq xi1 xi1 xi2 xi2 }
+       ; rewriteEqEvidence ev ReprEq NotSwapped xi1 xi2 co1 co2
+         `andWhenContinue` \ new_ev ->
+         continueWith (CIrredEvCan { cc_ev = new_ev }) }
 canEqFailure ev NomEq ty1 ty2 = canEqHardFailure ev NomEq ty1 ty2
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
