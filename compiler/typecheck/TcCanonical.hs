@@ -33,6 +33,7 @@ import DataCon ( dataConName )
 
 import Pair
 import Util
+import Bag
 import MonadUtils ( zipWith3M, zipWith3M_ )
 import Data.List  ( zip4 )
 import BasicTypes
@@ -655,13 +656,16 @@ canDecomposableTyConApp :: CtEvidence -> EqRel
 canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , length tys1 == length tys2
-  = if eq_rel == NomEq || ctEvFlavour ev /= Given || isDistinctTyCon tc1
-       -- See Note [Decomposing newtypes]
-    then do { traceTcS "canDecomposableTyConApp"
-                  (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
-            ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-            ; stopWith ev "Decomposed TyConApp" }
-    else canEqFailure ev eq_rel ty1 ty2
+  = do { inerts <- getTcSInerts
+       ; if    eq_rel == NomEq      -- NomEq doesn't care about newtype vs. data
+            || isDistinctTyCon tc1  -- always good to decompose non-newtypes
+            || (ctEvFlavour ev /= Given && isEmptyBag (matchableGivens loc pred inerts))
+            -- See Note [Decomposing newtypes]
+         then do { traceTcS "canDecomposableTyConApp"
+                       (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
+                 ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
+                 ; stopWith ev "Decomposed TyConApp" }
+         else canEqFailure ev eq_rel ty1 ty2 }
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
@@ -672,6 +676,9 @@ canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
   where
     ty1 = mkTyConApp tc1 tys1
     ty2 = mkTyConApp tc2 tys2
+
+    loc  = ctEvLoc ev
+    pred = ctEvPred ev
 
 {-
 Note [Use canEqFailure in canDecomposableTyConApp]
@@ -701,13 +708,15 @@ As explained in Note [NthCo and newtypes] in Coercion, we can't use
 NthCo on representational coercions over newtypes. So we avoid doing
 so.
 
-But is it sensible to decompose *Wanted* constraints over newtypes?
-Yes. By the time we reach canDecomposableTyConApp, we know that any
-newtypes that can be unwrapped have been. So, without importing more
-constructors, say, we know there is no way forward other than decomposition.
-So we take the one route we have available. This *does* mean that
-importing a newtype's constructor might make code that previously
-compiled fail to do so. (If that newtype is perversely recursive, say.)
+But is it sensible to decompose *Wanted* constraints over newtypes? Yes, as
+long as there are no Givens that might (later) influence Coercible solving.
+(See Note [Instance and Given overlap] in TcInteract.) By the time we reach
+canDecomposableTyConApp, we know that any newtypes that can be unwrapped have
+been. So, without importing more constructors, say, we know there is no way
+forward other than decomposition. So we take the one route we have available.
+This *does* mean that importing a newtype's constructor might make code that
+previously compiled fail to do so. (If that newtype is perversely recursive,
+say.)
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel

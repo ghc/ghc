@@ -15,7 +15,6 @@ import TcFlatten
 import VarSet
 import Type
 import Kind ( isKind, isConstraintKind )
-import Unify
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
 import CoAxiom(sfInteractTop, sfInteractInert)
 
@@ -567,15 +566,6 @@ solveOneFromTheOther ev_i ev_w
        | otherwise = IRKeep
 
      has_binding binds ev = isJust (lookupEvBind binds (ctEvId ev))
-
-prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
--- See Note [Solving superclass constraints] in TcInstDcls
-prohibitedSuperClassSolve from_loc solve_loc
-  | GivenOrigin (InstSC given_size) <- ctLocOrigin from_loc
-  , ScOrigin wanted_size <- ctLocOrigin solve_loc
-  = given_size >= wanted_size
-  | otherwise
-  = False
 
 {-
 Note [Replacement vs keeping]
@@ -1636,33 +1626,14 @@ matchClassInst :: DynFlags -> InertSet -> Class -> [Type] -> CtLoc -> TcS Lookup
 -- instances.  See Note [Instance and Given overlap]
 matchClassInst dflags inerts clas tys loc
   | not (xopt Opt_IncoherentInstances dflags)
+  , let matchable_givens = matchableGivens loc pred inerts
   , not (isEmptyBag matchable_givens)
   = do { traceTcS "Delaying instance application" $
-              vcat [ text "Work item=" <+> pprType (mkClassPred clas tys)
-                   , text "Relevant given dictionaries="
-                           <+> ppr matchable_givens ]
+           vcat [ text "Work item=" <+> pprType pred
+                , text "Potential matching givens:" <+> ppr matchable_givens ]
        ; return NoInstance }
   where
-     matchable_givens :: Cts
-     matchable_givens = filterBag matchable_given $
-                        findDictsByClass (inert_dicts $ inert_cans inerts) clas
-
-     matchable_given ct
-       | CDictCan { cc_class = clas_g, cc_tyargs = sys, cc_ev = fl } <- ct
-       , CtGiven { ctev_loc = loc_g } <- fl
-       , Just {} <- tcUnifyTys bind_meta_tv tys sys
-       , not (prohibitedSuperClassSolve loc_g loc)
-       = ASSERT( clas_g == clas ) True
-     matchable_given _ = False
-
-     bind_meta_tv :: TcTyVar -> BindFlag
-     -- Any meta tyvar may be unified later, so we treat it as
-     -- bindable when unifying with givens. That ensures that we
-     -- conservatively assume that a meta tyvar might get unified with
-     -- something that matches the 'given', until demonstrated
-     -- otherwise.
-     bind_meta_tv tv | isMetaTyVar tv = BindMe
-                     | otherwise      = Skolem
+     pred = mkClassPred clas tys
 
 matchClassInst _ _ clas [ ty ] _
   | className clas == knownNatClassName

@@ -9,7 +9,7 @@ module TcSMonad (
     extendWorkListCts, appendWorkList,
     selectNextWorkItem,
     workListSize, workListWantedCount,
-    updWorkListTcS, 
+    updWorkListTcS,
 
     -- The TcS monad
     TcS, runTcS, runTcSWithEvBinds,
@@ -42,6 +42,7 @@ module TcSMonad (
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertModel, getInertGivens,
     emptyInert, getTcSInerts, setTcSInerts, takeGivenInsolubles,
+    matchableGivens, prohibitedSuperClassSolve,
     getUnsolvedInerts,
     removeInertCts,
     addInertCan, addInertEq, insertFunEq,
@@ -115,6 +116,7 @@ import Kind
 import TcType
 import DynFlags
 import Type
+import Unify
 
 import TcEvidence
 import Class
@@ -1653,6 +1655,56 @@ getNoGivenEqs tclvl skol_tvs
           FlatSkol {} -> not (tv `elemVarSet` local_fsks)
           _           -> False
 
+-- | Returns Given constraints that might,
+-- potentially, match the given pred. This is used when checking to see if a
+-- Given might overlap with an instance. See Note [Instance and Given overlap]
+-- in TcInteract.
+matchableGivens :: CtLoc -> PredType -> InertSet -> Cts
+matchableGivens loc_w pred (IS { inert_cans = inert_cans })
+  = filterBag matchable_given all_relevant_givens
+  where
+    -- just look in class constraints and irreds. matchableGivens does get called
+    -- for ~R constraints, but we don't need to look through equalities, because
+    -- canonical equalities are used for rewriting. We'll only get caught by
+    -- non-canonical -- that is, irreducible -- equalities.
+    all_relevant_givens :: Cts
+    all_relevant_givens
+      | Just (clas, _) <- getClassPredTys_maybe pred
+      = findDictsByClass (inert_dicts inert_cans) clas
+        `unionBags` inert_irreds inert_cans
+      | otherwise
+      = inert_irreds inert_cans
+
+    matchable_given :: Ct -> Bool
+    matchable_given ct
+      | CtGiven { ctev_loc = loc_g } <- ctev
+      , Just _ <- tcUnifyTys bind_meta_tv [ctEvPred ctev] [pred]
+      , not (prohibitedSuperClassSolve loc_g loc_w)
+      = True
+
+      | otherwise
+      = False
+      where
+        ctev = cc_ev ct
+
+    bind_meta_tv :: TcTyVar -> BindFlag
+    -- Any meta tyvar may be unified later, so we treat it as
+    -- bindable when unifying with givens. That ensures that we
+    -- conservatively assume that a meta tyvar might get unified with
+    -- something that matches the 'given', until demonstrated
+    -- otherwise.
+    bind_meta_tv tv | isMetaTyVar tv = BindMe
+                    | otherwise      = Skolem
+
+prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
+-- See Note [Solving superclass constraints] in TcInstDcls
+prohibitedSuperClassSolve from_loc solve_loc
+  | GivenOrigin (InstSC given_size) <- ctLocOrigin from_loc
+  , ScOrigin wanted_size <- ctLocOrigin solve_loc
+  = given_size >= wanted_size
+  | otherwise
+  = False
+
 {-
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2175,7 +2227,7 @@ checkForCyclicBinds ev_binds
     is_co_bind (EvBind { eb_lhs = b }) = isEqVar b
 
     edges :: [(EvBind, EvVar, [EvVar])]
-    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs)) 
+    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs))
             | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs }) <- bagToList ev_binds]
 #endif
 
@@ -2816,4 +2868,3 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; return (TcLetCo ev_binds new_co) }
 
         ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs) }
-
