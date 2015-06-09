@@ -3,9 +3,11 @@
   <title>Release notes for version 7.10.2</title>
 
   <para>
-    The 7.10.2 release is a bugfix release, with over 40+ bug fixes
-    from users and contributors. The major bugfixes relative to 7.10.1
-    are listed below.
+    The 7.10.2 release is a bugfix release, with over 70+ bug fixes
+    from users and contributors relative to 7.10.1. The major bugfixes
+    are listed below. For the full list with more detail, see the
+    <ulink url="https://ghc.haskell.org/trac/ghc/milestone/7.10.2">GHC
+    7.10.2 milestone</ulink> on our bug tracker.
   </para>
 
   <sect2>
@@ -103,6 +105,13 @@
             fixed (issue #10218).
           </para>
        </listitem>
+       <listitem>
+          <para>
+            Several performance-related issues inside GHC have been
+            fixed. As a result, you should see improved compilation
+            times and memory usage (issues #10397, #10370).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 
@@ -123,6 +132,17 @@
                     constructors) are now exported from
                     <literal>GHC.Event</literal>.
                 </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.7.5.0 (was 0.7.3.0)
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>
