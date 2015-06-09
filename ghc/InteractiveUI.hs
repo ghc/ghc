@@ -64,11 +64,11 @@ import Util
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
 
-import Control.Monad as Monad
-
 import Control.Applicative hiding (empty)
-import Control.Monad.Trans.Class
+import Control.DeepSeq (deepseq)
+import Control.Monad as Monad
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
@@ -881,8 +881,11 @@ checkInputForLayout stmt getStmt = do
 
 enqueueCommands :: [String] -> GHCi ()
 enqueueCommands cmds = do
-  st <- getGHCiState
-  setGHCiState st{ cmdqueue = cmds ++ cmdqueue st }
+  -- make sure we force any exceptions in the commands while we're
+  -- still inside the exception handler, otherwise bad things will
+  -- happen (see #10501)
+  cmds `deepseq` return ()
+  modifyGHCiState $ \st -> st{ cmdqueue = cmds ++ cmdqueue st }
 
 -- | If we one of these strings prefixes a command, then we treat it as a decl
 -- rather than a stmt. NB that the appropriate decl prefixes depends on the
@@ -1328,9 +1331,6 @@ defineMacro overwrite s = do
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
   str <- liftIO ((unsafeCoerce# fun :: String -> IO String) s)
-  -- make sure we force any exceptions in the result, while we are still
-  -- inside the exception handler for commands:
-  seqList str (return ())
   enqueueCommands (lines str)
   return False
 
