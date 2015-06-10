@@ -27,10 +27,10 @@ $(eval $(call docbook,docs/users_guide,users_guide))
 
 $(eval $(call clean-target,docs/users_guide,gen,$(docs/users_guide_GENERATED_DOCBOOK_SOURCES)))
 
-html_docs/users_guide : docs/users_guide/users_guide/prof_scc.png
+html_docs/users_guide : docs/users_guide/users_guide/prof_scc.eps
 
-docs/users_guide/users_guide/prof_scc.png : \
-		docs/users_guide/prof_scc.png \
+docs/users_guide/users_guide/prof_scc.eps : \
+		docs/users_guide/prof_scc.eps \
 		docs/users_guide/users_guide/index.html
 	$(CP) $< $@
 # dep. on d/u/u/index.html is to make sure that the d/u/u dir is created first
