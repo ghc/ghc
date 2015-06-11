@@ -11,8 +11,8 @@ NewTyCo:
 IndTypesPerf:
 	$(RM) IndTypesPerf.o IndTypesPerf.hi
 	$(RM) IndTypesPerfMerge.o IndTypesPerfMerge.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c IndTypesPerfMerge.hs +RTS -M20M
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c IndTypesPerf.hs      +RTS -M20M
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c IndTypesPerfMerge.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c IndTypesPerf.hs
 
 T5955:
 	$(RM) T5955.o T5955.hi T5955a.o T5955a.hi 
