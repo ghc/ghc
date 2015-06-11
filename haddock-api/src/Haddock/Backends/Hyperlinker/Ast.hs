@@ -28,6 +28,7 @@ data RichTokenType
     = RtkVar
     | RtkType
     | RtkBind
+    | RtkDecl
 
 enrich :: GHC.RenamedSource -> [Token] -> [RichToken]
 enrich src =
@@ -36,11 +37,12 @@ enrich src =
         , rtkDetails = enrichToken token detailsMap
         }
   where
-    detailsMap = concat
-        [ variables src
-        , types src
-        , binds src
-        , imports src
+    detailsMap = concatMap ($ src)
+        [ variables
+        , types
+        , binds
+        , imports
+        , decls
         ]
 
 type DetailsMap = [(GHC.SrcSpan, TokenDetails)]
@@ -90,6 +92,15 @@ binds =
         (Just (GHC.L sspan (GHC.VarPat name))) ->
             pure (sspan, TokenDetails RtkBind name)
         _ -> empty
+
+decls :: GHC.RenamedSource -> DetailsMap
+decls (group, _, _, _) = concatMap ($ group)
+    [ map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
+    ]
+  where
+    typ (GHC.L _ t) =
+        let (GHC.L sspan name) = GHC.tcdLName t
+        in (sspan, TokenDetails RtkDecl name)
 
 imports :: GHC.RenamedSource -> DetailsMap
 imports =

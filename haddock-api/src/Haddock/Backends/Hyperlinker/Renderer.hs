@@ -38,7 +38,7 @@ richToken (RichToken tok Nothing) =
   where
     attrs = [ multiclass . tokenStyle . tkType $ tok ]
 richToken (RichToken tok (Just det)) =
-    internalAnchor det . hyperlink det $ content
+    externalAnchor det . internalAnchor det . hyperlink det $ content
   where
     content = tokenSpan tok ! [ multiclass style]
     style = (tokenStyle . tkType) tok ++ (richTokenStyle . rtkType) det
@@ -49,7 +49,7 @@ tokenSpan = Html.thespan . Html.toHtml . tkValue
 richTokenStyle :: RichTokenType -> [StyleClass]
 richTokenStyle RtkVar = ["hs-var"]
 richTokenStyle RtkType = ["hs-type"]
-richTokenStyle RtkBind = []
+richTokenStyle _ = []
 
 tokenStyle :: TokenType -> [StyleClass]
 tokenStyle TkIdentifier = ["hs-identifier"]
@@ -69,10 +69,18 @@ tokenStyle TkUnknown = []
 multiclass :: [StyleClass] -> HtmlAttr
 multiclass = Html.theclass . intercalate " "
 
+externalAnchor :: TokenDetails -> Html -> Html
+externalAnchor (TokenDetails RtkDecl name) content =
+    Html.anchor content ! [ Html.name $ externalAnchorIdent name ]
+externalAnchor _ content = content
+
 internalAnchor :: TokenDetails -> Html -> Html
 internalAnchor (TokenDetails RtkBind name) content =
     Html.anchor content ! [ Html.name $ internalAnchorIdent name ]
 internalAnchor _ content = content
+
+externalAnchorIdent :: GHC.Name -> String
+externalAnchorIdent = GHC.occNameString . GHC.nameOccName
 
 internalAnchorIdent :: GHC.Name -> String
 internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
@@ -91,4 +99,4 @@ externalHyperlink name content =
     Html.anchor content ! [ Html.href $ maybe "" id mmod ++ "#" ++ ident ]
   where
     mmod = GHC.moduleNameString . GHC.moduleName <$> GHC.nameModule_maybe name
-    ident = GHC.occNameString . GHC.nameOccName $ name
+    ident = externalAnchorIdent name
