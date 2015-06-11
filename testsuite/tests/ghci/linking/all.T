@@ -51,4 +51,5 @@ test('T3333',
      run_command,
      ['$MAKE -s --no-print-directory T3333'])
 
-test('T1407', normal, ghci_script, ['T1407.script'])
+test('T1407', when(opsys('mingw32'), expect_broken(1407)),
+     ghci_script, ['T1407.script'])
