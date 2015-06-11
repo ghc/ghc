@@ -1008,10 +1008,9 @@ lookupQualifiedNameGHCi rdr_name
       , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
       = do { res <- loadSrcInterface_maybe doc mod False Nothing
            ; case res of
-                Succeeded ifaces
+                Succeeded iface
                   -> return [ name
-                            | iface <- ifaces
-                            , avail <- mi_exports iface
+                            | avail <- mi_exports iface
                             , name  <- availNames avail
                             , nameOccName name == occ ]
 

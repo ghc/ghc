@@ -1402,9 +1402,8 @@ runTcInteractive hsc_env thing_inside
                       vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
-
-       ; let getOrphans m = fmap (concatMap (\iface -> mi_module iface
-                                                 : dep_orphs (mi_deps iface)))
+       ; let getOrphans m = fmap (\iface -> mi_module iface
+                                          : dep_orphs (mi_deps iface))
                                  (loadSrcInterface (text "runTcInteractive") m
                                                    False Nothing)
        ; orphs <- fmap concat . forM (ic_imports icxt) $ \i ->
