@@ -517,6 +517,10 @@ def normalise_version( *pkgs ):
         _normalise_errmsg_fun(name, opts, normalise_version_(*pkgs))
     return normalise_version__
 
+def normalise_drive_letter(name, opts):
+    # Windows only. Change D:\\ to C:\\.
+    _normalise_fun(name, opts, lambda str: re.sub(r'[A-Z]:\\', r'C:\\', str))
+
 def join_normalisers(*a):
     """
     Compose functions, flattening sequences.
