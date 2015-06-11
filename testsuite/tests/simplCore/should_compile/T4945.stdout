@@ -1,7 +1,0 @@
-                               -> STUArray RealWorld Int Int
-                              (ipv3 [OS=OneShot] :: STUArray RealWorld Int Int) ->
-                                          case ipv3 of _ [Occ=Dead] { STUArray ds5 ds6 dt ds7 ->
-                                  (Data.Array.Base.STUArray
-                                  (Data.Array.Base.STUArray
-                                  (Data.Array.Base.STUArray
-                                  (Data.Array.Base.STUArray
