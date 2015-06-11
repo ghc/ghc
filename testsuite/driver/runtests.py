@@ -139,7 +139,7 @@ if config.use_threads == 1:
         print("Warning: Ignoring request to use threads as python version is 2.7.2")
         print("See http://bugs.python.org/issue13817 for details.")
         config.use_threads = 0
-    if windows:
+    if windows: # See Trac ticket #10510.
         print("Warning: Ignoring request to use threads as running on Windows")
         config.use_threads = 0
 
