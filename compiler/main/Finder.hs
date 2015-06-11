@@ -9,7 +9,6 @@
 module Finder (
     flushFinderCaches,
     FindResult(..),
-    convFindExactResult, -- move to HscTypes?
     findImportedModule,
     findExactModule,
     findHomeModule,
@@ -46,7 +45,8 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.Time
-import Data.List        ( foldl', partition )
+import Data.List        ( foldl' )
+
 
 type FileExt = String   -- Filename extension
 type BaseName = String  -- Basename of file
@@ -75,7 +75,7 @@ flushFinderCaches hsc_env =
         is_ext mod _ | modulePackageKey mod /= this_pkg = True
                      | otherwise = False
 
-addToFinderCache :: IORef FinderCache -> Module -> FindExactResult -> IO ()
+addToFinderCache :: IORef FinderCache -> Module -> FindResult -> IO ()
 addToFinderCache ref key val =
   atomicModifyIORef' ref $ \c -> (extendModuleEnv c key val, ())
 
@@ -83,7 +83,7 @@ removeFromFinderCache :: IORef FinderCache -> Module -> IO ()
 removeFromFinderCache ref key =
   atomicModifyIORef' ref $ \c -> (delModuleEnv c key, ())
 
-lookupFinderCache :: IORef FinderCache -> Module -> IO (Maybe FindExactResult)
+lookupFinderCache :: IORef FinderCache -> Module -> IO (Maybe FindResult)
 lookupFinderCache ref key = do
    c <- readIORef ref
    return $! lookupModuleEnv c key
@@ -104,7 +104,7 @@ findImportedModule hsc_env mod_name mb_pkg =
         Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
                  | otherwise           -> pkg_import
   where
-    home_import   = convFindExactResult `fmap` findHomeModule hsc_env mod_name
+    home_import   = findHomeModule hsc_env mod_name
 
     pkg_import    = findExposedPackageModule hsc_env mod_name mb_pkg
 
@@ -118,7 +118,7 @@ findImportedModule hsc_env mod_name mb_pkg =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: HscEnv -> Module -> IO FindExactResult
+findExactModule :: HscEnv -> Module -> IO FindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
     in if modulePackageKey mod == thisPackage dflags
@@ -152,45 +152,17 @@ orIfNotFound this or_this = do
 -- been done.  Otherwise, do the lookup (with the IO action) and save
 -- the result in the finder cache and the module location cache (if it
 -- was successful.)
-homeSearchCache :: HscEnv
-                -> ModuleName
-                -> IO FindExactResult
-                -> IO FindExactResult
+homeSearchCache :: HscEnv -> ModuleName -> IO FindResult -> IO FindResult
 homeSearchCache hsc_env mod_name do_this = do
   let mod = mkModule (thisPackage (hsc_dflags hsc_env)) mod_name
   modLocationCache hsc_env mod do_this
-
--- | Converts a 'FindExactResult' into a 'FindResult' in the obvious way.
-convFindExactResult :: FindExactResult -> FindResult
-convFindExactResult (FoundExact loc m) = FoundModule (FoundHs loc m)
-convFindExactResult (NoPackageExact pk) = NoPackage pk
-convFindExactResult NotFoundExact { fer_paths = paths, fer_pkg = pkg } =
-    NotFound {
-        fr_paths = paths, fr_pkg = pkg,
-        fr_pkgs_hidden = [], fr_mods_hidden = [], fr_suggestions = []
-    }
-
-foundExact :: FindExactResult -> Bool
-foundExact FoundExact{} = True
-foundExact _ = False
 
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
 findExposedPackageModule hsc_env mod_name mb_pkg
   = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name mb_pkg of
-     LookupFound (m, _) -> do
-       fmap convFindExactResult (findPackageModule hsc_env m)
-     LookupFoundSigs ms backing -> do
-       locs <- mapM (findPackageModule hsc_env . fst) ms
-       let (ok, missing) = partition foundExact locs
-       case missing of
-        -- At the moment, we return the errors one at a time.  It might be
-        -- better if we collected them up and reported them all, but
-        -- FindResult doesn't have enough information to support this.
-        -- In any case, this REALLY shouldn't happen (it means there are
-        -- broken packages in the database.)
-        (m:_) -> return (convFindExactResult m)
-        _ -> return (FoundSigs [FoundHs l m | FoundExact l m <- ok] backing)
+     LookupFound m pkg_conf ->
+       findPackageModule_ hsc_env m pkg_conf
      LookupMultiple rs ->
        return (FoundMultiple rs)
      LookupHidden pkg_hiddens mod_hiddens ->
@@ -204,7 +176,7 @@ findExposedPackageModule hsc_env mod_name mb_pkg
                        , fr_mods_hidden = []
                        , fr_suggestions = suggest })
 
-modLocationCache :: HscEnv -> Module -> IO FindExactResult -> IO FindExactResult
+modLocationCache :: HscEnv -> Module -> IO FindResult -> IO FindResult
 modLocationCache hsc_env mod do_this = do
   m <- lookupFinderCache (hsc_FC hsc_env) mod
   case m of
@@ -217,7 +189,7 @@ modLocationCache hsc_env mod do_this = do
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc = do
   let mod = mkModule (thisPackage (hsc_dflags hsc_env)) mod_name
-  addToFinderCache (hsc_FC hsc_env) mod (FoundExact loc mod)
+  addToFinderCache (hsc_FC hsc_env) mod (Found loc mod)
   return mod
 
 uncacheModule :: HscEnv -> ModuleName -> IO ()
@@ -244,7 +216,7 @@ uncacheModule hsc_env mod = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findHomeModule :: HscEnv -> ModuleName -> IO FindExactResult
+findHomeModule :: HscEnv -> ModuleName -> IO FindResult
 findHomeModule hsc_env mod_name =
    homeSearchCache hsc_env mod_name $
    let
@@ -275,19 +247,19 @@ findHomeModule hsc_env mod_name =
   -- This is important only when compiling the base package (where GHC.Prim
   -- is a home module).
   if mod == gHC_PRIM
-        then return (FoundExact (error "GHC.Prim ModLocation") mod)
+        then return (Found (error "GHC.Prim ModLocation") mod)
         else searchPathExts home_path mod exts
 
 
 -- | Search for a module in external packages only.
-findPackageModule :: HscEnv -> Module -> IO FindExactResult
+findPackageModule :: HscEnv -> Module -> IO FindResult
 findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
         pkg_id = modulePackageKey mod
   --
   case lookupPackage dflags pkg_id of
-     Nothing -> return (NoPackageExact pkg_id)
+     Nothing -> return (NoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
 
 -- | Look up the interface file associated with module @mod@.  This function
@@ -297,14 +269,14 @@ findPackageModule hsc_env mod = do
 -- the 'PackageConfig' must be consistent with the package key in the 'Module'.
 -- The redundancy is to avoid an extra lookup in the package state
 -- for the appropriate config.
-findPackageModule_ :: HscEnv -> Module -> PackageConfig -> IO FindExactResult
+findPackageModule_ :: HscEnv -> Module -> PackageConfig -> IO FindResult
 findPackageModule_ hsc_env mod pkg_conf =
   ASSERT( modulePackageKey mod == packageConfigId pkg_conf )
   modLocationCache hsc_env mod $
 
   -- special case for GHC.Prim; we won't find it in the filesystem.
   if mod == gHC_PRIM
-        then return (FoundExact (error "GHC.Prim ModLocation") mod)
+        then return (Found (error "GHC.Prim ModLocation") mod)
         else
 
   let
@@ -327,7 +299,7 @@ findPackageModule_ hsc_env mod pkg_conf =
           -- don't bother looking for it.
           let basename = moduleNameSlashes (moduleName mod)
           loc <- mk_hi_loc one basename
-          return (FoundExact loc mod)
+          return (Found loc mod)
     _otherwise ->
           searchPathExts import_dirs mod [(package_hisuf, mk_hi_loc)]
 
@@ -342,7 +314,7 @@ searchPathExts
         FilePath -> BaseName -> IO ModLocation  -- action
        )
      ]
-  -> IO FindExactResult
+  -> IO FindResult
 
 searchPathExts paths mod exts
    = do result <- search to_search
@@ -368,13 +340,15 @@ searchPathExts paths mod exts
                       file = base <.> ext
                 ]
 
-    search [] = return (NotFoundExact {fer_paths = map fst to_search
-                                      ,fer_pkg   = Just (modulePackageKey mod)})
+    search [] = return (NotFound { fr_paths = map fst to_search
+                                 , fr_pkg   = Just (modulePackageKey mod)
+                                 , fr_mods_hidden = [], fr_pkgs_hidden = []
+                                 , fr_suggestions = [] })
 
     search ((file, mk_result) : rest) = do
       b <- doesFileExist file
       if b
-        then do { loc <- mk_result; return (FoundExact loc mod) }
+        then do { loc <- mk_result; return (Found loc mod) }
         else search rest
 
 mkHomeModLocationSearched :: DynFlags -> ModuleName -> FileExt
@@ -597,8 +571,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
                    vcat (map mod_hidden mod_hiddens) $$
                    tried_these files
 
-            _ -> pprPanic "cantFindErr"
-                   (ptext cannot_find <+> quotes (ppr mod_name))
+            _ -> panic "cantFindErr"
 
     build_tag = buildTag dflags
 

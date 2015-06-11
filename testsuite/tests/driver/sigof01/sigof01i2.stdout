@@ -1,8 +1,0 @@
-class Foo a where
-  foo :: a -> a
-data T = A.T
-mkT :: T
-x :: Bool
-Trust type is (Module: Safe, Package: trusted)
-Package Trust: Off
-B is trusted!

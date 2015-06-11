@@ -7,13 +7,3 @@ test('sigof01m',
      [ clean_cmd('rm -rf tmp_sigof01m') ],
      run_command,
      ['$MAKE -s --no-print-directory sigof01m'])
-
-test('sigof01i',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory sigof01i'])
-
-test('sigof01i2',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory sigof01i2'])
