@@ -540,6 +540,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/driver/T7835/Test
 /tests/driver/T8526/A.inc
 /tests/driver/T8602/t8602.sh
+/tests/driver/T9562/Main
 /tests/driver/Test.081b
 /tests/driver/Test.081b.hs
 /tests/driver/Test_081a
