@@ -143,7 +143,7 @@ nextarg: ;
     if (!filter) {
 	pathName = copystring(argv[0]);
 	DropSuffix(pathName, ".hp");
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+#if defined(_MSC_VER) || defined(_WIN32)
 	DropSuffix(pathName, ".exe");
 #endif
 	baseName = copystring(Basename(pathName));

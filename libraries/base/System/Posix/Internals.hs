@@ -134,7 +134,7 @@ ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         Nothing
 
 fdGetMode :: FD -> IO IOMode
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
+#if defined(mingw32_HOST_OS)
 fdGetMode _ = do
     -- We don't have a way of finding out which flags are set on FDs
     -- on Windows, so make a handle that thinks that anything goes.
@@ -314,7 +314,7 @@ foreign import ccall unsafe "consUtils.h is_console__"
 -- Turning on non-blocking for a file descriptor
 
 setNonBlockingFD :: FD -> Bool -> IO ()
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS)
 setNonBlockingFD fd set = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
                  (c_fcntl_read fd const_f_getfl)
@@ -336,7 +336,7 @@ setNonBlockingFD _ _ = return ()
 -- -----------------------------------------------------------------------------
 -- Set close-on-exec for a file descriptor
 
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS)
 setCloseOnExec :: FD -> IO ()
 setCloseOnExec fd = do
   throwErrnoIfMinus1_ "setCloseOnExec" $
@@ -346,7 +346,7 @@ setCloseOnExec fd = do
 -- -----------------------------------------------------------------------------
 -- foreign imports
 
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS)
 type CFilePath = CString
 #else
 type CFilePath = CWString
@@ -376,7 +376,7 @@ foreign import ccall unsafe "HsBase.h __hscore_fstat"
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "io.h _lseeki64"
    c_lseek :: CInt -> Int64 -> CInt -> IO Int64
 #else
@@ -427,7 +427,7 @@ foreign import ccall unsafe "HsBase.h unlink"
 foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS)
 foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
@@ -539,7 +539,7 @@ foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermi
 #endif
 
 s_issock :: CMode -> Bool
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS)
 s_issock cmode = c_s_issock cmode /= 0
 foreign import capi unsafe "sys/stat.h S_ISSOCK" c_s_issock :: CMode -> CInt
 #else

@@ -86,7 +86,7 @@
 #if HAVE_SYS_TIMES_H
 #include <sys/times.h>
 #endif
-#if HAVE_WINSOCK_H && defined(__MINGW32__)
+#if HAVE_WINSOCK_H && defined(_WIN32)
 #include <winsock.h>
 #endif
 #if HAVE_LIMITS_H
@@ -111,7 +111,7 @@
 # include <mach/mach_time.h>
 #endif
 
-#if !defined(__MINGW32__) && !defined(irix_HOST_OS)
+#if !defined(_WIN32) && !defined(irix_HOST_OS)
 # if HAVE_SYS_RESOURCE_H
 #  include <sys/resource.h>
 # endif
@@ -134,14 +134,14 @@
 #endif
 #include "WCsubst.h"
 
-#if defined(__MINGW32__)
+#if defined(_WIN32)
 /* in Win32Utils.c */
 extern void maperrno (void);
 extern int maperrno_func(DWORD dwErrorCode);
 extern HsWord64 getMonotonicUSec(void);
 #endif
 
-#if defined(__MINGW32__)
+#if defined(_WIN32)
 #include <io.h>
 #include <fcntl.h>
 #include <shlobj.h>
@@ -298,14 +298,14 @@ __hscore_ftruncate( int fd, off_t where )
 INLINE int
 __hscore_setmode( int fd, HsBool toBin )
 {
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+#if defined(_MSC_VER) || defined(_WIN32)
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
 #endif
 }
 
-#if defined(__MINGW32__)
+#if defined(_WIN32)
 // We want the versions of stat/fstat/lseek that use 64-bit offsets,
 // and you have to ask for those explicitly.  Unfortunately there
 // doesn't seem to be a 64-bit version of truncate/ftruncate, so while
@@ -331,7 +331,7 @@ INLINE dev_t  __hscore_st_dev  ( struct_stat* st ) { return st->st_dev; }
 INLINE ino_t  __hscore_st_ino  ( struct_stat* st ) { return st->st_ino; }
 #endif
 
-#if defined(__MINGW32__)
+#if defined(_WIN32)
 INLINE int __hscore_stat(wchar_t *file, struct_stat *buf) {
 	return _wstati64(file,buf);
 }
@@ -375,7 +375,7 @@ __hscore_ptr_c_cc( struct termios* ts )
 INLINE HsInt
 __hscore_sizeof_termios( void )
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
   return sizeof(struct termios);
 #else
   return 0;
@@ -383,7 +383,7 @@ __hscore_sizeof_termios( void )
 }
 #endif
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
+#if !defined(_MSC_VER) && !defined(_WIN32)
 INLINE HsInt
 __hscore_sizeof_sigset_t( void )
 {
@@ -468,7 +468,7 @@ INLINE int __hscore_sig_setmask( void )
 #endif
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 INLINE size_t __hscore_sizeof_siginfo_t (void)
 {
     return sizeof(siginfo_t);
@@ -519,7 +519,7 @@ __hscore_fd_cloexec( void )
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
 	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
