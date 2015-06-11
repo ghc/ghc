@@ -122,12 +122,14 @@ dwarfFrameSection  = dwarfSection "frame"
 dwarfGhcSection    = dwarfSection "ghc"
 
 dwarfSection :: String -> SDoc
-dwarfSection name = sdocWithPlatform $ \plat ->
+dwarfSection name = sdocWithPlatform $ \plat -> ftext $ mkFastString $
   case platformOS plat of
-    OSDarwin -> ftext $ mkFastString $
-                  ".section __DWARF,__debug_" ++ name ++ ",regular,debug"
-    _other   -> ftext $ mkFastString $
-                  ".section .debug_" ++ name ++ ",\"\",@progbits"
+    os | osElfTarget os
+       -> "\t.section .debug_" ++ name ++ ",\"\",@progbits"
+       | osMachOTarget os
+       -> "\t.section __DWARF,__debug_" ++ name ++ ",regular,debug"
+       | otherwise
+       -> "\t.section .debug_" ++ name ++ ",\"dr\""
 
 -- | Dwarf section labels
 dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: LitString

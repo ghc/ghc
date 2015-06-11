@@ -86,7 +86,7 @@ compileUnitHeader unitU = sdocWithPlatform $ \plat ->
   in vcat [ ptext (sLit "\t.long ") <> length  -- compilation unit size
           , ppr cuLabel <> colon
           , ptext (sLit "\t.word 3")           -- DWARF version
-          , pprDwWord (sectionOffset dwarfAbbrevLabel dwarfAbbrevLabel)
+          , sectionOffset dwarfAbbrevLabel dwarfAbbrevLabel
                                                -- abbrevs offset
           , ptext (sLit "\t.byte ") <> ppr (platformWordSize plat) -- word size
           ]
