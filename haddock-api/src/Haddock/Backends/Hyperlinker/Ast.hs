@@ -40,9 +40,9 @@ enrich src =
     detailsMap = concatMap ($ src)
         [ variables
         , types
+        , decls
         , binds
         , imports
-        , decls
         ]
 
 type DetailsMap = [(GHC.SrcSpan, TokenDetails)]
@@ -96,11 +96,16 @@ binds =
 decls :: GHC.RenamedSource -> DetailsMap
 decls (group, _, _, _) = concatMap ($ group)
     [ map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
+    , everything (<|>) fun
     ]
   where
     typ (GHC.L _ t) =
         let (GHC.L sspan name) = GHC.tcdLName t
         in (sspan, TokenDetails RtkDecl name)
+    fun term = case cast term of
+        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
+            | GHC.isExternalName name -> pure (sspan, TokenDetails RtkDecl name)
+        _ -> empty
 
 imports :: GHC.RenamedSource -> DetailsMap
 imports =
