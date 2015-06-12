@@ -154,8 +154,9 @@ subTableSrc _ _  _ [] = Nothing
 subTableSrc qual lnks splice decls = Just $ table << aboves (concatMap subRow decls)
   where
     subRow ((decl, mdoc, subs),L loc dn) =
-      (td ! [theclass "src"] << decl
-      <+> linkHtml loc dn
+      (td ! [theclass "src clearfix"] <<
+        (thespan ! [theclass "inst-left"] << decl)
+        <+> linkHtml loc dn
       <->
       docElement td << fmap (docToHtml Nothing qual) mdoc
       )
