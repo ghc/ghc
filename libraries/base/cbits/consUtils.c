@@ -3,7 +3,7 @@
  *
  * Win32 Console API support
  */
-#if defined(_MSC_VER) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__)
 /* to the end */
 
 #include "consUtils.h"

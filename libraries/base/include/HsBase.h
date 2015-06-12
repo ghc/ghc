@@ -298,7 +298,7 @@ __hscore_ftruncate( int fd, off_t where )
 INLINE int
 __hscore_setmode( int fd, HsBool toBin )
 {
-#if defined(_MSC_VER) || defined(_WIN32)
+#if defined(_WIN32)
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
@@ -383,7 +383,7 @@ __hscore_sizeof_termios( void )
 }
 #endif
 
-#if !defined(_MSC_VER) && !defined(_WIN32)
+#if !defined(_WIN32)
 INLINE HsInt
 __hscore_sizeof_sigset_t( void )
 {
