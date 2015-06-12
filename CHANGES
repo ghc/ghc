@@ -13,6 +13,8 @@ Changes in version 2.16.1
 
  * Expand response files in arguments (#285)
 
+ * Build the main executable with -threaded (#399)
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
