@@ -249,11 +249,17 @@ def signal_exit_code( val ):
 
 # -----
 
-def timeout_multiplier( val ):
-    return lambda name, opts, v=val: _timeout_multiplier(name, opts, v)
+def compile_timeout_multiplier( val ):
+    return lambda name, opts, v=val: _compile_timeout_multiplier(name, opts, v)
 
-def _timeout_multiplier( name, opts, v ):
-    opts.timeout_multiplier = v
+def _compile_timeout_multiplier( name, opts, v ):
+    opts.compile_timeout_multiplier = v
+
+def run_timeout_multiplier( val ):
+    return lambda name, opts, v=val: _run_timeout_multiplier(name, opts, v)
+
+def _run_timeout_multiplier( name, opts, v ):
+    opts.run_timeout_multiplier = v
 
 # -----
 
@@ -1256,7 +1262,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
            '> {errname} 2>&1'
           ).format(**locals())
 
-    result = runCmdFor(name, cmd)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.compile_timeout_multiplier)
 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
@@ -1338,7 +1344,7 @@ def simple_run( name, way, prog, args ):
     cmd = 'cd ' + opts.testdir + ' && ' + cmd
 
     # run the command
-    result = runCmdFor(name, cmd, timeout_multiplier=opts.timeout_multiplier)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1384,6 +1390,8 @@ def rts_flags(way):
 # Run a program in the interpreter and check its output
 
 def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
+    opts = getTestOpts()
+
     outname = add_suffix(name, 'interp.stdout')
     errname = add_suffix(name, 'interp.stderr')
     rm_no_fail(outname)
@@ -1449,7 +1457,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
-    result = runCmdFor(name, cmd, timeout_multiplier=getTestOpts().timeout_multiplier)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
