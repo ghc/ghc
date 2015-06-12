@@ -114,7 +114,7 @@
           <para>
             Several performance-related issues inside GHC have been
             fixed. As a result, you should see improved compilation
-            times and memory usage (issues #10397, #10370).
+            times and memory usage (issues #10397, #10370, #10422).
           </para>
        </listitem>
        <listitem>
