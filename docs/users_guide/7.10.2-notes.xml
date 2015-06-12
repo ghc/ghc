@@ -117,6 +117,13 @@
             times and memory usage (issues #10397, #10370).
           </para>
        </listitem>
+       <listitem>
+          <para>
+            A bug which could cause GHCi to crash if exceptions were
+            raised in the <literal>:cmd</literal> command has been
+            fixed.
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 
