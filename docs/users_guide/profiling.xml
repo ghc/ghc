@@ -1335,7 +1335,7 @@ profile of your program as it runs.  Simply generate an incremental
 heap profile as described in the previous section.  Run <command>gv</command> on your
 profile:
 <screen>
-  gv -watch -seascape FOO.ps
+  gv -watch -orientation=seascape FOO.ps
 </screen>
 If you forget the <literal>-watch</literal> flag you can still select
 "Watch file" from the "State" menu.  Now each time you generate a new
@@ -1348,7 +1348,7 @@ This can all be encapsulated in a little script:
   #!/bin/sh
   head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
     | hp2ps > FOO.ps
-  gv -watch -seascape FOO.ps &amp;
+  gv -watch -orientation=seascape FOO.ps &amp;
   while [ 1 ] ; do
     sleep 10 # We generate a new profile every 10 seconds.
     head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
