@@ -2922,7 +2922,7 @@ if you write <literal>import M( (+) )</literal> do you mean the
 <emphasis>function</emphasis> <literal>(+)</literal> or the
 <emphasis>type constructor</emphasis> <literal>(+)</literal>?
 The default is the former, but with <option>-XExplicitNamespaces</option> (which is implied
-by <option>-XExplicitTypeOperators</option>) GHC allows you to specify the latter
+by <option>-XTypeOperators</option>) GHC allows you to specify the latter
 by preceding it with the keyword <literal>type</literal>, thus:
 <programlisting>
 import M( type (+) )
