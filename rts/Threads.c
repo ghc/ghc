@@ -553,6 +553,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
         // Note [Throw to self when masked], also #767 and #8303.
         throwToSelf(cap, tso, (StgClosure *)stackOverflow_closure);
+        return;
     }
 
 
