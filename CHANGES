@@ -17,6 +17,8 @@ Changes in version 2.16.1
 
  * Use SrcSpan of declarations for inferred type sigs (#207)
 
+ * Fix cross-module instance locations (#383)
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
