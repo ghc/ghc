@@ -1283,4 +1283,151 @@ for \verb|T|, because the export of \verb|foo| is an \I{AvailTC} which
 does mention \verb|T|.
 \end{aside}
 
+\section{Cabal}
+
+Design goals:
+
+\begin{itemize}
+    \item Backpack files are user-written.  (In an earlier design, we had
+        the idea that Cabal would generate Backpack files; however, we've
+        since made Backpack files more user-friendly and reasonable to
+        write by hand.)
+
+    \item Backpack files are optional.  A package can add a Backpack file
+        to replace some (but not all) of the fields in a Cabal description.
+
+    \item Backpack files can be compiled without GHC, if it is self-contained
+        with respect to all the indefinite packages it includes.  To include
+        an indefinite package which is not locally defined but installed
+        to the package database, you must use Cabal.
+
+    \item Backpack packages are \emph{unversioned}; you never see a version
+        number in a Backpack package.
+\end{itemize}
+
+\subsection{Versioning}
+
+In this section, we discuss how Cabal's version numbers factor into
+Backpack, namely how we specify \I{PkgKey}s.
+
+\paragraph{History}
+Prior to GHC 7.10, GHC has allowed an arbitrary combination of libraries
+to be linked together, assuming that the package IDs (e.g.
+\verb|foo-0.1|) were all unique. Cabal enforces a stronger restriction,
+which is that there exists some unique mapping from package name to
+package version which is consistent with all transitive dependencies.
+
+\paragraph{Design goals}
+Here are some design goals for versioning:
+
+\begin{enumerate}
+    \item GHC only tests for equality on versioning; Cabal is
+    responsible for determining the version of a package.  For example,
+    pre-7.10 the linker symbols were prefixed using a package name and
+    version, but GHC simply represented this internally as an opaque
+    string.  As another example, package qualified imports only allow
+    qualification by package name, and not by version.
+
+    \item Cabal only tests for equality on package keys; GHC is
+    responsible for calculating the package key of a package.  (This is
+    because GHC must be able to maintain a mapping between the unhashed
+    and hashed versions of a key, and the hashing process must be
+    deterministic.)  If Cabal needs to generate a new package key, it
+    must do so through GHC.
+
+    \item Our design should, in principle, support mutual recursion
+    between packages, even if the implementation does not (presently).
+
+    \item GHC should not lose functionality, i.e. it should still be
+    possible to link together the same package with different versions;
+    however, Cabal may arrange for this to not occur by default unless a
+    user explicitly asks for it.
+\end{enumerate}
+
+These goals imply a few things:
+
+\begin{enumerate}
+    \item Backpack files should not contain any version numbers,
+    and should be agnostic to versioning.
+
+    \item Package keys must record versioning information, otherwise
+    we can't link together two different versions of the same package.
+\end{enumerate}
+
+\paragraph{Package keys}
+
+Earlier, we specified \I{PkgKey} as a package name $p$ and then a list
+of hole instantiations.  To allow linking together multiple versions of
+the same package, we must record versioning information into the
+\I{PkgKey}.  To do this, we include in the \I{PkgKey} a \I{VersionHash}.
+Cabal is responsible for defining \I{VersionHash}, but we give two possible
+definitions in Figure~\ref{fig:version}.
+
+\begin{figure}[htpb]
+$$
+\begin{array}{rcll}
+p && \mbox{Package name} \\
+v && \mbox{Version number} \\[1em]
+\I{VersionHash} & ::= & p \verb|-| v\; \verb|{| \, p_0 \; \verb|->| \; \I{VersionHash}_0 \verb|,|\, \ldots\, p_n \; \verb|->| \; \I{VersionHash}_n \, \verb|}| & \mbox{Full version hash} \\
+\I{VersionHash'} & ::= & p \; \verb|{| \, p_0\verb|-|v_0 \verb|,|\, \ldots\, p_n\verb|-|v_n \, \verb|}| & \mbox{Simplified version hash} \\
+\I{PkgKey} & ::= & \I{VersionHash} \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)| \\
+\end{array}
+$$
+\caption{Version hash} \label{fig:version}
+\end{figure}
+
+The difference between a full version hash and a simplified version hash
+is what linking restrictions they impose on programs: the full version
+hash supports linking arbitrary versions of packages with arbitrary
+other versions, whereas the simplified hash has a Cabal-style requirement
+that there be some globally consistent mapping from package name to version.
+
+The full version hash has some subtleties:
+
+\begin{itemize}
+    \item Each sub-\I{VersionHash} recorded in a \I{VersionHash} is
+    identified by a package name, which may not necessarily equal the
+    package name in the \I{VersionHash}.  This permits us to calculate
+    a \I{VersionHash} for a package like:
+\begin{verbatim}
+    package p where
+        include network (Network)
+        include network-old (Network as Network.Old)
+        ...
+\end{verbatim}
+    if we want \verb|network| to refer to \verb|network-2.0| and
+    \verb|network-old| to refer to \verb|network-1.0|.  Without
+    identifying each subdependency by package name, we wouldn't know
+    what \verb|network-old| would refer to.
+
+    \item If a package is locally specified in a Backpack
+    file, it does not occur in the \I{VersionHash}.  This is because
+    we always refer to the same package; there are no different versions!
+
+    \item You might wonder why we need a \I{VersionHash} as well as a \I{PkgKey};
+    why not just specify \I{PkgKey} as $p-v \; \verb|{| \, p \; \verb|->| \; \I{PkgKey} \verb|,|\, \ldots\, \verb|}| \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)|$?  However, there is ``too much'' information in the \I{PkgKey}, causing the scheme to not work with mutual recursion:
+
+\begin{verbatim}
+    package p where
+        module M
+        include q
+\end{verbatim}
+
+    To specify the package key of \verb|p|, we need the package key of \verb|q|; to
+    specify the package key of \verb|q|, we need the module identifier of \verb|M|
+    which contains the package key of \verb|p|: circularity!  (The simplified
+    version hash does not have this problem as it is not recursive.)
+\end{itemize}
+
+\paragraph{Cabal to GHC}
+
+Prior to GHC-7.10, Cabal passed versioning information to GHC using the
+\verb|-package-name| flag.  In GHC 7.10, this flag was renamed to
+\verb|-this-package-key|.  We propose that this flag be renamed once
+again to \verb|-this-version-hash|, to which Cabal passes a hash (or string)
+describing the versioning of the package which is then incorporated
+into the package key.  Cabal no longer needs to calculate package keys.
+In the absence of Backpack, there will be no semantic difference if we
+switch to full version hashes.
+
 \end{document} % chktex 16
