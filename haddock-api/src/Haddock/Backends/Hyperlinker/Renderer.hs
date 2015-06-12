@@ -96,7 +96,7 @@ internalHyperlink name content =
 
 externalHyperlink :: GHC.Name -> Html -> Html
 externalHyperlink name content =
-    Html.anchor content ! [ Html.href $ maybe "" id mmod ++ "#" ++ ident ]
+    Html.anchor content ! [ Html.href $ maybe "" id mmod ++ ".html#" ++ ident ]
   where
     mmod = GHC.moduleNameString . GHC.moduleName <$> GHC.nameModule_maybe name
     ident = externalAnchorIdent name
