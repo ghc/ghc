@@ -322,7 +322,7 @@ Indeed, the bindings can even be recursive.
 	  <tbody>
 	    <row>
 	      <entry><literal>::</literal></entry>
-	      <entry>::</entry> <!-- no special char, apparently -->
+	      <entry>&#x2237;</entry>
               <entry>0x2237</entry>
 	      <entry>PROPORTION</entry>
 	    </row>
@@ -363,7 +363,7 @@ Indeed, the bindings can even be recursive.
 	  <tbody>
 	    <row>
 	      <entry>-&lt;</entry>
-	      <entry>&larrtl;</entry>
+	      <entry>&#x2919;</entry>
 	      <entry>0x2919</entry>
 	      <entry>LEFTWARDS ARROW-TAIL</entry>
 	    </row>
@@ -372,7 +372,7 @@ Indeed, the bindings can even be recursive.
 	  <tbody>
 	    <row>
 	      <entry>&gt;-</entry>
-	      <entry>&rarrtl;</entry>
+	      <entry>&#x291A;</entry>
 	      <entry>0x291A</entry>
 	      <entry>RIGHTWARDS ARROW-TAIL</entry>
 	    </row>
@@ -381,7 +381,7 @@ Indeed, the bindings can even be recursive.
 	  <tbody>
 	    <row>
 	      <entry>-&lt;&lt;</entry>
-	      <entry></entry>
+	      <entry>&#x291B;</entry>
 	      <entry>0x291B</entry>
 	      <entry>LEFTWARDS DOUBLE ARROW-TAIL</entry>
 	    </row>
@@ -390,7 +390,7 @@ Indeed, the bindings can even be recursive.
 	  <tbody>
 	    <row>
 	      <entry>&gt;&gt;-</entry>
-	      <entry></entry>
+	      <entry>&#x291C;</entry>
 	      <entry>0x291C</entry>
 	      <entry>RIGHTWARDS DOUBLE ARROW-TAIL</entry>
 	    </row>
