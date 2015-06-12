@@ -22,6 +22,11 @@
        </listitem>
        <listitem>
           <para>
+            DWARF support should now work on Windows/MinGW (#10468).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A bug which caused GHC's <literal>libffi.so</literal>
             library to be built with executable stacks on some
             platforms has been fixed (issue #10208).
@@ -152,7 +157,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.22.3.0 (was 1.22.2.0)
+                    Version number 1.22.4.0 (was 1.22.2.0).
                </para>
            </listitem>
        </itemizedlist>
