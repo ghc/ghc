@@ -713,6 +713,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/ghc-api/T8639_api
 /tests/ghc-api/T9595
 /tests/ghc-api/T10052/T10052
+/tests/ghc-api/T10508_api
 /tests/ghc-api/apirecomp001/myghc
 /tests/ghc-api/dynCompileExpr/dynCompileExpr
 /tests/ghc-api/ghcApi

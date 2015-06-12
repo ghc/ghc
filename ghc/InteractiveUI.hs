@@ -36,13 +36,15 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              handleSourceError )
 import HsImpExp
+import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
 import PprTyThing
-import RdrName ( getGRE_NameQualifier_maybes )
+import PrelNames
+import RdrName ( RdrName, getGRE_NameQualifier_maybes, getRdrName )
 import SrcLoc
 import qualified Lexer
 
@@ -1317,14 +1319,18 @@ defineMacro overwrite s = do
 
   let filtered = [ cmd | cmd <- macros, cmdName cmd /= macro_name ]
 
-  -- give the expression a type signature, so we can be sure we're getting
-  -- something of the right type.
-  let new_expr = '(' : definition ++ ") :: String -> IO String"
-
   -- compile the expression
-  handleSourceError (\e -> GHC.printException e) $
-   do
-    hv <- GHC.compileExpr new_expr
+  handleSourceError GHC.printException $ do
+    step <- getGhciStepIO
+    expr <- GHC.parseExpr definition
+    -- > ghciStepIO . definition :: String -> IO String
+    let stringTy = nlHsTyVar $ getRdrName stringTyConName
+        ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
+        body = nlHsVar compose_RDR `mkHsApp` step `mkHsApp` expr
+        tySig = stringTy `nlHsFunTy` ioM
+        new_expr = L (getLoc expr) $ ExprWithTySig body tySig PlaceHolder
+    hv <- GHC.compileParsedExpr new_expr
+
     liftIO (writeIORef macros_ref -- later defined macros have precedence
             ((macro_name, lift . runMacro hv, noCompletion) : filtered))
 
@@ -1353,15 +1359,27 @@ undefineMacro str = mapM_ undef (words str)
 -- :cmd
 
 cmdCmd :: String -> GHCi ()
-cmdCmd str = do
-  let expr = '(' : str ++ ") :: IO String"
-  handleSourceError (\e -> GHC.printException e) $
-   do
-    hv <- GHC.compileExpr expr
+cmdCmd str = handleSourceError GHC.printException $ do
+    step <- getGhciStepIO
+    expr <- GHC.parseExpr str
+    -- > ghciStepIO str :: IO String
+    let new_expr = step `mkHsApp` expr
+    hv <- GHC.compileParsedExpr new_expr
+
     cmds <- liftIO $ (unsafeCoerce# hv :: IO String)
     enqueueCommands (lines cmds)
-    return ()
 
+-- | Generate a typed ghciStepIO expression
+-- @ghciStepIO :: Ty String -> IO String@.
+getGhciStepIO :: GHCi (LHsExpr RdrName)
+getGhciStepIO = do
+  ghciTyConName <- GHC.getGHCiMonad
+  let stringTy = nlHsTyVar $ getRdrName stringTyConName
+      ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
+      ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
+      body = nlHsVar (getRdrName ghciStepIoMName)
+      tySig = ghciM `nlHsFunTy` ioM
+  return $ noLoc $ ExprWithTySig body tySig PlaceHolder
 
 -----------------------------------------------------------------------------
 -- :check

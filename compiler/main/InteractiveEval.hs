@@ -33,6 +33,7 @@ module InteractiveEval (
         parseName,
         showModule,
         isModuleInterpreted,
+        parseExpr, compileParsedExpr,
         compileExpr, dynCompileExpr,
         Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
         -- * Depcreated API (remove in GHC 7.14)
@@ -72,6 +73,7 @@ import Unique
 import UniqSupply
 import MonadUtils
 import Module
+import PrelNames  ( toDynName )
 import Panic
 import UniqFM
 import Maybes
@@ -81,6 +83,7 @@ import BreakArray
 import RtClosureInspect
 import Outputable
 import FastString
+import Bag
 
 import System.Mem.Weak
 import System.Directory
@@ -1002,45 +1005,49 @@ typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
 
 -----------------------------------------------------------------------------
--- Compile an expression, run it and deliver the resulting HValue
+-- Compile an expression, run it and deliver the result
 
+-- | Parse an expression, the parsed expression can be further processed and
+-- passed to compileParsedExpr.
+parseExpr :: GhcMonad m => String -> m (LHsExpr RdrName)
+parseExpr expr = withSession $ \hsc_env -> do
+  liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
+
+-- | Compile an expression, run it and deliver the resulting HValue.
 compileExpr :: GhcMonad m => String -> m HValue
-compileExpr expr = withSession $ \hsc_env -> do
-  Just (ids, hval, fix_env) <- liftIO $ hscStmt hsc_env ("let __cmCompileExpr = "++expr)
+compileExpr expr = do
+  parsed_expr <- parseExpr expr
+  compileParsedExpr parsed_expr
+
+-- | Compile an parsed expression (before renaming), run it and deliver
+-- the resulting HValue.
+compileParsedExpr :: GhcMonad m => LHsExpr RdrName -> m HValue
+compileParsedExpr expr@(L loc _) = withSession $ \hsc_env -> do
+  -- > let _compileParsedExpr = expr
+  -- Create let stmt from expr to make hscParsedStmt happy.
+  -- We will ignore the returned [Id], namely [expr_id], and not really
+  -- create a new binding.
+  let expr_fs = fsLit "_compileParsedExpr"
+      expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
+      let_stmt = L loc . LetStmt . HsValBinds $
+        ValBindsIn (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
+
+  Just (ids, hvals_io, fix_env) <- liftIO $ hscParsedStmt hsc_env let_stmt
   updateFixityEnv fix_env
-  hvals <- liftIO hval
-  case (ids,hvals) of
-    ([_],[hv]) -> return hv
-    _          -> panic "compileExpr"
+  hvals <- liftIO hvals_io
+  case (ids, hvals) of
+    ([_expr_id], [hval]) -> return hval
+    _ -> panic "compileParsedExpr"
 
--- -----------------------------------------------------------------------------
--- Compile an expression, run it and return the result as a dynamic
-
+-- | Compile an expression, run it and return the result as a Dynamic.
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
 dynCompileExpr expr = do
-    iis <- getContext
-    let importDecl = ImportDecl {
-                         ideclSourceSrc = Nothing,
-                         ideclName = noLoc (mkModuleName "Data.Dynamic"),
-                         ideclPkgQual = Nothing,
-                         ideclSource = False,
-                         ideclSafe = False,
-                         ideclQualified = True,
-                         ideclImplicit = False,
-                         ideclAs = Nothing,
-                         ideclHiding = Nothing
-                     }
-    setContext (IIDecl importDecl : iis)
-    let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
-    Just (ids, hvals, fix_env) <- withSession $ \hsc_env ->
-                           liftIO $ hscStmt hsc_env stmt
-    setContext iis
-    updateFixityEnv fix_env
-
-    vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
-    case (ids,vals) of
-        (_:[], v:[]) -> return v
-        _            -> panic "dynCompileExpr"
+  parsed_expr <- parseExpr expr
+  -- > Data.Dynamic.toDyn expr
+  let loc = getLoc parsed_expr
+      to_dyn_expr = mkHsApp (L loc . HsVar $ getRdrName toDynName) parsed_expr
+  hval <- compileParsedExpr to_dyn_expr
+  return (unsafeCoerce# hval :: Dynamic)
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames

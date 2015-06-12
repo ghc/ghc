@@ -99,7 +99,7 @@ module GHC (
         -- ** Get/set the current context
         parseImportDecl,
         setContext, getContext,
-        setGHCiMonad,
+        setGHCiMonad, getGHCiMonad,
 #endif
         -- ** Inspecting the current context
         getBindings, getInsts, getPrintUnqual,
@@ -124,7 +124,8 @@ module GHC (
         lookupName,
 #ifdef GHCI
         -- ** Compiling expressions
-        InteractiveEval.compileExpr, HValue, dynCompileExpr,
+        HValue, parseExpr, compileParsedExpr,
+        InteractiveEval.compileExpr, dynCompileExpr,
 
         -- ** Other
         runTcInteractive,   -- Desired by some clients (Trac #8878)
@@ -1456,6 +1457,10 @@ setGHCiMonad name = withSession $ \hsc_env -> do
     modifySession $ \s ->
         let ic = (hsc_IC s) { ic_monad = ty }
         in s { hsc_IC = ic }
+
+-- | Get the monad GHCi lifts user statements into.
+getGHCiMonad :: GhcMonad m => m Name
+getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
 getHistorySpan h = withSession $ \hsc_env ->

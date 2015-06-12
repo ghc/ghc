@@ -36,6 +36,8 @@ import TysWiredIn
 import HscTypes
 import Class
 import TyCon
+import Outputable
+import UniqFM
 import Util
 import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
 
@@ -53,13 +55,20 @@ import Data.Array
 ********************************************************************* -}
 
 knownKeyNames :: [Name]
-knownKeyNames
-  = map getName wiredInThings
-    ++ cTupleTyConNames
-    ++ basicKnownKeyNames
+knownKeyNames =
+  ASSERT2( isNullUFM badNamesUFM, text "badknownKeyNames" <+> ppr badNamesUFM )
+  names
+  where
+  badNamesUFM = filterUFM (\ns -> length ns > 1) namesUFM
+  namesUFM = foldl (\m n -> addToUFM_Acc (:) singleton m n n) emptyUFM names
+  names = concat
+    [ map getName wiredInThings
+    , cTupleTyConNames
+    , basicKnownKeyNames
 #ifdef GHCI
-    ++ templateHaskellNames
+    , templateHaskellNames
 #endif
+    ]
 
 {- *********************************************************************
 *                                                                      *

@@ -170,12 +170,6 @@ isUnboundName name = name `hasKey` unboundKey
 This section tells what the compiler knows about the association of
 names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in TysWiredIn etc.
-
-The names for DPH can come from one of multiple backend packages. At the point where
-'basicKnownKeyNames' is used, we don't know which backend it will be.  Hence, we list
-the names for multiple backends.  That works out fine, although they use the same uniques,
-as we are guaranteed to only load one backend; hence, only one of the different names
-sharing a unique will be used.
 -}
 
 basicKnownKeyNames :: [Name]
@@ -188,7 +182,6 @@ basicKnownKeyNames
         stringTyConName,
         ratioDataConName,
         ratioTyConName,
-        integerTyConName,
 
         --  Classes.  *Must* include:
         --      classes that are grabbed by key (e.g., eqClassKey)
@@ -221,6 +214,8 @@ basicKnownKeyNames
         mkAppTyName,
         typeLitTypeRepName,
 
+        -- Dynamic
+        toDynName,
 
         -- Numeric stuff
         negateName, minusName, geName, eqName,
@@ -247,8 +242,8 @@ basicKnownKeyNames
         fmapName,
         joinMName,
 
-        -- MonadRec stuff
-        mfixName,
+        -- MonadFix
+        monadFixClassName, mfixName,
 
         -- Arrow stuff
         arrAName, composeAName, firstAName,
@@ -317,9 +312,6 @@ basicKnownKeyNames
         -- Float/Double
         rationalToFloatName,
         rationalToDoubleName,
-
-        -- MonadFix
-        monadFixClassName, mfixName,
 
         -- Other classes
         randomClassName, randomGenClassName, monadPlusClassName,
@@ -1038,7 +1030,9 @@ mkPolyTyConAppName    = varQual tYPEABLE_INTERNAL (fsLit "mkPolyTyConApp") mkPol
 mkAppTyName           = varQual tYPEABLE_INTERNAL (fsLit "mkAppTy")        mkAppTyKey
 typeLitTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeLitTypeRep") typeLitTypeRepKey
 
-
+-- Dynamic
+toDynName :: Name
+toDynName = varQual dYNAMIC (fsLit "toDyn") toDynIdKey
 
 -- Class Data
 dataClassName :: Name
@@ -1887,6 +1881,9 @@ mkPolyTyConAppKey = mkPreludeMiscIdUnique 504
 mkAppTyKey        = mkPreludeMiscIdUnique 505
 typeLitTypeRepKey = mkPreludeMiscIdUnique 506
 
+-- Dynamic
+toDynIdKey :: Unique
+toDynIdKey = mkPreludeMiscIdUnique 507
 
 {-
 ************************************************************************

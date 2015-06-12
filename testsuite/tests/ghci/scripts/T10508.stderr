@@ -1,0 +1,8 @@
+
+<interactive>:1:15:
+    Couldn't match type ‘a0 -> a0’ with ‘[Char]’
+    Expected type: Prelude.String
+      Actual type: a0 -> a0
+    Probable cause: ‘id’ is applied to too few arguments
+    In the first argument of ‘return’, namely ‘id’
+    In the expression: return id
