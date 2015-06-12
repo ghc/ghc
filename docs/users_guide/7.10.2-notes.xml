@@ -124,6 +124,13 @@
             fixed.
           </para>
        </listitem>
+       <listitem>
+          <para>
+            A bug in the event manager which could cause 'multi-shot'
+            event registrations to only fire once has been fixed
+            (issue #10317).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 
