@@ -16,6 +16,13 @@
     <itemizedlist>
        <listitem>
           <para>
+            A bug in the typechecker which could result in strange,
+            inconsistent reduction of type families has been fixed
+            (issue #10488).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A bug which caused GHC to generate bad DWARF unwinding
             information has been fixed (issue #10236).
           </para>
@@ -129,6 +136,18 @@
             A bug in the event manager which could cause 'multi-shot'
             event registrations to only fire once has been fixed
             (issue #10317).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which could cause compiled programs to loop forever
+            when glibc's iconv implementation (gconv) wasn't available
+            has been fixed, so these programs will now terminate with
+            an error. As a result of this change, however, GHC
+            compiled programs now also specifically recognize ASCII
+            encodings, and can bypass iconv in these cases. This
+            allows statically compiled programs to exist inside an
+            initramfs, for example. (issues #10298, #7695).
           </para>
        </listitem>
     </itemizedlist>
