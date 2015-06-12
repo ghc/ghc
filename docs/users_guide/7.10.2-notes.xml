@@ -4,10 +4,10 @@
 
   <para>
     The 7.10.2 release is a bugfix release, with over 70+ bug fixes
-    from users and contributors relative to 7.10.1. The major bugfixes
-    are listed below. For the full list with more detail, see the
-    <ulink url="https://ghc.haskell.org/trac/ghc/milestone/7.10.2">GHC
-    7.10.2 milestone</ulink> on our bug tracker.
+    relative to 7.10.1. The major fixes are listed below. For the full
+    list with more detail, see the <ulink
+    url="https://ghc.haskell.org/trac/ghc/milestone/7.10.2">GHC 7.10.2
+    milestone</ulink> on our bug tracker.
   </para>
 
   <sect2>
