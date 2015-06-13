@@ -30,5 +30,5 @@ packageRules :: Rules ()
 packageRules =
     forM_ [Stage0, Stage1] $ \stage -> do
         forM_ targetPackages $ \pkg -> do
-            let dir = pkgPath pkg </> targetDirectory stage pkg
-            buildPackage stage pkg dir targetWays buildSettings
+            let env = defaultEnvironment { getStage = stage, getPackage = pkg }
+            buildPackage env targetWays buildSettings

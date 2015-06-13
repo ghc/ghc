@@ -140,8 +140,12 @@ postProcessPackageData file = do
 -- * otherwise, we must collapse it into one space-separated string
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Stage -> Package -> FilePath -> Ways -> Settings -> Rules ()
-buildPackageData stage pkg dir ways settings =
+buildPackageData :: Environment -> Ways -> Settings -> Rules ()
+buildPackageData env ways settings =
+    let stage = getStage env
+        pkg   = getPackage env
+        dir   = pkgPath pkg </> targetDirectory stage pkg
+    in
     (dir </>) <$>
     [ "package-data.mk"
     , "haddock-prologue.txt"
@@ -152,7 +156,6 @@ buildPackageData stage pkg dir ways settings =
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
-            env = defaultEnvironment { getStage = stage, getPackage = pkg }
         need [pkgPath pkg </> pkgCabal pkg]
         -- GhcCabal will run the configure script, so we depend on it
         -- We still don't know who build the configure script from configure.ac
