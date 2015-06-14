@@ -1,8 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Expression.Settings (
-    Settings,
-
+module Settings.Util (
     -- Primitive settings elements
     arg, argM, args,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
@@ -17,8 +15,6 @@ module Expression.Settings (
 import Base hiding (Args, arg, args)
 import Oracles hiding (not)
 import Expression
-
-type Settings = DiffExpr [String]
 
 -- A single argument
 arg :: String -> Settings

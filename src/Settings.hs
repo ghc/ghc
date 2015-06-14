@@ -14,9 +14,9 @@ import Targets
 import Package
 import Switches
 import Oracles.Base
+import Settings.Util
 import UserSettings
 import Expression hiding (when, liftIO)
-import Expression.Settings
 
 settings :: Settings
 settings = defaultSettings <> userSettings

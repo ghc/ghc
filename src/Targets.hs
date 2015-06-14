@@ -13,7 +13,6 @@ import Base hiding (arg, args, Args, TargetDir)
 import Package
 import Switches
 import Expression
-import Expression.Settings
 
 -- These are the packages we build
 targetPackages :: Packages

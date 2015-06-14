@@ -7,7 +7,6 @@ import Oracles.Builder
 import Ways
 import Targets
 import Expression
-import Expression.Settings
 
 -- No user-specific settings by default
 userSettings :: Settings

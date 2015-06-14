@@ -3,7 +3,7 @@ module Expression (
     module Control.Monad.Reader,
     Expr, DiffExpr, fromDiff,
     Predicate,
-    Ways, Packages,
+    Settings, Ways, Packages,
     Environment (..), defaultEnvironment,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
@@ -37,8 +37,10 @@ type Expr a = ReaderT Environment Action a
 type DiffExpr a = Expr (Endo a)
 
 type Predicate = Expr Bool
-type Ways      = DiffExpr [Way]
-type Packages  = DiffExpr [Package]
+
+type Settings = DiffExpr [String]
+type Ways     = DiffExpr [Way]
+type Packages = DiffExpr [Package]
 
 instance Monoid a => Monoid (Expr a) where
     mempty  = return mempty
