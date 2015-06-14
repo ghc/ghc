@@ -3,8 +3,8 @@ module UserSettings (
     ) where
 
 import Base hiding (arg, args, Args)
-import Rules.Data
 import Oracles.Builder
+import Targets
 import Expression
 import Expression.Settings
 
@@ -14,7 +14,7 @@ userSettings = mconcat
     , builder (Ghc Stage0) ? remove ["-O2"]
     , builder GhcCabal ? removeSub "--configure-option=CFLAGS" ["-Werror"] ]
 
-userPackages :: Settings
+userPackages :: Packages
 userPackages = mconcat
     [ stage Stage1 ? remove [cabal]
     ,                remove [compiler] ]

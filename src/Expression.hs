@@ -89,7 +89,7 @@ interpret = flip runReaderT
 fromDiff :: Monoid a => DiffExpr a -> Expr a
 fromDiff = fmap (($ mempty) . appEndo)
 
-interpretDiff :: Environment -> Expr a -> Action a
+interpretDiff :: Monoid a => Environment -> DiffExpr a -> Action a
 interpretDiff env = interpret env . fromDiff
 
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a

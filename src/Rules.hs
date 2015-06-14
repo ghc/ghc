@@ -10,6 +10,7 @@ import Targets
 import Settings
 import Package
 import Expression
+import UserSettings
 import Rules.Package
 
 -- generateTargets needs package-data.mk files of all target packages
