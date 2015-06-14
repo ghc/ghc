@@ -1214,7 +1214,6 @@ commafy xs = hsep $ punctuate comma xs
 
 -- Print in C hex format: 0x13fa
 pprHexVal :: Integer -> Width -> SDoc
-pprHexVal 0 _ = ptext (sLit "0x0")
 pprHexVal w rep
   | w < 0     = parens (char '-' <>
                     ptext (sLit "0x") <> intToDoc (-w) <> repsuffix rep)
@@ -1234,7 +1233,9 @@ pprHexVal w rep
       repsuffix _ = char 'U'
 
       intToDoc :: Integer -> SDoc
-      intToDoc i = go (truncInt i)
+      intToDoc i = case truncInt i of
+                       0 -> char '0'
+                       v -> go v
 
       -- We need to truncate value as Cmm backend does not drop
       -- redundant bits to ease handling of negative values.
