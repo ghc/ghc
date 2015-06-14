@@ -2,8 +2,8 @@ module Settings (
     settings
     ) where
 
+import Targets
 import Base hiding (arg, args)
-import Oracles.Builder
 import Settings.GhcPkg
 import Settings.GhcCabal
 import UserSettings
@@ -13,7 +13,7 @@ settings :: Settings
 settings = defaultSettings <> userSettings
 
 defaultSettings :: Settings
-defaultSettings = do
-    stage <- asks getStage
-    mconcat [ builder GhcCabal ? cabalSettings
-            , builder (GhcPkg stage) ? ghcPkgSettings ]
+defaultSettings = mconcat
+    [ cabalSettings
+    , ghcPkgSettings
+    , customPackageSettings ]

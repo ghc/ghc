@@ -17,7 +17,7 @@ import Settings.Packages
 import UserSettings
 
 cabalSettings :: Settings
-cabalSettings = do
+cabalSettings = builder GhcCabal ? do
     stage <- asks getStage
     pkg   <- asks getPackage
     mconcat [ arg "configure"
@@ -26,7 +26,6 @@ cabalSettings = do
             , dllSettings
             , with' $ Ghc stage
             , with' $ GhcPkg stage
-            , customConfigureSettings
             , stage0 ? bootPackageDbSettings
             , librarySettings
             , configKeyNonEmpty "hscolour" ? with' HsColour -- TODO: generalise?
@@ -59,14 +58,18 @@ librarySettings = do
 
 configureSettings :: Settings
 configureSettings = do
-    let conf    key = appendSubD $ "--configure-option=" ++ key
-        ccSettings' = ccSettings <> remove ["-Werror"]
+    let conf key = appendSubD $ "--configure-option=" ++ key
+        cFlags   = mconcat [ ccSettings
+                           , remove ["-Werror"]
+                           , argStagedConfig "conf-cc-args" ]
+        ldFlags  = ldSettings <> argStagedConfig "conf-gcc-linker-args"
+        cppFlags = cppSettings <> argStagedConfig "conf-cpp-args"
     stage <- asks getStage
     mconcat
-        [ conf "CFLAGS"   ccSettings'
-        , conf "LDFLAGS"  ldSettings
-        , conf "CPPFLAGS" cppSettings
-        , appendSubD "--gcc-options" $ ccSettings' <> ldSettings
+        [ conf "CFLAGS"   cFlags
+        , conf "LDFLAGS"  ldFlags
+        , conf "CPPFLAGS" cppFlags
+        , appendSubD "--gcc-options" $ cFlags <> ldFlags
         , conf "--with-iconv-includes"  $ argConfig "iconv-include-dirs"
         , conf "--with-iconv-libraries" $ argConfig "iconv-lib-dirs"
         , conf "--with-gmp-includes"    $ argConfig "gmp-include-dirs"
@@ -106,9 +109,8 @@ ccSettings = do
     let gccGe46 = liftM not gccLt46
     mconcat
         [ package integerLibrary ? arg "-Ilibraries/integer-gmp2/gmp"
-        , builder GhcCabal ? argStagedConfig "conf-cc-args"
         , validating ? mconcat
-            [ notBuilder GhcCabal ? arg "-Werror"
+            [ arg "-Werror"
             , arg "-Wall"
             , gccIsClang ??
               ( arg "-Wno-unknown-pragmas" <>
@@ -117,7 +119,7 @@ ccSettings = do
         ]
 
 ldSettings :: Settings
-ldSettings = builder GhcCabal ? argStagedConfig "conf-gcc-linker-args"
+ldSettings = mempty
 
 cppSettings :: Settings
-cppSettings = builder GhcCabal ? argStagedConfig "conf-cpp-args"
+cppSettings = mempty

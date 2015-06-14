@@ -38,7 +38,6 @@ supports-package-key = @SUPPORTS_PACKAGE_KEY@
 solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
 split-objects-broken = @SplitObjsBroken@
 ghc-unregisterised   = @Unregisterised@
-validating           = NO
 ghc-source-path      = @hardtop@
 
 # Information about host and target systems:

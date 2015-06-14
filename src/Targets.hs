@@ -1,7 +1,7 @@
 module Targets (
     targetDirectory,
     knownPackages,
-    customConfigureSettings,
+    customPackageSettings,
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc,
     integerLibrary, parallel, pretty, primitive, process, stm, templateHaskell,
@@ -12,6 +12,7 @@ import Base hiding (arg, args)
 import Package
 import Switches
 import Expression
+import Oracles.Builder
 
 -- Build results will be placed into a target directory with the following
 -- typical structure:
@@ -79,15 +80,13 @@ integerLibraryCabal = case integerLibraryImpl of
     IntegerGmp2   -> "integer-gmp.cabal" -- Indeed, why make life easier?
     IntegerSimple -> "integer-simple.cabal"
 
--- Custom configure settings for packages
--- TODO: check if '--flag' and '--flags' should be collections of
--- sub-arguments or not.
-customConfigureSettings :: Settings
-customConfigureSettings = mconcat
+-- Custom package settings for packages
+customPackageSettings :: Settings
+customPackageSettings = builder GhcCabal ? mconcat
     [ package integerLibrary ?
-      windowsHost     ? appendSub "--configure-option" ["--with-intree-gmp"]
-    , package base    ? appendSub "--flags" [integerLibraryName]
-    , package ghcPrim ? appendSub "--flag"  ["include-ghc-prim"] ]
+      windowsHost     ? append ["--configure-option=--with-intree-gmp"]
+    , package base    ? append ["--flags=" ++ integerLibraryName]
+    , package ghcPrim ? append ["--flag=include-ghc-prim"] ]
 
 -- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/
