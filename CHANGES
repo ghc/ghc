@@ -19,6 +19,8 @@ Changes in version 2.16.1
 
  * Fix cross-module instance locations (#383)
 
+ * Fix alignment of Source link for instances in Firefox (#384)
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)

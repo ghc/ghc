@@ -318,6 +318,7 @@ div#style-menu-holder {
   height: 80%;
   top: 10%;
   padding: 0;
+  max-width: 75%;
 }
 
 #synopsis .caption {
@@ -378,6 +379,15 @@ div#style-menu-holder {
   margin: 0 -0.5em 0 0.5em;
 }
 
+#interface td.src .link {
+  float: right;
+  color: #919191;
+  border-left: 1px solid #919191;
+  background: #f0f0f0;
+  padding: 0 0.5em 0.2em;
+  margin: 0 -0.5em 0 0.5em;
+}
+
 #interface span.fixity {
   color: #919191;
   border-left: 1px solid #919191;
@@ -404,6 +414,14 @@ div#style-menu-holder {
 }
 #interface td.doc p + p {
   margin-top: 0.8em;
+}
+
+.clearfix:after {
+  clear: both;
+  content: " ";
+  display: block;
+  height: 0;
+  visibility: hidden;
 }
 
 .subs dl {
@@ -443,6 +461,11 @@ div#style-menu-holder {
 .inst, .inst li {
   list-style: none;
   margin-left: 1em;
+}
+
+/* Workaround for bug in Firefox (issue #384) */
+.inst-left {
+  float: left;
 }
 
 .top p.src {
