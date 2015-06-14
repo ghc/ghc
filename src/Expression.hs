@@ -1,12 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 module Expression (
     module Control.Monad.Reader,
-    Ways,
+    Expr, DiffExpr, fromDiff,
     Predicate,
-    Expression,
+    Ways, Packages,
     Environment (..), defaultEnvironment,
+    append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret,
-    whenPredicate, (?), (??), stage, notStage, builder, notBuilder, package,
+    applyPredicate, (?), (??), stage, notStage, builder, notBuilder, package,
     configKeyValue, configKeyValues,
     configKeyYes, configKeyNo, configKeyNonEmpty
     ) where
@@ -32,27 +33,71 @@ defaultEnvironment = Environment
         getPackage = error "Package not set in the environment"
     }
 
-type Expression a = ReaderT Environment Action a
+type Expr a = ReaderT Environment Action a
+type DiffExpr a = Expr (Endo a)
 
-type Ways      = Expression [Way]
-type Predicate = Expression Bool
+type Predicate = Expr Bool
+type Ways      = DiffExpr [Way]
+type Packages  = DiffExpr [Package]
 
-instance Monoid a => Monoid (Expression a) where
+instance Monoid a => Monoid (Expr a) where
     mempty  = return mempty
     mappend = liftM2 mappend
 
-interpret :: Environment -> Expression a -> Action a
+append :: Monoid a => a -> DiffExpr a
+append x = return $ Endo (<> x)
+
+appendM :: Monoid a => Action a -> DiffExpr a
+appendM mx = lift mx >>= append
+
+remove :: Eq a => [a] -> DiffExpr [a]
+remove xs = return . Endo $ filter (`notElem` xs)
+
+-- appendSub appends a list of sub-arguments to all arguments starting with a
+-- given prefix. If there is no argument with such prefix then a new argument
+-- of the form 'prefix=listOfSubarguments' is appended to the expression.
+-- Note: nothing is done if the list of sub-arguments is empty.
+appendSub :: String -> [String] -> DiffExpr [String]
+appendSub prefix xs
+    | xs == []  = mempty
+    | otherwise = return $ Endo (go False)
+  where
+    go True  []     = []
+    go False []     = [prefix ++ "=" ++ unwords xs]
+    go found (y:ys) = if prefix `isPrefixOf` y
+                      then unwords (y : xs) : go True ys
+                      else go found ys
+
+-- appendSubD is similar to appendSub but it extracts the list of sub-arguments
+-- from the given DiffExpr.
+appendSubD :: String -> DiffExpr [String] -> DiffExpr [String]
+appendSubD prefix diffExpr = fromDiff diffExpr >>= appendSub prefix
+
+filterSub :: String -> (String -> Bool) -> DiffExpr [String]
+filterSub prefix p = return . Endo $ map filterSubstr
+  where
+    filterSubstr s
+        | prefix `isPrefixOf` s = unwords . filter p . words $ s
+        | otherwise             = s
+
+removeSub :: String -> [String] -> DiffExpr [String]
+removeSub prefix xs = filterSub prefix (`notElem` xs)
+
+interpret :: Environment -> Expr a -> Action a
 interpret = flip runReaderT
 
-whenPredicate :: Monoid a => Predicate -> Expression a -> Expression a
-whenPredicate predicate expr = do
+fromDiff :: Monoid a => DiffExpr a -> Expr a
+fromDiff = fmap (($ mempty) . appEndo)
+
+applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
+applyPredicate predicate expr = do
     bool <- predicate
     if bool then expr else return mempty
 
-(?) :: Monoid a => Predicate -> Expression a -> Expression a
-(?) = whenPredicate
+(?) :: Monoid a => Predicate -> Expr a -> Expr a
+(?) = applyPredicate
 
-(??) :: Monoid a => Predicate -> (Expression a, Expression a) -> Expression a
+(??) :: Monoid a => Predicate -> (Expr a, Expr a) -> Expr a
 p ?? (t, f) = p ? t <> (liftM not p) ? f
 
 infixr 8 ?
@@ -77,7 +122,7 @@ configKeyValue key value = liftM (value ==) (lift $ askConfig key)
 
 -- checks if there is at least one match
 configKeyValues :: String -> [String] -> Predicate
-configKeyValues key values = liftM (flip elem $ values) (lift $ askConfig key)
+configKeyValues key values = liftM (`elem` values) (lift $ askConfig key)
 
 configKeyYes :: String -> Predicate
 configKeyYes key = configKeyValue key "YES"

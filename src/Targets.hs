@@ -1,5 +1,5 @@
 module Targets (
-    targetWays, targetPackages, targetDirectory, packagePredicate,
+    targetWays, targetPackages, targetDirectory, allPackages,
     customConfigureSettings,
     array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
     directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
@@ -7,7 +7,7 @@ module Targets (
     transformers, unix, win32, xhtml
     ) where
 
-import qualified Ways
+import Ways hiding (parallel)
 import Base hiding (arg, args, Args, TargetDir)
 import Package
 import Switches
@@ -15,46 +15,31 @@ import Expression
 import Expression.Settings
 
 -- These are the packages we build
-targetPackages :: [Package]
-targetPackages =
-    [ array, base, binPackageDb, binary, bytestring, cabal, compiler
-    , containers, deepseq, directory, filepath, ghcPrim, haskeline
-    , hoopl, hpc, integerLibrary, parallel, pretty, primitive, process
-    , stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
+targetPackages :: Packages
+targetPackages = mconcat
+    [ stage Stage0 ? packagesStage0
+    , stage Stage1 ? packagesStage1 ]
 
--- Some packages are built conditionally
--- TODO: make this function total (it only reads stage from the environment)
-packagePredicate :: Package -> Predicate
-packagePredicate pkg = do
-    stage   <- asks getStage
-    windows <- windowsHost
-    ios     <- targetOs "ios"
-    haddock <- buildHaddock
-    let result
-            | stage == Stage0 && pkg `notElem`
-                [ binPackageDb
-                , binary
-                , cabal
-                , compiler
-                , hoopl
-                , hpc
-                , terminfo
-                , transformers ] = False
-            | pkg == terminfo    = not windows && not ios
-            | pkg == unix        = not windows
-            | pkg == win32       = windows
-            | pkg == xhtml       = haddock
-            | stage == Stage0    = True
-            | stage == Stage1    = True
-            | otherwise          = False -- TODO: enable Stage2
-    return result
+packagesStage0 :: Packages
+packagesStage0 = mconcat
+    [ append [binPackageDb, binary, cabal, compiler, hoopl, hpc, transformers]
+    , notWindowsHost ? notTargetOs "ios" ? append [terminfo] ]
+
+packagesStage1 :: Packages
+packagesStage1 = mconcat
+    [ append [ array, base, bytestring, containers, deepseq, directory
+             , filepath, ghcPrim, haskeline, integerLibrary, parallel
+             , pretty, primitive, process, stm, templateHaskell, time ]
+    , windowsHost    ? append [win32]
+    , notWindowsHost ? append [unix]
+    , buildHaddock   ? append [xhtml] ]
 
 -- Packages will be build these ways
 targetWays :: Ways
 targetWays = mconcat
-    [                              return [Ways.vanilla] -- always build vanilla
-    , notStage Stage0            ? return [Ways.profiling]
-    , platformSupportsSharedLibs ? return [Ways.dynamic] ]
+    [                              append [vanilla] -- always build vanilla
+    , notStage Stage0            ? append [profiling]
+    , platformSupportsSharedLibs ? append [dynamic] ]
 
 -- Build results will be placed into a target directory with the following
 -- typical structure:
@@ -63,15 +48,17 @@ targetWays = mconcat
 -- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
 targetDirectory :: Stage -> Package -> FilePath
 targetDirectory stage package
-    | package == compiler = "stage" ++ show (1 + fromEnum stage)
+    | package == compiler = "stage" ++ show (fromEnum stage + 1)
     | stage   == Stage0   = "dist-boot"
     | otherwise           = "dist-install"
 
 -- Package definitions
-array, base, binPackageDb, binary, bytestring, cabal, containers, deepseq,
-    directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerLibrary,
-    parallel, pretty, primitive, process, stm, templateHaskell, terminfo, time,
-    transformers, unix, win32, xhtml :: Package
+allPackages :: [Package]
+allPackages =
+    [ array, base, binPackageDb, binary, bytestring, cabal, compiler
+    , containers, deepseq, directory, filepath, ghcPrim, haskeline
+    , hoopl, hpc, integerLibrary, parallel, pretty, primitive, process
+    , stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
 
 array           = library  "array"
 base            = library  "base"
@@ -118,11 +105,10 @@ integerLibraryCabal = case integerLibraryImpl of
 -- Custom configure settings for packages
 customConfigureSettings :: Settings
 customConfigureSettings = mconcat
-    [ package base           ? arg ("--flags=" ++ integerLibraryName)
-    , package ghcPrim        ? arg "--flag=include-ghc-prim"
-    , package integerLibrary ?
-        windowsHost ? arg "--configure-option=--with-intree-gmp"
-    ]
+    [ package integerLibrary ?
+      windowsHost     ? appendSub "--configure-option" ["--with-intree-gmp"]
+    , package base    ? appendSub "--flags" [integerLibraryName]
+    , package ghcPrim ? appendSub "--flag"  ["include-ghc-prim"]]
 
 -- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/

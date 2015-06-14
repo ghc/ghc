@@ -2,7 +2,7 @@ module Rules.Data (
     cabalSettings, ghcPkgSettings, buildPackageData
     ) where
 
-import qualified Ways
+import Ways hiding (parallel)
 import Base hiding (arg, args, Args)
 import Package
 import Expression hiding (when, liftIO)
@@ -17,61 +17,53 @@ import Util
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 librarySettings :: Ways -> Settings
 librarySettings waysExpression = do
-    ways        <- waysExpression
-    ghcInterp   <- ghcWithInterpreter
-    dynPrograms <- dynamicGhcPrograms
-    return $ [ if Ways.vanilla `elem` ways
-               then  "--enable-library-vanilla"
-               else "--disable-library-vanilla"
-             , if Ways.vanilla `elem` ways && ghcInterp && not dynPrograms
-               then  "--enable-library-for-ghci"
-               else "--disable-library-for-ghci"
-             , if Ways.profiling `elem` ways
-               then  "--enable-library-profiling"
-               else "--disable-library-profiling"
-             , if Ways.dynamic `elem` ways
-               then  "--enable-shared"
-               else "--disable-shared" ]
+    ways            <- fromDiff waysExpression
+    ghcInterpreter  <- ghcWithInterpreter
+    dynamicPrograms <- dynamicGhcPrograms
+    append [ if vanilla `elem` ways
+             then  "--enable-library-vanilla"
+             else "--disable-library-vanilla"
+           , if vanilla `elem` ways && ghcInterpreter && not dynamicPrograms
+             then  "--enable-library-for-ghci"
+             else "--disable-library-for-ghci"
+           , if profiling `elem` ways
+             then  "--enable-library-profiling"
+             else "--disable-library-profiling"
+           , if dynamic `elem` ways
+             then  "--enable-shared"
+             else "--disable-shared" ]
 
 configureSettings :: Settings
 configureSettings = do
-    let conf key expr = do
-            value <- liftM unwords expr
-            return $ if value == ""
-                     then []
-                     else ["--configure-option=" ++ key ++ "=" ++ value]
-
+    let conf key = appendSubD $ "--configure-option=" ++ key
     stage <- asks getStage
-    gccPath <- lift $ showArg (Gcc stage)
-    gccSettings <- liftM unwords (ccSettings <> ldSettings)
-
-    mconcat [ conf "CFLAGS"   ccSettings
-            , conf "LDFLAGS"  ldSettings
-            , conf "CPPFLAGS" cppSettings
-            , arg $ "--gcc-options=" ++ gccSettings
-            , conf "--with-iconv-includes"  (argConfig "iconv-include-dirs")
-            , conf "--with-iconv-libraries" (argConfig "iconv-lib-dirs")
-            , conf "--with-gmp-includes"    (argConfig "gmp-include-dirs")
-            , conf "--with-gmp-libraries"   (argConfig "gmp-lib-dirs")
-            -- TODO: why TargetPlatformFull and not host?
-            , crossCompiling ?
-              conf "--host"    (argConfig "target-platform-full")
-            , conf "--with-cc" (arg gccPath) ]
+    mconcat
+        [ conf "CFLAGS"   ccSettings
+        , conf "LDFLAGS"  ldSettings
+        , conf "CPPFLAGS" cppSettings
+        , appendSubD "--gcc-options" $ ccSettings <> ldSettings
+        , conf "--with-iconv-includes"  $ argConfig "iconv-include-dirs"
+        , conf "--with-iconv-libraries" $ argConfig "iconv-lib-dirs"
+        , conf "--with-gmp-includes"    $ argConfig "gmp-include-dirs"
+        , conf "--with-gmp-libraries"   $ argConfig "gmp-lib-dirs"
+        -- TODO: why TargetPlatformFull and not host?
+        , crossCompiling ? (conf "--host" $ argConfig "target-platform-full")
+        , conf "--with-cc" . argM . showArg $ Gcc stage ]
 
 bootPackageDbSettings :: Settings
 bootPackageDbSettings = do
     sourcePath <- lift $ askConfig "ghc-source-path"
-    return $ ["--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"]
+    arg $ "--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"
 
 dllSettings :: Settings
 dllSettings = arg ""
 
 with' :: Builder -> Settings
-with' builder = lift $ with builder
+with' builder = appendM $ with builder
 
 packageConstraints :: Settings
 packageConstraints = do
-    pkgs <- filterM packagePredicate targetPackages
+    pkgs <- fromDiff targetPackages
     constraints <- lift $ forM pkgs $ \pkg -> do
         let cabal  = pkgPath pkg </> pkgCabal pkg
             prefix = dropExtension (pkgCabal pkg) ++ " == "
@@ -82,7 +74,7 @@ packageConstraints = do
             [v] -> return $ prefix ++ dropWhile (not . isDigit) v
             _   -> redError $ "Cannot determine package version in '"
                             ++ cabal ++ "'."
-    return $ concatMap (\c -> ["--constraint", c]) $ constraints
+    args $ concatMap (\c -> ["--constraint", c]) $ constraints
 
 cabalSettings :: Settings
 cabalSettings = do
@@ -167,7 +159,7 @@ buildPackageData env ways settings =
 
 run' :: Environment -> Builder -> Settings -> Action ()
 run' env builder settings = do
-    args <- interpret (env {getBuilder = builder}) settings
+    args <- interpret (env {getBuilder = builder}) $ fromDiff settings
     putColoured Green (show args)
     run builder args
 

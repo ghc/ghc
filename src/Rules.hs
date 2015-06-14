@@ -16,19 +16,18 @@ import Rules.Package
 -- TODO: make interpret total
 generateTargets :: Rules ()
 generateTargets = action $
-    forM_ [Stage0 ..] $ \stage ->
-        forM_ targetPackages $ \pkg -> do
-            let env = defaultEnvironment { getStage = stage, getPackage = pkg }
-                dir = targetDirectory stage pkg
-            required <- interpret env (packagePredicate pkg)
-            when required $ need [pkgPath pkg </> dir </> "package-data.mk"]
+    forM_ [Stage0 ..] $ \stage -> do
+        let env = defaultEnvironment { getStage = stage }
+        pkgs <- interpret env $ fromDiff targetPackages
+        forM_ pkgs $ \pkg -> do
+            let dir = targetDirectory stage pkg
+            need [pkgPath pkg </> dir </> "package-data.mk"]
 
--- TODO: simplify
 -- TODO: make interpret total
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()
 packageRules =
     forM_ [Stage0, Stage1] $ \stage -> do
-        forM_ targetPackages $ \pkg -> do
+        forM_ allPackages $ \pkg -> do
             let env = defaultEnvironment { getStage = stage, getPackage = pkg }
             buildPackage env targetWays buildSettings

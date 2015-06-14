@@ -4,7 +4,7 @@ module Expression.Settings (
     Settings,
 
     -- Primitive settings elements
-    arg, args,
+    arg, argM, args,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
     -- argBuilderPath, argStagedBuilderPath,
     -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
@@ -18,21 +18,24 @@ import Base hiding (Args, arg, args)
 import Oracles hiding (not)
 import Expression
 
-type Settings = Expression [String]
+type Settings = DiffExpr [String]
 
 -- A single argument
 arg :: String -> Settings
-arg = return . return
+arg = append . return
+
+argM :: Action String -> Settings
+argM = appendM . fmap return
 
 -- A list of arguments
 args :: [String] -> Settings
-args = return
+args = append
 
 argConfig :: String -> Settings
-argConfig = lift . fmap return . askConfig
+argConfig = appendM . fmap return . askConfig
 
 argConfigList :: String -> Settings
-argConfigList = lift . fmap words . askConfig
+argConfigList = appendM . fmap words . askConfig
 
 stagedKey :: Stage -> String -> String
 stagedKey stage key = key ++ "-stage" ++ show stage
