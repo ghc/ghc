@@ -31,4 +31,4 @@ packageRules =
     forM_ [Stage0, Stage1] $ \stage -> do
         forM_ allPackages $ \pkg -> do
             let env = defaultEnvironment { getStage = stage, getPackage = pkg }
-            buildPackage env targetWays buildSettings
+            buildPackage env (targetWays <> userWays) (settings <> userSettings)
