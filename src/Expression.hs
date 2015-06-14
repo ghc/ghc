@@ -6,7 +6,7 @@ module Expression (
     Ways, Packages,
     Environment (..), defaultEnvironment,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
-    interpret,
+    interpret, interpretDiff,
     applyPredicate, (?), (??), stage, notStage, builder, notBuilder, package,
     configKeyValue, configKeyValues,
     configKeyYes, configKeyNo, configKeyNonEmpty
@@ -88,6 +88,9 @@ interpret = flip runReaderT
 
 fromDiff :: Monoid a => DiffExpr a -> Expr a
 fromDiff = fmap (($ mempty) . appEndo)
+
+interpretDiff :: Environment -> Expr a -> Action a
+interpretDiff env = interpret env . fromDiff
 
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
 applyPredicate predicate expr = do

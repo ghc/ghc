@@ -18,7 +18,7 @@ generateTargets :: Rules ()
 generateTargets = action $
     forM_ [Stage0 ..] $ \stage -> do
         let env = defaultEnvironment { getStage = stage }
-        pkgs <- interpret env $ fromDiff targetPackages
+        pkgs <- interpretDiff env $ targetPackages <> userPackages
         forM_ pkgs $ \pkg -> do
             let dir = targetDirectory stage pkg
             need [pkgPath pkg </> dir </> "package-data.mk"]
