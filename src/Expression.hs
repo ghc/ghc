@@ -8,7 +8,7 @@ module Expression (
     Environment (..), defaultEnvironment,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
-    applyPredicate, (?), (??), stage, notStage, builder, notBuilder, package,
+    applyPredicate, (?), (??), stage, builder, package,
     configKeyValue, configKeyValues,
     configKeyYes, configKeyNo, configKeyNonEmpty
     ) where
@@ -112,14 +112,8 @@ infixr 8 ?
 stage :: Stage -> Predicate
 stage s = liftM (s ==) (asks getStage)
 
-notStage :: Stage -> Predicate
-notStage = liftM not . stage
-
 builder :: Builder -> Predicate
 builder b = liftM (b ==) (asks getBuilder)
-
-notBuilder :: Builder -> Predicate
-notBuilder = liftM not . builder
 
 package :: Package -> Predicate
 package p = liftM (p ==) (asks getPackage)

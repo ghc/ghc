@@ -5,16 +5,17 @@ module Settings.GhcPkg (
 import Base hiding (arg, args)
 import Package
 import Targets
+import Switches
 import Expression hiding (when, liftIO)
 import Settings.Util
 import Settings.GhcCabal
 
 ghcPkgSettings :: Settings
 ghcPkgSettings = do
-    stg <- asks getStage
     pkg <- asks getPackage
-    let dir = pkgPath pkg </> targetDirectory stg pkg
+    stage <- asks getStage
+    let dir = pkgPath pkg </> targetDirectory stage pkg
     mconcat [ arg "update"
             , arg "--force"
-            , stage Stage0 ? bootPackageDbSettings
+            , stage0 ? bootPackageDbSettings
             , arg $ dir </> "inplace-pkg-config" ]

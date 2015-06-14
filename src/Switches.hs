@@ -1,6 +1,6 @@
 module Switches (
-    buildHaddock, validating,
     IntegerLibraryImpl (..), integerLibraryImpl,
+    notStage, stage0, stage1, stage2, notBuilder,
     supportsPackageKey, targetPlatforms, targetPlatform,
     targetOss, targetOs, notTargetOs,
     targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
@@ -8,20 +8,31 @@ module Switches (
     gccIsClang, gccLt46, windowsHost, notWindowsHost
     ) where
 
+import Base
+import Oracles.Builder
 import Expression
-
--- User-defined switches
-buildHaddock :: Predicate
-buildHaddock = return True
-
-validating :: Predicate
-validating = return False
 
 -- Support for multiple integer library implementations
 data IntegerLibraryImpl = IntegerGmp | IntegerGmp2 | IntegerSimple
 
 integerLibraryImpl :: IntegerLibraryImpl
 integerLibraryImpl = IntegerGmp2
+
+-- Derived predicates
+notStage :: Stage -> Predicate
+notStage = liftM not . stage
+
+stage0 :: Predicate
+stage0 = stage Stage0
+
+stage1 :: Predicate
+stage1 = stage Stage1
+
+stage2 :: Predicate
+stage2 = stage Stage2
+
+notBuilder :: Builder -> Predicate
+notBuilder = liftM not . builder
 
 -- Predicates based on configuration files
 supportsPackageKey :: Predicate

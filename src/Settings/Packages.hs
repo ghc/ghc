@@ -15,8 +15,8 @@ packages = defaultPackages <> userPackages
 -- These are the packages we build by default
 defaultPackages :: Packages
 defaultPackages = mconcat
-    [ stage Stage0 ? packagesStage0
-    , stage Stage1 ? packagesStage1 ]
+    [ stage0 ? packagesStage0
+    , stage1 ? packagesStage1 ]
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat

@@ -80,12 +80,14 @@ integerLibraryCabal = case integerLibraryImpl of
     IntegerSimple -> "integer-simple.cabal"
 
 -- Custom configure settings for packages
+-- TODO: check if '--flag' and '--flags' should be collections of
+-- sub-arguments or not.
 customConfigureSettings :: Settings
 customConfigureSettings = mconcat
     [ package integerLibrary ?
       windowsHost     ? appendSub "--configure-option" ["--with-intree-gmp"]
     , package base    ? appendSub "--flags" [integerLibraryName]
-    , package ghcPrim ? appendSub "--flag"  ["include-ghc-prim"]]
+    , package ghcPrim ? appendSub "--flag"  ["include-ghc-prim"] ]
 
 -- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/

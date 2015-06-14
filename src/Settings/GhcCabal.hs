@@ -14,6 +14,7 @@ import Expression hiding (when, liftIO)
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
+import UserSettings
 
 cabalSettings :: Settings
 cabalSettings = do
@@ -26,11 +27,11 @@ cabalSettings = do
             , with' $ Ghc stage
             , with' $ GhcPkg stage
             , customConfigureSettings
-            , Expression.stage Stage0 ? bootPackageDbSettings
+            , stage0 ? bootPackageDbSettings
             , librarySettings
             , configKeyNonEmpty "hscolour" ? with' HsColour -- TODO: generalise?
             , configureSettings
-            , Expression.stage Stage0 ? packageConstraints
+            , stage0 ? packageConstraints
             , with' $ Gcc stage
             , notStage Stage0 ? with' Ld
             , with' Ar
@@ -58,13 +59,14 @@ librarySettings = do
 
 configureSettings :: Settings
 configureSettings = do
-    let conf key = appendSubD $ "--configure-option=" ++ key
+    let conf    key = appendSubD $ "--configure-option=" ++ key
+        ccSettings' = ccSettings <> remove ["-Werror"]
     stage <- asks getStage
     mconcat
-        [ conf "CFLAGS"   ccSettings
+        [ conf "CFLAGS"   ccSettings'
         , conf "LDFLAGS"  ldSettings
         , conf "CPPFLAGS" cppSettings
-        , appendSubD "--gcc-options" $ ccSettings <> ldSettings
+        , appendSubD "--gcc-options" $ ccSettings' <> ldSettings
         , conf "--with-iconv-includes"  $ argConfig "iconv-include-dirs"
         , conf "--with-iconv-libraries" $ argConfig "iconv-lib-dirs"
         , conf "--with-gmp-includes"    $ argConfig "gmp-include-dirs"
@@ -98,7 +100,6 @@ packageConstraints = do
             _   -> redError $ "Cannot determine package version in '"
                             ++ cabal ++ "'."
     args $ concatMap (\c -> ["--constraint", c]) $ constraints
-
 
 ccSettings :: Settings
 ccSettings = do
