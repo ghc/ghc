@@ -7,10 +7,10 @@ module Rules (
 import Base hiding (arg, args, Args)
 import Control.Monad
 import Targets
-import Settings
 import Package
 import Expression
 import Rules.Package
+import Settings.Packages
 
 -- generateTargets needs package-data.mk files of all target packages
 -- TODO: make interpret total
@@ -28,6 +28,6 @@ generateTargets = action $
 packageRules :: Rules ()
 packageRules =
     forM_ [Stage0, Stage1] $ \stage -> do
-        forM_ allPackages $ \pkg -> do
+        forM_ knownPackages $ \pkg -> do
             let env = defaultEnvironment { getStage = stage, getPackage = pkg }
             buildPackage env

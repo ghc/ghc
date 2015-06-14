@@ -9,6 +9,8 @@ import Oracles.Flag (when)
 import Oracles.Builder
 import Targets
 import Settings
+import Settings.GhcPkg
+import Settings.GhcCabal
 import Util
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:

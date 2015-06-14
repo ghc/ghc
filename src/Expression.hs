@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 module Expression (
     module Control.Monad.Reader,
+    module Data.Monoid,
     Expr, DiffExpr, fromDiff,
     Predicate,
     Settings, Ways, Packages,
@@ -16,6 +17,7 @@ import Base hiding (arg, args, Args, TargetDir)
 import Ways
 import Oracles
 import Package
+import Data.Monoid
 import Control.Monad.Reader
 
 data Environment = Environment

@@ -1,6 +1,6 @@
 module Targets (
-    targetWays, targetPackages, targetDirectory,
-    allPackages,
+    targetDirectory,
+    knownPackages,
     customConfigureSettings,
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc,
@@ -8,38 +8,10 @@ module Targets (
     terminfo, time, transformers, unix, win32, xhtml
     ) where
 
-import Ways hiding (parallel)
-import Base hiding (arg, args, Args, TargetDir)
+import Base hiding (arg, args)
 import Package
 import Switches
 import Expression
-
--- These are the packages we build
-targetPackages :: Packages
-targetPackages = mconcat
-    [ stage Stage0 ? packagesStage0
-    , stage Stage1 ? packagesStage1 ]
-
-packagesStage0 :: Packages
-packagesStage0 = mconcat
-    [ append [binPackageDb, binary, cabal, compiler, hoopl, hpc, transformers]
-    , notWindowsHost ? notTargetOs "ios" ? append [terminfo] ]
-
-packagesStage1 :: Packages
-packagesStage1 = mconcat
-    [ append [ array, base, bytestring, containers, deepseq, directory
-             , filepath, ghcPrim, haskeline, integerLibrary, parallel
-             , pretty, primitive, process, stm, templateHaskell, time ]
-    , windowsHost    ? append [win32]
-    , notWindowsHost ? append [unix]
-    , buildHaddock   ? append [xhtml] ]
-
--- Packages will be build these ways
-targetWays :: Ways
-targetWays = mconcat
-    [                              append [vanilla] -- always build vanilla
-    , notStage Stage0            ? append [profiling]
-    , platformSupportsSharedLibs ? append [dynamic] ]
 
 -- Build results will be placed into a target directory with the following
 -- typical structure:
@@ -52,14 +24,19 @@ targetDirectory stage package
     | stage   == Stage0   = "dist-boot"
     | otherwise           = "dist-install"
 
--- Package definitions
-allPackages :: [Package]
-allPackages =
+-- These are all packages we know about. Build rules will be generated for
+-- all of them. However, not all of these packages will be built. For example,
+-- package 'win32' is built only on Windows.
+-- Settings/Packages.hs defines default conditions for building each package,
+-- which can be overridden in UserSettings.hs.
+knownPackages :: [Package]
+knownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
     , containers, deepseq, directory, filepath, ghcPrim, haskeline
     , hoopl, hpc, integerLibrary, parallel, pretty, primitive, process
     , stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
 
+-- Package definitions
 array           = library  "array"
 base            = library  "base"
 binPackageDb    = library  "bin-package-db"
