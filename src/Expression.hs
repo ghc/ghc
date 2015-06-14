@@ -45,7 +45,7 @@ instance Monoid a => Monoid (Expr a) where
     mappend = liftM2 mappend
 
 append :: Monoid a => a -> DiffExpr a
-append x = return $ Endo (<> x)
+append = return . Endo . mappend
 
 appendM :: Monoid a => Action a -> DiffExpr a
 appendM mx = lift mx >>= append

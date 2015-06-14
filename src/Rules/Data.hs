@@ -148,9 +148,9 @@ buildPackageData env ways settings =
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
-        need [pkgPath pkg </> pkgCabal pkg]
         -- GhcCabal will run the configure script, so we depend on it
-        -- We still don't know who build the configure script from configure.ac
+        need [pkgPath pkg </> pkgCabal pkg]
+        -- We still don't know who built the configure script from configure.ac
         when (doesFileExist $ configure <.> "ac") $ need [configure]
         run' env GhcCabal settings
         -- TODO: when (registerPackage settings) $
