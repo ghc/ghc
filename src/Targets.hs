@@ -1,5 +1,6 @@
 module Targets (
-    targetWays, targetPackages, targetDirectory, allPackages,
+    targetWays, targetPackages, targetDirectory,
+    allPackages,
     customConfigureSettings,
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc,

@@ -5,7 +5,6 @@ module Rules.Package (
 import Base
 import Rules.Data
 import Expression
-import Expression.Settings
 
-buildPackage :: Environment -> Ways -> Settings -> Rules ()
+buildPackage :: Environment -> Rules ()
 buildPackage = buildPackageData
