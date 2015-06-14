@@ -36,7 +36,7 @@ defaultEnvironment = Environment
     }
 
 type Expr a = ReaderT Environment Action a
-type DiffExpr a = Expr (Endo a)
+type DiffExpr a = Expr (Dual (Endo a))
 
 type Predicate = Expr Bool
 
@@ -49,49 +49,50 @@ instance Monoid a => Monoid (Expr a) where
     mappend = liftM2 mappend
 
 append :: Monoid a => a -> DiffExpr a
-append = return . Endo . mappend
+append x = return . Dual . Endo $ (<> x)
 
 appendM :: Monoid a => Action a -> DiffExpr a
 appendM mx = lift mx >>= append
 
 remove :: Eq a => [a] -> DiffExpr [a]
-remove xs = return . Endo $ filter (`notElem` xs)
+remove xs = return . Dual . Endo $ filter (`notElem` xs)
 
 -- appendSub appends a list of sub-arguments to all arguments starting with a
 -- given prefix. If there is no argument with such prefix then a new argument
 -- of the form 'prefix=listOfSubarguments' is appended to the expression.
 -- Note: nothing is done if the list of sub-arguments is empty.
-appendSub :: String -> [String] -> DiffExpr [String]
+appendSub :: String -> [String] -> Settings
 appendSub prefix xs
-    | xs == []  = mempty
-    | otherwise = return $ Endo (go False)
+    | xs' == [] = mempty
+    | otherwise = return . Dual . Endo $ go False
   where
+    xs' = filter (/= "") xs
     go True  []     = []
-    go False []     = [prefix ++ "=" ++ unwords xs]
+    go False []     = [prefix ++ "=" ++ unwords xs']
     go found (y:ys) = if prefix `isPrefixOf` y
-                      then unwords (y : xs) : go True ys
-                      else go found ys
+                      then unwords (y : xs') : go True ys
+                      else y : go found ys
 
 -- appendSubD is similar to appendSub but it extracts the list of sub-arguments
 -- from the given DiffExpr.
-appendSubD :: String -> DiffExpr [String] -> DiffExpr [String]
+appendSubD :: String -> Settings -> Settings
 appendSubD prefix diffExpr = fromDiff diffExpr >>= appendSub prefix
 
-filterSub :: String -> (String -> Bool) -> DiffExpr [String]
-filterSub prefix p = return . Endo $ map filterSubstr
+filterSub :: String -> (String -> Bool) -> Settings
+filterSub prefix p = return . Dual . Endo $ map filterSubstr
   where
     filterSubstr s
         | prefix `isPrefixOf` s = unwords . filter p . words $ s
         | otherwise             = s
 
-removeSub :: String -> [String] -> DiffExpr [String]
+removeSub :: String -> [String] -> Settings
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
 interpret :: Environment -> Expr a -> Action a
 interpret = flip runReaderT
 
 fromDiff :: Monoid a => DiffExpr a -> Expr a
-fromDiff = fmap (($ mempty) . appEndo)
+fromDiff = fmap (($ mempty) . appEndo . getDual)
 
 interpretDiff :: Monoid a => Environment -> DiffExpr a -> Action a
 interpretDiff env = interpret env . fromDiff
