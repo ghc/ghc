@@ -229,7 +229,7 @@ function perform_search(full)
 }
 
 function setSynopsis(filename) {
-    if (parent.window.synopsis) {
+    if (parent.window.synopsis && parent.window.synopsis.location) {
         if (parent.window.synopsis.location.replace) {
             // In Firefox this avoids adding the change to the history.
             parent.window.synopsis.location.replace(filename);
