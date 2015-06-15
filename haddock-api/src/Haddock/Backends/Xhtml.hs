@@ -546,7 +546,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     synopsis
       | no_doc_at_all = noHtml
       | otherwise
-      = divSynposis $
+      = divSynopsis $
             paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++
             shortDeclList (
                 mapMaybe (processExport True linksInfo unicode qual) exports
