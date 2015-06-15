@@ -112,6 +112,18 @@
        </listitem>
        <listitem>
           <para>
+            The SMP runtime is now enabled on AArch64 (issue #10525).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the code which caused GHC to emit invalid C code
+            when porting to a new platform has been fixed (issue
+            #10518).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A bug which could cause GHC to generate incorrect code at
             runtime (generating an infinite loop exception) has been
             fixed (issue #10218).
@@ -147,7 +159,7 @@
             compiled programs now also specifically recognize ASCII
             encodings, and can bypass iconv in these cases. This
             allows statically compiled programs to exist inside an
-            initramfs, for example. (issues #10298, #7695).
+            initramfs, for example (issues #10298, #7695).
           </para>
        </listitem>
     </itemizedlist>
