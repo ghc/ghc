@@ -3207,12 +3207,15 @@ sL span a = span `seq` a `seq` L span a
 
 -- replaced last 3 CPP macros in this file
 {-# INLINE sL0 #-}
+sL0 :: a -> Located a
 sL0 = L noSrcSpan       -- #define L0   L noSrcSpan
 
 {-# INLINE sL1 #-}
+sL1 :: Located a -> b -> Located b
 sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sLL #-}
+sLL :: Located a -> Located b -> c -> Located c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {- Note [Adding location info]
