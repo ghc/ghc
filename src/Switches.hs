@@ -1,6 +1,6 @@
 module Switches (
     IntegerLibraryImpl (..), integerLibraryImpl,
-    notStage, stage0, stage1, stage2, notBuilder,
+    notStage, stage0, stage1, stage2, builders, notBuilder,
     supportsPackageKey, targetPlatforms, targetPlatform,
     targetOss, targetOs, notTargetOs,
     targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
@@ -30,6 +30,9 @@ stage1 = stage Stage1
 
 stage2 :: Predicate
 stage2 = stage Stage2
+
+builders :: [Builder] -> Predicate
+builders = liftM or . sequence . map builder
 
 notBuilder :: Builder -> Predicate
 notBuilder = liftM not . builder

@@ -4,6 +4,7 @@ module Settings.Util (
     -- Primitive settings elements
     arg, argM, args,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
+    appendCcArgs,
     -- argBuilderPath, argStagedBuilderPath,
     -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     -- argIncludeDirs, argDepIncludeDirs,
@@ -45,6 +46,13 @@ argStagedConfigList :: String -> Settings
 argStagedConfigList key = do
     stage <- asks getStage
     argConfigList (stagedKey stage key)
+
+appendCcArgs :: [String] -> Settings
+appendCcArgs args = do
+    stage <- asks getStage
+    mconcat [ builder (Gcc stage) ? append args
+            , builder GhcCabal ? appendSub "--configure-option=CFLAGS" args
+            , builder GhcCabal ? appendSub "--gcc-options" args ]
 
 -- packageData :: Arity -> String -> Settings
 -- packageData arity key =

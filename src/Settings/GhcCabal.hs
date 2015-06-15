@@ -58,13 +58,13 @@ librarySettings = do
 
 configureSettings :: Settings
 configureSettings = do
+    stage <- asks getStage
     let conf key = appendSubD $ "--configure-option=" ++ key
         cFlags   = mconcat [ ccSettings
                            , remove ["-Werror"]
                            , argStagedConfig "conf-cc-args" ]
         ldFlags  = ldSettings <> argStagedConfig "conf-gcc-linker-args"
         cppFlags = cppSettings <> argStagedConfig "conf-cpp-args"
-    stage <- asks getStage
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
@@ -86,6 +86,7 @@ bootPackageDbSettings = do
 dllSettings :: Settings
 dllSettings = arg ""
 
+-- TODO: remove
 with' :: Builder -> Settings
 with' builder = appendM $ with builder
 
@@ -104,19 +105,16 @@ packageConstraints = do
                             ++ cabal ++ "'."
     args $ concatMap (\c -> ["--constraint", c]) $ constraints
 
+-- TODO: remove
 ccSettings :: Settings
-ccSettings = do
+ccSettings = validating ? do
     let gccGe46 = liftM not gccLt46
-    mconcat
-        [ package integerLibrary ? arg "-Ilibraries/integer-gmp2/gmp"
-        , validating ? mconcat
-            [ arg "-Werror"
+    mconcat [ arg "-Werror"
             , arg "-Wall"
             , gccIsClang ??
               ( arg "-Wno-unknown-pragmas" <>
                 gccGe46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
               , gccGe46 ? arg "-Wno-error=inline" )]
-        ]
 
 ldSettings :: Settings
 ldSettings = mempty

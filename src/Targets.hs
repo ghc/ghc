@@ -12,6 +12,7 @@ import Base hiding (arg, args)
 import Package
 import Switches
 import Expression
+import Settings.Util
 import Oracles.Builder
 
 -- Build results will be placed into a target directory with the following
@@ -80,13 +81,18 @@ integerLibraryCabal = case integerLibraryImpl of
     IntegerGmp2   -> "integer-gmp.cabal" -- Indeed, why make life easier?
     IntegerSimple -> "integer-simple.cabal"
 
--- Custom package settings for packages
 customPackageSettings :: Settings
-customPackageSettings = builder GhcCabal ? mconcat
+customPackageSettings = mconcat
     [ package integerLibrary ?
-      windowsHost     ? append ["--configure-option=--with-intree-gmp"]
-    , package base    ? append ["--flags=" ++ integerLibraryName]
-    , package ghcPrim ? append ["--flag=include-ghc-prim"] ]
+      mconcat [ windowsHost ? builder GhcCabal ?
+                append ["--configure-option=--with-intree-gmp"]
+              , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
+
+    , package base ?
+      builder GhcCabal ? append ["--flags=" ++ integerLibraryName]
+
+    , package ghcPrim ?
+      builder GhcCabal ? append ["--flag=include-ghc-prim"] ]
 
 -- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/
