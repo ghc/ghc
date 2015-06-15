@@ -10,8 +10,6 @@
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
 module TysPrim(
-        mkPrimTyConName, -- For implicit parameters in TysWiredIn only
-
         tyVarList, alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTy, betaTy, gammaTy, deltaTy,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar, openAlphaTyVars,
@@ -331,20 +329,25 @@ constraintKindTyCon   = mkKindTyCon constraintKindTyConName   superKind
 
 -- If you edit these, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
-superKindTyConName      = mkPrimTyConName (fsLit "BOX") superKindTyConKey superKindTyCon
-anyKindTyConName          = mkPrimTyConName (fsLit "AnyK") anyKindTyConKey anyKindTyCon
-liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon
-openTypeKindTyConName     = mkPrimTyConName (fsLit "OpenKind") openTypeKindTyConKey openTypeKindTyCon
-unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
-constraintKindTyConName   = mkPrimTyConName (fsLit "Constraint") constraintKindTyConKey constraintKindTyCon
+superKindTyConName        = mkPrimTyConName (fsLit "BOX")        superKindTyConKey        superKindTyCon
+anyKindTyConName          = mkPrimTyConName (fsLit "AnyK")       anyKindTyConKey          anyKindTyCon
+liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*")          liftedTypeKindTyConKey   liftedTypeKindTyCon
+openTypeKindTyConName     = mkPrimTyConName (fsLit "OpenKind")   openTypeKindTyConKey     openTypeKindTyCon
+unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#")          unliftedTypeKindTyConKey unliftedTypeKindTyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
-mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkTcOccFS occ)
-                                              key
-                                              (ATyCon tycon)
-                                              BuiltInSyntax
-        -- All of the super kinds and kinds are defined in Prim and use BuiltInSyntax,
-        -- because they are never in scope in the source
+mkPrimTyConName = mkPrimTcName BuiltInSyntax
+  -- All of the super kinds and kinds are defined in Prim,
+  -- and use BuiltInSyntax, because they are never in scope in the source
+
+constraintKindTyConName -- Unlike the others, Constraint does *not* use BuiltInSyntax,
+                        -- and can be imported/exported like any other type constructor
+  = mkPrimTcName UserSyntax (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
+
+
+mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
+mkPrimTcName built_in_syntax occ key tycon
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
 
 kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []   -- mkTyConApp isn't defined yet
@@ -725,16 +728,20 @@ The type constructor Any of kind forall k. k has these properties:
 
 Note [Any kinds]
 ~~~~~~~~~~~~~~~~
-
 The type constructor AnyK (of sort BOX) is used internally only to zonk kind
 variables with no constraints on them. It appears in similar circumstances to
 Any, but at the kind level. For example:
 
   type family Length (l :: [k]) :: Nat
-  type instance Length [] = Zero
 
-Length is kind-polymorphic, and when applied to the empty (promoted) list it
-will have the kind Length AnyK [].
+  f :: Proxy (Length []) -> Int
+  f = ....
+
+Length is kind-polymorphic.  So what is the elaborated type of f?
+   f :: Proxy (Length AnyK ([] AnyK)) -> Int
+
+Just like (length []) at the term level, which elaborates to
+   length (Any *) ([] (Any *))
 
 Note [Strangely-kinded void TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -765,7 +772,7 @@ anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
 anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar]
-                         AbstractClosedSynFamilyTyCon
+                         (ClosedSynFamilyTyCon Nothing)
                          NoParentTyCon
   where
     kind = ForAllTy kKiVar (mkTyVarTy kKiVar)

@@ -1,4 +1,6 @@
 
 WildcardInGADT1.hs:5:19:
-    A constructor cannot have a partial type:
-    Foo :: Either a _ -> Foo a
+    Unexpected wild card: ‘_’
+    In the type ‘Either a _’
+    In the definition of data constructor ‘Foo’
+    In the data declaration for ‘Foo’

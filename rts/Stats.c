@@ -9,6 +9,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Schedule.h"
 #include "Stats.h"
@@ -249,6 +250,12 @@ stat_endExit(void)
     getProcessTimes(&end_exit_cpu, &end_exit_elapsed);
 }
 
+void
+stat_startGCSync (gc_thread *gct)
+{
+    gct->gc_sync_start_elapsed = getProcessElapsedTime();
+}
+
 /* -----------------------------------------------------------------------------
    Called at the beginning of each GC
    -------------------------------------------------------------------------- */
@@ -308,10 +315,11 @@ stat_endGC (Capability *cap, gc_thread *gct,
     W_ alloc;
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
+        rtsConfig.gcDoneHook != NULL ||
         RtsFlags.ProfFlags.doHeapProfile)
         // heap profiling needs GC_tot_time
     {
-        Time cpu, elapsed, gc_cpu, gc_elapsed;
+        Time cpu, elapsed, gc_cpu, gc_elapsed, gc_sync_elapsed;
 
         // Has to be emitted while all caps stopped for GC, but before GC_END.
         // See trac.haskell.org/ThreadScope/wiki/RTSsummaryEvents
@@ -341,6 +349,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
         // timestamp as used in +RTS -s calculcations.
         traceEventGcEndAtT(cap, TimeToNS(elapsed - start_init_elapsed));
 
+        gc_sync_elapsed = gct->gc_start_elapsed - gct->gc_sync_start_elapsed;
         gc_elapsed = elapsed - gct->gc_start_elapsed;
         gc_cpu = cpu - gct->gc_start_cpu;
 
@@ -372,6 +381,21 @@ stat_endGC (Capability *cap, gc_thread *gct,
 
             GC_end_faults = faults;
             statsFlush();
+        }
+
+
+        if (rtsConfig.gcDoneHook != NULL) {
+            rtsConfig.gcDoneHook(gen,
+                                 alloc*sizeof(W_),
+                                 live*sizeof(W_),
+                                 copied*sizeof(W_),
+                                 par_max_copied * sizeof(W_),
+                                 mblocks_allocated * BLOCKS_PER_MBLOCK
+                                   * BLOCK_SIZE_W * sizeof(W_),
+                                 slop   * sizeof(W_),
+                                 TimeToNS(gc_sync_elapsed),
+                                 TimeToNS(gc_elapsed),
+                                 TimeToNS(gc_cpu));
         }
 
         GC_coll_cpu[gen] += gc_cpu;

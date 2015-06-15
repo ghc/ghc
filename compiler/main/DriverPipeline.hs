@@ -597,8 +597,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
              isHaskellishFile = isHaskell start_phase
 
-             env = PipeEnv{ pe_isHaskellishFile = isHaskellishFile,
-                            stop_phase,
+             env = PipeEnv{ stop_phase,
                             src_filename = input_fn,
                             src_basename = basename,
                             src_suffix = suffix',
@@ -607,14 +606,13 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- We want to catch cases of "you can't get there from here" before
          -- we start the pipeline, because otherwise it will just run off the
          -- end.
-         --
-         -- There is a partial ordering on phases, where A < B iff A occurs
-         -- before B in a normal compilation pipeline.
-
          let happensBefore' = happensBefore dflags
          case start_phase of
              RealPhase start_phase' ->
-                 when (not (start_phase' `happensBefore'` stop_phase)) $
+                 -- See Note [Partial ordering on phases]
+                 -- Not the same as: (stop_phase `happensBefore` start_phase')
+                 when (not (start_phase' `happensBefore'` stop_phase ||
+                            start_phase' `eqPhase` stop_phase)) $
                        throwGhcExceptionIO (UsageError
                                    ("cannot compile this file to desired target: "
                                       ++ input_fn))
@@ -664,6 +662,7 @@ pipeLoop :: PhasePlus -> FilePath -> CompPipeline (DynFlags, FilePath)
 pipeLoop phase input_fn = do
   env <- getPipeEnv
   dflags <- getDynFlags
+  -- See Note [Partial ordering on phases]
   let happensBefore' = happensBefore dflags
       stopPhase = stop_phase env
   case phase of
@@ -1068,7 +1067,7 @@ runPhase (RealPhase Cmm) input_fn dflags
 -- way too many hacks, and I can't say I've ever used it anyway.
 
 runPhase (RealPhase cc_phase) input_fn dflags
-   | any (cc_phase `eqPhase`) [Cc, Ccpp, HCc, Cobjc, Cobjcpp]
+   | any (cc_phase `eqPhase`) [Cc, Ccxx, HCc, Cobjc, Cobjcxx]
    = do
         let platform = targetPlatform dflags
             hcc = cc_phase `eqPhase` HCc
@@ -1137,9 +1136,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
 
         ghcVersionH <- liftIO $ getGhcVersionPathName dflags
 
-        let gcc_lang_opt | cc_phase `eqPhase` Ccpp    = "c++"
+        let gcc_lang_opt | cc_phase `eqPhase` Ccxx    = "c++"
                          | cc_phase `eqPhase` Cobjc   = "objective-c"
-                         | cc_phase `eqPhase` Cobjcpp = "objective-c++"
+                         | cc_phase `eqPhase` Cobjcxx = "objective-c++"
                          | otherwise                  = "c"
         liftIO $ SysTools.runCc dflags (
                 -- force the C compiler to interpret this file as C when
@@ -1176,7 +1175,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                            else [])
 
                        -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
-                       ++ (if (cc_phase /= Ccpp && cc_phase /= Cobjcpp)
+                       ++ (if (cc_phase /= Ccxx && cc_phase /= Cobjcxx)
                              then ["-Wimplicit"]
                              else [])
 
@@ -1658,6 +1657,10 @@ mkExtraObjToLinkIntoBinary dflags = do
       text " RtsConfig __conf = defaultRtsConfig;",
       text " __conf.rts_opts_enabled = "
           <> text (show (rtsOptsEnabled dflags)) <> semi,
+      text " __conf.rts_opts_suggestions = "
+          <> text (if rtsOptsSuggestions dflags
+                      then "rtsTrue"
+                      else "rtsFalse") <> semi,
       case rtsOpts dflags of
          Nothing   -> Outputable.empty
          Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
@@ -1731,7 +1734,7 @@ getLinkInfo dflags dep_packages = do
    --
    return (show link_info)
 
--- generates a Perl skript starting a parallel prg under PVM
+-- generates a Perl script starting a parallel prg under PVM
 mk_pvm_wrapper_script :: String -> String -> String -> String
 mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
  [

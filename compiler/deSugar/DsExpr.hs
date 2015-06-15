@@ -24,12 +24,7 @@ import Name
 import NameEnv
 import RdrName
 import FamInstEnv( topNormaliseType )
-
-#ifdef GHCI
-        -- Template Haskell stuff iff bootstrapped
 import DsMeta
-#endif
-
 import HsSyn
 
 import Platform
@@ -298,7 +293,7 @@ dsExpr (ExplicitTuple tup_args boxity)
                 -- The reverse is because foldM goes left-to-right
 
        ; return $ mkCoreLams lam_vars $
-                  mkCoreConApps (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
+                  mkCoreConApps (tupleDataCon boxity (length tup_args))
                                 (map (Type . exprType) args ++ args) }
 
 dsExpr (HsSCC _ cc expr@(L loc _)) = do
@@ -308,7 +303,7 @@ dsExpr (HsSCC _ cc expr@(L loc _)) = do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
         uniq <- newUnique
-        Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True)
+        Tick (ProfNote (mkUserCC (snd cc) mod_name loc uniq) count True)
                <$> dsLExpr expr
       else dsLExpr expr
 
@@ -433,7 +428,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
                             , srcLocCol  $ realSrcSpanStart r
                             )
            _             -> (0, 0)
-        srcLoc = mkCoreConApps (tupleCon BoxedTuple 2)
+        srcLoc = mkCoreConApps (tupleDataCon Boxed 2)
                      [ Type intTy              , Type intTy
                      , mkIntExprInt dflags line, mkIntExprInt dflags col
                      ]
@@ -486,7 +481,7 @@ For record construction we do this (assuming T has three arguments)
           e
           (recConErr t1 "M.hs/230/op3")
 \end{verbatim}
-@recConErr@ then converts its arugment string into a proper message
+@recConErr@ then converts its argument string into a proper message
 before printing it as
 \begin{verbatim}
         M.hs, line 230: missing field op1 was evaluated
@@ -646,11 +641,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 -- Template Haskell stuff
 
 dsExpr (HsRnBracketOut _ _) = panic "dsExpr HsRnBracketOut"
-#ifdef GHCI
 dsExpr (HsTcBracketOut x ps) = dsBracket x ps
-#else
-dsExpr (HsTcBracketOut _ _) = panic "dsExpr HsBracketOut"
-#endif
 dsExpr (HsSpliceE s)  = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension

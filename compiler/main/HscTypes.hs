@@ -1144,7 +1144,7 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 {-
 ************************************************************************
 *                                                                      *
-\subsection{The interactive context}
+                The interactive context
 *                                                                      *
 ************************************************************************
 
@@ -1220,28 +1220,40 @@ The details are a bit tricky though:
 Note [Interactively-bound Ids in GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Ids bound by previous Stmts in GHCi are currently
-        a) GlobalIds
-        b) with an Internal Name (not External)
-        c) and a tidied type
+        a) GlobalIds, with
+        b) An External Name, like Ghci4.foo
+           See Note [The interactive package] above
+        c) A tidied type
 
  (a) They must be GlobalIds (not LocalIds) otherwise when we come to
      compile an expression using these ids later, the byte code
      generator will consider the occurrences to be free rather than
      global.
 
- (b) They start with an Internal Name because a Stmt is a local
-     construct, so the renamer naturally builds an Internal name for
-     each of its binders.  It would be possible subsequently to give
-     them an External Name (in a GhciN module) but then we'd have
-     to substitute it out.  So for now they stay Internal.
+ (b) Having an External Name is important because of Note
+     [GlobalRdrEnv shadowing] in RdrName
 
  (c) Their types are tidied. This is important, because :info may ask
      to look at them, and :info expects the things it looks up to have
      tidy types
 
-However note that TyCons, Classes, and even Ids bound by other top-level
-declarations in GHCi (eg foreign import, record selectors) currently get
-External Names, with Ghci9 (or 8, or 7, etc) as the module name.
+Where do interactively-bound Ids come from?
+
+  - GHCi REPL Stmts   e.g.
+         ghci> let foo x = x+1
+    These start with an Internal Name because a Stmt is a local
+    construct, so the renamer naturally builds an Internal name for
+    each of its binders.  Then in tcRnStmt they are externalised via
+    TcRnDriver.externaliseAndTidyId, so they get Names like Ghic4.foo.
+
+  - Ids bound by the debugger etc have Names constructed by
+    IfaceEnv.newInteractiveBinder; at the call sites it is followed by
+    mkVanillaGlobal or mkVanillaGlobalWithInfo.  So again, they are
+    all Global, External.
+
+  - TyCons, Classes, and Ids bound by other top-level declarations in
+    GHCi (eg foreign import, record selectors) also get External
+    Names, with Ghci9 (or 8, or 7, etc) as the module name.
 
 
 Note [ic_tythings]
@@ -1447,9 +1459,11 @@ icExtendGblRdrEnv env tythings
   = foldr add env tythings  -- Foldr makes things in the front of
                             -- the list shadow things at the back
   where
-    add thing env = extendGlobalRdrEnv True {- Shadowing please -} env
-                                       [tyThingAvailInfo thing]
-       -- One at a time, to ensure each shadows the previous ones
+    -- One at a time, to ensure each shadows the previous ones
+    add thing env = foldl extendGlobalRdrEnv env1 (localGREsFromAvail avail)
+       where
+          env1  = shadowNames env (availNames avail)
+          avail = tyThingAvailInfo thing
 
 substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
@@ -1524,14 +1538,29 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
                                              (mkQualPackage dflags)
   where
   qual_name mod occ
+        | [] <- unqual_gres
+        , modulePackageKey mod `elem` [primPackageKey, basePackageKey, thPackageKey]
+        , not (isDerivedOccName occ)
+        = NameUnqual   -- For names from ubiquitous packages that come with GHC, if
+                       -- there are no entities called unqualified 'occ', then
+                       -- print unqualified.  Doing so does not cause ambiguity,
+                       -- and it reduces the amount of qualification in error
+                       -- messages.  We can't do this for all packages, because we
+                       -- might get errors like "Can't unify T with T".  But the
+                       -- ubiquitous packages don't contain any such gratuitous
+                       -- name clashes.
+                       --
+                       -- A motivating example is 'Constraint'. It's often not in
+                       -- scope, but printing GHC.Prim.Constraint seems overkill.
+
         | [gre] <- unqual_gres
         , right_name gre
-        = NameUnqual
-                -- If there's a unique entity that's in scope unqualified with 'occ'
-                -- AND that entity is the right one, then we can use the unqualified name
+        = NameUnqual   -- If there's a unique entity that's in scope
+                       -- unqualified with 'occ' AND that entity is
+                       -- the right one, then we can use the unqualified name
 
         | [gre] <- qual_gres
-        = NameQual (get_qual_mod (gre_prov gre))
+        = NameQual (greQualModName gre)
 
         | null qual_gres
         = if null (lookupGRE_RdrName (mkRdrQual (moduleName mod) occ) env)
@@ -1546,9 +1575,6 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 
         unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
         qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)
-
-        get_qual_mod LocalDef      = moduleName mod
-        get_qual_mod (Imported is) = ASSERT( not (null is) ) is_as (is_decl (head is))
 
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the
@@ -1692,7 +1718,7 @@ extras_plus thing = thing : implicitTyThings thing
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
   | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
-  | Just co <- isClosedSynFamilyTyCon_maybe tc
+  | Just co <- isClosedSynFamilyTyConWithAxiom_maybe tc
                                    = [ACoAxiom co]
   | otherwise                      = []
 

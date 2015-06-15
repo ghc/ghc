@@ -130,11 +130,11 @@ test('T5979',
     ghci_script, ['T5979.script'])
 test('T5975a',
      [pre_cmd('touch föøbàr1.hs'),
-      clean_cmd('rm föøbàr1.hs')],
+      clean_cmd('rm -f föøbàr1.hs')],
      ghci_script, ['T5975a.script'])
 test('T5975b',
      [pre_cmd('touch föøbàr2.hs'),
-      clean_cmd('rm föøbàr2.hs'),
+      clean_cmd('rm -f föøbàr2.hs'),
       extra_hc_opts('föøbàr2.hs')],
      ghci_script, ['T5975b.script'])
 test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
@@ -168,7 +168,8 @@ test('T7939', normal, ghci_script, ['T7939.script'])
 test('T7894', normal, ghci_script, ['T7894.script'])
 test('T8116', normal, ghci_script, ['T8116.script'])
 test('T8113', normal, ghci_script, ['T8113.script'])
-test('T8172', normal, ghci_script, ['T8172.script'])
+test('T8172', when(opsys('mingw32'), normalise_drive_letter),
+     ghci_script, ['T8172.script'])
 test('T8215', normal, ghci_script, ['T8215.script'])
 test('T8357', normal, ghci_script, ['T8357.script'])
 test('T8383', normal, ghci_script, ['T8383.script'])
@@ -187,7 +188,7 @@ test('T8831', normal, ghci_script, ['T8831.script'])
 test('T8917', normal, ghci_script, ['T8917.script'])
 test('T8931', normal, ghci_script, ['T8931.script'])
 test('T8959', normal, ghci_script, ['T8959.script'])
-test('T8959b', expect_broken(8959), ghci_script, ['T8959b.script'])
+test('T8959b', normal, ghci_script, ['T8959b.script'])
 test('T9181', normal, ghci_script, ['T9181.script'])
 test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
@@ -203,7 +204,21 @@ test('T9878',
     [extra_clean(['T9878.hi','T9878.o'])],
     ghci_script, ['T9878.script'])
 test('T9878b',
-    [ extra_run_opts('-fobject-code'),
+    [ when(opsys('mingw32'), expect_broken(9878)),
+      extra_run_opts('-fobject-code'),
       extra_clean(['T9878b.hi','T9878b.o'])],
     ghci_script, ['T9878b.script'])
 test('T10122', normal, ghci_script, ['T10122.script'])
+
+test('T10321', normal, ghci_script, ['T10321.script'])
+
+test('T10408A', normal, run_command,
+    ['$MAKE -s --no-print-directory T10408A'])
+test('T10408B', normal, run_command,
+    ['$MAKE -s --no-print-directory T10408B'])
+test('T10248', normal, ghci_script, ['T10248.script'])
+test('T10110', normal, ghci_script, ['T10110.script'])
+test('T10322', normal, ghci_script, ['T10322.script'])
+test('T10466', normal, ghci_script, ['T10466.script'])
+test('T10501', normal, ghci_script, ['T10501.script'])
+test('T10508', normal, ghci_script, ['T10508.script'])

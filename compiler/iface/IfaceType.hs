@@ -10,7 +10,8 @@ This module defines interface types and binders
 module IfaceType (
         IfExtName, IfLclName,
 
-        IfaceType(..), IfacePredType, IfaceKind, IfaceTyCon(..), IfaceCoercion(..),
+        IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
+        IfaceTyCon(..), IfaceTyConInfo(..),
         IfaceTyLit(..), IfaceTcArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr, IfaceTvBndr, IfaceIdBndr,
 
@@ -44,12 +45,12 @@ module IfaceType (
 #include "HsVersions.h"
 
 import Coercion
-import DataCon ( dataConTyCon )
+import DataCon ( isTupleDataCon )
 import TcType
 import DynFlags
 import TypeRep
 import Unique( hasKey )
-import Util ( filterOut, lengthIs, zipWithEqual )
+import Util ( filterOut, zipWithEqual )
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import Id
@@ -99,13 +100,19 @@ type IfaceKind     = IfaceType
 
 data IfaceType     -- A kind of universal type, used for types and kinds
   = IfaceTyVar    IfLclName               -- Type/coercion variable only, not tycon
+  | IfaceLitTy    IfaceTyLit
   | IfaceAppTy    IfaceType IfaceType
   | IfaceFunTy    IfaceType IfaceType
   | IfaceDFunTy   IfaceType IfaceType
   | IfaceForAllTy IfaceTvBndr IfaceType
+
   | IfaceTyConApp IfaceTyCon IfaceTcArgs  -- Not necessarily saturated
-                                          -- Includes newtypes, synonyms, tuples
-  | IfaceLitTy IfaceTyLit
+                                          -- Includes newtypes, synonyms
+
+  | IfaceTupleTy                  -- Saturated tuples (unsaturated ones use IfaceTyConApp)
+       TupleSort IfaceTyConInfo   -- A bit like IfaceTyCon
+       IfaceTcArgs                -- arity = length args
+          -- For promoted data cons, the kind args are omitted
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
@@ -128,10 +135,14 @@ data IfaceTcArgs
 -- coercion constructors, the lot.
 -- We have to tag them in order to pretty print them
 -- properly.
-data IfaceTyCon
-  = IfaceTc              { ifaceTyConName :: IfExtName }
-  | IfacePromotedDataCon { ifaceTyConName :: IfExtName }
-  | IfacePromotedTyCon   { ifaceTyConName :: IfExtName }
+data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
+                             , ifaceTyConInfo :: IfaceTyConInfo }
+
+data IfaceTyConInfo   -- Used to guide pretty-printing
+                      -- and to disambiguate D from 'D (they share a name)
+  = NoIfaceTyConInfo
+  | IfacePromotedDataCon
+  | IfacePromotedTyCon
 
 data IfaceCoercion
   = IfaceReflCo      Role IfaceType
@@ -207,8 +218,9 @@ ifTyVarsOfType ty
       IfaceForAllTy (var,t) ty
         -> delOneFromUniqSet (ifTyVarsOfType ty) var `unionUniqSets`
            ifTyVarsOfType t
-      IfaceTyConApp _ args -> ifTyVarsOfArgs args
-      IfaceLitTy    _      -> emptyUniqSet
+      IfaceTyConApp _ args  -> ifTyVarsOfArgs args
+      IfaceTupleTy _ _ args -> ifTyVarsOfArgs args
+      IfaceLitTy    _       -> emptyUniqSet
 
 ifTyVarsOfArgs :: IfaceTcArgs -> UniqSet IfLclName
 ifTyVarsOfArgs args = argv emptyUniqSet args
@@ -238,6 +250,7 @@ substIfaceType env ty
     go (IfaceDFunTy t1 t2)    = IfaceDFunTy (go t1) (go t2)
     go ty@(IfaceLitTy {})     = ty
     go (IfaceTyConApp tc tys) = IfaceTyConApp tc (substIfaceTcArgs env tys)
+    go (IfaceTupleTy s i tys) = IfaceTupleTy s i (substIfaceTcArgs env tys)
     go (IfaceForAllTy {})     = pprPanic "substIfaceType" (ppr ty)
 
 substIfaceTcArgs :: IfaceTySubst -> IfaceTcArgs -> IfaceTcArgs
@@ -302,18 +315,6 @@ we want
   'Just *         prints as    Just *
 
 
-************************************************************************
-*                                                                      *
-                Functions over IFaceTyCon
-*                                                                      *
-************************************************************************
--}
-
---isPromotedIfaceTyCon :: IfaceTyCon -> Bool
---isPromotedIfaceTyCon (IfacePromotedTyCon _) = True
---isPromotedIfaceTyCon _ = False
-
-{-
 ************************************************************************
 *                                                                      *
                 Pretty-printing
@@ -395,6 +396,7 @@ pprParendIfaceType = ppr_ty TyConPrec
 ppr_ty :: TyPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = sdocWithDynFlags (pprTyTcApp ctxt_prec tc tys)
+ppr_ty _         (IfaceTupleTy s i tys) = pprTuple s i tys
 ppr_ty _         (IfaceLitTy n)         = ppr_tylit n
         -- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
@@ -521,10 +523,6 @@ ppr_iface_tc_app pp _ tc [ty]
     n = ifaceTyConName tc
 
 ppr_iface_tc_app pp ctxt_prec tc tys
-  | Just (tup_sort, tup_args) <- is_tuple
-  = pprPromotionQuote tc <>
-    tupleParens tup_sort (sep (punctuate comma (map (pp TopPrec) tup_args)))
-
   | not (isSymOcc (nameOccName tc_name))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp TyConPrec) tys)
 
@@ -540,22 +538,10 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   where
     tc_name = ifaceTyConName tc
 
-    is_tuple = case wiredInNameTyThing_maybe tc_name of
-                 Just (ATyCon tc)
-                   | Just sort <- tyConTuple_maybe tc
-                   , tyConArity tc == length tys
-                   -> Just (sort, tys)
-
-                   | Just dc <- isPromotedDataCon_maybe tc
-                   , let dc_tc = dataConTyCon dc
-                   , isTupleTyCon dc_tc
-                   , let arity = tyConArity dc_tc
-                         ty_args = drop arity tys
-                   , ty_args `lengthIs` arity
-                   -> Just (tupleTyConSort tc, ty_args)
-
-                 _ -> Nothing
-
+pprTuple :: TupleSort -> IfaceTyConInfo -> IfaceTcArgs -> SDoc
+pprTuple sort info args
+  = pprPromotionQuoteI info <>
+    tupleParens sort (pprWithCommas pprIfaceType (tcArgsIfaceTypes args))
 
 ppr_tylit :: IfaceTyLit -> SDoc
 ppr_tylit (IfaceNumTyLit n) = integer n
@@ -635,27 +621,34 @@ instance Outputable IfaceTyCon where
   ppr tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
 
 pprPromotionQuote :: IfaceTyCon -> SDoc
-pprPromotionQuote (IfacePromotedDataCon _ ) = char '\''
-pprPromotionQuote (IfacePromotedTyCon _)    = ifPprDebug (char '\'')
-pprPromotionQuote _                         = empty
+pprPromotionQuote tc = pprPromotionQuoteI (ifaceTyConInfo tc)
+
+pprPromotionQuoteI  :: IfaceTyConInfo -> SDoc
+pprPromotionQuoteI NoIfaceTyConInfo     = empty
+pprPromotionQuoteI IfacePromotedDataCon = char '\''
+pprPromotionQuoteI IfacePromotedTyCon   = ifPprDebug (char '\'')
 
 instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
-   put_ bh tc =
-     case tc of
-       IfaceTc n              -> putByte bh 0 >> put_ bh n
-       IfacePromotedDataCon n -> putByte bh 1 >> put_ bh n
-       IfacePromotedTyCon   n -> putByte bh 2 >> put_ bh n
+   put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
+
+   get bh = do n <- get bh
+               i <- get bh
+               return (IfaceTyCon n i)
+
+instance Binary IfaceTyConInfo where
+   put_ bh NoIfaceTyConInfo     = putByte bh 0
+   put_ bh IfacePromotedDataCon = putByte bh 1
+   put_ bh IfacePromotedTyCon   = putByte bh 2
 
    get bh =
-     do tc <- getByte bh
-        case tc of
-          0 -> get bh >>= return . IfaceTc
-          1 -> get bh >>= return . IfacePromotedDataCon
-          2 -> get bh >>= return . IfacePromotedTyCon
-          _ -> panic ("get IfaceTyCon " ++ show tc)
+     do i <- getByte bh
+        case i of
+          0 -> return NoIfaceTyConInfo
+          1 -> return IfacePromotedDataCon
+          _ -> return IfacePromotedTyCon
 
 instance Outputable IfaceTyLit where
   ppr = ppr_tylit
@@ -729,9 +722,10 @@ instance Binary IfaceType where
             put_ bh ah
     put_ bh (IfaceTyConApp tc tys)
       = do { putByte bh 5; put_ bh tc; put_ bh tys }
-
+    put_ bh (IfaceTupleTy s i tys)
+      = do { putByte bh 6; put_ bh s; put_ bh i; put_ bh tys }
     put_ bh (IfaceLitTy n)
-      = do { putByte bh 30; put_ bh n }
+      = do { putByte bh 7; put_ bh n }
 
     get bh = do
             h <- getByte bh
@@ -752,10 +746,10 @@ instance Binary IfaceType where
                       return (IfaceDFunTy ag ah)
               5 -> do { tc <- get bh; tys <- get bh
                       ; return (IfaceTyConApp tc tys) }
-              30 -> do n <- get bh
+              6 -> do { s <- get bh; i <- get bh; tys <- get bh
+                      ; return (IfaceTupleTy s i tys) }
+              _  -> do n <- get bh
                        return (IfaceLitTy n)
-
-              _  -> panic ("get IfaceType " ++ show h)
 
 instance Binary IfaceCoercion where
   put_ bh (IfaceReflCo a b) = do
@@ -904,12 +898,32 @@ toIfaceType :: Type -> IfaceType
 -- Synonyms are retained in the interface type
 toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
 toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
+toIfaceType (LitTy n)         = IfaceLitTy (toIfaceTyLit n)
+toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 toIfaceType (FunTy t1 t2)
   | isPredTy t1 = IfaceDFunTy (toIfaceType t1) (toIfaceType t2)
   | otherwise   = IfaceFunTy  (toIfaceType t1) (toIfaceType t2)
-toIfaceType (TyConApp tc tys) = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTcArgs tc tys)
-toIfaceType (LitTy n)         = IfaceLitTy (toIfaceTyLit n)
-toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
+
+toIfaceType (TyConApp tc tys)  -- Look for the three sorts of saturated tuple
+  | Just sort <- tyConTuple_maybe tc
+  , n_tys == arity
+  = IfaceTupleTy sort NoIfaceTyConInfo (toIfaceTcArgs tc tys)
+
+  | Just tc' <- isPromotedTyCon_maybe tc
+  , Just sort <- tyConTuple_maybe tc'
+  , n_tys == arity
+  = IfaceTupleTy sort IfacePromotedTyCon (toIfaceTcArgs tc tys)
+
+  | Just dc <- isPromotedDataCon_maybe tc
+  , isTupleDataCon dc
+  , n_tys == 2*arity
+  = IfaceTupleTy BoxedTuple IfacePromotedDataCon (toIfaceTcArgs tc (drop arity tys))
+
+  | otherwise
+  = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTcArgs tc tys)
+  where
+    arity = tyConArity tc
+    n_tys = length tys
 
 toIfaceTyVar :: TyVar -> FastString
 toIfaceTyVar = occNameFS . getOccName
@@ -920,13 +934,17 @@ toIfaceCoVar = occNameFS . getOccName
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTyCon tc
-  | isPromotedDataCon tc = IfacePromotedDataCon tc_name
-  | isPromotedTyCon tc   = IfacePromotedTyCon tc_name
-  | otherwise            = IfaceTc tc_name
-    where tc_name = tyConName tc
+  = IfaceTyCon tc_name info
+  where
+    tc_name = tyConName tc
+    info | isPromotedDataCon tc = IfacePromotedDataCon
+         | isPromotedTyCon tc   = IfacePromotedTyCon
+         | otherwise            = NoIfaceTyConInfo
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
-toIfaceTyCon_name = IfaceTc
+toIfaceTyCon_name n = IfaceTyCon n NoIfaceTyConInfo
+  -- Used for the "rough-match" tycon stuff,
+  -- where pretty-printing is not an issue
 
 toIfaceTyLit :: TyLit -> IfaceTyLit
 toIfaceTyLit (NumTyLit x) = IfaceNumTyLit x

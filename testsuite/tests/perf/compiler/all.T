@@ -1,3 +1,6 @@
+# Tests that call 'compiler_stats_num_field' are skipped when debugging is on.
+# See testsuite/driver/testlib.py.
+
 def no_lint(name, opts):
    opts.compiler_always_flags = \
        [opt for opt in opts.compiler_always_flags if opt != '-dcore-lint' and opt != '-dcmm-lint']
@@ -326,7 +329,7 @@ test('T5030',
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
-           # 2014-12-10:  227205560 constraint solver got worse again; more agressive solving
+           # 2014-12-10:  227205560 constraint solver got worse again; more aggressive solving
            #                        of family-applications leads to less sharing, I think
 
            (wordsize(64), 403932600, 10)]),
@@ -343,7 +346,7 @@ test('T5030',
              # general round of updates
              # 2014-09-10 385152728  post-AMP-cleanup
              # 2014-12-08 340969128  constraint solver perf improvements (esp kick-out)
-             # 2014-12-10 449042120  constraint solver got worse again; more agressive solving
+             # 2014-12-10 449042120  constraint solver got worse again; more aggressive solving
              #                          of family-applications leads to less sharing, I think
              # 2015-03-17 403932600  tweak to solver algorithm
 
@@ -358,12 +361,13 @@ test('T5631',
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
-           (wordsize(64), 776121120, 5)]),
+           (wordsize(64), 812288344, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
         # 2014-09-09:     739704712 (amd64/Linux) AMP changes
         # 2014-11-04:     776121120 (amd64/Linux) new-flatten-skolems
+        # 2015-06-01:     812288344 (amd64/Linux) unknown cause
        only_ways(['normal'])
       ],
      compile,
@@ -391,7 +395,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 441932632, 10)]),
+           (wordsize(64), 548288760, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -406,6 +410,12 @@ test('T783',
             #   (general round of updates)
             # 2014-08-29: 441932632  (amd64/Linux)
             #   (better specialisation, raft of core-to-core optimisations)
+            # 2014-08-29: 719814352  (amd64/Linux)
+	    #   (changed order of cmm block causes analyses to allocate much more,
+	    #    but the changed order is slighly better in terms of runtime, and
+	    #    this test seems to be an extreme outlier.)
+            # 2015-05-16: 548288760  (amd64/Linux)
+	    #   (improved sequenceBlocks in nativeCodeGen, #10422)
       extra_hc_opts('-static')
       ],
       compile,[''])
@@ -490,8 +500,8 @@ test('T5837',
              # 2014-09-03:  37096484 (Windows laptop, w/w for INLINABLE things
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
              # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
- 
-           (wordsize(64), 53424304, 10)])
+
+           (wordsize(64), 38834096, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -506,6 +516,7 @@ test('T5837',
              # 2014-12-16 231155640 Mac  Flattener parameterized over roles;
              #                           some optimization
              # 2015-03-17 53424304  Mac  Better depth checking; fails earlier
+             # 2015-06-09 38834096  Better "improvement"; I'm not sure whey it improves things
       ],
       compile_fail,['-freduction-depth=50'])
 
@@ -627,8 +638,10 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 772510192, 5),
+          [(wordsize(64), 663978160, 5),
           # 2015-01-12    807117816   Initally created
+          # 2015-spring   772510192   Got better
+          # 2015-05-22    663978160   Fix for #10370 improves it more
            (wordsize(32), 375647160, 5)
           ]),
       ],

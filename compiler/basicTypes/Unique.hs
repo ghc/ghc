@@ -43,6 +43,7 @@ module Unique (
         mkAlphaTyVarUnique,
         mkPrimOpIdUnique,
         mkTupleTyConUnique, mkTupleDataConUnique,
+        mkCTupleTyConUnique,
         mkPreludeMiscIdUnique, mkPreludeDataConUnique,
         mkPreludeTyConUnique, mkPreludeClassUnique,
         mkPArrDataConUnique,
@@ -283,25 +284,25 @@ Allocation of unique supply characters:
 mkAlphaTyVarUnique     :: Int -> Unique
 mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
-mkTupleTyConUnique     :: TupleSort -> Int -> Unique
-mkPreludeDataConUnique :: Int -> Unique
-mkTupleDataConUnique   :: TupleSort -> Int -> Unique
+mkTupleTyConUnique     :: Boxity -> Arity -> Unique
+mkCTupleTyConUnique    :: Arity -> Unique
+mkPreludeDataConUnique :: Arity -> Unique
+mkTupleDataConUnique   :: Boxity -> Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkPArrDataConUnique    :: Int -> Unique
 
-mkAlphaTyVarUnique i            = mkUnique '1' i
-
-mkPreludeClassUnique i          = mkUnique '2' i
+mkAlphaTyVarUnique   i = mkUnique '1' i
+mkPreludeClassUnique i = mkUnique '2' i
 
 -- Prelude type constructors occupy *three* slots.
 -- The first is for the tycon itself; the latter two
 -- are for the generic to/from Ids.  See TysWiredIn.mk_tc_gen_info.
 
-mkPreludeTyConUnique i          = mkUnique '3' (3*i)
-mkTupleTyConUnique BoxedTuple   a       = mkUnique '4' (3*a)
-mkTupleTyConUnique UnboxedTuple a       = mkUnique '5' (3*a)
-mkTupleTyConUnique ConstraintTuple a    = mkUnique 'k' (3*a)
+mkPreludeTyConUnique i       = mkUnique '3' (3*i)
+mkTupleTyConUnique Boxed   a = mkUnique '4' (3*a)
+mkTupleTyConUnique Unboxed a = mkUnique '5' (3*a)
+mkCTupleTyConUnique        a = mkUnique 'k' (3*a)
 
 -- Data constructor keys occupy *two* slots.  The first is used for the
 -- data constructor itself and its wrapper function (the function that
@@ -309,10 +310,9 @@ mkTupleTyConUnique ConstraintTuple a    = mkUnique 'k' (3*a)
 -- used for the worker function (the function that builds the constructor
 -- representation).
 
-mkPreludeDataConUnique i        = mkUnique '6' (2*i)    -- Must be alphabetic
-mkTupleDataConUnique BoxedTuple   a = mkUnique '7' (2*a)        -- ditto (*may* be used in C labels)
-mkTupleDataConUnique UnboxedTuple    a = mkUnique '8' (2*a)
-mkTupleDataConUnique ConstraintTuple a = mkUnique 'h' (2*a)
+mkPreludeDataConUnique i       = mkUnique '6' (2*i)    -- Must be alphabetic
+mkTupleDataConUnique Boxed   a = mkUnique '7' (2*a)        -- ditto (*may* be used in C labels)
+mkTupleDataConUnique Unboxed a = mkUnique '8' (2*a)
 
 mkPrimOpIdUnique op         = mkUnique '9' op
 mkPreludeMiscIdUnique  i    = mkUnique '0' i

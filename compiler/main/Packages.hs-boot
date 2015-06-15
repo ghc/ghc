@@ -3,4 +3,5 @@ module Packages where
 import {-# SOURCE #-} Module (PackageKey)
 import {-# SOURCE #-} DynFlags (DynFlags)
 data PackageState
-packageKeyPackageIdString :: DynFlags -> PackageKey -> String
+packageKeyPackageIdString :: DynFlags -> PackageKey -> Maybe String
+emptyPackageState :: PackageState

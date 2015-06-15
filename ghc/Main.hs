@@ -339,9 +339,14 @@ checkOptions mode dflags srcs objs = do
         then throwGhcException (UsageError "no input files")
         else do
 
+   case mode of
+      StopBefore HCc | hscTarget dflags /= HscC
+        -> throwGhcException $ UsageError $
+           "the option -C is only available with an unregisterised GHC"
+      _ -> return ()
+
      -- Verify that output files point somewhere sensible.
    verifyOutputFiles dflags
-
 
 -- Compiler output options
 
@@ -651,9 +656,9 @@ doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
         haskellish (f,Nothing) =
-          looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
+          looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
-          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm
+          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm
                           , StopLn]
 
     hsc_env <- GHC.getSession

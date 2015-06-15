@@ -422,7 +422,7 @@ rts/RetainerSet_CC_OPTS += -Wno-format
 # On Windows:
 rts/win32/ConsoleHandler_CC_OPTS += -w
 rts/win32/ThrIOManager_CC_OPTS += -w
-# The above warning supression flags are a temporary kludge.
+# The above warning suppression flags are a temporary kludge.
 # While working on this module you are encouraged to remove it and fix
 # any warnings in the module. See
 #     http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings

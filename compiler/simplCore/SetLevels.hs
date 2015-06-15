@@ -1099,7 +1099,7 @@ add_id id_env (v, v1)
 
 zap_demand_info :: Var -> Var
 zap_demand_info v
-  | isId v    = zapDemandIdInfo v
+  | isId v    = zapIdDemandInfo v
   | otherwise = v
 
 {-

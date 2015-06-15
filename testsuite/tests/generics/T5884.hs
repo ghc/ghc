@@ -3,7 +3,6 @@
 module T5884 where
 
 import GHC.Generics
+import T5884Other
 
-import Data.Complex
-
-deriving instance Generic (Complex v)
+deriving instance Generic (Pair a)

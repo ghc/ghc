@@ -23,6 +23,7 @@ import Name
 import Var
 import Class
 import Type
+import TcType( immSuperClasses )
 import Unify
 import InstEnv
 import VarSet
@@ -382,11 +383,12 @@ checkInstCoverage be_liberal clas theta inst_taus
        = NotValid msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
-         ls_tvs = closeOverKinds (tyVarsOfTypes ls)  -- See Note [Closing over kinds in coverage]
+         ls_tvs = tyVarsOfTypes ls
          rs_tvs = tyVarsOfTypes rs
 
-         conservative_ok = rs_tvs `subVarSet` ls_tvs
-         liberal_ok      = rs_tvs `subVarSet` oclose theta ls_tvs
+         conservative_ok = rs_tvs `subVarSet` closeOverKinds ls_tvs
+         liberal_ok      = rs_tvs `subVarSet` closeOverKinds (oclose theta ls_tvs)
+                           -- closeOverKinds: see Note [Closing over kinds in coverage]
 
          msg = vcat [ sep [ ptext (sLit "The")
                             <+> ppWhen be_liberal (ptext (sLit "liberal"))
@@ -419,7 +421,7 @@ Example (Trac #8391), using liberal coverage
     instance Bar a (Foo a)
 
 In the instance decl, (a:k) does fix (Foo k a), but only if we notice
-that (a:k) fixes k.
+that (a:k) fixes k.  Trac #10109 is another example.
 
 Note [The liberal coverage condition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -444,32 +446,29 @@ oclose :: [PredType] -> TyVarSet -> TyVarSet
 -- See Note [The liberal coverage condition]
 oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = loop fixed_tvs
+  | otherwise   = fixVarSet extend fixed_tvs
   where
-    loop fixed_tvs
-      | new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
-      | otherwise                           = loop new_fixed_tvs
-      where new_fixed_tvs = foldl extend fixed_tvs tv_fds
-
-    extend fixed_tvs (ls,rs)
-        | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
-        | otherwise                = fixed_tvs
+    extend fixed_tvs = foldl add fixed_tvs tv_fds
+       where
+          add fixed_tvs (ls,rs)
+            | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
+            | otherwise                = fixed_tvs
 
     tv_fds  :: [(TyVarSet,TyVarSet)]
     tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-              | (xs, ys) <- concatMap determined preds
-              ]
+              | (xs, ys) <- concatMap determined preds ]
 
     determined :: PredType -> [([Type],[Type])]
     determined pred
        = case classifyPredType pred of
-            ClassPred cls tys ->
-               do let (cls_tvs, cls_fds) = classTvsFds cls
-                  fd <- cls_fds
-                  return (instFD fd cls_tvs tys)
             EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
-            TuplePred ts       -> concatMap determined ts
-            _                  -> []
+            ClassPred cls tys -> local_fds ++ concatMap determined superclasses
+              where
+               local_fds = [ instFD fd cls_tvs tys
+                           | fd <- cls_fds ]
+               (cls_tvs, cls_fds) = classTvsFds cls
+               superclasses = immSuperClasses cls tys
+            _ -> []
 
 {-
 ************************************************************************

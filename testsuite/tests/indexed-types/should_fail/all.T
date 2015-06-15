@@ -65,7 +65,7 @@ test('T2239', normal, compile, [''])
 test('T3440', normal, compile_fail, [''])
 test('T4485', normal, compile_fail, [''])
 test('T4174', normal, compile_fail, [''])
-test('DerivUnsatFam', when(compiler_lt('ghc', '7.1'), expect_fail), compile_fail, [''])
+test('DerivUnsatFam', normal, compile_fail, [''])
 test('T2664', normal, compile_fail, [''])
 test('T2664a', normal, compile, [''])
 test('T2544', normal, compile_fail, [''])
@@ -103,7 +103,7 @@ test('T7967', normal, compile_fail, [''])
 
 test('T7938', normal, compile_fail, [''])
 
-test('ClosedFam3', extra_clean(['ClosedFam3.o-boot', 'ClosedFam3.hi-boot']),
+test('ClosedFam3', extra_clean(['ClosedFam3.o-boot', 'ClosedFam3.hi-boot', 'ClosedFam3a.hi', 'ClosedFam3a.o']),
      multimod_compile_fail, ['ClosedFam3', '-v0'])
 test('ClosedFam4', normal, compile_fail, [''])
 test('T8155', normal, compile_fail, [''])
@@ -136,3 +136,4 @@ test('T6088', normal, compile_fail, [''])
 test('T7788', normal, compile_fail, [''])
 test('T8550', normal, compile_fail, [''])
 test('T9554', normal, compile_fail, [''])
+test('T10141', normal, compile_fail, [''])

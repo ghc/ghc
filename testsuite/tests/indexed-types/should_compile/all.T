@@ -159,7 +159,7 @@ test('T4484', normal, compile, [''])
 test('T4492', normal, compile, [''])
 test('T4494', normal, compile, [''])
 test('DataFamDeriv', normal, compile, [''])
-test('T1769', when(compiler_lt('ghc', '7.1'), expect_fail), compile, [''])
+test('T1769', normal, compile, [''])
 test('T4497', normal, compile, [''])
 test('T3484', normal, compile, [''])
 test('T3460', normal, compile, [''])
@@ -233,9 +233,9 @@ test('T8500',
 
 test('T8018', normal, compile, [''])
 test('T8020', normal, compile, [''])
-test('ClosedFam1', extra_clean(['ClosedFam1.o-boot', 'ClosedFam1.hi-boot']),
+test('ClosedFam1', extra_clean(['ClosedFam1.o-boot', 'ClosedFam1.hi-boot', 'ClosedFam1a.o', 'ClosedFam1a.hi']),
      multimod_compile, ['ClosedFam1', '-v0'])
-test('ClosedFam2', extra_clean(['ClosedFam2.o-boot', 'ClosedFam2.hi-boot']),
+test('ClosedFam2', extra_clean(['ClosedFam2.o-boot', 'ClosedFam2.hi-boot', 'ClosedFam2a.o', 'ClosedFam2a.hi']),
      multimod_compile, ['ClosedFam2', '-v0'])
 test('T8651', normal, compile, [''])
 test('T8889', normal, compile, [''])
@@ -249,8 +249,13 @@ test('Sock', normal, compile, [''])
 test('T9211', normal, compile, [''])
 test('T9747', normal, compile, [''])
 test('T9582', normal, compile, [''])
+test('T9840',
+     extra_clean(['T9840.hi-boot', 'T9840.o-boot', 'T9840a.hi', 'T9840a.o']),
+     multimod_compile,
+     ['T9840', '-v0'])
 test('T9090', normal, compile, [''])
 test('T10020', normal, compile, [''])
 test('T10079', normal, compile, [''])
 test('T10139', normal, compile, [''])
-
+test('T10340', normal, compile, [''])
+test('T10226', normal, compile, [''])

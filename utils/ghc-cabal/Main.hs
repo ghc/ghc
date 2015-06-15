@@ -114,11 +114,9 @@ doCheck directory
  $ do let verbosity = normal
       gpdFile <- defaultPackageDesc verbosity
       gpd <- readPackageDescription verbosity gpdFile
-      case partition isFailure $ checkPackage gpd Nothing of
-          ([],   [])       -> return ()
-          ([],   warnings) -> mapM_ print warnings
-          (errs, _)        -> do mapM_ print errs
-                                 exitWith (ExitFailure 1)
+      case filter isFailure $ checkPackage gpd Nothing of
+          []   -> return ()
+          errs -> mapM_ print errs >> exitWith (ExitFailure 1)
     where isFailure (PackageDistSuspicious {}) = False
           isFailure _ = True
 
@@ -419,15 +417,11 @@ generate directory distdir dll0Modules config_args
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
           libraryDirs = forDeps Installed.libraryDirs
-          -- temporary hack to support two in-tree versions of `integer-gmp`
-          isIntegerGmp2 = any ("integer-gmp2" `isInfixOf`) libraryDirs
           -- The mkLibraryRelDir function is a bit of a hack.
           -- Ideally it should be handled in the makefiles instead.
           mkLibraryRelDir "rts"   = "rts/dist/build"
           mkLibraryRelDir "ghc"   = "compiler/stage2/build"
           mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
-          mkLibraryRelDir "integer-gmp"
-                  | isIntegerGmp2 = mkLibraryRelDir "integer-gmp2"
           mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
           libraryRelDirs = map mkLibraryRelDir transitiveDepNames
       wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs

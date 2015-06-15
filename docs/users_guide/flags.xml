@@ -37,15 +37,21 @@
           </row>
           <row>
             <entry><option>-fprint-explicit-foralls</option></entry>
-            <entry>print explicit <literal>forall</literal> quantification in types</entry>
+            <entry>Print explicit <literal>forall</literal> quantification in types. See also <option>-XExplicitForAll</option></entry>
             <entry>dynamic</entry>
             <entry>-fno-print-explicit-foralls</entry>
           </row>
           <row>
             <entry><option>-fprint-explicit-kinds</option></entry>
-            <entry>print explicit kind foralls and kind arguments in types</entry>
+            <entry>Print explicit kind foralls and kind arguments in types. See also <option>-XKindSignature</option></entry>
             <entry>dynamic</entry>
             <entry>-fno-print-explicit-kinds</entry>
+          </row>
+          <row>
+            <entry><option>-fprint-unicode-syntax</option></entry>
+            <entry>Use unicode syntax when printing expressions, types and kinds. See also <option>-XUnicodeSyntax</option></entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-unicode-syntax</entry>
           </row>
           <row>
             <entry><option>-ferror-spans</option></entry>
@@ -706,8 +712,18 @@
         </thead>
         <tbody>
           <row>
+            <entry><option>-fconstraint-solver-iterations=</option><replaceable>n</replaceable></entry>
+	    <entry>Set the iteration limit for the type-constraint solver. 
+                   The default limit is 4. Typically one iteration
+                   suffices; so please yell if you find you need to set
+                   it higher than the default. Zero means infinity. </entry>
+	    <entry>dynamic</entry>
+	    <entry></entry>
+	  </row>
+          <row>
             <entry><option>-freduction-depth=</option><replaceable>n</replaceable></entry>
-	    <entry>set the <link linkend="undecidable-instances">limit for type simplification</link>. Default is 200.</entry>
+	    <entry>Set the <link linkend="undecidable-instances">limit for type simplification</link>. 
+                   Default is 200; zero means infinity.</entry>
 	    <entry>dynamic</entry>
 	    <entry></entry>
 	  </row>
@@ -2601,6 +2617,14 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-no-rtsopts-suggestions</option></entry>
+            <entry>Don't print RTS suggestions about linking with
+              <literal>-rtsopts</literal>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-no-link</option></entry>
             <entry>Omit linking</entry>
             <entry>dynamic</entry>
@@ -2990,12 +3014,6 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-ddump-cpranal</option></entry>
-            <entry>Dump output from CPR analysis</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-ddump-cse</option></entry>
             <entry>Dump CSE output</entry>
             <entry>dynamic</entry>
@@ -3010,12 +3028,6 @@
           <row>
             <entry><option>-ddump-ds</option></entry>
             <entry>Dump desugarer output</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-ddump-flatC</option></entry>
-            <entry>Dump &ldquo;flat&rdquo; C</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

@@ -78,6 +78,7 @@ import Outputable
 import FastString
 import Util
 import DynFlags
+import StaticFlags( opt_PprStyle_Debug )
 
 -- libraries
 import Data.List( mapAccumL, partition )
@@ -98,7 +99,7 @@ import qualified Data.Data        as Data hiding ( TyCon )
 data Type
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
-  | AppTy         -- See Note [AppTy invariant]
+  | AppTy         -- See Note [AppTy rep]
         Type
         Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
                         --
@@ -107,10 +108,10 @@ data Type
                         --
                         --  2) Argument type
 
-  | TyConApp      -- See Note [AppTy invariant]
+  | TyConApp      -- See Note [AppTy rep]
         TyCon
         [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
-                        -- Invariant: saturated appliations of 'FunTyCon' must
+                        -- Invariant: saturated applications of 'FunTyCon' must
                         -- use 'FunTy' and saturated synonyms must use their own
                         -- constructors. However, /unsaturated/ 'FunTyCon's
                         -- do appear as 'TyConApp's.
@@ -352,7 +353,10 @@ as ATyCon.  You can tell the difference, and get to the class, with
 The Class and its associated TyCon have the same Name.
 -}
 
--- | A typecheckable-thing, essentially anything that has a name
+-- | A global typecheckable-thing, essentially anything that has a name.
+-- Not to be confused with a 'TcTyThing', which is also a typecheckable
+-- thing but in the *local* context.  See 'TcEnv' for how to retrieve
+-- a 'TyThing' given a 'Name'.
 data TyThing
   = AnId     Id
   | AConLike ConLike
@@ -729,22 +733,33 @@ pprTcApp _ pp tc [ty]
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
 
 pprTcApp p pp tc tys
-  | isTupleTyCon tc && tyConArity tc == length tys
-  = pprPromotionQuote tc <>
-    tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
+  | Just sort <- tyConTuple_maybe tc
+  , tyConArity tc == length tys
+  = pprTupleApp p pp tc sort tys
 
   | Just dc <- isPromotedDataCon_maybe tc
   , let dc_tc = dataConTyCon dc
-  , isTupleTyCon dc_tc
+  , Just tup_sort <- tyConTuple_maybe dc_tc
   , let arity = tyConArity dc_tc    -- E.g. 3 for (,,) k1 k2 k3 t1 t2 t3
         ty_args = drop arity tys    -- Drop the kind args
   , ty_args `lengthIs` arity        -- Result is saturated
   = pprPromotionQuote tc <>
-    (tupleParens (tupleTyConSort dc_tc) $
-     sep (punctuate comma (map (pp TopPrec) ty_args)))
+    (tupleParens tup_sort $ pprWithCommas (pp TopPrec) ty_args)
 
   | otherwise
   = sdocWithDynFlags (pprTcApp_help p pp tc tys)
+
+pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> TupleSort -> [a] -> SDoc
+-- Print a saturated tuple
+pprTupleApp p pp tc sort tys
+  | null tys
+  , ConstraintTuple <- sort
+  = if opt_PprStyle_Debug then ptext (sLit "(%%)")
+                          else maybeParen p FunPrec $
+                               ptext (sLit "() :: Constraint")
+  | otherwise
+  = pprPromotionQuote tc <>
+    tupleParens sort (pprWithCommas (pp TopPrec) tys)
 
 pprTcApp_help :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
 -- This one has accss to the DynFlags
@@ -853,6 +868,8 @@ tidyTyVarBndr tidy_env@(occ_env, subst) tyvar
     -- System Names are for unification variables;
     -- when we tidy them we give them a trailing "0" (or 1 etc)
     -- so that they don't take precedence for the un-modified name
+    -- Plus, indicating a unification variable in this way is a
+    -- helpful clue for users
     occ1 | isSystemName name = mkTyVarOcc (occNameString occ ++ "0")
          | otherwise         = occ
 

@@ -1,0 +1,17 @@
+
+T10403.hs:17:6: warning:
+    Found hole ‘_’ with inferred constraints: Functor f
+    In the type signature for ‘h’: _ => _
+
+T10403.hs:17:11: warning:
+    Found hole ‘_’ with type: (a -> b) -> f a -> H f
+    Where: ‘f’ is a rigid type variable bound by
+               the inferred type of h :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:19:1
+           ‘b’ is a rigid type variable bound by
+               the inferred type of h :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:19:1
+           ‘a’ is a rigid type variable bound by
+               the inferred type of h :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:19:1
+    In the type signature for ‘h’: _ => _

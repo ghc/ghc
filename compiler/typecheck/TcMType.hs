@@ -143,7 +143,6 @@ predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
     ClassPred cls _ -> mkDictOcc (getOccName cls)
     EqPred _ _ _    -> mkVarOccFS (fsLit "cobox")
-    TuplePred _     -> mkVarOccFS (fsLit "tup")
     IrredPred _     -> mkVarOccFS (fsLit "irred")
 
 
@@ -329,8 +328,6 @@ cloneMetaTyVar tv
         ; return (mkTcTyVar name' (tyVarKind tv) details') }
 
 mkTcTyVarName :: Unique -> FastString -> Name
--- Make sure that fresh TcTyVar names finish with a digit
--- leaving the un-cluttered names free for user names
 mkTcTyVarName uniq str = mkSysTvName uniq str
 
 -- Works for both type and kind variables
@@ -454,11 +451,16 @@ tcInstTyVarX subst tyvar
   = do  { uniq <- newUnique
         ; details <- newMetaDetails (TauTv False)
         ; let name   = mkSystemName uniq (getOccName tyvar)
+                       -- See Note [Name of an instantiated type variable]
               kind   = substTy subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
         ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
 
-{-
+{- Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+
 ************************************************************************
 *                                                                      *
              Quantification
@@ -935,7 +937,7 @@ tidyCt env ct
      _ -> mkNonCanonical (tidy_ev env (ctEvidence ct))
   where
     tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
-     -- NB: we do not tidy the ctev_evtm/var field because we don't
+     -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
     tidy_ev env ctev@(CtGiven { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }

@@ -1017,9 +1017,9 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                  DynamicTarget
                     -> return (False, panic "ByteCodeGen.generateCCall(dyn)")
 
-                 StaticTarget _ _ False ->
+                 StaticTarget _ _ _ False ->
                      panic "generateCCall: unexpected FFI value import"
-                 StaticTarget target _ True
+                 StaticTarget _ target _ True
                     -> do res <- ioToBc (lookupStaticPtr stdcall_adj_target)
                           return (True, res)
                    where

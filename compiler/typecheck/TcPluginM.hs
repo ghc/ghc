@@ -31,12 +31,24 @@ module TcPluginM (
         matchFam,
 
         -- * Type variables
+        newUnique,
         newFlexiTyVar,
         isTouchableTcPluginM,
 
         -- * Zonking
         zonkTcType,
-        zonkCt
+        zonkCt,
+
+        -- * Creating constraints
+        newWanted,
+        newDerived,
+        newGiven,
+
+        -- * Manipulating evidence bindings
+        newEvVar,
+        setEvBind,
+        getEvBindsTcPluginM,
+        getEvBindsTcPluginM_maybe
 #endif
     ) where
 
@@ -51,11 +63,14 @@ import qualified IfaceEnv
 import qualified Finder
 
 import FamInstEnv ( FamInstEnv )
-import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, TcPluginM
-                  , unsafeTcPluginTcM, liftIO, traceTc )
+import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
+                  , unsafeTcPluginTcM, getEvBindsTcPluginM_maybe
+                  , liftIO, traceTc )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
-import TcEvidence ( TcCoercion )
+import TcEvidence ( TcCoercion, EvTerm, EvBind, EvBindsVar, mkGivenEvBind )
+import TcRnTypes  ( CtEvidence(..) )
+import Var        ( EvVar )
 
 import Module
 import Name
@@ -68,6 +83,8 @@ import Type
 import Id
 import InstEnv
 import FastString
+import Maybes
+import Unique
 
 
 -- | Perform some IO, typically to interact with an external tool.
@@ -123,6 +140,9 @@ matchFam :: TyCon -> [Type] -> TcPluginM (Maybe (TcCoercion, TcType))
 matchFam tycon args = unsafeTcPluginTcM $ TcSMonad.matchFamTcM tycon args
 
 
+newUnique :: TcPluginM Unique
+newUnique = unsafeTcPluginTcM TcRnMonad.newUnique
+
 newFlexiTyVar :: Kind -> TcPluginM TcTyVar
 newFlexiTyVar = unsafeTcPluginTcM . TcMType.newFlexiTyVar
 
@@ -135,4 +155,43 @@ zonkTcType = unsafeTcPluginTcM . TcMType.zonkTcType
 
 zonkCt :: Ct -> TcPluginM Ct
 zonkCt = unsafeTcPluginTcM . TcMType.zonkCt
+
+
+-- | Create a new wanted constraint.
+newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
+newWanted loc pty = do
+    new_ev <- newEvVar pty
+    return CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
+
+-- | Create a new derived constraint.
+newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
+newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
+
+-- | Create a new given constraint, with the supplied evidence.  This
+-- must not be invoked from 'tcPluginInit' or 'tcPluginStop', or it
+-- will panic.
+newGiven :: CtLoc -> PredType -> EvTerm -> TcPluginM CtEvidence
+newGiven loc pty evtm = do
+   new_ev <- newEvVar pty
+   setEvBind $ mkGivenEvBind new_ev evtm
+   return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
+
+-- | Create a fresh evidence variable.
+newEvVar :: PredType -> TcPluginM EvVar
+newEvVar = unsafeTcPluginTcM . TcMType.newEvVar
+
+-- | Bind an evidence variable.  This must not be invoked from
+-- 'tcPluginInit' or 'tcPluginStop', or it will panic.
+setEvBind :: EvBind -> TcPluginM ()
+setEvBind ev_bind = do
+    tc_evbinds <- getEvBindsTcPluginM
+    unsafeTcPluginTcM $ TcMType.addTcEvBind tc_evbinds ev_bind
+
+-- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
+-- constraint solving.  This must not be invoked from 'tcPluginInit'
+-- or 'tcPluginStop', or it will panic.
+getEvBindsTcPluginM :: TcPluginM EvBindsVar
+getEvBindsTcPluginM = fmap (expectJust oops) getEvBindsTcPluginM_maybe
+  where
+    oops = "plugin attempted to read EvBindsVar outside the constraint solver"
 #endif

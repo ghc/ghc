@@ -63,6 +63,7 @@ import UniqFM
 import UniqSupply
 import DynFlags
 import Util
+import Unique
 
 import BasicTypes       ( Alignment )
 import Digraph
@@ -779,25 +780,41 @@ mkNode block@(BasicBlock id instrs) = (block, id, getOutEdges instrs)
 
 seqBlocks :: BlockEnv i -> [(GenBasicBlock t1, BlockId, [BlockId])]
                         -> [GenBasicBlock t1]
-seqBlocks _ [] = []
-seqBlocks infos ((block,_,[]) : rest)
-  = block : seqBlocks infos rest
-seqBlocks infos ((block@(BasicBlock id instrs),_,[next]) : rest)
-  | can_fallthrough = BasicBlock id (init instrs) : seqBlocks infos rest'
-  | otherwise       = block : seqBlocks infos rest'
+seqBlocks infos blocks = placeNext pullable0 todo0
   where
-        can_fallthrough = not (mapMember next infos) && can_reorder
-        (can_reorder, rest') = reorder next [] rest
-          -- TODO: we should do a better job for cycles; try to maximise the
-          -- fallthroughs within a loop.
-seqBlocks _ _ = panic "AsmCodegen:seqBlocks"
+    -- pullable: Blocks that are not yet placed
+    -- todo:     Original order of blocks, to be followed if we have no good
+    --           reason not to;
+    --           may include blocks that have already been placed, but then
+    --           these are not in pullable
+    pullable0 = listToUFM [ (i,(b,n)) | (b,i,n) <- blocks ]
+    todo0     = [i | (_,i,_) <- blocks ]
 
-reorder :: (Eq a) => a -> [(t, a, t1)] -> [(t, a, t1)] -> (Bool, [(t, a, t1)])
-reorder  _ accum [] = (False, reverse accum)
-reorder id accum (b@(block,id',out) : rest)
-  | id == id'  = (True, (block,id,out) : reverse accum ++ rest)
-  | otherwise  = reorder id (b:accum) rest
+    placeNext _ [] = []
+    placeNext pullable (i:rest)
+        | Just (block, pullable') <- lookupDeleteUFM pullable i
+        = place pullable' rest block
+        | otherwise
+        -- We already placed this block, so ignore
+        = placeNext pullable rest
 
+    place pullable todo (block,[])
+                          = block : placeNext pullable todo
+    place pullable todo (block@(BasicBlock id instrs),[next])
+        | mapMember next infos
+        = block : placeNext pullable todo
+        | Just (nextBlock, pullable') <- lookupDeleteUFM pullable next
+        = BasicBlock id (init instrs) : place pullable' todo nextBlock
+        | otherwise
+        = block : placeNext pullable todo
+    place _ _ (_,tooManyNextNodes)
+        = pprPanic "seqBlocks" (ppr tooManyNextNodes)
+
+
+lookupDeleteUFM :: Uniquable key => UniqFM elt -> key -> Maybe (elt, UniqFM elt)
+lookupDeleteUFM m k = do -- Maybe monad
+    v <- lookupUFM m k
+    return (v, delFromUFM m k)
 
 -- -----------------------------------------------------------------------------
 -- Generate jump tables

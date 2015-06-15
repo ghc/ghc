@@ -24,7 +24,7 @@ rebindable6.hs:106:17:
                  return b }
 
 rebindable6.hs:107:17:
-    No instance for (HasFail ([Prelude.Char] -> t1))
+    No instance for (HasFail ([Char] -> t1))
       (maybe you haven't applied a function to enough arguments?)
       arising from a do statement
     The type variable ‘t1’ is ambiguous

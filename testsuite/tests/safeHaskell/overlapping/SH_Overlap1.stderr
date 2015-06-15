@@ -1,0 +1,15 @@
+[1 of 3] Compiling SH_Overlap1_B    ( SH_Overlap1_B.hs, SH_Overlap1_B.o )
+[2 of 3] Compiling SH_Overlap1_A    ( SH_Overlap1_A.hs, SH_Overlap1_A.o )
+[3 of 3] Compiling SH_Overlap1      ( SH_Overlap1.hs, SH_Overlap1.o )
+
+SH_Overlap1.hs:15:8: error:
+    Unsafe overlapping instances for C [Int] arising from a use of ‘f’
+    The matching instance is:
+      instance [overlap ok] [safe] C [Int]
+        -- Defined at SH_Overlap1_A.hs:11:3
+    It is compiled in a Safe module and as such can only
+    overlap instances from the same module, however it
+    overlaps the following instances from different modules:
+      instance C [a] -- Defined at SH_Overlap1.hs:11:3
+    In the expression: f ([1, 2, 3, 4] :: [Int])
+    In an equation for ‘test’: test = f ([1, 2, 3, 4] :: [Int])

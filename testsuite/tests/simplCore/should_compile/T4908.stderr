@@ -11,9 +11,9 @@ T4908.f_$s$wf =
       __DEFAULT ->
         case sc2 of ds1 {
           __DEFAULT -> T4908.f_$s$wf (-# ds 1#) sc1 ds1;
-          0# -> GHC.Types.True
+          0# -> True
         };
-      0# -> GHC.Types.True
+      0# -> True
     }
 end Rec }
 
@@ -32,11 +32,11 @@ T4908.$wf =
         case b of _ [Occ=Dead] { I# ds1 ->
         case ds1 of ds2 {
           __DEFAULT -> T4908.f_$s$wf (-# ds 1#) a ds2;
-          0# -> GHC.Types.True
+          0# -> True
         }
         }
         };
-      0# -> GHC.Types.True
+      0# -> True
     }
 
 f [InlPrag=INLINE[0]] :: Int -> (Int, Int) -> Bool
@@ -57,7 +57,7 @@ f =
 ------ Local rules for imported ids --------
 "SC:$wf0" [0]
     forall (sc :: Int#) (sc1 :: Int) (sc2 :: Int#).
-      T4908.$wf sc (sc1, GHC.Types.I# sc2)
+      T4908.$wf sc (sc1, I# sc2)
       = T4908.f_$s$wf sc sc1 sc2
 
 

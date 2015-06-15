@@ -61,6 +61,8 @@ import TysWiredIn
 import BasicTypes
 import SrcLoc
 import DynFlags ( ExtensionFlag( Opt_DataKinds ), getDynFlags )
+import Constants ( mAX_CTUPLE_SIZE )
+import ErrUtils( MsgDoc )
 import Unique
 import UniqSupply
 import Outputable
@@ -476,8 +478,8 @@ tc_hs_type hs_ty@(HsExplicitListTy _k tys) exp_kind
 tc_hs_type hs_ty@(HsExplicitTupleTy _ tys) exp_kind
   = do { tks <- mapM tc_infer_lhs_type tys
        ; let n          = length tys
-             kind_con   = promotedTupleTyCon   BoxedTuple n
-             ty_con     = promotedTupleDataCon BoxedTuple n
+             kind_con   = promotedTupleTyCon   Boxed n
+             ty_con     = promotedTupleDataCon Boxed n
              (taus, ks) = unzip tks
              tup_k      = mkTyConApp kind_con ks
        ; checkExpectedKind hs_ty tup_k exp_kind
@@ -534,12 +536,9 @@ tc_hs_type hs_ty@(HsTyLit (HsStrTy _ s)) exp_kind
        ; checkWiredInTyCon typeSymbolKindCon
        ; return (mkStrLitTy s) }
 
-
-tc_hs_type HsWildcardTy _ = panic "tc_hs_type HsWildcardTy"
--- unnamed wildcards should have been replaced by named wildcards
-
-tc_hs_type hs_ty@(HsNamedWildcardTy name) exp_kind
-  = do { (ty, k) <- tcTyVar name
+tc_hs_type hs_ty@(HsWildCardTy wc) exp_kind
+  = do { let name = wildCardName wc
+       ; (ty, k) <- tcTyVar name
        ; checkExpectedKind hs_ty k exp_kind
        ; return ty }
 
@@ -568,14 +567,28 @@ finish_tuple :: HsType Name -> TupleSort -> [TcType] -> ExpKind -> TcM TcType
 finish_tuple hs_ty tup_sort tau_tys exp_kind
   = do { traceTc "finish_tuple" (ppr res_kind $$ ppr exp_kind $$ ppr exp_kind)
        ; checkExpectedKind hs_ty res_kind exp_kind
-       ; checkWiredInTyCon tycon
+       ; tycon <- case tup_sort of
+           ConstraintTuple
+             | arity > mAX_CTUPLE_SIZE
+                         -> failWith (bigConstraintTuple arity)
+             | otherwise -> tcLookupTyCon (cTupleTyConName arity)
+           BoxedTuple    -> do { let tc = tupleTyCon Boxed arity
+                               ; checkWiredInTyCon tc
+                               ; return tc }
+           UnboxedTuple  -> return (tupleTyCon Unboxed arity)
        ; return (mkTyConApp tycon tau_tys) }
   where
-    tycon = tupleTyCon tup_sort (length tau_tys)
+    arity = length tau_tys
     res_kind = case tup_sort of
                  UnboxedTuple    -> unliftedTypeKind
                  BoxedTuple      -> liftedTypeKind
                  ConstraintTuple -> constraintKind
+
+bigConstraintTuple :: Arity -> MsgDoc
+bigConstraintTuple arity
+  = hang (ptext (sLit "Constraint tuple arity too large:") <+> int arity
+          <+> parens (ptext (sLit "max arity =") <+> int mAX_CTUPLE_SIZE))
+       2 (ptext (sLit "Instead, use a nested tuple"))
 
 ---------------------------
 tcInferApps :: Outputable a
@@ -1558,7 +1571,7 @@ tc_hs_kind (HsTupleTy _ kis) =
      checkWiredInTyCon tycon
      return $ mkTyConApp tycon kappas
   where
-     tycon = promotedTupleTyCon BoxedTuple (length kis)
+     tycon = promotedTupleTyCon Boxed (length kis)
 
 -- Argument not kind-shaped
 tc_hs_kind k = pprPanic "tc_hs_kind" (ppr k)

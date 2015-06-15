@@ -200,11 +200,13 @@ void performMajorGC(void);
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-StgInd *newCAF    (StgRegTable *reg, StgIndStatic *caf);
-StgInd *newDynCAF (StgRegTable *reg, StgIndStatic *caf);
+StgInd *newCAF         (StgRegTable *reg, StgIndStatic *caf);
+StgInd *newRetainedCAF (StgRegTable *reg, StgIndStatic *caf);
+StgInd *newGCdCAF      (StgRegTable *reg, StgIndStatic *caf);
 void revertCAFs (void);
 
 // Request that all CAFs are retained indefinitely.
+// (preferably use RtsConfig.keep_cafs instead)
 void setKeepCAFs (void);
 
 /* -----------------------------------------------------------------------------

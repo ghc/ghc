@@ -218,9 +218,9 @@
                        xs | all isDigit xs && not (null xs) -> Just (read xs)
                        _ -> Nothing
        result   = mkResult (getTagStr "Result" "*" tags)
-       white    = cannon (getTagStr "White" "?" tags)
+       white    = canon (getTagStr "White" "?" tags)
        whiteElo = getTagStr "WhiteElo" "" tags
-       black    = cannon (getTagStr "Black" "?" tags)
+       black    = canon (getTagStr "Black" "?" tags)
        blackElo = getTagStr "BlackElo" "" tags
        opening  = getOpening (getTagStr "ECO" "" tags)
 
@@ -240,7 +240,7 @@
        getMonth "11" = "Nov"
        getMonth "12" = "Dec"
 
-       cannon name = case span (/= ',') name of
+       canon name = case span (/= ',') name of
                        (a,[',',' ',b]) -> b : ". " ++ a
                        (a,[',',b]) -> b : ". " ++ a
                        (a,',':' ':b) -> b ++ " " ++ a

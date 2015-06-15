@@ -11,9 +11,8 @@
 # -----------------------------------------------------------------------------
 
 $(MKDIRHIER) : utils/mkdirhier/mkdirhier.sh
-	-mkdir $(INPLACE)
-	-mkdir $(INPLACE_BIN)
-	-mkdir $(INPLACE_LIB)
+	mkdir -p $(INPLACE_BIN)
+	mkdir -p $(INPLACE_LIB)
 	$(call removeFiles,$@)
 	echo '#!$(SHELL)'  		 >> $@
 	cat utils/mkdirhier/mkdirhier.sh >> $@

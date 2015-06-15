@@ -1,5 +1,5 @@
-import os
 import re
+import subprocess
 
 # Testsuite configuration setup for GHC
 #
@@ -9,14 +9,17 @@ config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ghc_compiler_always_flags.split()
 
+config.haddock               = 'haddock'
 config.hp2ps                 = 'hp2ps'
 config.hpc                   = 'hpc'
 config.gs                    = 'gs'
 config.confdir               = '.'
 
-# By default, we test the 'normal', 'opt' and 'hpc' ways.
-# 'optasm' is added by mk/test.mk if the compiler has a native code gen,
-# 'prof'   is added by mk/test.mk if the profiling way is enabled.
+# By default, the 'normal' and 'hpc' ways are enabled. In addition, certain
+# ways are enabled automatically if this GHC supports them. Ways that fall in
+# this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
+# 'profthreaded', 'ghci', and whichever of 'static/dyn' is not this GHC's
+# default mode. Other ways should be set explicitly from .T files.
 config.compile_ways       = ['normal', 'hpc']
 config.run_ways           = ['normal', 'hpc']
 
@@ -27,8 +30,6 @@ config.other_ways         = ['prof',
                              'threaded1_ls', 'threaded2_hT',
                              'llvm', 'debugllvm',
                              'profllvm', 'profoptllvm', 'profthreadedllvm',
-                             'threaded1llvm', 'threaded2llvm',
-                             'dynllvm',
                              'debug']
 
 if (ghc_with_native_codegen == 1):
@@ -110,9 +111,6 @@ config.way_flags = lambda name : {
     'profllvm'         : ['-prof', '-static', '-auto-all', '-fllvm'],
     'profoptllvm'      : ['-O', '-prof', '-static', '-auto-all', '-fllvm'],
     'profthreadedllvm' : ['-O', '-prof', '-static', '-auto-all', '-threaded', '-fllvm'],
-    'threaded1llvm'    : ['-threaded', '-debug', '-fllvm'],
-    'threaded2llvm'    : ['-O', '-threaded', '-eventlog', '-fllvm'],
-    'dynllvm'          : ['-O', '-dynamic', '-fllvm']
    }
 
 config.way_rts_flags = { 
@@ -143,9 +141,6 @@ config.way_rts_flags = {
     'profllvm'         : ['-p'],
     'profoptllvm'      : ['-hc', '-p'],
     'profthreadedllvm' : ['-p'],
-    'threaded1llvm'    : [],
-    'threaded2llvm'    : ['-N2 -ls'],
-    'dynllvm'          : []
    }
 
 # Useful classes of ways that can be used with only_ways() and
@@ -164,16 +159,11 @@ llvm_ways     = [x[0] for x in config.way_flags('dummy_name').items()
                       if '-fflvm' in x[1]]
 
 def get_compiler_info():
-# This should really not go through the shell
-    h = os.popen(config.compiler + ' --info', 'r')
-    s = h.read()
+    s = getStdout([config.compiler, '--info']).decode('utf8')
     s = re.sub('[\r\n]', '', s)
-    h.close()
     compilerInfoDict = dict(eval(s))
-    h = os.popen(config.compiler + ' +RTS --info', 'r')
-    s = h.read()
+    s = getStdout([config.compiler, '+RTS', '--info']).decode('utf8')
     s = re.sub('[\r\n]', '', s)
-    h.close()
     rtsInfoDict = dict(eval(s))
 
     # We use a '/'-separated path for libdir, even on Windows

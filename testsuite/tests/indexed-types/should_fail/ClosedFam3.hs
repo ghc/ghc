@@ -2,7 +2,7 @@
 
 module ClosedFam3 where
 
-import {-# SOURCE #-} ClosedFam3
+import ClosedFam3a
 
 type family Foo a where
   Foo Int = Bool

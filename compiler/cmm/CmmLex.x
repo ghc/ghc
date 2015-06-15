@@ -13,7 +13,7 @@
 {
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -Wwarn -w #-}
--- The above -Wwarn supression flag is a temporary kludge.
+-- The above -Wwarn suppression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings

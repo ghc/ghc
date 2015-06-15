@@ -46,4 +46,14 @@ T9367:
 
 .PHONY: T9762_prep
 T9762_prep:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -fhpc -dynamic T9762B.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O -fhpc -dynamic T9762B.hs
+
+.PHONY: T10408A
+T10408A:
+	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 \
+	    -ghci-script T10408A.script -ghci-script T10408B.script < /dev/null
+
+.PHONY: T10408B
+T10408B:
+	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
+	    -ghci-script T10408A.script -ghci-script T10408B.script < /dev/null

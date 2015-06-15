@@ -1,6 +1,6 @@
 
 module T9204 where
 
-import {-# SOURCE #-} T9204
+import T9204a
 
 data D a

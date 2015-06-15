@@ -40,20 +40,19 @@ import Digraph
 
 import PrelNames
 import TysPrim ( mkProxyPrimTy )
-import TyCon      ( isTupleTyCon, tyConDataCons_maybe
-                  , tyConName, isPromotedTyCon, isPromotedDataCon )
+import TyCon
 import TcEvidence
 import TcType
 import Type
+import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
-import TysWiredIn ( eqBoxDataCon, coercibleDataCon, tupleCon, mkListTy
+import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
                   , mkBoxedTupleTy, stringTy )
 import Id
 import MkId(proxyHashId)
 import Class
-import DataCon  ( dataConTyCon, dataConWorkId )
+import DataCon  ( dataConTyCon )
 import Name
-import MkId     ( seqId )
 import IdInfo   ( IdDetails(..) )
 import Var
 import VarSet
@@ -69,7 +68,6 @@ import BasicTypes hiding ( TopLevel )
 import DynFlags
 import FastString
 import ErrUtils( MsgDoc )
-import ListSetOps( getNth )
 import Util
 import Control.Monad( when )
 import MonadUtils
@@ -569,37 +567,41 @@ decomposeRuleLhs orig_bndrs orig_lhs
                           -- See Note [Unused spec binders]
   = Left (vcat (map dead_msg unbound))
 
-  | Var fn_var <- fun
-  , not (fn_var `elemVarSet` orig_bndr_set)
+  | Just (fn_id, args) <- decompose fun2 args2
+  , let extra_dict_bndrs = mk_extra_dict_bndrs fn_id args
   = -- pprTrace "decmposeRuleLhs" (vcat [ ptext (sLit "orig_bndrs:") <+> ppr orig_bndrs
     --                                  , ptext (sLit "orig_lhs:") <+> ppr orig_lhs
     --                                  , ptext (sLit "lhs1:")     <+> ppr lhs1
-    --                                  , ptext (sLit "bndrs1:") <+> ppr bndrs1
-    --                                  , ptext (sLit "fn_var:") <+> ppr fn_var
+    --                                  , ptext (sLit "extra_dict_bndrs:") <+> ppr extra_dict_bndrs
+    --                                  , ptext (sLit "fn_id:") <+> ppr fn_id
     --                                  , ptext (sLit "args:")   <+> ppr args]) $
-    Right (bndrs1, fn_var, args)
-
-  | Case scrut bndr ty [(DEFAULT, _, body)] <- fun
-  , isDeadBinder bndr   -- Note [Matching seqId]
-  , let args' = [Type (idType bndr), Type ty, scrut, body]
-  = Right (bndrs1, seqId, args' ++ args)
+    Right (orig_bndrs ++ extra_dict_bndrs, fn_id, args)
 
   | otherwise
   = Left bad_shape_msg
  where
-   lhs1       = drop_dicts orig_lhs
-   lhs2       = simpleOptExpr lhs1  -- See Note [Simplify rule LHS]
-   (fun,args) = collectArgs lhs2
+   lhs1         = drop_dicts orig_lhs
+   lhs2         = simpleOptExpr lhs1  -- See Note [Simplify rule LHS]
+   (fun2,args2) = collectArgs lhs2
+
    lhs_fvs    = exprFreeVars lhs2
    unbound    = filterOut (`elemVarSet` lhs_fvs) orig_bndrs
-   bndrs1     = orig_bndrs ++ extra_dict_bndrs
 
    orig_bndr_set = mkVarSet orig_bndrs
 
         -- Add extra dict binders: Note [Free dictionaries]
-   extra_dict_bndrs = [ mkLocalId (localiseName (idName d)) (idType d)
-                      | d <- varSetElems (lhs_fvs `delVarSetList` orig_bndrs)
-                      , isDictId d ]
+   mk_extra_dict_bndrs fn_id args
+     = [ mkLocalId (localiseName (idName d)) (idType d)
+       | d <- varSetElems (exprsFreeVars args `delVarSetList` (fn_id : orig_bndrs))
+              -- fn_id: do not quantify over the function itself, which may
+              -- itself be a dictionary (in pathological cases, Trac #10251)
+       , isDictId d ]
+
+   decompose (Var fn_id) args
+      | not (fn_id `elemVarSet` orig_bndr_set)
+      = Just (fn_id, args)
+
+   decompose _ _ = Nothing
 
    bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
                       2 (vcat [ text "Optimised lhs:" <+> ppr lhs2
@@ -840,36 +842,14 @@ dsEvTerm (EvCast tm co)
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
-dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
-                                     ; return (Var df `mkTyApps` tys `mkApps` tms') }
-
+dsEvTerm (EvDFunApp df tys tms)     = return (Var df `mkTyApps` tys `mkApps` (map Var tms))
 dsEvTerm (EvCoercion (TcCoVarCo v)) = return (Var v)  -- See Note [Simple coercions]
 dsEvTerm (EvCoercion co)            = dsTcCoercion co mkEqBox
-
-dsEvTerm (EvTupleSel v n)
-   = do { tm' <- dsEvTerm v
-        ; let scrut_ty = exprType tm'
-              (tc, tys) = splitTyConApp scrut_ty
-              Just [dc] = tyConDataCons_maybe tc
-              xs = mkTemplateLocals tys
-              the_x = getNth xs n
-        ; ASSERT( isTupleTyCon tc )
-          return $
-          Case tm' (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
-
-dsEvTerm (EvTupleMk tms)
-  = do { tms' <- mapM dsEvTerm tms
-       ; let tys = map exprType tms'
-       ; return $ Var (dataConWorkId dc) `mkTyApps` tys `mkApps` tms' }
-  where
-    dc = tupleCon ConstraintTuple (length tms)
-
 dsEvTerm (EvSuperClass d n)
   = do { d' <- dsEvTerm d
        ; let (cls, tys) = getClassPredTys (exprType d')
              sc_sel_id  = classSCSelId cls n    -- Zero-indexed
        ; return $ Var sc_sel_id `mkTyApps` tys `App` d' }
-  where
 
 dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
   where
@@ -980,6 +960,9 @@ dsEvTypeable ev =
     hash_name_fs
       | isPromotedTyCon tc    = appendFS (mkFastString "$k") name_fs
       | isPromotedDataCon tc  = appendFS (mkFastString "$c") name_fs
+      | isTupleTyCon tc &&
+        returnsConstraintKind (tyConKind tc)
+                              = appendFS (mkFastString "$p") name_fs
       | otherwise             = name_fs
 
     hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, hash_name_fs]

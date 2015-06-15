@@ -1,4 +1,0 @@
-
-T8028.hs:7:3:
-    Illegal empty closed type family
-    When splicing a TH declaration: type family F_0 where

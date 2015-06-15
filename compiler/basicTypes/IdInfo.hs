@@ -15,7 +15,6 @@ module IdInfo (
         -- * The IdInfo type
         IdInfo,         -- Abstract
         vanillaIdInfo, noCafIdInfo,
-        seqIdInfo, megaSeqIdInfo,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
@@ -24,7 +23,7 @@ module IdInfo (
 
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
-        zapDemandInfo,
+        zapDemandInfo, zapUsageInfo,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -56,7 +55,7 @@ module IdInfo (
         SpecInfo(..),
         emptySpecInfo,
         isEmptySpecInfo, specInfoFreeVars,
-        specInfoRules, seqSpecInfo, setSpecInfoHead,
+        specInfoRules, setSpecInfoHead,
         specInfo, setSpecInfo,
 
         -- ** The CAFInfo type
@@ -173,9 +172,9 @@ pprIdDetails other     = brackets (pp other)
 -- 'Unique' (and are hence the same 'Id'); for example, one might lack
 -- the properties attached to the other.
 --
--- The 'IdInfo' gives information about the value, or definition, of the
--- 'Id'.  It does not contain information about the 'Id''s usage,
--- except for 'demandInfo' and 'oneShotInfo'.
+-- Most of the 'IdInfo' gives information about the value, or definition, of
+-- the 'Id', independent of its usage. Exceptions to this
+-- are 'demandInfo', 'occInfo', 'oneShotInfo' and 'callArityInfo'.
 data IdInfo
   = IdInfo {
         arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
@@ -193,35 +192,6 @@ data IdInfo
         callArityInfo :: !ArityInfo    -- ^ How this is called.
                                          -- n <=> all calls have at least n arguments
     }
-
--- | Just evaluate the 'IdInfo' to WHNF
-seqIdInfo :: IdInfo -> ()
-seqIdInfo (IdInfo {}) = ()
-
--- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
--- compiler
-megaSeqIdInfo :: IdInfo -> ()
-megaSeqIdInfo info
-  = seqSpecInfo (specInfo info)                 `seq`
-
--- Omitting this improves runtimes a little, presumably because
--- some unfoldings are not calculated at all
---    seqUnfolding (unfoldingInfo info)         `seq`
-
-    seqDemandInfo (demandInfo info)             `seq`
-    seqStrictnessInfo (strictnessInfo info)     `seq`
-    seqCaf (cafInfo info)                       `seq`
-    seqOneShot (oneShotInfo info)               `seq`
-    seqOccInfo (occInfo info)
-
-seqOneShot :: OneShotInfo -> ()
-seqOneShot l = l `seq` ()
-
-seqStrictnessInfo :: StrictSig -> ()
-seqStrictnessInfo ty = seqStrictSig ty
-
-seqDemandInfo :: Demand -> ()
-seqDemandInfo dmd = seqDemand dmd
 
 -- Setters
 
@@ -400,9 +370,6 @@ setSpecInfoHead :: Name -> SpecInfo -> SpecInfo
 setSpecInfoHead fn (SpecInfo rules fvs)
   = SpecInfo (map (setRuleIdName fn) rules) fvs
 
-seqSpecInfo :: SpecInfo -> ()
-seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
-
 {-
 ************************************************************************
 *                                                                      *
@@ -433,9 +400,6 @@ vanillaCafInfo = MayHaveCafRefs
 mayHaveCafRefs :: CafInfo -> Bool
 mayHaveCafRefs  MayHaveCafRefs = True
 mayHaveCafRefs _               = False
-
-seqCaf :: CafInfo -> ()
-seqCaf c = c `seq` ()
 
 instance Outputable CafInfo where
    ppr = ppCafInfo
@@ -475,9 +439,13 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
 
     is_safe_dmd dmd = not (isStrictDmd dmd)
 
--- | Remove demand info on the 'IdInfo' if it is present, otherwise return @Nothing@
+-- | Remove all demand info on the 'IdInfo'
 zapDemandInfo :: IdInfo -> Maybe IdInfo
 zapDemandInfo info = Just (info {demandInfo = topDmd})
+
+-- | Remove usage (but not strictness) info on the 'IdInfo'
+zapUsageInfo :: IdInfo -> Maybe IdInfo
+zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables

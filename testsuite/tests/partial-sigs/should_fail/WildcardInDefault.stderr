@@ -1,4 +1,5 @@
 
 WildcardInDefault.hs:4:10:
-    Wildcard not allowed
-    In declaration: default (_)
+    Unexpected wild card: ‘_’
+    In a type in a `default' declaration: _
+    When checking the types in a default declaration

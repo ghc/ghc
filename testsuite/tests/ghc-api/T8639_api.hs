@@ -19,8 +19,8 @@ main
 
            -- With the next line, you get an "Not in scope" exception.
            -- If you comment out this runStmt, it runs without error and prints the  type.
-           runStmt "putStrLn (show 3)" RunToCompletion
-           runStmt "hFlush stdout" RunToCompletion
+           execStmt "putStrLn (show 3)" execOptions
+           execStmt "hFlush stdout" execOptions
 
            ty <- exprType "T8639_api_a.it"
            liftIO (putStrLn (showPpr flags ty))

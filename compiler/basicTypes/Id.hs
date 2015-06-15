@@ -45,8 +45,9 @@ module Id (
         setIdExported, setIdNotExported,
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-        zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
+        zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapFragileIdInfo,
         zapIdStrictness,
+        transferPolyIdInfo,
 
         -- ** Predicates on Ids
         isImplicitId, isDeadBinder,
@@ -197,7 +198,7 @@ lazySetIdInfo :: Id -> IdInfo -> Id
 lazySetIdInfo = Var.lazySetIdInfo
 
 setIdInfo :: Id -> IdInfo -> Id
-setIdInfo id info = seqIdInfo info `seq` (lazySetIdInfo id info)
+setIdInfo id info = info `seq` (lazySetIdInfo id info)
         -- Try to avoid spack leaks by seq'ing
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
@@ -733,8 +734,11 @@ zapLamIdInfo = zapInfo zapLamInfo
 zapFragileIdInfo :: Id -> Id
 zapFragileIdInfo = zapInfo zapFragileInfo
 
-zapDemandIdInfo :: Id -> Id
-zapDemandIdInfo = zapInfo zapDemandInfo
+zapIdDemandInfo :: Id -> Id
+zapIdDemandInfo = zapInfo zapDemandInfo
+
+zapIdUsageInfo :: Id -> Id
+zapIdUsageInfo = zapInfo zapUsageInfo
 
 {-
 Note [transferPolyIdInfo]

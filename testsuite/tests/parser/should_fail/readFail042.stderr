@@ -1,9 +1,9 @@
 
-readFail042.hs:10:9:
+readFail042.hs:9:9:
     Unexpected transform statement in a list comprehension
     Use TransformListComp
 
-readFail042.hs:11:9:
+readFail042.hs:9:9:
     Unexpected transform statement in a list comprehension
     Use TransformListComp
 

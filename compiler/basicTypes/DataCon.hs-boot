@@ -1,4 +1,5 @@
 module DataCon where
+import Var( TyVar )
 import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )
 import FieldLabel ( FieldLabel )
@@ -9,8 +10,8 @@ data DataCon
 data DataConRep
 dataConName      :: DataCon -> Name
 dataConTyCon     :: DataCon -> TyCon
+dataConExTyVars  :: DataCon -> [TyVar]
 dataConFieldLabels :: DataCon -> [FieldLabel]
-isVanillaDataCon :: DataCon -> Bool
 
 instance Eq DataCon
 instance Ord DataCon

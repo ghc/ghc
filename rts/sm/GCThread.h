@@ -183,6 +183,7 @@ typedef struct gc_thread_ {
     W_ scav_find_work;
 
     Time gc_start_cpu;   // process CPU time
+    Time gc_sync_start_elapsed;  // start of GC sync
     Time gc_start_elapsed;  // process elapsed time
     W_ gc_start_faults;
 

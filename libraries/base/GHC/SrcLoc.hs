@@ -1,4 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
+
+-- | @since 4.8.2.0
 module GHC.SrcLoc
   ( SrcLoc
   , srcLocPackage
@@ -14,6 +16,8 @@ module GHC.SrcLoc
   ) where
 
 -- | A single location in the source code.
+--
+-- @since 4.8.2.0
 data SrcLoc = SrcLoc
   { srcLocPackage   :: String
   , srcLocModule    :: String
@@ -24,6 +28,9 @@ data SrcLoc = SrcLoc
   , srcLocEndCol    :: Int
   } deriving (Show, Eq)
 
+-- | Pretty print 'SrcLoc'
+--
+-- @since 4.8.2.0
 showSrcLoc :: SrcLoc -> String
 showSrcLoc SrcLoc {..}
   = concat [ srcLocFile, ":"

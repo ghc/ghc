@@ -6,12 +6,23 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "Hooks.h"
+#include "RtsFlags.h"
 
 #include <stdio.h>
 
 void
 StackOverflowHook (W_ stack_size)    /* in bytes */
 {
-    fprintf(stderr, "Stack space overflow: current size %" FMT_Word " bytes.\nUse `+RTS -Ksize -RTS' to increase it.\n", stack_size);
-}
+    errorBelch("Stack space overflow: current size %" FMT_Word " bytes.",
+               stack_size);
 
+    if (rtsConfig.rts_opts_suggestions == rtsTrue) {
+        if (rtsConfig.rts_opts_enabled == RtsOptsAll) {
+            errorBelch("Use `+RTS -Ksize -RTS' to increase it.");
+        } else {
+            errorBelch("Relink with -rtsopts and "
+                       "use `+RTS -Ksize -RTS' to increase it.");
+        }
+    }
+}

@@ -317,7 +317,7 @@ else:
   only_darwin = skip
 
 test('static001',
-     [only_darwin, expect_fail,
+     [only_darwin, expect_broken(8127),
       extra_clean(['Static001.hi', 'Static001.o', 'liba.a', 'Static001_stub.h', 'Static001_stub.o'])],
      run_command,
      ['$MAKE -s --no-print-directory static001'])
@@ -405,13 +405,20 @@ def build_T9050(name, way):
      return simple_build(name + '.cmm', way, '-outputdir=. ', 0, '', 0, 0, 0)
 test('T9050', normal, build_T9050, [])
 
-test('write_interface_oneshot', normal, run_command, ['$MAKE -s --no-print-directory write_interface_oneshot'])
-test('write_interface_make', normal, run_command, ['$MAKE -s --no-print-directory write_interface_make'])
+test('write_interface_oneshot',
+     extra_clean(['write_interface_oneshot_hidir/*']),
+     run_command,
+     ['$MAKE -s --no-print-directory write_interface_oneshot'])
+
+test('write_interface_make',
+     extra_clean(['write_interface_make_hidir/*']),
+     run_command,
+     ['$MAKE -s --no-print-directory write_interface_make'])
 
 test('T9776', normal, compile_fail, ['-frule-check'])
 
 test('T9938',
-     [ extra_clean(['T9938.hi', 'T9938.o', 'T9938']), expect_broken(9938) ],
+     [ extra_clean(['T9938.hi', 'T9938.o', 'T9938']), normal ],
      run_command,
      ['$MAKE -s --no-print-directory T9938'])
 
@@ -422,3 +429,17 @@ test('T9938B',
 
 test('T9963', exit_code(1), run_command,
      ['{compiler} --interactive --print-libdir'])
+
+test('T10219', normal, run_command,
+     # `-x hspp` in make mode should work.
+     # Note: need to specify `-x hspp` before the filename.
+     ['{compiler} --make -x hspp T10219.hspp -fno-code -v0'])
+
+test('T10220', normal, run_command,
+     # Preprocessed T10220.hspp imports T10220B. Should work in --make mode.
+     ['{compiler} --make T10220.hspp -fno-code -v0'])
+
+test('T10182',
+     extra_clean(['T10182.o', 'T10182a.o', 'T10182.o-boot', 'T10182.hi', 'T10182a.hi', 'T10182.hi-boot']),
+     run_command,
+     ['$MAKE -s --no-print-directory T10182'])

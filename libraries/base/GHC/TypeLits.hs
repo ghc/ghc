@@ -22,7 +22,7 @@ for working with type-level naturals should be defined in a separate library.
 
 module GHC.TypeLits
   ( -- * Kinds
-    Nat, Symbol
+    Nat, Symbol  -- Both declared in GHC.Types in package ghc-prim
 
     -- * Linking type and value level
   , KnownNat, natVal, natVal'
@@ -39,6 +39,7 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Bool(True,False), Ordering(..), otherwise)
+import GHC.Types( Nat, Symbol )
 import GHC.Num(Integer)
 import GHC.Base(String)
 import GHC.Show(Show(..))
@@ -48,13 +49,6 @@ import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality(type (==), (:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
-
--- | (Kind) This is the kind of type-level natural numbers.
-data Nat
-
--- | (Kind) This is the kind of type-level symbols.
-data Symbol
-
 
 --------------------------------------------------------------------------------
 

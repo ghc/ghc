@@ -35,11 +35,11 @@ dwarfGen df modLoc us blocks = do
   -- Convert debug data structures to DWARF info records
   -- We strip out block information, as it is not currently useful for
   -- anything. In future we might want to only do this for -g1.
-  let procs = map stripBlocks $ debugSplitProcs blocks
+  let procs = debugSplitProcs blocks
       stripBlocks dbg = dbg { dblBlocks = [] }
   compPath <- getCurrentDirectory
   let dwarfUnit = DwarfCompileUnit
-        { dwChildren = map (procToDwarf df) procs
+        { dwChildren = map (procToDwarf df) (map stripBlocks procs)
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
@@ -86,7 +86,7 @@ compileUnitHeader unitU = sdocWithPlatform $ \plat ->
   in vcat [ ptext (sLit "\t.long ") <> length  -- compilation unit size
           , ppr cuLabel <> colon
           , ptext (sLit "\t.word 3")           -- DWARF version
-          , pprDwWord (sectionOffset dwarfAbbrevLabel dwarfAbbrevLabel)
+          , sectionOffset dwarfAbbrevLabel dwarfAbbrevLabel
                                                -- abbrevs offset
           , ptext (sLit "\t.byte ") <> ppr (platformWordSize plat) -- word size
           ]

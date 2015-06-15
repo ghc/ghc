@@ -2096,12 +2096,14 @@ $ ghci -lm
 
       <varlistentry>
         <term>
-          <literal>:back</literal>
+          <literal>:back <optional><replaceable>n</replaceable></optional></literal>
           <indexterm><primary><literal>:back</literal></primary></indexterm>
         </term>
         <listitem>
-          <para>Travel back one step in the history.  See <xref
-              linkend="tracing" />.  See also:
+          <para>Travel back <replaceable>n</replaceable> steps in the
+            history. <replaceable>n</replaceable> is one if omitted.
+            See <xref linkend="tracing" /> for more about GHCi's debugging
+            facilities. See also:
             <literal>:trace</literal>, <literal>:history</literal>,
             <literal>:forward</literal>.</para>
         </listitem>
@@ -2474,12 +2476,14 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
         <term>
-          <literal>:forward</literal>
+          <literal>:forward <optional><replaceable>n</replaceable></optional></literal>
           <indexterm><primary><literal>:forward</literal></primary></indexterm>
         </term>
         <listitem>
-          <para>Move forward in the history.   See <xref
-              linkend="tracing" />.  See also:
+          <para>Move forward <replaceable>n</replaceable> steps in the
+            history. <replaceable>n</replaceable> is one if omitted.
+            See <xref linkend="tracing" /> for more about GHCi's debugging
+            facilities. See also:
             <literal>:trace</literal>, <literal>:history</literal>,
             <literal>:back</literal>.</para>
         </listitem>

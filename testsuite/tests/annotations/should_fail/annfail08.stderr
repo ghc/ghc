@@ -1,6 +1,6 @@
 
 annfail08.hs:9:1:
-    No instance for (Data.Data.Data (a0 -> a0))
+    No instance for (Data (a0 -> a0))
       (maybe you haven't applied a function to enough arguments?)
       arising from an annotation
     In the annotation: {-# ANN f (id + 1) #-}

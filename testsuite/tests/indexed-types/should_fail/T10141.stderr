@@ -1,0 +1,6 @@
+
+T10141.hs:6:6: error:
+    The first argument of ‘G’ should have kind ‘k’,
+      but ‘Int’ has kind ‘*’
+    In the type ‘Int’
+    In the type family declaration for ‘G’

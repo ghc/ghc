@@ -398,7 +398,7 @@ Two cases, dealt with by the LetPat case of tcPatBndr
    we want to bind a cloned, local version of the variable, with the
    type given by the pattern context, *not* by the signature (even if
    there is one; see Trac #7268). The mkExport part of the
-   generalisation step will do the checking and impedence matching
+   generalisation step will do the checking and impedance matching
    against the signature.
 
  * If for some some reason we are not generalising (plan = NoGen), the
@@ -590,7 +590,7 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
         }
 
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
-  = do  { let tc = tupleTyCon (boxityNormalTupleSort boxity) (length pats)
+  = do  { let tc = tupleTyCon boxity (length pats)
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
         ; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
@@ -691,7 +691,7 @@ are not made available in the RHS of the match. For example
         f :: T a -> Int -> a
         f ~(T1 i) y = y
 It's obviously not sound to refine a to Int in the right
-hand side, because the arugment might not match T1 at all!
+hand side, because the argument might not match T1 at all!
 
 Finally, a lazy pattern should not bind any existential type variables
 because they won't be in scope when we do the desugaring

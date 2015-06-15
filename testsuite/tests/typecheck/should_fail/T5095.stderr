@@ -60,28 +60,23 @@ T5095.hs:9:11:
         -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’
       instance Eq Integer
         -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’
-      instance Eq Data.Monoid.All -- Defined in ‘Data.Monoid’
+      instance Eq All -- Defined in ‘Data.Monoid’
       instance forall (k :: BOX) (f :: k -> *) (a :: k).
                Eq (f a) =>
-               Eq (Data.Monoid.Alt f a)
+               Eq (Alt f a)
         -- Defined in ‘Data.Monoid’
-      instance Eq Data.Monoid.Any -- Defined in ‘Data.Monoid’
-      instance Eq a => Eq (Data.Monoid.Dual a)
-        -- Defined in ‘Data.Monoid’
-      instance Eq a => Eq (Data.Monoid.First a)
-        -- Defined in ‘Data.Monoid’
-      instance Eq a => Eq (Data.Monoid.Last a)
-        -- Defined in ‘Data.Monoid’
-      instance Eq a => Eq (Data.Monoid.Product a)
-        -- Defined in ‘Data.Monoid’
-      instance Eq a => Eq (Data.Monoid.Sum a) -- Defined in ‘Data.Monoid’
-      instance forall (k :: BOX) (s :: k). Eq (Data.Proxy.Proxy s)
+      instance Eq Any -- Defined in ‘Data.Monoid’
+      instance Eq a => Eq (Dual a) -- Defined in ‘Data.Monoid’
+      instance Eq a => Eq (First a) -- Defined in ‘Data.Monoid’
+      instance Eq a => Eq (Last a) -- Defined in ‘Data.Monoid’
+      instance Eq a => Eq (Product a) -- Defined in ‘Data.Monoid’
+      instance Eq a => Eq (Sum a) -- Defined in ‘Data.Monoid’
+      instance forall (k :: BOX) (s :: k). Eq (Proxy s)
         -- Defined in ‘Data.Proxy’
       instance (Eq a, Eq b) => Eq (Either a b)
         -- Defined in ‘Data.Either’
-      instance (GHC.Arr.Ix i, Eq e) => Eq (GHC.Arr.Array i e)
-        -- Defined in ‘GHC.Arr’
-      instance Eq (GHC.Arr.STArray s i e) -- Defined in ‘GHC.Arr’
+      instance (Ix i, Eq e) => Eq (Array i e) -- Defined in ‘GHC.Arr’
+      instance Eq (STArray s i e) -- Defined in ‘GHC.Arr’
     (The choice depends on the instantiation of ‘a’
      To pick the first instance above, use IncoherentInstances
      when compiling the other instance declarations)

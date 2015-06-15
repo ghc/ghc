@@ -2,7 +2,7 @@
 
 module TcSimplify(
        simplifyInfer,
-       quantifyPred, growThetaTyVars,
+       pickQuantifiablePreds, growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
        simplifyTop, simplifyInteractive,
@@ -14,39 +14,42 @@ module TcSimplify(
 
 #include "HsVersions.h"
 
-import TcRnTypes
-import TcRnMonad
-import TcErrors
-import TcMType as TcM
-import TcType
-import TcSMonad as TcS
-import TcInteract
-import Kind     ( isKind, isSubKind, defaultKind_maybe )
-import Inst
-import Unify    ( tcMatchTy )
-import Type     ( classifyPredType, isIPClass, PredTree(..)
-                , getClassPredTys_maybe, EqRel(..) )
-import TyCon    ( isTypeFamilyTyCon )
-import Class    ( Class )
-import Id       ( idType )
-import Var
-import Unique
-import VarSet
-import TcEvidence
-import Name
 import Bag
+import Class         ( classKey )
+import Class         ( Class )
+import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes
+                                    , Opt_FlexibleContexts )
+                     , DynFlags( solverIterations ) )
+import Inst
+import Id            ( idType )
+import Kind          ( isKind, isSubKind, defaultKind_maybe )
 import ListSetOps
-import Util
+import Maybes        ( isNothing )
+import Name
+import Outputable
 import PrelInfo
 import PrelNames
-import Control.Monad    ( unless )
-import DynFlags         ( ExtensionFlag( Opt_AllowAmbiguousTypes ) )
-import Class            ( classKey )
-import Maybes           ( isNothing )
-import Outputable
+import TcErrors
+import TcEvidence
+import TcInteract
+import TcMType   as TcM
+import TcRnMonad as TcRn
+import TcSMonad  as TcS
+import TcType
+import TrieMap       () -- DV: for now
+import TyCon         ( isTypeFamilyTyCon )
+import Type          ( classifyPredType, isIPClass, PredTree(..)
+                     , getClassPredTys_maybe, EqRel(..) )
+import Unify         ( tcMatchTy )
+import Util
+import Var
+import VarSet
+import BasicTypes    ( IntWithInf, intGtLimit )
+import ErrUtils      ( emptyMessages )
 import FastString
-import TrieMap () -- DV: for now
-import Data.List( partition )
+
+import Control.Monad ( unless )
+import Data.List     ( partition )
 
 {-
 *********************************************************************************
@@ -63,23 +66,47 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds
   = do { traceTc "simplifyTop {" $ text "wanted = " <+> ppr wanteds
-       ; ev_binds_var <- TcM.newTcEvBinds
-       ; zonked_final_wc <- solveWantedsTcMWithEvBinds ev_binds_var wanteds simpl_top
-       ; binds1 <- TcRnMonad.getTcEvBinds ev_binds_var
+       ; ((final_wc, unsafe_ol), binds1) <- runTcS $ simpl_top wanteds
        ; traceTc "End simplifyTop }" empty
 
        ; traceTc "reportUnsolved {" empty
-       ; binds2 <- reportUnsolved zonked_final_wc
+       ; binds2 <- reportUnsolved final_wc
        ; traceTc "reportUnsolved }" empty
+
+       ; traceTc "reportUnsolved (unsafe overlapping) {" empty
+       ; unless (isEmptyCts unsafe_ol) $ do {
+           -- grab current error messages and clear, warnAllUnsolved will
+           -- update error messages which we'll grab and then restore saved
+           -- messges.
+           ; errs_var  <- getErrsVar
+           ; saved_msg <- TcRn.readTcRef errs_var
+           ; TcRn.writeTcRef errs_var emptyMessages
+
+           ; warnAllUnsolved $ WC { wc_simple = unsafe_ol
+                                  , wc_insol = emptyCts
+                                  , wc_impl = emptyBag }
+
+           ; whyUnsafe <- fst <$> TcRn.readTcRef errs_var
+           ; TcRn.writeTcRef errs_var saved_msg
+           ; recordUnsafeInfer whyUnsafe
+           }
+       ; traceTc "reportUnsolved (unsafe overlapping) }" empty
 
        ; return (binds1 `unionBags` binds2) }
 
-simpl_top :: WantedConstraints -> TcS WantedConstraints
+type SafeOverlapFailures = Cts
+-- ^ See Note [Safe Haskell Overlapping Instances Implementation]
+
+type FinalConstraints = (WantedConstraints, SafeOverlapFailures)
+
+simpl_top :: WantedConstraints -> TcS FinalConstraints
     -- See Note [Top-level Defaulting Plan]
 simpl_top wanteds
   = do { wc_first_go <- nestTcS (solveWantedsAndDrop wanteds)
                             -- This is where the main work happens
-       ; try_tyvar_defaulting wc_first_go }
+       ; wc_final <- try_tyvar_defaulting wc_first_go
+       ; unsafe_ol <- getSafeOverlapFailures
+       ; return (wc_final, unsafe_ol) }
   where
     try_tyvar_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_tyvar_defaulting wc
@@ -188,14 +215,114 @@ defaulting. Again this is done at the top-level and the plan is:
      - Apply defaulting to their kinds
 
 More details in Note [DefaultTyVar].
+
+Note [Safe Haskell Overlapping Instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Safe Haskell, we apply an extra restriction to overlapping instances. The
+motive is to prevent untrusted code provided by a third-party, changing the
+behavior of trusted code through type-classes. This is due to the global and
+implicit nature of type-classes that can hide the source of the dictionary.
+
+Another way to state this is: if a module M compiles without importing another
+module N, changing M to import N shouldn't change the behavior of M.
+
+Overlapping instances with type-classes can violate this principle. However,
+overlapping instances aren't always unsafe. They are just unsafe when the most
+selected dictionary comes from untrusted code (code compiled with -XSafe) and
+overlaps instances provided by other modules.
+
+In particular, in Safe Haskell at a call site with overlapping instances, we
+apply the following rule to determine if it is a 'unsafe' overlap:
+
+ 1) Most specific instance, I1, defined in an `-XSafe` compiled module.
+ 2) I1 is an orphan instance or a MPTC.
+ 3) At least one overlapped instance, Ix, is both:
+    A) from a different module than I1
+    B) Ix is not marked `OVERLAPPABLE`
+
+This is a slightly involved heuristic, but captures the situation of an
+imported module N changing the behavior of existing code. For example, if
+condition (2) isn't violated, then the module author M must depend either on a
+type-class or type defined in N.
+
+Secondly, when should these heuristics be enforced? We enforced them when the
+type-class method call site is in a module marked `-XSafe` or `-XTrustworthy`.
+This allows `-XUnsafe` modules to operate without restriction, and for Safe
+Haskell inferrence to infer modules with unsafe overlaps as unsafe.
+
+One alternative design would be to also consider if an instance was imported as
+a `safe` import or not and only apply the restriction to instances imported
+safely. However, since instances are global and can be imported through more
+than one path, this alternative doesn't work.
+
+Note [Safe Haskell Overlapping Instances Implementation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+How is this implemented? It's compilcated! So we'll step through it all:
+
+ 1) `InstEnv.lookupInstEnv` -- Performs instance resolution, so this is where
+ we check if a particular type-class method call is safe or unsafe. We do this
+ through the return type, `ClsInstLookupResult`, where the last parameter is a
+ list of instances that are unsafe to overlap. When the method call is safe,
+ the list is null.
+
+ 2) `TcInteract.matchClassInst` -- This module drives the instance resolution /
+ dictionary generation. The return type is `LookupInstResult`, which either
+ says no instance matched, or one found and if it was a safe or unsafe overlap.
+
+ 3) `TcInteract.doTopReactDict` -- Takes a dictionary / class constraint and
+ tries to resolve it by calling (in part) `matchClassInst`. The resolving
+ mechanism has a work list (of constraints) that it process one at a time. If
+ the constraint can't be resolved, it's added to an inert set. When compiling
+ an `-XSafe` or `-XTrustworthy` module we follow this approach as we know
+ compilation should fail. These are handled as normal constraint resolution
+ failures from here-on (see step 6).
+
+ Otherwise, we may be inferring safety (or using `-fwarn-unsafe`) and
+ compilation should succeed, but print warnings and/or mark the compiled module
+ as `-XUnsafe`. In this case, we call `insertSafeOverlapFailureTcS` which adds
+ the unsafe (but resolved!) constraint to the `inert_safehask` field of
+ `InertCans`.
+
+ 4) `TcSimplify.simpl_top` -- Top-level function for driving the simplifier for
+ constraint resolution. Once finished, we call `getSafeOverlapFailures` to
+ retrieve the list of overlapping instances that were successfully resolved,
+ but unsafe. Remember, this is only applicable for generating warnings
+ (`-fwarn-unsafe`) or inferring a module unsafe. `-XSafe` and `-XTrustworthy`
+ cause compilation failure by not resolving the unsafe constraint at all.
+ `simpl_top` returns a list of unresolved constraints (all types), and resolved
+ (but unsafe) resolved dictionary constraints.
+
+ 5) `TcSimplify.simplifyTop` -- Is the caller of `simpl_top`. For unresolved
+ constraints, it calls `TcErrors.reportUnsolved`, while for unsafe overlapping
+ instance constraints, it calls `TcErrors.warnAllUnsolved`. Both functions
+ convert constraints into a warning message for the user.
+
+ 6) `TcErrors.*Unsolved` -- Generates error messages for conastraints by
+ actually calling `InstEnv.lookupInstEnv` again! Yes, confusing, but all we
+ know is the constraint that is unresolved or unsafe. For dictionary, this is
+ know we need a dictionary of type C, but not what instances are available and
+ how they overlap. So we once again call `lookupInstEnv` to figure that out so
+ we can generate a helpful error message.
+
+ 7) `TcSimplify.simplifyTop` -- In the case of `warnAllUnsolved` for resolved,
+ but unsafe dictionary constraints, we collect the generated warning message
+ (pop it) and call `TcRnMonad.recordUnsafeInfer` to mark the module we are
+ compiling as unsafe, passing the warning message along as the reason.
+
+ 8) `TcRnMonad.recordUnsafeInfer` -- Save the unsafe result and reason in an
+ IORef called `tcg_safeInfer`.
+
+ 9) `HscMain.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
+ `HscMain.markUnsafeInfer` (passing the reason along) when safe-inferrence
+ failed.
 -}
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
   = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; ev_binds_var <- TcM.newTcEvBinds
-       ; zonked_final_wc <- solveWantedsTcMWithEvBinds ev_binds_var wanteds simpl_top
+       ; ((final_wc, _), _binds) <- runTcS $ simpl_top wanteds
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
        -- Normally report all errors; but with -XAllowAmbiguousTypes
@@ -203,8 +330,8 @@ simplifyAmbiguityCheck ty wanteds
        -- inaccessible code
        ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
        ; traceTc "reportUnsolved(ambig) {" empty
-       ; unless (allow_ambiguous && not (insolubleWC zonked_final_wc))
-                (discardResult (reportUnsolved zonked_final_wc))
+       ; unless (allow_ambiguous && not (insolubleWC final_wc))
+                (discardResult (reportUnsolved final_wc))
        ; traceTc "reportUnsolved(ambig) }" empty
 
        ; return () }
@@ -221,14 +348,11 @@ simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
 simplifyDefault theta
   = do { traceTc "simplifyInteractive" empty
        ; wanted <- newWanteds DefaultOrigin theta
-       ; (unsolved, _binds) <- solveWantedsTcM (mkSimpleWC wanted)
+       ; unsolved <- solveWantedsTcM wanted
 
        ; traceTc "reportUnsolved {" empty
        -- See Note [Deferring coercion errors to runtime]
        ; reportAllUnsolved unsolved
-         -- Postcondition of solveWantedsTcM is that returned
-         -- constraints are zonked. So Precondition of reportUnsolved
-         -- is true.
        ; traceTc "reportUnsolved }" empty
 
        ; return () }
@@ -304,14 +428,14 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
        ; ev_binds_var <- TcM.newTcEvBinds
        ; wanted_transformed_incl_derivs <- setTcLevel rhs_tclvl $
                                            runTcSWithEvBinds ev_binds_var (solveWanteds wanteds)
-       ; wanted_transformed_incl_derivs <- zonkWC wanted_transformed_incl_derivs
+       ; wanted_transformed_incl_derivs <- TcM.zonkWC wanted_transformed_incl_derivs
 
               -- Step 4) Candidates for quantification are an approximation of wanted_transformed
               -- NB: Already the fixpoint of any unifications that may have happened
               -- NB: We do not do any defaulting when inferring a type, this can lead
               -- to less polymorphic types, see Note [Default while Inferring]
 
-       ; tc_lcl_env <- TcRnMonad.getLclEnv
+       ; tc_lcl_env <- TcRn.getLclEnv
        ; null_ev_binds_var <- TcM.newTcEvBinds
        ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
        ; quant_pred_candidates   -- Fully zonked
@@ -347,11 +471,11 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
          -- Decide what type variables and constraints to quantify
        ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
        ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
-       ; (qtvs, bound_theta, mr_bites) 
+       ; (qtvs, bound_theta, mr_bites)
              <- decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
 
-         -- Emit an implication constraint for the 
-         -- remaining constaints from the RHS
+         -- Emit an implication constraint for the
+         -- remaining constraints from the RHS
        ; bound_ev_vars <- mapM TcM.newEvVar bound_theta
        ; let skol_info = InferSkol [ (name, mkSigmaTy [] bound_theta ty)
                                    | (name, ty) <- name_taus ]
@@ -373,7 +497,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
          -- Promote any type variables that are free in the inferred type
          -- of the function:
          --    f :: forall qtvs. bound_theta => zonked_tau
-         -- These variables now become free in the envt, and hence will show 
+         -- These variables now become free in the envt, and hence will show
          -- up whenever 'f' is called.  They may currently at rhs_tclvl, but
          -- they had better be unifiable at the outer_tclvl!
          -- Example:   envt mentions alpha[1]
@@ -382,7 +506,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
          -- we don't quantify over beta (since it is fixed by envt)
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta
-       ; outer_tclvl    <- TcRnMonad.getTcLevel
+       ; outer_tclvl    <- TcRn.getTcLevel
        ; zonked_tau_tvs <- TcM.zonkTyVarsAndFV zonked_tau_tvs
               -- decideQuantification turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
@@ -430,14 +554,15 @@ If the monomorphism restriction does not apply, then we quantify as follows:
     (This actually unifies each quantifies meta-tyvar with a fresh skolem.)
     Result is qtvs.
 
-  * Filter the constraints using quantifyPred and the qtvs.  We have to
-    zonk the constraints first, so they "see" the freshly created skolems.
+  * Filter the constraints using pickQuantifyablePreds and the qtvs.
+    We have to zonk the constraints first, so they "see" the freshly
+    created skolems.
 
 If the MR does apply, mono_tvs includes all the constrained tyvars,
 and the quantified constraints are empty.
 -}
 
-decideQuantification 
+decideQuantification
     :: Bool                       -- Apply monomorphism restriction
     -> [PredType] -> TcTyVarSet   -- Constraints and type variables from RHS
     -> TcM ( [TcTyVar]       -- Quantify over these tyvars (skolems)
@@ -463,31 +588,42 @@ decideQuantification apply_mr constraints zonked_tau_tvs
               -- quantifyTyVars turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
 
-       ; let theta     = filter (quantifyPred (mkVarSet qtvs)) constraints
-             min_theta = mkMinimalBySCs theta  -- See Note [Minimize by Superclasses]
+       ; theta <- pickQuantifiablePreds (mkVarSet qtvs) constraints
+       ; let min_theta = mkMinimalBySCs theta  -- See Note [Minimize by Superclasses]
+
        ; traceTc "decideQuantification 2" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
                                                 , ppr tau_tvs_plus, ppr qtvs, ppr min_theta])
        ; return (qtvs, min_theta, False) }
 
 ------------------
-quantifyPred :: TyVarSet           -- Quantifying over these
-             -> PredType -> Bool   -- True <=> quantify over this wanted
+pickQuantifiablePreds :: TyVarSet         -- Quantifying over these
+                      -> TcThetaType      -- Proposed constraints to quantify
+                      -> TcM TcThetaType  -- A subset that we can actually quantify
 -- This function decides whether a particular constraint shoudl be
 -- quantified over, given the type variables that are being quantified
-quantifyPred qtvs pred
-  = case classifyPredType pred of
-      ClassPred cls tys
-         | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
-         | otherwise        -> tyVarsOfTypes tys `intersectsVarSet` qtvs
-
-      EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
-        -- representational equality is like a class constraint
-      EqPred ReprEq ty1 ty2 -> tyVarsOfTypes [ty1, ty2] `intersectsVarSet` qtvs
-
-      IrredPred ty          -> tyVarsOfType ty `intersectsVarSet` qtvs
-      TuplePred {}          -> False
+pickQuantifiablePreds qtvs theta
+  = do { flex_ctxt <- xoptM Opt_FlexibleContexts
+       ; return (filter (pick_me flex_ctxt) theta) }
   where
-    -- See Note [Quantifying over equality constraints]
+    pick_me flex_ctxt pred
+      = case classifyPredType pred of
+          ClassPred cls tys
+             | isIPClass cls -> True -- See note [Inheriting implicit parameters]
+             | otherwise     -> pick_cls_pred flex_ctxt tys
+
+          EqPred ReprEq ty1 ty2 -> pick_cls_pred flex_ctxt [ty1, ty2]
+                -- Representational equality is like a class constraint
+
+          EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
+          IrredPred ty          -> tyVarsOfType ty `intersectsVarSet` qtvs
+
+    pick_cls_pred flex_ctxt tys
+      = tyVarsOfTypes tys `intersectsVarSet` qtvs
+        && (checkValidClsArgs flex_ctxt tys)
+           -- Only quantify over predicates that checkValidType
+           -- will pass!  See Trac #10351.
+
+        -- See Note [Quantifying over equality constraints]
     quant_fun ty
       = case tcSplitTyConApp_maybe ty of
           Just (tc, tys) | isTypeFamilyTyCon tc
@@ -564,7 +700,7 @@ dynamic binding means) so we'd better infer the second.
 BOTTOM LINE: when *inferring types* you must quantify over implicit
 parameters, *even if* they don't mention the bound type variables.
 Reason: because implicit parameters, uniquely, have local instance
-declarations. See the predicate quantifyPred.
+declarations. See the pickQuantifiablePreds.
 
 Note [Quantification with errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -693,118 +829,90 @@ It does this by keeping track of which errors correspond to which coercion
 in TcErrors (with ErrEnv). TcErrors.reportTidyWanteds does not print the errors
 and does not fail if -fdefer-type-errors is on, so that we can continue
 compilation. The errors are turned into warnings in `reportUnsolved`.
-
-Note [Zonk after solving]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-We zonk the result immediately after constraint solving, for two reasons:
-
-a) because zonkWC generates evidence, and this is the moment when we
-   have a suitable evidence variable to hand.
-
-Note that *after* solving the constraints are typically small, so the
-overhead is not great.
 -}
 
-solveWantedsTcMWithEvBinds :: EvBindsVar
-                           -> WantedConstraints
-                           -> (WantedConstraints -> TcS WantedConstraints)
-                           -> TcM WantedConstraints
--- Returns a *zonked* result
--- We zonk when we finish primarily to un-flatten out any
--- flatten-skolems etc introduced by canonicalisation of
--- types involving type funuctions.  Happily the result
--- is typically much smaller than the input, indeed it is
--- often empty.
-solveWantedsTcMWithEvBinds ev_binds_var wc tcs_action
-  = do { traceTc "solveWantedsTcMWithEvBinds" $ text "wanted=" <+> ppr wc
-       ; wc2 <- runTcSWithEvBinds ev_binds_var (tcs_action wc)
-       ; zonkWC wc2 }
-         -- See Note [Zonk after solving]
-
-solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
--- Zonk the input constraints, and simplify them
--- Return the evidence binds in the BagEvBinds result
+solveWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
+-- Simplify the input constraints
+-- Discard the evidence binds
 -- Discards all Derived stuff in result
--- Postcondition: fully zonked and unflattened constraints
+-- Result is /not/ guaranteed zonked
 solveWantedsTcM wanted
-  = do { (wanted1, binds) <- runTcS (solveWantedsAndDrop wanted)
-       ; wanted2 <- zonkWC wanted1
-       ; return (wanted2, binds) }
+  = do { (wanted1, _binds) <- runTcS (solveWantedsAndDrop (mkSimpleWC wanted))
+       ; return wanted1 }
 
-solveWantedsAndDrop :: WantedConstraints -> TcS (WantedConstraints)
+solveWantedsAndDrop :: WantedConstraints -> TcS WantedConstraints
 -- Since solveWanteds returns the residual WantedConstraints,
 -- it should always be called within a runTcS or something similar,
-solveWantedsAndDrop wanted = do { wc <- solveWanteds wanted
-                                ; return (dropDerivedWC wc) }
+-- Result is not zonked
+solveWantedsAndDrop wanted
+  = do { wc <- solveWanteds wanted
+       ; return (dropDerivedWC wc) }
 
 solveWanteds :: WantedConstraints -> TcS WantedConstraints
 -- so that the inert set doesn't mindlessly propagate.
 -- NB: wc_simples may be wanted /or/ derived now
-solveWanteds wanteds
-  = do { traceTcS "solveWanteds {" (ppr wanteds)
+solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+  = do { traceTcS "solveWanteds {" (ppr wc)
 
          -- Try the simple bit, including insolubles. Solving insolubles a
          -- second time round is a bit of a waste; but the code is simple
          -- and the program is wrong anyway, and we don't run the danger
          -- of adding Derived insolubles twice; see
          -- TcSMonad Note [Do not add duplicate derived insolubles]
-       ; traceTcS "solveSimples {" empty
-       ; solved_simples_wanteds <- solveSimples wanteds
-       ; traceTcS "solveSimples end }" (ppr solved_simples_wanteds)
+       ; wc1 <- solveSimpleWanteds simples
+       ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
-       -- solveWanteds iterates when it is able to float equalities
-       -- equalities out of one or more of the implications.
-       ; final_wanteds <- simpl_loop 1 solved_simples_wanteds
+       ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
+
+       ; dflags <- getDynFlags
+       ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
+                                (WC { wc_simple = simples1, wc_impl = implics2
+                                    , wc_insol  = insols `unionBags` insols1 })
 
        ; bb <- getTcEvBindsMap
        ; traceTcS "solveWanteds }" $
-                 vcat [ text "final wc =" <+> ppr final_wanteds
+                 vcat [ text "final wc =" <+> ppr final_wc
                       , text "current evbinds  =" <+> ppr (evBindMapBinds bb) ]
 
-       ; return final_wanteds }
+       ; return final_wc }
 
-solveSimples :: WantedConstraints -> TcS WantedConstraints
--- Solve the wc_simple component of the WantedConstraints
--- No point in looking at wc_insol because they are, well, insoluble
--- Do not affect the inerts
-solveSimples (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
-  = nestTcS $
-    do { wc <- solveSimpleWanteds simples
-       ; return ( wc { wc_impl  = implics `unionBags` wc_impl  wc
-                     , wc_insol = insols  `unionBags` wc_insol wc } ) }
-
-simpl_loop :: Int
+simpl_loop :: Int -> IntWithInf -> Cts
            -> WantedConstraints
            -> TcS WantedConstraints
-simpl_loop n wanteds@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
-  | n > 10
-  = do { traceTcS "solveWanteds: loop!" empty
-       ; return wanteds }
+simpl_loop n limit floated_eqs
+           wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+  | n `intGtLimit` limit
+  = failTcS (hang (ptext (sLit "solveWanteds: too many iterations")
+                   <+> parens (ptext (sLit "limit =") <+> ppr limit))
+                2 (vcat [ ptext (sLit "Set limit with -fsolver-iterations=n; n=0 for no limit")
+                        , ppr wc ] ))
+
+  | no_floated_eqs
+  = return wc  -- Done!
 
   | otherwise
   = do { traceTcS "simpl_loop, iteration" (int n)
-       ; (floated_eqs, unsolved_implics) <- solveNestedImplications implics
 
-       ; if isEmptyBag floated_eqs
-         then return (wanteds { wc_impl = unsolved_implics })
-         else
+       -- solveSimples may make progress if either float_eqs hold
+       ; (unifs1, wc1) <- reportUnifications $
+                          solveSimpleWanteds (floated_eqs `unionBags` simples)
+                               -- Put floated_eqs first so they get solved first
+                               -- NB: the floated_eqs may include /derived/ equalities
+                               --     arising from fundeps inside an implication
 
-    do {   -- Put floated_eqs into the current inert set before looping
-         (unifs_happened, solve_simple_res)
-             <- reportUnifications $
-                solveSimples (WC { wc_simple = floated_eqs `unionBags` simples
-                                 -- Put floated_eqs first so they get solved first
-                                 , wc_insol = emptyBag, wc_impl = emptyBag })
+       ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
-       ; let new_wanteds = solve_simple_res `andWC`
-                           WC { wc_simple = emptyBag
-                              , wc_insol  = insols
-                              , wc_impl   = unsolved_implics }
+       -- solveImplications may make progress only if unifs2 holds
+       ; (floated_eqs2, implics2) <- if unifs1 == 0 && isEmptyBag implics1
+                                     then return (emptyBag, implics)
+                                     else solveNestedImplications (implics `unionBags` implics1)
 
-       ; if   not unifs_happened   -- See Note [Cutting off simpl_loop]
-           && isEmptyBag (wc_impl solve_simple_res)
-         then return new_wanteds
-         else simpl_loop (n+1) new_wanteds } }
+       ; simpl_loop (n+1) limit floated_eqs2
+                    (WC { wc_simple = simples1, wc_impl = implics2
+                        , wc_insol  = insols `unionBags` insols1 }) }
+
+  where
+    no_floated_eqs = isEmptyBag floated_eqs
 
 solveNestedImplications :: Bag Implication
                         -> TcS (Cts, Bag Implication)
@@ -851,21 +959,23 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        ; traceTcS "solveImplication {" (ppr imp $$ text "Inerts" <+> ppr inerts)
 
          -- Solve the nested constraints
-       ; (no_given_eqs, residual_wanted)
+       ; (no_given_eqs, given_insols, residual_wanted)
              <- nestImplicTcS ev_binds tclvl $
-               do { solveSimpleGivens (mkGivenLoc tclvl info env) givens
+               do { given_insols <- solveSimpleGivens (mkGivenLoc tclvl info env) givens
+                  ; no_eqs <- getNoGivenEqs tclvl skols
 
                   ; residual_wanted <- solveWanteds wanteds
                         -- solveWanteds, *not* solveWantedsAndDrop, because
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; no_eqs <- getNoGivenEqs tclvl skols
+                  ; return (no_eqs, given_insols, residual_wanted) }
 
-                  ; return (no_eqs, residual_wanted) }
-
-       ; (floated_eqs, final_wanted)
+       ; (floated_eqs, residual_wanted)
              <- floatEqualities skols no_given_eqs residual_wanted
+
+       ; traceTcS "solveImplication 2" (ppr given_insols $$ ppr residual_wanted)
+       ; let final_wanted = residual_wanted `addInsols` given_insols
 
        ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs
                                                  , ic_wanted = final_wanted })
@@ -883,7 +993,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
 setImplicationStatus :: Implication -> TcS (Maybe Implication)
 -- Finalise the implication returned from solveImplication:
 --    * Set the ic_status field
---    * Trim the ic_wanted field
+--    * Trim the ic_wanted field to remove Derived constraints
 -- Return Nothing if we can discard the implication altogether
 setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
                                     , ic_info = info
@@ -892,12 +1002,14 @@ setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
  | some_insoluble
  = return $ Just $
    implic { ic_status = IC_Insoluble
-          , ic_wanted = wc { wc_simple = pruned_simples } }
+          , ic_wanted = wc { wc_simple = pruned_simples
+                           , wc_insol  = pruned_insols } }
 
  | some_unsolved
  = return $ Just $
    implic { ic_status = IC_Unsolved
-          , ic_wanted = wc { wc_simple = pruned_simples } }
+          , ic_wanted = wc { wc_simple = pruned_simples
+                           , wc_insol  = pruned_insols } }
 
  | otherwise  -- Everything is solved; look at the implications
               -- See Note [Tracking redundant constraints]
@@ -919,6 +1031,7 @@ setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
                                      , ics_dead = dead_givens }
             final_implic = implic { ic_status = final_status
                                   , ic_wanted = wc { wc_simple = pruned_simples
+                                                   , wc_insol  = pruned_insols
                                                    , wc_impl   = pruned_implics } }
                -- We can only prune the child implications (pruned_implics)
                -- in the IC_Solved status case, because only then we can
@@ -935,7 +1048,8 @@ setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
    some_unsolved = not (isEmptyBag simples && isEmptyBag insols)
                  || isNothing mb_implic_needs
 
-   pruned_simples = filterBag isWantedCt simples  -- Drop Derived constraints
+   pruned_simples = dropDerivedSimples simples
+   pruned_insols  = dropDerivedInsols insols
    pruned_implics = filterBag need_to_keep_implic implics
 
    mb_implic_needs :: Maybe VarSet
@@ -965,8 +1079,8 @@ warnRedundantGivens (SigSkol ctxt _)
        FunSigCtxt _ warn_redundant -> warn_redundant
        ExprSigCtxt                 -> True
        _                           -> False
-warnRedundantGivens InstSkol = True
-warnRedundantGivens _        = False
+warnRedundantGivens (InstSkol {}) = True
+warnRedundantGivens _             = False
 
 neededEvVars :: EvBindMap -> VarSet -> VarSet
 -- Find all the evidence variables that are "needed",
@@ -1150,7 +1264,7 @@ promoteTyVar tclvl tv
   | isFloatedTouchableMetaTyVar tclvl tv
   = do { cloned_tv <- TcS.cloneMetaTyVar tv
        ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
-       ; setWantedTyBind tv (mkTyVarTy rhs_tv)
+       ; unifyTyVar tv (mkTyVarTy rhs_tv)
        ; return rhs_tv }
   | otherwise
   = return tv
@@ -1171,7 +1285,7 @@ defaultTyVar the_tv
   = do { tv' <- TcS.cloneMetaTyVar the_tv
        ; let new_tv = setTyVarKind tv' default_k
        ; traceTcS "defaultTyVar" (ppr the_tv <+> ppr new_tv)
-       ; setWantedTyBind the_tv (mkTyVarTy new_tv)
+       ; unifyTyVar the_tv (mkTyVarTy new_tv)
        ; return new_tv }
              -- Why not directly derived_pred = mkTcEqPred k default_k?
              -- See Note [DefaultTyVar]
@@ -1453,22 +1567,22 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_simple = simples })
        ; return (float_eqs, wanteds { wc_simple = remaining_simples }) }
   where
     skol_set = mkVarSet skols
-    (float_eqs, remaining_simples) = partitionBag float_me simples
+    (float_eqs, remaining_simples) = partitionBag (usefulToFloat is_useful) simples
+    is_useful pred = tyVarsOfType pred `disjointVarSet` skol_set
 
-    float_me :: Ct -> Bool
-    float_me ct   -- The constraint is un-flattened and de-cannonicalised
-       | let pred = ctPred ct
-       , EqPred NomEq ty1 ty2 <- classifyPredType pred
-       , tyVarsOfType pred `disjointVarSet` skol_set
-       , useful_to_float ty1 ty2
-       = True
-       | otherwise
-       = False
+usefulToFloat :: (TcPredType -> Bool) -> Ct -> Bool
+usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canonicalised
+  = is_meta_var_eq pred && is_useful_pred pred
+  where
+    pred = ctPred ct
 
       -- Float out alpha ~ ty, or ty ~ alpha
       -- which might be unified outside
       -- See Note [Do not float kind-incompatible equalities]
-    useful_to_float ty1 ty2
+    is_meta_var_eq pred
+      | EqPred NomEq ty1 ty2 <- classifyPredType pred
+      , let k1 = typeKind ty1
+            k2 = typeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) | isMetaTyVar tv1
                         , k2 `isSubKind` k1
@@ -1477,19 +1591,10 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_simple = simples })
                         , k1 `isSubKind` k2
                         -> True
           _ -> False
-      where
-        k1 = typeKind ty1
-        k2 = typeKind ty2
+      | otherwise
+      = False
 
-{-
-Note [Do not float kind-incompatible equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
-If we float the equality outwards, we'll get *another* Derived
-insoluble equality one level out, so the same error will be reported
-twice.  So we refrain from floating such equalities
-
-Note [Float equalities from under a skolem binding]
+{- Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Which of the simple equalities can we float out?  Obviously, only
 ones that don't mention the skolem-bound variables.  But that is
@@ -1511,6 +1616,13 @@ become touchable by being floated (perhaps by more than one level).
 We had a very complicated rule previously, but this is nice and
 simple.  (To see the notes, look at this Note in a version of
 TcSimplify prior to Oct 2014).
+
+Note [Do not float kind-incompatible equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
+If we float the equality outwards, we'll get *another* Derived
+insoluble equality one level out, so the same error will be reported
+twice.  So we refrain from floating such equalities.
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1537,22 +1649,22 @@ to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
 -}
 
 applyDefaultingRules :: WantedConstraints -> TcS Bool
-  -- True <=> I did some defaulting, reflected in ty_binds
+-- True <=> I did some defaulting, by unifying a meta-tyvar
+-- Imput WantedConstraints are not necessarily zonked
 
--- Return some extra derived equalities, which express the
--- type-class default choice.
 applyDefaultingRules wanteds
   | isEmptyWC wanteds
   = return False
   | otherwise
-  = do { traceTcS "applyDefaultingRules { " $
-                  text "wanteds =" <+> ppr wanteds
+  = do { info@(default_tys, _) <- getDefaultInfo
+       ; wanteds               <- TcS.zonkWC wanteds
 
-       ; info@(default_tys, _) <- getDefaultInfo
        ; let groups = findDefaultableGroups info wanteds
 
-       ; traceTcS "findDefaultableGroups" $ vcat [ text "groups=" <+> ppr groups
-                                                 , text "info=" <+> ppr info ]
+       ; traceTcS "applyDefaultingRules {" $
+                  vcat [ text "wanteds =" <+> ppr wanteds
+                       , text "groups  =" <+> ppr groups
+                       , text "info    =" <+> ppr info ]
 
        ; something_happeneds <- mapM (disambigGroup default_tys) groups
 
@@ -1638,7 +1750,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
 
        ; if success then
              -- Success: record the type variable binding, and return
-             do { setWantedTyBind the_tv default_ty
+             do { unifyTyVar the_tv default_ty
                 ; wrapWarnTcS $ warnDefaulting wanteds default_ty
                 ; traceTcS "disambigGroup succeeded }" (ppr default_ty)
                 ; return True }

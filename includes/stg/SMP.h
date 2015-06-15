@@ -158,13 +158,11 @@ xchg(StgPtr p, StgWord w)
                           : "memory"
                           );
 #elif aarch64_HOST_ARCH
-    // Don't think we actually use tmp here, but leaving
-    // it for consistent numbering
     StgWord tmp; 
     __asm__ __volatile__ (
                           "1:    ldaxr  %0, [%3]\n"
-                          "      stlxr  %w0, %2, [%3]\n"
-                          "      cbnz   %w0, 1b\n"
+                          "      stlxr  %w1, %2, [%3]\n"
+                          "      cbnz   %w1, 1b\n"
                           "      dmb sy\n"
                           : "=&r" (result), "=&r" (tmp)
                           : "r" (w), "r" (p)
@@ -373,6 +371,13 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
+#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv7)
+    // TODO FIXME: This case probably isn't totally correct - just because we
+    // use a pre-ARMv7 toolchain (e.g. to target an old Android device), doesn't
+    // mean the binary won't run on a newer ARMv7 system - in which case it
+    // needs a proper barrier. So we should rethink this
+    //  - Reid
+    __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif aarch64_HOST_ARCH
@@ -394,6 +399,8 @@ load_load_barrier(void) {
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require load/load barriers. */
+    __asm__ __volatile__ ("" : : : "memory");
+#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");

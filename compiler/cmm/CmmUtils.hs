@@ -28,9 +28,11 @@ module CmmUtils(
         cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
         cmmIndex, cmmIndexExpr, cmmLoadIndex, cmmLoadIndexW,
         cmmNegate,
-        cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
-        cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
-        cmmUShrWord, cmmAddWord, cmmMulWord, cmmQuotWord,
+        cmmULtWord, cmmUGeWord, cmmUGtWord, cmmUShrWord,
+        cmmSLtWord,
+        cmmNeWord, cmmEqWord,
+        cmmOrWord, cmmAndWord,
+        cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord,
         cmmToWord,
 
         isTrivialCmmExpr, hasNoGlobalRegs,
@@ -239,7 +241,7 @@ cmmLabelOff :: CLabel -> Int -> CmmLit
 cmmLabelOff lbl 0        = CmmLabel lbl
 cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
 
--- | Useful for creating an index into an array, with a staticaly known offset.
+-- | Useful for creating an index into an array, with a statically known offset.
 -- The type is the element type; used for making the multiplier
 cmmIndex :: DynFlags
          -> Width       -- Width w
@@ -304,9 +306,11 @@ cmmLoadIndexW :: DynFlags -> CmmExpr -> Int -> CmmType -> CmmExpr
 cmmLoadIndexW dflags base off ty = CmmLoad (cmmOffsetW dflags base off) ty
 
 -----------------------
-cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
-  cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
-  cmmUShrWord, cmmAddWord, cmmMulWord, cmmQuotWord
+cmmULtWord, cmmUGeWord, cmmUGtWord, cmmUShrWord,
+  cmmSLtWord,
+  cmmNeWord, cmmEqWord,
+  cmmOrWord, cmmAndWord,
+  cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord
   :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 cmmOrWord dflags  e1 e2 = CmmMachOp (mo_wordOr dflags)  [e1, e2]
 cmmAndWord dflags e1 e2 = CmmMachOp (mo_wordAnd dflags) [e1, e2]
@@ -316,6 +320,7 @@ cmmULtWord dflags e1 e2 = CmmMachOp (mo_wordULt dflags) [e1, e2]
 cmmUGeWord dflags e1 e2 = CmmMachOp (mo_wordUGe dflags) [e1, e2]
 cmmUGtWord dflags e1 e2 = CmmMachOp (mo_wordUGt dflags) [e1, e2]
 --cmmShlWord dflags e1 e2 = CmmMachOp (mo_wordShl dflags) [e1, e2]
+cmmSLtWord dflags e1 e2 = CmmMachOp (mo_wordSLt dflags) [e1, e2]
 cmmUShrWord dflags e1 e2 = CmmMachOp (mo_wordUShr dflags) [e1, e2]
 cmmAddWord dflags e1 e2 = CmmMachOp (mo_wordAdd dflags) [e1, e2]
 cmmSubWord dflags e1 e2 = CmmMachOp (mo_wordSub dflags) [e1, e2]

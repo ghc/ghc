@@ -173,15 +173,17 @@ type QueryQualifyModule = Module -> Bool
 type QueryQualifyPackage = PackageKey -> Bool
 
 -- See Note [Printing original names] in HscTypes
-data QualifyName                        -- given P:M.T
-        = NameUnqual                    -- refer to it as "T"
-        | NameQual ModuleName           -- refer to it as "X.T" for the supplied X
-        | NameNotInScope1
-                -- it is not in scope at all, but M.T is not bound in the current
-                -- scope, so we can refer to it as "M.T"
-        | NameNotInScope2
-                -- it is not in scope at all, and M.T is already bound in the
-                -- current scope, so we must refer to it as "P:M.T"
+data QualifyName   -- Given P:M.T
+  = NameUnqual           -- It's in scope unqualified as "T"
+                         -- OR nothing called "T" is in scope
+
+  | NameQual ModuleName  -- It's in scope qualified as "X.T"
+
+  | NameNotInScope1      -- It's not in scope at all, but M.T is not bound
+                         -- in the current scope, so we can refer to it as "M.T"
+
+  | NameNotInScope2      -- It's not in scope at all, and M.T is already bound in
+                         -- the current scope, so we must refer to it as "P:M.T"
 
 reallyAlwaysQualifyNames :: QueryQualifyName
 reallyAlwaysQualifyNames _ _ = NameNotInScope2

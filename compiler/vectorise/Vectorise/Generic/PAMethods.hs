@@ -365,7 +365,7 @@ buildToArrPReprs vect_tc repr_co _ pdatas_tc r
     -- eg: (xss :: PDatas (Tree a b))
     varg      <- newLocalVar (fsLit "xss") arg_ty
 
-    -- Coersion to case between the (PRepr a) type and its instance.
+    -- Coercion to case between the (PRepr a) type and its instance.
     pdatas_co <- mkBuiltinCo pdatasTyCon
     let co           = mkAppCo pdatas_co
                      . mkSymCo

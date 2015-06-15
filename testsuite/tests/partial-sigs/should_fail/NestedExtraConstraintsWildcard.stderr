@@ -1,6 +1,6 @@
 
 NestedExtraConstraintsWildcard.hs:4:23:
-    Invalid partial type signature:
-    Bool -> (Eq a, _) => a
-    An extra-constraints wildcard is only allowed
-    at the top-level of the signature
+    Invalid partial type: Bool -> (Eq a, _) => a
+    An extra-constraints wild card is only allowed
+    in the top-level context
+    In the type signature for ‘foo’

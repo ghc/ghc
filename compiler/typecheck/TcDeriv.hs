@@ -523,7 +523,7 @@ renameDeriv is_boot inst_infos bagBinds
         ; let bndrs = collectHsValBinders rn_aux_lhs
         ; envs <- extendGlobalRdrEnvRn (map Avail bndrs) emptyFsEnv ;
         ; setEnvs envs $
-    do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs) False) rn_aux_lhs
+    do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs)) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
         ; return (listToBag rn_inst_infos, rn_aux,
                   dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }
@@ -874,12 +874,10 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
 
              -- Make a Qual RdrName that will do for each DataCon
              -- so we can report it as used (Trac #7969)
-             data_con_rdrs = [ mkRdrQual (is_as (is_decl imp_spec)) occ
+             data_con_rdrs = [ greUsedRdrName gre
                              | dc_name <- data_con_names
-                             , let occ  = nameOccName dc_name
-                                   gres = lookupGRE_Name rdr_env dc_name
-                             , not (null gres)
-                             , Imported (imp_spec:_) <- [gre_prov (head gres)] ]
+                             , gre : _ <- [lookupGRE_Name rdr_env dc_name]
+                             , not (isLocalGRE gre) ]
 
        ; addUsedRdrNames data_con_rdrs
        ; unless (isNothing mtheta || not hidden_data_cons)
@@ -1601,7 +1599,7 @@ mkNewTypeEqn dflags overlap_mode tvs
             substTheta (zipOpenTvSubst cls_tyvars inst_tys) (classSCTheta cls)
 
 
-        -- Next we collect Coercible constaints between
+        -- Next we collect Coercible constraints between
         -- the Class method types, instantiated with the representation and the
         -- newtype type; precisely the constraints required for the
         -- calls to coercible that we are going to generate.
@@ -1807,11 +1805,10 @@ simplifyDeriv pred tvs theta
 
        ; traceTc "simplifyDeriv" $
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
-       ; (residual_wanted, _ev_binds1)
-             <- solveWantedsTcM (mkSimpleWC wanted)
-                -- Post: residual_wanted are already zonked
+       ; residual_wanted <- solveWantedsTcM wanted
 
-       ; let (good, bad) = partitionBagWith get_good (wc_simple residual_wanted)
+       ; residual_simple <- zonkSimples (wc_simple residual_wanted)
+       ; let (good, bad) = partitionBagWith get_good residual_simple
                          -- See Note [Exotic derived instance contexts]
              get_good :: Ct -> Either PredType Ct
              get_good ct | validDerivPred skol_set p

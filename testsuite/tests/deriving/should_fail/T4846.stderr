@@ -5,10 +5,9 @@ T4846.hs:29:1:
       ‘Expr Bool’ and
       ‘Expr BOOL’ are the same
     Relevant role signatures: type role Expr nominal
-    In the expression:
-        GHC.Prim.coerce (mkExpr :: Expr Bool) :: Expr BOOL
+    In the expression: coerce (mkExpr :: Expr Bool) :: Expr BOOL
     In an equation for ‘mkExpr’:
-        mkExpr = GHC.Prim.coerce (mkExpr :: Expr Bool) :: Expr BOOL
+        mkExpr = coerce (mkExpr :: Expr Bool) :: Expr BOOL
     When typechecking the code for ‘mkExpr’
       in a derived instance for ‘B BOOL’:
       To see the code I am typechecking, use -ddump-deriv

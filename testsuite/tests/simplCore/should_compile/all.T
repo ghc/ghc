@@ -63,8 +63,7 @@ test('T4908', only_ways(['optasm']),
               compile,
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
-test('T4930', [when(compiler_lt('ghc', '7.1'), expect_fail),
-               only_ways(['optasm'])],
+test('T4930', only_ways(['optasm']),
               compile,
               ['-O -ddump-simpl -dsuppress-uniques'])
 
@@ -108,7 +107,7 @@ test('T4918',
      ['$MAKE -s --no-print-directory T4918'])
 
 test('T4945',
-     when(compiler_lt('ghc', '7.1'), expect_fail),
+     expect_broken(4945),
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 
@@ -199,7 +198,7 @@ test('T5996',
      ['$MAKE -s --no-print-directory T5996'])
 test('T8537', normal, compile, [''])
 test('T8832',
-     expect_fail,
+     expect_broken(8832),
      run_command,
      ['$MAKE -s --no-print-directory T8832 T8832_WORDSIZE_OPTS=' +
       ('-DT8832_WORDSIZE_64' if wordsize(64) else '')])

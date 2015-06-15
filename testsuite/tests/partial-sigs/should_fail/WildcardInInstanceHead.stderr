@@ -1,4 +1,4 @@
 
 WildcardInInstanceHead.hs:7:14:
-    Wildcard not allowed
-    In instance head: Foo _
+    Unexpected wild card: ‘_’
+    In the instance declaration for ‘Foo _’

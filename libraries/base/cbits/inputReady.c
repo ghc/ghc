@@ -17,7 +17,7 @@ int
 fdReady(int fd, int write, int msecs, int isSock)
 {
     if 
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+#if defined(_WIN32)
     ( isSock ) {
 #else
     ( 1 ) {
@@ -54,7 +54,7 @@ fdReady(int fd, int write, int msecs, int isSock)
 	/* 1 => Input ready, 0 => not ready, -1 => error */
 	return (ready);
     }
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+#if defined(_WIN32)
     else {
 	DWORD rc;
 	HANDLE hFile = (HANDLE)_get_osfhandle(fd);

@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "Rts.h"
-#include <malloc.h>
 #include <string.h>
 
 #define ITERATIONS 1000

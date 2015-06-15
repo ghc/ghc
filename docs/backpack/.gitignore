@@ -7,4 +7,6 @@
 *.fls
 *.log
 *.synctex.gz
+*.out
+*.toc
 backpack-impl.pdf

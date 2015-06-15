@@ -30,7 +30,7 @@ module Literal
         , inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
         , isZeroLit
         , litFitsInChar
-        , onlyWithinBounds
+        , litValue
 
         -- ** Coercions
         , word2IntLit, int2WordLit
@@ -271,6 +271,17 @@ isZeroLit (MachFloat  0) = True
 isZeroLit (MachDouble 0) = True
 isZeroLit _              = False
 
+-- | Returns the 'Integer' contained in the 'Literal', for when that makes
+-- sense, i.e. for 'Char', 'Int', 'Word' and 'LitInteger'.
+litValue  :: Literal -> Integer
+litValue (MachChar   c) = toInteger $ ord c
+litValue (MachInt    i) = i
+litValue (MachInt64  i) = i
+litValue (MachWord   i) = i
+litValue (MachWord64 i) = i
+litValue (LitInteger i _) = i
+litValue l = pprPanic "litValue" (ppr l)
+
 {-
         Coercions
         ~~~~~~~~~
@@ -359,16 +370,6 @@ litFitsInChar _           = False
 litIsLifted :: Literal -> Bool
 litIsLifted (LitInteger {}) = True
 litIsLifted _               = False
-
--- | x `onlyWithinBounds` (l,h) is true if l <= y < h ==> x = y
-onlyWithinBounds :: Literal -> (Literal, Literal) -> Bool
-onlyWithinBounds (MachChar   x) (MachChar   l, MachChar   h) = x == l && succ x == h
-onlyWithinBounds (MachInt    x) (MachInt    l, MachInt    h) = x == l && succ x == h
-onlyWithinBounds (MachWord   x) (MachWord   l, MachWord   h) = x == l && succ x == h
-onlyWithinBounds (MachInt64  x) (MachInt64  l, MachInt64  h) = x == l && succ x == h
-onlyWithinBounds (MachWord64 x) (MachWord64 l, MachWord64 h) = x == l && succ x == h
-onlyWithinBounds _ _ = False
-
 
 {-
         Types

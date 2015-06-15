@@ -48,7 +48,7 @@ Foreign function interface (FFI)
   newtype MyIO a = MIO (IO a)
 </programlisting>
      (A reason for doing so might be to prevent the programmer from
-	calling arbitrary IO procedures in some part of the program.)
+       calling arbitrary IO procedures in some part of the program.)
 </para>
 <para>The Haskell FFI already specifies that arguments and results of
 foreign imports and exports will be automatically unwrapped if they are
@@ -66,18 +66,25 @@ OK:
 
       <sect2 id="ffi-prim">
         <title>Primitive imports</title>
-	<para>
-	  GHC extends the FFI with an additional calling convention
-	  <literal>prim</literal>, e.g.:
+       <para>
+         GHC extends the FFI with an additional calling convention
+         <literal>prim</literal>, e.g.:
 <programlisting>
    foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
 </programlisting>
-	  This is used to import functions written in Cmm code that follow an
-	  internal GHC calling convention. This feature is not intended for
-	  use outside of the core libraries that come with GHC. For more
-	  details see the <ulink linkend="http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps">
+         This is used to import functions written in Cmm code that follow an
+         internal GHC calling convention.  The arguments and results must
+         be unboxed types, except that an argument may be of type
+         <literal>Any</literal> (by way of <literal>unsafeCoerce#</literal>)
+         and the result type is allowed to be an unboxed tuple or the
+         type <literal>Any</literal>.
+       </para>
+       <para>
+         This feature is not intended for
+         use outside of the core libraries that come with GHC. For more
+         details see the <ulink linkend="http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps">
           GHC developer wiki</ulink>.
-	</para>
+       </para>
       </sect2>
 
       <sect2 id="ffi-interruptible">
@@ -110,7 +117,7 @@ OK:
 
 <programlisting>
 foreign import ccall interruptible
-   "sleep" :: CUint -> IO CUint
+   "sleep" sleepBlock :: CUint -> IO CUint
 </programlisting>
 
           <literal>interruptible</literal> behaves exactly as
@@ -301,9 +308,9 @@ extern HsInt foo(HsInt a0);</programlisting>
       "Foo_stub.h"</literal> and call <literal>foo()</literal>.</para>
 
       <para>The <filename>foo_stub.c</filename> and
-	<filename>foo_stub.h</filename> files can be redirected using the
-	<option>-stubdir</option> option; see <xref linkend="options-output"
-	  />.</para>
+       <filename>foo_stub.h</filename> files can be redirected using the
+       <option>-stubdir</option> option; see <xref linkend="options-output"
+         />.</para>
 
       <para>When linking the program, remember to include
         <filename>M_stub.o</filename> in the final link command line, or
@@ -313,18 +320,18 @@ extern HsInt foo(HsInt a0);</programlisting>
         correct bits).</para>
 
       <sect3 id="using-own-main">
-	<title>Using your own <literal>main()</literal></title>
+       <title>Using your own <literal>main()</literal></title>
 
-	<para>Normally, GHC's runtime system provides a
-	<literal>main()</literal>, which arranges to invoke
-	<literal>Main.main</literal> in the Haskell program.  However,
-	you might want to link some Haskell code into a program which
-	has a main function written in another language, say C.  In
-	order to do this, you have to initialize the Haskell runtime
-	system explicitly.</para>
+       <para>Normally, GHC's runtime system provides a
+       <literal>main()</literal>, which arranges to invoke
+       <literal>Main.main</literal> in the Haskell program.  However,
+       you might want to link some Haskell code into a program which
+       has a main function written in another language, say C.  In
+       order to do this, you have to initialize the Haskell runtime
+       system explicitly.</para>
 
-	<para>Let's take the example from above, and invoke it from a
-	standalone C program.  Here's the C code:</para>
+       <para>Let's take the example from above, and invoke it from a
+       standalone C program.  Here's the C code:</para>
 
 <programlisting>
 #include &lt;stdio.h&gt;
@@ -348,43 +355,43 @@ int main(int argc, char *argv[])
   return 0;
 }</programlisting>
 
-	<para>We've surrounded the GHC-specific bits with
-	<literal>#ifdef __GLASGOW_HASKELL__</literal>; the rest of the
-	code should be portable across Haskell implementations that
-	support the FFI standard.</para>
+       <para>We've surrounded the GHC-specific bits with
+       <literal>#ifdef __GLASGOW_HASKELL__</literal>; the rest of the
+       code should be portable across Haskell implementations that
+       support the FFI standard.</para>
 
-	<para>The call to <literal>hs_init()</literal>
-	initializes GHC's runtime system.  Do NOT try to invoke any
-	Haskell functions before calling
-	<literal>hs_init()</literal>: bad things will
-	undoubtedly happen.</para>
+       <para>The call to <literal>hs_init()</literal>
+       initializes GHC's runtime system.  Do NOT try to invoke any
+       Haskell functions before calling
+       <literal>hs_init()</literal>: bad things will
+       undoubtedly happen.</para>
 
-	<para>We pass references to <literal>argc</literal> and
-	<literal>argv</literal> to <literal>hs_init()</literal>
-	so that it can separate out any arguments for the RTS
-	(i.e. those arguments between
-	<literal>+RTS...-RTS</literal>).</para>
+       <para>We pass references to <literal>argc</literal> and
+       <literal>argv</literal> to <literal>hs_init()</literal>
+       so that it can separate out any arguments for the RTS
+       (i.e. those arguments between
+       <literal>+RTS...-RTS</literal>).</para>
 
         <para>After we've finished invoking our Haskell functions, we
-	can call <literal>hs_exit()</literal>, which terminates the
-	RTS.</para>
+       can call <literal>hs_exit()</literal>, which terminates the
+       RTS.</para>
 
-	<para>There can be multiple calls to
-	<literal>hs_init()</literal>, but each one should be matched
-	by one (and only one) call to
-	<literal>hs_exit()</literal><footnote><para>The outermost
-	<literal>hs_exit()</literal> will actually de-initialise the
-	system.  NOTE that currently GHC's runtime cannot reliably
-	re-initialise after this has happened,
+       <para>There can be multiple calls to
+       <literal>hs_init()</literal>, but each one should be matched
+       by one (and only one) call to
+       <literal>hs_exit()</literal><footnote><para>The outermost
+       <literal>hs_exit()</literal> will actually de-initialise the
+       system.  NOTE that currently GHC's runtime cannot reliably
+       re-initialise after this has happened,
         see <xref linkend="infelicities-ffi" />.</para>
-	</footnote>.</para>
+       </footnote>.</para>
 
-	<para>NOTE: when linking the final program, it is normally
-	easiest to do the link using GHC, although this isn't
-	essential.  If you do use GHC, then don't forget the flag
-	<option>-no-hs-main</option><indexterm><primary><option>-no-hs-main</option></primary>
-	  </indexterm>, otherwise GHC will try to link
-	to the <literal>Main</literal> Haskell module.</para>
+       <para>NOTE: when linking the final program, it is normally
+       easiest to do the link using GHC, although this isn't
+       essential.  If you do use GHC, then don't forget the flag
+       <option>-no-hs-main</option><indexterm><primary><option>-no-hs-main</option></primary>
+         </indexterm>, otherwise GHC will try to link
+       to the <literal>Main</literal> Haskell module.</para>
 
         <para>To use <literal>+RTS</literal> flags
           with <literal>hs_init()</literal>, we have to modify the
@@ -554,71 +561,71 @@ void mylib_end(void){
       kinds of allocation perform with GHC.</para>
 
       <variablelist>
-	<varlistentry>
-	  <term><literal>alloca</literal> and friends</term>
-	  <listitem>
-	    <para>Useful for short-term allocation when the allocation
-	    is intended to scope over a given <literal>IO</literal>
-	    computation.  This kind of allocation is commonly used
-	    when marshalling data to and from FFI functions.</para>
+       <varlistentry>
+         <term><literal>alloca</literal> and friends</term>
+         <listitem>
+           <para>Useful for short-term allocation when the allocation
+           is intended to scope over a given <literal>IO</literal>
+           computation.  This kind of allocation is commonly used
+           when marshalling data to and from FFI functions.</para>
 
-	    <para>In GHC, <literal>alloca</literal> is implemented
-	    using <literal>MutableByteArray#</literal>, so allocation
-	    and deallocation are fast: much faster than C's
-	    <literal>malloc/free</literal>, but not quite as fast as
-	    stack allocation in C.  Use <literal>alloca</literal>
-	    whenever you can.</para>
-	  </listitem>
-	</varlistentry>
+           <para>In GHC, <literal>alloca</literal> is implemented
+           using <literal>MutableByteArray#</literal>, so allocation
+           and deallocation are fast: much faster than C's
+           <literal>malloc/free</literal>, but not quite as fast as
+           stack allocation in C.  Use <literal>alloca</literal>
+           whenever you can.</para>
+         </listitem>
+       </varlistentry>
 
-	<varlistentry>
-	  <term><literal>mallocForeignPtr</literal></term>
-	  <listitem>
-	    <para>Useful for longer-term allocation which requires
-	    garbage collection.  If you intend to store the pointer to
-	    the memory in a foreign data structure, then
-	    <literal>mallocForeignPtr</literal> is
-	    <emphasis>not</emphasis> a good choice, however.</para>
+       <varlistentry>
+         <term><literal>mallocForeignPtr</literal></term>
+         <listitem>
+           <para>Useful for longer-term allocation which requires
+           garbage collection.  If you intend to store the pointer to
+           the memory in a foreign data structure, then
+           <literal>mallocForeignPtr</literal> is
+           <emphasis>not</emphasis> a good choice, however.</para>
 
-	    <para>In GHC, <literal>mallocForeignPtr</literal> is also
-	    implemented using <literal>MutableByteArray#</literal>.
-	    Although the memory is pointed to by a
-	    <literal>ForeignPtr</literal>, there are no actual
-	    finalizers involved (unless you add one with
-	    <literal>addForeignPtrFinalizer</literal>), and the
-	    deallocation is done using GC, so
-	    <literal>mallocForeignPtr</literal> is normally very
-	    cheap.</para>
-	  </listitem>
-	</varlistentry>
+           <para>In GHC, <literal>mallocForeignPtr</literal> is also
+           implemented using <literal>MutableByteArray#</literal>.
+           Although the memory is pointed to by a
+           <literal>ForeignPtr</literal>, there are no actual
+           finalizers involved (unless you add one with
+           <literal>addForeignPtrFinalizer</literal>), and the
+           deallocation is done using GC, so
+           <literal>mallocForeignPtr</literal> is normally very
+           cheap.</para>
+         </listitem>
+       </varlistentry>
 
-	<varlistentry>
-	  <term><literal>malloc/free</literal></term>
-	  <listitem>
-	    <para>If all else fails, then you need to resort to
-	    <literal>Foreign.malloc</literal> and
-	    <literal>Foreign.free</literal>.  These are just wrappers
-	    around the C functions of the same name, and their
-	    efficiency will depend ultimately on the implementations
-	    of these functions in your platform's C library.  We
-	    usually find <literal>malloc</literal> and
-	    <literal>free</literal> to be significantly slower than
-	    the other forms of allocation above.</para>
-	  </listitem>
-	</varlistentry>
+       <varlistentry>
+         <term><literal>malloc/free</literal></term>
+         <listitem>
+           <para>If all else fails, then you need to resort to
+           <literal>Foreign.malloc</literal> and
+           <literal>Foreign.free</literal>.  These are just wrappers
+           around the C functions of the same name, and their
+           efficiency will depend ultimately on the implementations
+           of these functions in your platform's C library.  We
+           usually find <literal>malloc</literal> and
+           <literal>free</literal> to be significantly slower than
+           the other forms of allocation above.</para>
+         </listitem>
+       </varlistentry>
 
-	<varlistentry>
-	  <term><literal>Foreign.Marshal.Pool</literal></term>
-	  <listitem>
-	    <para>Pools are currently implemented using
-	    <literal>malloc/free</literal>, so while they might be a
-	    more convenient way to structure your memory allocation
-	    than using one of the other forms of allocation, they
-	    won't be any more efficient.  We do plan to provide an
-	    improved-performance implementation of Pools in the
-	    future, however.</para>
-	  </listitem>
-	</varlistentry>
+       <varlistentry>
+         <term><literal>Foreign.Marshal.Pool</literal></term>
+         <listitem>
+           <para>Pools are currently implemented using
+           <literal>malloc/free</literal>, so while they might be a
+           more convenient way to structure your memory allocation
+           than using one of the other forms of allocation, they
+           won't be any more efficient.  We do plan to provide an
+           improved-performance implementation of Pools in the
+           future, however.</para>
+         </listitem>
+       </varlistentry>
       </variablelist>
     </sect2>
 

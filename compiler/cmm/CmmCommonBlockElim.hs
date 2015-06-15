@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, BangPatterns #-}
 module CmmCommonBlockElim
   ( elimCommonBlocks
   )
@@ -8,7 +8,9 @@ where
 import BlockId
 import Cmm
 import CmmUtils
+import CmmSwitch (eqSwitchTargetWith)
 import CmmContFlowOpt
+-- import PprCmm ()
 import Prelude hiding (iterate, succ, unzip, zip)
 
 import Hoopl hiding (ChangeFlag)
@@ -19,9 +21,8 @@ import Data.Word
 import qualified Data.Map as M
 import Outputable
 import UniqFM
-
-my_trace :: String -> SDoc -> a -> a
-my_trace = if False then pprTrace else \_ _ a -> a
+import Unique
+import Control.Arrow (first, second)
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks
@@ -37,40 +38,72 @@ my_trace = if False then pprTrace else \_ _ a -> a
 -- is made redundant by the old block.
 -- Otherwise, it is added to the useful blocks.
 
+-- To avoid comparing every block with every other block repeatedly, we group
+-- them by
+--   * a hash of the block, ignoring labels (explained below)
+--   * the list of outgoing labels
+-- The hash is invariant under relabeling, so we only ever compare within
+-- the same group of blocks.
+--
+-- The list of outgoing labels is updated as we merge blocks (that is why they
+-- are not included in the hash, which we want to calculate only once).
+--
+-- All in all, two blocks should never be compared if they have different
+-- hashes, and at most once otherwise. Previously, we were slower, and people
+-- rightfully complained: #10397
+
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
-     env = iterate hashed_blocks mapEmpty
-     hashed_blocks = map (\b -> (hash_block b, b)) $ postorderDfs g
+     env = iterate mapEmpty blocks_with_key
+     groups = groupByInt hash_block (postorderDfs g)
+     blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 
--- Iterate over the blocks until convergence
-iterate :: [(HashCode,CmmBlock)] -> BlockEnv BlockId -> BlockEnv BlockId
-iterate blocks subst =
-  case foldl common_block (False, emptyUFM, subst) blocks of
-    (changed,  _, subst)
-       | changed   -> iterate blocks subst
-       | otherwise -> subst
+-- Invariant: The blocks in the list are pairwise distinct
+-- (so avoid comparing them again)
+type DistinctBlocks = [CmmBlock]
+type Key = [Label]
+type Subst = BlockEnv BlockId
 
-type State  = (ChangeFlag, UniqFM [CmmBlock], BlockEnv BlockId)
+-- The outer list groups by hash. We retain this grouping throughout.
+iterate :: Subst -> [[(Key, DistinctBlocks)]] -> Subst
+iterate subst blocks
+    | mapNull new_substs = subst
+    | otherwise = iterate subst' updated_blocks
+  where
+    grouped_blocks :: [[(Key, [DistinctBlocks])]]
+    grouped_blocks = map groupByLabel blocks
 
-type ChangeFlag = Bool
-type HashCode = Int
+    merged_blocks :: [[(Key, DistinctBlocks)]]
+    (new_substs, merged_blocks) = List.mapAccumL (List.mapAccumL go) mapEmpty grouped_blocks
+      where
+        go !new_subst1 (k,dbs) = (new_subst1 `mapUnion` new_subst2, (k,db))
+          where
+            (new_subst2, db) = mergeBlockList subst dbs
 
--- Try to find a block that is equal (or ``common'') to b.
-common_block :: State -> (HashCode, CmmBlock) -> State
-common_block (old_change, bmap, subst) (hash, b) =
-  case lookupUFM bmap hash of
-    Just bs -> case (List.find (eqBlockBodyWith (eqBid subst) b) bs,
-                     mapLookup bid subst) of
-                 (Just b', Nothing)                         -> addSubst b'
-                 (Just b', Just b'') | entryLabel b' /= b'' -> addSubst b'
-                                     | otherwise -> (old_change, bmap, subst)
-                 _ -> (old_change, addToUFM bmap hash (b : bs), subst)
-    Nothing -> (old_change, addToUFM bmap hash [b], subst)
-  where bid = entryLabel b
-        addSubst b' = my_trace "found new common block" (ppr bid <> char '=' <> ppr (entryLabel b')) $
-                      (True, bmap, mapInsert bid (entryLabel b') subst)
+    subst' = subst `mapUnion` new_substs
+    updated_blocks = map (map (first (map (lookupBid subst')))) merged_blocks
+
+mergeBlocks :: Subst -> DistinctBlocks -> DistinctBlocks -> (Subst, DistinctBlocks)
+mergeBlocks subst existing new = go new
+  where
+    go [] = (mapEmpty, existing)
+    go (b:bs) = case List.find (eqBlockBodyWith (eqBid subst) b) existing of
+        -- This block is a duplicate. Drop it, and add it to the substitution
+        Just b' -> first (mapInsert (entryLabel b) (entryLabel b')) $ go bs
+        -- This block is not a duplicate, keep it.
+        Nothing -> second (b:) $ go bs
+
+mergeBlockList :: Subst -> [DistinctBlocks] -> (Subst, DistinctBlocks)
+mergeBlockList _ [] = pprPanic "mergeBlockList" empty
+mergeBlockList subst (b:bs) = go mapEmpty b bs
+  where
+    go !new_subst1 b [] = (new_subst1, b)
+    go !new_subst1 b1 (b2:bs) = go new_subst b bs
+      where
+        (new_subst2, b) =  mergeBlocks subst b1 b2
+        new_subst = new_subst1 `mapUnion` new_subst2
 
 
 -- -----------------------------------------------------------------------------
@@ -79,9 +112,16 @@ common_block (old_change, bmap, subst) (hash, b) =
 -- Below here is mostly boilerplate: hashing blocks ignoring labels,
 -- and comparing blocks modulo a label mapping.
 
--- To speed up comparisons, we hash each basic block modulo labels.
+-- To speed up comparisons, we hash each basic block modulo jump labels.
 -- The hashing is a bit arbitrary (the numbers are completely arbitrary),
 -- but it should be fast and good enough.
+
+-- We want to get as many small buckets as possible, as comparing blocks is
+-- expensive. So include as much as possible in the hash. Ideally everything
+-- that is compared with (==) in eqBlockBodyWith.
+
+type HashCode = Int
+
 hash_block :: CmmBlock -> HashCode
 hash_block block =
   fromIntegral (foldBlockNodesB3 (hash_fst, hash_mid, hash_lst) block (0 :: Word32) .&. (0x7fffffff :: Word32))
@@ -104,7 +144,7 @@ hash_block block =
         hash_node _ = error "hash_node: unknown Cmm node!"
 
         hash_reg :: CmmReg -> Word32
-        hash_reg   (CmmLocal _) = 117
+        hash_reg   (CmmLocal localReg) = hash_unique localReg -- important for performance, see #10397
         hash_reg   (CmmGlobal _)    = 19
 
         hash_e :: CmmExpr -> Word32
@@ -131,6 +171,9 @@ hash_block block =
         hash_list f = foldl (\z x -> f x + z) (0::Word32)
 
         cvt = fromInteger . toInteger
+
+        hash_unique :: Uniquable a => a -> Word32
+        hash_unique = cvt . getKey . getUnique
 
 -- | Ignore these node types for equality
 dont_care :: CmmNode O x -> Bool
@@ -188,13 +231,18 @@ eqExprWith eqBid = eq
 -- IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
 eqBlockBodyWith eqBid block block'
-  = and (zipWith (eqMiddleWith eqBid) nodes nodes') &&
-    eqLastWith eqBid l l'
+  {-
+  | equal     = pprTrace "equal" (vcat [ppr block, ppr block']) True
+  | otherwise = pprTrace "not equal" (vcat [ppr block, ppr block']) False
+  -}
+  = equal
   where (_,m,l)   = blockSplit block
         nodes     = filter (not . dont_care) (blockToList m)
         (_,m',l') = blockSplit block'
         nodes'    = filter (not . dont_care) (blockToList m')
 
+        equal = and (zipWith (eqMiddleWith eqBid) nodes nodes') &&
+                eqLastWith eqBid l l'
 
 
 eqLastWith :: (BlockId -> BlockId -> Bool) -> CmmNode O C -> CmmNode O C -> Bool
@@ -203,12 +251,9 @@ eqLastWith eqBid (CmmCondBranch c1 t1 f1) (CmmCondBranch c2 t2 f2) =
   c1 == c2 && eqBid t1 t2 && eqBid f1 f2
 eqLastWith eqBid (CmmCall t1 c1 g1 a1 r1 u1) (CmmCall t2 c2 g2 a2 r2 u2) =
   t1 == t2 && eqMaybeWith eqBid c1 c2 && a1 == a2 && r1 == r2 && u1 == u2 && g1 == g2
-eqLastWith eqBid (CmmSwitch e1 bs1) (CmmSwitch e2 bs2) =
-  e1 == e2 && eqListWith (eqMaybeWith eqBid) bs1 bs2
+eqLastWith eqBid (CmmSwitch e1 ids1) (CmmSwitch e2 ids2) =
+  e1 == e2 && eqSwitchTargetWith eqBid ids1 ids2
 eqLastWith _ _ _ = False
-
-eqListWith :: (a -> b -> Bool) -> [a] -> [b] -> Bool
-eqListWith eltEq es es' = all (uncurry eltEq) (List.zip es es')
 
 eqMaybeWith :: (a -> b -> Bool) -> Maybe a -> Maybe b -> Bool
 eqMaybeWith eltEq (Just e) (Just e') = eltEq e e'
@@ -237,3 +282,18 @@ copyTicks env g
               (CmmEntry lbl scp1, code) = blockSplitHead to
           in CmmEntry lbl (combineTickScopes scp0 scp1) `blockJoinHead`
              foldr blockCons code (map CmmTick ticks)
+
+-- Group by [Label]
+groupByLabel :: [(Key, a)] -> [(Key, [a])]
+groupByLabel = go M.empty
+  where
+    go !m [] = M.elems m
+    go !m ((k,v) : entries) = go (M.alter adjust k' m) entries
+      where k' = map getUnique k
+            adjust Nothing       = Just (k,[v])
+            adjust (Just (_,vs)) = Just (k,v:vs)
+
+
+groupByInt :: (a -> Int) -> [a] -> [[a]]
+groupByInt f xs = eltsUFM $ List.foldl' go emptyUFM xs
+  where go m x = alterUFM (Just . maybe [x] (x:)) m (f x)

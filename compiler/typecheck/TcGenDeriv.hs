@@ -1137,8 +1137,8 @@ gen_Show_binds get_fixity loc tycon
          ([a_Pat, con_pat], nlHsPar (nested_compose_Expr show_thingies))
       | otherwise   =
          ([a_Pat, con_pat],
-          showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR
-                                        (nlHsLit (HsInt "" con_prec_plus_one))))
+          showParen_Expr (genOpApp a_Expr ge_RDR
+                              (nlHsLit (HsInt "" con_prec_plus_one)))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1607,7 +1607,7 @@ data FFoldType a      -- Describes how to fold over a Type in a functor like way
         , ft_var     :: a                   -- The variable itself
         , ft_co_var  :: a                   -- The variable itself, contravariantly
         , ft_fun     :: a -> a -> a         -- Function type
-        , ft_tup     :: TupleSort -> [a] -> a  -- Tuple type
+        , ft_tup     :: TyCon -> [a] -> a   -- Tuple type
         , ft_ty_app  :: Type -> a -> a      -- Type app, variable only in last argument
         , ft_bad_app :: a                   -- Type app, variable other than in last argument
         , ft_forall  :: TcTyVar -> a -> a   -- Forall type
@@ -1643,11 +1643,11 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        | not (or xcs)     = (caseTrivial, False)   -- Variable does not occur
        -- At this point we know that xrs, xcs is not empty,
        -- and at least one xr is True
-       | isTupleTyCon con = (caseTuple (tupleTyConSort con) xrs, True)
+       | isTupleTyCon con = (caseTuple con xrs, True)
        | or (init xcs)    = (caseWrongArg, True)         -- T (..var..)    ty
-       | otherwise        = case splitAppTy_maybe ty of  -- T (..no var..) ty
-                              Nothing -> (caseWrongArg, True)   -- Non-decomposable (eg type function)
-                              Just (fun_ty, _) -> (caseTyApp fun_ty (last xrs), True)
+       | Just (fun_ty, _) <- splitAppTy_maybe ty         -- T (..no var..) ty
+                          = (caseTyApp fun_ty (last xrs), True)
+       | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
          (xrs,xcs) = unzip (map (go co) args)
     go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
@@ -1714,11 +1714,11 @@ mkSimpleConMatch fold extra_pats con insides = do
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [a]
                                  -> m (LMatch RdrName (LHsExpr RdrName)))
-                  -> TupleSort -> [a] -> LHsExpr RdrName -> m (LHsExpr RdrName)
-mkSimpleTupleCase match_for_con sort insides x = do
-    let con = tupleCon sort (length insides)
-    match <- match_for_con [] con insides
-    return $ nlHsCase x [match]
+                  -> TyCon -> [a] -> LHsExpr RdrName -> m (LHsExpr RdrName)
+mkSimpleTupleCase match_for_con tc insides x
+  = do { let data_con = tyConSingleDataCon tc
+       ; match <- match_for_con [] data_con insides
+       ; return $ nlHsCase x [match] }
 
 {-
 ************************************************************************

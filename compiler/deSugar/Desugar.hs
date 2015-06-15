@@ -14,7 +14,7 @@ import DynFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
-import TcRnMonad ( finalSafeMode )
+import TcRnMonad ( finalSafeMode, fixSafeInstances )
 import MkIface
 import Id
 import Name
@@ -179,7 +179,7 @@ deSugar hsc_env
                 mg_warns        = warns,
                 mg_anns         = anns,
                 mg_tcs          = tcs,
-                mg_insts        = insts,
+                mg_insts        = fixSafeInstances safe_mode insts,
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
@@ -372,7 +372,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
               fn_name   = idName fn_id
               final_rhs = simpleOptExpr rhs''    -- De-crap it
               rule      = mkRule False {- Not auto -} is_local
-                                 (unLoc name) act fn_name final_bndrs args
+                                 (snd $ unLoc name) act fn_name final_bndrs args
                                  final_rhs
 
               inline_shadows_rule   -- Function can be inlined before rule fires
@@ -391,7 +391,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 
         ; when inline_shadows_rule $
           warnDs (vcat [ hang (ptext (sLit "Rule")
-                               <+> doubleQuotes (ftext $ unLoc name)
+                               <+> doubleQuotes (ftext $ snd $ unLoc name)
                                <+> ptext (sLit "may never fire"))
                             2 (ptext (sLit "because") <+> quotes (ppr fn_id)
                                <+> ptext (sLit "might inline first"))

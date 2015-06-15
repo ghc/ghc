@@ -2,6 +2,8 @@
 module CommentsTest (foo) where
 {-
 An opening comment
+  {- with a nested one -}
+  {-# nested PRAGMA #-}
 -}
 
 import qualified Data.List as DL

@@ -43,7 +43,6 @@ import Linker
 import Exception
 import Numeric
 import Data.Array
-import Data.Int         ( Int64 )
 import Data.IORef
 import System.CPUTime
 import System.Environment
@@ -85,7 +84,7 @@ data GHCiState = GHCiState
         -- available ghci commands
         ghci_commands  :: [Command],
         -- ":" at the GHCi prompt repeats the last command, so we
-        -- remember is here:
+        -- remember it here:
         last_command   :: Maybe Command,
         cmdqueue       :: [String],
 
@@ -265,7 +264,7 @@ printForUserPartWay doc = do
   liftIO $ Outputable.printForUserPartWay dflags stdout (pprUserLength dflags) unqual doc
 
 -- | Run a single Haskell expression
-runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.RunResult)
+runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.ExecResult)
 runStmt expr step = do
   st <- getGHCiState
   reifyGHCi $ \x ->
@@ -274,7 +273,11 @@ runStmt expr step = do
       reflectGHCi x $ do
         GHC.handleSourceError (\e -> do GHC.printException e;
                                         return Nothing) $ do
-          r <- GHC.runStmtWithLocation (progname st) (line_number st) expr step
+          let opts = GHC.execOptions
+                { GHC.execSourceFile = progname st
+                , GHC.execLineNumber = line_number st
+                , GHC.execSingleStep = step }
+          r <- GHC.execStmt expr opts
           return (Just r)
 
 runDecls :: String -> GHCi (Maybe [GHC.Name])
@@ -289,43 +292,41 @@ runDecls decls = do
           r <- GHC.runDeclsWithLocation (progname st) (line_number st) decls
           return (Just r)
 
-resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
+resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.ExecResult
 resume canLogSpan step = do
   st <- getGHCiState
   reifyGHCi $ \x ->
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.resume canLogSpan step
+        GHC.resumeExec canLogSpan step
 
 -- --------------------------------------------------------------------------
 -- timing & statistics
 
-timeIt :: InputT GHCi a -> InputT GHCi a
-timeIt action
+timeIt :: (a -> Maybe Integer) -> InputT GHCi a -> InputT GHCi a
+timeIt getAllocs action
   = do b <- lift $ isOptionSet ShowTiming
        if not b
           then action
-          else do allocs1 <- liftIO $ getAllocations
-                  time1   <- liftIO $ getCPUTime
+          else do time1   <- liftIO $ getCPUTime
                   a <- action
-                  allocs2 <- liftIO $ getAllocations
+                  let allocs = getAllocs a
                   time2   <- liftIO $ getCPUTime
                   dflags  <- getDynFlags
-                  liftIO $ printTimes dflags (fromIntegral (allocs2 - allocs1))
-                                  (time2 - time1)
+                  liftIO $ printTimes dflags allocs (time2 - time1)
                   return a
 
-foreign import ccall unsafe "getAllocations" getAllocations :: IO Int64
-        -- defined in ghc/rts/Stats.c
-
-printTimes :: DynFlags -> Integer -> Integer -> IO ()
-printTimes dflags allocs psecs
+printTimes :: DynFlags -> Maybe Integer -> Integer -> IO ()
+printTimes dflags mallocs psecs
    = do let secs = (fromIntegral psecs / (10^(12::Integer))) :: Float
             secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
-                         text (separateThousands allocs) <+> text "bytes")))
+                         case mallocs of
+                           Nothing -> empty
+                           Just allocs ->
+                             text (separateThousands allocs) <+> text "bytes")))
   where
     separateThousands n = reverse . sep . reverse . show $ n
       where sep n'

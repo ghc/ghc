@@ -119,7 +119,7 @@ pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lineLbl) =
   $$ pprString compDir
   $$ pprFlag True -- use UTF8
   $$ if haveSrc
-     then pprData4' (sectionOffset lineLbl dwarfLineLabel)
+     then sectionOffset lineLbl dwarfLineLabel
      else empty
 pprDwarfInfoOpen _ (DwarfSubprogram _ name label) = sdocWithDynFlags $ \df ->
   pprAbbrev DwAbbrSubprogram
@@ -431,11 +431,13 @@ escapeChar c
 
 -- | Generate an offset into another section. This is tricky because
 -- this is handled differently depending on platform: Mac Os expects
--- us to calculate the offset using assembler arithmetic. Meanwhile,
--- GNU tools expect us to just reference the target directly, and will
--- figure out on their own that we actually need an offset.
+-- us to calculate the offset using assembler arithmetic. Linux expects
+-- us to just reference the target directly, and will figure out on
+-- their own that we actually need an offset. Finally, Windows has
+-- a special directive to refer to relative offsets. Fun.
 sectionOffset :: LitString -> LitString -> SDoc
 sectionOffset target section = sdocWithPlatform $ \plat ->
   case platformOS plat of
-    OSDarwin -> ptext target <> char '-' <> ptext section
-    _other   -> ptext target
+    OSDarwin  -> pprDwWord (ptext target <> char '-' <> ptext section)
+    OSMinGW32 -> text "\t.secrel32 " <> ptext target
+    _other    -> pprDwWord (ptext target)

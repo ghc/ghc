@@ -18,14 +18,13 @@ module RnEnv (
         reportUnboundName,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
+        lookupSigCtxtOccRn,
 
         lookupFixityRn, lookupTyFixityRn,
         lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
-        greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
-        lookupGreRn, lookupGreRn_maybe,
-        lookupGreLocalRn_maybe,
+        lookupGreAvailRn,
         getLookupOccRn, addUsedRdrNames,
 
         newLocalBndrRn, newLocalBndrsRn,
@@ -53,6 +52,7 @@ import RdrName
 import HscTypes
 import TcEnv
 import TcRnMonad
+import RdrHsSyn         ( setRdrNameSpace )
 import Name
 import NameSet
 import NameEnv
@@ -162,13 +162,8 @@ newTopSrcBinder (L loc rdr_name)
                   (addErrAt loc (badOrigBinding rdr_name))
          ; return name }
     else   -- See Note [Binders in Template Haskell] in Convert.hs
-      do { let occ = nameOccName name
-         ; occ `seq` return ()  -- c.f. seq in newGlobalBinder
-         ; this_mod <- getModule
-         ; updNameCache $ \ ns ->
-           let name' = mkExternalName (nameUnique name) this_mod occ loc
-               ns'   = ns { nsNames = extendNameCache (nsNames ns) this_mod occ name' }
-           in (ns', name') }
+      do { this_mod <- getModule
+         ; externaliseName this_mod name }
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do  { this_mod <- getModule
@@ -232,6 +227,7 @@ newTopSrcBinder (L loc rdr_name)
             Nothing ->
                 -- Normal case
              do { this_mod <- getModule
+                ; traceRn (text "newTopSrcBinder" <+> (ppr this_mod $$ ppr rdr_name $$ ppr loc))
                 ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc } }
 
 {-
@@ -303,11 +299,11 @@ lookupTopBndrRn_maybe rdr_name
                (do { op_ok <- xoptM Opt_TypeOperators
                    ; unless op_ok (addErr (opDeclErr rdr_name)) })
 
-        ; mb_gre <- lookupGreLocalRn_maybe rdr_name
-        ; case mb_gre of
-                Nothing  -> return Nothing
-                Just gre -> return (Just $ gre_name gre) }
-
+        ; env <- getGlobalRdrEnv
+        ; case filter isLocalGRE (lookupGRE_RdrName rdr_name env) of
+            [gre] -> return (Just (gre_name gre))
+            _     -> return Nothing  -- Ambiguous (can't happen) or unbound
+    }
 
 -----------------------------------------------
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
@@ -348,6 +344,8 @@ lookupExactOcc_either name
                           , gre <- lookupGlobalRdrEnv env occ
                           , gre_name gre == name ]
        ; case gres of
+           [gre] -> return (Right (gre_name gre))
+
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
                        ; if name `inLocalRdrEnvScope` lcl_env
@@ -364,28 +362,30 @@ lookupExactOcc_either name
                          return (Left exact_nm_err)
 #endif /* !GHCI */
                        }
-
-           [gre]   -> return (Right (gre_name gre))
-           _       -> return (Left dup_nm_err)
-           -- We can get more than one GRE here, if there are multiple
-           -- bindings for the same name. Sometimes they are caught later
-           -- by findLocalDupsRdrEnv, like in this example (Trac #8932):
-           --    $( [d| foo :: a->a; foo x = x |])
-           --    foo = True
-           -- But when the names are totally identical, we panic (Trac #7241):
-           --    $(newName "Foo" >>= \o -> return [DataD [] o [] [RecC o []] [''Show]])
-           -- So, let's emit an error here, even if it will lead to duplication in some cases.
+           gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
        }
-
   where
     exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
                       2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
                               , ptext (sLit "perhaps via newName, but did not bind it")
                               , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
-    dup_nm_err   = hang (ptext (sLit "Duplicate exact Name") <+> quotes (ppr $ nameOccName name))
-                      2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
-                              , ptext (sLit "perhaps via newName, but bound it multiple times")
-                              , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
+
+sameNameErr :: [GlobalRdrElt] -> MsgDoc
+sameNameErr [] = panic "addSameNameErr: empty list"
+sameNameErr gres@(_ : _)
+  = hang (ptext (sLit "Same exact name in multiple name-spaces:"))
+       2 (vcat (map pp_one sorted_names) $$ th_hint)
+  where
+    sorted_names = sortWith nameSrcLoc (map gre_name gres)
+    pp_one name
+      = hang (pprNameSpace (occNameSpace (getOccName name))
+              <+> quotes (ppr name) <> comma)
+           2 (ptext (sLit "declared at:") <+> ppr (nameSrcLoc name))
+
+    th_hint = vcat [ ptext (sLit "Probable cause: you bound a unique Template Haskell name (NameU),")
+                   , ptext (sLit "perhaps via newName, in different name-spaces.")
+                   , ptext (sLit "If that's it, then -ddump-splices might be useful") ]
+
 
 -----------------------------------------------
 lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
@@ -494,26 +494,7 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
     -- Note [Usage for sub-bndrs]
     used_rdr_name gre
       | isQual rdr_name = rdr_name
-      | otherwise       = greRdrName gre
-
-greRdrName :: GlobalRdrElt -> RdrName
-greRdrName gre
-  = case gre_prov gre of
-      LocalDef    -> unqual_rdr
-      Imported is -> used_rdr_name_from_is is
-
-  where
-    occ = greOccName gre
-    unqual_rdr = mkRdrUnqual occ
-
-    used_rdr_name_from_is imp_specs     -- rdr_name is unqualified
-      | not (all (is_qual . is_decl) imp_specs)
-      = unqual_rdr  -- An unqualified import is available
-      | otherwise
-      =             -- Only qualified imports available, so make up
-                    -- a suitable qualifed name from the first imp_spec
-        ASSERT( not (null imp_specs) )
-        mkRdrQual (is_as (is_decl (head imp_specs))) occ
+      | otherwise       = greUsedRdrName gre
 
 lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
 -- If Parent = NoParent, just do a normal lookup
@@ -588,7 +569,7 @@ These System names are generated by Convert.thRdrName
 But, constructors and the like need External Names, not System Names!
 So we do the following
 
- * In RnEnv.newGlobalBinder we spot Exact RdrNames that wrap a
+ * In RnEnv.newTopSrcBinder we spot Exact RdrNames that wrap a
    non-External Name, and make an External name for it. This is
    the name that goes in the GlobalRdrEnv
 
@@ -628,6 +609,25 @@ the ctxt_ns argument of Convert.thRdrName.)  When we check that is
 in scope in the GlobalRdrEnv, we need to look up the DataName namespace
 too.  (An alternative would be to make the GlobalRdrEnv also have
 a Name -> GRE mapping.)
+
+Note [Template Haskell ambiguity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The GlobalRdrEnv invariant says that if
+  occ -> [gre1, ..., gren]
+then the gres have distinct Names (INVARIANT 1 of GlobalRdrEnv).
+This is guaranteed by extendGlobalRdrEnvRn (the dups check in add_gre).
+
+So how can we get multiple gres in lookupExactOcc_maybe?  Because in
+TH we might use the same TH NameU in two different name spaces.
+eg (Trac #7241):
+   $(newName "Foo" >>= \o -> return [DataD [] o [] [RecC o []] [''Show]])
+Here we generate a type constructor and data constructor with the same
+unique, but differnt name spaces.
+
+It'd be nicer to rule this out in extendGlobalRdrEnvRn, but that would
+mean looking up the OccName in every name-space, just in case, and that
+seems a bit brutal.  So it's just done here on lookup.  But we might
+need to revisit that choice.
 
 Note [Usage for sub-bndrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -886,42 +886,49 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
 --------------------------------------------------
 
 lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
--- Just look up the RdrName in the GlobalRdrEnv
+-- Look up the RdrName in the GlobalRdrEnv
+--   Exactly one binding: records it as "used", return (Just gre)
+--   No bindings:         return Nothing
+--   Many bindings:       report "ambiguous", return an arbitrary (Just gre)
+-- (This API is a bit strange; lookupGRERn2_maybe is simpler.
+--  But it works and I don't want to fiddle too much.)
 lookupGreRn_maybe rdr_name
-  = lookupGreRn_help rdr_name (lookupGRE_RdrName rdr_name)
-
-lookupGreRn :: RdrName -> RnM GlobalRdrElt
--- If not found, add error message, and return a fake GRE
-lookupGreRn rdr_name
-  = do  { mb_gre <- lookupGreRn_maybe rdr_name
-        ; case mb_gre of {
-            Just gre -> return gre ;
-            Nothing  -> do
-        { traceRn (text "lookupGreRn" <+> ppr rdr_name)
-        ; name <- unboundName WL_Global rdr_name
-        ; return (GRE { gre_name = name, gre_par = NoParent,
-                        gre_prov = LocalDef }) }}}
-
-lookupGreLocalRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
--- Similar, but restricted to locally-defined things
-lookupGreLocalRn_maybe rdr_name
-  = lookupGreRn_help rdr_name lookup_fn
-  where
-    lookup_fn env = filter isLocalGRE (lookupGRE_RdrName rdr_name env)
-
-lookupGreRn_help :: RdrName                     -- Only used in error message
-                 -> (GlobalRdrEnv -> [GlobalRdrElt])    -- Lookup function
-                 -> RnM (Maybe GlobalRdrElt)
--- Checks for exactly one match; reports deprecations
--- Returns Nothing, without error, if too few
-lookupGreRn_help rdr_name lookup
   = do  { env <- getGlobalRdrEnv
-        ; case lookup env of
+        ; case lookupGRE_RdrName rdr_name env of
             []    -> return Nothing
             [gre] -> do { addUsedRdrName True gre rdr_name
                         ; return (Just gre) }
             gres  -> do { addNameClashErrRn rdr_name gres
+                        ; traceRn (text "name clash" <+> (ppr rdr_name $$ ppr gres $$ ppr env))
                         ; return (Just (head gres)) } }
+
+lookupGreRn2_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
+-- Look up the RdrName in the GlobalRdrEnv
+--   Exactly one binding: record it as "used",   return (Just gre)
+--   No bindings:         report "not in scope", return Nothing
+--   Many bindings:       report "ambiguous",    return Nothing
+lookupGreRn2_maybe rdr_name
+  = do  { env <- getGlobalRdrEnv
+        ; case lookupGRE_RdrName rdr_name env of
+            []    -> do { _ <- unboundName WL_Global rdr_name
+                        ; return Nothing }
+            [gre] -> do { addUsedRdrName True gre rdr_name
+                        ; return (Just gre) }
+            gres  -> do { addNameClashErrRn rdr_name gres
+                        ; traceRn (text "name clash" <+> (ppr rdr_name $$ ppr gres $$ ppr env))
+                        ; return Nothing } }
+
+lookupGreAvailRn :: RdrName -> RnM (Name, AvailInfo)
+-- Used in export lists
+-- If not found or ambiguous, add error message, and fake with UnboundName
+lookupGreAvailRn rdr_name
+  = do  { mb_gre <- lookupGreRn2_maybe rdr_name
+        ; case mb_gre of {
+            Just gre -> return (gre_name gre, availFromGRE gre) ;
+            Nothing  ->
+    do  { traceRn (text "lookupGreRn" <+> ppr rdr_name)
+        ; let name = mkUnboundName rdr_name
+        ; return (name, Avail name) } } }
 
 {-
 *********************************************************
@@ -955,13 +962,14 @@ addUsedSelector n = do { env <- getGblEnv
 
 addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
-addUsedRdrName warnIfDeprec gre rdr
-  | isLocalGRE gre = return ()  -- No call to warnIfDeprecated
-                                -- See Note [Handling of deprecations]
-  | otherwise      = do { env <- getGblEnv
-                        ; when warnIfDeprec $ warnIfDeprecated gre
-                        ; updMutVar (tcg_used_rdrnames env)
-                                    (\s -> Set.insert rdr s) }
+addUsedRdrName warn_if_deprec gre rdr
+  = do { unless (isLocalGRE gre) $
+         do { env <- getGblEnv
+            ; updMutVar (tcg_used_rdrnames env)
+                        (\s -> Set.insert rdr s) }
+
+       ; when warn_if_deprec $
+         warnIfDeprecated gre }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders
@@ -974,30 +982,35 @@ addUsedRdrNames rdrs
                    (\s -> foldr Set.insert s rdrs) }
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
-warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported (imp_spec : _) })
+warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
+  | (imp_spec : _) <- iss
   = do { dflags <- getDynFlags
-       ; when (wopt Opt_WarnWarningsDeprecations dflags) $
+       ; this_mod <- getModule
+       ; when (wopt Opt_WarnWarningsDeprecations dflags &&
+               not (nameIsLocalOrFrom this_mod name)) $
+                   -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addWarn (mk_msg txt)
+                Just txt -> addWarn (mk_msg imp_spec txt)
                 Nothing  -> return () } }
+  | otherwise
+  = return ()
   where
     occ = greOccName gre
-    mk_msg txt = sep [ sep [ ptext (sLit "In the use of")
-                             <+> pprNonVarNameSpace (occNameSpace occ)
-                             <+> quotes (ppr occ)
-                           , parens imp_msg <> colon ]
-                     , ppr txt ]
-
     name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    imp_mod  = importSpecModule imp_spec
-    imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
-    extra | imp_mod == moduleName name_mod = Outputable.empty
-          | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
+    doc = ptext (sLit "The name") <+> quotes (ppr occ) <+> ptext (sLit "is mentioned explicitly")
 
-    doc = ptext (sLit "The name") <+> quotes (ppr name) <+> ptext (sLit "is mentioned explicitly")
-
-warnIfDeprecated _ = return ()   -- No deprecations for things defined locally
+    mk_msg imp_spec txt
+      = sep [ sep [ ptext (sLit "In the use of")
+                    <+> pprNonVarNameSpace (occNameSpace occ)
+                    <+> quotes (ppr occ)
+                  , parens imp_msg <> colon ]
+            , ppr txt ]
+      where
+        imp_mod  = importSpecModule imp_spec
+        imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
+        extra | imp_mod == moduleName name_mod = Outputable.empty
+              | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
 
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
@@ -1066,10 +1079,9 @@ lookupQualifiedNameGHCi rdr_name
       , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
       = do { res <- loadSrcInterface_maybe doc mod False Nothing
            ; case res of
-                Succeeded ifaces
+                Succeeded iface
                   -> return [ name
-                            | iface <- ifaces
-                            , avail <- mi_exports iface
+                            | avail <- mi_exports iface
                             , name  <- availNames avail
                             , nameOccName name == occ ]
 
@@ -1107,7 +1119,7 @@ correctly report "misplaced type sig".
 
 Note [Signatures for top level things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
+data HsSigCtxt = ... | TopSigCtxt NameSet | ....
 
 * The NameSet says what is bound in this group of bindings.
   We can't use isLocalGRE from the GlobalRdrEnv, because of this:
@@ -1118,8 +1130,10 @@ data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
   will be in the GlobalRdrEnv, and will be a LocalDef. Yet the
   signature is mis-placed
 
-* The Bool says whether the signature is ok for a class method
-  or record selector.  Consider
+* For type signatures the NameSet should be the names bound by the
+  value bindings; for fixity declarations, the NameSet should also
+  include class sigs and record selectors
+
       infix 3 `f`          -- Yes, ok
       f :: C a => a -> a   -- No, not ok
       class C a where
@@ -1127,21 +1141,28 @@ data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
 -}
 
 data HsSigCtxt
-  = TopSigCtxt NameSet Bool  -- At top level, binding these names
+  = TopSigCtxt NameSet       -- At top level, binding these names
                              -- See Note [Signatures for top level things]
-                             -- Bool <=> ok to give sig for
-                             --          class method or record selctor
   | LocalBindCtxt NameSet    -- In a local binding, binding these names
   | ClsDeclCtxt   Name       -- Class decl for this class
   | InstDeclCtxt  Name       -- Intsance decl for this class
   | HsBootCtxt               -- Top level of a hs-boot file
+  | RoleAnnotCtxt NameSet    -- A role annotation, with the names of all types
+                             -- in the group
 
 lookupSigOccRn :: HsSigCtxt
                -> Sig RdrName
                -> Located RdrName -> RnM (Located Name)
-lookupSigOccRn ctxt sig
+lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
+
+-- | Lookup a name in relation to the names in a 'HsSigCtxt'
+lookupSigCtxtOccRn :: HsSigCtxt
+                   -> SDoc         -- ^ description of thing we're looking up,
+                                   -- like "type family"
+                   -> Located RdrName -> RnM (Located Name)
+lookupSigCtxtOccRn ctxt what
   = wrapLocM $ \ rdr_name ->
-    do { mb_name <- lookupBindGroupOcc ctxt (hsSigDoc sig) rdr_name
+    do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
            Left err   -> do { addErr err; return (mkUnboundName rdr_name) }
            Right name -> return name }
@@ -1167,11 +1188,12 @@ lookupBindGroupOcc ctxt what rdr_name
 
   | otherwise
   = case ctxt of
-      HsBootCtxt            -> lookup_top (const True)       True
-      TopSigCtxt ns meth_ok -> lookup_top (`elemNameSet` ns) meth_ok
-      LocalBindCtxt ns      -> lookup_group ns
-      ClsDeclCtxt  cls      -> lookup_cls_op cls
-      InstDeclCtxt cls      -> lookup_cls_op cls
+      HsBootCtxt       -> lookup_top (const True)
+      TopSigCtxt ns    -> lookup_top (`elemNameSet` ns)
+      RoleAnnotCtxt ns -> lookup_top (`elemNameSet` ns)
+      LocalBindCtxt ns -> lookup_group ns
+      ClsDeclCtxt  cls -> lookup_cls_op cls
+      InstDeclCtxt cls -> lookup_cls_op cls
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv
@@ -1185,18 +1207,13 @@ lookupBindGroupOcc ctxt what rdr_name
       where
         doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
-    lookup_top keep_me meth_ok
+    lookup_top keep_me
       = do { env <- getGlobalRdrEnv
            ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
            ; case filter (keep_me . gre_name) all_gres of
                [] | null all_gres -> bale_out_with Outputable.empty
-                  | otherwise -> bale_out_with local_msg
-               (gre:_)
-                  | gre_par gre /= NoParent
-                  , not meth_ok
-                  -> bale_out_with sub_msg
-                  | otherwise
-                  -> return (Right (gre_name gre)) }
+                  | otherwise     -> bale_out_with local_msg
+               (gre:_)            -> return (Right (gre_name gre)) }
 
     lookup_group bound_names  -- Look in the local envt (not top level)
       = do { local_env <- getLocalRdrEnv
@@ -1214,9 +1231,6 @@ lookupBindGroupOcc ctxt what rdr_name
 
     local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
                            <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
-
-    sub_msg = parens $ ptext (sLit "You cannot give a") <+> what
-                       <+> ptext (sLit "for a record selector or class method")
 
 
 ---------------
@@ -1705,18 +1719,17 @@ unknownNameSuggestErr where_look tried_rdr_name
                         , let name = gre_name gre
                               occ  = nameOccName name
                         , correct_name_space occ
-                        , (mod, how) <- quals_in_scope name (gre_prov gre)
+                        , (mod, how) <- quals_in_scope gre
                         , let rdr_qual = mkRdrQual mod occ ]
 
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
                     , gre_ok gre
                     , let name = gre_name gre
-                          prov = gre_prov gre
                           occ  = nameOccName name
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
-                    , pair <- case (unquals_in_scope name prov, quals_only occ prov) of
+                    , pair <- case (unquals_in_scope gre, quals_only gre) of
                                 (how:_, _)    -> [ (rdr_unqual, how) ]
                                 ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
                                 ([],    [])   -> [] ]
@@ -1732,27 +1745,29 @@ unknownNameSuggestErr where_look tried_rdr_name
               -- then we suggest @Map.Map@.
 
     --------------------
-    unquals_in_scope :: Name -> Provenance -> [HowInScope]
-    unquals_in_scope n LocalDef      = [ Left (nameSrcSpan n) ]
-    unquals_in_scope _ (Imported is) = [ Right ispec
-                                       | i <- is, let ispec = is_decl i
-                                       , not (is_qual ispec) ]
+    unquals_in_scope :: GlobalRdrElt -> [HowInScope]
+    unquals_in_scope (GRE { gre_name = n, gre_lcl = lcl, gre_imp = is })
+      | lcl       = [ Left (nameSrcSpan n) ]
+      | otherwise = [ Right ispec
+                    | i <- is, let ispec = is_decl i
+                    , not (is_qual ispec) ]
 
     --------------------
-    quals_in_scope :: Name -> Provenance -> [(ModuleName, HowInScope)]
+    quals_in_scope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
     -- Ones for which the qualified version is in scope
-    quals_in_scope n LocalDef      = case nameModule_maybe n of
-                                       Nothing -> []
-                                       Just m  -> [(moduleName m, Left (nameSrcSpan n))]
-    quals_in_scope _ (Imported is) = [ (is_as ispec, Right ispec)
-                                     | i <- is, let ispec = is_decl i ]
+    quals_in_scope (GRE { gre_name = n, gre_lcl = lcl, gre_imp = is })
+      | lcl = case nameModule_maybe n of
+                Nothing -> []
+                Just m  -> [(moduleName m, Left (nameSrcSpan n))]
+      | otherwise = [ (is_as ispec, Right ispec)
+                    | i <- is, let ispec = is_decl i ]
 
     --------------------
-    quals_only :: OccName -> Provenance -> [(RdrName, HowInScope)]
+    quals_only :: GlobalRdrElt -> [(RdrName, HowInScope)]
     -- Ones for which *only* the qualified version is in scope
-    quals_only _   LocalDef      = []
-    quals_only occ (Imported is) = [ (mkRdrQual (is_as ispec) occ, Right ispec)
-                                   | i <- is, let ispec = is_decl i, is_qual ispec ]
+    quals_only (GRE { gre_name = n, gre_imp = is })
+      = [ (mkRdrQual (is_as ispec) (nameOccName n), Right ispec)
+        | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 {-
 ************************************************************************
@@ -1824,40 +1839,49 @@ check_unused flag bound_names used_names
 -------------------------
 --      Helpers
 warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
-warnUnusedGREs gres = mapM_ warnUnusedGRE (filter reportable gres)
- where reportable gre@(GRE { gre_name = name })
-        | isWiredInName name = False    -- Don't report unused wired-in names
-                                        -- Otherwise we get a zillion warnings
-                                        -- from Data.Tuple
-        | otherwise = not (startsWithUnderscore (greOccName gre))
+warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 
 warnUnusedLocals :: [Name] -> RnM ()
-warnUnusedLocals names
- = warnUnusedGREs [GRE {gre_name = n, gre_par = NoParent, gre_prov = LocalDef} | n<-names]
+warnUnusedLocals names = mapM_ warnUnusedLocal names
 
--------------------------
-
-warnUnusedGRE :: GlobalRdrElt -> RnM ()
-warnUnusedGRE gre = case gre_prov gre of
-  LocalDef -> addUnusedWarning gre (nameSrcSpan (gre_name gre))
+warnUnusedLocal :: Name -> RnM ()
+warnUnusedLocal name
+  = when (reportable name) $
+    addUnusedWarning name (nameSrcSpan name)
                      (ptext (sLit "Defined but not used"))
-  Imported is -> mapM_ warn is
-   where
-    warn spec = addUnusedWarning gre span msg
+
+-- AMG TODO: needs adapting to cope with FldParents
+warnUnusedGRE :: GlobalRdrElt -> RnM ()
+warnUnusedGRE (GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
+  | lcl       = warnUnusedLocal name
+  | otherwise = when (reportable name) (mapM_ warn is)
+  where
+    warn spec = addUnusedWarning name span msg
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
            msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
 
-addUnusedWarning :: GlobalRdrElt -> SrcSpan -> SDoc -> RnM ()
-addUnusedWarning gre span msg
+reportable :: Name -> Bool
+reportable name
+  | isWiredInName name = False    -- Don't report unused wired-in names
+                                  -- Otherwise we get a zillion warnings
+                                  -- from Data.Tuple
+  | otherwise = not (startsWithUnderscore (nameOccName name))
+
+addUnusedWarning :: Name -> SrcSpan -> SDoc -> RnM ()
+addUnusedWarning name span msg
   = addWarnAt span $
     sep [msg <> colon,
-         nest 2 $ pprNonVarNameSpace (occNameSpace (greOccName gre))
-                        <+> quotes pp_name]
+         nest 2 $ pprNonVarNameSpace (occNameSpace (nameOccName name))
+                        <+> quotes (ppr name)]
+
+{-
+  -- AMG TODO
   where
     pp_name | isOverloadedRecFldGRE gre = ppr (greOccName gre)
             | otherwise                 = ppr (gre_name gre)
+-}
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres

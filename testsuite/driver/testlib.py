@@ -17,13 +17,7 @@ import copy
 import glob
 from math import ceil, trunc
 import collections
-
-have_subprocess = False
-try:
-    import subprocess
-    have_subprocess = True
-except:
-    print("Warning: subprocess not found, will fall back to spawnv")
+import subprocess
 
 from testglobals import *
 from testutil import *
@@ -90,6 +84,9 @@ def skip( name, opts ):
     opts.skip = 1
 
 def expect_fail( name, opts ):
+    # The compiler, testdriver, OS or platform is missing a certain
+    # feature, and we don't plan to or can't fix it now or in the
+    # future.
     opts.expect = 'fail';
 
 def reqlib( lib ):
@@ -103,24 +100,22 @@ def _reqlib( name, opts, lib ):
     if lib in have_lib:
         got_it = have_lib[lib]
     else:
-        if have_subprocess:
-            # By preference we use subprocess, as the alternative uses
-            # /dev/null which mingw doesn't have.
-            cmd = strip_quotes(config.ghc_pkg)
-            p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-            # read from stdout and stderr to avoid blocking due to
-            # buffers filling
-            p.communicate()
-            r = p.wait()
-        else:
-            r = os.system(config.ghc_pkg + ' --no-user-package-db describe '
-                                         + lib + ' > /dev/null 2> /dev/null')
+        cmd = strip_quotes(config.ghc_pkg)
+        p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        # read from stdout and stderr to avoid blocking due to
+        # buffers filling
+        p.communicate()
+        r = p.wait()
         got_it = r == 0
         have_lib[lib] = got_it
 
     if not got_it:
+        opts.expect = 'missing-lib'
+
+def req_haddock( name, opts ):
+    if not config.haddock:
         opts.expect = 'missing-lib'
 
 def req_profiling( name, opts ):
@@ -157,6 +152,8 @@ def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
 def expect_broken( bug ):
+    # This test is a expected not to work due to the indicated trac bug
+    # number.
     return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
 def _expect_broken( name, opts, bug ):
@@ -175,6 +172,11 @@ def record_broken(name, opts, bug):
     me = (bug, opts.testdir, name)
     if not me in brokens:
         brokens.append(me)
+
+def _expect_pass(way):
+    # Helper function. Not intended for use in .T files.
+    opts = getTestOpts()
+    return opts.expect == 'pass' and way not in opts.expect_fail_for
 
 # -----
 
@@ -272,6 +274,7 @@ def _extra_hc_opts( name, opts, v ):
 # -----
 
 def extra_clean( files ):
+    assert not isinstance(files, str), files
     return lambda name, opts, v=files: _extra_clean(name, opts, v);
 
 def _extra_clean( name, opts, v ):
@@ -519,6 +522,10 @@ def normalise_version( *pkgs ):
         _normalise_errmsg_fun(name, opts, normalise_version_(*pkgs))
     return normalise_version__
 
+def normalise_drive_letter(name, opts):
+    # Windows only. Change D:\\ to C:\\.
+    _normalise_fun(name, opts, lambda str: re.sub(r'[A-Z]:\\', r'C:\\', str))
+
 def join_normalisers(*a):
     """
     Compose functions, flattening sequences.
@@ -759,6 +766,11 @@ def test_common_work (name, opts, func, args):
 
 def clean(strs):
     for str in strs:
+        if (str.endswith('.package.conf') or
+            str.startswith('package.conf.') and not str.endswith('/*')):
+            # Package confs are directories now.
+            str += '/*'
+
         for name in glob.glob(in_testdir(str)):
             clean_full_path(name)
 
@@ -819,8 +831,7 @@ def do_test(name, way, func, args):
             passFail = 'No passFail found'
 
         if passFail == 'pass':
-            if getTestOpts().expect == 'pass' \
-               and way not in getTestOpts().expect_fail_for:
+            if _expect_pass(way):
                 t.n_expected_passes = t.n_expected_passes + 1
                 if name in t.expected_passes:
                     t.expected_passes[name].append(way)
@@ -831,8 +842,7 @@ def do_test(name, way, func, args):
                 t.n_unexpected_passes = t.n_unexpected_passes + 1
                 addPassingTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
         elif passFail == 'fail':
-            if getTestOpts().expect == 'pass' \
-               and way not in getTestOpts().expect_fail_for:
+            if _expect_pass(way):
                 reason = result['reason']
                 tag = result.get('tag')
                 if tag == 'stat':
@@ -1041,7 +1051,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
-    if not compare_outputs('stderr',
+    if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg,
                                             normalise_whitespace),
@@ -1071,7 +1081,8 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
     actual_asm_file = qualify(name, 's')
 
-    if not compare_outputs('asm', join_normalisers(normalise_errmsg, normalise_asm), \
+    if not compare_outputs(way, 'asm',
+                           join_normalisers(normalise_errmsg, normalise_asm),
                            expected_asm_file, actual_asm_file):
         return failBecause('asm mismatch')
 
@@ -1127,7 +1138,10 @@ def checkStats(name, way, stats_file, range_fields):
 
     result = passed()
     if len(range_fields) > 0:
-        f = open(in_testdir(stats_file))
+        try:
+            f = open(in_testdir(stats_file))
+        except IOError as e:
+            return failBecause(str(e))
         contents = f.read()
         f.close()
 
@@ -1246,8 +1260,9 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
-        if_verbose(1,'Compile failed (status ' + repr(result) + ') errors were:')
-        if_verbose_dump(1,actual_stderr)
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Compile failed (status ' + repr(result) + ') errors were:')
+            if_verbose_dump(1, actual_stderr)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
@@ -1330,17 +1345,18 @@ def simple_run( name, way, prog, args ):
 
     # check the exit code
     if exit_code != opts.exit_code:
-        print('Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')')
-        dump_stdout(name)
-        dump_stderr(name)
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')')
+            dump_stdout(name)
+            dump_stderr(name)
         return failBecause('bad exit code')
 
     check_hp = my_rts_flags.find("-h") != -1
     check_prof = my_rts_flags.find("-p") != -1
 
     if not opts.ignore_output:
-        bad_stderr = not opts.combined_output and not check_stderr_ok(name)
-        bad_stdout = not check_stdout_ok(name)
+        bad_stderr = not opts.combined_output and not check_stderr_ok(name, way)
+        bad_stdout = not check_stdout_ok(name, way)
         if bad_stderr:
             return failBecause('bad stderr')
         if bad_stdout:
@@ -1348,7 +1364,7 @@ def simple_run( name, way, prog, args ):
         # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
         if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
             return failBecause('bad heap profile')
-        if check_prof and not check_prof_ok(name):
+        if check_prof and not check_prof_ok(name, way):
             return failBecause('bad profile')
 
     return checkStats(name, way, stats_file, opts.stats_range_fields)
@@ -1455,8 +1471,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if getTestOpts().ignore_output or (check_stderr_ok(name) and
-                                       check_stdout_ok(name)):
+    if getTestOpts().ignore_output or (check_stderr_ok(name, way) and
+                                       check_stdout_ok(name, way)):
         return passed()
     else:
         return failBecause('bad stdout or stderr')
@@ -1501,7 +1517,7 @@ def get_compiler_flags(override_flags, noforce):
 
     return flags
 
-def check_stdout_ok( name ):
+def check_stdout_ok(name, way):
    if getTestOpts().with_namebase == None:
        namebase = name
    else:
@@ -1522,15 +1538,14 @@ def check_stdout_ok( name ):
    if check_stdout:
       return check_stdout(actual_stdout_file, extra_norm)
 
-   return compare_outputs('stdout', \
-                          extra_norm, \
+   return compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
    print('Stdout:')
    print(read_no_crs(qualify(name, 'run.stdout')))
 
-def check_stderr_ok( name ):
+def check_stderr_ok(name, way):
    if getTestOpts().with_namebase == None:
        namebase = name
    else:
@@ -1545,7 +1560,7 @@ def check_stderr_ok( name ):
       else:
          return normalise_errmsg(str)
 
-   return compare_outputs('stderr', \
+   return compare_outputs(way, 'stderr',
                           join_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
@@ -1595,7 +1610,7 @@ def check_hp_ok(name):
         print("hp2ps error when processing heap profile for " + name)
         return(False)
 
-def check_prof_ok(name):
+def check_prof_ok(name, way):
 
     prof_file = qualify(name,'prof')
 
@@ -1619,14 +1634,14 @@ def check_prof_ok(name):
     if not os.path.exists(expected_prof_file):
         return True
     else:
-        return compare_outputs('prof', \
+        return compare_outputs(way, 'prof',
                                join_normalisers(normalise_whitespace,normalise_prof), \
                                expected_prof_file, prof_file)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
 # otherwise.
-def compare_outputs( kind, normaliser, expected_file, actual_file ):
+def compare_outputs(way, kind, normaliser, expected_file, actual_file):
     if os.path.exists(expected_file):
         expected_raw = read_no_crs(expected_file)
         # print "norm:", normaliser(expected_raw)
@@ -1642,7 +1657,8 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
     if expected_str == actual_str:
         return 1
     else:
-        if_verbose(1, 'Actual ' + kind + ' output differs from expected:')
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Actual ' + kind + ' output differs from expected:')
 
         if expected_file_for_diff == '/dev/null':
             expected_normalised_file = '/dev/null'
@@ -1661,7 +1677,7 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
         # (including newlines) so the diff would be hard to read.
         # This does mean that the diff might contain changes that
         # would be normalised away.
-        if (config.verbose >= 1):
+        if config.verbose >= 1 and _expect_pass(way):
             r = os.system( 'diff -uw ' + expected_file_for_diff + \
                                    ' ' + actual_file )
 
@@ -1671,7 +1687,11 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
                 r = os.system( 'diff -u ' + expected_file_for_diff + \
                                       ' ' + actual_file )
 
-        if config.accept:
+        if config.accept and (getTestOpts().expect == 'fail' or
+                              way in getTestOpts().expect_fail_for):
+            if_verbose(1, 'Test is expected to fail. Not accepting new output.')
+            return 0
+        elif config.accept:
             if_verbose(1, 'Accepting new output.')
             write_file(expected_file, actual_raw)
             return 1
@@ -1685,6 +1705,11 @@ def normalise_whitespace( str ):
     return str
 
 def normalise_errmsg( str ):
+    # remove " error:" and lower-case " Warning:" to make patch for
+    # trac issue #10021 smaller
+    str = modify_lines(str, lambda l: re.sub(' error:', '', l))
+    str = modify_lines(str, lambda l: re.sub(' Warning:', ' warning:', l))
+
     # If somefile ends in ".exe" or ".exe:", zap ".exe" (for Windows)
     #    the colon is there because it appears in error messages; this
     #    hacky solution is used in place of more sophisticated filename
@@ -1740,6 +1765,10 @@ def normalise_exe_( str ):
     return str
 
 def normalise_output( str ):
+    # remove " error:" and lower-case " Warning:" to make patch for
+    # trac issue #10021 smaller
+    str = modify_lines(str, lambda l: re.sub(' error:', '', l))
+    str = modify_lines(str, lambda l: re.sub(' Warning:', ' warning:', l))
     # Remove a .exe extension (for Windows)
     # This can occur in error messages generated by the program.
     str = re.sub('([^\\s])\\.exe', '\\1', str)
@@ -1783,33 +1812,12 @@ def rawSystem(cmd_and_args):
     # with the Windows (non-cygwin) python. An argument "a b c"
     # turns into three arguments ["a", "b", "c"].
 
-    # However, subprocess is new in python 2.4, so fall back to
-    # using spawnv if we don't have it
     cmd = cmd_and_args[0]
-    if have_subprocess:
-        return subprocess.call([strip_quotes(cmd)] + cmd_and_args[1:])
-    else:
-        return os.spawnv(os.P_WAIT, cmd, cmd_and_args)
-
-# When running under native msys Python, any invocations of non-msys binaries,
-# including timeout.exe, will have their arguments munged according to some
-# heuristics, which leads to malformed command lines (#9626).  The easiest way
-# to avoid problems is to invoke through /usr/bin/cmd which sidesteps argument
-# munging because it is a native msys application.
-def passThroughCmd(cmd_and_args):
-    args = []
-    # cmd needs a Windows-style path for its first argument.
-    args.append(cmd_and_args[0].replace('/', '\\'))
-    # Other arguments need to be quoted to deal with spaces.
-    args.extend(['"%s"' % arg for arg in cmd_and_args[1:]])
-    return ["cmd", "/c", " ".join(args)]
+    return subprocess.call([strip_quotes(cmd)] + cmd_and_args[1:])
 
 # Note that this doesn't handle the timeout itself; it is just used for
 # commands that have timeout handling built-in.
 def rawSystemWithTimeout(cmd_and_args):
-    if config.os == 'mingw32' and sys.executable.startswith('/usr'):
-        # This is only needed when running under msys python.
-        cmd_and_args = passThroughCmd(cmd_and_args)
     r = rawSystem(cmd_and_args)
     if r == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
@@ -1860,7 +1868,7 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
             r = rawSystemWithTimeout(
                     ["strace", "-o", fn, "-fF",
                                "-e", "creat,open,chdir,clone,vfork",
-                     config.timeout_prog, str(timeout), cmd])
+                     strip_quotes(config.timeout_prog), str(timeout), cmd])
             addTestFilesWritten(name, fn)
             rm_no_fail(fn)
         else:
@@ -1877,7 +1885,10 @@ def runCmdExitCode( cmd ):
 # checking for files being written to by multiple tests
 
 re_strace_call_end = '(\) += ([0-9]+|-1 E.*)| <unfinished ...>)$'
-re_strace_unavailable       = re.compile('^\) += \? <unavailable>$')
+re_strace_unavailable_end ='\) += \? <unavailable>$'
+
+re_strace_unavailable_line  = re.compile('^' + re_strace_unavailable_end)
+re_strace_unavailable_cntnt = re.compile('^<\.\.\. .* resumed> ' + re_strace_unavailable_end)
 re_strace_pid               = re.compile('^([0-9]+) +(.*)')
 re_strace_clone             = re.compile('^(clone\(|<... clone resumed> ).*\) = ([0-9]+)$')
 re_strace_clone_unfinished  = re.compile('^clone\( <unfinished \.\.\.>$')
@@ -1888,7 +1899,10 @@ re_strace_chdir_resumed     = re.compile('^<\.\.\. chdir resumed> \) += 0$')
 re_strace_open              = re.compile('^open\("([^"]*)", ([A-Z_|]*)(, [0-9]+)?' + re_strace_call_end)
 re_strace_open_resumed      = re.compile('^<... open resumed> '                    + re_strace_call_end)
 re_strace_ignore_sigchild   = re.compile('^--- SIGCHLD \(Child exited\) @ 0 \(0\) ---$')
+re_strace_ignore_sigchild2  = re.compile('^--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, .*} ---$')
+re_strace_ignore_exited     = re.compile('^\+\+\+ exited with [0-9]* \+\+\+$')
 re_strace_ignore_sigvtalarm = re.compile('^--- SIGVTALRM \(Virtual timer expired\) @ 0 \(0\) ---$')
+re_strace_ignore_sigvtalarm2= re.compile('^--- SIGVTALRM {si_signo=SIGVTALRM, si_code=SI_TIMER, .*} ---$')
 re_strace_ignore_sigint     = re.compile('^--- SIGINT \(Interrupt\) @ 0 \(0\) ---$')
 re_strace_ignore_sigfpe     = re.compile('^--- SIGFPE \(Floating point exception\) @ 0 \(0\) ---$')
 re_strace_ignore_sigsegv    = re.compile('^--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
@@ -1934,7 +1948,7 @@ def addTestFilesWrittenHelper(name, fn):
             if m_pid:
                 pid = m_pid.group(1)
                 content = m_pid.group(2)
-            elif re_strace_unavailable.match(line):
+            elif re_strace_unavailable_line.match(line):
                 next
             else:
                 framework_fail(name, 'strace', "Can't find pid in strace line: " + line)
@@ -1986,7 +2000,13 @@ def addTestFilesWrittenHelper(name, fn):
                 pass
             elif re_strace_ignore_sigchild.match(content):
                 pass
+            elif re_strace_ignore_sigchild2.match(content):
+                pass
+            elif re_strace_ignore_exited.match(content):
+                pass
             elif re_strace_ignore_sigvtalarm.match(content):
+                pass
+            elif re_strace_ignore_sigvtalarm2.match(content):
                 pass
             elif re_strace_ignore_sigint.match(content):
                 pass
@@ -1995,6 +2015,8 @@ def addTestFilesWrittenHelper(name, fn):
             elif re_strace_ignore_sigsegv.match(content):
                 pass
             elif re_strace_ignore_sigpipe.match(content):
+                pass
+            elif re_strace_unavailable_cntnt.match(content):
                 pass
             else:
                 framework_fail(name, 'strace', "Can't understand strace line: " + line)
@@ -2060,7 +2082,8 @@ if config.have_profiling:
   if config.gs != '':
     resultGood = runCmdExitCode(genGSCmd(config.confdir + '/good.ps'));
     if resultGood == 0:
-        resultBad = runCmdExitCode(genGSCmd(config.confdir + '/bad.ps'));
+        resultBad = runCmdExitCode(genGSCmd(config.confdir + '/bad.ps') +
+                                   ' >/dev/null 2>&1')
         if resultBad != 0:
             print("GhostScript available for hp2ps tests")
             gs_working = 1;
@@ -2182,10 +2205,15 @@ def findTFiles_(path):
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t, file):
+def summary(t, file, short=False):
 
     file.write('\n')
     printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures, t.unexpected_stat_failures])
+
+    if short:
+        # Only print the list of unexpected tests above.
+        return
+
     file.write('OVERALL SUMMARY for test run started at '
                + time.strftime("%c %Z", t.start_time) + '\n'
                + str(datetime.timedelta(seconds=
@@ -2272,17 +2300,5 @@ def printFailingTestInfosSummary(file, testInfos):
                           ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
     file.write('\n')
 
-def getStdout(cmd_and_args):
-    if have_subprocess:
-        p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        (stdout, stderr) = p.communicate()
-        r = p.wait()
-        if r != 0:
-            raise Exception("Command failed: " + str(cmd_and_args))
-        if stderr != '':
-            raise Exception("stderr from command: " + str(cmd_and_args))
-        return stdout
-    else:
-        raise Exception("Need subprocess to get stdout, but don't have it")
+def modify_lines(s, f):
+    return '\n'.join([f(l) for l in s.splitlines()])

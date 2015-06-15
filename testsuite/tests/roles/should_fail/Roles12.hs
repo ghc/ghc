@@ -1,5 +1,5 @@
 module Roles12 where
 
-import {-# SOURCE #-} Roles12
+import Roles12a
 
 data T a

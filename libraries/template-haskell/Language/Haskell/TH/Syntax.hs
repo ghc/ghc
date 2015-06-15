@@ -1,5 +1,17 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
-             RoleAnnotations, DeriveGeneric, FlexibleInstances #-}
+             DeriveGeneric, FlexibleInstances, DefaultSignatures,
+             ScopedTypeVariables, Rank2Types #-}
+
+#if __GLASGOW_HASKELL__ >= 707
+{-# LANGUAGE RoleAnnotations #-}
+{-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
+#else
+{-# OPTIONS_GHC -w #-} -- -fno-warn-inline-rule-shadowing doesn't exist
+#endif
+
+#if MIN_VERSION_base(4,8,0)
+#define HAS_NATURAL
+#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,7 +29,7 @@
 
 module Language.Haskell.TH.Syntax where
 
-import Data.Data (Data(..), Typeable )
+import Data.Data hiding (Fixity(..))
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative( Applicative(..) )
 #endif
@@ -29,8 +41,11 @@ import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Int
 import Data.Word
 import Data.Ratio
-import Numeric.Natural
 import GHC.Generics     ( Generic )
+
+#ifdef HAS_NATURAL
+import Numeric.Natural
+#endif
 
 -----------------------------------------------------
 --
@@ -38,7 +53,7 @@ import GHC.Generics     ( Generic )
 --
 -----------------------------------------------------
 
-class Monad m => Quasi m where
+class (Applicative m, Monad m) => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -163,7 +178,9 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
+#if __GLASGOW_HASKELL__ >= 707
 type role TExp nominal   -- See Note [Role of TExp]
+#endif
 newtype TExp a = TExp { unType :: Exp }
 
 unTypeQ :: Q (TExp a) -> Q Exp
@@ -452,6 +469,8 @@ sequenceQ = sequence
 
 class Lift t where
   lift :: t -> Q Exp
+  default lift :: Data t => t -> Q Exp
+  lift = liftData
 
 -- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
@@ -487,8 +506,10 @@ instance Lift Word32 where
 instance Lift Word64 where
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
+#ifdef HAS_NATURAL
 instance Lift Natural where
   lift x = return (LitE (IntegerL (fromIntegral x)))
+#endif
 
 instance Integral a => Lift (Ratio a) where
   lift x = return (LitE (RationalL (toRational x)))
@@ -572,6 +593,99 @@ leftName, rightName :: Name
 leftName  = mkNameG DataName "base" "Data.Either" "Left"
 rightName = mkNameG DataName "base" "Data.Either" "Right"
 
+-----------------------------------------------------
+--
+--              Generic Lift implementations
+--
+-----------------------------------------------------
+
+-- | 'dataToQa' is an internal utility function for constructing generic
+-- conversion functions from types with 'Data' instances to various
+-- quasi-quoting representations.  See the source of 'dataToExpQ' and
+-- 'dataToPatQ' for two example usages: @mkCon@, @mkLit@
+-- and @appQ@ are overloadable to account for different syntax for
+-- expressions and patterns; @antiQ@ allows you to override type-specific
+-- cases, a common usage is just @const Nothing@, which results in
+-- no overloading.
+dataToQa  ::  forall a k q. Data a
+          =>  (Name -> k)
+          ->  (Lit -> Q q)
+          ->  (k -> [Q q] -> Q q)
+          ->  (forall b . Data b => b -> Maybe (Q q))
+          ->  a
+          ->  Q q
+dataToQa mkCon mkLit appCon antiQ t =
+    case antiQ t of
+      Nothing ->
+          case constrRep constr of
+            AlgConstr _ ->
+                appCon (mkCon conName) conArgs
+              where
+                conName :: Name
+                conName =
+                    case showConstr constr of
+                      "(:)"       -> Name (mkOccName ":")
+                                          (NameG DataName
+                                                (mkPkgName "ghc-prim")
+                                                (mkModName "GHC.Types"))
+                      con@"[]"    -> Name (mkOccName con)
+                                          (NameG DataName
+                                                (mkPkgName "ghc-prim")
+                                                (mkModName "GHC.Types"))
+                      con@('(':_) -> Name (mkOccName con)
+                                          (NameG DataName
+                                                (mkPkgName "ghc-prim")
+                                                (mkModName "GHC.Tuple"))
+                      con         -> mkNameG_d (tyConPackage tycon)
+                                               (tyConModule tycon)
+                                               con
+                  where
+                    tycon :: TyCon
+                    tycon = (typeRepTyCon . typeOf) t
+
+                conArgs :: [Q q]
+                conArgs = gmapQ (dataToQa mkCon mkLit appCon antiQ) t
+            IntConstr n ->
+                mkLit $ IntegerL n
+            FloatConstr n ->
+                mkLit $ RationalL n
+            CharConstr c ->
+                mkLit $ CharL c
+        where
+          constr :: Constr
+          constr = toConstr t
+
+      Just y -> y
+
+-- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the
+-- same value, in the SYB style. It is generalized to take a function
+-- override type-specific cases; see 'liftData' for a more commonly
+-- used variant.
+dataToExpQ  ::  Data a
+            =>  (forall b . Data b => b -> Maybe (Q Exp))
+            ->  a
+            ->  Q Exp
+dataToExpQ = dataToQa conE litE (foldl appE)
+    where conE s =  return (ConE s)
+          appE x y = do { a <- x; b <- y; return (AppE a b)}
+          litE c = return (LitE c)
+
+-- | 'liftData' is a variant of 'lift' in the 'Lift' type class which
+-- works for any type with a 'Data' instance.
+liftData :: Data a => a -> Q Exp
+liftData = dataToExpQ (const Nothing)
+
+-- | 'dataToPatQ' converts a value to a 'Q Pat' representation of the same
+-- value, in the SYB style. It takes a function to handle type-specific cases,
+-- alternatively, pass @const Nothing@ to get default behavior.
+dataToPatQ  ::  Data a
+            =>  (forall b . Data b => b -> Maybe (Q Pat))
+            ->  a
+            ->  Q Pat
+dataToPatQ = dataToQa id litP conP
+    where litP l = return (LitP l)
+          conP n ps = do ps' <- sequence ps
+                         return (ConP n ps')
 
 -----------------------------------------------------
 --              Names and uniques

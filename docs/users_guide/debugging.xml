@@ -182,16 +182,6 @@
 
 	    <varlistentry>
 	      <term>
-	        <option>-ddump-cpranal</option>:
-                <indexterm><primary><option>-ddump-cpranal</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para>CPR analyser output</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
 	        <option>-ddump-stranal</option>:
                 <indexterm><primary><option>-ddump-stranal</option></primary></indexterm>
 	      </term>
@@ -257,16 +247,6 @@
 	      </term>
 	      <listitem>
 		<para>output of STG-to-STG passes</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
-	        <option>-ddump-flatC</option>:
-                <indexterm><primary><option>-ddump-flatC</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para><emphasis>flattened</emphasis> Abstract&nbsp;C</para>
 	      </listitem>
 	    </varlistentry>
 
@@ -550,7 +530,7 @@
 
   </sect2>
 
-  <sect2 id="supression">
+  <sect2 id="suppression">
     <title>Suppressing unwanted information</title>
 
     <indexterm><primary>suppression</primary></indexterm>

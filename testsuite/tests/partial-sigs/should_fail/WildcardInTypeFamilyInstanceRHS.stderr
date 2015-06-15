@@ -1,4 +1,6 @@
 
 WildcardInTypeFamilyInstanceRHS.hs:8:25:
-    Wildcard not allowed
-    In type family instance equation of ‘Dual’: Maybe _
+    Unexpected wild card: ‘_’
+    In the type ‘Maybe _’
+    In the type instance declaration for ‘Dual’
+    In the instance declaration for ‘Foo Int’

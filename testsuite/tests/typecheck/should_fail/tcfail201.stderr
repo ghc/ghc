@@ -1,5 +1,5 @@
 
-tcfail201.hs:17:58:
+tcfail201.hs:17:58: error:
     Couldn't match expected type ‘a’ with actual type ‘HsDoc id0’
       ‘a’ is a rigid type variable bound by
           the type signature for:

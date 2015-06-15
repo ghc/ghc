@@ -13,14 +13,14 @@ test('Either', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures
 test('Every', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('EveryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug
-test('EqualityConstraint', expect_fail, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('EqualityConstraint', expect_broken(9478), compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExpressionSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExpressionSigNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraConstraints1', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraConstraints2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraConstraints3', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug
-test('ExtraNumAMROn', expect_fail, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('ExtraNumAMROn', expect_broken(9478), compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraNumAMROff', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Forall1', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('GenNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
@@ -34,7 +34,7 @@ test('NamedTyVar', normal, compile, ['-ddump-types -fno-warn-partial-type-signat
 test('ParensAroundContext', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug
-test('PatBind2', expect_fail, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('PatBind2', expect_broken(9478), compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatternSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Recursive', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcards', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
@@ -46,3 +46,5 @@ test('SomethingShowable', normal, compile, ['-ddump-types -fno-warn-partial-type
 test('Uncurry', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('UncurryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('WarningWildcardInstantiations', normal, compile, ['-ddump-types'])
+test('T10403', normal, compile, [''])
+test('T10438', normal, compile, [''])

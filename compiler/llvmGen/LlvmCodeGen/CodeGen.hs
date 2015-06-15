@@ -18,13 +18,13 @@ import Cmm
 import CPrim
 import PprCmm
 import CmmUtils
+import CmmSwitch
 import Hoopl
 
 import DynFlags
 import FastString
 import ForeignCall
-import Outputable hiding ( panic, pprPanic )
-import qualified Outputable
+import Outputable
 import Platform
 import OrdList
 import UniqSupply
@@ -156,21 +156,6 @@ barrier = do
     let s = Fence False SyncSeqCst
     return (unitOL s, [])
 
--- | Memory barrier instruction for LLVM < 3.0
-oldBarrier :: LlvmM StmtData
-oldBarrier = do
-
-    (fv, _, tops) <- getInstrinct (fsLit "llvm.memory.barrier") LMVoid [i1, i1, i1, i1, i1]
-
-    let args = [lmTrue, lmTrue, lmTrue, lmTrue, lmTrue]
-    let s1 = Expr $ Call StdCall fv args llvmStdFunAttrs
-
-    return (unitOL s1, tops)
-
-    where
-        lmTrue :: LlvmVar
-        lmTrue  = mkIntLit i1 (-1)
-
 -- | Foreign Calls
 genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
               -> LlvmM StmtData
@@ -179,12 +164,9 @@ genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
 -- intrinsic function.
 genCall (PrimTarget MO_WriteBarrier) _ _ = do
     platform <- getLlvmPlatform
-    ver <- getLlvmVer
-    case () of
-     _ | platformArch platform `elem` [ArchX86, ArchX86_64, ArchSPARC]
-                    -> return (nilOL, [])
-       | ver > 29   -> barrier
-       | otherwise  -> oldBarrier
+    if platformArch platform `elem` [ArchX86, ArchX86_64, ArchSPARC]
+       then return (nilOL, [])
+       else barrier
 
 genCall (PrimTarget MO_Touch) _ _
  = return (nilOL, [])
@@ -206,9 +188,7 @@ genCall (PrimTarget (MO_UF_Conv _)) [_] args =
 -- Handle prefetching data
 genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
   | 0 <= localityInt && localityInt <= 3 = do
-    ver <- getLlvmVer
-    let argTy | ver <= 29  = [i8Ptr, i32, i32]
-              | otherwise  = [i8Ptr, i32, i32, i32]
+    let argTy = [i8Ptr, i32, i32, i32]
         funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
 
@@ -219,8 +199,7 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
     (argVars', stmts3)      <- castVars $ zip argVars argTy
 
     trash <- getTrashStmts
-    let argSuffix | ver <= 29  = [mkIntLit i32 0, mkIntLit i32 localityInt]
-                  | otherwise  = [mkIntLit i32 0, mkIntLit i32 localityInt, mkIntLit i32 1]
+    let argSuffix = [mkIntLit i32 0, mkIntLit i32 localityInt, mkIntLit i32 1]
         call = Expr $ Call StdCall fptr (argVars' ++ argSuffix) []
         stmts = stmts1 `appOL` stmts2 `appOL` stmts3
                 `appOL` trash `snocOL` call
@@ -255,12 +234,10 @@ genCall t@(PrimTarget op) [] args'
  | op == MO_Memcpy ||
    op == MO_Memset ||
    op == MO_Memmove = do
-    ver <- getLlvmVer
     dflags <- getDynFlags
     let (args, alignVal) = splitAlignVal args'
-        (isVolTy, isVolVal)
-              | ver >= 28       = ([i1], [mkIntLit i1 0])
-              | otherwise       = ([], [])
+        isVolTy = [i1]
+        isVolVal = [mkIntLit i1 0]
         argTy | op == MO_Memset = [i8Ptr, i8,    llvmWord dflags, i32] ++ isVolTy
               | otherwise       = [i8Ptr, i8Ptr, llvmWord dflags, i32] ++ isVolTy
         funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
@@ -516,12 +493,9 @@ castVar v t | getVarType v == t
 cmmPrimOpFunctions :: CallishMachOp -> LlvmM LMString
 cmmPrimOpFunctions mop = do
 
-  ver <- getLlvmVer
   dflags <- getDynFlags
-  let intrinTy1 = (if ver >= 28
-                       then "p0i8.p0i8." else "") ++ showSDoc dflags (ppr $ llvmWord dflags)
-      intrinTy2 = (if ver >= 28
-                       then "p0i8." else "") ++ showSDoc dflags (ppr $ llvmWord dflags)
+  let intrinTy1 = "p0i8.p0i8." ++ showSDoc dflags (ppr $ llvmWord dflags)
+      intrinTy2 = "p0i8." ++ showSDoc dflags (ppr $ llvmWord dflags)
       unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                         ++ " not supported here")
 
@@ -824,18 +798,16 @@ For a real example of this, see ./rts/StgStdThunks.cmm
 
 
 -- | Switch branch
---
--- N.B. We remove Nothing's from the list of branches, as they are 'undefined'.
--- However, they may be defined one day, so we better document this behaviour.
-genSwitch :: CmmExpr -> [Maybe BlockId] -> LlvmM StmtData
-genSwitch cond maybe_ids = do
+genSwitch :: CmmExpr -> SwitchTargets -> LlvmM StmtData
+genSwitch cond ids = do
     (vc, stmts, top) <- exprToVar cond
     let ty = getVarType vc
 
-    let pairs = [ (ix, id) | (ix,Just id) <- zip [0..] maybe_ids ]
-    let labels = map (\(ix, b) -> (mkIntLit ty ix, blockIdToLlvm b)) pairs
+    let labels = [ (mkIntLit ty ix, blockIdToLlvm b)
+                 | (ix, b) <- switchTargetsCases ids ]
     -- out of range is undefined, so let's just branch to first label
-    let (_, defLbl) = head labels
+    let defLbl | Just l <- switchTargetsDefault ids = blockIdToLlvm l
+               | otherwise                          = snd (head labels)
 
     let s1 = Switch vc defLbl labels
     return $ (stmts `snocOL` s1, top)
@@ -1672,14 +1644,6 @@ toI32 = mkIntLit i32
 
 toIWord :: Integral a => DynFlags -> a -> LlvmVar
 toIWord dflags = mkIntLit (llvmWord dflags)
-
-
--- | Error functions
-panic :: String -> a
-panic s = Outputable.panic $ "LlvmCodeGen.CodeGen." ++ s
-
-pprPanic :: String -> SDoc -> a
-pprPanic s d = Outputable.pprPanic ("LlvmCodeGen.CodeGen." ++ s) d
 
 
 -- | Returns TBAA meta data by unique

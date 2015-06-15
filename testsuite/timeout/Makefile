@@ -62,7 +62,7 @@ endif
 endif
 
 clean distclean maintainer-clean:
-	-./Setup clean
+	test ! -f Setup || ./Setup clean
 	$(RM) -rf install-inplace
 	$(RM) -f calibrate.out
 	$(RM) -f Setup Setup.exe Setup.hi Setup.o

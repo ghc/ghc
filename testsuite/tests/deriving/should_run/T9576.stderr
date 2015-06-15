@@ -4,7 +4,7 @@ T9576: T9576.hs:6:31:
     In the second argument of ‘showParen’, namely
       ‘((.) (showString "MkBar ") (showsPrec 11 b1))’
     In the expression:
-      showParen ((a >= 11)) ((.) (showString "MkBar ") (showsPrec 11 b1))
+      showParen (a >= 11) ((.) (showString "MkBar ") (showsPrec 11 b1))
     When typechecking the code for ‘showsPrec’
       in a derived instance for ‘Show Bar’:
       To see the code I am typechecking, use -ddump-deriv

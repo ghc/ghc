@@ -24,7 +24,7 @@ import TcRnMonad
 import TyCon
 import ConLike
 import DataCon    (dataConName, dataConWorkId, dataConTyCon)
-import PrelInfo   (wiredInThings, basicKnownKeyNames)
+import PrelInfo   ( knownKeyNames )
 import Id         (idName, isDataConWorkId_maybe)
 import TysWiredIn
 import IfaceEnv
@@ -303,14 +303,11 @@ serialiseName bh name _ = do
 
 knownKeyNamesMap :: UniqFM Name
 knownKeyNamesMap = listToUFM_Directly [(nameUnique n, n) | n <- knownKeyNames]
-  where
-    knownKeyNames :: [Name]
-    knownKeyNames = map getName wiredInThings ++ basicKnownKeyNames
 
 
 -- See Note [Symbol table representation of names]
 putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
-putName _dict BinSymbolTable{ 
+putName _dict BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }    bh name
   | name `elemUFM` knownKeyNamesMap
@@ -320,11 +317,14 @@ putName _dict BinSymbolTable{
   | otherwise
   = case wiredInNameTyThing_maybe name of
      Just (ATyCon tc)
-       | isTupleTyCon tc             -> putTupleName_ bh tc 0
+       | Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 0
      Just (AConLike (RealDataCon dc))
-       | let tc = dataConTyCon dc, isTupleTyCon tc -> putTupleName_ bh tc 1
+       | let tc = dataConTyCon dc
+       , Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 1
      Just (AnId x)
-       | Just dc <- isDataConWorkId_maybe x, let tc = dataConTyCon dc, isTupleTyCon tc -> putTupleName_ bh tc 2
+       | Just dc <- isDataConWorkId_maybe x
+       , let tc = dataConTyCon dc
+       , Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 2
      _ -> do
        symtab_map <- readIORef symtab_map_ref
        case lookupUFM symtab_map name of
@@ -337,16 +337,16 @@ putName _dict BinSymbolTable{
                 $! addToUFM symtab_map name (off,name)
             put_ bh (fromIntegral off :: Word32)
 
-putTupleName_ :: BinHandle -> TyCon -> Word32 -> IO ()
-putTupleName_ bh tc thing_tag
+putTupleName_ :: BinHandle -> TyCon -> TupleSort -> Word32 -> IO ()
+putTupleName_ bh tc tup_sort thing_tag
   = -- ASSERT(arity < 2^(30 :: Int))
     put_ bh (0x80000000 .|. (sort_tag `shiftL` 28) .|. (thing_tag `shiftL` 26) .|. arity)
   where
-    arity = fromIntegral (tupleTyConArity tc)
-    sort_tag = case tupleTyConSort tc of
-        BoxedTuple      -> 0
-        UnboxedTuple    -> 1
-        ConstraintTuple -> 2
+    arity    = fromIntegral (tyConArity tc)
+    sort_tag = case tup_sort of
+                 BoxedTuple      -> 0
+                 UnboxedTuple    -> 1
+                 ConstraintTuple -> pprPanic "putTupleName:ConstraintTuple" (ppr tc)
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: NameCacheUpdater
@@ -367,11 +367,10 @@ getSymtabName _ncu _dict symtab bh = do
                         2 -> idName (dataConWorkId dc)
                         _ -> pprPanic "getSymtabName:unknown tuple thing" (ppr i)
           where
-            dc = tupleCon sort arity
+            dc = tupleDataCon sort arity
             sort = case (i .&. 0x30000000) `shiftR` 28 of
-                     0 -> BoxedTuple
-                     1 -> UnboxedTuple
-                     2 -> ConstraintTuple
+                     0 -> Boxed
+                     1 -> Unboxed
                      _ -> pprPanic "getSymtabName:unknown tuple sort" (ppr i)
             thing_tag = (i .&. 0x0CFFFFFF) `shiftR` 26
             arity = fromIntegral (i .&. 0x03FFFFFF)

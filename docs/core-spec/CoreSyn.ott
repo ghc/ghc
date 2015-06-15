@@ -69,10 +69,12 @@ e, u :: 'Expr_' ::= {{ com Expressions, \coderef{coreSyn/CoreSyn.lhs}{Expr} }}
   | ( e )                                        :: M :: Parens {{ com Parenthesized expression }}
   | e </ ui // i />                              :: M :: Apps {{ com Nested application }}
   | S ( n )                                      :: M :: Lookup {{ com Lookup in the runtime store }}
+  | \\ e                                         :: M :: Newline
+    {{ tex \qquad \\ \multicolumn{1}{r}{[[e]]} }}
 
 binding :: 'Bind_' ::= {{ com Let-bindings, \coderef{coreSyn/CoreSyn.lhs}{Bind} }}
   | n = e                         ::   :: NonRec  {{ com Non-recursive binding }}
-  | rec </ ni = ei // and // i /> ::   :: Rec     {{ com Recursive binding }}
+  | rec </ ni = ei // ;; // i />  ::   :: Rec     {{ com Recursive binding }}
 
 alt :: 'Alt_' ::= {{ com Case alternative, \coderef{coreSyn/CoreSyn.lhs}{Alt} }}
   | Kp </ ni // i /> -> e    ::   :: Alt  {{ com Constructor applied to fresh names }}
@@ -265,6 +267,7 @@ terminals :: 'terminals_' ::=
     {{ tex \twoheadrightarrow\!\!\!\!\!\! \raisebox{-.3ex}{!} \,\,\,\,\, }}
   | sym          ::   :: sym              {{ tex \textsf{sym} }}
   | ;            ::   :: trans            {{ tex \fatsemi }}
+  | ;;           ::   :: semi             {{ tex ; }}
   | Left         ::   :: Left             {{ tex \textsf{left} }}
   | Right        ::   :: Right            {{ tex \textsf{right} }}
   | _            ::   :: wildcard         {{ tex \text{\textvisiblespace} }}
@@ -314,6 +317,7 @@ terminals :: 'terminals_' ::=
   | take         ::   :: take             {{ tex \textsf{take}\! }}
   | coaxrProves  ::   :: coaxrProves      {{ tex \textsf{coaxrProves} }}
   | Just         ::   :: Just             {{ tex \textsf{Just} }}
+  | \\           ::   :: newline          {{ tex \\ }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -374,7 +378,7 @@ formula :: 'formula_' ::=
   | t = coercionKind g                 ::   :: coercionKind
   | Just ( t1 , t2 ) = coaxrProves mu </ si // i /> </ ( s'j , s''j ) // j />
                                        ::   :: coaxrProves
-                          
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

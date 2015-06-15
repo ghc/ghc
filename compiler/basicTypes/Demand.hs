@@ -18,6 +18,7 @@ module Demand (
         lubDmd, bothDmd, apply1Dmd, apply2Dmd,
         isTopDmd, isBotDmd, isAbsDmd, isSeqDmd,
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
+        addCaseBndrDmd,
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
@@ -25,7 +26,7 @@ module Demand (
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
         DmdEnv, emptyDmdEnv,
-        peelFV,
+        peelFV, findIdDemand,
 
         DmdResult, CPRResult,
         isBotRes, isTopRes,
@@ -47,8 +48,8 @@ module Demand (
         argOneShots, argsOneShots,
         trimToType, TypeShape(..),
 
-        isSingleUsed, reuseEnv, zapDemand, zapStrictSig,
-
+        isSingleUsed, reuseEnv,
+        killUsageDemand, killUsageSig, zapUsageDemand,
         strictifyDictDmd
 
      ) where
@@ -200,6 +201,10 @@ seqMaybeStr Lazy    = ()
 seqMaybeStr (Str s) = seqStrDmd s
 
 -- Splitting polymorphic demands
+splitMaybeStrProdDmd :: Int -> MaybeStr -> Maybe [MaybeStr]
+splitMaybeStrProdDmd n Lazy    = Just (replicate n Lazy)
+splitMaybeStrProdDmd n (Str s) = splitStrProdDmd n s
+
 splitStrProdDmd :: Int -> StrDmd -> Maybe [MaybeStr]
 splitStrProdDmd n HyperStr   = Just (replicate n strBot)
 splitStrProdDmd n HeadStr    = Just (replicate n strTop)
@@ -352,7 +357,49 @@ peelUseCall :: UseDmd -> Maybe (Count, UseDmd)
 peelUseCall (UCall c u)   = Just (c,u)
 peelUseCall _             = Nothing
 
-{-
+addCaseBndrDmd :: Demand    -- On the case binder
+               -> [Demand]  -- On the components of the constructor
+               -> [Demand]  -- Final demands for the components of the constructor
+-- See Note [Demand on case-alternative binders]
+addCaseBndrDmd (JD { strd = ms, absd = mu }) alt_dmds
+  = case mu of
+     Abs     -> alt_dmds
+     Use _ u -> zipWith bothDmd alt_dmds (mkJointDmds ss us)
+             where
+                Just ss = splitMaybeStrProdDmd arity ms  -- Guaranteed not to be a call
+                Just us = splitUseProdDmd      arity u   -- Ditto
+  where
+    arity = length alt_dmds
+
+{- Note [Demand on case-alternative binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The demand on a binder in a case alternative comes
+  (a) From the demand on the binder itself
+  (b) From the demand on the case binder
+Forgetting (b) led directly to Trac #10148.
+
+Example. Source code:
+  f x@(p,_) = if p then foo x else True
+
+  foo (p,True) = True
+  foo (p,q)    = foo (q,p)
+
+After strictness analysis:
+  f = \ (x_an1 [Dmd=<S(SL),1*U(U,1*U)>] :: (Bool, Bool)) ->
+      case x_an1
+      of wild_X7 [Dmd=<L,1*U(1*U,1*U)>]
+      { (p_an2 [Dmd=<S,1*U>], ds_dnz [Dmd=<L,A>]) ->
+      case p_an2 of _ {
+        False -> GHC.Types.True;
+        True -> foo wild_X7 }
+
+It's true that ds_dnz is *itself* absent, but the use of wild_X7 means
+that it is very much alive and demanded.  See Trac #10148 for how the
+consequences play out.
+
+This is needed even for non-product types, in case the case-binder
+is used but the components of the case alternative are not.
+
 Note [Don't optimise UProd(Used) to Used]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 These two UseDmds:
@@ -586,7 +633,8 @@ f g = (snd (g 3), True)
 should be: <L,C(U(AU))>m
 -}
 
-data CleanDemand = CD { sd :: StrDmd, ud :: UseDmd }
+data CleanDemand   -- A demand that is at least head-strict
+  = CD { sd :: StrDmd, ud :: UseDmd }
   deriving ( Eq, Show )
 
 instance Outputable CleanDemand where
@@ -1339,6 +1387,10 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
 
+findIdDemand :: DmdType -> Var -> Demand
+findIdDemand (DmdType fv _ res) id
+  = lookupVarEnv fv id `orElse` defaultDmd res
+
 {-
 Note [Default demand on free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1662,21 +1714,34 @@ of arguments, says conservatively if the function is going to diverge
 or not.
 
 Zap absence or one-shot information, under control of flags
+
+Note [Killing usage information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The flags -fkill-one-shot and -fkill-absence let you switch off the generation
+of absence or one-shot information altogether.  This is only used for performance
+tests, to see how important they are.
 -}
 
-zapDemand :: DynFlags -> Demand -> Demand
-zapDemand dflags dmd
-  | Just kfs <- killFlags dflags = zap_dmd kfs dmd
+zapUsageDemand :: Demand -> Demand
+-- Remove the usage info, but not the strictness info, from the demand
+zapUsageDemand = kill_usage (True, True)
+
+killUsageDemand :: DynFlags -> Demand -> Demand
+-- See Note [Killing usage information]
+killUsageDemand dflags dmd
+  | Just kfs <- killFlags dflags = kill_usage kfs dmd
   | otherwise                    = dmd
 
-zapStrictSig :: DynFlags -> StrictSig -> StrictSig
-zapStrictSig dflags sig@(StrictSig (DmdType env ds r))
-  | Just kfs <- killFlags dflags = StrictSig (DmdType env (map (zap_dmd kfs) ds) r)
+killUsageSig :: DynFlags -> StrictSig -> StrictSig
+-- See Note [Killing usage information]
+killUsageSig dflags sig@(StrictSig (DmdType env ds r))
+  | Just kfs <- killFlags dflags = StrictSig (DmdType env (map (kill_usage kfs) ds) r)
   | otherwise                    = sig
 
 type KillFlags = (Bool, Bool)
 
 killFlags :: DynFlags -> Maybe KillFlags
+-- See Note [Killing usage information]
 killFlags dflags
   | not kill_abs && not kill_one_shot = Nothing
   | otherwise                         = Just (kill_abs, kill_one_shot)
@@ -1684,8 +1749,8 @@ killFlags dflags
     kill_abs      = gopt Opt_KillAbsence dflags
     kill_one_shot = gopt Opt_KillOneShot dflags
 
-zap_dmd :: KillFlags -> Demand -> Demand
-zap_dmd kfs (JD {strd = s, absd = u}) = JD {strd = s, absd = zap_musg kfs u}
+kill_usage :: KillFlags -> Demand -> Demand
+kill_usage kfs (JD {strd = s, absd = u}) = JD {strd = s, absd = zap_musg kfs u}
 
 zap_musg :: KillFlags -> MaybeUsed -> MaybeUsed
 zap_musg (kill_abs, _) Abs

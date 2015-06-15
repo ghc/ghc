@@ -24,10 +24,10 @@ main
           setContext [ IIDecl (simpleImportDecl pRELUDE_NAME)
                      , IIDecl (simpleImportDecl (mkModuleNameFS (fsLit "System.IO")))]
           runDecls "data X = Y ()"
-          runStmt "print True" RunToCompletion
-          gtry $ runStmt "print (Y ())" RunToCompletion :: GhcMonad m => m (Either SomeException RunResult)
+          execStmt "print True" execOptions
+          gtry $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeException ExecResult)
           runDecls "data X = Y () deriving Show"
           _ <- dynCompileExpr "'x'"
-          runStmt "print (Y ())" RunToCompletion
-          runStmt "System.IO.hFlush System.IO.stdout" RunToCompletion
+          execStmt "print (Y ())" execOptions
+          execStmt "System.IO.hFlush System.IO.stdout" execOptions
         print "done"

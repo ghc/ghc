@@ -25,6 +25,7 @@ module GHC.Event
     , evtWrite
     , IOCallback
     , FdKey(keyFd)
+    , Lifetime(..)
     , registerFd
     , unregisterFd
     , unregisterFd_

@@ -1,0 +1,5 @@
+
+ExtraConstraintsWildcardTwice.hs:4:10:
+    Invalid partial type: (_, _) => a -> a
+    Only a single extra-constraints wild card is allowed
+    In the type signature for ‘foo’

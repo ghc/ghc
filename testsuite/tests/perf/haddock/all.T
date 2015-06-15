@@ -3,7 +3,7 @@
 # detect outliers, as described in Note [residency]. See #9556.
 
 test('haddock.base',
-     [unless(in_tree_compiler(), skip)
+     [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 9014511528,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
@@ -40,10 +40,10 @@ test('haddock.base',
             # 2014-08-05: XXX TODO UPDATE ME XXX
       ],
      stats,
-     ['../../../../libraries/base/dist-install/doc/html/base/base.haddock.t'])
+     ['../../../../libraries/base/dist-install/haddock.t'])
 
 test('haddock.Cabal',
-     [unless(in_tree_compiler(), skip)
+     [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 6710234312, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
@@ -81,12 +81,12 @@ test('haddock.Cabal',
             # 2014-08-05: XXX TODO UPDATE ME XXX
       ],
      stats,
-     ['../../../../libraries/Cabal/Cabal/dist-install/doc/html/Cabal/Cabal.haddock.t'])
+     ['../../../../libraries/Cabal/Cabal/dist-install/haddock.t'])
 
 test('haddock.compiler',
-     [unless(in_tree_compiler(), skip)
+     [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 33562468736, 10)
+          [(wordsize(64), 36740649320, 10)
             # 2012P-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -95,6 +95,7 @@ test('haddock.compiler',
             # 2012-11-27: 28708374824 (amd64/Linux)
             # 2014-09-10: 30353349160 (amd64/Linux) post-AMP cleanup
             # 2014-11-22: 33562468736 (amd64/Linux)
+            # 2015-06-02: 36740649320 (amd64/Linux) unknown cause
 
           ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
@@ -109,4 +110,4 @@ test('haddock.compiler',
             # 2014-06-29: 15110426000 (x86/Linux)
       ],
      stats,
-     ['../../../../compiler/stage2/doc/html/ghc/ghc.haddock.t'])
+     ['../../../../compiler/stage2/haddock.t'])

@@ -194,7 +194,7 @@ endif
 
 RUNTEST_OPTS +=  \
 	--rootdir=. \
-	--config=$(CONFIG) \
+	--configfile=$(CONFIG) \
 	-e 'config.confdir="$(CONFIGDIR)"' \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
@@ -205,19 +205,33 @@ RUNTEST_OPTS +=  \
 	-e 'config.exeext="$(exeext)"' \
 	-e 'config.top="$(TOP_ABS)"'
 
-# Put an extra pair of quotes around program paths,
-# so we don't have to in .T scripts or driver/testlib.py.
+# Wrap non-empty program paths in quotes, because they may contain spaces. Do
+# it here, so we don't have to (and don't forget to do it) in the .T test
+# scripts (search for '{compiler}' or '{hpc}'). This may or may not be a good
+# idea.
+# Use `--config` instead of `-e`, because `-e` (which calls Python's `eval`
+# function) would require another pair of (escaped) quotes, which interfers
+# with MinGW's magic path handling (see #10449, and
+# http://www.mingw.org/wiki/Posix_path_conversion).
+# We use double instead of single quotes, which may or may not be important
+# when using msys2 (#9626, #10441).
+quote_path = $(if $1,"$1")
 RUNTEST_OPTS +=  \
-	-e 'config.compiler="\"$(TEST_HC)\""' \
-	-e 'config.ghc_pkg="\"$(GHC_PKG)\""' \
-	-e 'config.hp2ps="\"$(HP2PS_ABS)\""' \
-	-e 'config.hpc="\"$(HPC)\""' \
-	-e 'config.gs="\"$(GS)\""' \
-	-e 'config.timeout_prog="\"$(TIMEOUT_PROGRAM)\""'
+	--config 'compiler=$(call quote_path,$(TEST_HC))' \
+	--config 'ghc_pkg=$(call quote_path,$(GHC_PKG))' \
+	--config 'haddock=$(call quote_path,$(HADDOCK))' \
+	--config 'hp2ps=$(call quote_path,$(HP2PS_ABS))' \
+	--config 'hpc=$(call quote_path,$(HPC))' \
+	--config 'gs=$(call quote_path,$(GS))' \
+	--config 'timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))'
 
-ifneq "$(OUTPUT_SUMMARY)" ""
+ifneq "$(SUMMARY_FILE)" ""
 RUNTEST_OPTS +=  \
-	--output-summary "$(OUTPUT_SUMMARY)"
+	--summary-file "$(SUMMARY_FILE)"
+endif
+ifeq "$(NO_PRINT_SUMMARY)" "YES"
+RUNTEST_OPTS +=  \
+	--no-print-summary 1
 endif
 
 RUNTEST_OPTS +=  \

@@ -1,5 +1,5 @@
 
-T9612.hs:16:9:
+T9612.hs:16:9: error:
     Couldn't match type ‘[(Int, a)]’ with ‘(Int, a)’
     arising from a functional dependency between:
       constraint ‘MonadWriter (Int, a) (WriterT [(Int, a)] Identity)’

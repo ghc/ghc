@@ -534,6 +534,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/driver/T7835/Test
 /tests/driver/T8526/A.inc
 /tests/driver/T8602/t8602.sh
+/tests/driver/T9562/Main
 /tests/driver/Test.081b
 /tests/driver/Test.081b.hs
 /tests/driver/Test_081a
@@ -711,6 +712,8 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/ghc-api/T8628
 /tests/ghc-api/T8639_api
 /tests/ghc-api/T9595
+/tests/ghc-api/T10052/T10052
+/tests/ghc-api/T10508_api
 /tests/ghc-api/apirecomp001/myghc
 /tests/ghc-api/dynCompileExpr/dynCompileExpr
 /tests/ghc-api/ghcApi
@@ -1191,6 +1194,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/plugins/plugins01
 /tests/plugins/plugins05
 /tests/plugins/plugins06
+/tests/plugins/plugins07
 /tests/plugins/simple-plugin/dist/
 /tests/plugins/simple-plugin/install/
 /tests/plugins/simple-plugin/local.package.conf
@@ -1198,6 +1202,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/plugins/simple-plugin/pkg.plugins02/
 /tests/plugins/simple-plugin/pkg.plugins03/
 /tests/plugins/simple-plugin/setup
+/tests/plugins/rule-defining-plugin/pkg.plugins07/
 /tests/polykinds/Freeman
 /tests/polykinds/MonoidsFD
 /tests/polykinds/MonoidsTF

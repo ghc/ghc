@@ -59,7 +59,18 @@
                     See the release notes for base for a description of the
                     <literal>CallStack</literal> type.
                </para>
-           </listitem>
+            </listitem>
+	    <listitem>
+	      <para>
+		To conform to the common case, the default role assigned to parameters
+		of datatypes declared in <literal>hs-boot</literal> files is
+		<literal>representational</literal>. However, if the constructor(s)
+		for the datatype are given, it makes sense to do normal role inference.
+		This is now implemented, effectively making the default role for
+		non-abstract datatypes in <literal>hs-boot</literal> files to be
+		<literal>phantom</literal>, like it is in regular Haskell code.
+	      </para>
+	    </listitem>
        </itemizedlist>
     </sect3>
 
@@ -85,6 +96,11 @@
                     <literal>Main</literal> with an explicit module header but
                     without <literal>main</literal> is now an error (#7765).
                </para>
+               <para>
+                    The <literal>:back</literal> and <literal>:forward</literal>
+                    commands now take an optional count allowing the user to move forward or
+                    backward in history several steps at a time.
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>
@@ -94,7 +110,12 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME.
+                    The <literal>TemplateHaskell</literal> now no longer automatically
+                    errors when used with a stage 1 compiler (i.e. GHC without
+                    interpreter support); in particular, plain
+                    Haskell quotes (not quasi-quotes) can now be compiled without erroring.
+                    Splices and quasi-quotes continue to only be supported by a
+                    stage 2 compiler.
                </para>
            </listitem>
        </itemizedlist>
@@ -380,6 +401,18 @@
             <listitem>
                 <para>
                     Version number XXXXX (was 2.9.0.0)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    The <literal>Lift</literal> type class for lifting values
+                    into Template Haskell splices now has a default signature
+                    <literal>lift :: Data a => a -> Q Exp</literal>, which means
+                    that you do not have to provide an explicit implementation
+                    of <literal>lift</literal> for types which have a <literal>Data</literal>
+                    instance.  To manually use this default implementation, you
+                    can use the <literal>liftData</literal> function which is
+                    now exported from <literal>Language.Haskell.TH.Syntax</literal>.
                </para>
            </listitem>
        </itemizedlist>

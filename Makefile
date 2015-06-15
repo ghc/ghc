@@ -10,6 +10,14 @@
 #
 # -----------------------------------------------------------------------------
 
+# Eliminate use of the built-in implicit rules, and clear out the default list
+# of suffixes for suffix rules. Speeds up make quite a bit. Both are needed
+# for the shortest `make -d` output.
+# Don't set --no-builtin-variables; some rules might stop working if you do
+# (e.g. 'make clean' in testsuite/ currently relies on an implicit $RM).
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:
+
 ifeq "$(wildcard distrib/)" ""
 
 # We're in a bindist
@@ -21,7 +29,7 @@ default:
 
 .PHONY: install show
 install show:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
+	$(MAKE) --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
 
 else
 
@@ -34,7 +42,7 @@ default : all
 help:
 	@cat MAKEHELP.md
 
-ifneq "$(filter maintainer-clean distclean clean help,$(MAKECMDGOALS))" ""
+ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
 else
 include mk/config.mk
@@ -53,7 +61,29 @@ endif
 endif
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show echo help test fulltest fast fasttest,$(MAKECMDGOALS))
+# (the ones we're filtering out)
+REALGOALS=$(filter-out \
+    binary-dist \
+    binary-dist-prep \
+    sdist sdist-ghc \
+    sdist-ghc-prep \
+    sdist-windows-tarballs \
+    sdist-windows-tarballs-prep \
+    sdist-testsuite \
+    sdist-testsuite-prep \
+    bootstrapping-files \
+    framework-pkg \
+    clean \
+    clean_% \
+    distclean \
+    maintainer-clean \
+    show \
+    echo \
+    help \
+    test \
+    fulltest \
+    fasttest \
+  ,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -70,38 +100,50 @@ REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framewor
 $(REALGOALS) all: mk/config.mk.old mk/project.mk.old compiler/ghc.cabal.old
 ifneq "$(OMIT_PHASE_0)" "YES"
 	@echo "===--- building phase 0"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 phase_0_builds
+	$(MAKE) --no-print-directory -f ghc.mk phase=0 phase_0_builds
 endif
 ifneq "$(OMIT_PHASE_1)" "YES"
 	@echo "===--- building phase 1"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 phase_1_builds
+	$(MAKE) --no-print-directory -f ghc.mk phase=1 phase_1_builds
 endif
 	@echo "===--- building final phase"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=final $@
+	$(MAKE) --no-print-directory -f ghc.mk phase=final $@
 
+.PHONY: binary-dist
 binary-dist: binary-dist-prep
 	mv bindistprep/*.tar.$(TAR_COMP_EXT) .
 
+.PHONY: binary-dist-prep
 binary-dist-prep:
 ifeq "$(mingw32_TARGET_OS)" "1"
-	$(MAKE) -r --no-print-directory -f ghc.mk windows-binary-dist-prep
+	$(MAKE) --no-print-directory -f ghc.mk windows-binary-dist-prep
 else
 	rm -f bindist-list
-	$(MAKE) -r --no-print-directory -f ghc.mk bindist BINDIST=YES
-	$(MAKE) -r --no-print-directory -f ghc.mk unix-binary-dist-prep
+	$(MAKE) --no-print-directory -f ghc.mk bindist BINDIST=YES
+	$(MAKE) --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
 
+.PHONY: sdist sdist-ghc sdist-ghc-prep sdist-windows-tarballs sdist-windows-tarballs-prep sdist-testsuite sdist-testsuite-prep
+# Just running `./boot && ./configure && make sdist` should work, so skip
+# phase 0 and 1 and don't build any dependency files.
+sdist sdist-ghc sdist-ghc-prep sdist-windows-tarballs sdist-windows-tarballs-prep sdist-testsuite sdist-testsuite-prep :
+	$(MAKE) --no-print-directory -f ghc.mk $@ NO_INCLUDE_DEPS=YES NO_INCLUDE_PKGDATA=YES
+
+.PHONY: clean distclean maintainer-clean
 clean distclean maintainer-clean:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
+	$(MAKE) --no-print-directory -f ghc.mk $@ CLEANING=YES
 	test ! -d testsuite || $(MAKE) -C testsuite $@
 
+.PHONY: $(filter clean_%,$(MAKECMDGOALS))
 $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
-	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
+	$(MAKE) --no-print-directory -f ghc.mk $@ CLEANING=YES
 
+.PHONY: bootstrapping-files show echo
 bootstrapping-files show echo:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@
+	$(MAKE) --no-print-directory -f ghc.mk $@
 
 ifeq "$(darwin_TARGET_OS)" "1"
+.PHONY: framework-pkg
 framework-pkg:
 	$(MAKE) -C distrib/MacOS $@
 endif
@@ -112,10 +154,10 @@ endif
 
 endif
 
-.PHONY: fasttest fast
-fasttest fast:
-	$(MAKE) -C testsuite/tests CLEANUP=1 OUTPUT_SUMMARY=../../testsuite_summary.txt fast
+.PHONY: fasttest
+fasttest:
+	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt fast
 
 .PHONY: fulltest test
 fulltest test:
-	$(MAKE) -C testsuite/tests CLEANUP=1 OUTPUT_SUMMARY=../../testsuite_summary.txt
+	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt

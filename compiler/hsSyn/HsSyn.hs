@@ -40,7 +40,7 @@ import HsImpExp
 import HsLit
 import PlaceHolder
 import HsPat
-import HsTypes
+import HsTypes  hiding  ( mkHsForAllTy )
 import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc

@@ -631,7 +631,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ]
 
-           ; addUsedRdrNames (map (greRdrName . snd) dot_dot_gres)
+           ; addUsedRdrNames (map (greUsedRdrName . snd) dot_dot_gres)
            ; return [ L loc (HsRecField
                         { hsRecFieldLbl = L loc arg_rdr
                         , hsRecFieldSel = Left fld

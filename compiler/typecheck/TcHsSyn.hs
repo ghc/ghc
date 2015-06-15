@@ -90,7 +90,7 @@ hsPatType (ViewPat _ _ ty)            = ty
 hsPatType (ListPat _ ty Nothing)      = mkListTy ty
 hsPatType (ListPat _ _ (Just (ty,_))) = ty
 hsPatType (PArrPat _ ty)              = mkPArrTy ty
-hsPatType (TuplePat _ bx tys)         = mkTupleTy (boxityNormalTupleSort bx) tys
+hsPatType (TuplePat _ bx tys)         = mkTupleTy bx tys
 hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys })
                                       = conLikeResTy con tys
 hsPatType (SigPatOut _ ty)            = ty
@@ -1247,10 +1247,6 @@ zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcCoToCo env co
 zonkEvTerm env (EvCast tm co)     = do { tm' <- zonkEvTerm env tm
                                        ; co' <- zonkTcCoToCo env co
                                        ; return (mkEvCast tm' co') }
-zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
-                                       ; return (EvTupleSel tm' n) }
-zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms
-                                       ; return (EvTupleMk tms') }
 zonkEvTerm _   (EvLit l)          = return (EvLit l)
 
 zonkEvTerm env (EvTypeable ev) =
@@ -1273,12 +1269,12 @@ zonkEvTerm env (EvCallStack cs)
                            ; return (EvCallStack (EvCsTop n l tm')) }
       EvCsPushCall n l tm -> do { tm' <- zonkEvTerm env tm
                                 ; return (EvCallStack (EvCsPushCall n l tm')) }
+
 zonkEvTerm env (EvSuperClass d n) = do { d' <- zonkEvTerm env d
                                        ; return (EvSuperClass d' n) }
 zonkEvTerm env (EvDFunApp df tys tms)
   = do { tys' <- zonkTcTypeToTypes env tys
-       ; tms' <- mapM (zonkEvTerm env) tms
-       ; return (EvDFunApp (zonkIdOcc env df) tys' tms') }
+       ; return (EvDFunApp (zonkIdOcc env df) tys' (zonkIdOccs env tms)) }
 zonkEvTerm env (EvDelayedError ty msg)
   = do { ty' <- zonkTcTypeToType env ty
        ; return (EvDelayedError ty' msg) }

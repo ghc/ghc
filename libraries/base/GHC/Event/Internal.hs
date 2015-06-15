@@ -83,8 +83,12 @@ evtConcat :: [Event] -> Event
 evtConcat = foldl' evtCombine evtNothing
 {-# INLINE evtConcat #-}
 
--- | The lifetime of a registration.
-data Lifetime = OneShot | MultiShot
+-- | The lifetime of an event registration.
+--
+-- @since 4.8.1.0
+data Lifetime = OneShot   -- ^ the registration will be active for only one
+                          -- event
+              | MultiShot -- ^ the registration will trigger multiple times
               deriving (Show, Eq)
 
 -- | The longer of two lifetimes.
@@ -93,6 +97,7 @@ elSupremum OneShot OneShot = OneShot
 elSupremum _       _       = MultiShot
 {-# INLINE elSupremum #-}
 
+-- | @mappend@ == @elSupremum@
 instance Monoid Lifetime where
     mempty = OneShot
     mappend = elSupremum

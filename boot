@@ -155,16 +155,25 @@ sub boot_pkgs {
 # autoreconf everything that needs it.
 sub autoreconf {
     my $dir;
+    my $fail;
 
     foreach $dir (".", glob("libraries/*/")) {
         if (-f "$dir/configure.ac") {
+            next if (my $pid = fork);
+            die "fork failed: $!" if (! defined $pid);
             print "Booting $dir\n";
             chdir $dir or die "can't change to $dir: $!";
-            system("autoreconf") == 0
-                or die "Running autoreconf failed with exitcode $?";
-            chdir $curdir or die "can't change to $curdir: $!";
+            exec("autoreconf");
+            exit 1;
         }
     }
+
+    # Wait for all child processes to finish.
+    while (wait() != -1) {
+        $fail = 1 if $?;
+    }
+
+    die "Running autoreconf failed" if $fail;
 }
 
 sub checkBuildMk {

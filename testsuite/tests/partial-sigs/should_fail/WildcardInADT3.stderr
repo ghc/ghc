@@ -1,4 +1,6 @@
 
 WildcardInADT3.hs:4:27:
-    A constructor cannot have a partial type:
-    Foo {get :: _ => a}
+    Unexpected wild card: ‘_’
+    In the type ‘_ => a’
+    In the definition of data constructor ‘Foo’
+    In the data declaration for ‘Foo’

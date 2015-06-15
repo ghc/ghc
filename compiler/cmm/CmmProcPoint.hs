@@ -18,6 +18,7 @@ import PprCmm ()
 import CmmUtils
 import CmmInfo
 import CmmLive (cmmGlobalLiveness)
+import CmmSwitch
 import Data.List (sortBy)
 import Maybes
 import Control.Monad
@@ -295,7 +296,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                     case lastNode block of
                       CmmBranch id          -> add_if_pp id rst
                       CmmCondBranch _ ti fi -> add_if_pp ti (add_if_pp fi rst)
-                      CmmSwitch _ tbl       -> foldr add_if_pp rst (catMaybes tbl)
+                      CmmSwitch _ ids       -> foldr add_if_pp rst $ switchTargetsToList ids
                       _                     -> rst
 
                   -- when jumping to a PP that has an info table, if
@@ -382,7 +383,7 @@ replaceBranches env cmmg
     last :: CmmNode O C -> CmmNode O C
     last (CmmBranch id)          = CmmBranch (lookup id)
     last (CmmCondBranch e ti fi) = CmmCondBranch e (lookup ti) (lookup fi)
-    last (CmmSwitch e tbl)       = CmmSwitch e (map (fmap lookup) tbl)
+    last (CmmSwitch e ids)       = CmmSwitch e (mapSwitchTargets lookup ids)
     last l@(CmmCall {})          = l { cml_cont = Nothing }
             -- NB. remove the continuation of a CmmCall, since this
             -- label will now be in a different CmmProc.  Not only

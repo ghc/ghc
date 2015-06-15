@@ -20,7 +20,7 @@ defns
 OpSem :: '' ::=
 
 defn S |- e --> e'  ::  :: step :: 'S_' {{ com Single step semantics }}
-{{ tex [[S]] \labeledjudge{op} [[e]] [[-->]] [[e']] }}
+{{ tex \begin{array}{l} [[S]] \labeledjudge{op} [[e]] [[-->]] [[e']] \end{array} }}
 by
 
 S(n) = e
@@ -50,18 +50,16 @@ g2 = nth 1 g
 ------------------------------- :: CPush
 S |- ((\n.e) |> g) g' --> (\n.e |> g2) (g0 ; g' ; g1)
 
------------------ :: LetNonRec
-S |- let n = e1 in e2 --> e2[n |-> e1]
+--------------------------------------- :: Trans
+S |- (e |> g1) |> g2 --> e |> (g1 ; g2)
 
+S |- e --> e'
+------------------------ :: Cast
+S |- e |> g --> e' |> g
 
-S, </ [ni |-> ei] // i /> |- u --> u'
------------------------------------- :: LetRec
-S |- let rec </ ni = ei // i /> in u --> let rec </ ni = ei // i /> in u'
-
-fv(u) \inter </ ni // i /> = empty
------------------------------------------- :: LetRecReturn
-S |- let rec </ ni = ei // i /> in u --> u
-
+S |- e --> e'
+------------------------------ :: Tick
+S |- e { tick } --> e' { tick }
 
 S |- e --> e'
 --------------------------------------- :: Case
@@ -85,13 +83,27 @@ T </ taa // aa /> ~#k T </ t'aa // aa /> = coercionKind g
 forall </ alphaaa_kaa // aa />. forall </ betabb_k'bb // bb />. </ t1cc // cc /> @-> T </ alphaaa_kaa // aa /> = dataConRepType K
 </ e'cc = ecc |> (t1cc @ </ [alphaaa_kaa |-> nth aa g] // aa /> </ [betabb_k'bb |-> <sbb>_Nom] // bb />) // cc />
 --------------------------- :: CasePush
-S |- case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
+S |- case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> \\ case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
 
-S |- e --> e'
------------------------- :: Cast
-S |- e |> g --> e' |> g
+----------------- :: LetNonRec
+S |- let n = e1 in e2 --> e2[n |-> e1]
 
-S |- e --> e'
------------------------------- :: Tick
-S |- e { tick } --> e' { tick }
+S, </ [ni |-> ei] // i /> |- u --> u'
+------------------------------------ :: LetRec
+S |- let rec </ ni = ei // i /> in u --> let rec </ ni = ei // i /> in u'
 
+--------------- :: LetRecApp
+S |- (let rec </ ni = ei // i /> in u) e' --> let rec </ ni = ei // i /> in (u e')
+
+---------------- :: LetRecCast
+S |- (let rec </ ni = ei // i /> in u) |> g --> let rec </ ni = ei // i /> in (u |> g)
+
+--------------- :: LetRecCase
+S |- case (let rec </ ni = ei // i /> in u) as n0 return t of </ altj // j /> --> \\ let rec </ ni = ei // i /> in (case u as n0 return t of </ altj // j />)
+
+--------------- :: LetRecFlat
+S |- let rec </ ni = ei // i /> in (let rec </ nj' = ej' // j /> in u) --> let rec </ ni = ei // i />;; </ nj' = ej' // j /> in u
+
+fv(u) \inter </ ni // i /> = empty
+--------------------------------- :: LetRecReturn
+S |- let rec </ ni = ei // i /> in u --> u

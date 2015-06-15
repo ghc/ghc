@@ -25,7 +25,7 @@ module TcType (
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel,
-  strictlyDeeperThan, sameDepthAs, fskTcLevel,
+  strictlyDeeperThan, sameDepthAs, fmvTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -69,6 +69,7 @@ module TcType (
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed,
+  checkValidClsArgs, hasTyVarHead,
 
   ---------------------------------
   -- Misc type manipulators
@@ -145,7 +146,9 @@ module TcType (
 
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
-  pprTheta, pprThetaArrowTy, pprClassPred
+  pprTheta, pprThetaArrowTy, pprClassPred,
+
+  TypeSize, sizePred, sizeType, sizeTypes
 
   ) where
 
@@ -178,7 +181,7 @@ import Maybes
 import ListSetOps
 import Outputable
 import FastString
-import ErrUtils( Validity(..), isValid )
+import ErrUtils( Validity(..), MsgDoc, isValid )
 
 import Data.IORef
 import Control.Monad (liftM, ap)
@@ -451,8 +454,8 @@ Note [TcLevel and untouchable type variables]
 Note [Skolem escape prevention]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We only unify touchable unification variables.  Because of
-(MetaTvInv), there can be no occurrences of he variable further out,
-so the unification can't cause the kolems to escape. Example:
+(MetaTvInv), there can be no occurrences of the variable further out,
+so the unification can't cause the skolems to escape. Example:
      data T = forall a. MkT a (a->Int)
      f x (MkT v f) = length [v,x]
 We decide (x::alpha), and generate an implication like
@@ -482,15 +485,14 @@ the whole implication disappears but when we pop out again we are left with
 uf will get unified *once more* to (F Int).
 -}
 
-fskTcLevel :: TcLevel
-fskTcLevel = TcLevel 0  -- 0 = Outside the outermost level:
-                                  --     flatten skolems
+fmvTcLevel :: TcLevel -> TcLevel
+fmvTcLevel (TcLevel n) = TcLevel (n-1)
 
 topTcLevel :: TcLevel
 topTcLevel = TcLevel 1   -- 1 = outermost level
 
 pushTcLevel :: TcLevel -> TcLevel
-pushTcLevel (TcLevel us) = TcLevel (us+1)
+pushTcLevel (TcLevel us) = TcLevel (us + 2)
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
@@ -859,7 +861,7 @@ mkTcEqPredRole Nominal          = mkTcEqPred
 mkTcEqPredRole Representational = mkTcReprEqPred
 mkTcEqPredRole Phantom          = panic "mkTcEqPredRole Phantom"
 
--- @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
+-- @isTauTy@ tests for nested for-alls.
 
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- tcView ty = isTauTy ty'
@@ -1234,7 +1236,7 @@ occurCheckExpand dflags tv ty
     -- True => fine
     fast_check (LitTy {})        = True
     fast_check (TyVarTy tv')     = tv /= tv'
-    fast_check (TyConApp _ tys)  = all fast_check tys
+    fast_check (TyConApp tc tys) = all fast_check tys && (isTauTyCon tc || impredicative)
     fast_check (FunTy arg res)   = fast_check arg && fast_check res
     fast_check (AppTy fun arg)   = fast_check fun && fast_check arg
     fast_check (ForAllTy tv' ty) = impredicative
@@ -1268,7 +1270,11 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty -> return ty  -- First try to eliminate the tyvar from the args
+          OC_OK ty 
+              | impredicative || isTauTyCon tc 
+              -> return ty  -- First try to eliminate the tyvar from the args
+              | otherwise
+              -> OC_Forall  -- A type synonym with a forall on the RHS
           bad | Just ty' <- tcView ty -> go ty'
               | otherwise             -> bad
                       -- Failing that, try to expand a synonym
@@ -1309,12 +1315,42 @@ straightforward.
 ************************************************************************
 
 Deconstructors and tests on predicate types
+
+Note [Kind polymorphic type classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    class C f where...   -- C :: forall k. k -> Constraint
+    g :: forall (f::*). C f => f -> f
+
+Here the (C f) in the signature is really (C * f), and we 
+don't want to complain that the * isn't a type variable!
 -}
 
 isTyVarClassPred :: PredType -> Bool
 isTyVarClassPred ty = case getClassPredTys_maybe ty of
     Just (_, tys) -> all isTyVarTy tys
     _             -> False
+
+-------------------------
+checkValidClsArgs :: Bool -> [KindOrType] -> Bool
+-- If the Bool is True (flexible contexts), return True (i.e. ok)
+-- Otherwise, check that the type (not kind) args are all headed by a tyvar
+--   E.g. (Eq a) accepted, (Eq (f a)) accepted, but (Eq Int) rejected
+-- This function is here rather than in TcValidity because it is
+-- called from TcSimplify, which itself is imported by TcValidity
+checkValidClsArgs flexible_contexts kts
+  | flexible_contexts = True
+  | otherwise         = all hasTyVarHead tys
+  where
+    (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
+   
+hasTyVarHead :: Type -> Bool
+-- Returns true of (a t1 .. tn), where 'a' is a type variable
+hasTyVarHead ty                 -- Haskell 98 allows predicates of form
+  | tcIsTyVarTy ty = True       --      C (a ty1 .. tyn)
+  | otherwise                   -- where a is a type variable
+  = case tcSplitAppTy_maybe ty of
+       Just (ty, _) -> hasTyVarHead ty
+       Nothing      -> False
 
 evVarPred_maybe :: EvVar -> Maybe PredType
 evVarPred_maybe v = if isPredTy ty then Just ty else Nothing
@@ -1342,7 +1378,6 @@ mkMinimalBySCs ptys = [ ploc |  ploc <- ptys
    trans_super_classes pred   -- Superclasses of pred, excluding pred itself
      = case classifyPredType pred of
          ClassPred cls tys -> transSuperClasses cls tys
-         TuplePred ts      -> concatMap trans_super_classes ts
          _                 -> []
 
 transSuperClasses :: Class -> [Type] -> [PredType]
@@ -1352,10 +1387,9 @@ transSuperClasses cls tys    -- Superclasses of (cls tys),
 
 transSuperClassesPred :: PredType -> [PredType]
 -- (transSuperClassesPred p) returns (p : p's superclasses)
-transSuperClassesPred p 
+transSuperClassesPred p
   = case classifyPredType p of
       ClassPred cls tys -> p : transSuperClasses cls tys
-      TuplePred ps      -> concatMap transSuperClassesPred ps
       _                 -> [p]
 
 immSuperClasses :: Class -> [Type] -> [PredType]
@@ -1371,7 +1405,6 @@ isImprovementPred ty
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
       ClassPred cls _    -> classHasFds cls
-      TuplePred ts       -> any isImprovementPred ts
       IrredPred {}       -> True -- Might have equalities after reduction?
 
 {-
@@ -1569,23 +1602,23 @@ tcSplitIOType_maybe ty
 
 isFFITy :: Type -> Bool
 -- True for any TyCon that can possibly be an arg or result of an FFI call
-isFFITy ty = isValid (checkRepTyCon legalFFITyCon ty empty)
+isFFITy ty = isValid (checkRepTyCon legalFFITyCon ty)
 
 isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity
 -- Checks for valid argument type for a 'foreign import'
 isFFIArgumentTy dflags safety ty
-   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty empty
+   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty
 
 isFFIExternalTy :: Type -> Validity
 -- Types that are allowed as arguments of a 'foreign export'
-isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty empty
+isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty
 
 isFFIImportResultTy :: DynFlags -> Type -> Validity
 isFFIImportResultTy dflags ty
-  = checkRepTyCon (legalFIResultTyCon dflags) ty empty
+  = checkRepTyCon (legalFIResultTyCon dflags) ty
 
 isFFIExportResultTy :: Type -> Validity
-isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty empty
+isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
 isFFIDynTy :: Type -> Type -> Validity
 -- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
@@ -1606,10 +1639,12 @@ isFFIDynTy expected ty
 
 isFFILabelTy :: Type -> Validity
 -- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
-isFFILabelTy ty = checkRepTyCon ok ty extra
+isFFILabelTy ty = checkRepTyCon ok ty
   where
-    ok tc = tc `hasKey` funPtrTyConKey || tc `hasKey` ptrTyConKey
-    extra = ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)")
+    ok tc | tc `hasKey` funPtrTyConKey || tc `hasKey` ptrTyConKey
+          = IsValid
+          | otherwise
+          = NotValid (ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)"))
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Validity
 -- Checks for valid argument type for a 'foreign import prim'
@@ -1618,33 +1653,40 @@ isFFIPrimArgumentTy :: DynFlags -> Type -> Validity
 -- the foreign function.
 isFFIPrimArgumentTy dflags ty
   | isAnyTy ty = IsValid
-  | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty empty
+  | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
 
 isFFIPrimResultTy :: DynFlags -> Type -> Validity
 -- Checks for valid result type for a 'foreign import prim'
--- Currently it must be an unlifted type, including unboxed tuples.
+-- Currently it must be an unlifted type, including unboxed tuples,
+-- or the well-known type Any.
 isFFIPrimResultTy dflags ty
-   = checkRepTyCon (legalFIPrimResultTyCon dflags) ty empty
+  | isAnyTy ty = IsValid
+  | otherwise = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
 
 isFunPtrTy :: Type -> Bool
-isFunPtrTy ty = isValid (checkRepTyCon (`hasKey` funPtrTyConKey) ty empty)
+isFunPtrTy ty
+  | Just (tc, [_]) <- splitTyConApp_maybe ty
+  = tc `hasKey` funPtrTyConKey
+  | otherwise
+  = False
 
 -- normaliseFfiType gets run before checkRepTyCon, so we don't
 -- need to worry about looking through newtypes or type functions
 -- here; that's already been taken care of.
-checkRepTyCon :: (TyCon -> Bool) -> Type -> SDoc -> Validity
-checkRepTyCon check_tc ty extra
+checkRepTyCon :: (TyCon -> Validity) -> Type -> Validity
+checkRepTyCon check_tc ty
   = case splitTyConApp_maybe ty of
       Just (tc, tys)
         | isNewTyCon tc -> NotValid (hang msg 2 (mk_nt_reason tc tys $$ nt_fix))
-        | check_tc tc   -> IsValid
-        | otherwise     -> NotValid (msg $$ extra)
-      Nothing -> NotValid (quotes (ppr ty) <+> ptext (sLit "is not a data type") $$ extra)
+        | otherwise     -> case check_tc tc of
+                             IsValid        -> IsValid
+                             NotValid extra -> NotValid (msg $$ extra)
+      Nothing -> NotValid (quotes (ppr ty) <+> ptext (sLit "is not a data type"))
   where
     msg = quotes (ppr ty) <+> ptext (sLit "cannot be marshalled in a foreign call")
     mk_nt_reason tc tys
-      | null tys  = ptext (sLit "because its data construtor is not in scope")
-      | otherwise = ptext (sLit "because the data construtor for")
+      | null tys  = ptext (sLit "because its data constructor is not in scope")
+      | otherwise = ptext (sLit "because the data constructor for")
                     <+> quotes (ppr tc) <+> ptext (sLit "is not in scope")
     nt_fix = ptext (sLit "Possible fix: import the data constructor to bring it into scope")
 
@@ -1669,47 +1711,46 @@ These chaps do the work; they are not exported
 ----------------------------------------------
 -}
 
-legalFEArgTyCon :: TyCon -> Bool
+legalFEArgTyCon :: TyCon -> Validity
 legalFEArgTyCon tc
   -- It's illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
   = boxedMarshalableTyCon tc
 
-legalFIResultTyCon :: DynFlags -> TyCon -> Bool
+legalFIResultTyCon :: DynFlags -> TyCon -> Validity
 legalFIResultTyCon dflags tc
-  | tc == unitTyCon         = True
+  | tc == unitTyCon         = IsValid
   | otherwise               = marshalableTyCon dflags tc
 
-legalFEResultTyCon :: TyCon -> Bool
+legalFEResultTyCon :: TyCon -> Validity
 legalFEResultTyCon tc
-  | tc == unitTyCon         = True
+  | tc == unitTyCon         = IsValid
   | otherwise               = boxedMarshalableTyCon tc
 
-legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
+legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Validity
 -- Checks validity of types going from Haskell -> external world
 legalOutgoingTyCon dflags _ tc
   = marshalableTyCon dflags tc
 
-legalFFITyCon :: TyCon -> Bool
+legalFFITyCon :: TyCon -> Validity
 -- True for any TyCon that can possibly be an arg or result of an FFI call
 legalFFITyCon tc
-  | isUnLiftedTyCon tc = True
-  | tc == unitTyCon    = True
+  | isUnLiftedTyCon tc = IsValid
+  | tc == unitTyCon    = IsValid
   | otherwise          = boxedMarshalableTyCon tc
 
-marshalableTyCon :: DynFlags -> TyCon -> Bool
+marshalableTyCon :: DynFlags -> TyCon -> Validity
 marshalableTyCon dflags tc
-  |  (xopt Opt_UnliftedFFITypes dflags
-      && isUnLiftedTyCon tc
-      && not (isUnboxedTupleTyCon tc)
-      && case tyConPrimRep tc of        -- Note [Marshalling VoidRep]
-           VoidRep -> False
-           _       -> True)
-  = True
+  | isUnLiftedTyCon tc
+  , not (isUnboxedTupleTyCon tc)
+  , case tyConPrimRep tc of        -- Note [Marshalling VoidRep]
+       VoidRep -> False
+       _       -> True
+  = validIfUnliftedFFITypes dflags
   | otherwise
   = boxedMarshalableTyCon tc
 
-boxedMarshalableTyCon :: TyCon -> Bool
+boxedMarshalableTyCon :: TyCon -> Validity
 boxedMarshalableTyCon tc
    | getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
                          , int32TyConKey, int64TyConKey
@@ -1721,35 +1762,42 @@ boxedMarshalableTyCon tc
                          , stablePtrTyConKey
                          , boolTyConKey
                          ]
-  = True
+  = IsValid
 
-  | otherwise = False
+  | otherwise = NotValid empty
 
-legalFIPrimArgTyCon :: DynFlags -> TyCon -> Bool
+legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity
 -- Check args of 'foreign import prim', only allow simple unlifted types.
 -- Strictly speaking it is unnecessary to ban unboxed tuples here since
 -- currently they're of the wrong kind to use in function args anyway.
 legalFIPrimArgTyCon dflags tc
-  | xopt Opt_UnliftedFFITypes dflags
-    && isUnLiftedTyCon tc
-    && not (isUnboxedTupleTyCon tc)
-  = True
+  | isUnLiftedTyCon tc
+  , not (isUnboxedTupleTyCon tc)
+  = validIfUnliftedFFITypes dflags
   | otherwise
-  = False
+  = NotValid unlifted_only
 
-legalFIPrimResultTyCon :: DynFlags -> TyCon -> Bool
+legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
 -- Check result type of 'foreign import prim'. Allow simple unlifted
 -- types and also unboxed tuple result types '... -> (# , , #)'
 legalFIPrimResultTyCon dflags tc
-  | xopt Opt_UnliftedFFITypes dflags
-    && isUnLiftedTyCon tc
-    && (isUnboxedTupleTyCon tc
-        || case tyConPrimRep tc of      -- Note [Marshalling VoidRep]
+  | isUnLiftedTyCon tc
+  , (isUnboxedTupleTyCon tc
+     || case tyConPrimRep tc of      -- Note [Marshalling VoidRep]
            VoidRep -> False
            _       -> True)
-  = True
+  = validIfUnliftedFFITypes dflags
+
   | otherwise
-  = False
+  = NotValid unlifted_only
+
+unlifted_only :: MsgDoc
+unlifted_only = ptext (sLit "foreign import prim only accepts simple unlifted types")
+
+validIfUnliftedFFITypes :: DynFlags -> Validity
+validIfUnliftedFFITypes dflags
+  | xopt Opt_UnliftedFFITypes dflags =  IsValid
+  | otherwise = NotValid (ptext (sLit "To marshal unlifted types, use UnliftedFFITypes"))
 
 {-
 Note [Marshalling VoidRep]
@@ -1761,3 +1809,80 @@ In turn that means you can't write
 Reason: the back end falls over with panic "primRepHint:VoidRep";
         and there is no compelling reason to permit it
 -}
+
+{-
+************************************************************************
+*                                                                      *
+        The "Paterson size" of a type
+*                                                                      *
+************************************************************************
+-}
+
+{-
+Note [Paterson conditions on PredTypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are considering whether *class* constraints terminate
+(see Note [Paterson conditions]). Precisely, the Paterson conditions
+would have us check that "the constraint has fewer constructors and variables
+(taken together and counting repetitions) than the head.".
+
+However, we can be a bit more refined by looking at which kind of constraint
+this actually is. There are two main tricks:
+
+ 1. It seems like it should be OK not to count the tuple type constructor
+    for a PredType like (Show a, Eq a) :: Constraint, since we don't
+    count the "implicit" tuple in the ThetaType itself.
+
+    In fact, the Paterson test just checks *each component* of the top level
+    ThetaType against the size bound, one at a time. By analogy, it should be
+    OK to return the size of the *largest* tuple component as the size of the
+    whole tuple.
+
+ 2. Once we get into an implicit parameter or equality we
+    can't get back to a class constraint, so it's safe
+    to say "size 0".  See Trac #4200.
+
+NB: we don't want to detect PredTypes in sizeType (and then call
+sizePred on them), or we might get an infinite loop if that PredType
+is irreducible. See Trac #5581.
+-}
+
+type TypeSize = IntWithInf
+
+sizeType :: Type -> TypeSize
+-- Size of a type: the number of variables and constructors
+sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
+sizeType (TyVarTy {})      = 1
+sizeType (TyConApp tc tys)
+  | isTypeFamilyTyCon tc   = infinity  -- Type-family applications can
+                                       -- expand to any arbitrary size
+  | otherwise              = sizeTypes tys + 1
+sizeType (LitTy {})        = 1
+sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
+sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
+sizeType (ForAllTy _ ty)   = sizeType ty
+
+sizeTypes :: [Type] -> TypeSize
+-- IA0_NOTE: Avoid kinds.
+sizeTypes xs = sum (map sizeType tys)
+  where tys = filter (not . isKind) xs
+
+-- Note [Size of a predicate]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We are considering whether class constraints terminate.
+-- Equality constraints and constraints for the implicit
+-- parameter class always termiante so it is safe to say "size 0".
+-- (Implicit parameter constraints always terminate because
+-- there are no instances for them---they are only solved by
+-- "local instances" in expressions).
+-- See Trac #4200.
+sizePred :: PredType -> TypeSize
+sizePred p
+  = case classifyPredType p of
+      ClassPred cls tys
+        | isIPClass cls     -> 0  -- See Note [Size of a predicate]
+        | isCTupleClass cls -> maximum (0 : map sizePred tys)
+        | otherwise         -> sizeTypes tys
+      EqPred {}             -> 0  -- See Note [Size of a predicate]
+      IrredPred ty          -> sizeType ty
+

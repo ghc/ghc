@@ -2199,7 +2199,7 @@ checkHeapSanityForRetainerProfiling( void )
             /*
               After all live objects have been scavenged, the garbage
               collector may create some objects in
-              scheduleFinalizers(). These objects are created throught
+              scheduleFinalizers(). These objects are created through
               allocate(), so the small object pool or the large object
               pool of the g0s0 may not be empty.
             */

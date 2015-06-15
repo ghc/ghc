@@ -515,8 +515,8 @@ addLocalInst (home_ie, my_insts) ispec
                     | otherwise = eps_inst_env eps
                inst_envs       = InstEnvs { ie_global  = global_ie
                                           , ie_local   = home_ie'
-                                          , ie_visible = tcg_visible_orphan_mods tcg_env }
-               (matches, _, _) = lookupInstEnv inst_envs cls tys
+                                          , ie_visible = tcVisibleOrphanMods tcg_env }
+               (matches, _, _) = lookupInstEnv False inst_envs cls tys
                dups            = filter (identicalClsInstHead ispec) (map fst matches)
 
              -- Check functional dependencies

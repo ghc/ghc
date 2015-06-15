@@ -6,10 +6,11 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "Hooks.h"
 
 void
-defaultsHook (void)
-{ /* this is called *after* RTSflags has had
+FlagDefaultsHook (void)
+{ /* this is called *after* RtsFlags has had
      its defaults set, but *before* we start
      processing the RTS command-line options.
 

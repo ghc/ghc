@@ -217,7 +217,7 @@ test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
 test('T8035', normal, compile_and_run, [''])
 
 test('linker_unload',
-     [ extra_clean(['Test.o','Test.hi', 'linker_unload']), when(opsys('mingw32'), expect_broken(8292)) ],
+     [ extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
      run_command,
      ['$MAKE -s --no-print-directory linker_unload'])
 
@@ -244,9 +244,11 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 # with the non-threaded one.
 test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
 
-test('T10017', [ only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
+test('T10017', [ when(opsys('mingw32'), skip)
+               , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
+                 , when(opsys('mingw32'), expect_broken(9381))
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
@@ -254,10 +256,14 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
      compile_and_run, ['-rdynamic -package ghc'])
 
 test('GcStaticPointers',
-     [ when(compiler_lt('ghc', '7.9'), skip) ],
+     [ when(compiler_lt('ghc', '7.9'), skip)
+     , when(doing_ghci(), extra_hc_opts('-fobject-code'))
+     ],
      compile_and_run, [''])
 test('ListStaticPointers',
-     [ when(compiler_lt('ghc', '7.9'), skip) ],
+     [ when(compiler_lt('ghc', '7.9'), skip)
+     , when(doing_ghci(), extra_hc_opts('-fobject-code'))
+     ],
      compile_and_run, [''])
 
 # 251 = RTS exit code for "out of memory"

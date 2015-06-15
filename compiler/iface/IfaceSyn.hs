@@ -156,8 +156,9 @@ data IfaceTyConParent
 
 data IfaceFamTyConFlav
   = IfaceOpenSynFamilyTyCon
-  | IfaceClosedSynFamilyTyCon IfExtName       -- name of associated axiom
-                              [IfaceAxBranch] -- for pretty printing purposes only
+  | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
+    -- ^ Name of associated axiom and branches for pretty printing purposes,
+    -- or 'Nothing' for an empty closed family without an axiom
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
@@ -698,13 +699,16 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
               2 (ppr kind <+> ppShowRhs ss (pp_rhs rhs))
          , ppShowRhs ss (nest 2 (pp_branches rhs)) ]
   where
-    pp_rhs IfaceOpenSynFamilyTyCon             = ppShowIface ss (ptext (sLit "open"))
-    pp_rhs IfaceAbstractClosedSynFamilyTyCon   = ppShowIface ss (ptext (sLit "closed, abstract"))
-    pp_rhs (IfaceClosedSynFamilyTyCon _ (_:_)) = ptext (sLit "where")
-    pp_rhs IfaceBuiltInSynFamTyCon = ppShowIface ss (ptext (sLit "built-in"))
-    pp_rhs _ = panic "pprIfaceDecl syn"
+    pp_rhs IfaceOpenSynFamilyTyCon
+      = ppShowIface ss (ptext (sLit "open"))
+    pp_rhs IfaceAbstractClosedSynFamilyTyCon
+      = ppShowIface ss (ptext (sLit "closed, abstract"))
+    pp_rhs (IfaceClosedSynFamilyTyCon _)
+      = ptext (sLit "where")
+    pp_rhs IfaceBuiltInSynFamTyCon
+      = ppShowIface ss (ptext (sLit "built-in"))
 
-    pp_branches (IfaceClosedSynFamilyTyCon ax brs)
+    pp_branches (IfaceClosedSynFamilyTyCon (Just (ax, brs)))
       = vcat (map (pprAxBranch (pprPrefixIfDeclBndr ss tycon)) brs)
         $$ ppShowIface ss (ptext (sLit "axiom") <+> ppr ax)
     pp_branches _ = Outputable.empty
@@ -929,7 +933,7 @@ pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceCoercion co
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
-pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
+pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -1112,8 +1116,9 @@ freeNamesIfIdDetails _                 = emptyNameSet
 -- All other changes are handled via the version info on the tycon
 freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
 freeNamesIfFamFlav IfaceOpenSynFamilyTyCon           = emptyNameSet
-freeNamesIfFamFlav (IfaceClosedSynFamilyTyCon ax br)
+freeNamesIfFamFlav (IfaceClosedSynFamilyTyCon (Just (ax, br)))
   = unitNameSet ax &&& fnList freeNamesIfAxBranch br
+freeNamesIfFamFlav (IfaceClosedSynFamilyTyCon Nothing) = emptyNameSet
 freeNamesIfFamFlav IfaceAbstractClosedSynFamilyTyCon = emptyNameSet
 freeNamesIfFamFlav IfaceBuiltInSynFamTyCon = emptyNameSet
 
@@ -1153,11 +1158,10 @@ freeNamesIfTcArgs ITC_Nil         = emptyNameSet
 freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
-freeNamesIfType (IfaceTyConApp tc ts) =
-   freeNamesIfTc tc &&& freeNamesIfTcArgs ts
+freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfTcArgs ts
+freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfTcArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
-freeNamesIfType (IfaceForAllTy tv t)  =
-   freeNamesIfTvBndr tv &&& freeNamesIfType t
+freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfTvBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceDFunTy s t)     = freeNamesIfType s &&& freeNamesIfType t
 
@@ -1462,8 +1466,7 @@ instance Binary IfaceDecl where
 
 instance Binary IfaceFamTyConFlav where
     put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 0
-    put_ bh (IfaceClosedSynFamilyTyCon ax br) = putByte bh 1 >> put_ bh ax
-                                                             >> put_ bh br
+    put_ bh (IfaceClosedSynFamilyTyCon mb)    = putByte bh 1 >> put_ bh mb
     put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 2
     put_ _ IfaceBuiltInSynFamTyCon
         = pprPanic "Cannot serialize IfaceBuiltInSynFamTyCon, used for pretty-printing only" Outputable.empty
@@ -1471,9 +1474,8 @@ instance Binary IfaceFamTyConFlav where
     get bh = do { h <- getByte bh
                 ; case h of
                     0 -> return IfaceOpenSynFamilyTyCon
-                    1 -> do { ax <- get bh
-                            ; br <- get bh
-                            ; return (IfaceClosedSynFamilyTyCon ax br) }
+                    1 -> do { mb <- get bh
+                            ; return (IfaceClosedSynFamilyTyCon mb) }
                     _ -> return IfaceAbstractClosedSynFamilyTyCon }
 
 instance Binary IfaceClassOp where

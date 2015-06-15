@@ -1,5 +1,5 @@
 
-T9662.hs:49:7:
+T9662.hs:49:7: error:
     Couldn't match type ‘k’ with ‘n’
       ‘k’ is a rigid type variable bound by
           the type signature for:
@@ -27,7 +27,7 @@ T9662.hs:49:7:
            (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
         id
 
-T9662.hs:49:7:
+T9662.hs:49:7: error:
     Couldn't match type ‘m’ with ‘k’
       ‘m’ is a rigid type variable bound by
           the type signature for:
@@ -55,7 +55,7 @@ T9662.hs:49:7:
            (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
         id
 
-T9662.hs:49:7:
+T9662.hs:49:7: error:
     Couldn't match type ‘n’ with ‘m’
       ‘n’ is a rigid type variable bound by
           the type signature for:

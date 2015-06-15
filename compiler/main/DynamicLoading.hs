@@ -27,7 +27,7 @@ import SrcLoc           ( noSrcSpan )
 import Finder           ( findImportedModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import LoadIface        ( loadPluginInterface )
-import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(..)
+import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                         , gre_name, mkRdrQual )
 import OccName          ( mkVarOcc )
@@ -213,8 +213,8 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                     -- Try and find the required name in the exports
                     let decl_spec = ImpDeclSpec { is_mod = mod_name, is_as = mod_name
                                                 , is_qual = False, is_dloc = noSrcSpan }
-                        provenance = Imported [ImpSpec decl_spec ImpAll]
-                        env = mkGlobalRdrEnv (gresFromAvails provenance (mi_exports iface))
+                        imp_spec = ImpSpec decl_spec ImpAll
+                        env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))
                     case lookupGRE_RdrName rdr_name env of
                         [gre] -> return (Just (gre_name gre))
                         []    -> return Nothing

@@ -11,6 +11,7 @@ import Cmm
 import CmmLint
 import CmmBuildInfoTables
 import CmmCommonBlockElim
+import CmmImplementSwitchPlans
 import CmmProcPoint
 import CmmContFlowOpt
 import CmmLayoutStack
@@ -70,6 +71,10 @@ cpsTop hsc_env proc =
 
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
+
+       g <- {-# SCC "createSwitchPlans" #-}
+            runUniqSM $ cmmImplementSwitchPlans dflags g
+       dump Opt_D_dump_cmm_switch "Post switch plan" g
 
        ----------- Proc points -------------------------------------------------
        let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g

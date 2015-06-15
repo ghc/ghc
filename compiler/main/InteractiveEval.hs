@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples #-}
+{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples,
+    RecordWildCards #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -10,8 +11,9 @@
 
 module InteractiveEval (
 #ifdef GHCI
-        RunResult(..), Status(..), Resume(..), History(..),
-        runStmt, runStmtWithLocation, runDecls, runDeclsWithLocation,
+        Status(..), Resume(..), History(..),
+        execStmt, ExecOptions(..), execOptions, ExecResult(..), resumeExec,
+        runDecls, runDeclsWithLocation,
         parseImportDecl, SingleStep(..),
         resume,
         abandon, abandonAll,
@@ -31,8 +33,11 @@ module InteractiveEval (
         parseName,
         showModule,
         isModuleInterpreted,
+        parseExpr, compileParsedExpr,
         compileExpr, dynCompileExpr,
-        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType
+        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
+        -- * Depcreated API (remove in GHC 7.14)
+        RunResult(..), runStmt, runStmtWithLocation,
 #endif
         ) where
 
@@ -48,6 +53,7 @@ import HsSyn
 import HscTypes
 import BasicTypes ( HValue )
 import InstEnv
+import IfaceEnv   ( newInteractiveBinder )
 import FamInstEnv ( FamInst, orphNamesOfFamInst )
 import TyCon
 import Type     hiding( typeKind )
@@ -65,7 +71,9 @@ import Linker
 import DynFlags
 import Unique
 import UniqSupply
+import MonadUtils
 import Module
+import PrelNames  ( toDynName )
 import Panic
 import UniqFM
 import Maybes
@@ -75,6 +83,7 @@ import BreakArray
 import RtClosureInspect
 import Outputable
 import FastString
+import Bag
 
 import System.Mem.Weak
 import System.Directory
@@ -93,21 +102,13 @@ import Data.Array
 import Exception
 import Control.Concurrent
 import System.IO.Unsafe
+import GHC.Conc         ( setAllocationCounter, getAllocationCounter )
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
 
 getResumeContext :: GhcMonad m => m [Resume]
 getResumeContext = withSession (return . ic_resume . hsc_IC)
-
-data SingleStep
-   = RunToCompletion
-   | SingleStep
-   | RunAndLogSteps
-
-isStep :: SingleStep -> Bool
-isStep RunToCompletion = False
-isStep _ = True
 
 mkHistory :: HscEnv -> HValue -> BreakInfo -> History
 mkHistory hsc_env hval bi = let
@@ -152,21 +153,30 @@ updateFixityEnv fix_env = do
   let ic = hsc_IC hsc_env
   setSession $ hsc_env { hsc_IC = ic { ic_fix_env = fix_env } }
 
--- | Run a statement in the current interactive context.  Statement
--- may bind multple values.
-runStmt :: GhcMonad m => String -> SingleStep -> m RunResult
-runStmt = runStmtWithLocation "<interactive>" 1
+-- -----------------------------------------------------------------------------
+-- execStmt
 
--- | Run a statement in the current interactive context.  Passing debug information
---   Statement may bind multple values.
-runStmtWithLocation :: GhcMonad m => String -> Int ->
-                       String -> SingleStep -> m RunResult
-runStmtWithLocation source linenumber expr step =
-  do
+-- | default ExecOptions
+execOptions :: ExecOptions
+execOptions = ExecOptions
+  { execSingleStep = RunToCompletion
+  , execSourceFile = "<interactive>"
+  , execLineNumber = 1
+  }
+
+-- | Run a statement in the current interactive context.
+execStmt
+  :: GhcMonad m
+  => String             -- ^ a statement (bind or expression)
+  -> ExecOptions
+  -> m ExecResult
+execStmt stmt ExecOptions{..} = do
     hsc_env <- getSession
 
-    breakMVar  <- liftIO $ newEmptyMVar  -- wait on this when we hit a breakpoint
-    statusMVar <- liftIO $ newEmptyMVar  -- wait on this when a computation is running
+    -- wait on this when we hit a breakpoint
+    breakMVar  <- liftIO $ newEmptyMVar
+    -- wait on this when a computation is running
+    statusMVar <- liftIO $ newEmptyMVar
 
     -- Turn off -fwarn-unused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
@@ -175,27 +185,62 @@ runStmtWithLocation source linenumber expr step =
         hsc_env' = hsc_env{ hsc_IC = ic{ ic_dflags = idflags' } }
 
     -- compile to value (IO [HValue]), don't run
-    r <- liftIO $ hscStmtWithLocation hsc_env' expr source linenumber
+    r <- liftIO $ hscStmtWithLocation hsc_env' stmt
+                    execSourceFile execLineNumber
 
     case r of
       -- empty statement / comment
-      Nothing -> return (RunOk [])
+      Nothing -> return (ExecComplete (Right []) 0)
 
-      Just (tyThings, hval, fix_env) -> do
+      Just (ids, hval, fix_env) -> do
         updateFixityEnv fix_env
 
         status <-
           withVirtualCWD $
-            withBreakAction (isStep step) idflags' breakMVar statusMVar $ do
-                liftIO $ sandboxIO idflags' statusMVar hval
+            withBreakAction (isStep execSingleStep) idflags'
+               breakMVar statusMVar $ do
+                 liftIO $ sandboxIO idflags' statusMVar hval
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
 
             size = ghciHistSize idflags'
 
-        handleRunStatus step expr bindings tyThings
+        handleRunStatus execSingleStep stmt bindings ids
                         breakMVar statusMVar status (emptyHistory size)
+
+-- | The type returned by the deprecated 'runStmt' and
+-- 'runStmtWithLocation' API
+data RunResult
+  = RunOk [Name]                -- ^ names bound by this evaluation
+  | RunException SomeException  -- ^ statement raised an exception
+  | RunBreak ThreadId [Name] (Maybe BreakInfo)
+
+-- | Conver the old result type to the new result type
+execResultToRunResult :: ExecResult -> RunResult
+execResultToRunResult r =
+  case r of
+    ExecComplete{ execResult = Left ex } -> RunException ex
+    ExecComplete{ execResult = Right names } -> RunOk names
+    ExecBreak{..} -> RunBreak breakThreadId breakNames breakInfo
+
+-- Remove in GHC 7.14
+{-# DEPRECATED runStmt "use execStmt" #-}
+-- | Run a statement in the current interactive context.  Statement
+-- may bind multple values.
+runStmt :: GhcMonad m => String -> SingleStep -> m RunResult
+runStmt stmt step =
+  execResultToRunResult <$> execStmt stmt execOptions { execSingleStep = step }
+
+-- Remove in GHC 7.14
+{-# DEPRECATED runStmtWithLocation "use execStmtWithLocation" #-}
+runStmtWithLocation :: GhcMonad m => String -> Int ->
+                       String -> SingleStep -> m RunResult
+runStmtWithLocation source linenumber expr step = do
+  execResultToRunResult <$>
+     execStmt expr execOptions { execSingleStep = step
+                               , execSourceFile = source
+                               , execLineNumber = linenumber }
 
 runDecls :: GhcMonad m => String -> m [Name]
 runDecls = runDeclsWithLocation "<interactive>" 1
@@ -243,7 +288,7 @@ emptyHistory size = nilBL size
 handleRunStatus :: GhcMonad m
                 => SingleStep -> String-> ([TyThing],GlobalRdrEnv) -> [Id]
                 -> MVar () -> MVar Status -> Status -> BoundedList History
-                -> m RunResult
+                -> m ExecResult
 
 handleRunStatus step expr bindings final_ids
                breakMVar statusMVar status history
@@ -294,24 +339,24 @@ handleRunStatus step expr bindings final_ids
              , resumeSpan = span, resumeHistory = toListBL history
              , resumeHistoryIx = 0 }
            hsc_env2 = pushResume hsc_env1 resume
-  
+
          modifySession (\_ -> hsc_env2)
-         return (RunBreak tid names mb_info)
-  
+         return (ExecBreak tid names mb_info)
+
     -- Completed with an exception
-    | Complete (Left e) <- status
-    = return (RunException e)
-  
+    | Complete (Left e) alloc <- status
+    = return (ExecComplete (Left e) alloc)
+
     -- Completed successfully
-    | Complete (Right hvals) <- status
+    | Complete (Right hvals) allocs <- status
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
          liftIO $ Linker.extendLinkEnv (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          modifySession (\_ -> hsc_env')
-         return (RunOk final_names)
-  
+         return (ExecComplete (Right final_names) allocs)
+
     | otherwise
     = panic "handleRunStatus"  -- The above cases are in fact exhaustive
 
@@ -351,7 +396,10 @@ foreign import ccall "&rts_breakpoint_io_action"
 sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing =
    mask $ \restore -> -- fork starts blocked
-     let runIt = liftM Complete $ try (restore $ rethrow dflags thing)
+     let runIt =
+           liftM (uncurry Complete) $
+           measureAlloc $
+           try $ restore $ rethrow dflags $ thing
      in if gopt Opt_GhciSandbox dflags
         then do tid <- forkIO $ do res <- runIt
                                    putMVar statusMVar res -- empty: can't block
@@ -397,6 +445,13 @@ redirectInterrupts target wait
           case m of
             Nothing -> wait
             Just target -> do throwTo target (e :: SomeException); wait
+
+measureAlloc :: IO a -> IO (a,Word64)
+measureAlloc io = do
+  setAllocationCounter maxBound
+  a <- io
+  allocs <- getAllocationCounter
+  return (a, fromIntegral (maxBound::Int64) - fromIntegral allocs)
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
@@ -460,7 +515,10 @@ noBreakAction False _ _ = putStrLn "*** Ignoring breakpoint"
 noBreakAction True  _ _ = return () -- exception: just continue
 
 resume :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> m RunResult
-resume canLogSpan step
+resume canLogSpan step = execResultToRunResult <$> resumeExec canLogSpan step
+
+resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> m ExecResult
+resumeExec canLogSpan step
  = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env
@@ -511,11 +569,11 @@ resume canLogSpan step
                 handleRunStatus step expr bindings final_ids
                                 breakMVar statusMVar status hist'
 
-back :: GhcMonad m => m ([Name], Int, SrcSpan)
-back  = moveHist (+1)
+back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
+back n = moveHist (+n)
 
-forward :: GhcMonad m => m ([Name], Int, SrcSpan)
-forward  = moveHist (subtract 1)
+forward :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
+forward n = moveHist (subtract n)
 
 moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan)
 moveHist fn = do
@@ -573,17 +631,18 @@ bindLocalsAtBreakpoint
 -- bind, all we can do is bind a local variable to the exception
 -- value.
 bindLocalsAtBreakpoint hsc_env apStack Nothing = do
-   let exn_fs    = fsLit "_exception"
-       exn_name  = mkInternalName (getUnique exn_fs) (mkVarOccFS exn_fs) span
-       e_fs      = fsLit "e"
-       e_name    = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
-       e_tyvar   = mkRuntimeUnkTyVar e_name liftedTypeKind
-       exn_id    = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
+   let exn_occ = mkVarOccFS (fsLit "_exception")
+       span    = mkGeneralSrcSpan (fsLit "<exception thrown>")
+   exn_name <- newInteractiveBinder hsc_env exn_occ span
+
+   let e_fs    = fsLit "e"
+       e_name  = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
+       e_tyvar = mkRuntimeUnkTyVar e_name liftedTypeKind
+       exn_id  = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
 
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
 
-       span = mkGeneralSrcSpan (fsLit "<exception thrown>")
    --
    Linker.extendLinkEnv [(exn_name, unsafeCoerce# apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span)
@@ -620,37 +679,28 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
    mb_hValues <- mapM (getIdValFromApStack apStack) (map fromIntegral offsets)
-   let filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_dflags hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
 
-   us <- mkSplitUniqSupply 'I'
-   let (us1, us2) = splitUniqSupply us
-       tv_subst   = newTyVars us1 free_tvs
-       new_ids    = zipWith3 (mkNewId tv_subst) occs filtered_ids (uniqsFromSupply us2)
-       names      = map idName new_ids
 
-   -- make an Id for _result.  We use the Unique of the FastString "_result";
-   -- we don't care about uniqueness here, because there will only be one
-   -- _result in scope at any time.
-   let result_name = mkInternalName (getUnique result_fs)
-                          (mkVarOccFS result_fs) span
-       result_id   = Id.mkVanillaGlobal result_name (substTy tv_subst result_ty)
+   us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
+   let tv_subst     = newTyVars us free_tvs
+       filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
+       (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
+                      map (substTy tv_subst . idType) filtered_ids
 
-   -- for each Id we're about to bind in the local envt:
-   --    - tidy the type variables
-   --    - globalise the Id (Ids are supposed to be Global, apparently).
-   --
-   let result_ok = isPointer result_id
+   new_ids     <- zipWith3M mkNewId occs tidy_tys filtered_ids
+   result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
-       all_ids | result_ok = result_id : new_ids
-               | otherwise = new_ids
-       id_tys = map idType all_ids
-       (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
-       final_ids = zipWith setIdType all_ids tidy_tys
+   let result_id = Id.mkVanillaGlobal result_name (substTy tv_subst result_ty)
+       result_ok = isPointer result_id
+
+       final_ids | result_ok = result_id : new_ids
+                 | otherwise = new_ids
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
+       names  = map idName new_ids
 
    Linker.extendLinkEnv [ (name,hval) | (name, Just hval) <- zip names mb_hValues ]
    when result_ok $ Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
@@ -661,13 +711,10 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
         -- state is single-threaded and otherwise we'd spam old bindings
         -- whenever we stop at a breakpoint.  The InteractveContext is properly
         -- saved/restored, but not the linker state.  See #1743, test break026.
-   mkNewId :: TvSubst -> OccName -> Id -> Unique -> Id
-   mkNewId tv_subst occ id uniq
-     = Id.mkVanillaGlobalWithInfo name ty (idInfo id)
-     where
-         loc    = nameSrcSpan (idName id)
-         name   = mkInternalName uniq occ loc
-         ty     = substTy tv_subst (idType id)
+   mkNewId :: OccName -> Type -> Id -> IO Id
+   mkNewId occ ty old_id
+     = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
+          ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
 
    newTyVars :: UniqSupply -> TcTyVarSet -> TvSubst
      -- Similarly, clone the type variables mentioned in the types
@@ -851,11 +898,11 @@ findGlobalRdrEnv hsc_env imports
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
 availsToGlobalRdrEnv mod_name avails
-  = mkGlobalRdrEnv (gresFromAvails imp_prov avails)
+  = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) avails)
   where
       -- We're building a GlobalRdrEnv as if the user imported
       -- all the specified modules into the global interactive module
-    imp_prov = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
+    imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
     decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
@@ -928,23 +975,9 @@ getRdrNamesInScope = withSession $ \hsc_env -> do
   let
       ic = hsc_IC hsc_env
       gbl_rdrenv = ic_rn_gbl_env ic
-      gbl_names = concatMap greToRdrNames $ globalRdrEnvElts gbl_rdrenv
+      gbl_names = concatMap greRdrNames $ globalRdrEnvElts gbl_rdrenv
   return gbl_names
 
-
--- ToDo: move to RdrName
-greToRdrNames :: GlobalRdrElt -> [RdrName]
-greToRdrNames GRE{ gre_name = name, gre_prov = prov }
-  = case prov of
-     LocalDef -> [unqual]
-     Imported specs -> concat (map do_spec (map is_decl specs))
-  where
-    occ = nameOccName name
-    unqual = Unqual occ
-    do_spec decl_spec
-        | is_qual decl_spec = [qual]
-        | otherwise         = [unqual,qual]
-        where qual = Qual (is_as decl_spec) occ
 
 -- | Parses a string as an identifier, and returns the list of 'Name's that
 -- the identifier can refer to in the current interactive context.
@@ -972,45 +1005,49 @@ typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
 
 -----------------------------------------------------------------------------
--- Compile an expression, run it and deliver the resulting HValue
+-- Compile an expression, run it and deliver the result
 
+-- | Parse an expression, the parsed expression can be further processed and
+-- passed to compileParsedExpr.
+parseExpr :: GhcMonad m => String -> m (LHsExpr RdrName)
+parseExpr expr = withSession $ \hsc_env -> do
+  liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
+
+-- | Compile an expression, run it and deliver the resulting HValue.
 compileExpr :: GhcMonad m => String -> m HValue
-compileExpr expr = withSession $ \hsc_env -> do
-  Just (ids, hval, fix_env) <- liftIO $ hscStmt hsc_env ("let __cmCompileExpr = "++expr)
+compileExpr expr = do
+  parsed_expr <- parseExpr expr
+  compileParsedExpr parsed_expr
+
+-- | Compile an parsed expression (before renaming), run it and deliver
+-- the resulting HValue.
+compileParsedExpr :: GhcMonad m => LHsExpr RdrName -> m HValue
+compileParsedExpr expr@(L loc _) = withSession $ \hsc_env -> do
+  -- > let _compileParsedExpr = expr
+  -- Create let stmt from expr to make hscParsedStmt happy.
+  -- We will ignore the returned [Id], namely [expr_id], and not really
+  -- create a new binding.
+  let expr_fs = fsLit "_compileParsedExpr"
+      expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
+      let_stmt = L loc . LetStmt . HsValBinds $
+        ValBindsIn (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
+
+  Just (ids, hvals_io, fix_env) <- liftIO $ hscParsedStmt hsc_env let_stmt
   updateFixityEnv fix_env
-  hvals <- liftIO hval
-  case (ids,hvals) of
-    ([_],[hv]) -> return hv
-    _          -> panic "compileExpr"
+  hvals <- liftIO hvals_io
+  case (ids, hvals) of
+    ([_expr_id], [hval]) -> return hval
+    _ -> panic "compileParsedExpr"
 
--- -----------------------------------------------------------------------------
--- Compile an expression, run it and return the result as a dynamic
-
+-- | Compile an expression, run it and return the result as a Dynamic.
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
 dynCompileExpr expr = do
-    iis <- getContext
-    let importDecl = ImportDecl {
-                         ideclSourceSrc = Nothing,
-                         ideclName = noLoc (mkModuleName "Data.Dynamic"),
-                         ideclPkgQual = Nothing,
-                         ideclSource = False,
-                         ideclSafe = False,
-                         ideclQualified = True,
-                         ideclImplicit = False,
-                         ideclAs = Nothing,
-                         ideclHiding = Nothing
-                     }
-    setContext (IIDecl importDecl : iis)
-    let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
-    Just (ids, hvals, fix_env) <- withSession $ \hsc_env ->
-                           liftIO $ hscStmt hsc_env stmt
-    setContext iis
-    updateFixityEnv fix_env
-
-    vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
-    case (ids,vals) of
-        (_:[], v:[]) -> return v
-        _            -> panic "dynCompileExpr"
+  parsed_expr <- parseExpr expr
+  -- > Data.Dynamic.toDyn expr
+  let loc = getLoc parsed_expr
+      to_dyn_expr = mkHsApp (L loc . HsVar $ getRdrName toDynName) parsed_expr
+  hval <- compileParsedExpr to_dyn_expr
+  return (unsafeCoerce# hval :: Dynamic)
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames
@@ -1051,4 +1088,3 @@ reconstructType hsc_env bound id = do
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
 #endif /* GHCI */
-

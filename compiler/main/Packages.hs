@@ -8,6 +8,7 @@ module Packages (
 
         -- * Reading the package config, and processing cmdline args
         PackageState(preloadPackages),
+        emptyPackageState,
         initPackages,
         readPackageConfigs,
         getPackageConfRefs,
@@ -255,6 +256,14 @@ data PackageState = PackageState {
   -- package IDs.
   installedPackageIdMap :: InstalledPackageIdMap
   }
+
+emptyPackageState :: PackageState
+emptyPackageState = PackageState {
+    pkgIdMap = emptyUFM,
+    preloadPackages = [],
+    moduleToPkgConfAll = Map.empty,
+    installedPackageIdMap = Map.empty
+    }
 
 type InstalledPackageIdMap = Map InstalledPackageId PackageKey
 type InstalledPackageIndex = Map InstalledPackageId PackageConfig
@@ -1354,12 +1363,10 @@ missingDependencyMsg (Just parent)
 
 -- -----------------------------------------------------------------------------
 
-packageKeyPackageIdString :: DynFlags -> PackageKey -> String
+packageKeyPackageIdString :: DynFlags -> PackageKey -> Maybe String
 packageKeyPackageIdString dflags pkg_key
-    | pkg_key == mainPackageKey = "main"
-    | otherwise = maybe "(unknown)"
-                      sourcePackageIdString
-                      (lookupPackage dflags pkg_key)
+    | pkg_key == mainPackageKey = Just "main"
+    | otherwise = fmap sourcePackageIdString (lookupPackage dflags pkg_key)
 
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: DynFlags -> PackageKey -> Module -> Name -> Bool

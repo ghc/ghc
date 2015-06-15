@@ -32,7 +32,7 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import Coercion   ( pprCoAxiom, isReflCo, mkSymCo, mkSubCo )
+import Coercion   ( pprCoAxiom {- , isReflCo, mkSymCo, mkSubCo -} )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
@@ -44,6 +44,7 @@ import Var
 import VarEnv
 import VarSet
 import PrelNames  ( typeableClassName, genericClassNames )
+--                   , knownNatClassName, knownSymbolClassName )
 import Bag
 import BasicTypes
 import DynFlags
@@ -412,8 +413,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
        -- As above but for Safe Inference mode.
        ; when (safeInferOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | genInstCheck x -> recordUnsafeInfer
-             _ | overlapCheck x -> recordUnsafeInfer
+             _ | genInstCheck x -> recordUnsafeInfer emptyBag
              _ -> return ()
 
        ; return ( gbl_env
@@ -425,10 +425,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     bad_typeable_instance i
       = typeableClassName == is_cls_nm (iSpec i)
 
-
-    overlapCheck ty = case overlapMode (is_flag $ iSpec ty) of
-                        NoOverlap _ -> False
-                        _           -> True
+    -- Check for hand-written Generic instances (disallowed in Safe Haskell)
     genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
     genInstErr i = hang (ptext (sLit $ "Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$
@@ -997,55 +994,15 @@ tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
 -- See Note [Recursive superclasses] for why this is so hard!
 -- In effect, be build a special-purpose solver for the first step
 -- of solving each superclass constraint
-tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_theta
-  = do { traceTc "tcSuperClasses" (ppr cls $$ ppr inst_tys $$ ppr given_cls_preds)
-       ; (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
+tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_theta
+  = do { (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
        ; return (ids, listToBag binds, listToBag implics) }
   where
-    loc     = getSrcSpan dfun_id
-    head_size = sizeTypes inst_tys
-
-    ------------
-    given_cls_preds :: [(EvTerm, TcType)] -- (ev_term, type of that ev_term)
-    -- given_cls_preds is the list of (ev_term, type) that can be derived
-    -- from the dfun_evs, using the rules (sc1) and (sc3) of
-    -- Note [Recursive superclasses] below
-    -- When solving for superclasses, we search this list
-    given_cls_preds
-      = [ ev_pr | dfun_ev <- dfun_evs
-                , ev_pr <- super_classes (EvId dfun_ev, idType dfun_ev) ]
-
-    ------------
-    super_classes ev_pair
-      | (ev_tm, pred) <- normalise_pr ev_pair
-      , ClassPred cls tys <- classifyPredType pred
-      = (ev_tm, pred) : super_classes_help ev_tm cls tys
-      | otherwise
-      = []
-
-    ------------
-    super_classes_help :: EvTerm -> Class -> [TcType] -> [(EvTerm, TcType)]
-    super_classes_help ev_tm cls tys  -- ev_tm :: cls tys
-      | sizeTypes tys >= head_size  -- Here is where we test for
-      = []                          -- a smaller dictionary
-      | otherwise
-      = concatMap super_classes ([EvSuperClass ev_tm i | i <- [0..]]
-                                 `zip` immSuperClasses cls tys)
-
-    ------------
-    normalise_pr :: (EvTerm, TcPredType) -> (EvTerm, TcPredType)
-    -- Normalise type functions as much as possible
-    normalise_pr (ev_tm, pred)
-      | isReflCo norm_co = (ev_tm,                pred)
-      | otherwise        = (mkEvCast ev_tm tc_co, norm_pred)
-      where
-        (norm_co, norm_pred) = normaliseType fam_envs Nominal pred
-        tc_co = TcCoercion (mkSubCo norm_co)
-
-    ------------
+    loc = getSrcSpan dfun_id
+    size = sizePred (mkClassPred cls inst_tys)
     tc_super (sc_pred, n)
-      = do { (sc_implic, sc_ev_id) <- checkInstConstraints $
-                                      emit_sc_pred fam_envs sc_pred
+      = do { (sc_implic, sc_ev_id) <- checkInstConstraints $ \_ ->
+                                      emitWanted (ScOrigin size) sc_pred
 
            ; sc_top_name <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; let sc_top_ty = mkForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
@@ -1060,55 +1017,6 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds fam_envs sc_th
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
                                  , abs_binds    = emptyBag }
            ; return (sc_top_id, L loc bind, sc_implic) }
-
-    -------------------
-    emit_sc_pred fam_envs sc_pred ev_binds
-      | (sc_co, norm_sc_pred) <- normaliseType fam_envs Nominal sc_pred
-                                 -- sc_co :: sc_pred ~ norm_sc_pred
-      , ClassPred cls tys <- classifyPredType norm_sc_pred
-      , className cls /= typeableClassName
-        -- `Typeable` has custom solving rules, which is why we exlucde it
-        -- from the short cut, and fall throught to calling the solver.
-
-      = do { sc_ev_tm <- emit_sc_cls_pred norm_sc_pred cls tys
-           ; sc_ev_id <- newEvVar sc_pred
-           ; let tc_co = TcCoercion (mkSubCo (mkSymCo sc_co))
-           ; addTcEvBind ev_binds (mkWantedEvBind sc_ev_id (mkEvCast sc_ev_tm tc_co))
-               -- This is where we set the evidence for the superclass, and do so
-               -- (very unusually) *outside the solver*.  That's why
-               -- checkInstConstraints passes in the evidence bindings
-           ; return sc_ev_id }
-
-      | otherwise
-      = do { sc_ev_id <- emitWanted ScOrigin sc_pred
-           ; traceTc "tcSuperClass 4" (ppr sc_pred $$ ppr sc_ev_id)
-           ; return sc_ev_id }
-
-    -------------------
-    emit_sc_cls_pred sc_pred cls tys
-      | (ev_tm:_) <- [ ev_tm | (ev_tm, ev_ty) <- given_cls_preds
-                             , ev_ty `tcEqType` sc_pred ]
-      = do { traceTc "tcSuperClass 1" (ppr sc_pred $$ ppr ev_tm)
-           ; return ev_tm }
-
-      | otherwise
-      = do { inst_envs <- tcGetInstEnvs
-           ; case lookupInstEnv inst_envs cls tys of
-               ([(ispec, dfun_inst_tys)], [], _) -- A single match
-                 -> do { let dfun_id = instanceDFunId ispec
-                       ; (inst_tys, inst_theta) <- instDFunType dfun_id dfun_inst_tys
-                       ; arg_evs  <- emitWanteds ScOrigin inst_theta
-                       ; let dict_app = EvDFunApp dfun_id inst_tys (map EvId arg_evs)
-                       ; traceTc "tcSuperClass 2" (ppr sc_pred $$ ppr dict_app)
-                       ; return dict_app }
-
-               _ -> -- No instance, so we want to report an error
-                    -- Emitting it as an 'insoluble' prevents the solver
-                    -- attempting to solve it (which might, wrongly, succeed)
-                    do { sc_ev <- newWanted ScOrigin sc_pred
-                       ; emitInsoluble (mkNonCanonical sc_ev)
-                       ; traceTc "tcSuperClass 3" (ppr sc_pred $$ ppr sc_ev)
-                       ; return (ctEvTerm sc_ev) } }
 
 -------------------
 checkInstConstraints :: (EvBindsVar -> TcM result)
@@ -1143,7 +1051,6 @@ describe somewhat more complicated situations, but ones
 encountered in practice.
 
 See also tests tcrun020, tcrun021, tcrun033
-
 
 ----- THE PROBLEM --------
 The problem is that it is all too easy to create a class whose
@@ -1185,10 +1092,10 @@ definition.  More precisely:
 To achieve the Superclass Invariant, in a dfun definition we can
 generate a guaranteed-non-bottom superclass witness from:
   (sc1) one of the dictionary arguments itself (all non-bottom)
-  (sc2) a call of a dfun (always returns a dictionary constructor)
-  (sc3) an immediate superclass of a smaller dictionary
+  (sc2) an immediate superclass of a smaller dictionary
+  (sc3) a call of a dfun (always returns a dictionary constructor)
 
-The tricky case is (sc3).  We proceed by induction on the size of
+The tricky case is (sc2).  We proceed by induction on the size of
 the (type of) the dictionary, defined by TcValidity.sizePred.
 Let's suppose we are building a dictionary of size 3, and
 suppose the Superclass Invariant holds of smaller dictionaries.
@@ -1230,8 +1137,39 @@ that is *not* smaller than the target so we can't take *its*
 superclasses.  As a result the program is rightly rejected, unless you
 add (Super (Fam a)) to the context of (i3).
 
-Note [Silent superclass arguments] (historical interest)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Solving superclass constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How do we ensure that every superclass witness is generated by
+one of (sc1) (sc2) or (sc3) in Note [Recursive superclases].
+Answer:
+
+  * Superclass "wanted" constraints have CtOrigin of (ScOrigin size)
+    where 'size' is the size of the instance declaration. e.g.
+          class C a => D a where...
+          instance blah => D [a] where ...
+    The wanted superclass constraint for C [a] has origin
+    ScOrigin size, where size = size( D [a] ).
+
+  * (sc1) When we rewrite such a wanted constraint, it retains its
+    origin.  But if we apply an instance declaration, we can set the
+    origin to (ScOrigin infinity), thus lifting any restrictions by
+    making prohibitedSuperClassSolve return False.
+
+  * (sc2) ScOrigin wanted constraints can't be solved from a
+    superclass selection, except at a smaller type.  This test is
+    implemented by TcInteract.prohibitedSuperClassSolve
+
+  * The "given" constraints of an instance decl have CtOrigin
+    GivenOrigin InstSkol.
+
+  * When we make a superclass selection from InstSkol we use
+    a SkolemInfo of (InstSC size), where 'size' is the size of
+    the constraint whose superclass we are taking.  An similarly
+    when taking the superclass of an InstSC.  This is implemented
+    in TcCanonical.newSCWorkFromFlavored
+
+Note [Silent superclass arguments] (historical interest only)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 NB1: this note describes our *old* solution to the
      recursive-superclass problem. I'm keeping the Note
      for now, just as institutional memory.
@@ -1380,7 +1318,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
            ; self_dict <- newDict clas inst_tys
            ; let self_ev_bind = mkWantedEvBind self_dict
-                                   (EvDFunApp dfun_id (mkTyVarTys tyvars) (map EvId dfun_ev_vars))
+                                   (EvDFunApp dfun_id (mkTyVarTys tyvars) dfun_ev_vars)
 
            ; (meth_id, local_meth_sig, hs_wrap)
                    <- mkMethIds hs_sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
@@ -1561,7 +1499,7 @@ that the type variables bound in the signature will scope over the body.
 What about the check that the instance method signature is more
 polymorphic than the instantiated class method type?  We just do a
 tcSubType call in mkMethIds, and use the HsWrapper thus generated in
-the method AbsBind.  It's very like the tcSubType impedence-matching
+the method AbsBind.  It's very like the tcSubType impedance-matching
 call in mkExport.  We have to pass the HsWrapper into
 tcMethodBody.
 -}

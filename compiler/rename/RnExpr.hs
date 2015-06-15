@@ -250,12 +250,10 @@ rnExpr (RecordUpd expr rbinds _ _ _)
                   fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig expr pty PlaceHolder)
-  = do  { (wcs, pty') <- extractWildcards pty
-        ; bindLocatedLocalsFV wcs $ \wcs_new -> do {
-          (pty'', fvTy) <- rnLHsType ExprWithTySigCtx pty'
-        ; (expr', fvExpr) <- bindSigTyVarsFV (hsExplicitTvs pty'') $
-                             rnLExpr expr
-        ; return (ExprWithTySig expr' pty'' wcs_new, fvExpr `plusFV` fvTy) } }
+  = do  { (pty', fvTy, wcs) <- rnLHsTypeWithWildCards ExprWithTySigCtx pty
+        ; (expr', fvExpr)   <- bindSigTyVarsFV (hsExplicitTvs pty') $
+                               rnLExpr expr
+        ; return (ExprWithTySig expr' pty' wcs, fvExpr `plusFV` fvTy) }
 
 rnExpr (HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -333,7 +331,9 @@ rnExpr e@(HsStatic expr) = do
              ]
       _ -> do
        let isTopLevelName n = isExternalName n || isWiredInName n
-       case nameSetElems $ filterNameSet (not . isTopLevelName) fvExpr of
+       case nameSetElems $ filterNameSet
+                             (\n -> not (isTopLevelName n || isUnboundName n))
+                             fvExpr                                           of
          [] -> return ()
          fvNonGlobal -> addErr $ cat
              [ text $ "Only identifiers of top-level bindings can "
@@ -751,7 +751,7 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
                    ; (thing, fvs_thing) <- thing_inside bndrs
                    ; let fvs = fvs_by `plusFV` fvs_thing
                          used_bndrs = filter (`elemNameSet` fvs) bndrs
-                         -- The paper (Fig 5) has a bug here; we must treat any free varaible
+                         -- The paper (Fig 5) has a bug here; we must treat any free variable
                          -- of the "thing inside", **or of the by-expression**, as used
                    ; return ((by', used_bndrs, thing), fvs) }
 

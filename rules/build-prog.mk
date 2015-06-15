@@ -22,7 +22,6 @@ $(call profStart, build-prog($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
-ifneq "$$(CLEANING)" "YES"
 ifeq "$$($1_$2_PROGNAME)" ""
 $$(error $1_$2_PROGNAME is not set)
 endif
@@ -30,7 +29,6 @@ ifneq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is set)
 endif
 $1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext$3)
-endif
 
 ifeq "$$(findstring $3,0 1 2)" ""
 $$(error $1/$2: stage argument to build-prog should be 0, 1, or 2)
@@ -45,6 +43,10 @@ $$(eval $$(call build-prog-helper,$1,$2,$3))
 endif
 $(call profEnd, build-prog($1,$2,$3))
 endef
+
+
+
+
 
 
 define build-prog-vars
@@ -81,16 +83,14 @@ endif
 $1_$2_depfile_base = $1/$2/build/.depend
 
 ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$(CLEANING)" "YES"
 $1_$2_INPLACE = $$(error $1_$2 should not be installed inplace, but INPLACE var evaluated)
 else
 $1_$2_INPLACE =
 endif
 else
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$($$($1_$2_PROGNAME)_INPLACE)" ""
 $$(error $$($1_$2_PROGNAME)_INPLACE defined twice)
-endif
 endif
 ifeq "$$($1_$2_TOPDIR)" "YES"
 $$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
@@ -106,6 +106,10 @@ endif
 endif
 
 endef
+
+
+
+
 
 define build-prog-helper
 # $1 = dir
@@ -181,6 +185,7 @@ $1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS += -no-auto-link-packages -no-hs-main
 endif
 
 ifneq "$$(BINDIST)" "YES"
+
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
@@ -252,7 +257,7 @@ $1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c $1/$2/
 
 $1/$2/build/tmp/$$($1_$2_PROG).dll : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call build-dll,$1,$2,$$($1_$2_PROGRAM_WAY),,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS),$$@)
-else
+else # $1_$2_PROG_NEEDS_C_WRAPPER=NO
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
@@ -261,7 +266,7 @@ else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_CC_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
 endif
-endif
+endif # $1_$2_PROG_NEEDS_C_WRAPPER
 
 # Note [lib-depends] if this program is built with stage1 or greater, we
 # need to depend on the libraries too.  NB. since $(ALL_STAGE1_LIBS) and
@@ -278,15 +283,12 @@ endif
 endif
 endif
 
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
 	$$(INSTALL) -m 755 $$< $$@
 endif
-endif
 
-endif
+endif # BINDIST=YES
 
 ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 $(call all-target,$1_$2,$$($1_$2_INPLACE))

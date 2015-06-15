@@ -34,6 +34,14 @@ import Name
 import TcRnMonad
 import TcType
 
+import Outputable
+import TcExpr
+import SrcLoc
+import FastString
+import THNames
+import TcUnify
+import TcEnv
+
 #ifdef GHCI
 import HscMain
         -- These imports are the reason that TcSplice
@@ -45,14 +53,11 @@ import Convert
 import RnExpr
 import RnEnv
 import RnTypes
-import TcExpr
 import TcHsSyn
 import TcSimplify
-import TcUnify
 import Type
 import Kind
 import NameSet
-import TcEnv
 import TcMType
 import TcHsType
 import TcIface
@@ -81,7 +86,6 @@ import DsExpr
 import DsMonad
 import Serialized
 import ErrUtils
-import SrcLoc
 import Util
 import Data.List        ( mapAccumL )
 import Unique
@@ -92,10 +96,7 @@ import Maybes( MaybeErr(..) )
 import DynFlags
 import Panic
 import Lexeme
-import FastString
-import Outputable
 
-import DsMeta
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
@@ -129,10 +130,87 @@ tcSpliceExpr     :: HsSplice Name  -> TcRhoType -> TcM (HsExpr TcId)
 -- runQuasiQuoteDecl :: HsQuasiQuote RdrName -> RnM [LHsDecl RdrName]
 
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
+{-
+************************************************************************
+*                                                                      *
+\subsection{Quoting an expression}
+*                                                                      *
+************************************************************************
+-}
+
+-- See Note [How brackets and nested splices are handled]
+-- tcTypedBracket :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
+tcTypedBracket brack@(TExpBr expr) res_ty
+  = addErrCtxt (quotationCtxtDoc brack) $
+    do { cur_stage <- getStage
+       ; ps_ref <- newMutVar []
+       ; lie_var <- getConstraintVar   -- Any constraints arising from nested splices
+                                       -- should get thrown into the constraint set
+                                       -- from outside the bracket
+
+       -- Typecheck expr to make sure it is valid,
+       -- Throw away the typechecked expression but return its type.
+       -- We'll typecheck it again when we splice it in somewhere
+       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
+                                tcInferRhoNC expr
+                                -- NC for no context; tcBracket does that
+
+       ; meta_ty <- tcTExpTy expr_ty
+       ; co <- unifyType meta_ty res_ty
+       ; ps' <- readMutVar ps_ref
+       ; texpco <- tcLookupId unsafeTExpCoerceName
+       ; return (mkHsWrapCo co (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
+                                               (noLoc (HsTcBracketOut brack ps'))))) }
+tcTypedBracket other_brack _
+  = pprPanic "tcTypedBracket" (ppr other_brack)
+
+-- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> TcRhoType -> TcM (HsExpr TcId)
+tcUntypedBracket brack ps res_ty
+  = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
+       ; ps' <- mapM tcPendingSplice ps
+       ; meta_ty <- tcBrackTy brack
+       ; co <- unifyType meta_ty res_ty
+       ; traceTc "tc_bracket done untyped" (ppr meta_ty)
+       ; return (mkHsWrapCo co (HsTcBracketOut brack ps'))  }
+
+---------------
+tcBrackTy :: HsBracket Name -> TcM TcType
+tcBrackTy (VarBr _ _) = tcMetaTy nameTyConName  -- Result type is Var (not Q-monadic)
+tcBrackTy (ExpBr _)   = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
+tcBrackTy (TypBr _)   = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
+tcBrackTy (DecBrG _)  = tcMetaTy decsQTyConName -- Result type is Q [Dec]
+tcBrackTy (PatBr _)   = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
+tcBrackTy (DecBrL _)  = panic "tcBrackTy: Unexpected DecBrL"
+tcBrackTy (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
+
+---------------
+tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
+tcPendingSplice (PendingRnSplice flavour splice_name expr)
+  = do { res_ty <- tcMetaTy meta_ty_name
+       ; expr' <- tcMonoExpr expr res_ty
+       ; return (PendingTcSplice splice_name expr') }
+  where
+     meta_ty_name = case flavour of
+                       UntypedExpSplice  -> expQTyConName
+                       UntypedPatSplice  -> patQTyConName
+                       UntypedTypeSplice -> typeQTyConName
+                       UntypedDeclSplice -> decsQTyConName
+
+---------------
+-- Takes a type tau and returns the type Q (TExp tau)
+tcTExpTy :: TcType -> TcM TcType
+tcTExpTy tau
+  = do { q    <- tcLookupTyCon qTyConName
+       ; texp <- tcLookupTyCon tExpTyConName
+       ; return (mkTyConApp q [mkTyConApp texp [tau]]) }
+
+quotationCtxtDoc :: HsBracket Name -> SDoc
+quotationCtxtDoc br_body
+  = hang (ptext (sLit "In the Template Haskell quotation"))
+         2 (ppr br_body)
+
 
 #ifndef GHCI
-tcTypedBracket   x _   = failTH x "Template Haskell bracket"
-tcUntypedBracket x _ _ = failTH x "Template Haskell bracket"
 tcSpliceExpr  e _      = failTH e "Template Haskell splice"
 
 -- runQuasiQuoteExpr q = failTH q "quasiquote"
@@ -325,79 +403,7 @@ When a variable is used, we compare
            g1 = $(map ...)         is OK
            g2 = $(f ...)           is not OK; because we havn't compiled f yet
 
-
-************************************************************************
-*                                                                      *
-\subsection{Quoting an expression}
-*                                                                      *
-************************************************************************
 -}
-
--- See Note [How brackets and nested splices are handled]
--- tcTypedBracket :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
-tcTypedBracket brack@(TExpBr expr) res_ty
-  = addErrCtxt (quotationCtxtDoc brack) $
-    do { cur_stage <- getStage
-       ; ps_ref <- newMutVar []
-       ; lie_var <- getConstraintVar   -- Any constraints arising from nested splices
-                                       -- should get thrown into the constraint set
-                                       -- from outside the bracket
-
-       -- Typecheck expr to make sure it is valid,
-       -- Throw away the typechecked expression but return its type.
-       -- We'll typecheck it again when we splice it in somewhere
-       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
-                                tcInferRhoNC expr
-                                -- NC for no context; tcBracket does that
-
-       ; meta_ty <- tcTExpTy expr_ty
-       ; co <- unifyType meta_ty res_ty
-       ; ps' <- readMutVar ps_ref
-       ; texpco <- tcLookupId unsafeTExpCoerceName
-       ; return (mkHsWrapCo co (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
-                                               (noLoc (HsTcBracketOut brack ps'))))) }
-tcTypedBracket other_brack _
-  = pprPanic "tcTypedBracket" (ppr other_brack)
-
--- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> TcRhoType -> TcM (HsExpr TcId)
-tcUntypedBracket brack ps res_ty
-  = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
-       ; ps' <- mapM tcPendingSplice ps
-       ; meta_ty <- tcBrackTy brack
-       ; co <- unifyType meta_ty res_ty
-       ; traceTc "tc_bracket done untyped" (ppr meta_ty)
-       ; return (mkHsWrapCo co (HsTcBracketOut brack ps'))  }
-
----------------
-tcBrackTy :: HsBracket Name -> TcM TcType
-tcBrackTy (VarBr _ _) = tcMetaTy nameTyConName  -- Result type is Var (not Q-monadic)
-tcBrackTy (ExpBr _)   = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
-tcBrackTy (TypBr _)   = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
-tcBrackTy (DecBrG _)  = tcMetaTy decsQTyConName -- Result type is Q [Dec]
-tcBrackTy (PatBr _)   = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
-tcBrackTy (DecBrL _)  = panic "tcBrackTy: Unexpected DecBrL"
-tcBrackTy (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
-
----------------
-tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
-tcPendingSplice (PendingRnSplice flavour splice_name expr)
-  = do { res_ty <- tcMetaTy meta_ty_name
-       ; expr' <- tcMonoExpr expr res_ty
-       ; return (PendingTcSplice splice_name expr') }
-  where
-     meta_ty_name = case flavour of
-                       UntypedExpSplice  -> expQTyConName
-                       UntypedPatSplice  -> patQTyConName
-                       UntypedTypeSplice -> typeQTyConName
-                       UntypedDeclSplice -> decsQTyConName
-
----------------
--- Takes a type tau and returns the type Q (TExp tau)
-tcTExpTy :: TcType -> TcM TcType
-tcTExpTy tau
-  = do { q    <- tcLookupTyCon qTyConName
-       ; texp <- tcLookupTyCon tExpTyConName
-       ; return (mkTyConApp q [mkTyConApp texp [tau]]) }
 
 {-
 ************************************************************************
@@ -468,11 +474,6 @@ tcTopSplice expr res_ty
 *                                                                      *
 ************************************************************************
 -}
-
-quotationCtxtDoc :: HsBracket Name -> SDoc
-quotationCtxtDoc br_body
-  = hang (ptext (sLit "In the Template Haskell quotation"))
-         2 (ppr br_body)
 
 spliceCtxtDoc :: HsSplice Name -> SDoc
 spliceCtxtDoc splice
@@ -879,7 +880,7 @@ reifyInstances th_nm th_tys
             Just (tc, tys)                 -- See Trac #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
-                     ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
+                     ; let (matches, unifies, _) = lookupInstEnv False inst_envs cls tys
                      ; traceTc "reifyInstances1" (ppr matches)
                      ; reifyClassInstances cls (map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc
@@ -1336,14 +1337,15 @@ reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 reifyFamFlavour :: TyCon -> TcM (Either TH.FamFlavour [TH.TySynEqn])
 reifyFamFlavour tc
   | isOpenTypeFamilyTyCon tc = return $ Left TH.TypeFam
-  | isDataFamilyTyCon    tc = return $ Left TH.DataFam
-
-    -- this doesn't really handle abstract closed families, but let's not worry
-    -- about that now
-  | Just ax <- isClosedSynFamilyTyCon_maybe tc
-  = do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
-       ; return $ Right eqns }
-
+  | isDataFamilyTyCon     tc = return $ Left TH.DataFam
+  | Just flav <- famTyConFlav_maybe tc = case flav of
+      OpenSynFamilyTyCon           -> return $ Left TH.TypeFam
+      AbstractClosedSynFamilyTyCon -> return $ Right []
+      BuiltInSynFamTyCon _         -> return $ Right []
+      ClosedSynFamilyTyCon Nothing -> return $ Right []
+      ClosedSynFamilyTyCon (Just ax)
+        -> do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
+              ; return $ Right eqns }
   | otherwise
   = panic "TcSplice.reifyFamFlavour: not a type family"
 
@@ -1388,7 +1390,7 @@ annotation anyway. This should be a rare case, indeed. Here is an example:
 
 Here G's kind is (forall k. k -> k), and the desugared RHS of that last
 instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
-the algoritm above, there are 3 arguments to G so we should peel off 3
+the algorithm above, there are 3 arguments to G so we should peel off 3
 arguments in G's kind. But G's kind has only two arguments. This is the
 rare special case, and we conservatively choose to put the annotation
 in.

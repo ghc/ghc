@@ -17,7 +17,7 @@ import CLabel
 import Cmm
 
 import FastString
-import qualified Outputable
+import Outputable
 
 -- ----------------------------------------------------------------------------
 -- * Constants
@@ -127,11 +127,3 @@ genStaticLit (CmmBlock b) = genStaticLit $ CmmLabel $ infoTblLbl b
 
 genStaticLit (CmmHighStackMark)
     = panic "genStaticLit: CmmHighStackMark unsupported!"
-
--- -----------------------------------------------------------------------------
--- * Misc
---
-
--- | Error Function
-panic :: String -> a
-panic s = Outputable.panic $ "LlvmCodeGen.Data." ++ s

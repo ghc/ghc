@@ -67,6 +67,7 @@ module Util (
 
         -- * Module names
         looksLikeModuleName,
+        looksLikePackageName,
 
         -- * Argument processing
         getCmd, toCmdArgs, toArgs,
@@ -115,6 +116,10 @@ import Data.List        hiding (group)
 import FastTypes
 #endif
 
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative (Applicative)
+#endif
+import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime )
@@ -655,6 +660,11 @@ cmpList cmp (a:as) (b:bs)
 removeSpaces :: String -> String
 removeSpaces = dropWhileEndLE isSpace . dropWhile isSpace
 
+-- Boolean operators lifted to Applicative
+(<&&>) :: Applicative f => f Bool -> f Bool -> f Bool
+(<&&>) = liftA2 (&&)
+infixr 3 <&&> -- same as (&&)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -821,6 +831,11 @@ looksLikeModuleName (c:cs) = isUpper c && go cs
   where go [] = True
         go ('.':cs) = looksLikeModuleName cs
         go (c:cs)   = (isAlphaNum c || c == '_' || c == '\'') && go cs
+
+-- Similar to 'parse' for Distribution.Package.PackageName,
+-- but we don't want to depend on Cabal.
+looksLikePackageName :: String -> Bool
+looksLikePackageName = all (all isAlphaNum <&&> not . (all isDigit)) . split '-'
 
 {-
 Akin to @Prelude.words@, but acts like the Bourne shell, treating

@@ -512,9 +512,10 @@ mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = CoPat co_fn p ty
 
+-- input coercion is Nominal
 mkHsWrapPatCo :: TcCoercion -> Pat id -> Type -> Pat id
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
-                        | otherwise     = CoPat (mkWpCast co) pat ty
+                        | otherwise     = CoPat (mkWpCast (mkTcSubCo co)) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
@@ -794,10 +795,11 @@ hsForeignDeclsBinders foreign_decls
     | L decl_loc (ForeignImport (L _ n) _ _ _) <- foreign_decls]
 
 -------------------
-hsPatSynBinders :: LHsBindsLR idL idR -> [Located idL]
+hsPatSynBinders :: HsValBinds RdrName -> [Located RdrName]
 -- Collect pattern-synonym binders only, not Ids
 -- See Note [SrcSpan for binders]
-hsPatSynBinders binds = foldrBag addPatSynBndr [] binds
+hsPatSynBinders (ValBindsIn binds _) = foldrBag addPatSynBndr [] binds
+hsPatSynBinders _ = panic "hsPatSynBinders"
 
 addPatSynBndr :: LHsBindLR idL idR -> [Located idL] -> [Located idL]
 -- See Note [SrcSpan for binders]

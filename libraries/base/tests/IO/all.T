@@ -72,21 +72,14 @@ test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  exit_code(1), compile_and_run, [''])
 test('openFile003',  extra_clean(['openFile003Dir']), compile_and_run, [''])
 test('openFile004',  extra_clean(['openFile004.out']), compile_and_run, [''])
-test('openFile005',
-     [when(compiler_type('hugs'), expect_fail),
-      extra_clean(['openFile005.out1', 'openFile005.out2'])],
+test('openFile005',  extra_clean(['openFile005.out1', 'openFile005.out2']),
      compile_and_run, [''])
 test('openFile006', extra_clean(['openFile006.out']), compile_and_run, [''])
-test('openFile007',
-     [when(compiler_type('hugs'), expect_fail),
-      extra_clean(['openFile007.out'])],
-     compile_and_run, [''])
+test('openFile007', extra_clean(['openFile007.out']), compile_and_run, [''])
 test('openFile008', cmd_prefix('ulimit -n 1024; '), compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
-test('readFile001',
-     [when(compiler_type('hugs'), expect_fail),
-      extra_clean(['readFile001.out'])],
+test('readFile001',  extra_clean(['readFile001.out']),
      compile_and_run, [''])
 test('readwrite001',
      extra_clean(['readwrite001.inout']),

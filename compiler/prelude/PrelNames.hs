@@ -121,7 +121,6 @@ import Module
 import OccName
 import RdrName
 import Unique
-import BasicTypes
 import Name
 import SrcLoc
 import FastString
@@ -171,12 +170,6 @@ isUnboundName name = name `hasKey` unboundKey
 This section tells what the compiler knows about the association of
 names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in TysWiredIn etc.
-
-The names for DPH can come from one of multiple backend packages. At the point where
-'basicKnownKeyNames' is used, we don't know which backend it will be.  Hence, we list
-the names for multiple backends.  That works out fine, although they use the same uniques,
-as we are guaranteed to only load one backend; hence, only one of the different names
-sharing a unique will be used.
 -}
 
 basicKnownKeyNames :: [Name]
@@ -189,7 +182,6 @@ basicKnownKeyNames
         stringTyConName,
         ratioDataConName,
         ratioTyConName,
-        integerTyConName,
 
         --  Classes.  *Must* include:
         --      classes that are grabbed by key (e.g., eqClassKey)
@@ -222,6 +214,8 @@ basicKnownKeyNames
         mkAppTyName,
         typeLitTypeRepName,
 
+        -- Dynamic
+        toDynName,
 
         -- Numeric stuff
         negateName, minusName, geName, eqName,
@@ -248,8 +242,8 @@ basicKnownKeyNames
         fmapName,
         joinMName,
 
-        -- MonadRec stuff
-        mfixName,
+        -- MonadFix
+        monadFixClassName, mfixName,
 
         -- Arrow stuff
         arrAName, composeAName, firstAName,
@@ -319,9 +313,6 @@ basicKnownKeyNames
         rationalToFloatName,
         rationalToDoubleName,
 
-        -- MonadFix
-        monadFixClassName, mfixName,
-
         -- Other classes
         randomClassName, randomGenClassName, monadPlusClassName,
 
@@ -371,7 +362,6 @@ basicKnownKeyNames
 
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
-           IntegerGMP2   -> [integerSDataConName]
            IntegerSimple -> []
 
 genericTyConNames :: [Name]
@@ -408,7 +398,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -462,7 +452,6 @@ gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
-gHC_IP          = mkBaseModule (fsLit "GHC.IP")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -518,19 +507,6 @@ mkMainModule m = mkModule mainPackageKey (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
 mkMainModule_ m = mkModule mainPackageKey m
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Constructing the names of tuples
-*                                                                      *
-************************************************************************
--}
-
-mkTupleModule :: TupleSort -> Module
-mkTupleModule BoxedTuple      = gHC_TUPLE
-mkTupleModule ConstraintTuple = gHC_TUPLE
-mkTupleModule UnboxedTuple    = gHC_PRIM
 
 {-
 ************************************************************************
@@ -964,7 +940,6 @@ integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           int
 integerSDataConName   = conName gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
   where n = case cIntegerLibraryType of
             IntegerGMP    -> "S#"
-            IntegerGMP2   -> "S#"
             IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
@@ -1055,7 +1030,9 @@ mkPolyTyConAppName    = varQual tYPEABLE_INTERNAL (fsLit "mkPolyTyConApp") mkPol
 mkAppTyName           = varQual tYPEABLE_INTERNAL (fsLit "mkAppTy")        mkAppTyKey
 typeLitTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeLitTypeRep") typeLitTypeRepKey
 
-
+-- Dynamic
+toDynName :: Name
+toDynName = varQual dYNAMIC (fsLit "toDyn") toDynIdKey
 
 -- Class Data
 dataClassName :: Name
@@ -1197,7 +1174,7 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 
 -- Implicit parameters
 ipClassName :: Name
-ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
+ipClassName         = clsQual gHC_CLASSES (fsLit "IP") ipClassNameKey
 
 -- Source Locations
 callStackDataConName, callStackTyConName, srcLocDataConName :: Name
@@ -1575,9 +1552,6 @@ typeRepTyConKey = mkPreludeTyConUnique 183
 
 #include "primop-vector-uniques.hs-incl"
 
-unitTyConKey :: Unique
-unitTyConKey = mkTupleTyConUnique BoxedTuple 0
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1907,6 +1881,9 @@ mkPolyTyConAppKey = mkPreludeMiscIdUnique 504
 mkAppTyKey        = mkPreludeMiscIdUnique 505
 typeLitTypeRepKey = mkPreludeMiscIdUnique 506
 
+-- Dynamic
+toDynIdKey :: Unique
+toDynIdKey = mkPreludeMiscIdUnique 507
 
 {-
 ************************************************************************

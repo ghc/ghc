@@ -251,7 +251,7 @@ schedule (Capability *initialCapability, Task *task)
     case SCHED_INTERRUPTING:
         debugTrace(DEBUG_sched, "SCHED_INTERRUPTING");
         /* scheduleDoGC() deletes all the threads */
-        scheduleDoGC(&cap,task,rtsFalse);
+        scheduleDoGC(&cap,task,rtsTrue);
 
         // after scheduleDoGC(), we must be shutting down.  Either some
         // other Capability did the final GC, or we did it above,
@@ -1458,6 +1458,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     Capability *cap = *pcap;
     rtsBool heap_census;
     nat collect_gen;
+    rtsBool major_gc;
 #ifdef THREADED_RTS
     nat gc_type;
     nat i, sync;
@@ -1476,6 +1477,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     // Figure out which generation we are collecting, so that we can
     // decide whether this is a parallel GC or not.
     collect_gen = calcNeeded(force_major || heap_census, NULL);
+    major_gc = (collect_gen == RtsFlags.GcFlags.generations-1);
 
 #ifdef THREADED_RTS
     if (sched_state < SCHED_INTERRUPTING
@@ -1618,8 +1620,9 @@ delete_threads_and_gc:
      * We now have all the capabilities; if we're in an interrupting
      * state, then we should take the opportunity to delete all the
      * threads in the system.
+     * Checking for major_gc ensures that the last GC is major.
      */
-    if (sched_state == SCHED_INTERRUPTING) {
+    if (sched_state == SCHED_INTERRUPTING && major_gc) {
         deleteAllThreads(cap);
 #if defined(THREADED_RTS)
         // Discard all the sparks from every Capability.  Why?

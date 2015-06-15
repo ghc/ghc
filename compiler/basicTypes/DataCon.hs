@@ -184,7 +184,7 @@ Why might the wrapper have anything to do?  Two reasons:
   The wrapper has the programmer-specified type:
         \$wMkT :: a -> T [a]
         \$wMkT a x = MkT [a] a [a] x
-  The third argument is a coerion
+  The third argument is a coercion
         [a] :: [a]~[a]
 
 INVARIANT: the dictionary constructor for a class
@@ -937,11 +937,11 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                                 -- class dictionary, with superclasses)
                   -> [Type]     -- ^ Instantiated at these types
                   -> [Type]
-dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs, dcEqSpec = eq_spec,
+dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyVars = ex_tvs}) inst_tys
  = ASSERT2( length univ_tvs == length inst_tys
           , ptext (sLit "dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
-   ASSERT2( null ex_tvs && null eq_spec, ppr dc )
+   ASSERT2( null ex_tvs, ppr dc )
    map (substTyWith univ_tvs inst_tys) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
@@ -1024,7 +1024,6 @@ dataConCannotMatch tys con
     -- TODO: could gather equalities from superclasses too
     predEqs pred = case classifyPredType pred of
                      EqPred NomEq ty1 ty2 -> [(ty1, ty2)]
-                     TuplePred ts         -> concatMap predEqs ts
                      _                    -> []
 
 {-

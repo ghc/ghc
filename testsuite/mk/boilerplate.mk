@@ -1,3 +1,10 @@
+# Eliminate use of the built-in implicit rules, and clear out the default list
+# of suffixes for suffix rules. Speeds up make quite a bit. Both are needed
+# for the shortest `make -d` output.
+# Don't set --no-builtin-variables; some rules might stop working if you do
+# (e.g. 'make clean' in testsuite/ currently relies on an implicit $RM).
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:
 
 default: all
 
@@ -108,6 +115,10 @@ ifeq "$(RUNGHC)" ""
 RUNGHC := $(call find_tool,runghc)
 endif
 
+ifeq "$(HADDOCK)" ""
+HADDOCK := $(call find_tool,haddock)
+endif
+
 ifeq "$(HSC2HS)" ""
 HSC2HS := $(call find_tool,hsc2hs)
 endif
@@ -128,6 +139,12 @@ endif
 $(eval $(call canonicaliseExecutable,GHC_PKG))
 ifeq "$(shell test -x '$(GHC_PKG)' && echo exists)" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
+endif
+
+$(eval $(call canonicaliseExecutable,HADDOCK))
+ifeq "$(shell test -x '$(HADDOCK)' && echo exists)" ""
+# haddock is optional.
+HADDOCK :=
 endif
 
 $(eval $(call canonicaliseExecutable,HSC2HS))
@@ -177,6 +194,7 @@ $(ghc-config-mk) : $(TOP)/mk/ghc-config
 	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
 # If the ghc-config fails, remove $@, and fail
 
+# Note: $(CLEANING) is not defined in the testsuite.
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include $(ghc-config-mk)
 endif

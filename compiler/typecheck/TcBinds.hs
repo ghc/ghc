@@ -56,7 +56,7 @@ import BasicTypes
 import Outputable
 import FastString
 import Type(mkStrLitTy)
-import PrelNames(ipClassName)
+import PrelNames( ipClassName, gHC_PRIM )
 import TcValidity (checkValidType)
 
 import Control.Monad
@@ -651,7 +651,7 @@ mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
         ; traceTc "mkExport: check sig"
                   (vcat [ ppr poly_name, ppr sel_poly_ty, ppr (idType poly_id) ])
 
-        -- Perform the impedence-matching and ambiguity check
+        -- Perform the impedance-matching and ambiguity check
         -- right away.  If it fails, we want to fail now (and recover
         -- in tcPolyBinds).  If we delay checking, we get an error cascade.
         -- Remember we are in the tcPolyInfer case, so the type envt is
@@ -688,8 +688,9 @@ mkInferredPolyId poly_name qtvs theta mono_ty
              my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType norm_mono_ty))
                   -- Include kind variables!  Trac #7916
 
-             my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
-             my_theta = filter (quantifyPred my_tvs2) theta
+       ; my_theta <- pickQuantifiablePreds my_tvs2 theta
+
+       ; let my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
              inferred_poly_ty = mkSigmaTy my_tvs my_theta norm_mono_ty
 
        ; addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $
@@ -785,9 +786,9 @@ Examples that might fail:
  - an inferred type that includes unboxed tuples
 
 However we don't do the ambiguity check (checkValidType omits it for
-InfSigCtxt) because the impedence-matching stage, which follows
+InfSigCtxt) because the impedance-matching stage, which follows
 immediately, will do it and we don't want two error messages.
-Moreover, because of the impedence matching stage, the ambiguity-check
+Moreover, because of the impedance matching stage, the ambiguity-check
 suggestion of -XAllowAmbiguiousTypes will not work.
 
 
@@ -811,7 +812,7 @@ The types we really want for f and g are
    f :: forall a. (Eq a, Num a) => a -> Bool -> Bool
    g :: forall b. [b] -> Bool -> Bool
 
-We can get these by "impedence matching":
+We can get these by "impedance matching":
    tuple :: forall a b. (Eq a, Num a) => (a -> Bool -> Bool, [b] -> Bool -> Bool)
    tuple a b d1 d1 = let ...bind f_mono, g_mono in (f_mono, g_mono)
 
@@ -821,9 +822,9 @@ We can get these by "impedence matching":
 Suppose the shared quantified tyvars are qtvs and constraints theta.
 Then we want to check that
    f's polytype  is more polymorphic than   forall qtvs. theta => f_mono_ty
-and the proof is the impedence matcher.
+and the proof is the impedance matcher.
 
-Notice that the impedence matcher may do defaulting.  See Trac #7173.
+Notice that the impedance matcher may do defaulting.  See Trac #7173.
 
 It also cleverly does an ambiguity check; for example, rejecting
    f :: F a -> a
@@ -1709,13 +1710,13 @@ checkStrictBinds :: TopLevelFlag -> RecFlag
 --      c) not a multiple-binding group (more or less implied by (a))
 
 checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
-  | unlifted_bndrs || any_strict_pat   -- This binding group must be matched strictly
-  = do  { checkTc (isNotTopLevel top_lvl)
-                  (strictBindErr "Top-level" unlifted_bndrs orig_binds)
-        ; checkTc (isNonRec rec_group)
-                  (strictBindErr "Recursive" unlifted_bndrs orig_binds)
+  | any_unlifted_bndr || any_strict_pat   -- This binding group must be matched strictly
+  = do  { check (isNotTopLevel top_lvl)
+                (strictBindErr "Top-level" any_unlifted_bndr orig_binds)
+        ; check (isNonRec rec_group)
+                (strictBindErr "Recursive" any_unlifted_bndr orig_binds)
 
-        ; checkTc (all is_monomorphic (bagToList tc_binds))
+        ; check (all is_monomorphic (bagToList tc_binds))
                   (polyBindErr orig_binds)
             -- data Ptr a = Ptr Addr#
             -- f x = let p@(Ptr y) = ... in ...
@@ -1723,8 +1724,8 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
             -- not mix with an unlifted binding for 'y'.  You should
             -- use a bang pattern.  Trac #6078.
 
-        ; checkTc (isSingleton orig_binds)
-                  (strictBindErr "Multiple" unlifted_bndrs orig_binds)
+        ; check (isSingleton orig_binds)
+                (strictBindErr "Multiple" any_unlifted_bndr orig_binds)
 
         -- Complain about a binding that looks lazy
         --    e.g.    let I# y = x in ...
@@ -1732,13 +1733,13 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
         -- matching, so (for software engineering reasons) we insist
         -- that the strictness is manifest on each binding
         -- However, lone (unboxed) variables are ok
-        ; checkTc (not any_pat_looks_lazy)
+        ; check (not any_pat_looks_lazy)
                   (unliftedMustBeBang orig_binds) }
   | otherwise
   = traceTc "csb2" (ppr [(id, idType id) | id <- poly_ids]) >>
     return ()
   where
-    unlifted_bndrs     = any is_unlifted poly_ids
+    any_unlifted_bndr  = any is_unlifted poly_ids
     any_strict_pat     = any (isStrictHsBind   . unLoc) orig_binds
     any_pat_looks_lazy = any (looksLazyPatBind . unLoc) orig_binds
 
@@ -1753,6 +1754,13 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
                      = null tvs && null evs
     is_monomorphic _ = True
 
+    check :: Bool -> MsgDoc -> TcM ()
+    -- Just like checkTc, but with a special case for module GHC.Prim:
+    --      see Note [Compiling GHC.Prim]
+    check True  _   = return ()
+    check False err = do { mod <- getModule
+                         ; checkTc (mod == gHC_PRIM) err }
+
 unliftedMustBeBang :: [LHsBind Name] -> SDoc
 unliftedMustBeBang binds
   = hang (text "Pattern bindings containing unlifted types should use an outermost bang pattern:")
@@ -1765,12 +1773,29 @@ polyBindErr binds
                 ptext (sLit "Probable fix: use a bang pattern")])
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc
-strictBindErr flavour unlifted_bndrs binds
+strictBindErr flavour any_unlifted_bndr binds
   = hang (text flavour <+> msg <+> ptext (sLit "aren't allowed:"))
        2 (vcat (map ppr binds))
   where
-    msg | unlifted_bndrs = ptext (sLit "bindings for unlifted types")
-        | otherwise      = ptext (sLit "bang-pattern or unboxed-tuple bindings")
+    msg | any_unlifted_bndr = ptext (sLit "bindings for unlifted types")
+        | otherwise         = ptext (sLit "bang-pattern or unboxed-tuple bindings")
+
+
+{- Note [Compiling GHC.Prim]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Module GHC.Prim has no source code: it is the host module for
+primitive, built-in functions and types.  However, for Haddock-ing
+purposes we generate (via utils/genprimopcode) a fake source file
+GHC/Prim.hs, and give it to Haddock, so that it can generate
+documentation.  It contains definitions like
+    nullAddr# :: NullAddr#
+which would normally be rejected as a top-level unlifted binding. But
+we don't want to complain, because we are only "compiling" this fake
+mdule for documentation purposes.  Hence this hacky test for gHC_PRIM
+in checkStrictBinds.
+
+(We only make the test if things look wrong, so there is no cost in
+the common case.) -}
 
 
 {- *********************************************************************

@@ -51,7 +51,7 @@ import GHC.Word
 type Time = Word64
 
 -- | @'nat'@ defined in @rts/Types.h@
-type Nat = #{type unsigned int}
+type RtsNat = #{type unsigned int}
 
 data GiveGCStats
     = NoGCStats
@@ -78,19 +78,19 @@ instance Enum GiveGCStats where
 data GCFlags = GCFlags
     { statsFile             :: Maybe FilePath
     , giveStats             :: GiveGCStats
-    , maxStkSize            :: Nat
-    , initialStkSize        :: Nat
-    , stkChunkSize          :: Nat
-    , stkChunkBufferSize    :: Nat
-    , maxHeapSize           :: Nat
-    , minAllocAreaSize      :: Nat
-    , minOldGenSize         :: Nat
-    , heapSizeSuggestion    :: Nat
+    , maxStkSize            :: RtsNat
+    , initialStkSize        :: RtsNat
+    , stkChunkSize          :: RtsNat
+    , stkChunkBufferSize    :: RtsNat
+    , maxHeapSize           :: RtsNat
+    , minAllocAreaSize      :: RtsNat
+    , minOldGenSize         :: RtsNat
+    , heapSizeSuggestion    :: RtsNat
     , heapSizeSuggestionAuto :: Bool
     , oldGenFactor          :: Double
     , pcFreeHeap            :: Double
-    , generations           :: Nat
-    , steps                 :: Nat
+    , generations           :: RtsNat
+    , steps                 :: RtsNat
     , squeezeUpdFrames      :: Bool
     , compact               :: Bool -- ^ True <=> "compact all the time"
     , compactThreshold      :: Double
@@ -305,7 +305,7 @@ getGCFlags = do
   ptr <- getGcFlagsPtr
   GCFlags <$> (peekFilePath =<< #{peek GC_FLAGS, statsFile} ptr)
           <*> (toEnum . fromIntegral <$>
-                (#{peek GC_FLAGS, giveStats} ptr :: IO Nat))
+                (#{peek GC_FLAGS, giveStats} ptr :: IO RtsNat))
           <*> #{peek GC_FLAGS, maxStkSize} ptr
           <*> #{peek GC_FLAGS, initialStkSize} ptr
           <*> #{peek GC_FLAGS, stkChunkSize} ptr
@@ -367,7 +367,7 @@ getCCFlags :: IO CCFlags
 getCCFlags = do
   ptr <- getCcFlagsPtr
   CCFlags <$> (toEnum . fromIntegral
-                <$> (#{peek COST_CENTRE_FLAGS, doCostCentres} ptr :: IO Nat))
+                <$> (#{peek COST_CENTRE_FLAGS, doCostCentres} ptr :: IO RtsNat))
           <*> #{peek COST_CENTRE_FLAGS, profilerTicks} ptr
           <*> #{peek COST_CENTRE_FLAGS, msecsPerTick} ptr
 

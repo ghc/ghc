@@ -15,8 +15,7 @@ instance Monoid Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 
 data Data.ByteString.ByteString
-  = Data.ByteString.Internal.PS {-# UNPACK #-}(GHC.ForeignPtr.ForeignPtr
-                                                 GHC.Word.Word8)
+  = Data.ByteString.Internal.PS {-# UNPACK #-}(ForeignPtr Word8)
                                 {-# UNPACK #-}Int
                                 {-# UNPACK #-}Int
   	-- Defined in ‘Data.ByteString.Internal’

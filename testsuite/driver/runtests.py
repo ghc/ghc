@@ -18,10 +18,7 @@ import re
 # * If we import ctypes before subprocess on cygwin, then sys.exit(0)
 #   says "Aborted" and we fail with exit code 134.
 # So we import it here first, so that the testsuite doesn't appear to fail.
-try:
-    import subprocess
-except:
-    pass
+import subprocess
 
 PYTHON3 = sys.version_info >= (3, 0)
 if PYTHON3:
@@ -43,9 +40,11 @@ config = getConfig() # get it from testglobals
 # cmd-line options
 
 long_options = [
-  "config=",  		# config file
+  "configfile=",	# config file
+  "config=",  		# config field
   "rootdir=", 		# root of tree containing tests (default: .)
-  "output-summary=", 	# file in which to save the (human-readable) summary
+  "summary-file=",      # file in which to save the (human-readable) summary
+  "no-print-summary=",  # should we print the summary?
   "only=",		# just this test (can be give multiple --only= flags)
   "way=",		# just this way
   "skipway=",		# skip this way
@@ -58,7 +57,7 @@ long_options = [
 opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
        
 for opt,arg in opts:
-    if opt == '--config':
+    if opt == '--configfile':
         exec(open(arg).read())
 
     # -e is a string to execute from the command line.  For example:
@@ -66,11 +65,18 @@ for opt,arg in opts:
     if opt == '-e':
         exec(arg)
 
+    if opt == '--config':
+        field, value = arg.split('=', 1)
+        setattr(config, field, value)
+
     if opt == '--rootdir':
         config.rootdirs.append(arg)
 
-    if opt == '--output-summary':
-        config.output_summary = arg
+    if opt == '--summary-file':
+        config.summary_file = arg
+
+    if opt == '--no-print-summary':
+        config.no_print_summary = True
 
     if opt == '--only':
         config.only.append(arg)
@@ -133,7 +139,7 @@ if config.use_threads == 1:
         print("Warning: Ignoring request to use threads as python version is 2.7.2")
         print("See http://bugs.python.org/issue13817 for details.")
         config.use_threads = 0
-    if windows:
+    if windows: # See Trac ticket #10510.
         print("Warning: Ignoring request to use threads as running on Windows")
         config.use_threads = 0
 
@@ -304,10 +310,10 @@ else:
             break
         oneTest()
         
-    summary(t, sys.stdout)
+    summary(t, sys.stdout, config.no_print_summary)
 
-    if config.output_summary != '':
-        summary(t, open(config.output_summary, 'w'))
+    if config.summary_file != '':
+        summary(t, open(config.summary_file, 'w'))
 
 sys.exit(0)
 

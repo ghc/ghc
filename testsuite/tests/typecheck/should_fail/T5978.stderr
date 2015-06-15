@@ -1,5 +1,5 @@
 
-T5978.hs:22:11:
+T5978.hs:22:11: error:
     Couldn't match type ‘Bool’ with ‘Char’
     arising from a functional dependency between:
       constraint ‘C Double Char’ arising from a use of ‘polyBar’

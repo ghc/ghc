@@ -305,20 +305,13 @@ gen_hs_source (Info defaults entries) =
                         ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
 
            spec o = comm : decls
-             where decls = case o of
+             where decls = case o of  -- See Note [Placeholder declarations]
                         PrimOpSpec { name = n, ty = t, opts = options } ->
-                            [ pprFixity fixity n | OptionFixity (Just fixity) <- options ]
-                            ++
-                            [ wrapOp n ++ " :: " ++ pprTy t,
-                              wrapOp n ++ " = let x = x in x" ]
+                            prim_fixity n options ++ prim_decl n t
                         PrimVecOpSpec { name = n, ty = t, opts = options } ->
-                            [ pprFixity fixity n | OptionFixity (Just fixity) <- options ]
-                            ++
-                            [ wrapOp n ++ " :: " ++ pprTy t,
-                              wrapOp n ++ " = let x = x in x" ]
+                            prim_fixity n options ++ prim_decl n t
                         PseudoOpSpec { name = n, ty = t } ->
-                            [ wrapOp n ++ " :: " ++ pprTy t,
-                              wrapOp n ++ " = let x = x in x" ]
+                            prim_decl n t
                         PrimTypeSpec { ty = t }   ->
                             [ "data " ++ pprTy t ]
                         PrimVecTypeSpec { ty = t }   ->
@@ -329,10 +322,21 @@ gen_hs_source (Info defaults entries) =
                         [] -> ""
                         d -> "\n" ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ d)
 
+           prim_fixity n options = [ pprFixity fixity n | OptionFixity (Just fixity) <- options ]
+
+           prim_decl n t = [ wrapOp n ++ " :: " ++ pprTy t,
+                             wrapOp n ++ " = " ++ wrapOpRhs n ]
+
            wrapOp nm | isAlpha (head nm) = nm
                      | otherwise         = "(" ++ nm ++ ")"
+
            wrapTy nm | isAlpha (head nm) = nm
                      | otherwise         = "(" ++ nm ++ ")"
+
+           wrapOpRhs "tagToEnum#" = "let x = x in x"
+           wrapOpRhs nm           = wrapOp nm
+              -- Special case for tagToEnum#: see Note [Placeholder declarations]
+
            unlatex s = case s of
                 '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
                 '{':'\\':'t':'t':cs -> markup "@" "@" cs
@@ -348,6 +352,27 @@ gen_hs_source (Info defaults entries) =
                 where special = "/'`\"@<"
 
            pprFixity (Fixity i d) n = pprFixityDir d ++ " " ++ show i ++ " " ++ n
+
+{- Note [Placeholder declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are generating fake declarations for things in GHC.Prim, just to
+keep GHC's renamer and typechecker happy enough for what Haddock
+needs.  Our main plan is to say
+        foo :: <type>
+        foo = foo
+We have to silence GHC's complaints about unboxed-top-level declarations
+with an ad-hoc fix in TcBinds: see Note [Compiling GHC.Prim] in TcBinds.
+
+That works for all the primitive functions except tagToEnum#.
+If we generate the binding
+        tagToEnum# = tagToEnum#
+GHC will complain about "tagToEnum# must appear applied to one argument".
+We could hack GHC to silence this complaint when compiling GHC.Prim,
+but it seems easier to generate
+        tagToEnum# = let x = x in x
+We don't do this for *all* bindings because for ones with an unboxed
+RHS we would get other complaints (e.g.can't unify "*" with "#").
+-}
 
 pprTy :: Ty -> String
 pprTy = pty
@@ -567,12 +592,10 @@ gen_wrappers (Info _ entries)
 
         dodgy spec
            = name spec `elem` 
-             [-- C code generator can't handle these
-              "seq#", 
-              "tagToEnum#",
-              -- not interested in parallel support
-              "par#", "parGlobal#", "parLocal#", "parAt#", 
-              "parAtAbs#", "parAtRel#", "parAtForNow#" 
+             [-- tagToEnum# is really magical, and can't have
+              -- a wrapper since its implementation depends on
+              -- the type of its result
+              "tagToEnum#"
              ]
 
         is_llvm_only :: Entry -> Bool
@@ -815,7 +838,7 @@ ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
 
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 
-ppType (TyUTup ts) = "(mkTupleTy UnboxedTuple " 
+ppType (TyUTup ts) = "(mkTupleTy Unboxed " 
                      ++ listify (map ppType ts) ++ ")"
 
 ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"

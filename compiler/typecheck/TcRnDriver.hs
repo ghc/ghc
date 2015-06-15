@@ -28,6 +28,17 @@ module TcRnDriver (
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runQuasi )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
+import IfaceEnv( externaliseName )
+import TcType   ( isUnitTy, isTauTy )
+import TcHsType
+import TcMatches
+import RnTypes
+import RnExpr
+import MkId
+import TidyPgm    ( globaliseAndTidyId )
+import TysWiredIn ( unitTy, mkListTy )
+import DynamicLoading ( loadPlugins )
+import Plugins ( tcPlugin )
 #endif
 
 import DynFlags
@@ -58,6 +69,7 @@ import MkIface
 import TcSimplify
 import TcTyClsDecls
 import LoadIface
+import TidyPgm    ( mkBootModDetailsTc )
 import RnNames
 import RnEnv
 import RnSource
@@ -80,25 +92,11 @@ import ConLike
 import DataCon
 import Type
 import Class
+import BasicTypes hiding( SuccessFlag(..) )
 import CoAxiom
 import Annotations
 import Data.List ( sortBy )
 import Data.Ord
-#ifdef GHCI
-import BasicTypes hiding( SuccessFlag(..) )
-import TcType   ( isUnitTy, isTauTy )
-import TcHsType
-import TcMatches
-import RnTypes
-import RnExpr
-import MkId
-import TidyPgm    ( globaliseAndTidyId )
-import TysWiredIn ( unitTy, mkListTy )
-import DynamicLoading ( loadPlugins )
-import Plugins ( tcPlugin )
-#endif
-import TidyPgm    ( mkBootModDetailsTc )
-
 import FastString
 import Maybes
 import Util
@@ -170,7 +168,7 @@ tcRnSignature dflags hsc_src
            | otherwise -> do
             { sig_iface <- initIfaceTcRn $ loadSysInterface (text "sig-of") sof
             ; let { gr = mkGlobalRdrEnv
-                              (gresFromAvails LocalDef (mi_exports sig_iface))
+                              (gresFromAvails Nothing (mi_exports sig_iface))
                   ; avails = calculateAvails dflags
                                     sig_iface False{- safe -} False{- boot -} }
             ; return (tcg_env
@@ -178,7 +176,7 @@ tcRnSignature dflags hsc_src
                 , tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
                 })
             } ;
-            Nothing
+          Nothing
              | HsigFile <- hsc_src
              , HscNothing <- hscTarget dflags -> do
                 { return tcg_env
@@ -420,9 +418,6 @@ tcRnImports hsc_env import_decls
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_rn_imports   = rn_imports,
-              tcg_visible_orphan_mods = foldl extendModuleSet
-                                              (tcg_visible_orphan_mods gbl)
-                                              (imp_orphs imports),
               tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts,
@@ -438,9 +433,10 @@ tcRnImports hsc_env import_decls
 
                 -- Load any orphan-module and family instance-module
                 -- interfaces, so that their rules and instance decls will be
-                -- found.
+                -- found.  But filter out a self hs-boot: these instances
+                -- will be checked when we define them locally.
         ; loadModuleInterfaces (ptext (sLit "Loading orphan modules"))
-                               (imp_orphs imports)
+                               (filter (/= this_mod) (imp_orphs imports))
 
                 -- Check type-family consistency
         ; traceRn (text "rn1: checking family instance consistency")
@@ -459,7 +455,7 @@ tcRnImports hsc_env import_decls
 ************************************************************************
 -}
 
-tcRnSrcDecls :: ModDetails 
+tcRnSrcDecls :: ModDetails
              -> Maybe (Located [LIE RdrName])   -- Exports
              -> [LHsDecl RdrName]               -- Declarations
              -> TcM TcGblEnv
@@ -705,23 +701,20 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM TcGblEnv
 -- with the type environment we've just come up with
 -- In the common case where there is no hi-boot file, the list
 -- of boot_names is empty.
---
--- The bindings we return give bindings for the dfuns defined in the
--- hs-boot file, such as        $fbEqT = $fEqT
 
 checkHiBootIface
-        tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds,
-                            tcg_insts = local_insts,
-                            tcg_type_env = local_type_env, tcg_exports = local_exports })
+        tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds
+                          , tcg_insts = local_insts
+                          , tcg_type_env = local_type_env
+                          , tcg_exports = local_exports })
         boot_details
   | HsBootFile <- hs_src     -- Current module is already a hs-boot file!
   = return tcg_env
 
   | otherwise
-  = do  { mb_dfun_prs <- checkHiBootIface' local_insts local_type_env
-                                           local_exports boot_details
-        ; let dfun_prs   = catMaybes mb_dfun_prs
-              boot_dfuns = map fst dfun_prs
+  = do  { dfun_prs <- checkHiBootIface' local_insts local_type_env
+                                        local_exports boot_details
+        ; let boot_dfuns = map fst dfun_prs
               dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
                                      | (boot_dfun, dfun) <- dfun_prs ]
               type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
@@ -734,9 +727,15 @@ checkHiBootIface
              -- can "see" that boot dfun.   See Trac #4003
 
 checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
-                  -> ModDetails -> TcM [Maybe (Id, Id)]
+                  -> ModDetails -> TcM [(Id, Id)]
 -- Variant which doesn't require a full TcGblEnv; you could get the
 -- local components from another ModDetails.
+--
+-- We return a list of "impedance-matching" bindings for the dfuns
+-- defined in the hs-boot file, such as
+--           $fxEqT = $fEqT
+-- We need these because the module and hi-boot file might differ in
+-- the name it chose for the dfun.
 
 checkHiBootIface'
         local_insts local_type_env local_exports
@@ -757,11 +756,12 @@ checkHiBootIface'
             --        instances?  We can't easily equate tycons...
 
                 -- Check instance declarations
+                -- and generate an impedance-matching binding
         ; mb_dfun_prs <- mapM check_inst boot_insts
 
         ; failIfErrsM
 
-        ; return mb_dfun_prs }
+        ; return (catMaybes mb_dfun_prs) }
 
   where
     check_export boot_avail     -- boot_avail is exported by the boot iface
@@ -804,18 +804,25 @@ checkHiBootIface'
     check_inst boot_inst
         = case [dfun | inst <- local_insts,
                        let dfun = instanceDFunId inst,
-                       idType dfun `eqType` boot_inst_ty ] of
-            [] -> do { traceTc "check_inst" (vcat [ text "local_insts" <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
-                                                  , text "boot_inst"   <+> ppr boot_inst
-                                                  , text "boot_inst_ty" <+> ppr boot_inst_ty
-                                                  ])
+                       idType dfun `eqType` boot_dfun_ty ] of
+            [] -> do { traceTc "check_inst" $ vcat
+                          [ text "local_insts"  <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
+                          , text "boot_inst"    <+> ppr boot_inst
+                          , text "boot_dfun_ty" <+> ppr boot_dfun_ty
+                          ]
                      ; addErrTc (instMisMatch True boot_inst); return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
+                     where
+                        local_boot_dfun = Id.mkExportedLocalId VanillaId boot_dfun_name (idType dfun)
+                           -- Name from the /boot-file/ ClsInst, but type from the dfun
+                           -- defined in /this module/.  That ensures that the TyCon etc
+                           -- inside the type are the ones defined in this module, not
+                           -- the ones gotten from the hi-boot file, which may have
+                           -- a lot less info (Trac #T8743, comment:10).
         where
-          boot_dfun = instanceDFunId boot_inst
-          boot_inst_ty = idType boot_dfun
-          local_boot_dfun = Id.mkExportedLocalId VanillaId (idName boot_dfun) boot_inst_ty
-
+          boot_dfun      = instanceDFunId boot_inst
+          boot_dfun_ty   = idType boot_dfun
+          boot_dfun_name = idName boot_dfun
 
 -- This has to compare the TyThing from the .hi-boot file to the TyThing
 -- in the current source file.  We must be careful to allow alpha-renaming
@@ -984,9 +991,9 @@ checkBootTyCon tc1 tc2
   where
     roles1 = tyConRoles tc1
     roles2 = tyConRoles tc2
-    roles_msg = text "The roles do not match." <+>
-                (text "Roles default to" <+>
-                 quotes (text "representational") <+> text "in boot files")
+    roles_msg = text "The roles do not match." $$
+                (text "Roles on abstract types default to" <+>
+                 quotes (text "representational") <+> text "in boot files.")
 
     eqAlgRhs tc (AbstractTyCon dis1) rhs2
       | dis1      = check (isDistinctAlgRhs rhs2)   --Check compatibility
@@ -1024,8 +1031,11 @@ checkBootTyCon tc1 tc2
         pname1 = quotes (ppr name1)
         pname2 = quotes (ppr name2)
 
-    eqClosedFamilyAx (CoAxiom { co_ax_branches = branches1 })
-                     (CoAxiom { co_ax_branches = branches2 })
+    eqClosedFamilyAx Nothing Nothing  = True
+    eqClosedFamilyAx Nothing (Just _) = False
+    eqClosedFamilyAx (Just _) Nothing = False
+    eqClosedFamilyAx (Just (CoAxiom { co_ax_branches = branches1 }))
+                     (Just (CoAxiom { co_ax_branches = branches2 }))
       =  brListLength branches1 == brListLength branches2
       && (and $ brListZipWith eqClosedFamilyBranch branches1 branches2)
 
@@ -1043,10 +1053,10 @@ emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 ----------------
 missingBootThing :: Bool -> Name -> String -> SDoc
 missingBootThing is_boot name what
-  = ppr name <+> ptext (sLit "is exported by the") <+>
-              (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
-              <+> ptext (sLit "file, but not")
-              <+> text what <+> ptext (sLit "the module")
+  = quotes (ppr name) <+> ptext (sLit "is exported by the")
+    <+> (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
+    <+> ptext (sLit "file, but not")
+    <+> text what <+> ptext (sLit "the module")
 
 bootMisMatch :: Bool -> SDoc -> TyThing -> TyThing -> SDoc
 bootMisMatch is_boot extra_info real_thing boot_thing
@@ -1198,13 +1208,8 @@ tcTopSrcDecls boot_details
         -- make sure that at least one of the imports for them is used
         -- See Note [Newtype constructor usage in foreign declarations]
     gre_to_rdr_name gre rdrs
-      = case gre_prov gre of
-           LocalDef          -> rdrs
-           Imported []       -> panic "gre_to_rdr_name: Imported []"
-           Imported (is : _) -> mkRdrQual modName occName : rdrs
-              where
-                modName = is_as (is_decl is)
-                occName = nameOccName (gre_name gre)
+      | isLocalGRE gre = rdrs
+      | otherwise      = greUsedRdrName gre : rdrs
 
 ---------------------------
 tcTyClsInstDecls :: ModDetails
@@ -1396,15 +1401,18 @@ runTcInteractive hsc_env thing_inside
                       vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
-       ; let getOrphans m = fmap (concatMap (\iface -> mi_module iface
-                                                 : dep_orphs (mi_deps iface)))
+       ; let getOrphans m = fmap (\iface -> mi_module iface
+                                          : dep_orphs (mi_deps iface))
                                  (loadSrcInterface (text "runTcInteractive") m
                                                    False Nothing)
-       ; ic_visible_mods <- fmap concat . forM (ic_imports icxt) $ \i ->
+       ; orphs <- fmap concat . forM (ic_imports icxt) $ \i ->
             case i of
                 IIModule n -> getOrphans n
                 IIDecl i -> getOrphans (unLoc (ideclName i))
-       ; gbl_env <- getGblEnv
+       ; let imports = emptyImportAvails {
+                            imp_orphs = orphs
+                        }
+       ; (gbl_env, lcl_env) <- getEnvs
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt
                          , tcg_type_env     = type_env
@@ -1420,32 +1428,69 @@ runTcInteractive hsc_env thing_inside
                               -- to make RecordWildCards work (test: ghci049)
                          , tcg_fix_env      = ic_fix_env icxt
                          , tcg_default      = ic_default icxt
-                         , tcg_visible_orphan_mods = mkModuleSet ic_visible_mods
-                              -- I guess there's a risk ic_imports will be
-                              -- desynchronized with the true RdrEnv; probably
-                              -- should insert some ASSERTs somehow.
-                              -- TODO: Cache this
+                              -- must calculate imp_orphs of the ImportAvails
+                              -- so that instance visibility is done correctly
+                         , tcg_imports      = imports
                          }
 
-       ; setGblEnv gbl_env' $
-         tcExtendGhciIdEnv ty_things $   -- See Note [Initialising the type environment for GHCi]
-         thing_inside }                  -- in TcEnv
+       ; lcl_env' <- tcExtendLocalTypeEnv lcl_env lcl_ids
+       ; setEnvs (gbl_env', lcl_env') thing_inside }
   where
     (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
 
-    icxt                  = hsc_IC hsc_env
-    (ic_insts, ic_finsts) = ic_instances icxt
-    ty_things             = ic_tythings icxt
+    icxt                     = hsc_IC hsc_env
+    (ic_insts, ic_finsts)    = ic_instances icxt
+    (lcl_ids, top_ty_things) = partitionWith is_closed (ic_tythings icxt)
 
-    type_env1 = mkTypeEnvWithImplicits ty_things
+    is_closed :: TyThing -> Either (Name, TcTyThing) TyThing
+    -- Put Ids with free type variables (always RuntimeUnks)
+    -- in the *local* type environment
+    -- See Note [Initialising the type environment for GHCi]
+    is_closed thing
+      | AnId id <- thing
+      , NotTopLevel <- isClosedLetBndr id
+      = Left (idName id, ATcId { tct_id = id, tct_closed = NotTopLevel })
+      | otherwise
+      = Right thing
+
+    type_env1 = mkTypeEnvWithImplicits top_ty_things
     type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId ic_insts)
                 -- Putting the dfuns in the type_env
                 -- is just to keep Core Lint happy
 
     con_fields = [ (dataConName c, dataConFieldLabels c)
-                 | ATyCon t <- ty_things
+                 | ATyCon t <- top_ty_things
                  , c <- tyConDataCons t ]
 
+
+{- Note [Initialising the type environment for GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most of the the Ids in ic_things, defined by the user in 'let' stmts,
+have closed types. E.g.
+   ghci> let foo x y = x && not y
+
+However the GHCi debugger creates top-level bindings for Ids whose
+types have free RuntimeUnk skolem variables, standing for unknown
+types.  If we don't register these free TyVars as global TyVars then
+the typechecker will try to quantify over them and fall over in
+zonkQuantifiedTyVar. so we must add any free TyVars to the
+typechecker's global TyVar set.  That is most conveniently by using
+tcExtendLocalTypeEnv, which automatically extends the global TyVar
+set.
+
+We do this by splitting out the Ids with open types, using 'is_closed'
+to do the partition.  The top-level things go in the global TypeEnv;
+the open, NotTopLevel, Ids, with free RuntimeUnk tyvars, go in the
+local TypeEnv.
+
+Note that we don't extend the local RdrEnv (tcl_rdr); all the in-scope
+things are already in the interactive context's GlobalRdrEnv.
+Extending the local RdrEnv isn't terrible, but it means there is an
+entry for the same Name in both global and local RdrEnvs, and that
+lead to duplicate "perhaps you meant..." suggestions (e.g. T5564).
+
+We don't bother with the tcl_th_bndrs environment either.
+-}
 
 #ifdef GHCI
 -- | The returned [Id] is the list of new Ids bound by this statement. It can
@@ -1468,7 +1513,8 @@ tcRnStmt hsc_env rdr_stmt
     mapM_ bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
 
     traceTc "tcs 1" empty ;
-    let { global_ids = map globaliseAndTidyId zonked_ids } ;
+    this_mod <- getModule ;
+    global_ids <- mapM (externaliseAndTidyId this_mod) zonked_ids ;
         -- Note [Interactively-bound Ids in GHCi] in HscTypes
 
 {- ---------------------------------------------
@@ -1698,7 +1744,8 @@ getGhciStepIO :: TcM (LHsExpr Name)
 getGhciStepIO = do
     ghciTy <- getGHCiMonad
     fresh_a <- newUnique
-    let a_tv   = mkTcTyVarName fresh_a (fsLit "a")
+    loc     <- getSrcSpanM
+    let a_tv   = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
         ghciM  = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM    = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
@@ -1760,7 +1807,15 @@ tcRnExpr hsc_env rdr_expr
     _ <- simplifyInteractive (andWC stWC lie_top) ;
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
-    zonkTcType all_expr_ty
+    ty <- zonkTcType all_expr_ty ;
+
+    -- We normalise type families, so that the type of an expression is the
+    -- same as of a bound expression (TcBinds.mkInferredPolyId). See Trac
+    -- #10321 for further discussion.
+    fam_envs <- tcGetFamInstEnvs ;
+    -- normaliseType returns a coercion which we discard, so the Role is
+    -- irrelevant
+    return (snd (normaliseType fam_envs Nominal ty))
     }
 
 --------------------------
@@ -1786,11 +1841,8 @@ tcRnType :: HscEnv
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM Opt_PolyKinds $   -- See Note [Kind-generalise in tcRnType]
-    do { (wcs, rdr_type') <- extractWildcards rdr_type
-       ; (rn_type, wcs)   <- bindLocatedLocalsRn wcs $ \wcs_new -> do {
-       ; (rn_type, _fvs)  <- rnLHsType GHCiCtx rdr_type'
+    do { (rn_type, _fvs, wcs) <- rnLHsTypeWithWildCards GHCiCtx rdr_type
        ; failIfErrsM
-       ; return (rn_type, wcs_new) }
 
         -- Now kind-check the type
         -- It can have any rank or kind
@@ -1876,8 +1928,7 @@ tcRnDeclsi hsc_env local_decls =
         <- zonkTopDecls all_ev_binds binds Nothing sig_ns rules vects
                         imp_specs fords
 
-    let --global_ids = map globaliseAndTidyId bind_ids
-        final_type_env = extendTypeEnvWithIds type_env bind_ids --global_ids
+    let final_type_env = extendTypeEnvWithIds type_env bind_ids
         tcg_env' = tcg_env { tcg_binds     = binds',
                              tcg_ev_binds  = ev_binds',
                              tcg_imp_specs = imp_specs',
@@ -1886,6 +1937,12 @@ tcRnDeclsi hsc_env local_decls =
                              tcg_fords     = fords' }
 
     setGlobalTypeEnv tcg_env' final_type_env
+
+
+externaliseAndTidyId :: Module -> Id -> TcM Id
+externaliseAndTidyId this_mod id
+  = do { name' <- externaliseName this_mod (idName id)
+       ; return (globaliseAndTidyId (setIdName id name')) }
 
 #endif /* GHCi */
 
@@ -1907,7 +1964,7 @@ getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (ptext (sLit "getModuleInterface")) mod
 
-tcRnLookupRdrName :: HscEnv -> Located RdrName 
+tcRnLookupRdrName :: HscEnv -> Located RdrName
                   -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
@@ -2002,19 +2059,10 @@ loadUnqualIfaces hsc_env ictxt
     unqual_mods = [ nameModule name
                   | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt)
                   , let name = gre_name gre
-                  , from_external_package name
+                  , nameIsFromExternalPackage this_pkg name
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
     doc = ptext (sLit "Need interface for module whose export(s) are in scope unqualified")
-
-    from_external_package name  -- True <=> the Name comes from some other package
-                                --          (not the home package, not the interactive package)
-      | Just mod <- nameModule_maybe name
-      , modulePackageKey mod /= this_pkg    -- Not the home package
-      , not (isInteractiveModule mod)       -- Not the 'interactive' package
-      = True
-      | otherwise
-      = False
 
 
 {-
@@ -2141,13 +2189,13 @@ withTcPlugins hsc_env m =
                 -- error occurs during compilation (Fix of #10078)
                 eitherRes <- tryM $ do
                   updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
-                mapM_ runTcPluginM stops
+                mapM_ (flip runTcPluginM Nothing) stops
                 case eitherRes of
                   Left _ -> failM
                   Right res -> return res
   where
   startPlugin (TcPlugin start solve stop) =
-    do s <- runTcPluginM start
+    do s <- runTcPluginM start Nothing
        return (solve s, stop s)
 
 loadTcPlugins :: HscEnv -> IO [TcPlugin]

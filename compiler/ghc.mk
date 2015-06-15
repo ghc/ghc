@@ -54,7 +54,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
 	@echo 'data IntegerLibrary = IntegerGMP'                            >> $@
-	@echo '                    | IntegerGMP2'                           >> $@
 	@echo '                    | IntegerSimple'                         >> $@
 	@echo '                    deriving Eq'                             >> $@
 	@echo                                                               >> $@
@@ -88,8 +87,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cIntegerLibraryType   :: IntegerLibrary'                     >> $@
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 	@echo 'cIntegerLibraryType   = IntegerGMP'                          >> $@
-else ifeq "$(INTEGER_LIBRARY)" "integer-gmp2"
-	@echo 'cIntegerLibraryType   = IntegerGMP2'                         >> $@
 else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
 	@echo 'cIntegerLibraryType   = IntegerSimple'                       >> $@
 else ifneq "$(CLEANING)" "YES"
@@ -494,6 +491,7 @@ compiler_stage2_dll0_MODULES = \
 	CoreUnfold \
 	CoreUtils \
 	CostCentre \
+	Ctype \
 	DataCon \
 	Demand \
 	Digraph \
@@ -534,6 +532,7 @@ compiler_stage2_dll0_MODULES = \
 	InstEnv \
 	Kind \
 	Lexeme \
+	Lexer \
 	ListSetOps \
 	Literal \
 	Maybes \
@@ -603,6 +602,7 @@ compiler_stage2_dll0_MODULES += \
 	CmmInfo \
 	CmmMachOp \
 	CmmNode \
+	CmmSwitch \
 	CmmUtils \
 	CodeGen.Platform \
 	CodeGen.Platform.ARM \
@@ -680,9 +680,15 @@ compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
 # after build-package, because that sets compiler_stage1_HC_OPTS:
+ifeq "$(V)" "0"
+compiler_stage1_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage1HcOpts)
+compiler_stage2_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage2HcOpts)
+compiler_stage3_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage3HcOpts)
+else
 compiler_stage1_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(GhcHcOpts) $(GhcStage2HcOpts)
 compiler_stage3_HC_OPTS += $(GhcHcOpts) $(GhcStage3HcOpts)
+endif
 
 ifneq "$(BINDIST)" "YES"
 

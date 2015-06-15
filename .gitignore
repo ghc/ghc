@@ -37,6 +37,11 @@ config.log
 config.status
 configure
 
+# Temporarily generated configure files
+confdefs.h
+conftest-book.xml
+conftest.xml
+
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
 

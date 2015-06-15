@@ -137,6 +137,7 @@ data Flag
   | FlagNoUserDb
   | FlagVerbosity (Maybe String)
   | FlagIPId
+  | FlagPackageKey
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -181,6 +182,8 @@ flags = [
         "ignore case for substring matching",
   Option [] ["ipid"] (NoArg FlagIPId)
         "interpret package arguments as installed package IDs",
+  Option [] ["package-key"] (NoArg FlagPackageKey)
+        "interpret package arguments as installed package keys",
   Option ['v'] ["verbose"] (OptArg FlagVerbosity "Verbosity")
         "verbosity level (0-2, default 1)"
   ]
@@ -317,6 +320,12 @@ substProg prog (c:xs) = c : substProg prog xs
 data Force = NoForce | ForceFiles | ForceAll | CannotForce
   deriving (Eq,Ord)
 
+-- | Enum flag representing argument type
+data AsPackageArg
+    = AsIpid
+    | AsPackageKey
+    | AsDefault
+
 -- | Represents how a package may be specified by a user on the command line.
 data PackageArg
     -- | A package identifier foo-0.1; the version might be a glob.
@@ -324,8 +333,11 @@ data PackageArg
     -- | An installed package ID foo-0.1-HASH.  This is guaranteed to uniquely
     -- match a single entry in the package database.
     | IPId InstalledPackageId
+    -- | A package key foo_HASH.  This is also guaranteed to uniquely match
+    -- a single entry in the package database
+    | PkgKey PackageKey
     -- | A glob against the package name.  The first string is the literal
-    -- glob, the second is a function which returns @True@ if the the argument
+    -- glob, the second is a function which returns @True@ if the argument
     -- matches.
     | Substring String (String->Bool)
 
@@ -338,7 +350,9 @@ runit verbosity cli nonopts = do
           | FlagForce `elem` cli        = ForceAll
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
-        as_ipid = FlagIPId `elem` cli
+        as_arg | FlagIPId        `elem` cli = AsIpid
+               | FlagPackageKey  `elem` cli = AsPackageKey
+               | otherwise                  = AsDefault
         multi_instance = FlagMultiInstance `elem` cli
         expand_env_vars= FlagExpandEnvVars `elem` cli
         mexpand_pkgroot= foldl' accumExpandPkgroot Nothing cli
@@ -415,25 +429,25 @@ runit verbosity cli nonopts = do
                         multi_instance
                         expand_env_vars True force
     ["unregister", pkgarg_str] -> do
-        pkgarg <- readPackageArg as_ipid pkgarg_str
+        pkgarg <- readPackageArg as_arg pkgarg_str
         unregisterPackage pkgarg verbosity cli force
     ["expose", pkgarg_str] -> do
-        pkgarg <- readPackageArg as_ipid pkgarg_str
+        pkgarg <- readPackageArg as_arg pkgarg_str
         exposePackage pkgarg verbosity cli force
     ["hide",   pkgarg_str] -> do
-        pkgarg <- readPackageArg as_ipid pkgarg_str
+        pkgarg <- readPackageArg as_arg pkgarg_str
         hidePackage pkgarg verbosity cli force
     ["trust",    pkgarg_str] -> do
-        pkgarg <- readPackageArg as_ipid pkgarg_str
+        pkgarg <- readPackageArg as_arg pkgarg_str
         trustPackage pkgarg verbosity cli force
     ["distrust", pkgarg_str] -> do
-        pkgarg <- readPackageArg as_ipid pkgarg_str
+        pkgarg <- readPackageArg as_arg pkgarg_str
         distrustPackage pkgarg verbosity cli force
     ["list"] -> do
         listPackages verbosity cli Nothing Nothing
     ["list", pkgarg_str] ->
         case substringCheck pkgarg_str of
-          Nothing -> do pkgarg <- readPackageArg as_ipid pkgarg_str
+          Nothing -> do pkgarg <- readPackageArg as_arg pkgarg_str
                         listPackages verbosity cli (Just pkgarg) Nothing
           Just m -> listPackages verbosity cli
                                  (Just (Substring pkgarg_str m)) Nothing
@@ -447,13 +461,13 @@ runit verbosity cli nonopts = do
         latestPackage verbosity cli pkgid
     ["describe", pkgid_str] -> do
         pkgarg <- case substringCheck pkgid_str of
-          Nothing -> readPackageArg as_ipid pkgid_str
+          Nothing -> readPackageArg as_arg pkgid_str
           Just m  -> return (Substring pkgid_str m)
         describePackage verbosity cli pkgarg (fromMaybe False mexpand_pkgroot)
         
     ["field", pkgid_str, fields] -> do
         pkgarg <- case substringCheck pkgid_str of
-          Nothing -> readPackageArg as_ipid pkgid_str
+          Nothing -> readPackageArg as_arg pkgid_str
           Just m  -> return (Substring pkgid_str m)
         describeField verbosity cli pkgarg
                       (splitFields fields) (fromMaybe True mexpand_pkgroot)
@@ -489,10 +503,12 @@ parseGlobPackageId =
       _ <- string "-*"
       return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
 
-readPackageArg :: Bool -> String -> IO PackageArg
-readPackageArg True str =
+readPackageArg :: AsPackageArg -> String -> IO PackageArg
+readPackageArg AsIpid str =
     parseCheck (IPId `fmap` parse) str "installed package id"
-readPackageArg False str = Id `fmap` readGlobPkgId str
+readPackageArg AsPackageKey str =
+    parseCheck (PkgKey `fmap` parse) str "package key"
+readPackageArg AsDefault str = Id `fmap` readGlobPkgId str
 
 -- globVersion means "all versions"
 globVersion :: Version
@@ -1384,6 +1400,7 @@ findPackagesByDB db_stack pkgarg
         ps -> return ps
   where
         pkg_msg (Id pkgid)           = display pkgid
+        pkg_msg (PkgKey pk)          = display pk
         pkg_msg (IPId ipid)          = display ipid
         pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
 
@@ -1398,6 +1415,7 @@ realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg
+(PkgKey pk)     `matchesPkg` pkg = pk == packageKey pkg
 (IPId ipid)     `matchesPkg` pkg = ipid == installedPackageId pkg
 (Substring _ m) `matchesPkg` pkg = m (display (sourcePackageId pkg))
 
@@ -2023,5 +2041,7 @@ removeFileSafe fn =
   removeFile fn `catchIO` \ e ->
     when (not $ isDoesNotExistError e) $ ioError e
 
+-- | Turn a path relative to the current directory into a (normalised)
+-- absolute path.
 absolutePath :: FilePath -> IO FilePath
 absolutePath path = return . normalise . (</> path) =<< getCurrentDirectory

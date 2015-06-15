@@ -326,11 +326,13 @@ stablePackageKeyCmp p1 p2 = packageKeyFS p1 `compare` packageKeyFS p2
 
 instance Outputable PackageKey where
    ppr pk = getPprStyle $ \sty -> sdocWithDynFlags $ \dflags ->
-    text (packageKeyPackageIdString dflags pk)
-    -- Don't bother qualifying if it's wired in!
-       <> (if qualPackage sty pk && not (pk `elem` wiredInPackageKeys)
-            then char '@' <> ftext (packageKeyFS pk)
-            else empty)
+    case packageKeyPackageIdString dflags pk of
+      Nothing -> ftext (packageKeyFS pk)
+      Just pkg -> text pkg
+           -- Don't bother qualifying if it's wired in!
+           <> (if qualPackage sty pk && not (pk `elem` wiredInPackageKeys)
+                then char '@' <> ftext (packageKeyFS pk)
+                else empty)
 
 instance Binary PackageKey where
   put_ bh pid = put_ bh (packageKeyFS pid)
@@ -383,7 +385,6 @@ integerPackageKey     = fsToPackageKey (fsLit n)
   where
     n = case cIntegerLibraryType of
         IntegerGMP    -> "integer-gmp"
-        IntegerGMP2   -> "integer-gmp"
         IntegerSimple -> "integer-simple"
 basePackageKey        = fsToPackageKey (fsLit "base")
 rtsPackageKey         = fsToPackageKey (fsLit "rts")

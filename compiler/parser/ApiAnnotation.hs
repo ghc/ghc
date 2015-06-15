@@ -228,10 +228,13 @@ data AnnKeywordId
     | AnnMinus -- ^ '-'
     | AnnModule
     | AnnNewtype
+    | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
     | AnnOpen   -- ^ '(\#' or '{-\# LANGUAGE' etc
     | AnnOpenC   -- ^ '{'
     | AnnOpenP   -- ^ '('
+    | AnnOpenPE   -- ^ '$('
+    | AnnOpenPTE   -- ^ '$$('
     | AnnOpenS   -- ^ '['
     | AnnPackageName
     | AnnPattern
@@ -242,8 +245,12 @@ data AnnKeywordId
     | AnnRole
     | AnnSafe
     | AnnSemi -- ^ ';'
+    | AnnSimpleQuote -- ^ '''
     | AnnStatic -- ^ 'static'
     | AnnThen
+    | AnnThIdSplice -- ^ '$'
+    | AnnThIdTySplice -- ^ '$$'
+    | AnnThTyQuote -- ^ double '''
     | AnnTilde -- ^ '~'
     | AnnTildehsh -- ^ '~#'
     | AnnType

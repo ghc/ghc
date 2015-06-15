@@ -20,11 +20,9 @@ test('SafeInfered03',
 test('SafeInfered04',
      [ extra_clean(['SafeInfered04_A.hi', 'SafeInfered04_A.o']) ],
      multimod_compile, ['SafeInfered04', ''])
-
-# Test should fail, tests an earlier bug in 7.8
-# test('SafeInfered05',
-#      [ extra_clean(['SafeInfered05_A.hi', 'SafeInfered05_A.o']) ],
-#      multimod_compile_fail, ['SafeInfered05', ''])
+test('SafeInfered05',
+     [ extra_clean(['SafeInfered05_A.hi', 'SafeInfered05_A.o']) ],
+     multimod_compile, ['SafeInfered05', ''])
 
 # Tests that should fail to compile as they should be infered unsafe
 test('UnsafeInfered01',
@@ -44,7 +42,7 @@ test('UnsafeInfered06',
      multimod_compile_fail, ['UnsafeInfered06', ''])
 test('UnsafeInfered08',
      [ extra_clean(['UnsafeInfered08_A.hi', 'UnsafeInfered08_A.o']) ],
-     multimod_compile_fail, ['UnsafeInfered08', ''])
+     multimod_compile, ['UnsafeInfered08', ''])
 test('UnsafeInfered09',
      [ extra_clean(['UnsafeInfered09_A.hi', 'UnsafeInfered09_A.o',
                     'UnsafeInfered09_B.hi', 'UnsafeInfered09_B.o']) ],
@@ -58,15 +56,19 @@ test('UnsafeInfered11',
      [ extra_clean(['UnsafeInfered11_A.hi', 'UnsafeInfered11_A.o']) ],
      multimod_compile_fail, ['UnsafeInfered11', ''])
 
-# Test should fail as unsafe and we made warn unsafe + -Werror
+# Test TH is unsafe
 test('UnsafeInfered12', normal, compile_fail, [''])
-test('UnsafeInfered13', normal, compile_fail, [''])
-test('UnsafeInfered14', normal, compile_fail, [''])
-test('UnsafeInfered15', normal, compile_fail, [''])
-test('UnsafeInfered16', normal, compile_fail, [''])
-test('UnsafeInfered17', normal, compile_fail, [''])
+
+# Test various overlapping instance flags
+# GHC 7.10 and earlier we regarded them as unsafe, but we now take an approach
+# based on looking only at sites of actual overlaps
+test('UnsafeInfered13', normal, compile, [''])
+test('UnsafeInfered14', normal, compile, [''])
+test('UnsafeInfered15', normal, compile, [''])
+test('UnsafeInfered16', normal, compile, [''])
+test('UnsafeInfered17', normal, compile, [''])
 test('UnsafeInfered18', normal, compile, [''])
-test('UnsafeInfered19', normal, compile_fail, [''])
+test('UnsafeInfered19', normal, compile, [''])
 
 # Mixed tests
 test('Mixed01', normal, compile_fail, [''])

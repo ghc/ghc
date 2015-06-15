@@ -11,11 +11,11 @@ sigof02:
 	rm -rf tmp_sigof02
 	mkdir tmp_sigof02
 	'$(GHC_PKG)' field containers key | sed 's/^.*: *//' > tmp_sigof02/containers
-	'$(TEST_HC)' $(S02_OPTS) -c Map.hsig -sig-of "`cat tmp_sigof02/containers`:Data.Map.Strict"
+	'$(TEST_HC)' $(S02_OPTS) -c Map.hsig -sig-of "Map is `cat tmp_sigof02/containers`:Data.Map.Strict"
 	'$(TEST_HC)' $(S02_OPTS) -c Main.hs
 	'$(TEST_HC)' $(S02_OPTS) -package containers tmp_sigof02/Main.o -o tmp_sigof02/StrictMain
 	! ./tmp_sigof02/StrictMain
-	'$(TEST_HC)' $(S02_OPTS) -c Map.hsig -sig-of "`cat tmp_sigof02/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02_OPTS) -c Map.hsig -sig-of "Map is `cat tmp_sigof02/containers`:Data.Map.Lazy"
 	'$(TEST_HC)' $(S02_OPTS) -c Main.hs
 	'$(TEST_HC)' $(S02_OPTS) -package containers tmp_sigof02/Main.o -o tmp_sigof02/LazyMain
 	./tmp_sigof02/LazyMain
@@ -47,8 +47,8 @@ sigof02d:
 	rm -rf tmp_sigof02d
 	mkdir tmp_sigof02d
 	'$(GHC_PKG)' field containers key | sed 's/^.*: *//' > tmp_sigof02d/containers
-	'$(TEST_HC)' $(S02D_OPTS) -c Map.hsig -sig-of "`cat tmp_sigof02d/containers`:Data.Map.Lazy"
-	'$(TEST_HC)' $(S02D_OPTS) -c MapAsSet.hsig -sig-of "`cat tmp_sigof02d/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02D_OPTS) -c Map.hsig -sig-of "Map is `cat tmp_sigof02d/containers`:Data.Map.Lazy, MapAsSet is `cat tmp_sigof02d/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02D_OPTS) -c MapAsSet.hsig -sig-of "Map is `cat tmp_sigof02d/containers`:Data.Map.Lazy, MapAsSet is `cat tmp_sigof02d/containers`:Data.Map.Lazy"
 	'$(TEST_HC)' $(S02D_OPTS) -c Double.hs
 	'$(TEST_HC)' $(S02D_OPTS) -package containers tmp_sigof02d/Main.o -o tmp_sigof02d/Double
 	./tmp_sigof02d/Double

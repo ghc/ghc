@@ -8,4 +8,9 @@ test('T8639_api', normal,
 test('T8628', normal,
               run_command,
               ['$MAKE -s --no-print-directory T8628'])
-test('T9595', extra_run_opts('"' + config.libdir + '"'), compile_and_run, ['-package ghc'])
+test('T9595', extra_run_opts('"' + config.libdir + '"'),
+              compile_and_run,
+              ['-package ghc'])
+test('T10508_api', extra_run_opts('"' + config.libdir + '"'),
+                   compile_and_run,
+                   ['-package ghc'])

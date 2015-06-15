@@ -176,7 +176,7 @@ rnTopBindsRHS bound_names binds
   = do { is_boot <- tcIsHsBootOrSig
        ; if is_boot
          then rnTopBindsBoot binds
-         else rnValBindsRHS (TopSigCtxt bound_names False) binds }
+         else rnValBindsRHS (TopSigCtxt bound_names) binds }
 
 rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
 -- A hs-boot file has no bindings.
@@ -442,7 +442,7 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocM checkConName rdrname
-       ; name <- lookupLocatedTopBndrRn rdrname   -- Should be bound at top level already
+       ; name <- lookupLocatedTopBndrRn rdrname   -- Should be in scope already
        ; return (PatSynBind psb{ psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
@@ -813,11 +813,17 @@ renameSig _ (IdSig x)
 
 renameSig ctxt sig@(TypeSig vs ty _)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        -- (named and anonymous) wildcards are bound here.
-        ; (wcs, ty') <- extractWildcards ty
-        ; bindLocatedLocalsFV wcs $ \wcs_new -> do {
-          (new_ty, fvs) <- rnHsSigType (ppr_sig_bndrs vs) ty'
-        ; return (TypeSig new_vs new_ty wcs_new, fvs) } }
+        ; let doc = ppr_sig_bndrs vs
+              wildCardsAllowed = case ctxt of
+                TopSigCtxt _    -> True
+                LocalBindCtxt _ -> True
+                _               -> False
+        ; (new_ty, fvs, wcs)
+            <- if wildCardsAllowed
+               then rnHsSigTypeWithWildCards doc ty
+               else do { (new_ty, fvs) <- rnHsSigType doc ty
+                       ; return (new_ty, fvs, []) }
+        ; return (TypeSig new_vs new_ty wcs, fvs) }
 
 renameSig ctxt sig@(GenericSig vs ty)
   = do  { defaultSigs_on <- xoptM Opt_DefaultSignatures

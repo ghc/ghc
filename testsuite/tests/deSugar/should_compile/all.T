@@ -75,7 +75,7 @@ test('GadtOverlap', normal, compile, ['-Wall'])
 test('T2395', normal, compile, [''])
 test('T4371', normal, compile, [''])
 test('T4439', normal, compile, [''])
-test('T4488', when(compiler_lt('ghc', '7.1'), expect_fail), compile, [''])
+test('T4488', normal, compile, [''])
 test('T4870',
      [only_ways(['optasm']),
       only_compiler_types(['ghc']),
@@ -103,3 +103,4 @@ test('T5252Take2',
 test('T2431', normal, compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T7669', normal, compile, [''])
 test('T8470', normal, compile, [''])
+test('T10251', normal, compile, [''])

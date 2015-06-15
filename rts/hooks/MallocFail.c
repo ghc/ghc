@@ -6,6 +6,7 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "Hooks.h"
 
 #include <stdio.h>
 

@@ -46,7 +46,7 @@ module BasicTypes(
 
         Boxity(..), isBoxed,
 
-        TupleSort(..), tupleSortBoxity, boxityNormalTupleSort,
+        TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
 
         -- ** The OneShotInfo type
@@ -88,13 +88,13 @@ module BasicTypes(
 
         SourceText,
 
-        IntWithInf, infinity, treatZeroAsInf, mkIntWithInf
+        IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit
    ) where
 
 import FastString
 import Outputable
 import SrcLoc ( Located,unLoc )
-
+import StaticFlags( opt_PprStyle_Debug )
 import Data.Data hiding (Fixity)
 import Data.Function (on)
 import GHC.Exts (Any)
@@ -268,14 +268,18 @@ initialVersion = 1
 
 -- reason/explanation from a WARNING or DEPRECATED pragma
 -- For SourceText usage, see note [Pragma source text]
-data WarningTxt = WarningTxt (Located SourceText) [Located FastString]
-                | DeprecatedTxt (Located SourceText) [Located FastString]
+data WarningTxt = WarningTxt (Located SourceText)
+                             [Located (SourceText,FastString)]
+                | DeprecatedTxt (Located SourceText)
+                                [Located (SourceText,FastString)]
     deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
-    ppr (WarningTxt    _ ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
-    ppr (DeprecatedTxt _ ds) = text "Deprecated:" <+>
-                               doubleQuotes (vcat (map (ftext . unLoc) ds))
+    ppr (WarningTxt    _ ws)
+                            = doubleQuotes (vcat (map (ftext . snd . unLoc) ws))
+    ppr (DeprecatedTxt _ ds)
+                            = text "Deprecated:" <+>
+                              doubleQuotes (vcat (map (ftext . snd . unLoc) ds))
 
 {-
 ************************************************************************
@@ -573,19 +577,20 @@ data TupleSort
   deriving( Eq, Data, Typeable )
 
 tupleSortBoxity :: TupleSort -> Boxity
-tupleSortBoxity BoxedTuple     = Boxed
-tupleSortBoxity UnboxedTuple   = Unboxed
+tupleSortBoxity BoxedTuple      = Boxed
+tupleSortBoxity UnboxedTuple    = Unboxed
 tupleSortBoxity ConstraintTuple = Boxed
 
-boxityNormalTupleSort :: Boxity -> TupleSort
-boxityNormalTupleSort Boxed   = BoxedTuple
-boxityNormalTupleSort Unboxed = UnboxedTuple
+boxityTupleSort :: Boxity -> TupleSort
+boxityTupleSort Boxed   = BoxedTuple
+boxityTupleSort Unboxed = UnboxedTuple
 
 tupleParens :: TupleSort -> SDoc -> SDoc
 tupleParens BoxedTuple      p = parens p
-tupleParens ConstraintTuple p = parens p -- The user can't write fact tuples
-                                         -- directly, we overload the (,,) syntax
-tupleParens UnboxedTuple p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
+tupleParens UnboxedTuple    p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
+tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
+  | opt_PprStyle_Debug        = ptext (sLit "(%") <+> p <+> ptext (sLit "%)")
+  | otherwise                 = parens p
 
 {-
 ************************************************************************
@@ -1159,6 +1164,10 @@ instance Num IntWithInf where
   fromInteger = Int . fromInteger
 
   (-) = panic "subtracting IntWithInfs"
+
+intGtLimit :: Int -> IntWithInf -> Bool
+intGtLimit _ Infinity = False
+intGtLimit n (Int m)  = n > m
 
 -- | Add two 'IntWithInf's
 plusWithInf :: IntWithInf -> IntWithInf -> IntWithInf

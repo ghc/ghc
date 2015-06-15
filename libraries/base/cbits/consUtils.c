@@ -3,7 +3,7 @@
  *
  * Win32 Console API support
  */
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__)
 /* to the end */
 
 #include "consUtils.h"
@@ -108,4 +108,4 @@ flush_input_console__(int fd)
     return -1;
 }
 
-#endif /* defined(__MINGW32__) || ... */
+#endif /* defined(_WIN32) || ... */

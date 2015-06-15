@@ -12,6 +12,7 @@ import Hoopl
 import BlockId
 import Cmm
 import CmmUtils
+import CmmSwitch (mapSwitchTargets)
 import Maybes
 import Panic
 
@@ -355,7 +356,7 @@ replaceLabels env g
      txnode :: CmmNode e x -> CmmNode e x
      txnode (CmmBranch bid)         = CmmBranch (lookup bid)
      txnode (CmmCondBranch p t f)   = mkCmmCondBranch (exp p) (lookup t) (lookup f)
-     txnode (CmmSwitch e arms)      = CmmSwitch (exp e) (map (liftM lookup) arms)
+     txnode (CmmSwitch e ids)       = CmmSwitch (exp e) (mapSwitchTargets lookup ids)
      txnode (CmmCall t k rg a res r) = CmmCall (exp t) (liftM lookup k) rg a res r
      txnode fc@CmmForeignCall{}     = fc{ args = map exp (args fc)
                                         , succ = lookup (succ fc) }

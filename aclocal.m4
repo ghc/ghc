@@ -565,10 +565,13 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
-    arm*linux*)
-        # On arm/linux and arm/android, tell gcc to link using the gold linker.
-        # Forcing LD to be ld.gold is done in configre.ac.
-        $3="$$3 -fuse-ld=gold"
+    arm*linux*       | \
+    aarch64*linux*   )
+        # On arm/linux, aarch64/linux, arm/android and aarch64/android, tell
+        # gcc to link using the gold linker.
+        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
+        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $4="$$4 -z noexecstack"
         ;;
     esac
 
@@ -877,7 +880,7 @@ AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
 [if test x"$HappyCmd" != x; then
    fptools_cv_happy_version=`"$HappyCmd" -v |
-			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'` ;
+              grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'` ;
 else
    fptools_cv_happy_version="";
 fi;
@@ -904,7 +907,7 @@ AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
 [if test x"$AlexCmd" != x; then
    fptools_cv_alex_version=`"$AlexCmd" -v |
-			  grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'` ;
+              grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'` ;
 else
    fptools_cv_alex_version="";
 fi;
@@ -1276,7 +1279,7 @@ if grep '^conftest.txt$' conftest.out > /dev/null 2>&1 ; then
     *mingw32)
       if test x${OSTYPE} != xmsys
       then
- 	    fp_prog_find="`cygpath --mixed ${fp_prog_find}`"
+        fp_prog_find="`cygpath --mixed ${fp_prog_find}`"
         AC_MSG_NOTICE([normalized find command to $fp_prog_find])
       fi ;;
     *) ;;
@@ -1654,7 +1657,7 @@ then
   then
     # We can't test timer_create when we're cross-compiling, so we
     # optimistiaclly assume that it actually works properly.
-    AC_DEFINE([USE_TIMER_CREATE], 1,  [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)])
+    AC_DEFINE([USE_TIMER_CREATE], 1,  [Define to 1 if we can use timer_create(CLOCK_REALTIME,...)])
   else
   AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)],
     [fptools_cv_timer_create_works],
@@ -1715,36 +1718,6 @@ int main(int argc, char *argv[])
     }
     alarm(1);
 
-    if (timer_create(CLOCK_PROCESS_CPUTIME_ID, &ev, &timer) != 0) {
-        fprintf(stderr,"No CLOCK_PROCESS_CPUTIME_ID timer\n");
-       exit(1);
-    }
-
-    it.it_value.tv_sec = 0;
-    it.it_value.tv_nsec = 1;
-    it.it_interval = it.it_value;
-    if (timer_settime(timer, 0, &it, NULL) != 0) {
-        fprintf(stderr,"settime problem\n");
-        exit(4);
-    }
-
-    tock = 0;
-
-    for(n = 3; n < 20000; n++){
-        for(m = 2; m <= n/2; m++){
-            if (!(n%m)) count++;
-            if (tock) goto out;
-        }
-    }
-out:
-
-    if (!tock) {
-        fprintf(stderr,"no CLOCK_PROCESS_CPUTIME_ID signal\n");
-        exit(5);
-    }
-
-    timer_delete(timer);
-
     if (timer_create(CLOCK_REALTIME, &ev, &timer) != 0) {
         fprintf(stderr,"No CLOCK_REALTIME timer\n");
         exit(2);
@@ -1777,7 +1750,7 @@ out:
   ])
 case $fptools_cv_timer_create_works in
     yes) AC_DEFINE([USE_TIMER_CREATE], 1,
-                   [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)]);;
+                   [Define to 1 if we can use timer_create(CLOCK_REALTIME,...)]);;
 esac
   fi
 fi
@@ -2099,19 +2072,43 @@ AC_DEFUN([XCODE_VERSION],[
 # $4 = the version of the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-	# Test for program with version name.
+    # Test for program with version name.
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3-$4])
     if test "$$1" = ""; then
-		# Test for program without version name.
-		FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
-		AC_MSG_CHECKING([$$1 is version $4])
-		if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
+        # Test for program without version name.
+        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
+        AC_MSG_CHECKING([$$1 is version $4])
+        if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
             AC_MSG_RESULT(yes)
         else
-			AC_MSG_RESULT(no)
-			$1=""
-		fi
+            AC_MSG_RESULT(no)
+            $1=""
+        fi
     fi
+])
+
+# FIND_LD
+# Find the version of `ld` to use. This is used in both in the top level
+# configure.ac and in distrib/configure.ac.in.
+#
+# $1 = the variable to set
+#
+AC_DEFUN([FIND_LD],[
+    FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
+    case $target in
+        arm*linux*       | \
+        aarch64*linux*   )
+            # Arm and Aarch64 requires use of the binutils ld.gold linker.
+            # This case should catch at least arm-unknown-linux-gnueabihf,
+            # arm-linux-androideabi, arm64-unknown-linux and
+            # aarch64-linux-android
+            FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
+            $1="$LD_GOLD"
+            ;;
+        *)
+            $1="$LD"
+            ;;
+    esac
 ])
 
 # FIND_GHC_BOOTSTRAP_PROG()
@@ -2124,12 +2121,12 @@ AC_DEFUN([FIND_LLVM_PROG],[
 # $3 = The string to grep for to find the correct line.
 #
 AC_DEFUN([FIND_GHC_BOOTSTRAP_PROG],[
-	BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
-	if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
-		AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
-	else
-		$1=$BootstrapTmpCmd
-	fi
+    BootstrapTmpCmd=`grep $3 $($2 --print-libdir)/settings 2>/dev/null | sed 's/.*", "//;s/".*//'`
+    if test -n "$BootstrapTmpCmd" && test `basename $BootstrapTmpCmd` = $BootstrapTmpCmd ; then
+        AC_PATH_PROG([$1], [$BootstrapTmpCmd], "")
+    else
+        $1=$BootstrapTmpCmd
+    fi
 ])
 
 

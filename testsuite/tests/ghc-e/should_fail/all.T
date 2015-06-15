@@ -18,5 +18,7 @@ test('ghc-e-fail1', [exit_code(2), req_interp, ignore_output], run_command,
 test('ghc-e-fail2', [exit_code(2), req_interp, ignore_output], run_command,
      ['$MAKE --no-print-directory -s ghc-e-fail2'])
 
-test('T9930fail', [exit_code(2), ignore_output], run_command,
+# Don't run on Windows, as executable is written to T9930.exe
+# and no failure is induced.
+test('T9930fail', [exit_code(2), ignore_output, when(opsys('mingw32'), skip)], run_command,
      ['$MAKE --no-print-directory -s T9930fail'])

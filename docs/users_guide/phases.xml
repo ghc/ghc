@@ -893,10 +893,10 @@ $ cat foo.hspp</screen>
           executables linked against the library are smaller as they only
           link against the object files that they need. However, assembling
           all the sections separately is expensive, so this is slower than
-          compiling normally.
-          We use this feature for building GHC's libraries
-          (warning: don't use it unless you know what you're
-          doing!).</para>
+          compiling normally. Additionally, the size of the library itself
+          (the <literal>.a</literal> file) can be a factor of 2 to 2.5
+          larger.
+          We use this feature for building GHC's libraries.</para>
         </listitem>
       </varlistentry>
 
@@ -1215,6 +1215,27 @@ $ cat foo.hspp</screen>
             Note that <option>-with-rtsopts</option> has no effect when
             used with <option>-no-hs-main</option>; see
             <xref linkend="using-own-main" /> for details.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-no-rtsopts-suggestions</option>
+          <indexterm><primary><option>-no-rtsopts-suggestions</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            This option disables RTS suggestions about linking with <option>-rtsopts</option>
+            when they are not available.
+
+            These suggestions would be unhelpful if the users have installed Haskell programs
+            through their package managers.
+            With this option enabled, these suggestions will not appear.
+
+            It is recommended for people distributing binaries
+            to build with either <option>-rtsopts</option> or
+            <option>-no-rtsopts-suggestions</option>.
           </para>
         </listitem>
       </varlistentry>

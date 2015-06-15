@@ -61,7 +61,7 @@ module Name (
         isValName, isVarName,
         isWiredInName, isBuiltInSyntax,
         wiredInNameTyThing_maybe,
-        nameIsLocalOrFrom, nameIsHomePackageImport,
+        nameIsLocalOrFrom, nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
 
         -- * Class 'NamedThing' and overloaded friends
@@ -255,6 +255,17 @@ nameIsHomePackageImport this_mod
                           && modulePackageKey nm_mod == this_pkg
   where
     this_pkg = modulePackageKey this_mod
+
+-- | Returns True if the Name comes from some other package: neither this
+-- pacakge nor the interactive package.
+nameIsFromExternalPackage :: PackageKey -> Name -> Bool
+nameIsFromExternalPackage this_pkg name
+  | Just mod <- nameModule_maybe name
+  , modulePackageKey mod /= this_pkg    -- Not this package
+  , not (isInteractiveModule mod)       -- Not the 'interactive' package
+  = True
+  | otherwise
+  = False
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
@@ -534,8 +545,8 @@ pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
       NameNotInScope2  -> ppr (modulePackageKey mod) <> colon     -- Module not in
-                          <> ppr (moduleName mod) <> dot         -- scope either
-      _otherwise       -> empty
+                          <> ppr (moduleName mod) <> dot          -- scope either
+      NameUnqual       -> empty                   -- In scope unqualified
 
 ppr_underscore_unique :: Unique -> SDoc
 -- Print an underscore separating the name from its unique

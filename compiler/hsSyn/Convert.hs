@@ -13,6 +13,7 @@ module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 thRdrNameGuesses ) where
 
 import HsSyn as Hs
+import HsTypes  ( mkHsForAllTy )
 import qualified Class
 import RdrName
 import qualified Name
@@ -244,7 +245,7 @@ cvtDec (InstanceD ctxt ty decs)
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
         ; ctxt' <- cvtContext ctxt
         ; L loc ty' <- cvtType ty
-        ; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
+        ; let inst_ty' = L loc $ mkHsForAllTy Implicit [] ctxt' $ L loc ty'
         ; returnJustL $ InstD $ ClsInstD $
           ClsInstDecl inst_ty' binds' sigs' ats' adts' Nothing }
 
@@ -300,14 +301,11 @@ cvtDec (TySynInstD tc eqn)
                                         , tfid_fvs = placeHolderNames } } }
 
 cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
-  | not $ null eqns
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
        ; mkind' <- cvtMaybeKind mkind
        ; eqns' <- mapM (cvtTySynEqn tc') eqns
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind' }
-  | otherwise
-  = failWith (ptext (sLit "Illegal empty closed type family"))
+         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' mkind' }
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
@@ -317,7 +315,7 @@ cvtDec (TH.RoleAnnotD tc roles)
 cvtDec (TH.StandaloneDerivD cxt ty)
   = do { cxt' <- cvtContext cxt
        ; L loc ty'  <- cvtType ty
-       ; let inst_ty' = L loc $ mkImplicitHsForAllTy cxt' $ L loc ty'
+       ; let inst_ty' = L loc $ mkHsForAllTy Implicit [] cxt' $ L loc ty'
        ; returnJustL $ DerivD $
          DerivDecl { deriv_type = inst_ty', deriv_overlap_mode = Nothing } }
 
@@ -497,7 +495,8 @@ cvtForD (ImportF callconv safety from nm ty)
 cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType ty
-        ; let e = CExport (noLoc (CExportStatic (mkFastString as)
+        ; let e = CExport (noLoc (CExportStatic as
+                                                (mkFastString as)
                                                 (cvt_conv callconv)))
                                                 (noLoc as)
         ; return $ ForeignExport nm' ty' noForeignExportCoercionYet e }
@@ -548,7 +547,7 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
        ; returnJustL $ Hs.RuleD
-            $ HsRules "{-# RULES" [noLoc $ HsRule (noLoc nm') act bndrs'
+            $ HsRules "{-# RULES" [noLoc $ HsRule (noLoc (nm,nm')) act bndrs'
                                                   lhs' placeHolderNames
                                                   rhs' placeHolderNames]
        }
@@ -1004,14 +1003,14 @@ cvtTypeKind ty_str ty
              | n == 1
              -> failWith (ptext (sLit ("Illegal 1-tuple " ++ ty_str ++ " constructor")))
              | otherwise
-             -> mk_apps (HsTyVar (getRdrName (tupleTyCon BoxedTuple n))) tys'
+             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
            UnboxedTupleT n
              | length tys' == n         -- Saturated
              -> if n==1 then return (head tys') -- Singleton tuples treated
                                                 -- like nothing (ie just parens)
                         else returnL (HsTupleTy HsUnboxedTuple tys')
              | otherwise
-             -> mk_apps (HsTyVar (getRdrName (tupleTyCon UnboxedTuple n))) tys'
+             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Unboxed n))) tys'
            ArrowT
              | [x',y'] <- tys' -> returnL (HsFunTy x' y')
              | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'

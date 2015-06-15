@@ -32,7 +32,7 @@ test('drv-functor2', normal, compile, [''])
 test('drv-foldable-traversable1', normal, compile, [''])
 test('T6031', extra_clean(['T6031a.o', 'T6031a.hi']), multimod_compile, ['T6031', '-v0'])
 test('T1133',
-     extra_clean(['T1133.o-boot', 'T1133.hi-boot']),
+     extra_clean(['T1133.o-boot', 'T1133.hi-boot', 'T1133a.o', 'T1133a.hi']),
      run_command,
      ['$MAKE --no-print-directory -s T1133'])
 test('T7704', normal, compile, [''])

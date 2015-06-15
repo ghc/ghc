@@ -6,10 +6,12 @@ ffi018_ghci_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ffi018_ghci_c.c
 
 T1288_ghci_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghciWayFlags) -c T1288_ghci_c.c
+	# Don't show gcc warning: 'stdcall' attribute ignored [-Wattributes]
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghciWayFlags) -c -optc=-Wno-attributes T1288_ghci_c.c
 
 T2276_ghci_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghciWayFlags) -c T2276_ghci_c.c
+	# Don't show gcc warning: 'stdcall' attribute ignored [-Wattributes]
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghciWayFlags) -c -optc=-Wno-attributes T2276_ghci_c.c
 
 ffi002_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ffi002.hs

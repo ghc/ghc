@@ -68,9 +68,10 @@ module HscMain
     , hscGetModuleInterface
     , hscRnImportDecls
     , hscTcRnLookupRdrName
-    , hscStmt, hscStmtWithLocation
+    , hscStmt, hscStmtWithLocation, hscParsedStmt
     , hscDecls, hscDeclsWithLocation
     , hscTcExpr, hscImport, hscKcType
+    , hscParseExpr
     , hscCompileCoreExpr
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
@@ -90,11 +91,8 @@ import BasicTypes       ( HValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
-import Type             ( Type )
-import PrelNames
-import {- Kind parts of -} Type         ( Kind )
+import Type             ( Type, Kind )
 import CoreLint         ( lintInteractiveExpr )
-import DsMeta           ( templateHaskellNames )
 import VarEnv           ( emptyTidyEnv )
 import Panic
 import ConLike
@@ -191,14 +189,6 @@ newHscEnv dflags = do
                      hsc_FC           = fc_var,
                      hsc_type_env_var = Nothing }
 
-
-knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
-knownKeyNames =              -- where templateHaskellNames are defined
-    map getName wiredInThings
-        ++ basicKnownKeyNames
-#ifdef GHCI
-        ++ templateHaskellNames
-#endif
 
 -- -----------------------------------------------------------------------------
 
@@ -409,19 +399,21 @@ tcRnModule' hsc_env sum save_rn_syntax mod = do
                ioMsgMaybe $
                    tcRnModule hsc_env (ms_hsc_src sum) save_rn_syntax mod
 
-    tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_res)
+    -- See Note [Safe Haskell Overlapping Instances Implementation]
+    -- although this is used for more than just that failure case.
+    (tcSafeOK, whyUnsafe) <- liftIO $ readIORef (tcg_safeInfer tcg_res)
     dflags   <- getDynFlags
     let allSafeOK = safeInferred dflags && tcSafeOK
 
     -- end of the safe haskell line, how to respond to user?
     if not (safeHaskellOn dflags) || (safeInferOn dflags && not allSafeOK)
         -- if safe Haskell off or safe infer failed, mark unsafe
-        then markUnsafeInfer tcg_res emptyBag
+        then markUnsafeInfer tcg_res whyUnsafe
 
         -- module (could be) safe, throw warning if needed
         else do
             tcg_res' <- hscCheckSafeImports tcg_res
-            safe <- liftIO $ readIORef (tcg_safeInfer tcg_res')
+            safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
             when safe $ do
               case wopt Opt_WarnSafe dflags of
                 True -> (logWarnings $ unitBag $ mkPlainWarnMsg dflags
@@ -780,8 +772,8 @@ hscFileFrontEnd mod_summary = do
 --
 -- It used to be that we only did safe inference on modules that had no Safe
 -- Haskell flags, but now we perform safe inference on all modules as we want
--- to allow users to set the `--fwarn-safe`, `--fwarn-unsafe` and
--- `--fwarn-trustworthy-safe` flags on Trustworthy and Unsafe modules so that a
+-- to allow users to set the `-fwarn-safe`, `-fwarn-unsafe` and
+-- `-fwarn-trustworthy-safe` flags on Trustworthy and Unsafe modules so that a
 -- user can ensure their assumptions are correct and see reasons for why a
 -- module is safe or unsafe.
 --
@@ -820,7 +812,7 @@ hscCheckSafeImports tcg_env = do
     warns dflags rules = listToBag $ map (warnRules dflags) rules
     warnRules dflags (L loc (HsRule n _ _ _ _ _ _)) =
         mkPlainWarnMsg dflags loc $
-            text "Rule \"" <> ftext (unLoc n) <> text "\" ignored" $+$
+            text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
 -- | Validate that safe imported modules are actually safe.  For modules in the
@@ -1059,7 +1051,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
          (logWarnings $ unitBag $
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
-    liftIO $ writeIORef (tcg_safeInfer tcg_env) False
+    liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicity safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.
@@ -1418,30 +1410,36 @@ hscStmtWithLocation :: HscEnv
                     -> Int    -- ^ Starting line
                     -> IO (Maybe ([Id], IO [HValue], FixityEnv))
 hscStmtWithLocation hsc_env0 stmt source linenumber =
- runInteractiveHsc hsc_env0 $ do
+  runInteractiveHsc hsc_env0 $ do
     maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
-        Nothing -> return Nothing
+      Nothing -> return Nothing
 
-        Just parsed_stmt -> do
-            -- Rename and typecheck it
-            hsc_env <- getHscEnv
-            (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt hsc_env parsed_stmt
+      Just parsed_stmt -> do
+        hsc_env <- getHscEnv
+        liftIO $ hscParsedStmt hsc_env parsed_stmt
 
-            -- Desugar it
-            ds_expr <- ioMsgMaybe $ deSugarExpr hsc_env tc_expr
-            liftIO (lintInteractiveExpr "desugar expression" hsc_env ds_expr)
-            handleWarnings
+hscParsedStmt :: HscEnv
+              -> GhciLStmt RdrName  -- ^ The parsed statement
+              -> IO (Maybe ([Id], IO [HValue], FixityEnv))
+hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
+  -- Rename and typecheck it
+  (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt hsc_env stmt
 
-            -- Then code-gen, and link it
-            -- It's important NOT to have package 'interactive' as thisPackageKey
-            -- for linking, else we try to link 'main' and can't find it.
-            -- Whereas the linker already knows to ignore 'interactive'
-            let  src_span     = srcLocSpan interactiveSrcLoc
-            hval <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
-            let hval_io = unsafeCoerce# hval :: IO [HValue]
+  -- Desugar it
+  ds_expr <- ioMsgMaybe $ deSugarExpr hsc_env tc_expr
+  liftIO (lintInteractiveExpr "desugar expression" hsc_env ds_expr)
+  handleWarnings
 
-            return $ Just (ids, hval_io, fix_env)
+  -- Then code-gen, and link it
+  -- It's important NOT to have package 'interactive' as thisPackageKey
+  -- for linking, else we try to link 'main' and can't find it.
+  -- Whereas the linker already knows to ignore 'interactive'
+  let src_span = srcLocSpan interactiveSrcLoc
+  hval <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
+  let hvals_io = unsafeCoerce# hval :: IO [HValue]
+
+  return $ Just (ids, hvals_io, fix_env)
 
 -- | Compile a decls
 hscDecls :: HscEnv
@@ -1542,14 +1540,9 @@ hscTcExpr :: HscEnv
           -> String -- ^ The expression
           -> IO Type
 hscTcExpr hsc_env0 expr = runInteractiveHsc hsc_env0 $ do
-    hsc_env <- getHscEnv
-    maybe_stmt <- hscParseStmt expr
-    case maybe_stmt of
-        Just (L _ (BodyStmt expr _ _ _)) ->
-            ioMsgMaybe $ tcRnExpr hsc_env expr
-        _ ->
-            throwErrors $ unitBag $ mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
-                (text "not an expression:" <+> quotes (text expr))
+  hsc_env <- getHscEnv
+  parsed_expr <- hscParseExpr expr
+  ioMsgMaybe $ tcRnExpr hsc_env parsed_expr
 
 -- | Find the kind of a type
 -- Currently this does *not* generalise the kinds of the type
@@ -1562,6 +1555,15 @@ hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
     ioMsgMaybe $ tcRnType hsc_env normalise ty
+
+hscParseExpr :: String -> Hsc (LHsExpr RdrName)
+hscParseExpr expr = do
+  hsc_env <- getHscEnv
+  maybe_stmt <- hscParseStmt expr
+  case maybe_stmt of
+    Just (L _ (BodyStmt expr _ _ _)) -> return expr
+    _ -> throwErrors $ unitBag $ mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
+      (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt RdrName))
 hscParseStmt = hscParseThing parseStmt

@@ -111,6 +111,7 @@ typeArity ty
 
       | Just (arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
+
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
       , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]

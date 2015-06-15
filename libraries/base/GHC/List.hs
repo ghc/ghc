@@ -84,8 +84,15 @@ last [x]                =  x
 last (_:xs)             =  last xs
 last []                 =  errorEmptyList "last"
 #else
--- use foldl to allow fusion
-last = foldl (\_ x -> x) (errorEmptyList "last")
+-- Use foldl to make last a good consumer.
+-- This will compile to good code for the actual GHC.List.last.
+-- (At least as long it is eta-expaned, otherwise it does not, #10260.)
+last xs = foldl (\_ x -> x) lastError xs
+{-# INLINE last #-}
+-- The inline pragma is required to make GHC remember the implementation via
+-- foldl.
+lastError :: a
+lastError = errorEmptyList "last"
 #endif
 
 -- | Return all the elements of a list except the last one.

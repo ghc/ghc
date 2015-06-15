@@ -1,6 +1,5 @@
 -- !!! Bug # 7600.
 -- See file T7600 for main description.
-{-# LANGUAGE CPP #-}
 module T7600_A (test_run) where
 
 import Control.Monad.ST
@@ -11,8 +10,6 @@ import Data.Word
 import Numeric
 
 import GHC.Float
-
-#include "ghcconfig.h"
 
 -- Test run
 test_run :: Float -> Double -> IO ()
@@ -41,45 +38,26 @@ widen' :: Float -> Double
 {-# NOINLINE widen' #-}
 widen' = float2Double
 
-doubleToBytes :: Double -> [Int]
-doubleToBytes d
+doubleToWord64 :: Double -> Word64
+doubleToWord64 d
    = runST (do
-        arr <- newArray_ ((0::Int),7)
+        arr <- newArray_ ((0::Int),0)
         writeArray arr 0 d
-        arr <- castDoubleToWord8Array arr
-        i0 <- readArray arr 0
-        i1 <- readArray arr 1
-        i2 <- readArray arr 2
-        i3 <- readArray arr 3
-        i4 <- readArray arr 4
-        i5 <- readArray arr 5
-        i6 <- readArray arr 6
-        i7 <- readArray arr 7
-        return (map fromIntegral [i0,i1,i2,i3,i4,i5,i6,i7])
+        arr <- castDoubleToWord64Array arr
+        readArray arr 0
      )
 
-castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
-castFloatToWord8Array = castSTUArray
+castFloatToWord64Array :: STUArray s Int Float -> ST s (STUArray s Int Word64)
+castFloatToWord64Array = castSTUArray
 
-castDoubleToWord8Array :: STUArray s Int Double -> ST s (STUArray s Int Word8)
-castDoubleToWord8Array = castSTUArray
+castDoubleToWord64Array :: STUArray s Int Double -> ST s (STUArray s Int Word64)
+castDoubleToWord64Array = castSTUArray
 
 dToStr :: Double -> String
 dToStr d
-  = let bs     = doubleToBytes d
-        hex d' = case showHex d' "" of
-                     []    -> error "dToStr: too few hex digits for float"
-                     [x]   -> ['0',x]
-                     [x,y] -> [x,y]
-                     _     -> error "dToStr: too many hex digits for float"
+  = let bs     = doubleToWord64 d
+        hex d' = showHex d' ""
 
-        str  = map toUpper $ concat . fixEndian . (map hex) $ bs
+        str  = map toUpper $ hex bs
     in  "0x" ++ str
-
-fixEndian :: [a] -> [a]
-#ifdef WORDS_BIGENDIAN
-fixEndian = id
-#else
-fixEndian = reverse
-#endif
 

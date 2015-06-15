@@ -44,11 +44,11 @@ main = do
     setContext [IIModule mod]
     liftIO $ hFlush stdout  -- make sure things above are printed before
                             -- interactive output
-    r <- runStmt "main" RunToCompletion
+    r <- execStmt "main" execOptions
     case r of
-      RunOk _        -> prn "ok"
-      RunException _ -> prn "exception"
-      RunBreak _ _ _ -> prn "breakpoint"
+      ExecComplete { execResult = Right _ } -> prn "ok"
+      ExecComplete { execResult = Left _ } -> prn "exception"
+      ExecBreak{} -> prn "breakpoint"
     liftIO $ hFlush stdout
     return ()
 

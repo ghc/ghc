@@ -34,7 +34,7 @@ import OccName          ( OccName, pprOccName, mkVarOccFS )
 import TyCon            ( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
 import Type             ( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
                           typePrimRep )
-import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), TupleSort(..) )
+import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..) )
 import ForeignCall      ( CLabelString )
 import Unique           ( Unique, mkPrimOpIdUnique )
 import Outputable
@@ -277,12 +277,6 @@ Invariants:
         (c) stableNameToInt always returns the same Int for a given
             stable name.
 
-
--- HWL: The first 4 Int# in all par... annotations denote:
---   name, granularity info, size of result, degree of parallelism
---      Same  structure as _seq_ i.e. returns Int#
--- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
---   `the processor containing the expression v'; it is not evaluated
 
 These primops are pretty weird.
 

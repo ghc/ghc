@@ -197,7 +197,7 @@ convention.
 {
 {-# LANGUAGE BangPatterns #-} -- required for versions of Happy before 1.18.6
 {-# OPTIONS -Wwarn -w #-}
--- The above warning supression flag is a temporary kludge.
+-- The above warning suppression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
@@ -226,6 +226,7 @@ import CmmOpt
 import MkGraph
 import Cmm
 import CmmUtils
+import CmmSwitch        ( mkSwitchTargets )
 import CmmInfo
 import BlockId
 import CmmLex
@@ -258,6 +259,7 @@ import Data.Array
 import Data.Char        ( ord )
 import System.Exit
 import Data.Maybe
+import qualified Data.Map as M
 
 #include "HsVersions.h"
 }
@@ -676,24 +678,24 @@ globals :: { [GlobalReg] }
         : GLOBALREG                     { [$1] }
         | GLOBALREG ',' globals         { $1 : $3 }
 
-maybe_range :: { Maybe (Int,Int) }
-        : '[' INT '..' INT ']'  { Just (fromIntegral $2, fromIntegral $4) }
+maybe_range :: { Maybe (Integer,Integer) }
+        : '[' INT '..' INT ']'  { Just ($2, $4) }
         | {- empty -}           { Nothing }
 
-arms    :: { [CmmParse ([Int],Either BlockId (CmmParse ()))] }
+arms    :: { [CmmParse ([Integer],Either BlockId (CmmParse ()))] }
         : {- empty -}                   { [] }
         | arm arms                      { $1 : $2 }
 
-arm     :: { CmmParse ([Int],Either BlockId (CmmParse ())) }
+arm     :: { CmmParse ([Integer],Either BlockId (CmmParse ())) }
         : 'case' ints ':' arm_body      { do b <- $4; return ($2, b) }
 
 arm_body :: { CmmParse (Either BlockId (CmmParse ())) }
         : '{' body '}'                  { return (Right (withSourceNote $1 $3 $2)) }
         | 'goto' NAME ';'               { do l <- lookupLabel $2; return (Left l) }
 
-ints    :: { [Int] }
-        : INT                           { [ fromIntegral $1 ] }
-        | INT ',' ints                  { fromIntegral $1 : $3 }
+ints    :: { [Integer] }
+        : INT                           { [ $1 ] }
+        | INT ',' ints                  { $1 : $3 }
 
 default :: { Maybe (CmmParse ()) }
         : 'default' ':' '{' body '}'    { Just (withSourceNote $3 $5 $4) }
@@ -1307,7 +1309,9 @@ withSourceNote a b parse = do
 -- optional range on the switch (eg. switch [0..7] {...}), or by
 -- the minimum/maximum values from the branches.
 
-doSwitch :: Maybe (Int,Int) -> CmmParse CmmExpr -> [([Int],Either BlockId (CmmParse ()))]
+doSwitch :: Maybe (Integer,Integer)
+         -> CmmParse CmmExpr
+         -> [([Integer],Either BlockId (CmmParse ()))]
          -> Maybe (CmmParse ()) -> CmmParse ()
 doSwitch mb_range scrut arms deflt
    = do
@@ -1319,22 +1323,16 @@ doSwitch mb_range scrut arms deflt
 
         -- Compile each case branch
         table_entries <- mapM emitArm arms
+        let table = M.fromList (concat table_entries)
 
-        -- Construct the table
-        let
-            all_entries = concat table_entries
-            ixs = map fst all_entries
-            (min,max) 
-                | Just (l,u) <- mb_range = (l,u)
-                | otherwise              = (minimum ixs, maximum ixs)
+        dflags <- getDynFlags
+        let range = fromMaybe (0, tARGET_MAX_WORD dflags) mb_range
 
-            entries = elems (accumArray (\_ a -> Just a) dflt_entry (min,max)
-                                all_entries)
         expr <- scrut
         -- ToDo: check for out of range and jump to default if necessary
-        emit (mkSwitch expr entries)
+        emit $ mkSwitch expr (mkSwitchTargets False range dflt_entry table)
    where
-        emitArm :: ([Int],Either BlockId (CmmParse ())) -> CmmParse [(Int,BlockId)]
+        emitArm :: ([Integer],Either BlockId (CmmParse ())) -> CmmParse [(Integer,BlockId)]
         emitArm (ints,Left blockid) = return [ (i,blockid) | i <- ints ]
         emitArm (ints,Right code) = do
            blockid <- forkLabelledCode code

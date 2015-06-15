@@ -48,6 +48,7 @@ ifeq "$$(HSCOLOUR_SRCS)" "YES"
 	"$$(ghc-cabal_INPLACE)" hscolour $1 $2
 endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
+	  --verbosity=0 \
 	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \
 	  --no-tmp-comp-dir \
 	  --dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
@@ -61,7 +62,7 @@ endif
 	  $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS) \
 	  $$($1_$2_HS_SRCS) \
 	  $$($1_$2_EXTRA_HADDOCK_SRCS) \
-	  +RTS -t$$@.t --machine-readable
+	  +RTS -t"$1/$2/haddock.t" --machine-readable
 
 # --no-tmp-comp-dir above is important: it saves a few minutes in a
 # validate.  This flag lets Haddock use the pre-compiled object files

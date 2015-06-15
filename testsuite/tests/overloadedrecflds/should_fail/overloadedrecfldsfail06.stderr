@@ -1,18 +1,18 @@
 [1 of 2] Compiling OverloadedRecFldsFail06_A ( OverloadedRecFldsFail06_A.hs, OverloadedRecFldsFail06_A.o )
 
-OverloadedRecFldsFail06_A.hs:9:15: Warning:
+OverloadedRecFldsFail06_A.hs:9:15: warning:
     Defined but not used: data constructor ‘MkUnused’
 
-OverloadedRecFldsFail06_A.hs:9:42: Warning:
+OverloadedRecFldsFail06_A.hs:9:42: warning:
     Defined but not used: ‘unused2’
 
-OverloadedRecFldsFail06_A.hs:9:59: Warning:
+OverloadedRecFldsFail06_A.hs:9:59: warning:
     Defined but not used: ‘used_locally’
 [2 of 2] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 
-overloadedrecfldsfail06.hs:7:1: Warning:
+overloadedrecfldsfail06.hs:7:1: warning:
     The import of ‘Unused(unused), V(x), U(y), MkV, Unused’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
-<no location info>: 
+<no location info>: error: 
 Failing due to -Werror.

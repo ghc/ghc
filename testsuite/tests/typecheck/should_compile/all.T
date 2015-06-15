@@ -84,7 +84,7 @@ test('tc079', normal, compile, [''])
 test('tc080', normal, compile, [''])
 test('tc081', normal, compile, [''])
 test('tc082', normal, compile, [''])
-test('tc084', when(compiler_type('hugs'), expect_fail), compile, [''])
+test('tc084', normal, compile, [''])
 test('tc085', only_compiler_types(['ghc']), compile, [''])
 test('tc086', normal, compile, [''])
 test('tc087', normal, compile, [''])
@@ -96,7 +96,7 @@ test('tc092', normal, compile, [''])
 test('tc093', normal, compile, [''])
 test('tc094', normal, compile, [''])
 test('tc095', normal, compile, [''])
-test('tc096', when(compiler_type('hugs'), expect_fail), compile, [''])
+test('tc096', normal, compile, [''])
 test('tc097', normal, compile, [''])
 test('tc098', normal, compile, [''])
 test('tc099', normal, compile, [''])
@@ -254,9 +254,9 @@ test('tc236', normal, compile, [''])
 test('tc237', normal, compile, [''])
 test('tc238', normal, compile, [''])
 
-test('tc239', extra_clean(['Tc239_Help.hi', 'Tc239_Help.o']), 
+test('tc239', extra_clean(['Tc239_Help.hi', 'Tc239_Help.o']),
      multimod_compile, ['tc239', '-v0'])
-     
+
 test('tc240', normal, compile, [''])
 test('tc241', normal, compile, [''])
 test('tc242', normal, compile, [''])
@@ -278,13 +278,13 @@ test('FD4', normal, compile, [''])
 test('faxen', normal, compile, [''])
 test('T1495', normal, compile, [''])
 test('T2045', normal, compile, [''])   # Needs -fhpc
-test('T2478', normal, compile, ['']) 
-test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']), 
+test('T2478', normal, compile, [''])
+test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']),
      multimod_compile, ['T2433', '-v0'])
-test('T2494', normal, compile_fail, ['']) 
-test('T2494-2', normal, compile, ['']) 
-test('T2497', normal, compile, ['']) 
-     
+test('T2494', normal, compile_fail, [''])
+test('T2494-2', normal, compile, [''])
+test('T2497', normal, compile, [''])
+
 
 # Omitting temporarily
 test('syn-perf', normal, compile, ['-freduction-depth=30'])
@@ -332,7 +332,7 @@ test('T4498', normal, compile, [''])
 test('T4524', normal, compile, [''])
 test('T4917', normal, compile, [''])
 
-test('T4912', extra_clean(['T4912a.hi', 'T4912a.o']), 
+test('T4912', extra_clean(['T4912a.hi', 'T4912a.o']),
      multimod_compile, ['T4912', '-v0'])
 
 test('T4952', normal, compile, [''])
@@ -357,7 +357,7 @@ test('tc262', normal, compile, [''])
 test('tc263',
     extra_clean(['Tc263_Help.o','Tc263_Help.hi']),
     multimod_compile, ['tc263','-v0'])
-test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of base:Data.STRef'])
+test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of "ShouldCompile is base:Data.STRef"'])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])
@@ -447,3 +447,14 @@ test('T10100', normal, compile, [''])
 test('T10156', normal, compile, [''])
 test('T10177', normal, compile, [''])
 test('T10185', expect_broken(10185), compile, [''])
+test('T10195', normal, compile, [''])
+test('T10109', normal, compile, [''])
+test('TcCustomSolverSuper', normal, compile, [''])
+test('T10335', normal, compile, [''])
+test('Improvement', normal, compile, [''])
+test('T10009', normal, compile, [''])
+test('T10390', normal, compile, [''])
+test('T8555', normal, compile, [''])
+test('T8799', normal, compile, [''])
+test('T10423', normal, compile, [''])
+test('T10489', normal, compile, [''])

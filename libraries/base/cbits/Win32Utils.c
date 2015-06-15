@@ -4,7 +4,7 @@
    Useful Win32 bits
    ------------------------------------------------------------------------- */
 
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+#if defined(_WIN32)
 
 #include "HsBase.h"
 

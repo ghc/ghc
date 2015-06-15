@@ -13,6 +13,7 @@
 #include "RtsUtils.h"
 #include "Ticky.h"
 #include "Schedule.h"
+#include "RtsFlags.h"
 
 #ifdef HAVE_TIME_H
 #include <time.h>
@@ -64,7 +65,7 @@ stgMallocBytes (int n, char *msg)
     n2 = (size_t) n;
     if ((space = (char *) malloc(n2)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      MallocFailHook((W_) n, msg); /*msg*/
+      rtsConfig.mallocFailHook((W_) n, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
@@ -79,7 +80,7 @@ stgReallocBytes (void *p, int n, char *msg)
     n2 = (size_t) n;
     if ((space = (char *) realloc(p, (size_t) n2)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      MallocFailHook((W_) n, msg); /*msg*/
+      rtsConfig.mallocFailHook((W_) n, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
@@ -92,7 +93,7 @@ stgCallocBytes (int n, int m, char *msg)
 
     if ((space = (char *) calloc((size_t) n, (size_t) m)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      MallocFailHook((W_) n*m, msg); /*msg*/
+      rtsConfig.mallocFailHook((W_) n*m, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
@@ -116,7 +117,7 @@ stgFree(void* p)
 void
 stackOverflow(StgTSO* tso)
 {
-    StackOverflowHook(tso->tot_stack_size * sizeof(W_));
+    rtsConfig.stackOverflowHook(tso->tot_stack_size * sizeof(W_));
 
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
@@ -129,8 +130,8 @@ heapOverflow(void)
     if (!heap_overflow)
     {
         /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-        OutOfHeapHook(0/*unknown request size*/,
-                      (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
+        rtsConfig.outOfHeapHook(0/*unknown request size*/,
+                                (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 
         heap_overflow = rtsTrue;
     }

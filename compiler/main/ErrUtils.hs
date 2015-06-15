@@ -29,7 +29,7 @@ module ErrUtils (
         --  * Messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
-        errorMsg,
+        errorMsg, warningMsg,
         fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
         compilationProgressMsg,
         showPass,
@@ -111,10 +111,6 @@ data Severity
   | SevError
   | SevFatal
 
-isWarning :: Severity -> Bool
-isWarning SevWarning = True
-isWarning _          = False
-
 instance Show ErrMsg where
     show em = errMsgShortString em
 
@@ -132,10 +128,13 @@ mkLocMessage severity locn msg
                   else ppr (srcSpanStart locn)
       in hang (locn' <> colon <+> sev_info) 4 msg
   where
-    sev_info = ppWhen (isWarning severity)
-                      (ptext (sLit "Warning:"))
-      -- For warnings, print    Foo.hs:34: Warning:
-      --                           <the warning message>
+    -- Add prefixes, like    Foo.hs:34: warning:
+    --                           <the warning message>
+    sev_info = case severity of
+                 SevWarning -> ptext (sLit "warning:")
+                 SevError -> ptext (sLit "error:")
+                 SevFatal -> ptext (sLit "fatal:")
+                 _ -> empty
 
 makeIntoWarning :: ErrMsg -> ErrMsg
 makeIntoWarning err = err { errMsgSeverity = SevWarning }
@@ -323,7 +322,7 @@ chooseDumpFile dflags flag
                          Just d  -> d </> f
                          Nothing ->       f
 
--- | Build a nice file name from name of a GeneralFlag constructor
+-- | Build a nice file name from name of a 'DumpFlag' constructor
 beautifyDumpName :: DumpFlag -> String
 beautifyDumpName Opt_D_th_dec_file = "th.hs"
 beautifyDumpName flag
@@ -351,6 +350,10 @@ ifVerbose dflags val act
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
    = log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
+
+warningMsg :: DynFlags -> MsgDoc -> IO ()
+warningMsg dflags msg
+   = log_action dflags dflags SevWarning noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg

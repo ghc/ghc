@@ -169,7 +169,7 @@ test('T4240',
      ['$MAKE -s --no-print-directory T4240'])
 
 test('T4489', normal, compile, [''])
-test('T4478', when(compiler_lt('ghc', '7.1'), expect_fail), compile, [''])
+test('T4478', normal, compile, [''])
 test('T4534', normal, compile, [''])
 
 test('mc09', normal, compile, [''])
@@ -212,6 +212,7 @@ test('T7167', normal, compile, [''])
 test('T7336', expect_broken(7336), compile, ['-Wall'])
 
 test('T2435', normal, multimod_compile, ['T2435','-v0'])
+test('T7672', normal, multimod_compile, ['T7672','-v0'])
 test('T7963',
      [extra_clean(['T7963a.hi', 'T7963a.o',
                    'T7963.imports'])],

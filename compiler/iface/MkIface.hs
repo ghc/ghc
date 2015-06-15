@@ -273,7 +273,7 @@ mkIface_ hsc_env maybe_old_fingerprint
         fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
         warns       = src_warns
         iface_rules = map (coreRuleToIfaceRule this_mod) rules
-        iface_insts = map instanceToIfaceInst insts
+        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         iface_vect_info = flattenVectInfo vect_info
         trust_info  = setSafeMode safe_mode
@@ -561,9 +561,20 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- dependency tree.  We only care about orphan modules in the current
    -- package, because changes to orphans outside this package will be
    -- tracked by the usage on the ABI hash of package modules that we import.
-   let orph_mods = filter ((== this_pkg) . modulePackageKey)
-                   $ dep_orphs sorted_deps
+   let orph_mods
+        = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
+        . filter ((== this_pkg) . modulePackageKey)
+        $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
+
+   -- Note [Do not update EPS with your own hi-boot]
+   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   -- (See also Trac #10182).  When your hs-boot file includes an orphan
+   -- instance declaration, you may find that the dep_orphs of a module you
+   -- import contains reference to yourself.  DO NOT actually load this module
+   -- or add it to the orphan hashes: you're going to provide the orphan
+   -- instances yourself, no need to consult hs-boot; if you do load the
+   -- interface into EPS, you will see a duplicate orphan instance.
 
    orphan_hash <- computeFingerprint (mk_put_name local_env)
                       (map ifDFun orph_insts, orph_rules, orph_fis)
@@ -1325,7 +1336,7 @@ checkDependencies hsc_env summary iface
    this_pkg = thisPackage (hsc_dflags hsc_env)
 
    dep_missing (L _ (ImportDecl { ideclName = L _ mod, ideclPkgQual = pkg })) = do
-     find_res <- liftIO $ findImportedModule hsc_env mod pkg
+     find_res <- liftIO $ findImportedModule hsc_env mod (fmap snd pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
@@ -1658,10 +1669,13 @@ tyConToIfaceDecl env tycon
                Nothing           -> IfNoParent
 
     to_if_fam_flav OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
-    to_if_fam_flav (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
+    to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
+      = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
       where defs = fromBranchList $ coAxiomBranches ax
             ibr  = map (coAxBranchToIfaceBranch' tycon) defs
             axn  = coAxiomName ax
+    to_if_fam_flav (ClosedSynFamilyTyCon Nothing)
+      = IfaceClosedSynFamilyTyCon Nothing
     to_if_fam_flav AbstractClosedSynFamilyTyCon
       = IfaceAbstractClosedSynFamilyTyCon
 
@@ -1672,11 +1686,14 @@ tyConToIfaceDecl env tycon
     ifaceConDecls (NewTyCon { data_con = con })    flds = IfNewTyCon  (ifaceConDecl con) (ifaceOverloaded flds) (ifaceFields flds)
     ifaceConDecls (DataTyCon { data_cons = cons }) flds = IfDataTyCon (map ifaceConDecl cons) (ifaceOverloaded flds) (ifaceFields flds)
     ifaceConDecls (DataFamilyTyCon {})             _    = IfDataFamTyCon
+    ifaceConDecls (TupleTyCon { data_con = con })  _    = IfDataTyCon [ifaceConDecl con] False []
     ifaceConDecls (AbstractTyCon distinct)         _    = IfAbstractTyCon distinct
-        -- The last case happens when a TyCon has been trimmed during tidying
-        -- Furthermore, tyThingToIfaceDecl is also used
-        -- in TcRnDriver for GHCi, when browsing a module, in which case the
-        -- AbstractTyCon case is perfectly sensible.
+        -- The AbstractTyCon case happens when a TyCon has been trimmed
+        -- during tidying.
+        -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver
+        -- for GHCi, when browsing a module, in which case the
+        -- AbstractTyCon and TupleTyCon cases are perfectly sensible.
+        -- (Tuple declarations are not serialised into interface files.)
 
     ifaceConDecl data_con
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
@@ -1697,7 +1714,7 @@ tyConToIfaceDecl env tycon
           -- (a) we don't need to redundantly put them into the interface file
           -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
           --     we know that the type variables will line up
-          -- The latter (b) is important because we pretty-print type construtors
+          -- The latter (b) is important because we pretty-print type constructors
           -- by converting to IfaceSyn and pretty-printing that
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
@@ -2017,8 +2034,9 @@ toIfaceApp (App f a) as = toIfaceApp f (a:as)
 toIfaceApp (Var v) as
   = case isDataConWorkId_maybe v of
         -- We convert the *worker* for tuples into IfaceTuples
-        Just dc |  isTupleTyCon tc && saturated
-                -> IfaceTuple (tupleTyConSort tc) tup_args
+        Just dc |  saturated
+                ,  Just tup_sort <- tyConTuple_maybe tc
+                -> IfaceTuple tup_sort tup_args
           where
             val_args  = dropWhile isTypeArg as
             saturated = val_args `lengthIs` idArity v

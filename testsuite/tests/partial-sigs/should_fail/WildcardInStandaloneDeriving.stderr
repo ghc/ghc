@@ -1,4 +1,2 @@
 
-WildcardInStandaloneDeriving.hs:4:19:
-    Wildcard not allowed
-    in the stand-alone deriving instance: ‘_’
+WildcardInStandaloneDeriving.hs:4:19: Malformed instance: _

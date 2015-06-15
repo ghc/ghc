@@ -131,14 +131,15 @@ ppr_expr add_par expr@(App {})
     let
         pp_args     = sep (map pprArg args)
         val_args    = dropWhile isTypeArg args   -- Drop the type arguments for tuples
-        pp_tup_args = sep (punctuate comma (map pprCoreExpr val_args))
+        pp_tup_args = pprWithCommas pprCoreExpr val_args
     in
     case fun of
         Var f -> case isDataConWorkId_maybe f of
                         -- Notice that we print the *worker*
                         -- for tuples in paren'd format.
-                   Just dc | saturated && isTupleTyCon tc
-                           -> tupleParens (tupleTyConSort tc) pp_tup_args
+                   Just dc | saturated
+                           , Just sort <- tyConTuple_maybe tc
+                           -> tupleParens sort pp_tup_args
                            where
                              tc        = dataConTyCon dc
                              saturated = val_args `lengthIs` idArity f
@@ -228,8 +229,8 @@ pprCoreAlt (con, args, rhs)
 
 ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
 ppr_case_pat (DataAlt dc) args
-  | isTupleTyCon tc
-  = tupleParens (tupleTyConSort tc) (hsep (punctuate comma (map ppr_bndr args)))
+  | Just sort <- tyConTuple_maybe tc
+  = tupleParens sort (pprWithCommas ppr_bndr args)
   where
     ppr_bndr = pprBndr CaseBind
     tc = dataConTyCon dc
@@ -339,7 +340,7 @@ pprIdBndrInfo info
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_SuppressIdInfo dflags
     then empty
-    else megaSeqIdInfo info `seq` doc -- The seq is useful for poking on black holes
+    else info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info

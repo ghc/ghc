@@ -1,7 +1,7 @@
 module T8743 where
 
 -- Without the following import, it does not fail
-import {-# SOURCE #-} T8743 ()
+import T8743a ()
 
 -- [()] required, () does not work.
 class ToRow a where toRow :: a -> [()]

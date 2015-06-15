@@ -111,10 +111,10 @@ data Phase
         | Cpp   HscSource
         | HsPp  HscSource
         | Hsc   HscSource
-        | Ccpp
-        | Cc
-        | Cobjc
-        | Cobjcpp
+        | Ccxx          -- Compile C++
+        | Cc            -- Compile C
+        | Cobjc         -- Compile Objective-C
+        | Cobjcxx       -- Compile Objective-C++
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
         | Splitter      -- Assembly file splitter (part of '-split-objs')
         | SplitAs       -- Assembler for split assembly files (part of '-split-objs')
@@ -148,10 +148,8 @@ eqPhase (Unlit _)   (Unlit _)  = True
 eqPhase (Cpp   _)   (Cpp   _)  = True
 eqPhase (HsPp  _)   (HsPp  _)  = True
 eqPhase (Hsc   _)   (Hsc   _)  = True
-eqPhase Ccpp        Ccpp       = True
 eqPhase Cc          Cc         = True
 eqPhase Cobjc       Cobjc      = True
-eqPhase Cobjcpp     Cobjcpp    = True
 eqPhase HCc         HCc        = True
 eqPhase Splitter    Splitter   = True
 eqPhase SplitAs     SplitAs    = True
@@ -163,11 +161,26 @@ eqPhase CmmCpp      CmmCpp     = True
 eqPhase Cmm         Cmm        = True
 eqPhase MergeStub   MergeStub  = True
 eqPhase StopLn      StopLn     = True
+eqPhase Ccxx        Ccxx       = True
+eqPhase Cobjcxx     Cobjcxx    = True
 eqPhase _           _          = False
 
--- Partial ordering on phases: we want to know which phases will occur before
--- which others.  This is used for sanity checking, to ensure that the
--- pipeline will stop at some point (see DriverPipeline.runPipeline).
+{- Note [Partial ordering on phases]
+
+We want to know which phases will occur before which others. This is used for
+sanity checking, to ensure that the pipeline will stop at some point (see
+DriverPipeline.runPipeline).
+
+A < B iff A occurs before B in a normal compilation pipeline.
+
+There is explicitly not a total ordering on phases, because in registerised
+builds, the phase `HsC` doesn't happen before nor after any other phase.
+
+Although we check that a normal user doesn't set the stop_phase to HsC through
+use of -C with registerised builds (in Main.checkOptions), it is still
+possible for a ghc-api user to do so. So be careful when using the function
+happensBefore, and don't think that `not (a <= b)` implies `b < a`.
+-}
 happensBefore :: DynFlags -> Phase -> Phase -> Bool
 happensBefore dflags p1 p2 = p1 `happensBefore'` p2
     where StopLn `happensBefore'` _ = False
@@ -189,10 +202,10 @@ nextPhase dflags p
       LlvmMangle -> As False
       SplitAs    -> MergeStub
       As _       -> MergeStub
-      Ccpp       -> As False
+      Ccxx       -> As False
       Cc         -> As False
       Cobjc      -> As False
-      Cobjcpp    -> As False
+      Cobjcxx    -> As False
       CmmCpp     -> Cmm
       Cmm        -> maybeHCc
       HCc        -> As False
@@ -215,13 +228,13 @@ startPhase "hscpp"    = HsPp  HsSrcFile
 startPhase "hspp"     = Hsc   HsSrcFile
 startPhase "hc"       = HCc
 startPhase "c"        = Cc
-startPhase "cpp"      = Ccpp
+startPhase "cpp"      = Ccxx
 startPhase "C"        = Cc
 startPhase "m"        = Cobjc
-startPhase "M"        = Cobjcpp
-startPhase "mm"       = Cobjcpp
-startPhase "cc"       = Ccpp
-startPhase "cxx"      = Ccpp
+startPhase "M"        = Cobjcxx
+startPhase "mm"       = Cobjcxx
+startPhase "cc"       = Ccxx
+startPhase "cxx"      = Ccxx
 startPhase "split_s"  = Splitter
 startPhase "s"        = As False
 startPhase "S"        = As True
@@ -247,9 +260,9 @@ phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
         --     because runPipeline uses the StopBefore phase to pick the
         --     output filename.  That could be fixed, but watch out.
 phaseInputExt HCc                 = "hc"
-phaseInputExt Ccpp                = "cpp"
+phaseInputExt Ccxx                = "cpp"
 phaseInputExt Cobjc               = "m"
-phaseInputExt Cobjcpp             = "mm"
+phaseInputExt Cobjcxx             = "mm"
 phaseInputExt Cc                  = "c"
 phaseInputExt Splitter            = "split_s"
 phaseInputExt (As True)           = "S"
@@ -266,10 +279,14 @@ phaseInputExt StopLn              = "o"
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
     haskellish_user_src_suffixes, haskellish_sig_suffixes
  :: [String]
+-- When a file with an extension in the haskellish_src_suffixes group is
+-- loaded in --make mode, its imports will be loaded too.
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
-                               [ "hspp", "hscpp", "hcr", "cmm", "cmmcpp" ]
-haskellish_suffixes          = haskellish_src_suffixes ++ ["hc", "raw_s"]
+                               [ "hspp", "hscpp" ]
+haskellish_suffixes          = haskellish_src_suffixes ++
+                               [ "hc", "cmm", "cmmcpp" ]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "lm_s", "m", "M", "mm" ]
+
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes =
   haskellish_sig_suffixes ++ [ "hs", "lhs", "hs-boot", "lhs-boot" ]

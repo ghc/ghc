@@ -1,4 +1,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 module WildcardInDefaultSignature where
 
-class C a where default f :: _
+
+class C a where
+  f :: a
+  default f :: _

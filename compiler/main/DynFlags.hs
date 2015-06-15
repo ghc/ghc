@@ -51,7 +51,8 @@ module DynFlags (
         fFlags, fWarningFlags, fLangFlags, xFlags,
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
-        SigOf(..), getSigOf,
+        SigOf, getSigOf,
+        checkOptLevel,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -157,7 +158,7 @@ import Module
 import PackageConfig
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState)
+import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
@@ -243,6 +244,7 @@ data DumpFlag
    -- enabled if you run -ddump-cmm
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
+   | Opt_D_dump_cmm_switch
    | Opt_D_dump_cmm_proc
    | Opt_D_dump_cmm_sink
    | Opt_D_dump_cmm_sp
@@ -328,6 +330,7 @@ data GeneralFlag
 
    | Opt_PrintExplicitForalls
    | Opt_PrintExplicitKinds
+   | Opt_PrintUnicodeSyntax
 
    -- optimisation opts
    | Opt_CallArity
@@ -643,16 +646,10 @@ data ExtensionFlag
    | Opt_StaticPointers
    deriving (Eq, Enum, Show)
 
-data SigOf = NotSigOf
-           | SigOf Module
-           | SigOfMap (Map ModuleName Module)
+type SigOf = Map ModuleName Module
 
 getSigOf :: DynFlags -> ModuleName -> Maybe Module
-getSigOf dflags n =
-    case sigOf dflags of
-        NotSigOf -> Nothing
-        SigOf m -> Just m
-        SigOfMap m -> Map.lookup n m
+getSigOf dflags n = Map.lookup n (sigOf dflags)
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -695,6 +692,8 @@ data DynFlags = DynFlags {
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
   reductionDepth        :: IntWithInf,   -- ^ Typechecker maximum stack depth
+  solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
+                                         --   Typically only 1 is needed
 
   thisPackage           :: PackageKey,   -- ^ name of package currently being compiled
 
@@ -751,6 +750,7 @@ data DynFlags = DynFlags {
 
   rtsOpts               :: Maybe String,
   rtsOptsEnabled        :: RtsOptsEnabled,
+  rtsOptsSuggestions    :: Bool,
 
   hpcDir                :: String,      -- ^ Path to store the .mix files
 
@@ -843,6 +843,8 @@ data DynFlags = DynFlags {
   flushErr              :: FlushErr,
 
   haddockOptions        :: Maybe String,
+
+  -- | GHCi scripts specified by -ghci-script, in reverse order
   ghciScripts           :: [String],
 
   -- Output style options
@@ -1027,7 +1029,7 @@ opt_lc dflags = sOpt_lc (settings dflags)
 versionedAppDir :: DynFlags -> IO FilePath
 versionedAppDir dflags = do
   appdir <- getAppUserDataDirectory (programName dflags)
-  return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+  return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':projectVersion dflags)
 
 -- | The target code type of the compilation (if any).
 --
@@ -1414,7 +1416,7 @@ defaultDynFlags mySettings =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        sigOf                   = NotSigOf,
+        sigOf                   = Map.empty,
         verbosity               = 0,
         optLevel                = 0,
         simplPhases             = 2,
@@ -1441,6 +1443,7 @@ defaultDynFlags mySettings =
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
+        solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
         thisPackage             = mainPackageKey,
 
@@ -1478,6 +1481,7 @@ defaultDynFlags mySettings =
         cmdlineFrameworks       = [],
         rtsOpts                 = Nothing,
         rtsOptsEnabled          = RtsOptsSafeOnly,
+        rtsOptsSuggestions      = True,
 
         hpcDir                  = ".hpc",
 
@@ -1485,7 +1489,8 @@ defaultDynFlags mySettings =
         packageFlags            = [],
         packageEnv              = Nothing,
         pkgDatabase             = Nothing,
-        pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
+        -- This gets filled in with GHC.setSessionDynFlags
+        pkgState                = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
         rtsBuildTag             = mkBuildTag (defaultWays mySettings),
@@ -1773,8 +1778,9 @@ lang_set dflags lang =
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
 
+-- | Check whether to use unicode syntax for output
 useUnicodeSyntax :: DynFlags -> Bool
-useUnicodeSyntax = xopt Opt_UnicodeSyntax
+useUnicodeSyntax = gopt Opt_PrintUnicodeSyntax
 
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
@@ -1858,15 +1864,7 @@ unsafeFlags = [ ("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
                     xopt Opt_TemplateHaskell,
                     flip xopt_unset Opt_TemplateHaskell)
               ]
-unsafeFlagsForInfer = unsafeFlags ++
-              -- TODO: Can we do better than this for inference?
-              [ ("-XOverlappingInstances", overlapInstLoc,
-                  xopt Opt_OverlappingInstances,
-                  flip xopt_unset Opt_OverlappingInstances)
-              , ("-XIncoherentInstances", incoherentOnLoc,
-                  xopt Opt_IncoherentInstances,
-                  flip xopt_unset Opt_IncoherentInstances)
-              ]
+unsafeFlagsForInfer = unsafeFlags
 
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
@@ -1918,9 +1916,7 @@ parseSigOf :: String -> SigOf
 parseSigOf str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse -sig-of: " ++ str)
-  where parse = parseOne +++ parseMany
-        parseOne = SigOf `fmap` parseModule
-        parseMany = SigOfMap . Map.fromList <$> sepBy parseEntry (R.char ',')
+  where parse = Map.fromList <$> sepBy parseEntry (R.char ',')
         parseEntry = do
             n <- tok $ parseModuleName
             -- ToDo: deprecate this 'is' syntax?
@@ -2185,9 +2181,8 @@ safeFlagCheck cmdl dflags =
                     "-fpackage-trust ignored;" ++
                     " must be specified with a Safe Haskell flag"]
 
+    -- Have we inferred Unsafe? See Note [HscMain . Safe Haskell Inference]
     safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
-    -- Have we inferred Unsafe?
-    -- See Note [HscMain . Safe Haskell Inference]
 
 
 {- **********************************************************************
@@ -2397,6 +2392,8 @@ dynamic_flags = [
   , defGhcFlag "rtsopts=some"   (NoArg (setRtsOptsEnabled RtsOptsSafeOnly))
   , defGhcFlag "rtsopts=none"   (NoArg (setRtsOptsEnabled RtsOptsNone))
   , defGhcFlag "no-rtsopts"     (NoArg (setRtsOptsEnabled RtsOptsNone))
+  , defGhcFlag "no-rtsopts-suggestions"
+      (noArg (\d -> d {rtsOptsSuggestions = False} ))
   , defGhcFlag "main-is"        (SepArg setMainIs)
   , defGhcFlag "haddock"        (NoArg (setGeneralFlag Opt_Haddock))
   , defGhcFlag "haddock-opts"   (hasArg addHaddockOpts)
@@ -2442,6 +2439,7 @@ dynamic_flags = [
   , defGhcFlag "ddump-cmm-raw"           (setDumpFlag Opt_D_dump_cmm_raw)
   , defGhcFlag "ddump-cmm-cfg"           (setDumpFlag Opt_D_dump_cmm_cfg)
   , defGhcFlag "ddump-cmm-cbe"           (setDumpFlag Opt_D_dump_cmm_cbe)
+  , defGhcFlag "ddump-cmm-switch"        (setDumpFlag Opt_D_dump_cmm_switch)
   , defGhcFlag "ddump-cmm-proc"          (setDumpFlag Opt_D_dump_cmm_proc)
   , defGhcFlag "ddump-cmm-sink"          (setDumpFlag Opt_D_dump_cmm_sink)
   , defGhcFlag "ddump-cmm-sp"            (setDumpFlag Opt_D_dump_cmm_sp)
@@ -2599,6 +2597,8 @@ dynamic_flags = [
       (sepArg (\s d -> d{ ruleCheck = Just s }))
   , defFlag "freduction-depth"
       (intSuffix (\n d -> d{ reductionDepth = treatZeroAsInf n }))
+  , defFlag "fconstraint-solver-iterations"
+      (intSuffix (\n d -> d{ solverIterations = treatZeroAsInf n }))
   , defFlag "fcontext-stack"
       (intSuffixM (\n d ->
        do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"
@@ -2979,6 +2979,7 @@ fFlags = [
   flagGhciSpec "print-evld-with-show"         Opt_PrintEvldWithShow,
   flagSpec "print-explicit-foralls"           Opt_PrintExplicitForalls,
   flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
+  flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "regs-graph"                       Opt_RegsGraph,
@@ -3007,7 +3008,7 @@ fLangFlags = [
 -- See Note [Supporting CLI completion]
   flagSpec' "th"                              Opt_TemplateHaskell
     (\on -> deprecatedForExtension "TemplateHaskell" on
-         >> checkTemplateHaskellOk on),
+         >> setTemplateHaskellLoc on),
   flagSpec' "fi"                              Opt_ForeignFunctionInterface
     (deprecatedForExtension "ForeignFunctionInterface"),
   flagSpec' "ffi"                             Opt_ForeignFunctionInterface
@@ -3178,7 +3179,7 @@ xFlags = [
   flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
   flagSpec "StaticPointers"                   Opt_StaticPointers,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
-                                              checkTemplateHaskellOk,
+                                              setTemplateHaskellLoc,
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
   flagSpec "TransformListComp"                Opt_TransformListComp,
   flagSpec "TupleSections"                    Opt_TupleSections,
@@ -3267,11 +3268,6 @@ impliedXFlags
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
 
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
-
-    -- An implicit parameter constraint, `?x::Int`, is desugared into
-    -- `IP "x" Int`, which requires a flexible context/instance.
-    , (Opt_ImplicitParams, turnOn, Opt_FlexibleContexts)
-    , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
 
     , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
 
@@ -3507,28 +3503,9 @@ setIncoherentInsts True = do
   l <- getCurLoc
   upd (\d -> d { incoherentOnLoc = l })
 
-checkTemplateHaskellOk :: TurnOnFlag -> DynP ()
-#ifdef GHCI
-checkTemplateHaskellOk turn_on
-  | turn_on && rtsIsProfiled
-  = addErr "You can't use Template Haskell with a profiled compiler"
-  | otherwise
+setTemplateHaskellLoc :: TurnOnFlag -> DynP ()
+setTemplateHaskellLoc _
   = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
-#else
--- In stage 1, Template Haskell is simply illegal, except with -M
--- We don't bleat with -M because there's no problem with TH there,
--- and in fact GHC's build system does ghc -M of the DPH libraries
--- with a stage1 compiler
-checkTemplateHaskellOk turn_on
-  | turn_on = do dfs <- liftEwM getCmdLineState
-                 case ghcMode dfs of
-                    MkDepend -> return ()
-                    _        -> addErr msg
-  | otherwise = return ()
-  where
-    msg = "Template Haskell requires GHC with interpreter support\n    " ++
-          "Perhaps you are using a stage-1 compiler?"
-#endif
 
 {- **********************************************************************
 %*                                                                      *
@@ -3871,13 +3848,14 @@ setObjTarget l = updM set
      | otherwise = return dflags
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
-setOptLevel n dflags
-   | hscTarget dflags == HscInterpreted && n > 0
-        = do addWarn "-O conflicts with --interactive; -O ignored."
-             return dflags
-   | otherwise
-        = return (updOptLevel n dflags)
+setOptLevel n dflags = return (updOptLevel n dflags)
 
+checkOptLevel :: Int -> DynFlags -> Either String DynFlags
+checkOptLevel n dflags
+   | hscTarget dflags == HscInterpreted && n > 0
+     = Left "-O conflicts with --interactive; -O ignored."
+   | otherwise
+     = Right dflags
 
 -- -Odph is equivalent to
 --

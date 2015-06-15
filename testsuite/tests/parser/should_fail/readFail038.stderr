@@ -1,4 +1,4 @@
 
-readFail038.hs:6:7:
+readFail038.hs:5:9:
     Unexpected parallel statement in a list comprehension
     Use ParallelListComp

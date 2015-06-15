@@ -1,0 +1,7 @@
+
+T10451.hs:5:12: error:
+    Constraint tuple arity too large: 20 (max arity = 16)
+      Instead, use a nested tuple
+    In the type ‘(Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                  Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a)’
+    In the type declaration for ‘T’

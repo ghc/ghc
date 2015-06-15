@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module TcCanonical( 
+module TcCanonical(
      canonicalize,
      unifyDerived,
 
@@ -23,7 +23,7 @@ import Coercion
 import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
-import Name( isSystemName, nameOccName )
+import Name( isSystemName )
 import OccName( OccName )
 import Outputable
 import DynFlags( DynFlags )
@@ -173,40 +173,8 @@ canEvNC ev
                                   canClassNC ev cls tys
       EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
                                   canEqNC    ev eq_rel ty1 ty2
-      TuplePred tys         -> do traceTcS "canEvNC:tup" (ppr tys)
-                                  canTuple   ev tys
       IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr (ctEvPred ev))
                                   canIrred   ev
-{-
-************************************************************************
-*                                                                      *
-*                      Tuple Canonicalization
-*                                                                      *
-************************************************************************
--}
-
-canTuple :: CtEvidence -> [PredType] -> TcS (StopOrContinue Ct)
-canTuple ev preds
-  | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
-  = do { new_evars <- mapM (newWantedEvVar loc) preds
-       ; setWantedEvBind evar (EvTupleMk (map (ctEvTerm . fst) new_evars))
-       ; emitWorkNC (freshGoals new_evars)
-         -- Note the "NC": these are fresh goals, not necessarily canonical
-       ; stopWith ev "Decomposed tuple constraint" }
-
-  | CtGiven { ctev_evtm = tm, ctev_loc = loc } <- ev
-  = do { let mk_pr pred i = (pred, EvTupleSel tm i)
-       ; given_evs <- newGivenEvVars loc (zipWith mk_pr preds [0..])
-       ; emitWorkNC given_evs
-       ; stopWith ev "Decomposed tuple constraint" }
-
-  | CtDerived { ctev_loc = loc } <- ev
-  = do { mapM_ (emitNewDerived loc) preds
-       ; stopWith ev "Decomposed tuple constraint" }
-
-  | otherwise = panic "canTuple"
-
-
 {-
 ************************************************************************
 *                                                                      *
@@ -253,26 +221,24 @@ emitSuperclasses ct@(CDictCan { cc_ev = ev , cc_tyargs = xis_new, cc_class = cls
       ; continueWith ct }
 emitSuperclasses _ = panic "emit_superclasses of non-class!"
 
-{-
-Note [Adding superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Adding superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Since dictionaries are canonicalized only once in their lifetime, the
 place to add their superclasses is canonicalisation.  See Note [Add
 superclasses only during canonicalisation].  Here is what we do:
 
-  Deriveds: Do nothing.
-
   Givens:   Add all their superclasses as Givens.
+            They may be needed to prove Wanteds
 
-  Wanteds:  Add all their superclasses as Derived.
-            Not as Wanted: we don't need a proof.
-            Nor as Given: that leads to superclass loops.
+  Wanteds:  Do nothing.
 
-We also want to ensure minimal constraints to quantify over.  For
-instance, if our wanted constraint is (Eq a, Ord a) we'd only like to
-quantify over Ord a.  But we deal with that completely independently
-in TcSimplify. See Note [Minimize by SuperClasses] in TcSimplify.
+  Deriveds: Add all their superclasses as Derived.
+            The sole reason is to expose functional dependencies
+            in superclasses or equality superclasses.
+
+            We only do this in the improvement phase, if solving has
+            not succeeded; see Note [The improvement story] in
+            TcInteract
 
 Examples of how adding superclasses as Derived is useful
 
@@ -293,6 +259,7 @@ Examples of how adding superclasses as Derived is useful
          [D] F a ~ beta
     Now we we get [D] beta ~ b, and can solve that.
 
+---------- Historical note -----------
 Example of why adding superclass of a Wanted as a Given would
 be terrible, see Note [Do not add superclasses of solved dictionaries]
 in TcSMonad, which has this example:
@@ -349,26 +316,30 @@ situation can't happen.
 newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
-  | isDerived flavor
-  = return ()  -- Deriveds don't yield more superclasses because we will
-               -- add them transitively in the case of wanteds.
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
+  = do { let size = sizePred (mkClassPred cls xis)
+             loc' = case ctLocOrigin loc of
+                       GivenOrigin InstSkol
+                         -> loc { ctl_origin = GivenOrigin (InstSC size) }
+                       GivenOrigin (InstSC n)
+                         -> loc { ctl_origin = GivenOrigin (InstSC (n `max` size)) }
+                       _ -> loc
+                    -- See Note [Solving superclass constraints] in TcInstDcls
+                    -- for explantation of loc'
 
-  | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- flavor
-  = do { let sc_theta = immSuperClasses cls xis
-             mk_pr sc_pred i = (sc_pred, EvSuperClass ev_tm i)
-       ; given_evs <- newGivenEvVars loc (zipWith mk_pr sc_theta [0..])
+       ; given_evs <- newGivenEvVars loc' (mkEvScSelectors (EvId evar) cls xis)
        ; emitWorkNC given_evs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
   = return () -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
-  | otherwise -- Wanted case, just add those SC that can lead to improvement.
+  | otherwise -- Derived case, just add those SC that can lead to improvement.
   = do { let sc_rec_theta = transSuperClasses cls xis
              impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
-       ; mapM_ (emitNewDerived loc) impr_theta }
+       ; emitNewDeriveds loc impr_theta }
 
 
 {-
@@ -389,7 +360,6 @@ canIrred old_ev
     do { -- Re-classify, in case flattening has improved its shape
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
-           TuplePred tys         -> canTuple   new_ev tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
            _                     -> continueWith $
                                     CIrredEvCan { cc_ev = new_ev } } }
@@ -459,7 +429,7 @@ can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | Just ty2' <- tcView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
 -- need to check for reflexivity in the ReprEq case.
--- See Note [AppTy reflexivity check] and Note [Eager reflexivity check]
+-- See Note [Eager reflexivity check]
 can_eq_nc' _flat _rdr_env _envs ev ReprEq ty1 _ ty2 _
   | ty1 `eqType` ty2
   = canEqReflexive ev ReprEq ty1
@@ -536,11 +506,6 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ (AppTy t2 s2) _
   | Just (t1, s1) <- tcSplitAppTy_maybe ty1
   = can_eq_app ev t1 s1 t2 s2
 
--- See Note [AppTy reflexivity check]
-can_eq_nc' _flat _rdr_env _envs ev ReprEq ty1@(AppTy {}) _ ty2@(AppTy {}) _
-  | ty1 `eqType` ty2
-  = canEqReflexive ev ReprEq ty1
-
 -- No similarity in type structure detected. Flatten and try again!
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
   = do { (xi1, co1) <- flatten FM_FlattenAll ev ps_ty1
@@ -598,8 +563,7 @@ equality because the flattener technology deals with the similar case
 Note that this check does not catch all cases, but it will catch the cases
 we're most worried about, types like X above that are actually inhabited.
 
-Note [AppTy reflexivity check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here's another place where this reflexivity check is key:
 Consider trying to prove (f a) ~R (f a). The AppTys in there can't
 be decomposed, because representational equality isn't congruent with respect
 to AppTy. So, when canonicalising the equality above, we get stuck and
@@ -642,12 +606,10 @@ can_eq_newtype_nc rdr_env ev swapped co ty1 ty1' ty2 ps_ty2
 -- avoiding "redundant import" warnings.
 markDataConsAsUsed :: GlobalRdrEnv -> TyCon -> TcS ()
 markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
-  [ mkRdrQual (is_as (is_decl imp_spec)) occ
+  [ greUsedRdrName gre
   | dc <- tyConDataCons tc
-  , let dc_name = dataConName dc
-        occ  = nameOccName dc_name
-  , gre : _               <- return $ lookupGRE_Name rdr_env dc_name
-  , Imported (imp_spec:_) <- return $ gre_prov gre ]
+  , gre : _  <- return $ lookupGRE_Name rdr_env (dataConName dc)
+  , not (isLocalGRE gre) ]
 
 ---------
 -- ^ Decompose a type application. Nominal equality only!
@@ -658,7 +620,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
            -> TcS (StopOrContinue Ct)
 can_eq_app ev s1 t1 s2 t2
   | CtDerived { ctev_loc = loc } <- ev
-  = do { emitNewDerived loc (mkTcEqPred t1 t2)
+  = do { emitNewDerivedEq loc (mkTcEqPred t1 t2)
        ; canEqNC ev NomEq s1 s2 }
   | CtWanted { ctev_evar = evar, ctev_loc = loc } <- ev
   = do { ev_s <- newWantedEvVarNC loc (mkTcEqPred s1 s2)
@@ -666,8 +628,8 @@ can_eq_app ev s1 t1 s2 t2
        ; let co = mkTcAppCo (ctEvCoercion ev_s) co_t
        ; setWantedEvBind evar (EvCoercion co)
        ; canEqNC ev_s NomEq s1 s2 }
-  | CtGiven { ctev_evtm = ev_tm, ctev_loc = loc } <- ev
-  = do { let co   = evTermCoercion ev_tm
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  = do { let co   = mkTcCoVarCo evar
              co_s = mkTcLRCo CLeft  co
              co_t = mkTcLRCo CRight co
        ; evar_s <- newGivenEvVar loc (mkTcEqPred s1 s2, EvCoercion co_s)
@@ -685,11 +647,14 @@ canDecomposableTyConApp :: CtEvidence -> EqRel
 -- See Note [Decomposing TyConApps]
 canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
-  , length tys1 == length tys2  -- Success: decompose!
-  = do { traceTcS "canDecomposableTyConApp"
+  , length tys1 == length tys2
+  = if eq_rel == NomEq || ctEvFlavour ev /= Given || isDistinctTyCon tc1
+       -- See Note [Decomposing newtypes]
+    then do { traceTcS "canDecomposableTyConApp"
                   (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
-       ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-       ; stopWith ev "Decomposed TyConApp" }
+            ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
+            ; stopWith ev "Decomposed TyConApp" }
+    else canEqFailure ev eq_rel ty1 ty2
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
@@ -715,6 +680,20 @@ Here is the case:
 Suppose we are canonicalising (Int ~R DF (T a)), where we don't yet
 know `a`. This is *not* a hard failure, because we might soon learn
 that `a` is, in fact, Char, and then the equality succeeds.
+
+Note [Decomposing newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As explained in Note [NthCo and newtypes] in Coercion, we can't use
+NthCo on representational coercions over newtypes. So we avoid doing
+so.
+
+But is it sensible to decompose *Wanted* constraints over newtypes?
+Yes. By the time we reach canDecomposableTyConApp, we know that any
+newtypes that can be unwrapped have been. So, without importing more
+constructors, say, we know there is no way forward other than decomposition.
+So we take the one route we have available. This *does* mean that
+importing a newtype's constructor might make code that previously
+compiled fail to do so. (If that newtype is perversely recursive, say.)
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
@@ -730,8 +709,8 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
         -> do { cos <- zipWith3M (unifyWanted loc) tc_roles tys1 tys2
               ; setWantedEvBind evar (EvCoercion (mkTcTyConAppCo role tc cos)) }
 
-     CtGiven { ctev_evtm = ev_tm, ctev_loc = loc }
-        -> do { let ev_co = evTermCoercion ev_tm
+     CtGiven { ctev_evar = evar, ctev_loc = loc }
+        -> do { let ev_co = mkTcCoVarCo evar
               ; given_evs <- newGivenEvVars loc $
                              [ ( mkTcEqPredRole r ty1 ty2
                                , EvCoercion (mkTcNthCo i ev_co) )
@@ -932,7 +911,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
   = rewriteEqEvidence ev eq_rel swapped xi1 xi2 co1 co2
     `andWhenContinue` \ new_ev ->
     case eq_rel of
-      NomEq  -> do { emitInsoluble (mkNonCanonical ev)
+      NomEq  -> do { emitInsoluble (mkNonCanonical new_ev)
               -- If we have a ~ [a], it is not canonical, and in particular
               -- we don't want to rewrite existing inerts with it, otherwise
               -- we'd risk divergence in the constraint solver
@@ -965,9 +944,13 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
   = do { setEvBindIfWanted ev (EvCoercion $ mkTcReflCo role xi1)
        ; stopWith ev "Equal tyvars" }
 
-  | incompat_kind   = incompat
-  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
-  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
+  | incompat_kind   = incompatibleKind ev xi1 k1 xi2 k2
+
+-- We don't do this any more
+-- See Note [Orientation of equalities with fmvs] in TcSMonad
+--  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
+--  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
+
   | same_kind       = if swap_over then do_swap else no_swap
   | k1_sub_k2       = do_swap   -- Note [Kind orientation for CTyEqCan]
   | otherwise       = no_swap   -- k2_sub_k1
@@ -994,12 +977,21 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
         continueWith (CTyEqCan { cc_ev = new_ev, cc_tyvar = tv1
                                , cc_rhs = xi2, cc_eq_rel = eq_rel })
 
-    -- See Note [Orient equalities with flatten-meta-vars on the left] in TcFlatten
+{- We don't do this any more
+   See Note [Orientation of equalities with fmvs] in TcSMonad
+    -- tv1 is the flatten meta-var
     do_fmv swapped tv1 xi1 xi2 co1 co2
       | same_kind
       = canon_eq swapped tv1 xi1 xi2 co1 co2
-      | otherwise  -- Presumably tv1 `subKind` tv2, which is the wrong way round
-      = ASSERT2( tyVarKind tv1 `isSubKind` typeKind xi2,
+      | otherwise  -- Presumably tv1 :: *, since it is a flatten meta-var,
+                   -- at a kind that has some interesting sub-kind structure.
+                   -- Since the two kinds are not the same, we must have
+                   -- tv1 `subKind` tv2, which is the wrong way round
+                   --   e.g.  (fmv::*) ~ (a::OpenKind)
+                   -- So make a new meta-var and use that:
+                   --         fmv ~ (beta::*)
+                   --         (a::OpenKind) ~ (beta::*)
+      = ASSERT2( k1_sub_k2,
                  ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1) $$
                  ppr xi2 <+> dcolon <+> ppr (typeKind xi2) )
         ASSERT2( isWanted ev, ppr ev )  -- Only wanteds have flatten meta-vars
@@ -1009,8 +1001,7 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
                                                         tv_ty xi2)
            ; emitWorkNC [new_ev]
            ; canon_eq swapped tv1 xi1 tv_ty co1 (ctEvCoercion new_ev) }
-
-    incompat = incompatibleKind ev xi1 k1 xi2 k2
+-}
 
     swap_over
       -- If tv1 is touchable, swap only if tv2 is also
@@ -1068,7 +1059,7 @@ incompatibleKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible 
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
          -- Create a derived kind-equality, and solve it
-       ; emitNewDerived kind_co_loc (mkTcEqPred k1 k2)
+       ; emitNewDerivedEq kind_co_loc (mkTcEqPred k1 k2)
 
          -- Put the not-currently-soluble thing into the inert set
        ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
@@ -1227,23 +1218,6 @@ as possible.  Hence the ps_ty1, ps_ty2 argument passed to canEqTyVar.
 ************************************************************************
 -}
 
-{-
-Note [Bind new Givens immediately]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For Givens we make new EvVars and bind them immediately. We don't worry
-about caching, but we don't expect complicated calculations among Givens.
-It is important to bind each given:
-      class (a~b) => C a b where ....
-      f :: C a b => ....
-Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
-But that superclass selector can't (yet) appear in a coercion
-(see evTermCoercion), so the easy thing is to bind it to an Id.
-
-See Note [Coercion evidence terms] in TcEvidence.
--}
-
-
------------------------------
 data StopOrContinue a
   = ContinueWith a    -- The constraint was not solved, although it may have
                       --   been rewritten
@@ -1314,7 +1288,7 @@ as well as in old_pred; that is important for good error messages.
  -}
 
 
-rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
+rewriteEvidence old_ev@(CtDerived {}) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteEvidence to put the isTcReflCo test first!
@@ -1322,23 +1296,20 @@ rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvTerm c), which fails for Derived constraints.
     -- (Getting this wrong caused Trac #7384.)
-    do { mb_ev <- newDerived loc new_pred
-       ; case mb_ev of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
+    continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence old_ev new_pred co
   | isTcReflCo co -- See Note [Rewriting with Refl]
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+  = continueWith (old_ev { ctev_pred = new_pred })
 
-rewriteEvidence ev@(CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
-  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
-       ; return (ContinueWith new_ev) }
+rewriteEvidence ev@(CtGiven { ctev_evar = old_evar , ctev_loc = loc }) new_pred co
+  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
+       ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
-    new_tm = mkEvCast old_tm (tcDowngradeRole Representational
-                                              (ctEvRole ev)
-                                              (mkTcSymCo co))  
+    new_tm = mkEvCast (EvId old_evar) (tcDowngradeRole Representational
+                                                       (ctEvRole ev)
+                                                       (mkTcSymCo co))
 
 rewriteEvidence ev@(CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { (new_ev, freshness) <- newWantedEvVar loc new_pred
@@ -1375,24 +1346,20 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 --
 -- It's all a form of rewwriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
+  | CtDerived {} <- old_ev  -- Don't force the evidence for a Derived
+  = continueWith (old_ev { ctev_pred = new_pred })
+
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
   , isTcReflCo rhs_co
-  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
+  = continueWith (old_ev { ctev_pred = new_pred })
 
-  | CtDerived {} <- old_ev
-  = do { mb <- newDerived loc' new_pred
-       ; case mb of
-           Just new_ev -> continueWith new_ev
-           Nothing     -> stopWith old_ev "Cached derived" }
-
-  | CtGiven { ctev_evtm = old_tm } <- old_ev
+  | CtGiven { ctev_evar = old_evar } <- old_ev
   = do { let new_tm = EvCoercion (lhs_co
-                                  `mkTcTransCo` maybeSym swapped (evTermCoercion old_tm)
+                                  `mkTcTransCo` maybeSym swapped (mkTcCoVarCo old_evar)
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; new_ev <- newGivenEvVar loc' (new_pred, new_tm)
-                   -- See Note [Bind new Givens immediately]
-       ; return (ContinueWith new_ev) }
+       ; continueWith new_ev }
 
   | CtWanted { ctev_evar = evar } <- old_ev
   = do { new_evar <- newWantedEvVarNC loc' new_pred
@@ -1402,7 +1369,7 @@ rewriteEqEvidence old_ev eq_rel swapped nlhs nrhs lhs_co rhs_co
                   `mkTcTransCo` rhs_co
        ; setWantedEvBind evar (EvCoercion co)
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
-       ; return (ContinueWith new_evar) }
+       ; continueWith new_evar }
 
   | otherwise
   = panic "rewriteEvidence"
@@ -1505,7 +1472,7 @@ unify_derived loc role    orig_ty1 orig_ty2
                 Nothing   -> bale_out }
     go _ _ = bale_out
 
-    bale_out = emitNewDerived loc (mkTcEqPredRole role orig_ty1 orig_ty2)
+    bale_out = emitNewDerivedEq loc (mkTcEqPredRole role orig_ty1 orig_ty2)
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co

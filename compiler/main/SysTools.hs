@@ -717,6 +717,10 @@ We cache the LinkerInfo inside DynFlags, since clients may link
 multiple times. The definition of LinkerInfo is there to avoid a
 circular dependency.
 
+-}
+
+{- Note [ELF needed shared libs]
+
 Some distributions change the link editor's default handling of
 ELF DT_NEEDED tags to include only those shared objects that are
 needed to resolve undefined symbols. For Template Haskell we need
@@ -724,8 +728,10 @@ the last temporary shared library also if it is not needed for the
 currently linked temporary shared library. We specify --no-as-needed
 to override the default. This flag exists in GNU ld and GNU gold.
 
--}
+The flag is only needed on ELF systems. On Windows (PE) and Mac OS X
+(Mach-O) the flag is not needed.
 
+-}
 
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
@@ -763,10 +769,13 @@ getLinkerInfo' dflags = do
           -- Set DT_NEEDED for all shared libraries. Trac #10110.
           return (GnuLD $ map Option ["-Wl,--hash-size=31",
                                       "-Wl,--reduce-memory-overheads",
+                                      -- ELF specific flag
+                                      -- see Note [ELF needed shared libs]
                                       "-Wl,--no-as-needed"])
 
         | any ("GNU gold" `isPrefixOf`) stdo =
           -- GNU gold only needs --no-as-needed. Trac #10110.
+          -- ELF specific flag, see Note [ELF needed shared libs]
           return (GnuGold [Option "-Wl,--no-as-needed"])
 
          -- Unknown linker.
@@ -1074,8 +1083,7 @@ newTempSuffix dflags = atomicModifyIORef' (nextTempSuffix dflags) $ \n -> (n+1,n
 newTempName :: DynFlags -> Suffix -> IO FilePath
 newTempName dflags extn
   = do d <- getTempDir dflags
-       x <- getProcessID
-       findTempName (d </> "ghc" ++ show x ++ "_")
+       findTempName (d </> "ghc_") -- See Note [Deterministic base name]
   where
     findTempName :: FilePath -> IO FilePath
     findTempName prefix
@@ -1090,12 +1098,11 @@ newTempName dflags extn
 newTempLibName :: DynFlags -> Suffix -> IO (FilePath, FilePath, String)
 newTempLibName dflags extn
   = do d <- getTempDir dflags
-       x <- getProcessID
-       findTempName d ("ghc" ++ show x ++ "_")
+       findTempName d ("ghc_")
   where
     findTempName :: FilePath -> String -> IO (FilePath, FilePath, String)
     findTempName dir prefix
-      = do n <- newTempSuffix dflags
+      = do n <- newTempSuffix dflags -- See Note [Deterministic base name]
            let libname = prefix ++ show n
                filename = dir </> "lib" ++ libname <.> extn
            b <- doesFileExist filename
@@ -1147,6 +1154,17 @@ getTempDir dflags = do
                 return dir
       `catchIO` \e -> if isAlreadyExistsError e
                       then mkTempDir prefix else ioError e
+
+-- Note [Deterministic base name]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The filename of temporary files, especially the basename of C files, can end
+-- up in the output in some form, e.g. as part of linker debug information. In the
+-- interest of bit-wise exactly reproducible compilation (#4012), the basename of
+-- the temporary file no longer contains random information (it used to contain
+-- the process id).
+--
+-- This is ok, as the temporary directory used contains the pid (see getTempDir).
 
 addFilesToClean :: DynFlags -> [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
@@ -1595,14 +1613,9 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-            let buildingRts = thisPackage dflags == rtsPackageKey
-            let bsymbolicFlag = if buildingRts
-                                then -- -Bsymbolic breaks the way we implement
-                                     -- hooks in the RTS
-                                     []
-                                else -- we need symbolic linking to resolve
-                                     -- non-PIC intra-package-relocations
-                                     ["-Wl,-Bsymbolic"]
+            let bsymbolicFlag = -- we need symbolic linking to resolve
+                                -- non-PIC intra-package-relocations
+                                ["-Wl,-Bsymbolic"]
 
             runLink dflags (
                     map Option verbFlags

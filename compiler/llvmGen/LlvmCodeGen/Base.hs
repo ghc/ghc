@@ -45,7 +45,7 @@ import CodeGen.Platform ( activeStgRegs )
 import DynFlags
 import FastString
 import Cmm
-import qualified Outputable as Outp
+import Outputable as Outp
 import qualified Pretty as Prt
 import Platform
 import UniqFM
@@ -538,11 +538,3 @@ aliasify (LMGlobal var val) = do
 -- away with casting the alias to the desired type in @getSymbolPtr@
 -- and instead just emit a reference to the definition symbol directly.
 -- This is the @Just@ case in @getSymbolPtr@.
-
--- ----------------------------------------------------------------------------
--- * Misc
---
-
--- | Error function
-panic :: String -> a
-panic s = Outp.panic $ "LlvmCodeGen.Base." ++ s

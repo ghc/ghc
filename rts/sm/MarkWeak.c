@@ -348,7 +348,8 @@ static void checkWeakPtrSanity(StgWeak *hd, StgWeak *tl)
 {
     StgWeak *w, *prev;
     for (w = hd; w != NULL; prev = w, w = w->link) {
-        ASSERT(INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure*)w)->header.info)->type == WEAK);
+        ASSERT(INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure*)w)->header.info)->type == WEAK
+            || UNTAG_CLOSURE((StgClosure*)w)->header.info == &stg_DEAD_WEAK_info);
         checkClosure((StgClosure*)w);
     }
     if (tl != NULL) {

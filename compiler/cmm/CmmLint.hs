@@ -14,13 +14,13 @@ import Hoopl
 import Cmm
 import CmmUtils
 import CmmLive
+import CmmSwitch (switchTargetsToList)
 import PprCmm ()
 import BlockId
 import FastString
 import Outputable
 import DynFlags
 
-import Data.Maybe
 import Control.Monad (liftM, ap)
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
@@ -171,9 +171,9 @@ lintCmmLast labels node = case node of
             _ <- lintCmmExpr e
             checkCond dflags e
 
-  CmmSwitch e branches -> do
+  CmmSwitch e ids -> do
             dflags <- getDynFlags
-            mapM_ checkTarget $ catMaybes branches
+            mapM_ checkTarget $ switchTargetsToList ids
             erep <- lintCmmExpr e
             if (erep `cmmEqType_ignoring_ptrhood` bWord dflags)
               then return ()

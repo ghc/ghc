@@ -47,6 +47,7 @@ import Digraph
 import Exception        ( tryIO, gbracket, gfinally )
 import FastString
 import Maybes           ( expectJust )
+import Name
 import MonadUtils       ( allM, MonadIO )
 import Outputable
 import Panic
@@ -97,7 +98,7 @@ label_self thread_name = do
 --
 -- Note that each 'ModSummary' in the module graph caches its 'DynFlags'.
 -- These 'DynFlags' are determined by the /current/ session 'DynFlags' and the
--- @OPTIONS@ and @LANGUAGE@ pragmas of the parsed module.  Thus if you want to
+-- @OPTIONS@ and @LANGUAGE@ pragmas of the parsed module.  Thus if you want
 -- changes to the 'DynFlags' to take effect you need to call this function
 -- again.
 --
@@ -139,12 +140,12 @@ data LoadHowMuch
 -- possible.  Depending on the target (see 'DynFlags.hscTarget') compilating
 -- and loading may result in files being created on disk.
 --
--- Calls the 'reportModuleCompilationResult' callback after each compiling
--- each module, whether successful or not.
+-- Calls the 'defaultWarnErrLogger' after each compiling each module, whether
+-- successful or not.
 --
 -- Throw a 'SourceError' if errors are encountered before the actual
 -- compilation starts (e.g., during dependency analysis).  All other errors
--- are reported using the callback.
+-- are reported using the 'defaultWarnErrLogger'.
 --
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
@@ -208,7 +209,7 @@ load how_much = do
     -- before we unload anything, make sure we don't leave an old
     -- interactive context around pointing to dead bindings.  Also,
     -- write the pruned HPT to allow the old HPT to be GC'd.
-    modifySession $ \_ -> discardIC $ hsc_env { hsc_HPT = pruned_hpt }
+    setSession $ discardIC $ hsc_env { hsc_HPT = pruned_hpt }
 
     liftIO $ debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
                             text "Stable BCO:" <+> ppr stable_bco)
@@ -392,10 +393,23 @@ discardProg hsc_env
   = discardIC $ hsc_env { hsc_mod_graph = emptyMG
                         , hsc_HPT = emptyHomePackageTable }
 
--- | Discard the contents of the InteractiveContext, but keep the DynFlags
+-- | Discard the contents of the InteractiveContext, but keep the DynFlags.
+-- It will also keep ic_int_print and ic_monad if their names are from
+-- external packages.
 discardIC :: HscEnv -> HscEnv
 discardIC hsc_env
-  = hsc_env { hsc_IC = emptyInteractiveContext (ic_dflags (hsc_IC hsc_env)) }
+  = hsc_env { hsc_IC = new_ic { ic_int_print = keep_external_name ic_int_print
+                              , ic_monad = keep_external_name ic_monad } }
+  where
+  dflags = ic_dflags old_ic
+  old_ic = hsc_IC hsc_env
+  new_ic = emptyInteractiveContext dflags
+  keep_external_name ic_name
+    | nameIsFromExternalPackage this_pkg old_name = old_name
+    | otherwise = ic_name new_ic
+    where
+    this_pkg = thisPackage dflags
+    old_name = ic_name old_ic
 
 intermediateCleanTempFiles :: DynFlags -> [ModSummary] -> HscEnv -> IO ()
 intermediateCleanTempFiles dflags summaries hsc_env
@@ -1681,7 +1695,8 @@ msDeps s =
         ++ [ (m,NotBoot) | m <- ms_home_imps s ]
 
 home_imps :: [Located (ImportDecl RdrName)] -> [Located ModuleName]
-home_imps imps = [ ideclName i |  L _ i <- imps, isLocal (ideclPkgQual i) ]
+home_imps imps = [ ideclName i |  L _ i <- imps,
+                                  isLocal (fmap snd $ ideclPkgQual i) ]
   where isLocal Nothing = True
         isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
         isLocal _ = False

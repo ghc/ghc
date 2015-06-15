@@ -11,10 +11,10 @@ module TcEvidence (
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
-  EvBindMap(..), emptyEvBindMap, extendEvBinds, 
+  EvBindMap(..), emptyEvBindMap, extendEvBinds,
                  lookupEvBind, evBindMapBinds, foldEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  EvTerm(..), mkEvCast, evVarsOfTerm,
+  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvScSelectors,
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
@@ -37,10 +37,11 @@ module TcEvidence (
 import Var
 import Coercion
 import PprCore ()   -- Instance OutputableBndr TyVar
-import TypeRep  -- Knows type representation
+import TypeRep      -- Knows type representation
 import TcType
 import Type
 import TyCon
+import Class( Class )
 import CoAxiom
 import PrelNames
 import VarEnv
@@ -709,11 +710,7 @@ data EvTerm
   | EvCast EvTerm TcCoercion     -- d |> co, the coercion being at role representational
 
   | EvDFunApp DFunId             -- Dictionary instance application
-       [Type] [EvTerm]
-
-  | EvTupleSel EvTerm  Int       -- n'th component of the tuple, 0-indexed
-
-  | EvTupleMk [EvTerm]           -- tuple built from this stuff
+       [Type] [EvId]
 
   | EvDelayedError Type FastString  -- Used with Opt_DeferTypeErrors
                                -- See Note [Deferring coercion errors to runtime]
@@ -787,7 +784,7 @@ Instead we make a binding
     g1 :: a~Bool = g |> ax7 a
 and the constraint
     [G] g1 :: a~Bool
-See Trac [7238] and Note [Bind new Givens immediately] in TcSMonad
+See Trac [7238] and Note [Bind new Givens immediately] in TcRnTypes
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -974,6 +971,12 @@ mkEvCast ev lco
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 
+mkEvScSelectors :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
+mkEvScSelectors ev cls tys
+   = zipWith mk_pr (immSuperClasses cls tys) [0..]
+  where
+    mk_pr pred i = (pred, EvSuperClass ev i)
+
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
 
@@ -993,11 +996,9 @@ evTermCoercion tm = pprPanic "evTermCoercion" (ppr tm)
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvId v)             = unitVarSet v
 evVarsOfTerm (EvCoercion co)      = coVarsOfTcCo co
-evVarsOfTerm (EvDFunApp _ _ evs)  = evVarsOfTerms evs
-evVarsOfTerm (EvTupleSel v _)     = evVarsOfTerm v
+evVarsOfTerm (EvDFunApp _ _ evs)  = mkVarSet evs
 evVarsOfTerm (EvSuperClass v _)   = evVarsOfTerm v
 evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo co
-evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
@@ -1074,15 +1075,13 @@ instance Outputable EvBind where
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
-  ppr (EvId v)           = ppr v
-  ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
-  ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
-  ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
-  ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
-  ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
+  ppr (EvId v)              = ppr v
+  ppr (EvCast v co)         = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
+  ppr (EvCoercion co)       = ptext (sLit "CO") <+> ppr co
+  ppr (EvSuperClass d n)    = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
-  ppr (EvLit l)          = ppr l
-  ppr (EvCallStack cs)   = ppr cs
+  ppr (EvLit l)             = ppr l
+  ppr (EvCallStack cs)      = ppr cs
   ppr (EvDelayedError ty msg) =     ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
   ppr (EvTypeable ev)    = ppr ev

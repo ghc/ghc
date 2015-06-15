@@ -1,5 +1,5 @@
 
-T5570.hs:7:16:
+T5570.hs:7:16: error:
     Couldn't match kind ‘*’ with ‘#’
     When matching types
       r0 :: *

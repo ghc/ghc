@@ -23,7 +23,7 @@ test('readFail020', normal, compile_fail, [''])
 # empty file (length zero) is not a legal Haskell module.  It fails to compile
 # because it doesn't contain a definition of Main.main.  GHC 5.02 crashed
 # on this example.
-test('readFail021', when(compiler_type('hugs'), expect_fail), compile_fail, [''])
+test('readFail021', normal, compile_fail, [''])
 
 test('readFail022', normal, compile_fail, [''])
 test('readFail023', normal, compile_fail, [''])
@@ -86,3 +86,4 @@ test('ExportCommaComma', normal, compile_fail, [''])
 test('T8430', literate, compile_fail, [''])
 test('T8431', [timeout_multiplier(0.05)], compile_fail, ['-XAlternativeLayoutRule'])
 test('T8506', normal, compile_fail, [''])
+test('T9225', normal, compile_fail, [''])
