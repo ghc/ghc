@@ -1,6 +1,6 @@
 module Switches (
     IntegerLibraryImpl (..), integerLibraryImpl,
-    notStage, stage0, stage1, stage2, builders, notBuilder,
+    notStage, stage0, stage1, stage2,
     supportsPackageKey, targetPlatforms, targetPlatform,
     targetOss, targetOs, notTargetOs,
     targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
@@ -9,7 +9,6 @@ module Switches (
     ) where
 
 import Base
-import Oracles.Builder
 import Expression
 
 -- Support for multiple integer library implementations
@@ -30,12 +29,6 @@ stage1 = stage Stage1
 
 stage2 :: Predicate
 stage2 = stage Stage2
-
-builders :: [Builder] -> Predicate
-builders = liftM or . sequence . map builder
-
-notBuilder :: Builder -> Predicate
-notBuilder = liftM not . builder
 
 -- Predicates based on configuration files
 supportsPackageKey :: Predicate

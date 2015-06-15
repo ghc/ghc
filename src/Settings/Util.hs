@@ -51,8 +51,8 @@ appendCcArgs :: [String] -> Settings
 appendCcArgs args = do
     stage <- asks getStage
     mconcat [ builder (Gcc stage) ? append args
-            , builder GhcCabal ? appendSub "--configure-option=CFLAGS" args
-            , builder GhcCabal ? appendSub "--gcc-options" args ]
+            , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" args
+            , builder GhcCabal    ? appendSub "--gcc-options" args ]
 
 -- packageData :: Arity -> String -> Settings
 -- packageData arity key =
