@@ -41,6 +41,9 @@ a[href]:link { color: rgb(196,69,29); }
 a[href]:visited { color: rgb(171,105,84); }
 a[href]:hover { text-decoration:underline; }
 
+a[href].def:link, a[href].def:visited { color: black; }
+a[href].def:hover { color: rgb(78, 98, 114); }
+
 /* @end */
 
 /* @group Fonts & Sizes */
