@@ -1684,8 +1684,8 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = os.system( 'diff -u ' + expected_file_for_diff + \
-                                      ' ' + actual_file )
+                r = os.system( 'diff -u ' + expected_normalised_file + \
+                                      ' ' + actual_normalised_file )
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
