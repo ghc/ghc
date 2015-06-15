@@ -241,13 +241,6 @@
        </listitem>
         <listitem>
             <para>
-                GHC's LLVM backend is currently incompatible with LLVM
-                3.4 (<ulink
-		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>).
-           </para>
-       </listitem>
-        <listitem>
-            <para>
                 GHCi fails to appropriately load
                 <literal>.dyn_o</literal> files (<ulink
 		url="https://ghc.haskell.org/trac/ghc/ticket/8736">issue #8736</ulink>).
