@@ -259,3 +259,5 @@ test('T10079', normal, compile, [''])
 test('T10139', normal, compile, [''])
 test('T10340', normal, compile, [''])
 test('T10226', normal, compile, [''])
+test('T10507', normal, compile, [''])
+

@@ -9,7 +9,7 @@ module TcSMonad (
     extendWorkListCts, appendWorkList,
     selectNextWorkItem,
     workListSize, workListWantedCount,
-    updWorkListTcS, updWorkListTcS_return,
+    updWorkListTcS, 
 
     -- The TcS monad
     TcS, runTcS, runTcSWithEvBinds,
@@ -41,7 +41,7 @@ module TcSMonad (
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertModel, getInertGivens,
-    emptyInert, getTcSInerts, setTcSInerts, takeInertInsolubles,
+    emptyInert, getTcSInerts, setTcSInerts, takeGivenInsolubles,
     getUnsolvedInerts,
     removeInertCts,
     addInertCan, addInertEq, insertFunEq,
@@ -1474,15 +1474,43 @@ getInertCans = do { inerts <- getTcSInerts; return (inert_cans inerts) }
 setInertCans :: InertCans -> TcS ()
 setInertCans ics = updInertTcS $ \ inerts -> inerts { inert_cans = ics }
 
-takeInertInsolubles :: TcS Cts
--- Take the insoluble constraints out of the inert set
-takeInertInsolubles
+takeGivenInsolubles :: TcS Cts
+-- See Note [The inert set after solving Givens]
+takeGivenInsolubles
+  = updRetInertCans $ \ cans ->
+    ( inert_insols cans
+    , cans { inert_insols = emptyBag
+           , inert_funeqs = filterFunEqs isGivenCt (inert_funeqs cans) } )
+
+{- Note [The inert set after solving Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After solving the Givens we take two things out of the inert set
+
+  a) The insolubles; we return these to report inaccessible code
+     We return these separately.  We don't want to leave them in
+     the inert set, lest we onfuse them with insolubles arising from
+     solving wanteds
+
+  b) Any Derived CFunEqCans.  Derived CTyEqCans are in the
+     inert_model and do no harm.  In contrast, Derived CFunEqCans
+     get mixed up with the Wanteds later and confuse the
+     post-solve-wanted unflattening (Trac #10507).
+     E.g.  From   [G] 1 <= m, [G] m <= n
+           We get [D] 1 <= n, and we must remove it!
+         Otherwise we unflatten it more then once, and assign
+         to its fmv more than once...disaster.
+     It's ok to remove them because they turned ont not to
+     yield an insoluble, and hence have now done their work.
+-}
+
+updRetInertCans :: (InertCans -> (a, InertCans)) -> TcS a
+-- Modify the inert set with the supplied function
+updRetInertCans upd_fn
   = do { is_var <- getTcSInertsRef
        ; wrapTcS (do { inerts <- TcM.readTcRef is_var
-                     ; let cans = inert_cans inerts
-                           cans' = cans { inert_insols = emptyBag }
+                     ; let (res, cans') = upd_fn (inert_cans inerts)
                      ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
-                     ; return (inert_insols cans) }) }
+                     ; return res }) }
 
 updInertCans :: (InertCans -> InertCans) -> TcS ()
 -- Modify the inert set with the supplied function
@@ -2281,17 +2309,6 @@ updWorkListTcS f
        ; wl_curr <- wrapTcS (TcM.readTcRef wl_var)
        ; let new_work = f wl_curr
        ; wrapTcS (TcM.writeTcRef wl_var new_work) }
-
-updWorkListTcS_return :: (WorkList -> (a,WorkList)) -> TcS a
--- Process the work list, returning a depleted work list,
--- plus a value extracted from it (typically a work item removed from it)
-updWorkListTcS_return f
-  = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- wrapTcS (TcM.readTcRef wl_var)
-       ; traceTcS "updWorkList" (ppr wl_curr)
-       ; let (res,new_work) = f wl_curr
-       ; wrapTcS (TcM.writeTcRef wl_var new_work)
-       ; return res }
 
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs

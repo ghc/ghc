@@ -126,13 +126,14 @@ must keep track of them separately.
 
 solveSimpleGivens :: CtLoc -> [EvVar] -> TcS Cts
 -- Solves the givens, adding them to the inert set
--- Returns any insoluble givens, taking those ones out of the inert set
+-- Returns any insoluble givens, which represent inaccessible code,
+-- taking those ones out of the inert set
 solveSimpleGivens loc givens
   | null givens  -- Shortcut for common case
   = return emptyCts
   | otherwise
   = do { go (map mk_given_ct givens)
-       ; takeInertInsolubles }
+       ; takeGivenInsolubles }
   where
     mk_given_ct ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
                                                 , ctev_pred = evVarPred ev_id
