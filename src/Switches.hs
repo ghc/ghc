@@ -1,6 +1,7 @@
 module Switches (
     IntegerLibraryImpl (..), integerLibraryImpl,
     notStage, stage0, stage1, stage2,
+    configKeyYes, configKeyNo, configKeyNonEmpty,
     supportsPackageKey, targetPlatforms, targetPlatform,
     targetOss, targetOs, notTargetOs,
     targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
@@ -29,6 +30,15 @@ stage1 = stage Stage1
 
 stage2 :: Predicate
 stage2 = stage Stage2
+
+configKeyYes :: String -> Predicate
+configKeyYes key = configKeyValue key "YES"
+
+configKeyNo :: String -> Predicate
+configKeyNo key = configKeyValue key "NO"
+
+configKeyNonEmpty :: String -> Predicate
+configKeyNonEmpty key = liftM not $ configKeyValue key ""
 
 -- Predicates based on configuration files
 supportsPackageKey :: Predicate

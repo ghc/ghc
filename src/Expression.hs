@@ -9,8 +9,7 @@ module Expression (
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
     applyPredicate, (?), (??), stage, builder, package,
-    configKeyValue, configKeyValues,
-    configKeyYes, configKeyNo, configKeyNonEmpty
+    configKeyValue, configKeyValues
     ) where
 
 import Base hiding (arg, args, Args, TargetDir)
@@ -25,8 +24,11 @@ data Environment = Environment
         getStage   :: Stage,
         getBuilder :: Builder,
         getPackage :: Package
+        -- getWay  :: Way, and maybe something else will be useful later
      }
 
+-- TODO: all readers are currently partial functions. Can use type classes to
+-- guarantee these errors never occur.
 defaultEnvironment :: Environment
 defaultEnvironment = Environment
     {
@@ -48,14 +50,30 @@ instance Monoid a => Monoid (Expr a) where
     mempty  = return mempty
     mappend = liftM2 mappend
 
+-- Basic operations on expressions:
+-- 1) append something to an expression
 append :: Monoid a => a -> DiffExpr a
 append x = return . Dual . Endo $ (<> x)
 
-appendM :: Monoid a => Action a -> DiffExpr a
-appendM mx = lift mx >>= append
-
+-- 2) remove given elements from a list expression
 remove :: Eq a => [a] -> DiffExpr [a]
 remove xs = return . Dual . Endo $ filter (`notElem` xs)
+
+-- 3) apply a predicate to an expression
+applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
+applyPredicate predicate expr = do
+    bool <- predicate
+    if bool then expr else return mempty
+
+-- A convenient operator for predicate application
+(?) :: Monoid a => Predicate -> Expr a -> Expr a
+(?) = applyPredicate
+
+infixr 8 ?
+
+-- A monadic version of append
+appendM :: Monoid a => Action a -> DiffExpr a
+appendM mx = lift mx >>= append
 
 -- appendSub appends a list of sub-arguments to all arguments starting with a
 -- given prefix. If there is no argument with such prefix then a new argument
@@ -85,31 +103,28 @@ filterSub prefix p = return . Dual . Endo $ map filterSubstr
         | prefix `isPrefixOf` s = unwords . filter p . words $ s
         | otherwise             = s
 
+-- remove given elements from a list of sub-arguments with a given prefix
+-- Example: removeSub "--configure-option=CFLAGS" ["-Werror"]
 removeSub :: String -> [String] -> Settings
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
+-- Interpret a given expression in a given environment
 interpret :: Environment -> Expr a -> Action a
 interpret = flip runReaderT
 
+-- Extract an expression from a difference expression
 fromDiff :: Monoid a => DiffExpr a -> Expr a
 fromDiff = fmap (($ mempty) . appEndo . getDual)
 
+-- Interpret a given difference expression in a given environment
 interpretDiff :: Monoid a => Environment -> DiffExpr a -> Action a
 interpretDiff env = interpret env . fromDiff
 
-applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
-applyPredicate predicate expr = do
-    bool <- predicate
-    if bool then expr else return mempty
-
-(?) :: Monoid a => Predicate -> Expr a -> Expr a
-(?) = applyPredicate
-
+-- An equivalent of if-then-else for predicates
 (??) :: Monoid a => Predicate -> (Expr a, Expr a) -> Expr a
 p ?? (t, f) = p ? t <> (liftM not p) ? f
 
-infixr 8 ?
-
+-- Basic predicates
 stage :: Stage -> Predicate
 stage s = liftM (s ==) (asks getStage)
 
@@ -125,12 +140,3 @@ configKeyValue key value = liftM (value ==) (lift $ askConfig key)
 -- checks if there is at least one match
 configKeyValues :: String -> [String] -> Predicate
 configKeyValues key values = liftM (`elem` values) (lift $ askConfig key)
-
-configKeyYes :: String -> Predicate
-configKeyYes key = configKeyValue key "YES"
-
-configKeyNo :: String -> Predicate
-configKeyNo key = configKeyValue key "NO"
-
-configKeyNonEmpty :: String -> Predicate
-configKeyNonEmpty key = liftM not $ configKeyValue key ""
