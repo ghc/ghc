@@ -18,3 +18,6 @@ deriving instance Show (T n)
 hey :: (Typeable n, KnownNat n) => T (Foo n)
 -- SHOULD BE: hey :: KnownNat n => T (Foo n)
 hey = T Hey
+
+ho :: T (Foo 42)
+ho = T Hey

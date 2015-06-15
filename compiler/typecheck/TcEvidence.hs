@@ -733,7 +733,7 @@ data EvTerm
 -- | Instructions on how to make a 'Typeable' dictionary.
 data EvTypeable
   = EvTypeableTyCon TyCon [Kind]
-    -- ^ Dicitionary for concrete type constructors.
+    -- ^ Dictionary for concrete type constructors.
 
   | EvTypeableTyApp (EvTerm,Type) (EvTerm,Type)
     -- ^ Dictionary for type applications;  this is used when we have
