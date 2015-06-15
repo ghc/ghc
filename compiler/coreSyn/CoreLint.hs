@@ -1255,7 +1255,7 @@ lintCoercion the_co@(NthCo n co)
        ; case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
            (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
-             , isDistinctTyCon tc_s || r /= Representational
+             , isInjectiveTyCon tc_s r
                  -- see Note [NthCo and newtypes] in Coercion
              , tys_s `equalLength` tys_t
              , n < length tys_s

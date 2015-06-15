@@ -459,13 +459,13 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- have already been dealt with
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
           (TyConApp tc1 tys1) _ (TyConApp tc2 tys2) _
-  | isDecomposableTyCon tc1
-  , isDecomposableTyCon tc2
-  = canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
+  | mightBeUnsaturatedTyCon tc1
+  , mightBeUnsaturatedTyCon tc2
+  = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
            (TyConApp tc1 _) ps_ty1 (FunTy {}) ps_ty2
-  | isDecomposableTyCon tc1
+  | mightBeUnsaturatedTyCon tc1
       -- The guard is important
       -- e.g.  (x -> y) ~ (F x y) where F has arity 1
       --       should not fail, but get the app/app case
@@ -477,7 +477,7 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel (FunTy s1 t1) _ (FunTy s2 t2) _
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
           (FunTy {}) ps_ty1 (TyConApp tc2 _) ps_ty2
-  | isDecomposableTyCon tc2
+  | mightBeUnsaturatedTyCon tc2
   = canEqHardFailure ev eq_rel ps_ty1 ps_ty2
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
@@ -622,6 +622,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
 
 -- AppTys only decompose for nominal equality, so this case just leads
 -- to an irreducible constraint; see typecheck/should_compile/T10494
+-- See Note [Decomposing equality]
 can_eq_app ev ReprEq _ _ _ _
   = do { traceTcS "failing to decompose representational AppTy equality" (ppr ev)
        ; continueWith (CIrredEvCan { cc_ev = ev }) }
@@ -650,20 +651,17 @@ can_eq_app ev NomEq s1 t1 s2 t2
   = error "can_eq_app"
 
 ------------------------
-canDecomposableTyConApp :: CtEvidence -> EqRel
-                        -> TyCon -> [TcType]
-                        -> TyCon -> [TcType]
-                        -> TcS (StopOrContinue Ct)
+canTyConApp :: CtEvidence -> EqRel
+            -> TyCon -> [TcType]
+            -> TyCon -> [TcType]
+            -> TcS (StopOrContinue Ct)
 -- See Note [Decomposing TyConApps]
-canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
+canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , length tys1 == length tys2
   = do { inerts <- getTcSInerts
-       ; if    eq_rel == NomEq      -- NomEq doesn't care about newtype vs. data
-            || isDistinctTyCon tc1  -- always good to decompose non-newtypes
-            || (ctEvFlavour ev /= Given && isEmptyBag (matchableGivens loc pred inerts))
-            -- See Note [Decomposing newtypes]
-         then do { traceTcS "canDecomposableTyConApp"
+       ; if can_decompose inerts
+         then do { traceTcS "canTyConApp"
                        (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
                  ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
                  ; stopWith ev "Decomposed TyConApp" }
@@ -671,7 +669,8 @@ canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
-  | eq_rel == ReprEq && not (isDistinctTyCon tc1 && isDistinctTyCon tc2)
+  | eq_rel == ReprEq && not (isGenerativeTyCon tc1 Representational &&
+                             isGenerativeTyCon tc2 Representational)
   = canEqFailure ev eq_rel ty1 ty2
   | otherwise
   = canEqHardFailure ev eq_rel ty1 ty2
@@ -681,6 +680,11 @@ canDecomposableTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
     loc  = ctEvLoc ev
     pred = ctEvPred ev
+
+     -- See Note [Decomposing equality]
+    can_decompose inerts
+      =  isInjectiveTyCon tc1 (eqRelRole eq_rel)
+      || (ctEvFlavour ev /= Given && isEmptyBag (matchableGivens loc pred inerts))
 
 {-
 Note [Use canEqFailure in canDecomposableTyConApp]
@@ -734,8 +738,6 @@ NthCo on representational coercions over newtypes. NthCo comes into play
 only when decomposing givens. So we avoid decomposing representational given
 equalities over newtypes.
 
-(NB: isNewTyCon tc == True  ===>   isDistinctTyCon tc == False)
-
 But is it ever sensible to decompose *Wanted* constraints over newtypes? Yes, as
 long as there are no Givens that might (later) influence Coercible solving.
 (See Note [Instance and Given overlap] in TcInteract.) By the time we reach
@@ -758,6 +760,89 @@ decompose. If we have `newtype Nt a = Mk Bool`, then there might be well-formed
 evidence that (Nt Int ~R Nt Char), even if we can't form that evidence in this
 module (because Mk is not in scope). Creating this scenario in source Haskell
 is challenging; there is no test case.
+
+
+Note [Decomposing equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have a constraint (of any flavour and role) that looks like
+T tys1 ~ T tys2, what can we conclude about tys1 and tys2? The answer,
+of course, is "it depends". This Note spells it all out.
+
+In this Note, "decomposition" refers to taking the constraint
+  [fl] (T tys1 ~X T tys2)
+(for some flavour fl and some role X) and replacing it with
+  [fls'] (tys1 ~Xs' tys2)
+where that notation indicates a list of new constraints, where the
+new constraints may have different flavours and different roles.
+
+The key property to consider is injectivity. When decomposing a Given the
+decomposition is sound if and only if T is injective in all of its type
+arguments. When decomposing a Wanted, the decomposition is sound (assuming the
+correct roles in the produced equality constraints), but it may be a guess --
+that is, an unforced decision by the constraint solver. Decomposing Wanteds
+over injective TyCons does not entail guessing. But sometimes we want to
+decompose a Wanted even when the TyCon involved is not injective! (See below.)
+
+So, in broad strokes, we want this rule:
+
+(*) Decompose a constraint (T tys1 ~X T tys2) if and only if T is injective
+at role X.
+
+Pursuing the details requires exploring three axes:
+* Flavour: Given vs. Derived vs. Wanted
+* Role: Nominal vs. Representational
+* TyCon species: datatype vs. newtype vs. data family vs. type family vs. type variable
+
+(So a type variable isn't a TyCon, but it's convenient to put the AppTy case
+in the same table.)
+
+Right away, we can say that Derived behaves just as Wanted for the purposes
+of decomposition. The difference between Derived and Wanted is the handling of
+evidence. Since decomposition in these cases isn't a matter of soundness but of
+guessing, we want the same behavior regardless of evidence.
+
+Here is a table (discussion following) detailing where decomposition is allowed:
+
+NOMINAL               GIVEN                       WANTED
+
+Datatype               YES                         YES
+Newtype                YES                         YES
+Data family            YES                         YES
+Type family            YES, in injective args{1}   YES, in injective args{1}
+Type variable          YES                         YES
+
+REPRESENTATIONAL      GIVEN                       WANTED
+
+Datatype               YES                         YES
+Newtype                NO{2}                      MAYBE{2}
+Data family            NO{3}                      MAYBE{3}
+Type family             NO                          NO
+Type variable          NO{4}                       NO{4}
+
+{1}: Type families can be injective in some, but not all, of their arguments,
+so we want to do partial decomposition. This is quite different than the way
+other decomposition is done, where the decomposed equalities replace the original
+one. We thus proceed much like we do with superclasses: emitting new Givens
+when "decomposing" a partially-injective type family Given and new Deriveds
+when "decomposing" a partially-injective type family Wanted. (As of the time of
+writing, 13 June 2015, the implementation of injective type families has not
+been merged, but it should be soon. Please delete this parenthetical if the
+implementation is indeed merged.)
+
+{2}: See Note [Decomposing newtypes]
+
+{3}: Because of the possibility of newtype instances, we must treat data families
+like newtypes. See also Note [Decomposing newtypes].
+
+{4}: Because type variables can stand in for newtypes, we conservatively do not
+decompose AppTys over representational equality.
+
+In the implementation of can_eq_nc and friends, we don't directly pattern
+match using lines like in the tables above, as those tables don't cover
+all cases (what about PrimTyCon? tuples?). Instead we just ask about injectivity,
+boiling the tables above down to rule (*). The exceptions to rule (*) are for
+injective type families, which are handled separately from other decompositions,
+and the MAYBE entries above.
 
 -}
 
@@ -1475,9 +1560,8 @@ unifyWanted loc role    orig_ty1 orig_ty2
            ; co_t <- unifyWanted loc role t1 t2
            ; return (mkTcTyConAppCo role funTyCon [co_s,co_t]) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-      | tc1 == tc2, isDecomposableTyCon tc1, tys1 `equalLength` tys2
-      , (not (isNewTyCon tc1) && not (isDataFamilyTyCon tc1)) || role == Nominal
-         -- don't look under newtypes!
+      | tc1 == tc2, tys1 `equalLength` tys2
+      , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
       = do { cos <- zipWith3M (unifyWanted loc) (tyConRolesX role tc1) tys1 tys2
            ; return (mkTcTyConAppCo role tc1 cos) }
     go (TyVarTy tv) ty2
@@ -1520,8 +1604,8 @@ unify_derived loc role    orig_ty1 orig_ty2
       = do { unify_derived loc role s1 s2
            ; unify_derived loc role t1 t2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-      | tc1 == tc2, isDecomposableTyCon tc1, tys1 `equalLength` tys2
-      , (not (isNewTyCon tc1) && not (isDataFamilyTyCon tc1)) || role == Nominal
+      | tc1 == tc2, tys1 `equalLength` tys2
+      , isInjectiveTyCon tc1 role
       = unifyDeriveds loc (tyConRolesX role tc1) tys1 tys2
     go (TyVarTy tv) ty2
       = do { mb_ty <- isFilledMetaTyVar_maybe tv

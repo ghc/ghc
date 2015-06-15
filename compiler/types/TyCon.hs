@@ -36,7 +36,7 @@ module TyCon(
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isTypeSynonymTyCon,
-        isDecomposableTyCon,
+        mightBeUnsaturatedTyCon,
         isPromotedDataCon, isPromotedTyCon,
         isPromotedDataCon_maybe, isPromotedTyCon_maybe,
         promotableTyCon_maybe, promoteTyCon,
@@ -49,7 +49,7 @@ module TyCon(
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
-        isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
+        isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isDistinctAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
         isImplicitTyCon,
@@ -1210,21 +1210,33 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isDataTyCon _ = False
 
--- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to
--- themselves, even via representational coercions (except for unsafeCoerce).
--- This excludes newtypes, type functions, type synonyms.
--- It relates directly to the FC consistency story:
---     If the axioms are consistent,
---     and  co : S tys ~R T tys, and S,T are "distinct" TyCons,
---     then S=T.
--- Cf Note [Pruning dead case alternatives] in Unify
-isDistinctTyCon :: TyCon -> Bool
-isDistinctTyCon (AlgTyCon {algTcRhs = rhs}) = isDistinctAlgRhs rhs
-isDistinctTyCon (FunTyCon {})               = True
-isDistinctTyCon (PrimTyCon {})              = True
-isDistinctTyCon (PromotedDataCon {})        = True
-isDistinctTyCon _                           = False
+-- | 'isInjectiveTyCon' is true of 'TyCon's for which this property holds
+-- (where X is the role passed in):
+--   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
+-- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
+isInjectiveTyCon :: TyCon -> Role -> Bool
+isInjectiveTyCon _                             Phantom          = False
+isInjectiveTyCon (FunTyCon {})                 _                = True
+isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
+isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
+  = isDistinctAlgRhs rhs
+isInjectiveTyCon (SynonymTyCon {})             _                = False
+isInjectiveTyCon (FamilyTyCon {})              _                = False
+isInjectiveTyCon (PrimTyCon {})                _                = True
+isInjectiveTyCon (PromotedDataCon {})          _                = True
+isInjectiveTyCon (PromotedTyCon {ty_con = tc}) r
+  = isInjectiveTyCon tc r
 
+-- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
+-- (where X is the role passed in):
+--   If (T tys ~X t), then (t's head ~X T).
+isGenerativeTyCon :: TyCon -> Role -> Bool
+isGenerativeTyCon = isInjectiveTyCon
+  -- as it happens, generativity and injectivity coincide, but there's
+  -- no a priori reason this must be the case
+
+-- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective
+-- with respect to representational equality?
 isDistinctAlgRhs :: AlgTyConRhs -> Bool
 isDistinctAlgRhs (TupleTyCon {})          = True
 isDistinctAlgRhs (DataTyCon {})           = True
@@ -1317,17 +1329,17 @@ isTypeSynonymTyCon _                 = False
 -- right hand side to which a synonym family application can expand.
 --
 
-isDecomposableTyCon :: TyCon -> Bool
+mightBeUnsaturatedTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
 --   I.e. is it injective and generative w.r.t nominal equality?
 -- Specifically NOT true of synonyms (open and otherwise)
 --
--- It'd be unusual to call isDecomposableTyCon on a regular H98
+-- It'd be unusual to call mightBeUnsaturatedTyCon on a regular H98
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
-isDecomposableTyCon (SynonymTyCon {}) = False
-isDecomposableTyCon (FamilyTyCon  {}) = False
-isDecomposableTyCon _other            = True
+mightBeUnsaturatedTyCon (SynonymTyCon {}) = False
+mightBeUnsaturatedTyCon (FamilyTyCon  {}) = False
+mightBeUnsaturatedTyCon _other            = True
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool

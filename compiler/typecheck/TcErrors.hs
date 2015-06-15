@@ -386,7 +386,7 @@ reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
 ---------------
 isRigid, isRigidOrSkol :: Type -> Bool
 isRigid ty
-  | Just (tc,_) <- tcSplitTyConApp_maybe ty = isDecomposableTyCon tc
+  | Just (tc,_) <- tcSplitTyConApp_maybe ty = isGenerativeTyCon tc Nominal
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | isForAllTy ty                           = True
   | otherwise                               = False
