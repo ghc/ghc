@@ -1631,7 +1631,7 @@ After solving the Givens we take two things out of the inert set
            We get [D] 1 <= n, and we must remove it!
          Otherwise we unflatten it more then once, and assign
          to its fmv more than once...disaster.
-     It's ok to remove them because they turned not not to
+     It's ok to remove them because they turned out not to
      yield an insoluble, and hence have now done their work.
 -}
 
