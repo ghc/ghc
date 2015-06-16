@@ -47,8 +47,8 @@ module Type (
         mkFamilyTyConApp,
         isDictLikeTy,
         mkEqPred, mkCoerciblePred, mkPrimEqPred, mkReprPrimEqPred,
-        mkClassPred,
-        isClassPred, isEqPred,
+        mkClassPred, mkInstanceOfPred,
+        isClassPred, isEqPred, isInstanceOfPred,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
         isCTupleClass,
 
@@ -56,6 +56,7 @@ module Type (
         PredTree(..), EqRel(..), eqRelRole, classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
         getEqPredTys, getEqPredTys_maybe, getEqPredRole,
+        getInstanceOfPredTys, getInstanceOfPredTys_maybe,
         predTypeEqRel,
 
         -- ** Common type constructors
@@ -161,8 +162,8 @@ import NameEnv
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
-import PrelNames ( eqTyConKey, coercibleTyConKey,
+import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, instanceOfTyCon, typeNatKind, typeSymbolKind )
+import PrelNames ( eqTyConKey, coercibleTyConKey, instanceOfTyConKey,
                    ipClassNameKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
@@ -895,7 +896,7 @@ isPredTy ty = go ty []
     go_k (ForAllTy kv k1) (k2:args) = go_k (substKiWith [kv] [k2] k1) args
     go_k _ _ = False                  -- Typeable * Int :: Constraint
 
-isClassPred, isEqPred, isIPPred :: PredType -> Bool
+isClassPred, isEqPred, isIPPred, isInstanceOfPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
     Just tyCon | isClassTyCon tyCon -> True
     _                               -> False
@@ -906,6 +907,10 @@ isEqPred ty = case tyConAppTyCon_maybe ty of
 isIPPred ty = case tyConAppTyCon_maybe ty of
     Just tc -> isIPTyCon tc
     _       -> False
+
+isInstanceOfPred ty = case tyConAppTyCon_maybe ty of
+    Just tyCon -> tyCon `hasKey` instanceOfTyConKey
+    _          -> False
 
 isIPTyCon :: TyCon -> Bool
 isIPTyCon tc = tc `hasKey` ipClassNameKey
@@ -975,6 +980,11 @@ isDictLikeTy ty = case splitTyConApp_maybe ty of
                        | isTupleTyCon tc -> all isDictLikeTy tys
         _other                           -> False
 
+-- --------------------- Instance of types ---------------------------------
+
+mkInstanceOfPred :: Type -> Type -> PredType
+mkInstanceOfPred a b = TyConApp instanceOfTyCon [a, b]
+
 {-
 Note [Dictionary-like types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1025,6 +1035,7 @@ eqRelRole ReprEq = Representational
 data PredTree = ClassPred Class [Type]
               | EqPred EqRel Type Type
               | IrredPred PredType
+              | InstanceOfPred Type Type
 
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
@@ -1034,6 +1045,9 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, tys) | tc `hasKey` eqTyConKey
                    , let [_, ty1, ty2] = tys
                    -> EqPred NomEq ty1 ty2
+    Just (tc, tys) | tc `hasKey` instanceOfTyConKey
+                   , let [ty1, ty2] = tys
+                   -> InstanceOfPred ty1 ty2
      -- NB: Coercible is also a class, so this check must come *after*
      -- the Coercible check
     Just (tc, tys) | Just clas <- tyConClass_maybe tc
@@ -1083,6 +1097,20 @@ predTypeEqRel ty
   = ReprEq
   | otherwise
   = NomEq
+
+getInstanceOfPredTys :: PredType -> (Type, Type)
+getInstanceOfPredTys ty
+  = case splitTyConApp_maybe ty of
+      Just (tc, (ty1 : ty2 : tys)) ->
+        ASSERT ( null tys && tc `hasKey` instanceOfTyConKey ) (ty1, ty2)
+      _ -> pprPanic "getInstanceOfPredTys" (ppr ty)
+
+getInstanceOfPredTys_maybe :: PredType -> Maybe (Type, Type)
+getInstanceOfPredTys_maybe ty
+  = case splitTyConApp_maybe ty of
+      Just (tc, [ty1, ty2])
+        | tc `hasKey` instanceOfTyConKey -> Just (ty1, ty2)
+      _ -> Nothing
 
 {-
 %************************************************************************

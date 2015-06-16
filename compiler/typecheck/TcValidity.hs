@@ -126,7 +126,7 @@ unless the instance is available *here*.
 
 Note [When to call checkAmbiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We call checkAmbiguity 
+We call checkAmbiguity
    (a) on user-specified type signatures
    (b) in checkValidType
 
@@ -991,7 +991,7 @@ The underlying idea is that
 -}
 
 leafTyConKeys :: [Unique]
-leafTyConKeys = [eqTyConKey, coercibleTyConKey, ipClassNameKey]
+leafTyConKeys = [eqTyConKey, coercibleTyConKey, ipClassNameKey, instanceOfTyConKey]
 
 checkInstTermination :: [TcType] -> ThetaType -> TcM ()
 -- See Note [Paterson conditions]
@@ -1314,4 +1314,3 @@ fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
 
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
-

@@ -68,9 +68,10 @@ module TysWiredIn (
         parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon,
         parrTyCon_RDR, parrTyConName,
 
-        -- * Equality predicates
+        -- * Equality and instance predicates
         eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
         coercibleTyCon, coercibleDataCon, coercibleClass,
+        instanceOfTyCon, instanceOfDataCon,
 
         mkWiredInTyConName -- This is used in TcTypeNats to define the
                            -- built-in functions for evaluation.
@@ -156,6 +157,7 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , parrTyCon
               , eqTyCon
               , coercibleTyCon
+              , instanceOfTyCon
               , typeNatKindCon
               , typeSymbolKindCon
               ]
@@ -172,15 +174,20 @@ mkWiredInDataConName built_in modu fs unique datacon
                   (AConLike (RealDataCon datacon))    -- Relevant DataCon
                   built_in
 
--- See Note [Kind-changing of (~) and Coercible]
+-- See Note [Kind-changing of (~). Coercible and InstanceOf]
 eqTyConName, eqBoxDataConName :: Name
 eqTyConName      = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "~")   eqTyConKey      eqTyCon
 eqBoxDataConName = mkWiredInDataConName UserSyntax    gHC_TYPES (fsLit "Eq#") eqBoxDataConKey eqBoxDataCon
 
--- See Note [Kind-changing of (~) and Coercible]
+-- See Note [Kind-changing of (~), Coercible and InstanceOf]
 coercibleTyConName, coercibleDataConName :: Name
 coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercible")  coercibleTyConKey   coercibleTyCon
 coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
+
+-- See Note [Kind-changing of (~). Coercible and InstanceOf]
+instanceOfTyConName, instanceOfDataConName :: Name
+instanceOfTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "InstanceOf")   instanceOfTyConKey   instanceOfTyCon
+instanceOfDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkInstanceOf") instanceOfDataConKey instanceOfDataCon
 
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
@@ -583,6 +590,25 @@ coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon
 
 coercibleClass :: Class
 coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
+
+instanceOfTyCon :: TyCon
+instanceOfTyCon = mkAlgTyCon instanceOfTyConName
+    (mkArrowKinds [liftedTypeKind, liftedTypeKind] constraintKind)
+    [alphaTyVar, betaTyVar]
+    [Nominal, Nominal]
+    Nothing
+    []      -- No stupid theta
+    (DataTyCon [instanceOfDataCon] False)
+    NoParentTyCon
+    NonRecursive
+    False
+    Nothing   -- No parent for constraint-kinded types
+
+instanceOfDataCon :: DataCon
+instanceOfDataCon = pcDataCon instanceOfDataConName
+    [alphaTyVar, betaTyVar]
+    [FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar)]
+    instanceOfTyCon
 
 charTy :: Type
 charTy = mkTyConTy charTyCon

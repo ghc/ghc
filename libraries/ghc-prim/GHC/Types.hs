@@ -24,6 +24,7 @@ module GHC.Types (
         SPEC(..),
         Nat, Symbol,
         Coercible,
+        InstanceOf
     ) where
 
 import GHC.Prim
@@ -98,10 +99,10 @@ elsewhere in GHC would be necessary. See [FFI type roles] in TcForeign.
 -}
 
 {-
-Note [Kind-changing of (~) and Coercible]
+Note [Kind-changing of (~), Coercible and InstanceOf]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(~) and Coercible are tricky to define. To the user, they must appear as
+(~), Coercible and InstanceOf are tricky to define. To the user, they must appear as
 constraints, but we cannot define them as such in Haskell. But we also cannot
 just define them only in GHC.Prim (like (->)), because we need a real module
 for them, e.g. to compile the constructor's info table.
@@ -174,6 +175,9 @@ data Coercible a b = MkCoercible ((~#) a b)
 --      * the compiled code is the same either way
 --      * TysWiredIn has the truthful types
 -- Also see Note [Kind-changing of (~) and Coercible]
+
+-- | A constraint inhabited only if type `a` is an instance of type `b`.
+data InstanceOf a b = MkInstanceOf (b -> a)
 
 -- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False
 --   if it is 0#.

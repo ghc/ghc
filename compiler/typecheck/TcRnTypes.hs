@@ -1150,6 +1150,19 @@ data Ct
         -- See Note [The flattening story] in TcFlatten
     }
 
+  | CInstanceOfVarLeft {  -- InstanceOf alpha sigma
+      cc_ev     :: CtEvidence,
+      cc_ivar   :: TcTyVar,
+      cc_rhs    :: TcType
+    }
+  | CInstanceOfVarRight {  -- InstanceOf sigma alpha
+       -- Invariants:
+       --   * sigma is not a type variable
+      cc_ev     :: CtEvidence,
+      cc_lhs    :: TcType,
+      cc_ivar   :: TcTyVar
+    }
+
   | CNonCanonical {        -- See Note [NonCanonical Semantics]
       cc_ev  :: CtEvidence
     }
@@ -2231,7 +2244,7 @@ pprCtOrigin :: CtOrigin -> SDoc
 
 pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
-pprCtOrigin (SpecPragOrigin ctxt) 
+pprCtOrigin (SpecPragOrigin ctxt)
   = case ctxt of
        FunSigCtxt n _ -> ptext (sLit "a SPECIALISE pragma for") <+> quotes (ppr n)
        SpecInstCtxt   -> ptext (sLit "a SPECIALISE INSTANCE pragma")
@@ -2293,7 +2306,7 @@ pprCtO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"),
 pprCtO SectionOrigin         = ptext (sLit "an operator section")
 pprCtO TupleOrigin           = ptext (sLit "a tuple")
 pprCtO NegateOrigin          = ptext (sLit "a use of syntactic negation")
-pprCtO (ScOrigin n)          = ptext (sLit "the superclasses of an instance declaration") 
+pprCtO (ScOrigin n)          = ptext (sLit "the superclasses of an instance declaration")
                                <> ifPprDebug (parens (ppr n))
 pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
 pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")

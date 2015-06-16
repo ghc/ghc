@@ -81,7 +81,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred, 
+  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
   immSuperClasses,
   isImprovementPred,
 
@@ -1270,8 +1270,8 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty 
-              | impredicative || isTauTyCon tc 
+          OC_OK ty
+              | impredicative || isTauTyCon tc
               -> return ty  -- First try to eliminate the tyvar from the args
               | otherwise
               -> OC_Forall  -- A type synonym with a forall on the RHS
@@ -1321,7 +1321,7 @@ Note [Kind polymorphic type classes]
     class C f where...   -- C :: forall k. k -> Constraint
     g :: forall (f::*). C f => f -> f
 
-Here the (C f) in the signature is really (C * f), and we 
+Here the (C f) in the signature is really (C * f), and we
 don't want to complain that the * isn't a type variable!
 -}
 
@@ -1342,7 +1342,7 @@ checkValidClsArgs flexible_contexts kts
   | otherwise         = all hasTyVarHead tys
   where
     (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
-   
+
 hasTyVarHead :: Type -> Bool
 -- Returns true of (a t1 .. tn), where 'a' is a type variable
 hasTyVarHead ty                 -- Haskell 98 allows predicates of form
@@ -1400,12 +1400,13 @@ immSuperClasses cls tys
 
 isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
-isImprovementPred ty 
+isImprovementPred ty
   = case classifyPredType ty of
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?
+      InstanceOfPred {}  -> False
 
 {-
 ************************************************************************
@@ -1885,4 +1886,4 @@ sizePred p
         | otherwise         -> sizeTypes tys
       EqPred {}             -> 0  -- See Note [Size of a predicate]
       IrredPred ty          -> sizeType ty
-
+      InstanceOfPred {}     -> 0  -- See Note [Size of a predicate]

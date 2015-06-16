@@ -1542,6 +1542,9 @@ callStackTyConKey = mkPreludeTyConUnique 182
 typeRepTyConKey :: Unique
 typeRepTyConKey = mkPreludeTyConUnique 183
 
+instanceOfTyConKey :: Unique
+instanceOfTyConKey = mkPreludeTyConUnique 184
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1614,6 +1617,9 @@ fingerprintDataConKey                   = mkPreludeDataConUnique 35
 callStackDataConKey, srcLocDataConKey :: Unique
 callStackDataConKey                     = mkPreludeDataConUnique 36
 srcLocDataConKey                        = mkPreludeDataConUnique 37
+
+instanceOfDataConKey :: Unique
+instanceOfDataConKey                    = mkPreludeDataConUnique 38
 
 {-
 ************************************************************************
