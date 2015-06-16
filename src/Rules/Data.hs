@@ -13,6 +13,41 @@ import Settings.GhcPkg
 import Settings.GhcCabal
 import Util
 
+-- Build package-data.mk by using GhcCabal to process pkgCabal file
+buildPackageData :: Environment -> Rules ()
+buildPackageData env =
+    let stage = getStage env
+        pkg   = getPackage env
+        dir   = pkgPath pkg </> targetDirectory stage pkg
+    in
+    (dir </>) <$>
+    [ "package-data.mk"
+    , "haddock-prologue.txt"
+    , "inplace-pkg-config"
+    , "setup-config"
+    , "build" </> "autogen" </> "cabal_macros.h"
+    -- TODO: Is this needed? Also check out Paths_cpsa.hs.
+    -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
+    ] &%> \_ -> do
+        let configure = pkgPath pkg </> "configure"
+            -- TODO: 1) how to automate this? 2) handle multiple files?
+            newEnv    = env { getFile = dir </> "package-data.mk" }
+        -- GhcCabal will run the configure script, so we depend on it
+        need [pkgPath pkg </> pkgCabal pkg]
+        -- We still don't know who built the configure script from configure.ac
+        when (doesFileExist $ configure <.> "ac") $ need [configure]
+        run' env GhcCabal
+        -- TODO: when (registerPackage settings) $
+        run' env (GhcPkg stage)
+        postProcessPackageData $ dir </> "package-data.mk"
+
+-- TODO: This should probably go to Oracles.Builder
+run' :: Environment -> Builder -> Action ()
+run' env builder = do
+    args <- interpret (env {getBuilder = builder}) $ fromDiff settings
+    putColoured Green (show args)
+    run builder args
+
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
 -- For example, get rid of
@@ -31,68 +66,3 @@ postProcessPackageData file = do
         processLine line = replaceSeparators '_' prefix ++ suffix
           where
             (prefix, suffix) = break (== '=') line
-
--- this is a positional argument, hence:
--- * if it is empty, we need to emit one empty string argument
--- * otherwise, we must collapse it into one space-separated string
-
--- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Environment -> Rules ()
-buildPackageData env =
-    let stage = getStage env
-        pkg   = getPackage env
-        dir   = pkgPath pkg </> targetDirectory stage pkg
-    in
-    (dir </>) <$>
-    [ "package-data.mk"
-    , "haddock-prologue.txt"
-    , "inplace-pkg-config"
-    , "setup-config"
-    , "build" </> "autogen" </> "cabal_macros.h"
-    -- TODO: Is this needed? Also check out Paths_cpsa.hs.
-    -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
-    ] &%> \_ -> do
-        let configure = pkgPath pkg </> "configure"
-        -- GhcCabal will run the configure script, so we depend on it
-        need [pkgPath pkg </> pkgCabal pkg]
-        -- We still don't know who built the configure script from configure.ac
-        when (doesFileExist $ configure <.> "ac") $ need [configure]
-        run' env GhcCabal
-        -- TODO: when (registerPackage settings) $
-        run' env (GhcPkg stage)
-        postProcessPackageData $ dir </> "package-data.mk"
-
-run' :: Environment -> Builder -> Action ()
-run' env builder = do
-    args <- interpret (env {getBuilder = builder}) $ fromDiff settings
-    putColoured Green (show args)
-    run builder args
-
---buildRule :: Package -> TodoItem -> Rules ()
---buildRule pkg @ (Package name path cabal _) todo @ (stage, dist, settings) =
---    let pathDist  = path </> dist
---        cabalPath = path </> cabal
---        configure = path </> "configure"
---    in
---    -- All these files are produced by a single run of GhcCabal
---    (pathDist </>) <$>
---    [ "package-data.mk"
---    , "haddock-prologue.txt"
---    , "inplace-pkg-config"
---    , "setup-config"
---    , "build" </> "autogen" </> "cabal_macros.h"
---    -- TODO: Is this needed? Also check out Paths_cpsa.hs.
---    -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
---    ] &%> \_ -> do
---        need [cabalPath]
---        when (doesFileExist $ configure <.> "ac") $ need [configure]
---        -- GhcCabal will run the configure script, so we depend on it
---        -- We still don't know who build the configure script from configure.ac
---        run GhcCabal $ cabalArgs pkg todo
---        when (registerPackage settings) $
---            run (GhcPkg stage) $ ghcPkgArgs pkg todo
---        postProcessPackageData $ pathDist </> "package-data.mk"
-
--- buildSettings = + builder Gcc ? ccSettings
-
--- builder Gcc ? "-tricky-flag"

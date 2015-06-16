@@ -24,7 +24,7 @@ data Environment = Environment
         getStage   :: Stage,
         getPackage :: Package,
         getBuilder :: Builder,
-        getFile    :: FilePath,
+        getFile    :: FilePath, -- TODO: handle multple files?
         getWay     :: Way
      }
 

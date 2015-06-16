@@ -83,6 +83,9 @@ bootPackageDbSettings = do
     sourcePath <- lift $ askConfig "ghc-source-path"
     arg $ "--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"
 
+-- this is a positional argument, hence:
+-- * if it is empty, we need to emit one empty string argument
+-- * otherwise, we must collapse it into one space-separated string
 dllSettings :: Settings
 dllSettings = arg ""
 
