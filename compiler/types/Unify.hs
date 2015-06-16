@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DeriveFunctor #-}
 
 module Unify (
         -- Matching of types:
@@ -29,7 +29,6 @@ import Kind
 import Type
 import TyCon
 import TypeRep
-import Util
 
 import Control.Monad (liftM, ap)
 #if __GLASGOW_HASKELL__ < 709
@@ -277,89 +276,22 @@ Suppose x::T (F a), where 'a' is in scope.  Then 'a' might be instantiated
 to 'Bool', in which case x::T Int, so
         ANSWER = NO (clearly)
 
-Suppose x::T X.  Then *in Haskell* it's impossible to construct a (non-bottom)
-value of type (T X) using T1.  But *in FC* it's quite possible.  The newtype
-gives a coercion
-        CoX :: X ~R Int
-So (T CoX)_R :: T X ~R T Int; hence (T1 `cast` sym (T CoX)) is a non-bottom value
-of type (T X) constructed with T1.  Hence
-        ANSWER = NO we can't prune the T1 branch (surprisingly)
-
-Furthermore, this can even happen; see Trac #1251.  GHC's newtype-deriving
-mechanism uses a cast, just as above, to move from one dictionary to another,
-in effect giving the programmer access to CoX.
-
-Finally, suppose x::T Y.  Then *even in FC* we can't construct a
-non-bottom value of type (T Y) using T1.  That's because we can get
-from Y to Char, but not to Int.
-
-
-Here's a related question.      data Eq a b where EQ :: Eq a a
-Consider
-        case x of { EQ -> ... }
-
-Suppose x::Eq Int Char.  Is the alternative dead?  Clearly yes.
-
-What about x::Eq Int a, in a context where we have evidence that a~Char.
-Then again the alternative is dead.
-
-
-                        Summary
-
-We are really doing a test for unsatisfiability of the type
-constraints implied by the match. And that is clearly, in general, a
-hard thing to do.
-
-However, since we are simply dropping dead code, a conservative test
-suffices.  There is a continuum of tests, ranging from easy to hard, that
-drop more and more dead code.
-
-For now we implement a very simple test: type variables match
-anything, type functions (incl newtypes) match anything, and only
-distinct data types fail to match.  We can elaborate later.
-
-NB: typesCantMatch is subtly different than the apartness checks
-elsewhere in this module. It reasons over *representational* equality
-(saying that a newtype is not distinct from its representation) whereas
-the checks in, say, tcUnifyTysFG are about *nominal* equality. tcUnifyTysFG
-also assumes that its inputs are type-family-free, whereas no such assumption
-is in play here.
+We see here that we want precisely the apartness check implemented within
+tcUnifyTysFG. So that's what we do! Two types cannot match if they are surely
+apart. Note that since we are simply dropping dead code, a conservative test
+suffices.
 -}
 
+-- | Given a list of pairs of types, are any two members of a pair surely
+-- apart, even after arbitrary type function evaluation and substitution?
 typesCantMatch :: [(Type,Type)] -> Bool
+-- See Note [Pruning dead case alternatives]
 typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
   where
     cant_match :: Type -> Type -> Bool
-    cant_match t1 t2
-        | Just t1' <- coreView t1 = cant_match t1' t2
-        | Just t2' <- coreView t2 = cant_match t1 t2'
-
-    cant_match (FunTy a1 r1) (FunTy a2 r2)
-        = cant_match a1 a2 || cant_match r1 r2
-
-    cant_match (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-        | isDistinctTyCon tc1 && isDistinctTyCon tc2
-        = tc1 /= tc2 || typesCantMatch (zipEqual "typesCantMatch" tys1 tys2)
-
-    cant_match (FunTy {}) (TyConApp tc _) = isDistinctTyCon tc
-    cant_match (TyConApp tc _) (FunTy {}) = isDistinctTyCon tc
-        -- tc can't be FunTyCon by invariant
-
-    cant_match (AppTy f1 a1) ty2
-        | Just (f2, a2) <- repSplitAppTy_maybe ty2
-        = cant_match f1 f2 || cant_match a1 a2
-    cant_match ty1 (AppTy f2 a2)
-        | Just (f1, a1) <- repSplitAppTy_maybe ty1
-        = cant_match f1 f2 || cant_match a1 a2
-
-    cant_match (LitTy x) (LitTy y) = x /= y
-
-    cant_match _ _ = False      -- Safe!
-
--- Things we could add;
---      foralls
---      look through newtypes
---      take account of tyvar bindings (EQ example above)
+    cant_match t1 t2 = case tcUnifyTysFG (const BindMe) [t1] [t2] of
+      SurelyApart -> True
+      _           -> False
 
 {-
 ************************************************************************
@@ -450,9 +382,9 @@ tcUnifyTy :: Type -> Type       -- All tyvars are bindable
           -> Maybe TvSubst      -- A regular one-shot (idempotent) substitution
 -- Simple unification of two types; all type variables are bindable
 tcUnifyTy ty1 ty2
-  = case initUM (const BindMe) (unify emptyTvSubstEnv ty1 ty2) of
-      Unifiable subst_env -> Just (niFixTvSubst subst_env)
-      _other              -> Nothing
+  = case initUM (const BindMe) (unify ty1 ty2) of
+      Unifiable subst -> Just subst
+      _other          -> Nothing
 
 -----------------
 tcUnifyTys :: (TyVar -> BindFlag)
@@ -473,17 +405,14 @@ data UnifyResultM a = Unifiable a        -- the subst that unifies the types
                                          -- it must be part of an most general unifier
                                          -- See Note [The substitution in MaybeApart]
                     | SurelyApart
+                    deriving Functor
 
 -- See Note [Fine-grained unification]
 tcUnifyTysFG :: (TyVar -> BindFlag)
              -> [Type] -> [Type]
              -> UnifyResult
 tcUnifyTysFG bind_fn tys1 tys2
-  = initUM bind_fn $
-    do { subst <- unifyList emptyTvSubstEnv tys1 tys2
-
-        -- Find the fixed point of the resulting non-idempotent substitution
-        ; return (niFixTvSubst subst) }
+  = initUM bind_fn (unify_tys tys1 tys2)
 
 {-
 ************************************************************************
@@ -564,81 +493,74 @@ niSubstTvSet subst tvs
 ************************************************************************
 -}
 
-unify :: TvSubstEnv     -- An existing substitution to extend
-      -> Type -> Type   -- Types to be unified, and witness of their equality
-      -> UM TvSubstEnv          -- Just the extended substitution,
-                                -- Nothing if unification failed
--- We do not require the incoming substitution to be idempotent,
--- nor guarantee that the outgoing one is.  That's fixed up by
--- the wrappers.
-
+unify :: Type -> Type -> UM ()
 -- Respects newtypes, PredTypes
 
 -- in unify, any NewTcApps/Preds should be taken at face value
-unify subst (TyVarTy tv1) ty2  = uVar subst tv1 ty2
-unify subst ty1 (TyVarTy tv2)  = uVar subst tv2 ty1
+unify (TyVarTy tv1) ty2  = uVar tv1 ty2
+unify ty1 (TyVarTy tv2)  = uVar tv2 ty1
 
-unify subst ty1 ty2 | Just ty1' <- tcView ty1 = unify subst ty1' ty2
-unify subst ty1 ty2 | Just ty2' <- tcView ty2 = unify subst ty1 ty2'
+unify ty1 ty2 | Just ty1' <- tcView ty1 = unify ty1' ty2
+unify ty1 ty2 | Just ty2' <- tcView ty2 = unify ty1 ty2'
 
-unify subst (TyConApp tyc1 tys1) (TyConApp tyc2 tys2)
-  | tyc1 == tyc2
-  = unify_tys subst tys1 tys2
-
-unify subst (FunTy ty1a ty1b) (FunTy ty2a ty2b)
-  = do  { subst' <- unify subst ty1a ty2a
-        ; unify subst' ty1b ty2b }
+unify ty1 ty2
+  | Just (tc1, tys1) <- splitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- splitTyConApp_maybe ty2
+  = if tc1 == tc2
+    then if isInjectiveTyCon tc1 Nominal
+         then unify_tys tys1 tys2
+         else don'tBeSoSure $ unify_tys tys1 tys2
+    else -- tc1 /= tc2
+         if isGenerativeTyCon tc1 Nominal && isGenerativeTyCon tc2 Nominal
+         then surelyApart
+         else maybeApart
 
         -- Applications need a bit of care!
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
         -- NB: we've already dealt with type variables and Notes,
         -- so if one type is an App the other one jolly well better be too
-unify subst (AppTy ty1a ty1b) ty2
+unify (AppTy ty1a ty1b) ty2
   | Just (ty2a, ty2b) <- repSplitAppTy_maybe ty2
-  = do  { subst' <- unify subst ty1a ty2a
-        ; unify subst' ty1b ty2b }
+  = do  { unify ty1a ty2a
+        ; unify ty1b ty2b }
 
-unify subst ty1 (AppTy ty2a ty2b)
+unify ty1 (AppTy ty2a ty2b)
   | Just (ty1a, ty1b) <- repSplitAppTy_maybe ty1
-  = do  { subst' <- unify subst ty1a ty2a
-        ; unify subst' ty1b ty2b }
+  = do  { unify ty1a ty2a
+        ; unify ty1b ty2b }
 
-unify subst (LitTy x) (LitTy y) | x == y = return subst
+unify (LitTy x) (LitTy y) | x == y = return ()
 
-unify _ _ _ = surelyApart
+unify _ _ = surelyApart
         -- ForAlls??
 
 ------------------------------
-unify_tys :: TvSubstEnv -> [Type] -> [Type] -> UM TvSubstEnv
-unify_tys subst xs ys = unifyList subst xs ys
-
-unifyList :: TvSubstEnv -> [Type] -> [Type] -> UM TvSubstEnv
-unifyList subst orig_xs orig_ys
-  = go subst orig_xs orig_ys
+unify_tys :: [Type] -> [Type] -> UM ()
+unify_tys orig_xs orig_ys
+  = go orig_xs orig_ys
   where
-    go subst []     []     = return subst
-    go subst (x:xs) (y:ys) = do { subst' <- unify subst x y
-                                ; go subst' xs ys }
-    go subst _ _ = maybeApart subst  -- See Note [Lists of different lengths are MaybeApart]
+    go []     []     = return ()
+    go (x:xs) (y:ys) = do { unify x y
+                          ; go xs ys }
+    go _ _ = maybeApart  -- See Note [Lists of different lengths are MaybeApart]
 
 ---------------------------------
-uVar :: TvSubstEnv      -- An existing substitution to extend
-     -> TyVar           -- Type variable to be unified
+uVar :: TyVar           -- Type variable to be unified
      -> Type            -- with this type
-     -> UM TvSubstEnv
+     -> UM ()
 
-uVar subst tv1 ty
- = -- Check to see whether tv1 is refined by the substitution
-   case (lookupVarEnv subst tv1) of
-     Just ty' -> unify subst ty' ty     -- Yes, call back into unify'
-     Nothing  -> uUnrefined subst       -- No, continue
-                            tv1 ty ty
+uVar tv1 ty
+ = do { subst <- umGetTvSubstEnv
+         -- Check to see whether tv1 is refined by the substitution
+      ; case (lookupVarEnv subst tv1) of
+          Just ty' -> unify ty' ty     -- Yes, call back into unify'
+          Nothing  -> uUnrefined subst tv1 ty ty }  -- No, continue
 
-uUnrefined :: TvSubstEnv          -- An existing substitution to extend
+uUnrefined :: TvSubstEnv          -- environment to extend (from the UM monad)
            -> TyVar               -- Type variable to be unified
            -> Type                -- with this type
            -> Type                -- (version w/ expanded synonyms)
-           -> UM TvSubstEnv
+           -> UM ()
 
 -- We know that tv1 isn't refined
 
@@ -651,7 +573,7 @@ uUnrefined subst tv1 ty2 ty2'
 
 uUnrefined subst tv1 ty2 (TyVarTy tv2)
   | tv1 == tv2          -- Same type variable
-  = return subst
+  = return ()
 
     -- Check to see whether tv2 is refined
   | Just ty' <- lookupVarEnv subst tv2
@@ -660,7 +582,7 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
   | otherwise
 
   = do {   -- So both are unrefined; unify the kinds
-       ; subst' <- unify subst (tyVarKind tv1) (tyVarKind tv2)
+       ; unify (tyVarKind tv1) (tyVarKind tv2)
 
            -- And then bind one or the other,
            -- depending on which is bindable
@@ -671,28 +593,28 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
        ; b2 <- tvBindFlag tv2
        ; let ty1 = TyVarTy tv1
        ; case (b1, b2) of
-           (Skolem, Skolem) -> maybeApart subst' -- See Note [Unification with skolems]
-           (BindMe, _)      -> return (extendVarEnv subst' tv1 ty2)
-           (_, BindMe)      -> return (extendVarEnv subst' tv2 ty1) }
+           (Skolem, Skolem) -> maybeApart -- See Note [Unification with skolems]
+           (BindMe, _)      -> extendSubst tv1 ty2
+           (_, BindMe)      -> extendSubst tv2 ty1 }
 
 uUnrefined subst tv1 ty2 ty2'   -- ty2 is not a type variable
   | tv1 `elemVarSet` niSubstTvSet subst (tyVarsOfType ty2')
-  = maybeApart subst                    -- Occurs check
+  = maybeApart                          -- Occurs check
                                         -- See Note [Fine-grained unification]
   | otherwise
-  = do { subst' <- unify subst k1 k2
+  = do { unify k1 k2
        -- Note [Kinds Containing Only Literals]
-       ; bindTv subst' tv1 ty2 }        -- Bind tyvar to the synonym if poss
+       ; bindTv tv1 ty2 }        -- Bind tyvar to the synonym if poss
   where
     k1 = tyVarKind tv1
     k2 = typeKind ty2'
 
-bindTv :: TvSubstEnv -> TyVar -> Type -> UM TvSubstEnv
-bindTv subst tv ty      -- ty is not a type variable
+bindTv :: TyVar -> Type -> UM ()
+bindTv tv ty      -- ty is not a type variable
   = do  { b <- tvBindFlag tv
         ; case b of
-            Skolem -> maybeApart subst -- See Note [Unification with skolems]
-            BindMe -> return $ extendVarEnv subst tv ty
+            Skolem -> maybeApart  -- See Note [Unification with skolems]
+            BindMe -> extendSubst tv ty
         }
 
 {-
@@ -718,7 +640,8 @@ data BindFlag
 -}
 
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
-                         -> UnifyResultM a }
+                         -> TvSubstEnv
+                         -> UnifyResultM (a, TvSubstEnv) }
 
 instance Functor UM where
       fmap = liftM
@@ -728,24 +651,39 @@ instance Applicative UM where
       (<*>) = ap
 
 instance Monad UM where
-  return a = UM (\_tvs -> Unifiable a)
-  fail _   = UM (\_tvs -> SurelyApart) -- failed pattern match
-  m >>= k  = UM (\tvs -> case unUM m tvs of
-                           Unifiable v -> unUM (k v) tvs
-                           MaybeApart v ->
-                             case unUM (k v) tvs of
-                               Unifiable v' -> MaybeApart v'
-                               other        -> other
+  return a = UM (\_tvs subst  -> Unifiable (a, subst))
+  fail _   = UM (\_tvs _subst -> SurelyApart) -- failed pattern match
+  m >>= k  = UM (\tvs  subst  -> case unUM m tvs subst of
+                           Unifiable (v, subst') -> unUM (k v) tvs subst'
+                           MaybeApart (v, subst') ->
+                             case unUM (k v) tvs subst' of
+                               Unifiable (v', subst'') -> MaybeApart (v', subst'')
+                               other                   -> other
                            SurelyApart -> SurelyApart)
 
-initUM :: (TyVar -> BindFlag) -> UM a -> UnifyResultM a
-initUM badtvs um = unUM um badtvs
+-- returns an idempotent substitution
+initUM :: (TyVar -> BindFlag) -> UM () -> UnifyResult
+initUM badtvs um = fmap (niFixTvSubst . snd) $ unUM um badtvs emptyTvSubstEnv
 
 tvBindFlag :: TyVar -> UM BindFlag
-tvBindFlag tv = UM (\tv_fn -> Unifiable (tv_fn tv))
+tvBindFlag tv = UM (\tv_fn subst -> Unifiable (tv_fn tv, subst))
 
-maybeApart :: TvSubstEnv -> UM TvSubstEnv
-maybeApart subst = UM (\_tv_fn -> MaybeApart subst)
+-- | Extend the TvSubstEnv in the UM monad
+extendSubst :: TyVar -> Type -> UM ()
+extendSubst tv ty = UM (\_tv_fn subst -> Unifiable ((), extendVarEnv subst tv ty))
+
+-- | Retrive the TvSubstEnv from the UM monad
+umGetTvSubstEnv :: UM TvSubstEnv
+umGetTvSubstEnv = UM $ \_tv_fn subst -> Unifiable (subst, subst)
+
+-- | Converts any SurelyApart to a MaybeApart
+don'tBeSoSure :: UM () -> UM ()
+don'tBeSoSure um = UM $ \tv_fn subst -> case unUM um tv_fn subst of
+  SurelyApart -> MaybeApart ((), subst)
+  other       -> other
+
+maybeApart :: UM ()
+maybeApart = UM (\_tv_fn subst -> MaybeApart ((), subst))
 
 surelyApart :: UM a
-surelyApart = UM (\_tv_fn -> SurelyApart)
+surelyApart = UM (\_tv_fn _subst -> SurelyApart)
