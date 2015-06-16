@@ -455,30 +455,12 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
        ; stopWith ev "Equal LitTy" }
 
 -- Decomposable type constructor applications
--- Synonyms and type functions (which are not decomposable)
--- have already been dealt with
-can_eq_nc' _flat _rdr_env _envs ev eq_rel
-          (TyConApp tc1 tys1) _ (TyConApp tc2 tys2) _
-  | mightBeUnsaturatedTyCon tc1
-  , mightBeUnsaturatedTyCon tc2
+can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
+  | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
+  , not (isTypeFamilyTyCon tc1)
+  , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
-
-can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           (TyConApp tc1 _) ps_ty1 (FunTy {}) ps_ty2
-  | mightBeUnsaturatedTyCon tc1
-      -- The guard is important
-      -- e.g.  (x -> y) ~ (F x y) where F has arity 1
-      --       should not fail, but get the app/app case
-  = canEqHardFailure ev eq_rel ps_ty1 ps_ty2
-
-can_eq_nc' _flat _rdr_env _envs ev eq_rel (FunTy s1 t1) _ (FunTy s2 t2) _
-  = do { canDecomposableTyConAppOK ev eq_rel funTyCon [s1,t1] [s2,t2]
-       ; stopWith ev "Decomposed FunTyCon" }
-
-can_eq_nc' _flat _rdr_env _envs ev eq_rel
-          (FunTy {}) ps_ty1 (TyConApp tc2 _) ps_ty2
-  | mightBeUnsaturatedTyCon tc2
-  = canEqHardFailure ev eq_rel ps_ty1 ps_ty2
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
            s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
