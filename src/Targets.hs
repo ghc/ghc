@@ -88,7 +88,7 @@ customPackageSettings = mconcat
     [ package integerLibrary ?
       mconcat [ windowsHost ? builder GhcCabal ?
                 arg "--configure-option=--with-intree-gmp"
-              , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
+              , ccArgs ["-Ilibraries/integer-gmp2/gmp"] ]
 
     , package base ?
       builder GhcCabal ? arg ("--flags=" ++ integerLibraryName)

@@ -4,7 +4,7 @@ module Settings.Util (
     -- Primitive settings elements
     arg, argM, args,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
-    appendCcArgs,
+    ccArgs,
     -- argBuilderPath, argStagedBuilderPath,
     -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     -- argIncludeDirs, argDepIncludeDirs,
@@ -48,8 +48,8 @@ argStagedConfigList key = do
     argConfigList (stagedKey stage key)
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
-appendCcArgs :: [String] -> Settings
-appendCcArgs args = do
+ccArgs :: [String] -> Settings
+ccArgs args = do
     stage <- asks getStage
     mconcat [ builder (Gcc stage) ? append args
             , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" args

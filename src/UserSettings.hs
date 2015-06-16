@@ -38,7 +38,7 @@ userSettings' = mconcat
     [ package base           ?
       builder GhcCabal       ? arg ("--flags=" ++ integerLibraryName)
 
-    , package integerLibrary ? appendCcArgs ["-Ilibraries/integer-gmp2/gmp"]
+    , package integerLibrary ? ccArgs ["-Ilibraries/integer-gmp2/gmp"]
 
     , windowsHost            ?
       package integerLibrary ?
