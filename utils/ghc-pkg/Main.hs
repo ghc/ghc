@@ -1077,10 +1077,15 @@ updateDBCache verbosity db = do
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
-#ifndef mingw32_HOST_OS
-  status <- getFileStatus filename
-  setFileTimes (location db) (accessTime status) (modificationTime status)
-#endif
+  -- See Note [writeAtomic leaky abstraction]
+  -- Cross-platform "touch". This only works if filename is not empty, and not
+  -- open for writing already.
+  -- TODO. When the Win32 or directory packages have either a touchFile or a
+  -- setModificationTime function, use one of those.
+  withBinaryFile filename ReadWriteMode $ \handle -> do
+      c <- hGetChar handle
+      hSeek handle AbsoluteSeek 0
+      hPutChar handle c
 
 type PackageCacheFormat = GhcPkg.InstalledPackageInfo
                             String     -- installed package id
@@ -2045,3 +2050,38 @@ removeFileSafe fn =
 -- absolute path.
 absolutePath :: FilePath -> IO FilePath
 absolutePath path = return . normalise . (</> path) =<< getCurrentDirectory
+
+
+{- Note [writeAtomic leaky abstraction]
+GhcPkg.writePackageDb calls writeAtomic, which first writes to a temp file,
+and then moves the tempfile to its final destination. This all happens in the
+same directory (package.conf.d).
+Moving a file doesn't change its modification time, but it *does* change the
+modification time of the directory it is placed in. Since we compare the
+modification time of the cache file to that of the directory it is in to
+decide whether the cache is out-of-date, it will be instantly out-of-date
+after creation, if the renaming takes longer than the smallest time difference
+that the getModificationTime can measure.
+
+The solution we opt for is a "touch" of the cache file right after it is
+created. This resets the modification time of the cache file and the directory
+to the current time.
+
+Other possible solutions:
+  * backdate the modification time of the directory to the modification time
+    of the cachefile. This is what we used to do on posix platforms. An
+    observer of the directory would see the modification time of the directory
+    jump back in time. Not nice, although in practice probably not a problem.
+    Also note that a cross-platform implementation of setModificationTime is
+    currently not available.
+  * set the modification time of the cache file to the modification time of
+    the directory (instead of the curent time). This could also work,
+    given that we are the only ones writing to this directory. It would also
+    require a high-precision getModificationTime (lower precision times get
+    rounded down it seems), or the cache would still be out-of-date.
+  * change writeAtomic to create the tempfile outside of the target file's
+    directory.
+  * create the cachefile outside of the package.conf.d directory in the first
+    place. But there are tests and there might be tools that currently rely on
+    the package.conf.d/package.cache format.
+-}
