@@ -1,0 +1,83 @@
+Shaking up GHC (3rd shake) meeting, 16 June 2015
+
+Things to discuss:
+================================================
+
+1. Parameters of the build system that are still not user configurable:
+
+* targetDirectory (Targets.hs) -- is this important? Can be moved to
+UserSettings.hs, but will clutter it (what is the good balance of
+what we expose to users?). Can be made into a conditional expression
+similar to userWays, userPackages and userSettings, but is it worth it?
+
+* knownPackages (Targets.hs) -- fix by adding knownUserPackages? A nasty
+import cycle is then created between Targets.hs and UserSettings.hs
+
+* integerLibraryImpl (Switches.hs) -- fix by having three integer library
+packages in Targets.hs and choosing which one to build in userPackages, e.g.:
+
+userPackages = remove [integerGmp2] <> append [integerSimple]
+
+* In general, should Targets.hs be editable by users as well? Ideally,
+there should only be one place for user to look: UserSettings.hs.
+
+* Any other parameters I missed which should be user configurable?
+
+================================================
+
+2. When predicates are moved from configuration files to UserSettings we
+no longer track their state in oracles. This may lead to inconsistent
+state of the build system. A more general problem: how do we accurately
+track changes in the build systems, specifically in UserSettings.hs?
+
+================================================
+
+3. Discuss if the current design makes recording provenance information
+possible. (Should probably be implemented only after the first successful
+complete build though.)
+
+==============================================
+
+4. I'd like interpret/interpretDiff to be total functions. It should be
+possible to check at compile which questions a given environment can
+answer and raise an error if an expression needs to know more.
+
+For example, consider an environment envS that can only answer 'getStage'
+question, and environment envSP that can answer questions 'getStage' and
+'getPackage'. Now consider two expressions
+
+exprS = stage0 ? foo
+
+exprSP = stage0 ? package base ? bar
+
+Now I'd like the following to produce a compile error:
+
+interpret envS exprSP
+
+However, all other combinations should be fine:
+
+interpret envS  exprS
+interpret envSP exprS
+interpret envSP exprSP
+
+I played with some possible solutions using type classes, but they all
+seem clumsy/heavy.
+
+Hence, for now I have:
+
+data Environment = Environment
+     {
+        getStage   :: Stage,
+        getBuilder :: Builder,
+        getPackage :: Package
+     }
+
+defaultEnvironment :: Environment
+defaultEnvironment = Environment
+    {
+        getStage   = error "Stage not set in the environment",
+        getBuilder = error "Builder not set in the environment",
+        getPackage = error "Package not set in the environment"
+    } 
+
+which leads to a lot of partial functions all over the build system.
