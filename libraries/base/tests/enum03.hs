@@ -1,5 +1,9 @@
 -- !!! Testing the Word Enum instances.
-{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -F -pgmF ./enum_processor.py #-}
+-- The processor is a non-CPP-based equivalent of
+-- #define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
+-- which is not portable to clang
+
 module Main(main) where
 
 import Control.Exception
@@ -17,7 +21,6 @@ main = do
   testEnumWord64
 
 
-#define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 
 testEnumWord8 :: IO ()
 testEnumWord8 = do
