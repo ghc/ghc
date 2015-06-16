@@ -2,6 +2,7 @@ module Targets (
     targetDirectory,
     knownPackages,
     customPackageSettings,
+    integerLibraryName,
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc,
     integerLibrary, parallel, pretty, primitive, process, stm, templateHaskell,

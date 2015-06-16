@@ -11,7 +11,9 @@ what we expose to users?). Can be made into a conditional expression
 similar to userWays, userPackages and userSettings, but is it worth it?
 
 * knownPackages (Targets.hs) -- fix by adding knownUserPackages? A nasty
-import cycle is then created between Targets.hs and UserSettings.hs
+import cycle is then created between Targets.hs and UserSettings.hs. Possible
+solution: add file Settings/Targets.hs which will actually put two things
+together similar to what's done with userWays, userPackages and userSettings.
 
 * integerLibraryImpl (Switches.hs) -- fix by having three integer library
 packages in Targets.hs and choosing which one to build in userPackages, e.g.:
@@ -25,10 +27,15 @@ there should only be one place for user to look: UserSettings.hs.
 
 ================================================
 
-2. When predicates are moved from configuration files to UserSettings we
-no longer track their state in oracles. This may lead to inconsistent
-state of the build system. A more general problem: how do we accurately
-track changes in the build systems, specifically in UserSettings.hs?
+2. When predicates (e.g. buildHaddock) are moved from configuration files to
+UserSettings we no longer track their state in oracles. This may lead to an
+inconsistent state of the build system. This is a special case of a more general
+problem: how do we accurately track changes in the build system, specifically
+in UserSettings.hs? Although in general this is a hard problem, this special
+case may be easier to solve: just channel everything exported from
+UserSettings.hs through oracles? Another alternative which was discussed
+previously: pass the final lists of arguments through oracles. Care must
+be taken though as final command lines can be as large as 5Mb!
 
 ================================================
 
@@ -40,15 +47,15 @@ complete build though.)
 
 4. I'd like interpret/interpretDiff to be total functions. It should be
 possible to check at compile which questions a given environment can
-answer and raise an error if an expression needs to know more.
+answer and raise a *compile* error if the expression needs to know more.
 
 For example, consider an environment envS that can only answer 'getStage'
 question, and environment envSP that can answer questions 'getStage' and
 'getPackage'. Now consider two expressions
 
-exprS = stage0 ? foo
+exprS = stage0 ? arg "foo"
 
-exprSP = stage0 ? package base ? bar
+exprSP = stage0 ? package base ? arg "bar"
 
 Now I'd like the following to produce a compile error:
 
@@ -61,23 +68,41 @@ interpret envSP exprS
 interpret envSP exprSP
 
 I played with some possible solutions using type classes, but they all
-seem clumsy/heavy.
+seem clumsy/heavy, e.g. carrying (GetStage env, GetPackage env) constraints
+with any expression similar to exprSP.
 
-Hence, for now I have:
+Right now I have:
 
 data Environment = Environment
      {
         getStage   :: Stage,
+        getPackage :: Package,
         getBuilder :: Builder,
-        getPackage :: Package
+        getFile    :: FilePath,
+        getWay     :: Way
      }
 
 defaultEnvironment :: Environment
 defaultEnvironment = Environment
     {
         getStage   = error "Stage not set in the environment",
+        getPackage = error "Package not set in the environment",
         getBuilder = error "Builder not set in the environment",
-        getPackage = error "Package not set in the environment"
-    } 
+        getFile    = error "File not set in the environment",
+        getWay     = error "Way not set in the environment"
+    }
 
-which leads to a lot of partial functions all over the build system.
+which is annoying and leads to many partial functions all over the build
+system. Haskell should be above that!
+
+Any ideas? Having
+
+(GetStage env, GetPackage env, GetBuilder env, ...) => DiffExpr env
+
+all over the build system seems unsatisfactory.
+
+Note, environment is (always?) built in the following order: getStage,
+getPackage, getBuilder, getFile, getWay. Hence, it may be OK to have only
+6 combinations of getters in a type constraint, not 2^5, e.g.: empty,
+GetStage env, (GetStage env, GetPackage env), etc.
+

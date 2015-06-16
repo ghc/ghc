@@ -8,7 +8,7 @@ module Expression (
     Environment (..), defaultEnvironment,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
-    applyPredicate, (?), (??), stage, builder, package,
+    applyPredicate, (?), (??), stage, package, builder, file, way,
     configKeyValue, configKeyValues
     ) where
 
@@ -22,9 +22,10 @@ import Control.Monad.Reader
 data Environment = Environment
      {
         getStage   :: Stage,
+        getPackage :: Package,
         getBuilder :: Builder,
-        getPackage :: Package
-        -- getWay  :: Way, and maybe something else will be useful later
+        getFile    :: FilePath,
+        getWay     :: Way
      }
 
 -- TODO: all readers are currently partial functions. Can use type classes to
@@ -33,8 +34,10 @@ defaultEnvironment :: Environment
 defaultEnvironment = Environment
     {
         getStage   = error "Stage not set in the environment",
+        getPackage = error "Package not set in the environment",
         getBuilder = error "Builder not set in the environment",
-        getPackage = error "Package not set in the environment"
+        getFile    = error "File not set in the environment",
+        getWay     = error "Way not set in the environment"
     }
 
 type Expr a = ReaderT Environment Action a
@@ -128,11 +131,17 @@ p ?? (t, f) = p ? t <> (liftM not p) ? f
 stage :: Stage -> Predicate
 stage s = liftM (s ==) (asks getStage)
 
+package :: Package -> Predicate
+package p = liftM (p ==) (asks getPackage)
+
 builder :: Builder -> Predicate
 builder b = liftM (b ==) (asks getBuilder)
 
-package :: Package -> Predicate
-package p = liftM (p ==) (asks getPackage)
+file :: FilePattern -> Predicate
+file f = liftM (f ?==) (asks getFile)
+
+way :: Way -> Predicate
+way w = liftM (w ==) (asks getWay)
 
 configKeyValue :: String -> String -> Predicate
 configKeyValue key value = liftM (value ==) (lift $ askConfig key)

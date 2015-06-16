@@ -1,6 +1,5 @@
 module UserSettings (
     userSettings, userPackages, userWays,
-
     buildHaddock, validating
     ) where
 
@@ -36,9 +35,24 @@ validating = return False
 -- Examples:
 userSettings' :: Settings
 userSettings' = mconcat
-    [ package compiler     ? stage0 ? arg "foo"
-    , builder (Ghc Stage0) ? remove ["-O2"]
-    , builder GhcCabal     ? removeSub "--configure-option=CFLAGS" ["-Werror"] ]
+    [ package base           ?
+      builder GhcCabal       ? arg ("--flags=" ++ integerLibraryName)
+
+    , package integerLibrary ? appendCcArgs ["-Ilibraries/integer-gmp2/gmp"]
+
+    , windowsHost            ?
+      package integerLibrary ?
+      builder GhcCabal       ? arg "--configure-option=--with-intree-gmp"
+
+    , package compiler       ?
+      stage0                 ?
+      way profiling          ?
+      file "pattern.*"       ? args ["foo", "bar"]
+
+    , builder (Ghc Stage0)   ? remove ["-O2"]
+
+    , builder GhcCabal       ? removeSub "--configure-option=CFLAGS" ["-Werror"]
+    ]
 
 userPackages' :: Packages
 userPackages' = mconcat
