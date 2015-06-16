@@ -13,45 +13,76 @@ similar to userWays, userPackages and userSettings, but is it worth it?
 * knownPackages (Targets.hs) -- fix by adding knownUserPackages? A nasty
 import cycle is then created between Targets.hs and UserSettings.hs. Possible
 solution: add file Settings/Targets.hs which will actually put two things
-together similar to what's done with userWays, userPackages and userSettings.
+together similar to how it's done with userWays, userPackages and userSettings.
 
 * integerLibraryImpl (Switches.hs) -- fix by having three integer library
 packages in Targets.hs and choosing which one to build in userPackages, e.g.:
 
 userPackages = remove [integerGmp2] <> append [integerSimple]
 
-* In general, should Targets.hs be editable by users as well? Ideally,
-there should only be one place for user to look: UserSettings.hs.
+(Maybe a useful pattern: replace a b = remove a <> append b.)
+
+* In general, should Targets.hs (or any other file) be editable by users?
+Ideally, there should only be one place for users to look: UserSettings.hs.
 
 * Any other parameters I missed which should be user configurable?
 
 ================================================
 
 2. When predicates (e.g. buildHaddock) are moved from configuration files to
-UserSettings we no longer track their state in oracles. This may lead to an
+UserSettings.hs we no longer track their state in oracles. This may lead to an
 inconsistent state of the build system. This is a special case of a more general
 problem: how do we accurately track changes in the build system, specifically
 in UserSettings.hs? Although in general this is a hard problem, this special
-case may be easier to solve: just channel everything exported from
+case may be easier to solve: e.g., just channel everything exported from
 UserSettings.hs through oracles? Another alternative which was discussed
 previously: pass the final lists of arguments through oracles. Care must
-be taken though as final command lines can be as large as 5Mb!
+be taken though as final command lines can be as large as 5Mb and may bloat
+the Shake database!
 
 ================================================
 
-3. Discuss if the current design makes recording provenance information
+3. Discuss if/how the current approach makes recording provenance information
 possible. (Should probably be implemented only after the first successful
 complete build though.)
 
 ==============================================
 
-4. I'd like interpret/interpretDiff to be total functions. It should be
+4. Duplication of information in knownPackages and packages.
+
+I'd like to enforce the following invariant: whenever a package is used
+in userPackages, it must also be placed in knownPackages/knownUserPackages.
+
+This feels awkward/redundant. The reason for having knownPackages is that I
+need a list of packages outside the Action monad for it to be useable in
+packageRules (see Rules.hs). The current solution seems to be the cheapest way
+to achieve that. An alternative would be to have one additional implementation
+of interpret, which would extract the 'support' from a given expression, i.e.
+the set of packages that can occur in a given expression, regardless of how
+predicates evaluate (without looking up oracles which live in the Action monad).
+
+For example,
+
+interpret' (stage0 ? base <> stage1 ? compiler) == [base, compiler]
+
+This seems to require a lot of extra code though. Hence redundant knownPackages.
+
+==============================================
+
+5. (Just realised that the following is trickier than I thought. Maybe not
+worth raising at this meeting if not enough time.)
+
+I'd like interpret/interpretDiff to be total functions. It should be
 possible to check at compile which questions a given environment can
-answer and raise a *compile* error if the expression needs to know more.
+answer and raise a *compile* error if the expression needs to know more. Why
+is this useful? For example, I'd like to allow only getStage and
+platform-specific predicates in userPackages (since nothing else is known at
+this point; one can argue that we should even forbid to use such predicates
+when constructing expressions of type Packages).
 
 For example, consider an environment envS that can only answer 'getStage'
 question, and environment envSP that can answer questions 'getStage' and
-'getPackage'. Now consider two expressions
+'getPackage'. Now consider two expressions:
 
 exprS = stage0 ? arg "foo"
 
@@ -105,4 +136,7 @@ Note, environment is (always?) built in the following order: getStage,
 getPackage, getBuilder, getFile, getWay. Hence, it may be OK to have only
 6 combinations of getters in a type constraint, not 2^5, e.g.: empty,
 GetStage env, (GetStage env, GetPackage env), etc.
+
+==============================================
+
 
