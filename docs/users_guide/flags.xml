@@ -94,7 +94,7 @@
         <tbody>
           <row>
             <entry><option>--help</option>,<option>-?</option></entry>
-            <entry>Disply help</entry>
+            <entry>Display help</entry>
             <entry>mode</entry>
             <entry>-</entry>
           </row>
@@ -1984,7 +1984,7 @@
           <row>
             <entry><option>-fliberate-case-threshold</option>=<replaceable>n</replaceable></entry>
             <entry>Set the size threshold for the liberate-case transformation to <replaceable>n</replaceable> (default: 2000)</entry>
-            <entry>dynamis</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-liberate-case-threshold</option></entry>
           </row>
 
@@ -2013,7 +2013,7 @@
             <entry>
             <option>-fmax-inline-memcpy-insns</option>=<replaceable>n</replaceable>
             </entry>
-            <entry>Inline memcpy calls if they would generate no more
+            <entry>Inline <literal>memcpy</literal> calls if they would generate no more
             than <replaceable>n</replaceable> pseudo instructions
             (default: 32).
             </entry>
@@ -2025,7 +2025,7 @@
             <entry>
             <option>-fmax-inline-memset-insns</option>=<replaceable>n</replaceable>
             </entry>
-            <entry>Inline memset calls if they would generate no more
+            <entry>Inline <literal>memset</literal> calls if they would generate no more
             than <replaceable>n</replaceable> pseudo instructions
             (default: 32).
             </entry>
@@ -3406,5 +3406,6 @@ Misc:
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

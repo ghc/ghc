@@ -105,7 +105,7 @@
     </variablelist>
   </sect1>
 
-  <sect1 id="wrong-compilee">
+  <sect1 id="wrong-compile">
     <title>When your program &ldquo;does the wrong thing&rdquo;</title>
 
     <indexterm><primary>problems running your program</primary></indexterm>
@@ -208,5 +208,6 @@
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

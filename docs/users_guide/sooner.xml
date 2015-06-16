@@ -58,7 +58,7 @@ should go here!</para>
           <emphasis>real memory</emphasis> on your machine, and the
           machine starts &ldquo;thrashing,&rdquo; <emphasis>the party
           is over</emphasis>.  Compile times will be worse than
-          terrible!  Use something like the csh-builtin
+          terrible!  Use something like the csh builtin
           <command>time</command> command to get a report on how many
           page faults you're getting.</para>
 
@@ -544,5 +544,6 @@ be required).
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->
