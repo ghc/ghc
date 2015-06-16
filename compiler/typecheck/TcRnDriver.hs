@@ -996,7 +996,7 @@ checkBootTyCon tc1 tc2
                  quotes (text "representational") <+> text "in boot files.")
 
     eqAlgRhs tc (AbstractTyCon dis1) rhs2
-      | dis1      = check (isDistinctAlgRhs rhs2)   --Check compatibility
+      | dis1      = check (isGenInjAlgRhs rhs2)   --Check compatibility
                           (text "The natures of the declarations for" <+>
                            quotes (ppr tc) <+> text "are different")
       | otherwise = checkSuccess

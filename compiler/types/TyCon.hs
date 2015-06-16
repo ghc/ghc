@@ -49,7 +49,7 @@ module TyCon(
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
-        isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isDistinctAlgRhs,
+        isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
         isImplicitTyCon,
@@ -1165,7 +1165,7 @@ isAbstractTyCon _ = False
 -- algebraic
 makeTyConAbstract :: TyCon -> TyCon
 makeTyConAbstract tc@(AlgTyCon { algTcRhs = rhs })
-  = tc { algTcRhs = AbstractTyCon (isDistinctAlgRhs rhs) }
+  = tc { algTcRhs = AbstractTyCon (isGenInjAlgRhs rhs) }
 makeTyConAbstract tc = pprPanic "makeTyConAbstract" (ppr tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
@@ -1214,12 +1214,13 @@ isDataTyCon _ = False
 -- (where X is the role passed in):
 --   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
 -- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
+-- See also Note [Decomposing equalities] in TcCanonical
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon _                             Phantom          = False
 isInjectiveTyCon (FunTyCon {})                 _                = True
 isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
 isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
-  = isDistinctAlgRhs rhs
+  = isGenInjAlgRhs rhs
 isInjectiveTyCon (SynonymTyCon {})             _                = False
 isInjectiveTyCon (FamilyTyCon {})              _                = False
 isInjectiveTyCon (PrimTyCon {})                _                = True
@@ -1230,6 +1231,7 @@ isInjectiveTyCon (PromotedTyCon {ty_con = tc}) r
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
 --   If (T tys ~X t), then (t's head ~X T).
+-- See also Note [Decomposing equalities] in TcCanonical
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon = isInjectiveTyCon
   -- as it happens, generativity and injectivity coincide, but there's
@@ -1237,12 +1239,12 @@ isGenerativeTyCon = isInjectiveTyCon
 
 -- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective
 -- with respect to representational equality?
-isDistinctAlgRhs :: AlgTyConRhs -> Bool
-isDistinctAlgRhs (TupleTyCon {})          = True
-isDistinctAlgRhs (DataTyCon {})           = True
-isDistinctAlgRhs (DataFamilyTyCon {})     = False
-isDistinctAlgRhs (AbstractTyCon distinct) = distinct
-isDistinctAlgRhs (NewTyCon {})            = False
+isGenInjAlgRhs :: AlgTyConRhs -> Bool
+isGenInjAlgRhs (TupleTyCon {})          = True
+isGenInjAlgRhs (DataTyCon {})           = True
+isGenInjAlgRhs (DataFamilyTyCon {})     = False
+isGenInjAlgRhs (AbstractTyCon distinct) = distinct
+isGenInjAlgRhs (NewTyCon {})            = False
 
 -- | Is this 'TyCon' that for a @newtype@
 isNewTyCon :: TyCon -> Bool
@@ -1332,6 +1334,8 @@ isTypeSynonymTyCon _                 = False
 mightBeUnsaturatedTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
 --   I.e. is it injective and generative w.r.t nominal equality?
+--   That is, if (T a b) ~N d e f, is it always the case that
+--            (T ~N d), (a ~N e) and (b ~N f)?
 -- Specifically NOT true of synonyms (open and otherwise)
 --
 -- It'd be unusual to call mightBeUnsaturatedTyCon on a regular H98

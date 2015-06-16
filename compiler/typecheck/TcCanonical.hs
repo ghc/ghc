@@ -720,7 +720,9 @@ NthCo on representational coercions over newtypes. NthCo comes into play
 only when decomposing givens. So we avoid decomposing representational given
 equalities over newtypes.
 
-But is it ever sensible to decompose *Wanted* constraints over newtypes? Yes, as
+But is it ever sensible to decompose *Wanted* constraints over newtypes? Yes --
+it's the only way we could ever prove (IO Int ~R IO Age), recalling that IO
+is a newtype. However, we must decompose wanteds only as
 long as there are no Givens that might (later) influence Coercible solving.
 (See Note [Instance and Given overlap] in TcInteract.) By the time we reach
 canDecomposableTyConApp, we know that any newtypes that can be unwrapped have
@@ -743,6 +745,20 @@ evidence that (Nt Int ~R Nt Char), even if we can't form that evidence in this
 module (because Mk is not in scope). Creating this scenario in source Haskell
 is challenging; there is no test case.
 
+Example of how decomposing a wanted newtype is wrong, if it's not the only
+possibility:
+
+  newtype Nt a = MkNt (Id a)
+  type family Id a where Id a = a
+
+  [W] Nt Int ~R Nt Age
+
+Because of its use of a type family, Nt's parameter will get inferred to have
+a nominal role. Thus, decomposing the wanted will yield [W] Int ~N Age, which
+is unsatisfiable. Unwrapping, though, leads to a solution.
+
+In summary, decomposing a wanted is always sound, but it might not be complete.
+So we do it when it's the only possible way forward.
 
 Note [Decomposing equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -814,7 +830,8 @@ implementation is indeed merged.)
 {2}: See Note [Decomposing newtypes]
 
 {3}: Because of the possibility of newtype instances, we must treat data families
-like newtypes. See also Note [Decomposing newtypes].
+like newtypes. See also Note [Decomposing newtypes]. See #10534 and test case
+typecheck/should_fail/T10534.
 
 {4}: Because type variables can stand in for newtypes, we conservatively do not
 decompose AppTys over representational equality.
