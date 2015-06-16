@@ -2229,6 +2229,9 @@ srcParseErr dflags buf len
                         (text "Perhaps you intended to use TemplateHaskell")
               $$ ppWhen (token == "<-")
                         (text "Perhaps this statement should be within a 'do' block?")
+              $$ ppWhen (token == "=")
+                        (text "Perhaps you need a 'let' in a 'do' block?"
+                         $$ text "e.g. 'let x = 5' instead of 'x = 5'")
   where token = lexemeToString (offsetBytes (-len) buf) len
         th_enabled = xopt Opt_TemplateHaskell dflags
 
