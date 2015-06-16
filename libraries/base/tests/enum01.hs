@@ -1,5 +1,9 @@
 -- !!! Testing the Prelude's Enum instances.
-{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -F -pgmF ./enum_processor.py #-}
+-- The processor is a non-CPP-based equivalent of
+-- #define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
+-- which is not portable to clang
+
 module Main(main) where
 
 import Control.Exception
@@ -82,7 +86,6 @@ main = do
   OK - on with the regression testing.
 -}
 
-#define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 
 
 testEnumInt :: IO ()
