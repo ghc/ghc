@@ -271,16 +271,12 @@ void hs_thread_done(void);
 
       <para>When GHC compiles a module (say <filename>M.hs</filename>)
       which uses <literal>foreign export</literal> or
-      <literal>foreign import "wrapper"</literal>, it generates two
-      additional files, <filename>M_stub.c</filename> and
-      <filename>M_stub.h</filename>.  GHC will automatically compile
-      <filename>M_stub.c</filename> to generate
-      <filename>M_stub.o</filename> at the same time.</para>
+      <literal>foreign import "wrapper"</literal>, it generates
+      a <filename>M_stub.h</filename> for use by C programs.</para>
 
       <para>For a plain <literal>foreign export</literal>, the file
       <filename>M_stub.h</filename> contains a C prototype for the
-      foreign exported function, and <filename>M_stub.c</filename>
-      contains its definition.  For example, if we compile the
+      foreign exported function.  For example, if we compile the
       following module:</para>
 
 <programlisting>
@@ -302,22 +298,13 @@ f n = n:(f (n-1))</programlisting>
 #include "HsFFI.h"
 extern HsInt foo(HsInt a0);</programlisting>
 
-      <para>and <filename>Foo_stub.c</filename> contains the
-      compiler-generated definition of <literal>foo()</literal>.  To
-      invoke <literal>foo()</literal> from C, just <literal>#include
+      <para>To invoke <literal>foo()</literal> from C, just <literal>#include
       "Foo_stub.h"</literal> and call <literal>foo()</literal>.</para>
 
-      <para>The <filename>foo_stub.c</filename> and
-       <filename>foo_stub.h</filename> files can be redirected using the
+      <para>The
+       <filename>Foo_stub.h</filename> file can be redirected using the
        <option>-stubdir</option> option; see <xref linkend="options-output"
          />.</para>
-
-      <para>When linking the program, remember to include
-        <filename>M_stub.o</filename> in the final link command line, or
-        you'll get link errors for the missing function(s) (this isn't
-        necessary when building your program with <literal>ghc
-        --make</literal>, as GHC will automatically link in the
-        correct bits).</para>
 
       <sect3 id="using-own-main">
        <title>Using your own <literal>main()</literal></title>
@@ -338,7 +325,7 @@ extern HsInt foo(HsInt a0);</programlisting>
 #include "HsFFI.h"
 
 #ifdef __GLASGOW_HASKELL__
-#include "foo_stub.h"
+#include "Foo_stub.h"
 #endif
 
 int main(int argc, char *argv[])
@@ -411,7 +398,7 @@ int main(int argc, char *argv[])
 #include "HsFFI.h"
 
 #ifdef __GLASGOW_HASKELL__
-#include "foo_stub.h"
+#include "Foo_stub.h"
 #include "Rts.h"
 #endif
 
