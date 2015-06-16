@@ -679,7 +679,7 @@ Here is one case:
   data family DF a
   newtype instance DF Bool = MkDF Int
 
-Suppose we are canonicalising (Int ~R DF (T a)), where we don't yet
+Suppose we are canonicalising (Int ~R DF (TF a)), where we don't yet
 know `a`. This is *not* a hard failure, because we might soon learn
 that `a` is, in fact, Char, and then the equality succeeds.
 
