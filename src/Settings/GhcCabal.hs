@@ -105,7 +105,7 @@ packageConstraints = do
                             ++ cabal ++ "'."
     args $ concatMap (\c -> ["--constraint", c]) $ constraints
 
--- TODO: remove
+-- TODO: should be in a different file
 ccSettings :: Settings
 ccSettings = validating ? do
     let gccGe46 = liftM not gccLt46

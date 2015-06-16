@@ -10,18 +10,23 @@ import Ways
 import Targets
 import Switches
 import Expression
+import Settings.Util
 
 -- No user-specific settings by default
 userSettings :: Settings
 userSettings = mempty
 
+-- Control conditions of which packages get to be built
+-- TODO: adding *new* packages is not possible (see knownPackages in Targets.hs)
 userPackages :: Packages
 userPackages = mempty
 
+-- Control which ways are built
 userWays :: Ways
 userWays = mempty
 
 -- User-defined predicates
+-- TODO: migrate more predicates here from configuration files
 buildHaddock :: Predicate
 buildHaddock = return True
 
@@ -31,7 +36,7 @@ validating = return False
 -- Examples:
 userSettings' :: Settings
 userSettings' = mconcat
-    [ package compiler     ? stage0 ? append ["foo", "bar"]
+    [ package compiler     ? stage0 ? arg "foo"
     , builder (Ghc Stage0) ? remove ["-O2"]
     , builder GhcCabal     ? removeSub "--configure-option=CFLAGS" ["-Werror"] ]
 

@@ -12,6 +12,7 @@ import Expression hiding (when, liftIO)
 settings :: Settings
 settings = defaultSettings <> userSettings
 
+-- TODO: add all other settings
 defaultSettings :: Settings
 defaultSettings = mconcat
     [ cabalSettings

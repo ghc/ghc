@@ -12,6 +12,8 @@ module Switches (
 import Base
 import Expression
 
+-- TODO: This setting should be moved to UserSettings.hs
+-- TODO: Define three packages for integer library instead of one in Targets.hs
 -- Support for multiple integer library implementations
 data IntegerLibraryImpl = IntegerGmp | IntegerGmp2 | IntegerSimple
 

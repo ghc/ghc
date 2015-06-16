@@ -13,7 +13,7 @@ import Rules.Package
 import Settings.Packages
 
 -- generateTargets needs package-data.mk files of all target packages
--- TODO: make interpret total
+-- TODO: make interpretDiff total
 generateTargets :: Rules ()
 generateTargets = action $
     forM_ [Stage0 ..] $ \stage -> do
@@ -23,7 +23,6 @@ generateTargets = action $
             let dir = targetDirectory stage pkg
             need [pkgPath pkg </> dir </> "package-data.mk"]
 
--- TODO: make interpret total
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()
 packageRules =

@@ -124,7 +124,7 @@ interpretDiff env = interpret env . fromDiff
 (??) :: Monoid a => Predicate -> (Expr a, Expr a) -> Expr a
 p ?? (t, f) = p ? t <> (liftM not p) ? f
 
--- Basic predicates
+-- Basic predicates (see Switches.hs for derived predicates)
 stage :: Stage -> Predicate
 stage s = liftM (s ==) (asks getStage)
 
@@ -137,6 +137,7 @@ package p = liftM (p ==) (asks getPackage)
 configKeyValue :: String -> String -> Predicate
 configKeyValue key value = liftM (value ==) (lift $ askConfig key)
 
--- checks if there is at least one match
+-- Check if there is at least one match
+-- Example: configKeyValues "host-os-cpp" ["mingw32", "cygwin32"]
 configKeyValues :: String -> [String] -> Predicate
 configKeyValues key values = liftM (`elem` values) (lift $ askConfig key)

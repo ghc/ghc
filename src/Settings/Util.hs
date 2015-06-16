@@ -47,12 +47,17 @@ argStagedConfigList key = do
     stage <- asks getStage
     argConfigList (stagedKey stage key)
 
+-- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Settings
 appendCcArgs args = do
     stage <- asks getStage
     mconcat [ builder (Gcc stage) ? append args
             , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" args
             , builder GhcCabal    ? appendSub "--gcc-options" args ]
+
+
+
+
 
 -- packageData :: Arity -> String -> Settings
 -- packageData arity key =

@@ -20,6 +20,7 @@ import Oracles.Builder
 -- * build/           : contains compiled object code
 -- * doc/             : produced by haddock
 -- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
+-- TODO: This is currently not user configurable. Is this right?
 targetDirectory :: Stage -> Package -> FilePath
 targetDirectory stage package
     | package == compiler = "stage" ++ show (fromEnum stage + 1)
@@ -85,14 +86,14 @@ customPackageSettings :: Settings
 customPackageSettings = mconcat
     [ package integerLibrary ?
       mconcat [ windowsHost ? builder GhcCabal ?
-                append ["--configure-option=--with-intree-gmp"]
+                arg "--configure-option=--with-intree-gmp"
               , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
 
     , package base ?
-      builder GhcCabal ? append ["--flags=" ++ integerLibraryName]
+      builder GhcCabal ? arg ("--flags=" ++ integerLibraryName)
 
     , package ghcPrim ?
-      builder GhcCabal ? append ["--flag=include-ghc-prim"] ]
+      builder GhcCabal ? arg "--flag=include-ghc-prim" ]
 
 -- Note [Cabal name weirdness]
 -- Find out if we can move the contents to just Cabal/
