@@ -238,13 +238,13 @@ pprStmt stmt =
         hargs    = zip args arg_hints
 
         fn_call
-          -- The mem primops carry an extra alignment arg, must drop it.
+          -- The mem primops carry an extra alignment arg.
           -- We could maybe emit an alignment directive using this info.
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
-          | op `elem` [MO_Memcpy, MO_Memset, MO_Memmove]
+          | Just _align <- machOpMemcpyishAlign op
           = (ptext (sLit ";EF_(") <> fn <> char ')' <> semi) $$
-            pprForeignCall fn cconv hresults (init hargs)
+            pprForeignCall fn cconv hresults hargs
           | otherwise
           = pprCall fn cconv hresults hargs
 
@@ -745,9 +745,9 @@ pprCallishMachOp_for_C mop
         MO_F32_Exp      -> ptext (sLit "expf")
         MO_F32_Sqrt     -> ptext (sLit "sqrtf")
         MO_WriteBarrier -> ptext (sLit "write_barrier")
-        MO_Memcpy       -> ptext (sLit "memcpy")
-        MO_Memset       -> ptext (sLit "memset")
-        MO_Memmove      -> ptext (sLit "memmove")
+        MO_Memcpy _     -> ptext (sLit "memcpy")
+        MO_Memset _     -> ptext (sLit "memset")
+        MO_Memmove _    -> ptext (sLit "memmove")
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_Clz w)      -> ptext (sLit $ clzLabel w)
