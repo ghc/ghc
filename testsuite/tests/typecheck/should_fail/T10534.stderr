@@ -1,0 +1,22 @@
+
+T10534a.hs:9:10: error:
+    Could not deduce: a ~ b
+    from the context: Coercible (DF a) (DF b)
+      bound by the type signature for:
+               silly :: Coercible (DF a) (DF b) => a -> b
+      at T10534a.hs:9:10-42
+      ‘a’ is a rigid type variable bound by
+          the type signature for: silly :: Coercible (DF a) (DF b) => a -> b
+          at T10534a.hs:9:10
+      ‘b’ is a rigid type variable bound by
+          the type signature for: silly :: Coercible (DF a) (DF b) => a -> b
+          at T10534a.hs:9:10
+    arising from trying to show that the representations of
+      ‘DF a’ and
+      ‘DF b’ are the same
+    Relevant role signatures: type role DF nominal
+    In the ambiguity check for the type signature for ‘silly’:
+      silly :: forall a b. Coercible (DF a) (DF b) => a -> b
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‘silly’:
+      silly :: Coercible (DF a) (DF b) => a -> b

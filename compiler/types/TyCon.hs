@@ -1237,7 +1237,7 @@ isDistinctTyCon _                           = False
 
 isDistinctAlgRhs :: AlgTyConRhs -> Bool
 isDistinctAlgRhs (DataTyCon {})           = True
-isDistinctAlgRhs (DataFamilyTyCon {})     = True
+isDistinctAlgRhs (DataFamilyTyCon {})     = False
 isDistinctAlgRhs (AbstractTyCon distinct) = distinct
 isDistinctAlgRhs (NewTyCon {})            = False
 
