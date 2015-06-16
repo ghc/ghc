@@ -169,7 +169,7 @@
       </varlistentry>
     </variablelist>
 
-    <para>There are several other haskell and GHC-related mailing
+    <para>There are several other Haskell and GHC-related mailing
     lists served by <literal>www.haskell.org</literal>.  Go to <ulink
     url="http://www.haskell.org/mailman/listinfo/"><literal>http://www.haskell.org/mailman/listinfo/</literal></ulink>
     for the full list.</para>
@@ -314,5 +314,6 @@
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

@@ -570,5 +570,6 @@ $ tester
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

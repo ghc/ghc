@@ -345,5 +345,6 @@ solve givens deriveds wanteds = ...
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

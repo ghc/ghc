@@ -9,7 +9,7 @@
   <sect1 id="runghc-introduction">
     <title>Flags</title>
 
-    <para>The runghc commandline looks like:</para>
+    <para>The runghc command-line looks like:</para>
 <screen>
 runghc [runghc flags] [GHC flags] module [program args]
 </screen>
@@ -42,5 +42,6 @@ runghc [runghc flags] [GHC flags] module [program args]
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->
