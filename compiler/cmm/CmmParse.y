@@ -975,22 +975,38 @@ machOps = listToUFM $
         ( "i2f64",    flip MO_SF_Conv W64 )
         ]
 
+callishMachOps :: UniqFM ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
 callishMachOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
-        ( "write_barrier", MO_WriteBarrier ),
-        ( "memcpy", MO_Memcpy ),
-        ( "memset", MO_Memset ),
-        ( "memmove", MO_Memmove ),
+        ( "write_barrier", (,) MO_WriteBarrier ),
+        ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
+        ( "memset", memcpyLikeTweakArgs MO_Memset ),
+        ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
 
-        ("prefetch0",MO_Prefetch_Data 0),
-        ("prefetch1",MO_Prefetch_Data 1),
-        ("prefetch2",MO_Prefetch_Data 2),
-        ("prefetch3",MO_Prefetch_Data 3)
+        ("prefetch0", (,) $ MO_Prefetch_Data 0),
+        ("prefetch1", (,) $ MO_Prefetch_Data 1),
+        ("prefetch2", (,) $ MO_Prefetch_Data 2),
+        ("prefetch3", (,) $ MO_Prefetch_Data 3)
 
         -- ToDo: the rest, maybe
         -- edit: which rest?
         -- also: how do we tell CMM Lint how to type check callish macops?
     ]
+  where
+    memcpyLikeTweakArgs :: (Int -> CallishMachOp) -> [CmmExpr] -> (CallishMachOp, [CmmExpr])
+    memcpyLikeTweakArgs op [] = pgmError "memcpy-like function requires at least one argument"
+    memcpyLikeTweakArgs op args@(_:_) =
+        -- Force alignment with result to ensure pprPgmError fires
+        align `seq` (op align, args')
+      where
+        args' = init args
+        align = case last args of
+          CmmLit (CmmInt alignInteger _) -> fromInteger alignInteger
+          e -> pprPgmError "Non-constant alignment in memcpy-like function:" (ppr e)
+        -- The alignment of memcpy-ish operations must be a
+        -- compile-time constant. We verify this here, passing it around
+        -- in the MO_* constructor. In order to do this, however, we
+        -- must intercept the arguments in primCall.
 
 parseSafety :: String -> P Safety
 parseSafety "safe"   = return PlaySafe
@@ -1207,10 +1223,11 @@ primCall
 primCall results_code name args_code
   = case lookupUFM callishMachOps name of
         Nothing -> fail ("unknown primitive " ++ unpackFS name)
-        Just p  -> return $ do
+        Just f  -> return $ do
                 results <- sequence results_code
                 args <- sequence args_code
-                code (emitPrimCall (map fst results) p args)
+                let (p, args') = f args
+                code (emitPrimCall (map fst results) p args')
 
 doStore :: CmmType -> CmmParse CmmExpr  -> CmmParse CmmExpr -> CmmParse ()
 doStore rep addr_code val_code

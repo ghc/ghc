@@ -186,7 +186,7 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
 
       // copy over old content
       prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
-                   StgArrWords_bytes(mba), WDS(1));
+                   StgArrWords_bytes(mba), SIZEOF_W);
 
       return (new_mba);
    }
@@ -438,7 +438,7 @@ stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
     bytes = WDS(n);
-    prim %memcpy(dst_p, src_p, bytes, WDS(1));
+    prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
 
     return ();
 }
@@ -453,9 +453,9 @@ stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
     bytes = WDS(n);
     if (src == dst) {
-        prim %memmove(dst_p, src_p, bytes, WDS(1));
+        prim %memmove(dst_p, src_p, bytes, SIZEOF_W);
     } else {
-        prim %memcpy(dst_p, src_p, bytes, WDS(1));
+        prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
     }
 
     return ();

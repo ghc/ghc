@@ -855,7 +855,7 @@
         src_p = (src) + SIZEOF_StgMutArrPtrs + WDS(src_off);      \
         bytes = WDS(n);                                           \
                                                                   \
-        prim %memcpy(dst_p, src_p, bytes, WDS(1));                \
+        prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);              \
                                                                   \
         dst_cards_p = dst_elems_p + WDS(StgMutArrPtrs_ptrs(dst)); \
         setCards(dst_cards_p, dst_off, n);                        \
@@ -875,9 +875,9 @@
         bytes = WDS(n);                                           \
                                                                   \
         if ((src) == (dst)) {                                     \
-            prim %memmove(dst_p, src_p, bytes, WDS(1));           \
+            prim %memmove(dst_p, src_p, bytes, SIZEOF_W);         \
         } else {                                                  \
-            prim %memcpy(dst_p, src_p, bytes, WDS(1));            \
+            prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);          \
         }                                                         \
                                                                   \
         dst_cards_p = dst_elems_p + WDS(StgMutArrPtrs_ptrs(dst)); \
