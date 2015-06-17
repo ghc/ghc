@@ -8,6 +8,7 @@ import qualified Name as GHC
 import qualified Unique as GHC
 
 import Data.List
+import Data.Maybe
 import Data.Monoid
 
 import Text.XHtml (Html, HtmlAttr, (!))
@@ -86,20 +87,25 @@ internalAnchorIdent :: GHC.Name -> String
 internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
 
 hyperlink :: TokenDetails -> Html -> Html
-hyperlink details =
-    if GHC.isInternalName $ name
-    then internalHyperlink name
-    else externalHyperlink name
-  where
-    name = rtkName details
+hyperlink details = case rtkName details of
+    Left name ->
+        if GHC.isInternalName name
+        then internalHyperlink name
+        else externalHyperlink mname (Just name)
+      where
+        mname = GHC.moduleName <$> GHC.nameModule_maybe name
+    Right name -> externalHyperlink (Just name) Nothing
 
 internalHyperlink :: GHC.Name -> Html -> Html
 internalHyperlink name content =
     Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
-externalHyperlink :: GHC.Name -> Html -> Html
-externalHyperlink name content =
-    Html.anchor content ! [ Html.href $ maybe "" id mmod ++ ".html#" ++ ident ]
+externalHyperlink :: Maybe GHC.ModuleName -> Maybe GHC.Name -> Html -> Html
+externalHyperlink mmname miname content =
+    Html.anchor content ! [ Html.href $ path ++ anchor ]
   where
-    mmod = GHC.moduleNameString . GHC.moduleName <$> GHC.nameModule_maybe name
-    ident = externalAnchorIdent name
+    path = fromMaybe "" $ modulePath <$> mmname
+    anchor = fromMaybe "" $ ("#" ++) . externalAnchorIdent <$> miname
+
+modulePath :: GHC.ModuleName -> String
+modulePath name = GHC.moduleNameString name ++ ".html"

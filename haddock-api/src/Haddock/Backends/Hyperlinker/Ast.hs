@@ -24,12 +24,14 @@ data TokenDetails
     | RtkType GHC.Name
     | RtkBind GHC.Name
     | RtkDecl GHC.Name
+    | RtkModule GHC.ModuleName
 
-rtkName :: TokenDetails -> GHC.Name
-rtkName (RtkVar name) = name
-rtkName (RtkType name) = name
-rtkName (RtkBind name) = name
-rtkName (RtkDecl name) = name
+rtkName :: TokenDetails -> Either GHC.Name GHC.ModuleName
+rtkName (RtkVar name) = Left name
+rtkName (RtkType name) = Left name
+rtkName (RtkBind name) = Left name
+rtkName (RtkDecl name) = Left name
+rtkName (RtkModule name) = Right name
 
 enrich :: GHC.RenamedSource -> [Token] -> [RichToken]
 enrich src =
@@ -109,8 +111,8 @@ decls (group, _, _, _) = concatMap ($ group)
         _ -> empty
 
 imports :: GHC.RenamedSource -> DetailsMap
-imports =
-    everything (<|>) ie
+imports src@(_, imps, _, _) =
+    everything (<|>) ie src ++ map (imp . GHC.unLoc) imps
   where
     ie term = case cast term of
         (Just (GHC.IEVar v)) -> pure $ var v
@@ -120,6 +122,9 @@ imports =
         _ -> empty
     typ (GHC.L sspan name) = (sspan, RtkType name)
     var (GHC.L sspan name) = (sspan, RtkVar name)
+    imp idecl =
+        let (GHC.L sspan name) = GHC.ideclName idecl
+        in (sspan, RtkModule name)
 
 matches :: Span -> GHC.SrcSpan -> Bool
 matches tspan (GHC.RealSrcSpan aspan)
