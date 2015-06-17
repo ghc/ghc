@@ -59,7 +59,7 @@ spanToNewline [] = ([], [])
 spanToNewline ('\\':'\n':str) =
     let (str', rest) = spanToNewline str
     in ('\\':'\n':str', rest)
-spanToNewline ('\n':str) = ("\n", str)
+spanToNewline str@('\n':_) = ("", str)
 spanToNewline (c:str) =
     let (str', rest) = spanToNewline str
     in (c:str', rest)
