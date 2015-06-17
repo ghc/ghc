@@ -3,7 +3,7 @@
 
 module Haddock.Backends.Hyperlinker.Ast
     ( enrich
-    , RichToken(..), RichTokenType(..), TokenDetails(..)
+    , RichToken(..), TokenDetails(..), rtkName
     ) where
 
 import Haddock.Backends.Hyperlinker.Parser
@@ -19,16 +19,17 @@ data RichToken = RichToken
     , rtkDetails :: Maybe TokenDetails
     }
 
-data TokenDetails = TokenDetails
-    { rtkType :: RichTokenType
-    , rtkName :: GHC.Name
-    }
+data TokenDetails
+    = RtkVar GHC.Name
+    | RtkType GHC.Name
+    | RtkBind GHC.Name
+    | RtkDecl GHC.Name
 
-data RichTokenType
-    = RtkVar
-    | RtkType
-    | RtkBind
-    | RtkDecl
+rtkName :: TokenDetails -> GHC.Name
+rtkName (RtkVar name) = name
+rtkName (RtkType name) = name
+rtkName (RtkBind name) = name
+rtkName (RtkDecl name) = name
 
 enrich :: GHC.RenamedSource -> [Token] -> [RichToken]
 enrich src =
@@ -68,7 +69,7 @@ variables =
   where
     var term = case cast term of
         (Just (GHC.L sspan (GHC.HsVar name))) ->
-            pure (sspan, TokenDetails RtkVar name)
+            pure (sspan, RtkVar name)
         _ -> empty
 
 types :: GHC.RenamedSource -> DetailsMap
@@ -77,7 +78,7 @@ types =
   where
     ty term = case cast term of
         (Just (GHC.L sspan (GHC.HsTyVar name))) ->
-            pure (sspan, TokenDetails RtkType name)
+            pure (sspan, RtkType name)
         _ -> empty
 
 binds :: GHC.RenamedSource -> DetailsMap
@@ -86,11 +87,11 @@ binds =
   where
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name)) ->
-            pure (sspan, TokenDetails RtkBind name)
+            pure (sspan, RtkBind name)
         _ -> empty
     pat term = case cast term of
         (Just (GHC.L sspan (GHC.VarPat name))) ->
-            pure (sspan, TokenDetails RtkBind name)
+            pure (sspan, RtkBind name)
         _ -> empty
 
 decls :: GHC.RenamedSource -> DetailsMap
@@ -101,10 +102,10 @@ decls (group, _, _, _) = concatMap ($ group)
   where
     typ (GHC.L _ t) =
         let (GHC.L sspan name) = GHC.tcdLName t
-        in (sspan, TokenDetails RtkDecl name)
+        in (sspan, RtkDecl name)
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
-            | GHC.isExternalName name -> pure (sspan, TokenDetails RtkDecl name)
+            | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
 
 imports :: GHC.RenamedSource -> DetailsMap
@@ -117,8 +118,8 @@ imports =
         (Just (GHC.IEThingAll t)) -> pure $ typ t
         (Just (GHC.IEThingWith t vs)) -> [typ t] ++ map var vs
         _ -> empty
-    typ (GHC.L sspan name) = (sspan, TokenDetails RtkType name)
-    var (GHC.L sspan name) = (sspan, TokenDetails RtkVar name)
+    typ (GHC.L sspan name) = (sspan, RtkType name)
+    var (GHC.L sspan name) = (sspan, RtkVar name)
 
 matches :: Span -> GHC.SrcSpan -> Bool
 matches tspan (GHC.RealSrcSpan aspan)

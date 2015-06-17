@@ -41,14 +41,14 @@ richToken (RichToken tok (Just det)) =
     externalAnchor det . internalAnchor det . hyperlink det $ content
   where
     content = tokenSpan tok ! [ multiclass style]
-    style = (tokenStyle . tkType) tok ++ (richTokenStyle . rtkType) det
+    style = (tokenStyle . tkType) tok ++ richTokenStyle det
 
 tokenSpan :: Token -> Html
 tokenSpan = Html.thespan . Html.toHtml . tkValue
 
-richTokenStyle :: RichTokenType -> [StyleClass]
-richTokenStyle RtkVar = ["hs-var"]
-richTokenStyle RtkType = ["hs-type"]
+richTokenStyle :: TokenDetails -> [StyleClass]
+richTokenStyle (RtkVar _) = ["hs-var"]
+richTokenStyle (RtkType _) = ["hs-type"]
 richTokenStyle _ = []
 
 tokenStyle :: TokenType -> [StyleClass]
@@ -70,12 +70,12 @@ multiclass :: [StyleClass] -> HtmlAttr
 multiclass = Html.theclass . intercalate " "
 
 externalAnchor :: TokenDetails -> Html -> Html
-externalAnchor (TokenDetails RtkDecl name) content =
+externalAnchor (RtkDecl name) content =
     Html.anchor content ! [ Html.name $ externalAnchorIdent name ]
 externalAnchor _ content = content
 
 internalAnchor :: TokenDetails -> Html -> Html
-internalAnchor (TokenDetails RtkBind name) content =
+internalAnchor (RtkBind name) content =
     Html.anchor content ! [ Html.name $ internalAnchorIdent name ]
 internalAnchor _ content = content
 
@@ -86,9 +86,12 @@ internalAnchorIdent :: GHC.Name -> String
 internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
 
 hyperlink :: TokenDetails -> Html -> Html
-hyperlink (TokenDetails _ name) = if GHC.isInternalName name
+hyperlink details =
+    if GHC.isInternalName $ name
     then internalHyperlink name
     else externalHyperlink name
+  where
+    name = rtkName details
 
 internalHyperlink :: GHC.Name -> Html -> Html
 internalHyperlink name content =
