@@ -47,12 +47,22 @@ chunk [] = []
 chunk str@(c:_)
     | isSpace c = chunk' $ span isSpace str
 chunk str
-    | "--" `isPrefixOf` str = chunk' $ span (not . (== '\n')) str
+    | "--" `isPrefixOf` str = chunk' $ spanToNewline str
     | "{-" `isPrefixOf` str = chunk' $ chunkComment 0 str
     | otherwise = chunk' $ head $ lex str
 
 chunk' :: (String, String) -> [String]
 chunk' (c, rest) = c:(chunk rest)
+
+spanToNewline :: String -> (String, String)
+spanToNewline [] = ([], [])
+spanToNewline ('\\':'\n':str) =
+    let (str', rest) = spanToNewline str
+    in ('\\':'\n':str', rest)
+spanToNewline ('\n':str) = ("\n", str)
+spanToNewline (c:str) =
+    let (str', rest) = spanToNewline str
+    in (c:str', rest)
 
 chunkComment :: Int -> String -> (String, String)
 chunkComment _ [] = ("", "")
