@@ -15,7 +15,7 @@ module TcSMonad (
     TcS, runTcS, runTcSWithEvBinds,
     failTcS, tryTcS, nestTcS, nestImplicTcS, recoverTcS,
 
-    runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq,
+    runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq, splitInst,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -2869,3 +2869,13 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; return (TcLetCo ev_binds new_co) }
 
         ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs) }
+
+-- Split a sigma type and instantiate its variables
+splitInst :: Type -> TcS ([TyVar], ThetaType, Type)
+splitInst sigma
+  = do { let (qvars, q, ty) = tcSplitSigmaTy sigma
+         -- instantiate variables for q and ty
+         ; (subst, inst_vars) <- wrapTcS $ TcM.tcInstTyVars qvars
+         ; let q_subst  = map (Type.substTy subst) q
+               ty_subst = Type.substTy subst ty
+         ; return (inst_vars, q_subst, ty_subst) }

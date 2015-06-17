@@ -18,7 +18,7 @@ module TcEvidence (
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
-  EvInstanceOf(..), mkInstanceOfEq,
+  EvInstanceOf(..), mkInstanceOfEq, mkInstanceOfInst,
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -767,12 +767,15 @@ data EvCallStack
 -- Evidence for instantiation / InstanceOf constraints
 data EvInstanceOf
   = EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
-  | EvInstanceOfInst TcCoercion EvTerm
+  | EvInstanceOfInst TcCoercion [EvTerm]
   | EvInstanceOfLet  TcEvBinds  EvInstanceOf
     deriving ( Data.Data, Data.Typeable )
 
 mkInstanceOfEq :: TcCoercion -> EvTerm
 mkInstanceOfEq = EvInstanceOf . EvInstanceOfEq
+
+mkInstanceOfInst :: TcCoercion -> [EvVar] -> EvTerm
+mkInstanceOfInst co q = EvInstanceOf (EvInstanceOfInst co (map EvId q))
 
 {-
 Note [Coercion evidence terms]
@@ -1037,8 +1040,8 @@ evVarsOfTypeable ev =
 evVarsOfInstanceOf :: EvInstanceOf -> VarSet
 evVarsOfInstanceOf ev =
   case ev of
-    EvInstanceOfEq co     -> coVarsOfTcCo co
-    EvInstanceOfInst co t -> coVarsOfTcCo co `unionVarSet` evVarsOfTerm t
+    EvInstanceOfEq   co   -> coVarsOfTcCo co
+    EvInstanceOfInst co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
     EvInstanceOfLet  _  _ -> emptyVarSet
 
 {-

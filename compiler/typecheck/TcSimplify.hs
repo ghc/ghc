@@ -616,6 +616,7 @@ pickQuantifiablePreds qtvs theta
 
           EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
           IrredPred ty          -> tyVarsOfType ty `intersectsVarSet` qtvs
+          InstanceOfPred ty1 ty2 -> quant_fun ty1 || quant_fun ty2
 
     pick_cls_pred flex_ctxt tys
       = tyVarsOfTypes tys `intersectsVarSet` qtvs
