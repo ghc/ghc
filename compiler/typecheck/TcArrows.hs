@@ -360,8 +360,9 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith mkLocalId tup_names tup_elt_tys
-        ; tcExtendIdEnv tup_ids $ do
+        ; let tup_ids  = zipWith mkLocalId tup_names tup_elt_tys
+              tup_ids' = [(tup_id, TcIdMonomorphic) | tup_id <- tup_ids]
+        ; tcExtendIdEnv tup_ids' $ do
         { (stmts', tup_rets)
                 <- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty   $ \ _res_ty' ->
                         -- ToDo: res_ty not really right

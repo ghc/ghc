@@ -68,9 +68,10 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
               -- the RULE.  c.f. Trac #10072
 
        ; let (id_bndrs, tv_bndrs) = partition isId vars
+             id_bndrs' = [(id_bndr, TcIdMonomorphic) | id_bndr <- id_bndrs]
        ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
-            <- tcExtendTyVarEnv tv_bndrs $
-               tcExtendIdEnv    id_bndrs $
+            <- tcExtendTyVarEnv tv_bndrs  $
+               tcExtendIdEnv    id_bndrs' $
                do { -- See Note [Solve order for RULES]
                     ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
                   ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
@@ -329,4 +330,3 @@ simplifyRule name lhs_wanted rhs_wanted
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_simple = non_q_cts }) }
-

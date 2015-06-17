@@ -483,7 +483,7 @@ tc_pat  :: PatEnv
 
 tc_pat penv (VarPat name) pat_ty thing_inside
   = do  { (co, id) <- tcPatBndr penv name pat_ty
-        ; res <- tcExtendIdEnv1 name id thing_inside
+        ; res <- tcExtendIdEnv1 name id TcIdUnrestricted thing_inside
         ; return (mkHsWrapPatCo co (VarPat id) pat_ty, res) }
 
 tc_pat penv (ParPat pat) pat_ty thing_inside
@@ -520,7 +520,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
 
 tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
   = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
-        ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
+        ; (pat', res) <- tcExtendIdEnv1 name bndr_id TcIdUnrestricted $
                          tc_lpat pat (idType bndr_id) penv thing_inside
             -- NB: if we do inference on:
             --          \ (y@(x::forall a. a->a)) = e
@@ -657,7 +657,7 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
         ; icls <- tcLookupClass integralClassName
         ; instStupidTheta orig [mkClassPred icls [pat_ty']]
 
-        ; res <- tcExtendIdEnv1 name bndr_id thing_inside
+        ; res <- tcExtendIdEnv1 name bndr_id TcIdUnrestricted thing_inside
         ; return (mkHsWrapPatCo co pat' pat_ty, res) }
 
 tc_pat _ _other_pat _ _ = panic "tc_pat"        -- ConPatOut, SigPatOut
