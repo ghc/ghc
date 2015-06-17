@@ -1150,17 +1150,12 @@ data Ct
         -- See Note [The flattening story] in TcFlatten
     }
 
-  | CInstanceOfVarLeft {  -- InstanceOf alpha sigma
-      cc_ev     :: CtEvidence,
-      cc_ivar   :: TcTyVar,
-      cc_rhs    :: TcType
-    }
-  | CInstanceOfVarRight {  -- InstanceOf sigma alpha
-       -- Invariants:
-       --   * sigma is not a type variable
+  | CInstanceOfCan {  -- Canonical instance constraints
+       -- * InstanceOf tyvar sigma
+       -- * InstanceOf sigma tyvar
       cc_ev     :: CtEvidence,
       cc_lhs    :: TcType,
-      cc_ivar   :: TcTyVar
+      cc_rhs    :: TcType
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics]
@@ -1414,12 +1409,13 @@ isTypeHoleCt _ = False
 instance Outputable Ct where
   ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)
          where ct_sort = case ct of
-                           CTyEqCan {}      -> "CTyEqCan"
-                           CFunEqCan {}     -> "CFunEqCan"
-                           CNonCanonical {} -> "CNonCanonical"
-                           CDictCan {}      -> "CDictCan"
-                           CIrredEvCan {}   -> "CIrredEvCan"
-                           CHoleCan {}      -> "CHoleCan"
+                           CTyEqCan {}       -> "CTyEqCan"
+                           CFunEqCan {}      -> "CFunEqCan"
+                           CNonCanonical {}  -> "CNonCanonical"
+                           CDictCan {}       -> "CDictCan"
+                           CIrredEvCan {}    -> "CIrredEvCan"
+                           CHoleCan {}       -> "CHoleCan"
+                           CInstanceOfCan {} -> "CInstanceOfCan"
 
 singleCt :: Ct -> Cts
 singleCt = unitBag

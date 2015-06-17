@@ -165,6 +165,8 @@ canonicalize (CIrredEvCan { cc_ev = ev })
   = canIrred ev
 canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ, cc_hole = hole })
   = canHole ev occ hole
+canonicalize (CInstanceOfCan { cc_ev = ev })
+  = canInstanceOfNC ev
 
 canEvNC :: CtEvidence -> TcS (StopOrContinue Ct)
 -- Called only for non-canonical EvVars
@@ -176,6 +178,8 @@ canEvNC ev
                                   canEqNC    ev eq_rel ty1 ty2
       IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr (ctEvPred ev))
                                   canIrred   ev
+      InstanceOfPred ty1 ty2 -> do traceTcS "canEvNC:inst" (ppr ty1 $$ ppr ty2)
+                                   canInstanceOfNC ev
 {-
 ************************************************************************
 *                                                                      *
@@ -362,6 +366,7 @@ canIrred old_ev
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
+           InstanceOfPred {}     -> canInstanceOfNC new_ev
            _                     -> continueWith $
                                     CIrredEvCan { cc_ev = new_ev } } }
 
@@ -1623,3 +1628,45 @@ unify_derived loc role    orig_ty1 orig_ty2
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co
 maybeSym NotSwapped co = co
+
+{-
+************************************************************************
+*                                                                      *
+*                      InstanceOf Canonicalization
+*                                                                      *
+************************************************************************
+-}
+
+canInstanceOfNC :: CtEvidence -> TcS (StopOrContinue Ct)
+canInstanceOfNC ev
+  = canInstanceOf ev
+    `andWhenContinue` can_instance_of
+
+canInstanceOf :: CtEvidence -> TcS (StopOrContinue Ct)
+canInstanceOf ev
+  = do { let Just (tc, [lhs, rhs]) = splitTyConApp_maybe (ctEvPred ev)
+       ; (xil, col) <- flatten FM_FlattenAll ev lhs
+       ; (xir, cor) <- flatten FM_FlattenAll ev rhs
+       ; let co = mkTcTyConAppCo Nominal tc [col, cor]
+             xi = mkInstanceOfPred xil xir
+             mk_ct new_ev = CInstanceOfCan { cc_ev = new_ev
+                                           , cc_lhs = xil, cc_rhs = xir }
+       ; mb <- rewriteEvidence ev xi co
+       ; traceTcS "canInstanceOf" (vcat [ ppr ev <+> ppr lhs <+> ppr rhs
+                                        , ppr xi, ppr mb ])
+       ; return (fmap mk_ct mb) }
+
+can_instance_of :: Ct -> TcS (StopOrContinue Ct)
+can_instance_of ct@(CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
+    -- case InstanceOf sigma (T ...) --> sigma ~ T ...
+  | Nothing <- getTyVar_maybe rhs, Nothing <- splitForAllTy_maybe rhs
+  = do { let eq = mkTcEqPredRole Nominal lhs rhs
+       ; case ev of
+           CtDerived {} -> canEqNC (ev { ctev_pred = eq }) NomEq lhs rhs
+           CtGiven {ctev_loc = loc } ->
+             do { emitNewDerivedEq loc eq
+                ; stopWith ev "Given instance equality" }
+           CtWanted { ctev_evar = evar, ctev_loc = loc } ->
+             do { new_ev <- newWantedEvVarNC loc eq
+                ; setWantedEvBind evar (mkInstanceOfEq (ctEvCoercion new_ev))
+                ; canEqNC new_ev NomEq lhs rhs } }

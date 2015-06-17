@@ -9,7 +9,7 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP #-}
 
 module Inst (
-       deeplySkolemise, deeplyInstantiate, 
+       deeplySkolemise, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
        emitWanted, emitWanteds,
@@ -620,12 +620,13 @@ addClsInstsErr herald ispecs
 
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet
-tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })     = extendVarSet (tyVarsOfType xi) tv
-tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk }) = extendVarSet (tyVarsOfTypes tys) fsk
-tyVarsOfCt (CDictCan { cc_tyargs = tys })                = tyVarsOfTypes tys
-tyVarsOfCt (CIrredEvCan { cc_ev = ev })                  = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CHoleCan { cc_ev = ev })                     = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CNonCanonical { cc_ev = ev })                = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })       = extendVarSet (tyVarsOfType xi) tv
+tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })   = extendVarSet (tyVarsOfTypes tys) fsk
+tyVarsOfCt (CDictCan { cc_tyargs = tys })                  = tyVarsOfTypes tys
+tyVarsOfCt (CIrredEvCan { cc_ev = ev })                    = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CHoleCan { cc_ev = ev })                       = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CNonCanonical { cc_ev = ev })                  = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CInstanceOfCan { cc_lhs = lhs, cc_rhs = rhs }) = tyVarsOfTypes [lhs, rhs]
 
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet

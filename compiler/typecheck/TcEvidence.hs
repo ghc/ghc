@@ -18,6 +18,7 @@ module TcEvidence (
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
+  EvInstanceOf(..), mkInstanceOfEq,
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -727,6 +728,8 @@ data EvTerm
 
   | EvTypeable EvTypeable   -- Dictionary for `Typeable`
 
+  | EvInstanceOf EvInstanceOf  -- Instantiation of a type
+
   deriving( Data.Data, Data.Typeable )
 
 
@@ -760,6 +763,16 @@ data EvCallStack
     -- ^ @EvCsTop name loc stk@ represents a use of an implicit parameter
     -- @?name@, occurring at @loc@, in a calling context @stk@.
   deriving( Data.Data, Data.Typeable )
+
+-- Evidence for instantiation / InstanceOf constraints
+data EvInstanceOf
+  = EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
+  | EvInstanceOfInst TcCoercion EvTerm
+  | EvInstanceOfLet  TcEvBinds  EvInstanceOf
+    deriving ( Data.Data, Data.Typeable )
+
+mkInstanceOfEq :: TcCoercion -> EvTerm
+mkInstanceOfEq = EvInstanceOf . EvInstanceOfEq
 
 {-
 Note [Coercion evidence terms]
@@ -1003,6 +1016,7 @@ evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
 evVarsOfTerm (EvTypeable ev)      = evVarsOfTypeable ev
+evVarsOfTerm (EvInstanceOf ev)    = evVarsOfInstanceOf ev
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -1019,6 +1033,13 @@ evVarsOfTypeable ev =
     EvTypeableTyCon _ _    -> emptyVarSet
     EvTypeableTyApp e1 e2  -> evVarsOfTerms (map fst [e1,e2])
     EvTypeableTyLit _      -> emptyVarSet
+
+evVarsOfInstanceOf :: EvInstanceOf -> VarSet
+evVarsOfInstanceOf ev =
+  case ev of
+    EvInstanceOfEq co     -> coVarsOfTcCo co
+    EvInstanceOfInst co t -> coVarsOfTcCo co `unionVarSet` evVarsOfTerm t
+    EvInstanceOfLet  _  _ -> emptyVarSet
 
 {-
 ************************************************************************
@@ -1085,6 +1106,7 @@ instance Outputable EvTerm where
   ppr (EvDelayedError ty msg) =     ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
   ppr (EvTypeable ev)    = ppr ev
+  ppr (EvInstanceOf ev)  = ppr ev
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
@@ -1105,6 +1127,12 @@ instance Outputable EvTypeable where
       EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
       EvTypeableTyLit x        -> ppr x
 
+instance Outputable EvInstanceOf where
+  ppr ev =
+    case ev of
+      EvInstanceOfEq   co   -> ptext (sLit "EQ")   <+> ppr co
+      EvInstanceOfInst co q -> ptext (sLit "INST") <+> ppr q <+> ppr co
+      EvInstanceOfLet  b i  -> ptext (sLit "LET")  <+> ppr b <+> ppr i
 
 ----------------------------------------------------------------------
 -- Helper functions for dealing with IP newtype-dictionaries

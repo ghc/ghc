@@ -1787,9 +1787,10 @@ removeInertCt is ct =
     CTyEqCan  { cc_tyvar = x,  cc_rhs    = ty } ->
       is { inert_eqs    = delTyEq (inert_eqs is) x ty }
 
-    CIrredEvCan {}   -> panic "removeInertCt: CIrredEvCan"
-    CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
-    CHoleCan {}      -> panic "removeInertCt: CHoleCan"
+    CIrredEvCan {}    -> panic "removeInertCt: CIrredEvCan"
+    CNonCanonical {}  -> panic "removeInertCt: CNonCanonical"
+    CHoleCan {}       -> panic "removeInertCt: CHoleCan"
+    CInstanceOfCan {} -> panic "removeInertCt: CInstanceOfCan"
 
 
 lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavour))
