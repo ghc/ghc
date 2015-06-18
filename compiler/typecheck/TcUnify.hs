@@ -1012,13 +1012,10 @@ checkTauTvUpdate dflags tv ty
     defer_me :: TcType -> Bool
     -- Checks for (a) occurrence of tv
     --            (b) type family applications
-    --            (c) foralls
     -- See Note [Conservative unification check]
     defer_me (LitTy {})        = False
     defer_me (TyVarTy tv')     = tv == tv'
-    defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc
-                                 || any defer_me tys
-                                 || not (impredicative || isTauTyCon tc)
+    defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
     defer_me (FunTy arg res)   = defer_me arg || defer_me res
     defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
     defer_me (ForAllTy _ ty)   = not impredicative || defer_me ty

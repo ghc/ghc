@@ -1,7 +1,0 @@
-
-T10194.hs:7:8:
-    Cannot instantiate unification variable ‘b0’
-    with a type involving foralls: X
-      Perhaps you want ImpredicativeTypes
-    In the expression: (.)
-    In an equation for ‘comp’: comp = (.)

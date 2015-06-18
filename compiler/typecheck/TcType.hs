@@ -853,7 +853,7 @@ mkTcEqPredRole Nominal          = mkTcEqPred
 mkTcEqPredRole Representational = mkTcReprEqPred
 mkTcEqPredRole Phantom          = panic "mkTcEqPredRole Phantom"
 
--- @isTauTy@ tests for nested for-alls.
+-- @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
 
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- tcView ty = isTauTy ty'
@@ -1228,7 +1228,7 @@ occurCheckExpand dflags tv ty
     -- True => fine
     fast_check (LitTy {})        = True
     fast_check (TyVarTy tv')     = tv /= tv'
-    fast_check (TyConApp tc tys) = all fast_check tys && (isTauTyCon tc || impredicative)
+    fast_check (TyConApp _ tys)  = all fast_check tys
     fast_check (FunTy arg res)   = fast_check arg && fast_check res
     fast_check (AppTy fun arg)   = fast_check fun && fast_check arg
     fast_check (ForAllTy tv' ty) = impredicative
@@ -1262,11 +1262,7 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty
-              | impredicative || isTauTyCon tc
-              -> return ty  -- First try to eliminate the tyvar from the args
-              | otherwise
-              -> OC_Forall  -- A type synonym with a forall on the RHS
+          OC_OK ty -> return ty  -- First try to eliminate the tyvar from the args
           bad | Just ty' <- tcView ty -> go ty'
               | otherwise             -> bad
                       -- Failing that, try to expand a synonym
