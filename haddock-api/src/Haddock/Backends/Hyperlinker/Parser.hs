@@ -6,6 +6,7 @@ module Haddock.Backends.Hyperlinker.Parser
 
 import Data.Char
 import Data.List
+import Data.Maybe
 
 data Token = Token
     { tkType :: TokenType
@@ -45,14 +46,15 @@ parse = tokenize . tag . chunk
 chunk :: String -> [String]
 chunk [] = []
 chunk str@(c:_)
-    | isSpace c = chunk' $ span isSpace str
+    | isSpace c =
+        let (space, mcpp, rest) = spanSpaceOrCpp str
+        in [space] ++ maybeToList mcpp ++ chunk rest
 chunk str
     | "--" `isPrefixOf` str = chunk' $ spanToNewline str
     | "{-" `isPrefixOf` str = chunk' $ chunkComment 0 str
     | otherwise = chunk' $ head $ lex str
-
-chunk' :: (String, String) -> [String]
-chunk' (c, rest) = c:(chunk rest)
+  where
+    chunk' (c, rest) = c:(chunk rest)
 
 spanToNewline :: String -> (String, String)
 spanToNewline [] = ([], [])
@@ -63,6 +65,16 @@ spanToNewline str@('\n':_) = ("", str)
 spanToNewline (c:str) =
     let (str', rest) = spanToNewline str
     in (c:str', rest)
+
+spanSpaceOrCpp :: String -> (String, Maybe String, String)
+spanSpaceOrCpp ('\n':'#':str) =
+    let (str', rest) = spanToNewline str
+    in ("\n", Just $ '#':str', rest)
+spanSpaceOrCpp (c:str')
+    | isSpace c =
+        let (space, mcpp, rest) = spanSpaceOrCpp str'
+        in (c:space, mcpp, rest)
+spanSpaceOrCpp str = ("", Nothing, str)
 
 chunkComment :: Int -> String -> (String, String)
 chunkComment _ [] = ("", "")
