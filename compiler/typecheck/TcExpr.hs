@@ -131,7 +131,7 @@ tcHole occ res_ty
  = do { ty <- newFlexiTyVarTy liftedTypeKind
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
-      ; loc <- getCtLoc HoleOrigin
+      ; loc <- getCtLocM HoleOrigin
       ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
                            , cc_hole = ExprHole }
       ; emitInsoluble can

@@ -1688,7 +1688,7 @@ warnDefaulting wanteds default_ty
              warn_msg  = hang (ptext (sLit "Defaulting the following constraint(s) to type")
                                 <+> quotes (ppr default_ty))
                             2 ppr_wanteds
-       ; setCtLoc loc $ warnTc warn_default warn_msg }
+       ; setCtLocM loc $ warnTc warn_default warn_msg }
 
 {-
 Note [Runtime skolems]
@@ -1707,7 +1707,7 @@ are created by in RtClosureInspect.zonkRTTIType.
 
 solverDepthErrorTcS :: CtLoc -> TcType -> TcM a
 solverDepthErrorTcS loc ty
-  = setCtLoc loc $
+  = setCtLocM loc $
     do { ty <- zonkTcType ty
        ; env0 <- tcInitTidyEnv
        ; let tidy_env     = tidyFreeTyVars env0 (tyVarsOfType ty)

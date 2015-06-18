@@ -2468,7 +2468,7 @@ addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
 
 checkWellStagedDFun :: PredType -> DFunId -> CtLoc -> TcS ()
 checkWellStagedDFun pred dfun_id loc
-  = wrapTcS $ TcM.setCtLoc loc $
+  = wrapTcS $ TcM.setCtLocM loc $
     do { use_stage <- TcM.getStage
        ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
   where

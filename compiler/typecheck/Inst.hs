@@ -70,7 +70,7 @@ import Data.Maybe( isJust )
 
 newWanted :: CtOrigin -> PredType -> TcM CtEvidence
 newWanted orig pty
-  = do loc <- getCtLoc orig
+  = do loc <- getCtLocM orig
        v <- newEvVar pty
        return $ CtWanted { ctev_evar = v
                          , ctev_pred = pty
@@ -84,7 +84,7 @@ emitWanteds origin theta = mapM (emitWanted origin) theta
 
 emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred
-  = do { loc <- getCtLoc origin
+  = do { loc <- getCtLocM origin
        ; ev  <- newEvVar pred
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
@@ -403,7 +403,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
 syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty tidy_env
-  = do { inst_loc <- getCtLoc orig
+  = do { inst_loc <- getCtLocM orig
        ; let msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr name)
                           <+> ptext (sLit "(needed by a syntactic construct)")
                         , nest 2 (ptext (sLit "has the required type:")

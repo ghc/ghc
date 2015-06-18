@@ -667,7 +667,7 @@ uType, uType_defer
 -- See Note [Deferred unification]
 uType_defer origin ty1 ty2
   = do { eqv <- newEq ty1 ty2
-       ; loc <- getCtLoc origin
+       ; loc <- getCtLocM origin
        ; emitSimple $ mkNonCanonical $
              CtWanted { ctev_evar = eqv
                       , ctev_pred = mkTcEqPred ty1 ty2
