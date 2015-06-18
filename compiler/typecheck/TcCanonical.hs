@@ -1657,20 +1657,13 @@ canInstanceOf ev
        ; return (fmap mk_ct mb) }
 
 can_instance_of :: Ct -> TcS (StopOrContinue Ct)
-can_instance_of ct@(CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
+can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
+    -- case InstanceOf sigma sigma, for the exact same sigma
+  | lhs `eqType` rhs
+  = can_instance_to_eq ev lhs rhs
     -- case InstanceOf sigma (T ...) --> sigma ~ T ...
   | Nothing <- getTyVar_maybe rhs, Nothing <- splitForAllTy_maybe rhs
-  = do { let eq = mkTcEqPredRole Nominal lhs rhs
-       ; case ev of
-           CtDerived {} -> canEqNC (ev { ctev_pred = eq }) NomEq lhs rhs
-           CtGiven {ctev_loc = loc } ->
-             do { emitNewDerivedEq loc eq
-                ; stopWith ev "Given instanceOf equality" }
-           CtWanted { ctev_evar = evar, ctev_loc = loc } ->
-             do { new_ev <- newWantedEvVarNC loc eq
-                ; setWantedEvBind evar (mkInstanceOfEq (ctEvCoercion new_ev))
-                ; canEqNC new_ev NomEq lhs rhs } }
-
+  = can_instance_to_eq ev lhs rhs
   -- case InstanceOf (T ...) (forall qvars. Q => ty)
   | Nothing <- getTyVar_maybe lhs, Nothing <- splitForAllTy_maybe lhs
   , Just _  <- splitForAllTy_maybe rhs
@@ -1688,3 +1681,17 @@ can_instance_of ct@(CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
            ; emitWorkNC new_ev_qs
            ; canEqNC new_ev_ty NomEq lhs ty }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
+can_instance_of _ = panic "can_instance_of in a non InstanceOf constraint"
+
+can_instance_to_eq :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
+can_instance_to_eq ev lhs rhs
+  = do { let eq = mkTcEqPredRole Nominal lhs rhs
+       ; case ev of
+           CtDerived {} -> canEqNC (ev { ctev_pred = eq }) NomEq lhs rhs
+           CtGiven {ctev_loc = loc } ->
+             do { emitNewDerivedEq loc eq
+                ; stopWith ev "Given instanceOf equality" }
+           CtWanted { ctev_evar = evar, ctev_loc = loc } ->
+             do { new_ev <- newWantedEvVarNC loc eq
+                ; setWantedEvBind evar (mkInstanceOfEq (ctEvCoercion new_ev))
+                ; canEqNC new_ev NomEq lhs rhs } }
