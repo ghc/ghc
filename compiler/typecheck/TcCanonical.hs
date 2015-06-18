@@ -882,15 +882,19 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
 -- Examples in Note [Use canEqFailure in canDecomposableTyConApp]
 canEqFailure :: CtEvidence -> EqRel
              -> TcType -> TcType -> TcS (StopOrContinue Ct)
+canEqFailure ev NomEq ty1 ty2
+  = canEqHardFailure ev NomEq ty1 ty2
 canEqFailure ev ReprEq ty1 ty2
   = do { (xi1, co1) <- flatten FM_FlattenAll ev ty1
        ; (xi2, co2) <- flatten FM_FlattenAll ev ty2
+            -- We must flatten the types before putting them in the
+            -- inert set, so that we are sure to kick them out when
+            -- new equalities become available
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
        ; rewriteEqEvidence ev ReprEq NotSwapped xi1 xi2 co1 co2
          `andWhenContinue` \ new_ev ->
          continueWith (CIrredEvCan { cc_ev = new_ev }) }
-canEqFailure ev NomEq ty1 ty2 = canEqHardFailure ev NomEq ty1 ty2
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
 canEqHardFailure :: CtEvidence -> EqRel
@@ -948,7 +952,7 @@ When an equality fails, we still want to rewrite the equality
 all the way down, so that it accurately reflects
  (a) the mutable reference substitution in force at start of solving
  (b) any ty-binds in force at this point in solving
-See Note [Kick out insolubles] in TcInteract.
+See Note [Kick out insolubles] in TcSMonad.
 And if we don't do this there is a bad danger that
 TcSimplify.applyTyVarDefaulting will find a variable
 that has in fact been substituted.
