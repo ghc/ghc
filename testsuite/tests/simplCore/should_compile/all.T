@@ -107,7 +107,7 @@ test('T4918',
      ['$MAKE -s --no-print-directory T4918'])
 
 test('T4945',
-     expect_broken(4945),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 
