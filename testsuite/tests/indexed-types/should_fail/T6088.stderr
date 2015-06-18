@@ -1,4 +1,5 @@
 
-T6088.hs:16:33:
+T6088.hs:16:33: error:
     Couldn't match type ‘Pos n’ with ‘True’
+      arising from the 'deriving' clause of a data type declaration
     When deriving the instance for (C (B n))

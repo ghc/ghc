@@ -1,20 +1,14 @@
 
-T7148.hs:27:40:
+T7148.hs:27:40: error:
     Occurs check: cannot construct the infinite type: b ~ Tagged a b
-    arising from the coercion of the method ‘iso2’
-      from type ‘forall b. SameType b () -> SameType b b’
-        to type ‘forall b. SameType b () -> SameType b (Tagged a b)’
-    Relevant role signatures:
-      type role Tagged phantom representational
-      type role SameType nominal nominal
+      arising from the coercion of the method ‘iso2’
+        from type ‘forall b. SameType b () -> SameType b b’
+          to type ‘forall b. SameType b () -> SameType b (Tagged a b)’
     When deriving the instance for (IsoUnit (Tagged a b))
 
-T7148.hs:27:40:
+T7148.hs:27:40: error:
     Occurs check: cannot construct the infinite type: b ~ Tagged a b
-    arising from the coercion of the method ‘iso1’
-      from type ‘forall b. SameType () b -> SameType b b’
-        to type ‘forall b. SameType () b -> SameType (Tagged a b) b’
-    Relevant role signatures:
-      type role Tagged phantom representational
-      type role SameType nominal nominal
+      arising from the coercion of the method ‘iso1’
+        from type ‘forall b. SameType () b -> SameType b b’
+          to type ‘forall b. SameType () b -> SameType (Tagged a b) b’
     When deriving the instance for (IsoUnit (Tagged a b))
