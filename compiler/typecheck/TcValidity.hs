@@ -23,7 +23,7 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import TypeRep
 import TcType
 import TcMType
-import TysWiredIn ( coercibleClass, eqTyConName )
+import TysWiredIn ( coercibleClass, eqTyCon )
 import PrelNames
 import Type
 import Unify( tcMatchTyX )
@@ -439,7 +439,7 @@ check_syn_tc_app :: UserTypeCtxt -> Rank -> KindOrType
 -- which must be saturated,
 -- but not data families, which need not be saturated
 check_syn_tc_app ctxt rank ty tc tys
-  | tc_arity <= n_args   -- Saturated
+  | tc_arity <= length tys   -- Saturated
        -- Check that the synonym has enough args
        -- This applies equally to open and closed synonyms
        -- It's OK to have an *over-applied* type synonym
@@ -462,11 +462,8 @@ check_syn_tc_app ctxt rank ty tc tys
   = mapM_ check_arg tys
 
   | otherwise
-  = failWithTc (arityErr flavour (tyConName tc) tc_arity n_args)
+  = failWithTc (tyConArityErr tc tys)
   where
-    flavour | isTypeFamilyTyCon tc = "Type family"
-            | otherwise            = "Type synonym"
-    n_args = length tys
     tc_arity  = tyConArity tc
     check_arg | isTypeFamilyTyCon tc = check_arg_type  ctxt rank
               | otherwise            = check_mono_type ctxt synArgMonoType
@@ -642,12 +639,10 @@ check_eq_pred :: DynFlags -> PredType -> [TcType] -> TcM ()
 check_eq_pred dflags pred tys
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
-    do { checkTc (n_tys == 3)
-                 (arityErr "Equality constraint" eqTyConName 3 n_tys)
+    do { checkTc (length tys == 3)
+                 (tyConArityErr eqTyCon tys)
        ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags)
                  (eqPredTyErr pred) }
-  where
-    n_tys = length tys
 
 check_tuple_pred :: Bool -> DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
 check_tuple_pred under_syn dflags ctxt pred ts
@@ -710,18 +705,15 @@ solved to add+canonicalise another (Foo a) constraint.  -}
 check_class_pred :: DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
 check_class_pred dflags ctxt pred cls tys
   | isIPClass cls
-  = do { checkTc (arity == n_tys) arity_err
-       ; checkTc (okIPCtxt ctxt)  (badIPPred pred) }
+  = do { check_arity
+       ; checkTc (okIPCtxt ctxt) (badIPPred pred) }
 
   | otherwise
-  = do { checkTc (arity == n_tys) arity_err
+  = do { check_arity
        ; checkTc arg_tys_ok (predTyVarErr pred) }
   where
-    class_name = className cls
-    arity      = classArity cls
-    n_tys      = length tys
-    arity_err  = arityErr "Class" class_name arity n_tys
-
+    check_arity = checkTc (classArity cls == length tys)
+                          (tyConArityErr (classTyCon cls) tys)
     flexible_contexts = xopt Opt_FlexibleContexts     dflags
     undecidable_ok    = xopt Opt_UndecidableInstances dflags
 
@@ -806,9 +798,28 @@ constraintSynErr kind = hang (ptext (sLit "Illegal constraint synonym of kind:")
 dupPredWarn :: [[PredType]] -> SDoc
 dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprType (map head dups)
 
+tyConArityErr :: TyCon -> [TcType] -> SDoc
+-- For type-constructor arity errors, be careful to report
+-- the number of /type/ arguments required and supplied,
+-- ignoring the /kind/ arguments, which the user does not see.
+-- (e.g. Trac #10516)
+tyConArityErr tc tks
+  = arityErr (tyConFlavour tc) (tyConName tc)
+             tc_type_arity tc_type_args
+  where
+    tvs = tyConTyVars tc
+
+    kbs :: [Bool]  -- True for a Type arg, false for a Kind arg
+    kbs = map isTypeVar tvs
+
+    -- tc_type_arity = number of *type* args expected
+    -- tc_type_args  = number of *type* args encountered
+    tc_type_arity = count id kbs
+    tc_type_args  = count (id . fst) (kbs `zip` tks)
+
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
-arityErr kind name n m
-  = hsep [ text kind, quotes (ppr name), ptext (sLit "should have"),
+arityErr what name n m
+  = hsep [ ptext (sLit "The") <+> text what, quotes (ppr name), ptext (sLit "should have"),
            n_arguments <> comma, text "but has been given",
            if m==0 then text "none" else int m]
     where

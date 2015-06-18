@@ -68,6 +68,7 @@ module TyCon(
         tyConArity,
         tyConRoles,
         tyConParent,
+        tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe, famTyConFlav_maybe,
@@ -1762,6 +1763,24 @@ instance Outputable TyCon where
   -- At the moment a promoted TyCon has the same Name as its
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
+
+tyConFlavour :: TyCon -> String
+tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+  | ClassTyCon _ <- parent = "class"
+  | otherwise = case rhs of
+                  TupleTyCon { tup_sort = sort }
+                     | isBoxed (tupleSortBoxity sort) -> "tuple"
+                     | otherwise                      -> "unboxed tuple"
+                  DataTyCon {}       -> "data type"
+                  NewTyCon {}        -> "newtype"
+                  DataFamilyTyCon {} -> "data family"
+                  AbstractTyCon {}   -> "abstract type"
+tyConFlavour (FamilyTyCon {})     = "type family"
+tyConFlavour (SynonymTyCon {})    = "type synonym"
+tyConFlavour (FunTyCon {})        = "built-in type"
+tyConFlavour (PrimTyCon {})       = "built-in type"
+tyConFlavour (PromotedDataCon {}) = "promoted data constructor"
+tyConFlavour (PromotedTyCon {})   = "promoted type constructor"
 
 pprPromotionQuote :: TyCon -> SDoc
 pprPromotionQuote (PromotedDataCon {}) = char '\''   -- Quote promoted DataCons

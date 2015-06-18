@@ -989,7 +989,7 @@ tcConArgs :: ConLike -> [TcSigmaType]
 
 tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
   = do  { checkTc (con_arity == no_of_args)     -- Check correct arity
-                  (arityErr "Constructor" con_like con_arity no_of_args)
+                  (arityErr "constructor" con_like con_arity no_of_args)
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg pats_w_tys
                                               penv thing_inside
@@ -1000,7 +1000,7 @@ tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
 
 tcConArgs con_like arg_tys (InfixCon p1 p2) penv thing_inside
   = do  { checkTc (con_arity == 2)      -- Check correct arity
-                  (arityErr "Constructor" con_like con_arity 2)
+                  (arityErr "constructor" con_like con_arity 2)
         ; let [arg_ty1,arg_ty2] = arg_tys       -- This can't fail after the arity check
         ; ([p1',p2'], res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
                                               penv thing_inside
