@@ -2268,28 +2268,22 @@ tup_exprs :: { [LHsTupArg RdrName] }
            | commas tup_tail
                 {% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (fst $1)
                       ; return
-                           (let tt = if null $2
-                                       then [noLoc missingTupArg]
-                                       else $2
-                            in map (\l -> L l missingTupArg) (fst $1) ++ tt) } }
+                           (map (\l -> L l missingTupArg) (fst $1) ++ $2) } }
 
 -- Always starts with commas; always follows an expr
 commas_tup_tail :: { (SrcSpan,[LHsTupArg RdrName]) }
 commas_tup_tail : commas tup_tail
        {% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (tail $ fst $1)
              ; return (
-         let tt = if null $2
-                    then [L (last $ fst $1) missingTupArg]
-                    else $2
-         in (head $ fst $1
-            ,(map (\l -> L l missingTupArg) (tail $ fst $1)) ++ tt)) } }
+            (head $ fst $1
+            ,(map (\l -> L l missingTupArg) (tail $ fst $1)) ++ $2)) } }
 
 -- Always follows a comma
 tup_tail :: { [LHsTupArg RdrName] }
           : texp commas_tup_tail {% addAnnotation (gl $1) AnnComma (fst $2) >>
                                     return ((L (gl $1) (Present $1)) : snd $2) }
           | texp                 { [L (gl $1) (Present $1)] }
-          | {- empty -}          { [] {- [noLoc missingTupArg] -} }
+          | {- empty -}          { [noLoc missingTupArg] }
 
 -----------------------------------------------------------------------------
 -- List expressions
