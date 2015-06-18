@@ -1420,7 +1420,7 @@ Note [Kick out insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have an insoluble alpha ~ [alpha], which is insoluble
 because an occurs check.  And then we unify alpha := [Int].
-Then we really want to rewrite the insouluble to [Int] ~ [[Int]].
+Then we really want to rewrite the insoluble to [Int] ~ [[Int]].
 Now it can be decomposed.  Otherwise we end up with a "Can't match
 [Int] ~ [[Int]]" which is true, but a bit confusing because the
 outer type constructors match.
@@ -2378,7 +2378,7 @@ emitWorkCt ct
 emitInsoluble :: Ct -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts.
 emitInsoluble ct
-  = do { traceTcS "Emit insoluble" (ppr ct)
+  = do { traceTcS "Emit insoluble" (ppr ct $$ pprCtLoc (ctLoc ct))
        ; updInertTcS add_insol }
   where
     this_pred = ctPred ct
@@ -2748,6 +2748,7 @@ newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newWantedEvVarNC loc pty
   = do { -- checkReductionDepth loc pty
        ; new_ev <- newEvVar pty
+       ; traceTcS "Emitting new wanted" (ppr new_ev $$ pprCtLoc loc)
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
@@ -2759,7 +2760,6 @@ newWantedEvVar loc pty
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                             ; return (ctev, Cached) }
             _ -> do { ctev <- newWantedEvVarNC loc pty
-                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (ctev, Fresh) } }
 
 emitNewDerived :: CtLoc -> TcPredType -> TcS ()
@@ -2782,7 +2782,7 @@ emitNewDerivedEq :: CtLoc -> TcPredType -> TcS ()
 -- There's no caching, no lookupInInerts
 emitNewDerivedEq loc pred
   = do { ev <- newDerivedNC loc pred
-       ; traceTcS "Emitting new derived equality" (ppr ev)
+       ; traceTcS "Emitting new derived equality" (ppr ev $$ pprCtLoc loc)
        ; updWorkListTcS (extendWorkListDerived loc ev) }
 
 newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
