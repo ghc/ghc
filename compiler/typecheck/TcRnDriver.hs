@@ -1298,7 +1298,7 @@ check_main dflags tcg_env
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; main_expr
                 <- addErrCtxt mainCtxt    $
-                   tcMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
+                   tcPolyMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
 
                 -- See Note [Root-main Id]
                 -- Construct the binding

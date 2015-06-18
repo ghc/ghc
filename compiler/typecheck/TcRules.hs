@@ -74,7 +74,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                tcExtendIdEnv    id_bndrs' $
                do { -- See Note [Solve order for RULES]
                     ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
-                  ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
+                  ; (rhs', rhs_wanted) <- captureConstraints (tcPolyMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
        ; (lhs_evs, other_lhs_wanted) <- simplifyRule (snd $ unLoc name)

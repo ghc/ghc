@@ -375,7 +375,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
-    rhs <- tcPolyExpr (nlHsVar nm) sig_ty
+    rhs <- tcPolyMonoExpr (nlHsVar nm) sig_ty
 
     (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
 

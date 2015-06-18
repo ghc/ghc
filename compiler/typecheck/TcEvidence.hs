@@ -7,7 +7,7 @@ module TcEvidence (
   -- HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpLams, mkWpLet, mkWpCast,
-  mkWpFun, idHsWrapper, isIdHsWrapper, pprHsWrapper,
+  mkWpFun, mkWpInstanceOf, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -568,6 +568,8 @@ data HsWrapper
                               -- Guaranteed not the identity coercion
                               -- At role Representational
 
+  | WpInstanceOf EvInstanceOf -- Application of an instantiation witness
+
         -- Evidence abstraction and application
         -- (both dictionaries and coercions)
   | WpEvLam  EvVar               -- \d. []       the 'd' is an evidence variable
@@ -600,6 +602,9 @@ mkWpCast co
   | isTcReflCo co = WpHole
   | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
                     WpCast co
+
+mkWpInstanceOf :: EvVar -> HsWrapper
+mkWpInstanceOf = WpInstanceOf . EvInstanceOfVar
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
@@ -766,7 +771,8 @@ data EvCallStack
 
 -- Evidence for instantiation / InstanceOf constraints
 data EvInstanceOf
-  = EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
+  = EvInstanceOfVar  EvId
+  | EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
   | EvInstanceOfInst TcCoercion [EvTerm]
   | EvInstanceOfLet  TcEvBinds  EvInstanceOf
     deriving ( Data.Data, Data.Typeable )
@@ -1040,6 +1046,7 @@ evVarsOfTypeable ev =
 evVarsOfInstanceOf :: EvInstanceOf -> VarSet
 evVarsOfInstanceOf ev =
   case ev of
+    EvInstanceOfVar  v    -> unitVarSet v
     EvInstanceOfEq   co   -> coVarsOfTcCo co
     EvInstanceOfInst co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
     EvInstanceOfLet  _  _ -> emptyVarSet
@@ -1075,6 +1082,7 @@ pprHsWrapper doc wrap
     help it (WpEvLam id)    = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
     help it (WpTyLam tv)    = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
     help it (WpLet binds)   = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
+    help it (WpInstanceOf i) = add_parens $ sep [ppr i, it False]
 
     pp_bndr v = pprBndr LambdaBind v <> dot
 
@@ -1133,6 +1141,7 @@ instance Outputable EvTypeable where
 instance Outputable EvInstanceOf where
   ppr ev =
     case ev of
+      EvInstanceOfVar  id   -> ptext (sLit "VAR")  <+> ppr id
       EvInstanceOfEq   co   -> ptext (sLit "EQ")   <+> ppr co
       EvInstanceOfInst co q -> ptext (sLit "INST") <+> ppr q <+> ppr co
       EvInstanceOfLet  b i  -> ptext (sLit "LET")  <+> ppr b <+> ppr i

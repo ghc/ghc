@@ -15,7 +15,7 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
        ) where
 
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho, tcCheckId,
-                                tcMonoExpr, tcMonoExprNC, tcPolyExpr )
+                                tcPolyMonoExpr, tcPolyMonoExprNC )
 
 import HsSyn
 import BasicTypes
@@ -273,7 +273,7 @@ tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 tcBody :: LHsExpr Name -> TcRhoType -> TcM (LHsExpr TcId)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; body' <- tcMonoExpr body res_ty
+        ; body' <- tcPolyMonoExpr body res_ty
         ; return body'
         }
 
@@ -342,7 +342,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
 
 tcGuardStmt :: TcExprStmtChecker
 tcGuardStmt _ (BodyStmt guard _ _ _) res_ty thing_inside
-  = do  { guard' <- tcMonoExpr guard boolTy
+  = do  { guard' <- tcPolyMonoExpr guard boolTy
         ; thing  <- thing_inside res_ty
         ; return (BodyStmt guard' noSyntaxExpr noSyntaxExpr boolTy, thing) }
 
@@ -374,21 +374,21 @@ tcLcStmt :: TyCon       -- The list/Parray type constructor ([] or PArray)
          -> TcExprStmtChecker
 
 tcLcStmt _ _ (LastStmt body _) elt_ty thing_inside
-  = do { body' <- tcMonoExprNC body elt_ty
+  = do { body' <- tcPolyMonoExprNC body elt_ty
        ; thing <- thing_inside (panic "tcLcStmt: thing_inside")
        ; return (LastStmt body' noSyntaxExpr, thing) }
 
 -- A generator, pat <- rhs
 tcLcStmt m_tc ctxt (BindStmt pat rhs _ _) elt_ty thing_inside
  = do   { pat_ty <- newFlexiTyVarTy liftedTypeKind
-        ; rhs'   <- tcMonoExpr rhs (mkTyConApp m_tc [pat_ty])
+        ; rhs'   <- tcPolyMonoExpr rhs (mkTyConApp m_tc [pat_ty])
         ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat pat_ty $
                             thing_inside elt_ty
         ; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 -- A boolean guard
 tcLcStmt _ _ (BodyStmt rhs _ _ _) elt_ty thing_inside
-  = do  { rhs'  <- tcMonoExpr rhs boolTy
+  = do  { rhs'  <- tcPolyMonoExpr rhs boolTy
         ; thing <- thing_inside elt_ty
         ; return (BodyStmt rhs' noSyntaxExpr noSyntaxExpr boolTy, thing) }
 
@@ -446,7 +446,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              using_poly_ty = mkForAllTy alphaTyVar $ by_arrow $
                              poly_arg_ty `mkFunTy` poly_res_ty
 
-       ; using' <- tcPolyExpr using using_poly_ty
+       ; using' <- tcPolyMonoExpr using using_poly_ty
        ; let final_using = fmap (HsWrap (WpTyApp tup_ty)) using'
 
              -- 'stmts' returns a result of type (m1_ty tuple_ty),
@@ -485,7 +485,7 @@ tcMcStmt _ (LastStmt body return_op) res_ty thing_inside
   = do  { a_ty       <- newFlexiTyVarTy liftedTypeKind
         ; return_op' <- tcSyntaxOp MCompOrigin return_op
                                    (a_ty `mkFunTy` res_ty)
-        ; body'      <- tcMonoExprNC body a_ty
+        ; body'      <- tcPolyMonoExprNC body a_ty
         ; thing      <- thing_inside (panic "tcMcStmt: thing_inside")
         ; return (LastStmt body' return_op', thing) }
 
@@ -509,7 +509,7 @@ tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
                       then return noSyntaxExpr
                       else tcSyntaxOp MCompOrigin fail_op (mkFunTy stringTy new_res_ty)
 
-        ; rhs' <- tcMonoExprNC rhs rhs_ty
+        ; rhs' <- tcPolyMonoExprNC rhs rhs_ty
         ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty $
                            thing_inside new_res_ty
 
@@ -527,7 +527,7 @@ tcMcStmt _ (BodyStmt rhs then_op guard_op _) res_ty thing_inside
           test_ty    <- newFlexiTyVarTy liftedTypeKind
         ; rhs_ty     <- newFlexiTyVarTy liftedTypeKind
         ; new_res_ty <- newFlexiTyVarTy liftedTypeKind
-        ; rhs'       <- tcMonoExpr rhs test_ty
+        ; rhs'       <- tcPolyMonoExpr rhs test_ty
         ; guard_op'  <- tcSyntaxOp MCompOrigin guard_op
                                    (mkFunTy test_ty rhs_ty)
         ; then_op'   <- tcSyntaxOp MCompOrigin then_op
@@ -589,7 +589,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
             tcStmtsAndThen (TransStmtCtxt ctxt) tcMcStmt stmts using_arg_ty $ \res_ty' -> do
                 { by' <- case by of
                            Nothing -> return Nothing
-                           Just e  -> do { e' <- tcMonoExpr e by_e_ty; return (Just e') }
+                           Just e  -> do { e' <- tcPolyMonoExpr e by_e_ty; return (Just e') }
 
                 -- Find the Ids (and hence types) of all old binders
                 ; bndr_ids <- tcLookupLocalIds bndr_names
@@ -611,7 +611,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        --------------- Typecheck the 'fmap' function -------------
        ; fmap_op' <- case form of
                        ThenForm -> return noSyntaxExpr
-                       _ -> fmap unLoc . tcPolyExpr (noLoc fmap_op) $
+                       _ -> fmap unLoc . tcPolyMonoExpr (noLoc fmap_op) $
                             mkForAllTy alphaTyVar $ mkForAllTy betaTyVar $
                             (alphaTy `mkFunTy` betaTy)
                             `mkFunTy` (n_app alphaTy)
@@ -620,7 +620,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        --------------- Typecheck the 'using' function -------------
        -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
 
-       ; using' <- tcPolyExpr using using_poly_ty
+       ; using' <- tcPolyMonoExpr using using_poly_ty
        ; let final_using = fmap (HsWrap (WpTyApp tup_ty)) using'
 
        --------------- Bulding the bindersMap ----------------
@@ -682,7 +682,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op) res_ty thing_inside
                         (m_ty `mkAppTy` betaTy)
                         `mkFunTy`
                         (m_ty `mkAppTy` mkBoxedTupleTy [alphaTy, betaTy])
-       ; mzip_op' <- unLoc `fmap` tcPolyExpr (noLoc mzip_op) mzip_ty
+       ; mzip_op' <- unLoc `fmap` tcPolyMonoExpr (noLoc mzip_op) mzip_ty
 
        ; (blocks', thing) <- loop m_ty bndr_stmts_s
 
@@ -732,7 +732,7 @@ tcMcStmt _ stmt _ _
 tcDoStmt :: TcExprStmtChecker
 
 tcDoStmt _ (LastStmt body _) res_ty thing_inside
-  = do { body' <- tcMonoExprNC body res_ty
+  = do { body' <- tcPolyMonoExprNC body res_ty
        ; thing <- thing_inside (panic "tcDoStmt: thing_inside")
        ; return (LastStmt body' noSyntaxExpr, thing) }
 
@@ -758,7 +758,7 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
                       then return noSyntaxExpr
                       else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
 
-        ; rhs' <- tcMonoExprNC rhs rhs_ty
+        ; rhs' <- tcPolyMonoExprNC rhs rhs_ty
         ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty $
                            thing_inside new_res_ty
 
@@ -774,7 +774,7 @@ tcDoStmt _ (BodyStmt rhs then_op _ _) res_ty thing_inside
         ; then_op' <- tcSyntaxOp DoOrigin then_op
                            (mkFunTys [rhs_ty, new_res_ty] res_ty)
 
-        ; rhs' <- tcMonoExprNC rhs rhs_ty
+        ; rhs' <- tcPolyMonoExprNC rhs rhs_ty
         ; thing <- thing_inside new_res_ty
         ; return (BodyStmt rhs' then_op' noSyntaxExpr rhs_ty, thing) }
 
@@ -829,7 +829,7 @@ When typechecking
         do { bar; ... } :: IO ()
 we want to typecheck 'bar' in the knowledge that it should be an IO thing,
 pushing info from the context into the RHS.  To do this, we check the
-rebindable syntax first, and push that information into (tcMonoExprNC rhs).
+rebindable syntax first, and push that information into (tcPolyMonoExprNC rhs).
 Otherwise the error shows up when cheking the rebindable syntax, and
 the expected/inferred stuff is back to front (see Trac #3613).
 

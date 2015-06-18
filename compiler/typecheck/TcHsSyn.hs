@@ -299,8 +299,8 @@ zonkTopLExpr :: LHsExpr TcId -> TcM (LHsExpr Id)
 zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind
-             -> LHsBinds TcId 
-             -> Maybe (Located [LIE RdrName]) 
+             -> LHsBinds TcId
+             -> Maybe (Located [LIE RdrName])
              -> NameSet
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
              -> TcM ([Id],
@@ -866,6 +866,8 @@ zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToType env ty
                                  ; return (env, WpTyApp ty') }
 zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
                                  ; return (env1, WpLet bs') }
+zonkCoFn env (WpInstanceOf i) = do { i' <- zonkEvInstanceOf env i
+                                   ; return (env, WpInstanceOf i') }
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit TcId -> TcM (HsOverLit Id)
@@ -1278,6 +1280,9 @@ zonkEvTerm env (EvDFunApp df tys tms)
 zonkEvTerm env (EvDelayedError ty msg)
   = do { ty' <- zonkTcTypeToType env ty
        ; return (EvDelayedError ty' msg) }
+zonkEvTerm env (EvInstanceOf i)
+  = do { i' <- zonkEvInstanceOf env i
+       ; return (EvInstanceOf i') }
 
 zonkTcEvBinds_s :: ZonkEnv -> [TcEvBinds] -> TcM (ZonkEnv, [TcEvBinds])
 zonkTcEvBinds_s env bs = do { (env, bs') <- mapAccumLM zonk_tc_ev_binds env bs
@@ -1320,6 +1325,21 @@ zonkEvBind env (EvBind { eb_lhs = var, eb_rhs = term, eb_is_given = is_given })
            _other -> zonkEvTerm env term
 
       ; return (EvBind { eb_lhs = var', eb_rhs = term', eb_is_given = is_given }) }
+
+zonkEvInstanceOf :: ZonkEnv -> EvInstanceOf -> TcM EvInstanceOf
+zonkEvInstanceOf env (EvInstanceOfVar v)
+  = return (EvInstanceOfVar (zonkIdOcc env v))
+zonkEvInstanceOf env (EvInstanceOfEq co)
+  = do { co' <- zonkTcCoToCo env co
+       ; return (EvInstanceOfEq co') }
+zonkEvInstanceOf env (EvInstanceOfInst co q)
+  = do { co' <- zonkTcCoToCo env co
+       ; q'  <- mapM (zonkEvTerm env) q
+       ; return (EvInstanceOfInst co' q') }
+zonkEvInstanceOf env (EvInstanceOfLet bnds i)
+  = do { (env', bnds') <- zonkTcEvBinds env bnds
+       ; i' <- zonkEvInstanceOf env' i
+       ; return (EvInstanceOfLet bnds' i') }
 
 {-
 ************************************************************************
@@ -1474,7 +1494,7 @@ zonkCoToCo env co
                                    do { (env', tv') <- zonkTyBndrX env tv
                                       ; co' <- zonkCoToCo env' co
                                       ; return (mkForAllCo tv' co') }
-                                   
+
 zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- This variant collects unbound type variables in a mutable variable
 -- Works on both types and kinds

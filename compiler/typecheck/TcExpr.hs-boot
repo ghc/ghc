@@ -4,14 +4,9 @@ import Name     ( Name )
 import TcType   ( TcType, TcRhoType, TcSigmaType )
 import TcRnTypes( TcM, TcId, CtOrigin )
 
-tcPolyExpr ::
+tcPolyMonoExpr, tcPolyMonoExprNC ::
           LHsExpr Name
        -> TcSigmaType
-       -> TcM (LHsExpr TcId)
-
-tcMonoExpr, tcMonoExprNC ::
-          LHsExpr Name
-       -> TcRhoType
        -> TcM (LHsExpr TcId)
 
 tcInferRho, tcInferRhoNC ::

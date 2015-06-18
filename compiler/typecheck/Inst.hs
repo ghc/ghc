@@ -28,7 +28,7 @@ module Inst (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   TcExpr( tcPolyMonoExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType )
 
 import FastString
@@ -397,7 +397,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- same type as the standard one.
         -- Tiresome jiggling because tcCheckSigma takes a located expression
      span <- getSrcSpanM
-     expr <- tcPolyExpr (L span user_nm_expr) sigma1
+     expr <- tcPolyMonoExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
 syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv

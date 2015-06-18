@@ -187,7 +187,7 @@ tcBrackTy (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
 tcPendingSplice (PendingRnSplice flavour splice_name expr)
   = do { res_ty <- tcMetaTy meta_ty_name
-       ; expr' <- tcMonoExpr expr res_ty
+       ; expr' <- tcPolyMonoExpr expr res_ty
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
@@ -432,7 +432,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
   = do { meta_exp_ty <- tcTExpTy res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
-                  tcMonoExpr expr meta_exp_ty
+                  tcPolyMonoExpr expr meta_exp_ty
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
        ; ps <- readMutVar ps_var
@@ -450,7 +450,7 @@ tcTopSplice expr res_ty
          -- making sure it has type Q (T res_ty)
          meta_exp_ty <- tcTExpTy res_ty
        ; zonked_q_expr <- tcTopSpliceExpr True $
-                          tcMonoExpr expr meta_exp_ty
+                          tcPolyMonoExpr expr meta_exp_ty
 
          -- Run the expression
        ; expr2 <- runMetaE zonked_q_expr
@@ -464,7 +464,7 @@ tcTopSplice expr res_ty
          -- These steps should never fail; this is a *typed* splice
        ; addErrCtxt (spliceResultDoc expr) $ do
        { (exp3, _fvs) <- rnLExpr expr2
-       ; exp4 <- tcMonoExpr exp3 res_ty
+       ; exp4 <- tcPolyMonoExpr exp3 res_ty
        ; return (unLoc exp4) } }
 
 {-
@@ -494,7 +494,7 @@ tcTopSpliceExpr :: Bool -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 -- Note that set the level to Splice, regardless of the original level,
 -- before typechecking the expression.  For example:
 --      f x = $( ...$(g 3) ... )
--- The recursive call to tcMonoExpr will simply expand the
+-- The recursive call to tcPolyMonoExpr will simply expand the
 -- inner escape before dealing with the outer one
 
 tcTopSpliceExpr isTypedSplice tc_action
