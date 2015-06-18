@@ -39,6 +39,7 @@ module RnEnv (
         addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
+        mkFieldEnv,
         dataTcOccs, kindSigErr, perhapsForallMsg, unknownSubordinateErr,
         HsDocContext(..), docOfHsDocContext
     ) where
@@ -1842,25 +1843,43 @@ warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
 warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 
 warnUnusedLocals :: [Name] -> RnM ()
-warnUnusedLocals names = mapM_ warnUnusedLocal names
+warnUnusedLocals names = do
+    fld_env <- mkFieldEnv <$> getGlobalRdrEnv
+    mapM_ (warnUnusedLocal fld_env) names
 
-warnUnusedLocal :: Name -> RnM ()
-warnUnusedLocal name
+warnUnusedLocal :: NameEnv (FieldLabelString, Name) -> Name -> RnM ()
+warnUnusedLocal fld_env name
   = when (reportable name) $
-    addUnusedWarning name (nameSrcSpan name)
+    addUnusedWarning occ (nameSrcSpan name)
                      (ptext (sLit "Defined but not used"))
+  where
+    occ = case lookupNameEnv fld_env name of
+              Just (fl, _) -> mkVarOccFS fl
+              Nothing      -> nameOccName name
 
--- AMG TODO: needs adapting to cope with FldParents
 warnUnusedGRE :: GlobalRdrElt -> RnM ()
-warnUnusedGRE (GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
-  | lcl       = warnUnusedLocal name
+warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
+  | lcl       = do fld_env <- mkFieldEnv <$> getGlobalRdrEnv
+                   warnUnusedLocal fld_env name
   | otherwise = when (reportable name) (mapM_ warn is)
   where
-    warn spec = addUnusedWarning name span msg
+    occ = greOccName gre
+    warn spec = addUnusedWarning occ span msg
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
            msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
+
+-- | Make a map from selector names to field labels and parent tycon
+-- names, to be used when reporting unused record fields.
+mkFieldEnv :: GlobalRdrEnv -> NameEnv (FieldLabelString, Name)
+mkFieldEnv rdr_env = mkNameEnv [ (gre_name gre, (lbl, par_is par))
+                               | gres <- occEnvElts rdr_env
+                               , gre <- gres
+                               , isOverloadedRecFldGRE gre
+                               , let par      = gre_par gre
+                                     Just lbl = par_lbl par
+                               ]
 
 reportable :: Name -> Bool
 reportable name
@@ -1869,19 +1888,12 @@ reportable name
                                   -- from Data.Tuple
   | otherwise = not (startsWithUnderscore (nameOccName name))
 
-addUnusedWarning :: Name -> SrcSpan -> SDoc -> RnM ()
-addUnusedWarning name span msg
+addUnusedWarning :: OccName -> SrcSpan -> SDoc -> RnM ()
+addUnusedWarning occ span msg
   = addWarnAt span $
     sep [msg <> colon,
-         nest 2 $ pprNonVarNameSpace (occNameSpace (nameOccName name))
-                        <+> quotes (ppr name)]
-
-{-
-  -- AMG TODO
-  where
-    pp_name | isOverloadedRecFldGRE gre = ppr (greOccName gre)
-            | otherwise                 = ppr (gre_name gre)
--}
+         nest 2 $ pprNonVarNameSpace (occNameSpace occ)
+                        <+> quotes (ppr occ)]
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres

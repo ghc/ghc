@@ -1551,16 +1551,10 @@ warnUnusedImportDecls gbl_env
                             -- both for warning about unnecessary ones, and for
                             -- deciding the minimal ones
              rdr_env = tcg_rdr_env gbl_env
+             fld_env = mkFieldEnv rdr_env
 
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage user_imports rdr_env uses sel_uses fld_env
-
-             fld_env = mkNameEnv [ (gre_name gre, (lbl, par_is par))
-                                     | gres <- occEnvElts rdr_env
-                                     , gre <- gres
-                                     , isOverloadedRecFldGRE gre
-                                     , let par      = gre_par gre
-                                           Just lbl = par_lbl par ]
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
                        , ptext (sLit "Selector uses:") <+> ppr (nameSetElems sel_uses)
