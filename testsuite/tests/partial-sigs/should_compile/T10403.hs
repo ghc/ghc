@@ -1,4 +1,5 @@
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -fdefer-type-errors #-}
 module T10403 where
 
 data I a = I a
@@ -11,9 +12,10 @@ instance Functor (B t) where
 
 newtype H f = H (f ())
 
-app :: H (B t)
-app = h (H . I) (B ())
-
 h :: _ => _
---h :: Functor m => (a -> b) -> m a -> H m
+-- h :: Functor m => (a -> b) -> m a -> H m
 h f b = (H . fmap (const ())) (fmap f b)
+
+h2 :: _
+-- h2 :: Functor m => (a -> b) -> m a -> H m
+h2 f b = (H . fmap (const ())) (fmap f b)
