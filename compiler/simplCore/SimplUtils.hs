@@ -62,6 +62,7 @@ import MonadUtils
 import Outputable
 import FastString
 import Pair
+import ListSetOps       ( minusList )
 
 import Control.Monad    ( when )
 import Data.List        ( partition )
@@ -1669,23 +1670,23 @@ prepareAlts scrut case_bndr' alts
            --   OutId, it has maximum information; this is important.
            --   Test simpl013 is an example
   = do { us <- getUniquesM
-       ; let (imposs_deflt_cons, refined_deflt, alts')
+       ; let (imposs_deflt_cons', refined_deflt, alts')
                 = filterAlts us (varType case_bndr') imposs_cons alts
-       ; when refined_deflt $ tick (FillInCaseDefault case_bndr')
-
-       ; alts'' <- combineIdenticalAlts case_bndr' alts'
-       ; return (imposs_deflt_cons, alts'') }
+             (combining_done, imposs_deflt_cons'', alts'')
+                = combineIdenticalAlts imposs_deflt_cons' alts'
+       ; when refined_deflt  $ tick (FillInCaseDefault case_bndr')
+       ; when combining_done $ tick (AltMerge case_bndr')
+       ; return (imposs_deflt_cons'', alts'') }
   where
     imposs_cons = case scrut of
                     Var v -> otherCons (idUnfolding v)
                     _     -> []
 
-{-
-Note [Combine identical alternatives]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- If several alternatives are identical, merge them into
- a single DEFAULT alternative.  I've occasionally seen this
- making a big difference:
+{- Note [Combine identical alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If several alternatives are identical, merge them into a single
+DEFAULT alternative.  I've occasionally seen this making a big
+difference:
 
      case e of               =====>     case e of
        C _ -> f x                         D v -> ....v....
@@ -1723,23 +1724,49 @@ NB: it's important that all this is done in [InAlt], *before* we work
 on the alternatives themselves, because Simpify.simplAlt may zap the
 occurrence info on the binders in the alternatives, which in turn
 defeats combineIdenticalAlts (see Trac #7360).
+
+Note [Care with impossible-constructors when combining alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have (Trac #10538)
+   data T = A | B | C
+
+   ... case x::T of
+         DEFAULT -> e1
+         A -> e2
+         B -> e1
+
+When calling combineIdentialAlts, we'll have computed that the "impossible
+constructors" for the DEFAULT alt is {A,B}, since if x is A or B we'll
+take the other alternatives.  But suppose we combine B into the DEFAULT,
+to get
+   ... case x::T of
+         DEFAULT -> e1
+         A -> e2
+Then we must be careful to trim the impossible constructors to just {A},
+else we risk compiling 'e1' wrong!
 -}
 
-combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
+
+combineIdenticalAlts :: [AltCon] -> [InAlt] -> (Bool, [AltCon], [InAlt])
 -- See Note [Combine identical alternatives]
-combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
+-- See Note [Care with impossible-constructors when combining alternatives]
+-- True <=> we did some combining, result is a single DEFAULT alternative
+combineIdenticalAlts imposs_cons ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1    -- Remember the default
   , not (null eliminated_alts) -- alternative comes first
-  = do  { tick (AltMerge case_bndr)
-        ; return ((DEFAULT, [], mkTicks (concat tickss) rhs1) : filtered_alts) }
+  = (True, imposs_cons', deflt_alt : filtered_alts)
   where
     (eliminated_alts, filtered_alts) = partition identical_to_alt1 con_alts
+    deflt_alt = (DEFAULT, [], mkTicks (concat tickss) rhs1)
+    imposs_cons' = imposs_cons `minusList` map fstOf3 eliminated_alts
+
     cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2
     identical_to_alt1 (_con,bndrs,rhs)
       = all isDeadBinder bndrs && rhs `cheapEqTicked` rhs1
     tickss = map (stripTicksT tickishFloatable . thirdOf3) eliminated_alts
 
-combineIdenticalAlts _ alts = return alts
+combineIdenticalAlts imposs_cons alts
+  = (False, imposs_cons, alts)
 
 {-
 ************************************************************************
