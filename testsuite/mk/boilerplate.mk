@@ -143,8 +143,8 @@ endif
 
 $(eval $(call canonicaliseExecutable,HADDOCK))
 ifeq "$(shell test -x '$(HADDOCK)' && echo exists)" ""
-# haddock is optional.
-HADDOCK :=
+# haddock is optional. Use 'override' to override canonicalise's override...
+override HADDOCK :=
 endif
 
 $(eval $(call canonicaliseExecutable,HSC2HS))
