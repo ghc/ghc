@@ -576,6 +576,7 @@ allocNursery (bdescr *tail, W_ blocks)
 STATIC_INLINE void
 assignNurseryToCapability (Capability *cap, nat n)
 {
+    ASSERT(n < n_nurseries);
     cap->r.rNursery = &nurseries[n];
     cap->r.rCurrentNursery = nurseries[n].blocks;
     newNurseryBlock(nurseries[n].blocks);
@@ -726,14 +727,19 @@ resizeNurseries (W_ blocks)
 rtsBool
 getNewNursery (Capability *cap)
 {
-    StgWord i = atomic_inc(&next_nursery, 1) - 1;
-    if (i >= n_nurseries) {
-        return rtsFalse;
-    }
-    assignNurseryToCapability(cap, i);
-    return rtsTrue;
-}
+    StgWord i;
 
+    for(;;) {
+        i = next_nursery;
+        if (i >= n_nurseries) {
+            return rtsFalse;
+        }
+        if (cas(&next_nursery, i, i+1) == i) {
+            assignNurseryToCapability(cap, i);
+            return rtsTrue;
+        }
+    }
+}
 /* -----------------------------------------------------------------------------
    move_STACK is called to update the TSO structure after it has been
    moved from one place to another.
