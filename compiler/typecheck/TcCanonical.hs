@@ -1661,26 +1661,26 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
     -- case InstanceOf sigma sigma, for the exact same sigma
   | lhs `eqType` rhs
   = can_instance_to_eq ev lhs rhs
-    -- case InstanceOf sigma (T ...) --> sigma ~ T ...
-  | Nothing <- getTyVar_maybe rhs, Nothing <- splitForAllTy_maybe rhs
-  = can_instance_to_eq ev lhs rhs
-  -- case InstanceOf (T ...) (forall qvars. Q => ty)
+    -- case InstanceOf (T ...) sigma --> T ... ~ sigma
   | Nothing <- getTyVar_maybe lhs, Nothing <- splitForAllTy_maybe lhs
-  , Just _  <- splitForAllTy_maybe rhs
+  = can_instance_to_eq ev lhs rhs
+  -- case InstanceOf (forall qvars. Q => ty) (T ...)
+  | Nothing <- getTyVar_maybe rhs, Nothing <- splitForAllTy_maybe rhs
+  , Just _  <- splitForAllTy_maybe lhs
   = case ev of
       CtWanted { ctev_evar = evar, ctev_loc = loc } ->
-        do { (qvars, q, ty) <- splitInst rhs
+        do { (qvars, q, ty) <- splitInst lhs
              -- generate new constraints
            ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
            ; let eq = mkTcEqPredRole Nominal lhs ty
            ; new_ev_ty <- newWantedEvVarNC loc eq
              -- compute the evidence for the instantiation
            ; let qvars' = map TyVarTy qvars
-           ; setWantedEvBind evar (mkInstanceOfInst rhs qvars' (ctEvCoercion new_ev_ty)
+           ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvCoercion new_ev_ty)
                                                     (map ctev_evar new_ev_qs))
              -- emit new work
            ; emitWorkNC new_ev_qs
-           ; canEqNC new_ev_ty NomEq lhs ty }
+           ; canEqNC new_ev_ty NomEq rhs ty }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
 can_instance_of _ = panic "can_instance_of in a non InstanceOf constraint"
 
@@ -1689,10 +1689,10 @@ can_instance_to_eq ev lhs rhs
   = do { let eq = mkTcEqPredRole Nominal lhs rhs
        ; case ev of
            CtDerived {} -> canEqNC (ev { ctev_pred = eq }) NomEq lhs rhs
-           CtGiven {ctev_loc = loc } ->
+           CtGiven { ctev_loc = loc } ->
              do { emitNewDerivedEq loc eq
                 ; stopWith ev "Given instanceOf equality" }
            CtWanted { ctev_evar = evar, ctev_loc = loc } ->
              do { new_ev <- newWantedEvVarNC loc eq
-                ; setWantedEvBind evar (mkInstanceOfEq rhs (ctEvCoercion new_ev))
+                ; setWantedEvBind evar (mkInstanceOfEq lhs (ctEvCoercion new_ev))
                 ; canEqNC new_ev NomEq lhs rhs } }

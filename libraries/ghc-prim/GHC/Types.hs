@@ -177,7 +177,7 @@ data Coercible a b = MkCoercible ((~#) a b)
 -- Also see Note [Kind-changing of (~) and Coercible]
 
 -- | A constraint inhabited only if type `a` is an instance of type `b`.
-data InstanceOf a b = MkInstanceOf (b -> a)
+data InstanceOf b a = MkInstanceOf (b -> a)
 
 -- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False
 --   if it is 0#.

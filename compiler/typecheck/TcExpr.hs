@@ -959,7 +959,7 @@ tc_app fun args fun_ty res_ty post_proc
         -- Rather like tcWrapResult, but (perhaps for historical reasons)
         -- we do this before typechecking the arguments
         ; ev_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
-                    emitWanted AppOrigin (mkInstanceOfPred res_ty actual_res_ty)
+                    emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
 
         -- Typecheck the arguments
         ; args1 <- tcArgs fun args expected_arg_tys
@@ -1142,7 +1142,7 @@ tc_check_id orig id_name res_ty
                  -> do { co <- unifyType res_ty actual_ty
                        ; return (mkHsWrap (mkWpCast co) (HsVar id)) }
                TcIdUnrestricted
-                 -> do { ev <- emitWanted orig (mkInstanceOfPred res_ty actual_ty)
+                 -> do { ev <- emitWanted orig (mkInstanceOfPred actual_ty res_ty)
                        ; return (mkHsWrap (mkWpInstanceOf actual_ty ev) (HsVar id)) } }
 
     inst_data_con con

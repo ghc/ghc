@@ -1159,12 +1159,12 @@ dsEvInstanceOf _  (EvInstanceOfVar v)
   = return (Var v)
 dsEvInstanceOf ty (EvInstanceOfEq co)
   = do { bndr <- newSysLocalDs ty
-       ; expr <- dsTcCoercion (TcSymCo co) (mkCast (Var bndr))
+       ; expr <- dsTcCoercion co (mkCast (Var bndr))
        ; return (mkCoreLams [bndr] expr) }
 dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
   = do { bndr <- newSysLocalDs ty
        ; qs'  <- mapM dsEvTerm qs
        ; let exprTy = foldl (\e t -> App e (Type t)) (Var bndr) qvars
              exprEv = foldl App exprTy qs'
-       ; expr <- dsTcCoercion (TcSymCo co) (mkCast exprEv)
+       ; expr <- dsTcCoercion co (mkCast exprEv)
        ; return (mkCoreLams [bndr] expr) }
