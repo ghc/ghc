@@ -99,7 +99,9 @@ test('allocLimit2', normal, compile_and_run, [''])
 test('allocLimit3', [ when(opsys('mingw32'), only_ways(threaded_ways)),
                       exit_code(1) ], compile_and_run, [''])
 
-test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS') ],
+test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
+                      # ghci consumes part of set limit at startup
+                      omit_ways(['ghci']) ],
                     compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
