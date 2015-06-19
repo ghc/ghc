@@ -568,12 +568,11 @@ data HsWrapper
                               -- Guaranteed not the identity coercion
                               -- At role Representational
 
-  | WpInstanceOf EvInstanceOf -- Application of an instantiation witness
-
         -- Evidence abstraction and application
         -- (both dictionaries and coercions)
   | WpEvLam  EvVar               -- \d. []       the 'd' is an evidence variable
   | WpEvApp  EvTerm              -- [] d         the 'd' is evidence for a constraint
+  | WpEvRevApp EvTerm            -- d []         the 'd' is evidence for a instantiation
 
         -- Kind and Type abstraction and application
   | WpTyLam TyVar       -- \a. []  the 'a' is a type/kind variable (not coercion var)
@@ -603,8 +602,8 @@ mkWpCast co
   | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
                     WpCast co
 
-mkWpInstanceOf :: EvVar -> HsWrapper
-mkWpInstanceOf = WpInstanceOf . EvInstanceOfVar
+mkWpInstanceOf :: Type -> EvVar -> HsWrapper
+mkWpInstanceOf ty v = WpEvRevApp (EvInstanceOf ty (EvInstanceOfVar v))
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
@@ -733,7 +732,7 @@ data EvTerm
 
   | EvTypeable EvTypeable   -- Dictionary for `Typeable`
 
-  | EvInstanceOf EvInstanceOf  -- Instantiation of a type
+  | EvInstanceOf Type EvInstanceOf  -- Instantiation of a type
 
   deriving( Data.Data, Data.Typeable )
 
@@ -773,15 +772,15 @@ data EvCallStack
 data EvInstanceOf
   = EvInstanceOfVar  EvId
   | EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
-  | EvInstanceOfInst TcCoercion [EvTerm]
+  | EvInstanceOfInst [Type] TcCoercion [EvTerm]
   | EvInstanceOfLet  TcEvBinds  EvInstanceOf
     deriving ( Data.Data, Data.Typeable )
 
-mkInstanceOfEq :: TcCoercion -> EvTerm
-mkInstanceOfEq = EvInstanceOf . EvInstanceOfEq
+mkInstanceOfEq :: Type -> TcCoercion -> EvTerm
+mkInstanceOfEq ty co = EvInstanceOf ty (EvInstanceOfEq co)
 
-mkInstanceOfInst :: TcCoercion -> [EvVar] -> EvTerm
-mkInstanceOfInst co q = EvInstanceOf (EvInstanceOfInst co (map EvId q))
+mkInstanceOfInst :: Type -> [Type] -> TcCoercion -> [EvVar] -> EvTerm
+mkInstanceOfInst ty vars co q = EvInstanceOf ty (EvInstanceOfInst vars co (map EvId q))
 
 {-
 Note [Coercion evidence terms]
@@ -1025,7 +1024,7 @@ evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
 evVarsOfTerm (EvTypeable ev)      = evVarsOfTypeable ev
-evVarsOfTerm (EvInstanceOf ev)    = evVarsOfInstanceOf ev
+evVarsOfTerm (EvInstanceOf _ ev)  = evVarsOfInstanceOf ev
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -1046,10 +1045,10 @@ evVarsOfTypeable ev =
 evVarsOfInstanceOf :: EvInstanceOf -> VarSet
 evVarsOfInstanceOf ev =
   case ev of
-    EvInstanceOfVar  v    -> unitVarSet v
-    EvInstanceOfEq   co   -> coVarsOfTcCo co
-    EvInstanceOfInst co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
-    EvInstanceOfLet  _  _ -> emptyVarSet
+    EvInstanceOfVar  v      -> unitVarSet v
+    EvInstanceOfEq   co     -> coVarsOfTcCo co
+    EvInstanceOfInst _ co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
+    EvInstanceOfLet  _  _   -> emptyVarSet
 
 {-
 ************************************************************************
@@ -1082,7 +1081,7 @@ pprHsWrapper doc wrap
     help it (WpEvLam id)    = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
     help it (WpTyLam tv)    = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
     help it (WpLet binds)   = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
-    help it (WpInstanceOf i) = add_parens $ sep [ppr i, it False]
+    help it (WpEvRevApp id) = no_parens  $ sep [it False, ptext (sLit "<|"), nest 2 (ppr id)]
 
     pp_bndr v = pprBndr LambdaBind v <> dot
 
@@ -1117,7 +1116,7 @@ instance Outputable EvTerm where
   ppr (EvDelayedError ty msg) =     ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
   ppr (EvTypeable ev)    = ppr ev
-  ppr (EvInstanceOf ev)  = ppr ev
+  ppr (EvInstanceOf _ ev) = ppr ev
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
@@ -1141,10 +1140,10 @@ instance Outputable EvTypeable where
 instance Outputable EvInstanceOf where
   ppr ev =
     case ev of
-      EvInstanceOfVar  id   -> ptext (sLit "VAR")  <+> ppr id
-      EvInstanceOfEq   co   -> ptext (sLit "EQ")   <+> ppr co
-      EvInstanceOfInst co q -> ptext (sLit "INST") <+> ppr q <+> ppr co
-      EvInstanceOfLet  b i  -> ptext (sLit "LET")  <+> ppr b <+> ppr i
+      EvInstanceOfVar  id  -> ptext (sLit "VAR")  <+> ppr id
+      EvInstanceOfEq   co  -> ptext (sLit "EQ")   <+> ppr co
+      EvInstanceOfInst vars co q -> ptext (sLit "INST") <+> ppr vars <+> ppr q <+> ppr co
+      EvInstanceOfLet  b i -> ptext (sLit "LET")  <+> ppr b <+> ppr i
 
 ----------------------------------------------------------------------
 -- Helper functions for dealing with IP newtype-dictionaries

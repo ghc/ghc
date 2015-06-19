@@ -801,6 +801,7 @@ dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
+dsHsWrapper (WpEvRevApp tm)   e = liftM (flip App e) (dsEvTerm tm)
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
@@ -864,6 +865,8 @@ dsEvTerm (EvLit l) =
 dsEvTerm (EvCallStack cs) = dsEvCallStack cs
 
 dsEvTerm (EvTypeable ev) = dsEvTypeable ev
+
+dsEvTerm (EvInstanceOf ty ev) = dsEvInstanceOf ty ev
 
 dsEvTypeable :: EvTypeable -> DsM CoreExpr
 dsEvTypeable ev =
@@ -1150,3 +1153,18 @@ which simpleOpt (currently) doesn't remove. So the rule never matches.
 Maybe simpleOpt should be smarter.  But it seems like a good plan
 to simply never generate the redundant box/unbox in the first place.
 -}
+
+dsEvInstanceOf :: Type -> EvInstanceOf -> DsM CoreExpr
+dsEvInstanceOf _  (EvInstanceOfVar v)
+  = return (Var v)
+dsEvInstanceOf ty (EvInstanceOfEq co)
+  = do { bndr <- newSysLocalDs ty
+       ; expr <- dsTcCoercion (TcSymCo co) (mkCast (Var bndr))
+       ; return (mkCoreLams [bndr] expr) }
+dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
+  = do { bndr <- newSysLocalDs ty
+       ; qs'  <- mapM dsEvTerm qs
+       ; let exprTy = foldl (\e t -> App e (Type t)) (Var bndr) qvars
+             exprEv = foldl App exprTy qs'
+       ; expr <- dsTcCoercion (TcSymCo co) (mkCast exprEv)
+       ; return (mkCoreLams [bndr] expr) }

@@ -966,7 +966,7 @@ tc_app fun args fun_ty res_ty post_proc
 
         -- Assemble the result
         ; let fun2 = mkLHsWrapCo co_fun (post_proc fun1)
-              app  = mkLHsWrap (mkWpInstanceOf ev_res) (foldl mkHsApp fun2 args1)
+              app  = mkLHsWrap (mkWpInstanceOf actual_res_ty ev_res) (foldl mkHsApp fun2 args1)
 
         ; return (unLoc app) }
 
@@ -1143,7 +1143,7 @@ tc_check_id orig id_name res_ty
                        ; return (mkHsWrap (mkWpCast co) (HsVar id)) }
                TcIdUnrestricted
                  -> do { ev <- emitWanted orig (mkInstanceOfPred res_ty actual_ty)
-                       ; return (mkHsWrap (mkWpInstanceOf ev) (HsVar id)) } }
+                       ; return (mkHsWrap (mkWpInstanceOf actual_ty ev) (HsVar id)) } }
 
     inst_data_con con
        -- For data constructors,

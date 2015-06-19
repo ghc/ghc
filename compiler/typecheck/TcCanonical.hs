@@ -1669,13 +1669,14 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
   , Just _  <- splitForAllTy_maybe rhs
   = case ev of
       CtWanted { ctev_evar = evar, ctev_loc = loc } ->
-        do { (_qvars, q, ty) <- splitInst rhs
+        do { (qvars, q, ty) <- splitInst rhs
              -- generate new constraints
            ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
            ; let eq = mkTcEqPredRole Nominal lhs ty
            ; new_ev_ty <- newWantedEvVarNC loc eq
              -- compute the evidence for the instantiation
-           ; setWantedEvBind evar (mkInstanceOfInst (ctEvCoercion new_ev_ty)
+           ; let qvars' = map TyVarTy qvars
+           ; setWantedEvBind evar (mkInstanceOfInst rhs qvars' (ctEvCoercion new_ev_ty)
                                                     (map ctev_evar new_ev_qs))
              -- emit new work
            ; emitWorkNC new_ev_qs
@@ -1693,5 +1694,5 @@ can_instance_to_eq ev lhs rhs
                 ; stopWith ev "Given instanceOf equality" }
            CtWanted { ctev_evar = evar, ctev_loc = loc } ->
              do { new_ev <- newWantedEvVarNC loc eq
-                ; setWantedEvBind evar (mkInstanceOfEq (ctEvCoercion new_ev))
+                ; setWantedEvBind evar (mkInstanceOfEq rhs (ctEvCoercion new_ev))
                 ; canEqNC new_ev NomEq lhs rhs } }
