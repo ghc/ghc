@@ -1424,7 +1424,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
             // all the Capabilities, but even so it's a slightly
             // unsavoury invariant.
             task->cap = tmpcap;
-            waitForReturnCapability(&tmpcap, task);
+            waitForCapability(&tmpcap, task);
             if (tmpcap->no != i) {
                 barf("acquireAllCapabilities: got the wrong capability");
             }
@@ -1801,7 +1801,7 @@ forkProcess(HsStablePtr *entry
     task = newBoundTask();
 
     cap = NULL;
-    waitForReturnCapability(&cap, task);
+    waitForCapability(&cap, task);
 
 #ifdef THREADED_RTS
     do {
@@ -2278,7 +2278,7 @@ resumeThread (void *task_)
     task->cap = cap;
 
     // Wait for permission to re-enter the RTS with the result.
-    waitForReturnCapability(&cap,task);
+    waitForCapability(&cap,task);
     // we might be on a different capability now... but if so, our
     // entry on the suspended_ccalls list will also have been
     // migrated.
@@ -2408,7 +2408,7 @@ void scheduleWorker (Capability *cap, Task *task)
     // cap->lock until we've finished workerTaskStop() below.
     //
     // There may be workers still involved in foreign calls; those
-    // will just block in waitForReturnCapability() because the
+    // will just block in waitForCapability() because the
     // Capability has been shut down.
     //
     ACQUIRE_LOCK(&cap->lock);
@@ -2499,7 +2499,7 @@ exitScheduler (rtsBool wait_foreign USED_IF_THREADS)
     if (sched_state < SCHED_SHUTTING_DOWN) {
         sched_state = SCHED_INTERRUPTING;
         Capability *cap = task->cap;
-        waitForReturnCapability(&cap,task);
+        waitForCapability(&cap,task);
         scheduleDoGC(&cap,task,rtsTrue);
         ASSERT(task->incall->tso == NULL);
         releaseCapability(cap);
@@ -2523,7 +2523,7 @@ freeScheduler( void )
     still_running = freeTaskManager();
     // We can only free the Capabilities if there are no Tasks still
     // running.  We might have a Task about to return from a foreign
-    // call into waitForReturnCapability(), for example (actually,
+    // call into waitForCapability(), for example (actually,
     // this should be the *only* thing that a still-running Task can
     // do at this point, and it will block waiting for the
     // Capability).
@@ -2567,7 +2567,7 @@ performGC_(rtsBool force_major)
 
     // TODO: do we need to traceTask*() here?
 
-    waitForReturnCapability(&cap,task);
+    waitForCapability(&cap,task);
     scheduleDoGC(&cap,task,force_major);
     releaseCapability(cap);
     boundTaskExiting(task);

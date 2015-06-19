@@ -167,6 +167,17 @@ isBoundTask (Task *task)
     return (task->incall->tso != NULL);
 }
 
+// A Task is currently a worker if
+//  (a) it was created as a worker (task->worker), and
+//  (b) it has not left and re-entered Haskell, in which case
+//      task->incall->prev_stack would be non-NULL.
+//
+INLINE_HEADER rtsBool
+isWorker (Task *task)
+{
+    return (task->worker && task->incall->prev_stack == NULL);
+}
+
 // Linked list of all tasks.
 //
 extern Task *all_tasks;
