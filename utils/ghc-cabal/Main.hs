@@ -396,17 +396,17 @@ generate directory distdir dll0Modules config_args
 
           dep_ids  = map snd (externalPackageDeps lbi)
           deps     = map display dep_ids
+          dep_direct = map (fromMaybe (error "ghc-cabal: dep_keys failed")
+                           . PackageIndex.lookupInstalledPackageId
+                                            (installedPkgs lbi)
+                           . fst)
+                       . externalPackageDeps
+                       $ lbi
           dep_keys
             | packageKeySupported comp
-                   = map (display
-                        . Installed.packageKey
-                        . fromMaybe (error "ghc-cabal: dep_keys failed")
-                        . PackageIndex.lookupInstalledPackageId
-                                                           (installedPkgs lbi)
-                        . fst)
-                   . externalPackageDeps
-                   $ lbi
+                   = map (display . Installed.packageKey) dep_direct
             | otherwise = deps
+          dep_ipids = map (display . Installed.installedPackageId) dep_direct
           depNames = map (display . packageName) dep_ids
 
           transitive_dep_ids = map Installed.sourcePackageId dep_pkgs
@@ -448,6 +448,7 @@ generate directory distdir dll0Modules config_args
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_KEYS = " ++ unwords dep_keys,
+                variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
                 variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords transitiveDeps,
                 variablePrefix ++ "_TRANSITIVE_DEP_KEYS = " ++ unwords transitiveDepKeys,

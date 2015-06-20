@@ -87,13 +87,12 @@ $4_USE_PACKAGE_KEY=NO
 endif
 endif
 
-ifeq "$($4_USE_PACKAGE_KEY)" "NO"
 $1_$2_$4_DEP_OPTS = \
- $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg))
+ $$(foreach pkg,$$($1_$2_DEP_IPIDS),-package-id $$(pkg))
+
+ifeq "$($4_USE_PACKAGE_KEY)" "NO"
 $4_THIS_PACKAGE_KEY = -package-name
 else
-$1_$2_$4_DEP_OPTS = \
- $$(foreach pkg,$$($1_$2_DEP_KEYS),-package-key $$(pkg))
 $4_THIS_PACKAGE_KEY = -this-package-key
 endif
 
