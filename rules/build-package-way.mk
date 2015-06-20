@@ -23,8 +23,8 @@ $(call hs-objs,$1,$2,$3)
 # The .a/.so library file, indexed by two different sets of vars:
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
-$1_$2_$3_LIB_NAME = libHS$$($1_$2_LIB_NAME)$$($3_libsuf)
-$1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_NAME)
+$1_$2_$3_LIB_FILE = libHS$$($1_$2_LIB_NAME)$$($3_libsuf)
+$1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
 $$($1_$2_PACKAGE_KEY)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
 ifeq "$$(HostOS_CPP)" "mingw32"

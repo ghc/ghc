@@ -229,7 +229,7 @@ endif
 ifeq "$(GhcDebugged)" "YES"
 WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_debug
 endif
-WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_dyn_LIB_NAME
+WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_dyn_LIB_FILE
 
 # -----------------------------------------------------------------------------
 # Compilation Flags

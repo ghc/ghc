@@ -153,8 +153,8 @@ $(call distdir-way-opts,rts,dist,$1)
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
 
-rts_$1_LIB_NAME = libHSrts$$($1_libsuf)
-rts_$1_LIB = rts/dist/build/$$(rts_$1_LIB_NAME)
+rts_$1_LIB_FILE = libHSrts$$($1_libsuf)
+rts_$1_LIB = rts/dist/build/$$(rts_$1_LIB_FILE)
 
 rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
 rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
