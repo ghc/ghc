@@ -402,11 +402,13 @@ generate directory distdir dll0Modules config_args
                            . fst)
                        . externalPackageDeps
                        $ lbi
-          dep_keys
-            | packageKeySupported comp
-                   = map (display . Installed.packageKey) dep_direct
-            | otherwise = deps
           dep_ipids = map (display . Installed.installedPackageId) dep_direct
+          depLibNames
+            | packageKeySupported comp
+                = map (\p -> packageKeyLibraryName
+                                (Installed.sourcePackageId p)
+                                (Installed.packageKey p)) dep_direct
+            | otherwise = deps
           depNames = map (display . packageName) dep_ids
 
           transitive_dep_ids = map Installed.sourcePackageId dep_pkgs
@@ -443,9 +445,9 @@ generate directory distdir dll0Modules config_args
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
-                variablePrefix ++ "_DEP_KEYS = " ++ unwords dep_keys,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
+                variablePrefix ++ "_DEP_LIB_NAMES = " ++ unwords depLibNames,
                 variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords transitiveDeps,
                 variablePrefix ++ "_TRANSITIVE_DEP_LIB_NAMES = " ++ unwords transitiveDepLibNames,
                 variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,

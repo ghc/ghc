@@ -189,7 +189,7 @@ ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
-    $$(foreach dep,$$($1_$2_DEPS),\
+    $$(foreach dep,$$($1_$2_DEP_LIB_NAMES),\
         $$(if $$(filter ghc%,$$(dep)),\
             $(if $(filter 0,$3),$$(compiler_stage1_PROGRAM_DEP_LIB),\
             $(if $(filter 1,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\

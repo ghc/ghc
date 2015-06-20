@@ -25,7 +25,7 @@ $(call hs-objs,$1,$2,$3)
 # the second is indexed by the package id, distdir and way
 $1_$2_$3_LIB_FILE = libHS$$($1_$2_LIB_NAME)$$($3_libsuf)
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
-$$($1_$2_PACKAGE_KEY)_$2_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_$2_LIB_NAME)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
 ifeq "$$(HostOS_CPP)" "mingw32"
 ifneq "$$($1_$2_dll0_HS_OBJS)" ""
@@ -42,7 +42,7 @@ endif
 # Really we should use a consistent scheme for distdirs, but in the
 # meantime we work around it by defining ghc-<ver>_dist-install_way_LIB:
 ifeq "$$($1_PACKAGE) $2" "ghc stage2"
-$$($1_$2_PACKAGE_KEY)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_$2_LIB_NAME)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
 endif
 
 # All the .a/.so library file dependencies for this library.
@@ -50,8 +50,8 @@ endif
 # The $(subst stage2,dist-install,..) is needed due to Note
 # [inconsistent distdirs].
 #
-# NB: Use DEP_KEYS, since DEPS only contains package IDs
-$1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEP_KEYS),$$($$(dep)_$(subst stage2,dist-install,$2)_$3_LIB))
+# NB: Use DEP_LIB_NAMES for the /directory/ parameter.
+$1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEP_LIB_NAMES),$$($$(dep)_$(subst stage2,dist-install,$2)_$3_LIB))
 
 $1_$2_$3_NON_HS_OBJS = $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS)  $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
 $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
