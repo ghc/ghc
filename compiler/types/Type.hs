@@ -392,7 +392,7 @@ repSplitAppTy_maybe (FunTy ty1 ty2)
   | otherwise                         = Just (TyConApp funTyCon [ty1], ty2)
 repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 repSplitAppTy_maybe (TyConApp tc tys)
-  | isDecomposableTyCon tc || tys `lengthExceeds` tyConArity tc
+  | mightBeUnsaturatedTyCon tc || tys `lengthExceeds` tyConArity tc
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
 repSplitAppTy_maybe _other = Nothing
@@ -415,8 +415,8 @@ splitAppTys ty = split ty ty []
     split _       (AppTy ty arg)        args = split ty ty (arg:args)
     split _       (TyConApp tc tc_args) args
       = let -- keep type families saturated
-            n | isDecomposableTyCon tc = 0
-              | otherwise              = tyConArity tc
+            n | mightBeUnsaturatedTyCon tc = 0
+              | otherwise                  = tyConArity tc
             (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)

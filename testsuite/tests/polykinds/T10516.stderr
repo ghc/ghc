@@ -1,0 +1,4 @@
+
+T10516.hs:8:6: error:
+    The type synonym ‘App’ should have 2 arguments, but has been given 1
+    In the type signature for ‘f’: f :: f a -> X (App f) a

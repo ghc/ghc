@@ -56,9 +56,9 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isExprHoleCt, isTypeHoleCt,
-        ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel,
+        ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvLoc, ctEvEqRel,
+        ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvTerm, ctEvCoercion, ctEvId,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
@@ -72,7 +72,7 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        CtOrigin(..), pprCtOrigin,
+        CtOrigin(..), pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
         SkolemInfo(..),
@@ -94,7 +94,6 @@ module TcRnTypes(
         -- Pretty printing
         pprEvVarTheta,
         pprEvVars, pprEvVarWithType,
-        pprArising, pprArisingAt,
 
         -- Misc other types
         TcId, TcIdSet, HoleSort(..)
@@ -1270,6 +1269,12 @@ ctEvidence = cc_ev
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
 
+setCtLoc :: Ct -> CtLoc -> Ct
+setCtLoc ct loc = ct { cc_ev = (cc_ev ct) { ctev_loc = loc } }
+
+ctOrigin :: Ct -> CtOrigin
+ctOrigin = ctLocOrigin . ctLoc
+
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
@@ -1754,6 +1759,9 @@ ctEvPred = ctev_pred
 ctEvLoc :: CtEvidence -> CtLoc
 ctEvLoc = ctev_loc
 
+ctEvOrigin :: CtEvidence -> CtOrigin
+ctEvOrigin = ctLocOrigin . ctEvLoc
+
 -- | Get the equality relation relevant for a 'CtEvidence'
 ctEvEqRel :: CtEvidence -> EqRel
 ctEvEqRel = predTypeEqRel . ctEvPred
@@ -2038,17 +2046,6 @@ pushErrCtxtSameOrigin :: ErrCtxt -> CtLoc -> CtLoc
 pushErrCtxtSameOrigin err loc@(CtLoc { ctl_env = lcl })
   = loc { ctl_env = lcl { tcl_ctxt = err : tcl_ctxt lcl } }
 
-pprArising :: CtOrigin -> SDoc
--- Used for the main, top-level error message
--- We've done special processing for TypeEq and FunDep origins
-pprArising (TypeEqOrigin {}) = empty
-pprArising orig              = pprCtOrigin orig
-
-pprArisingAt :: CtLoc -> SDoc
-pprArisingAt (CtLoc { ctl_origin = o, ctl_env = lcl})
-  = sep [ pprCtOrigin o
-        , text "at" <+> ppr (tcl_loc lcl)]
-
 {-
 ************************************************************************
 *                                                                      *
@@ -2179,7 +2176,6 @@ data CtOrigin
   | KindEqOrigin
       TcType TcType             -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
-  | CoercibleOrigin TcType TcType  -- a Coercible constraint
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
 
@@ -2232,11 +2228,19 @@ data CtOrigin
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
 
-pprCtOrigin :: CtOrigin -> SDoc
+pprCtLoc :: CtLoc -> SDoc
+-- "arising from ... at ..."
+-- Not an instance of Outputable because of the "arising from" prefix
+pprCtLoc (CtLoc { ctl_origin = o, ctl_env = lcl})
+  = sep [ pprCtOrigin o
+        , text "at" <+> ppr (tcl_loc lcl)]
 
+pprCtOrigin :: CtOrigin -> SDoc
+-- "arising from ..."
+-- Not an instance of Outputable because of the "arising from" prefix
 pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
-pprCtOrigin (SpecPragOrigin ctxt) 
+pprCtOrigin (SpecPragOrigin ctxt)
   = case ctxt of
        FunSigCtxt n _ -> ptext (sLit "a SPECIALISE pragma for") <+> quotes (ppr n)
        SpecInstCtxt   -> ptext (sLit "a SPECIALISE INSTANCE pragma")
@@ -2244,13 +2248,13 @@ pprCtOrigin (SpecPragOrigin ctxt)
 
 pprCtOrigin (FunDepOrigin1 pred1 loc1 pred2 loc2)
   = hang (ctoHerald <+> ptext (sLit "a functional dependency between constraints:"))
-       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprArisingAt loc1)
-               , hang (quotes (ppr pred2)) 2 (pprArisingAt loc2) ])
+       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprCtLoc loc1)
+               , hang (quotes (ppr pred2)) 2 (pprCtLoc loc2) ])
 
 pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
   = hang (ctoHerald <+> ptext (sLit "a functional dependency between:"))
        2 (vcat [ hang (ptext (sLit "constraint") <+> quotes (ppr pred1))
-                    2 (pprArising orig1 )
+                    2 (pprCtOrigin orig1 )
                , hang (ptext (sLit "instance") <+> quotes (ppr pred2))
                     2 (ptext (sLit "at") <+> ppr loc2) ])
 
@@ -2272,11 +2276,6 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
   = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
-
-pprCtOrigin (CoercibleOrigin ty1 ty2)
-  = hang (ctoHerald <+> text "trying to show that the representations of")
-       2 (quotes (ppr ty1) <+> text "and" $$
-          quotes (ppr ty2) <+> text "are the same")
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin

@@ -1185,8 +1185,8 @@ would then be rejected.
 In short, if you want GADT-like behaviour for pattern synonyms,
 then (unlike unlike concrete data constructors like <literal>S1</literal>)
 you must write its type with explicit provided equalities.
-For a concrete data construoctr like <literal>S1</literal> you can write
-its type signature as eigher <literal>S1 :: Bool -> S Bool</literal> or
+For a concrete data constructor like <literal>S1</literal> you can write
+its type signature as either <literal>S1 :: Bool -> S Bool</literal> or
 <literal>S1 :: (b~Bool) => Bool -> S b</literal>; the two are equivalent.
 Not so for pattern synonyms: the two forms are different, in order to
 distinguish the two cases above. (See <ulink url="https://ghc.haskell.org/trac/ghc/ticket/9953">Trac #9953</ulink> for
@@ -1372,7 +1372,7 @@ rec { b &lt;- f a c     ===>    (b,c) &lt;- mfix (\ ~(b,c) -> do { b &lt;- f a c
     A <literal>rec</literal>-block tells the compiler where precisely the recursive knot should be tied. It turns out that
     the placement of the recursive knots can be rather delicate: in particular, we would like the knots to be wrapped
     around as minimal groups as possible. This process is known as <emphasis>segmentation</emphasis>, and is described
-    in detail in Secton 3.2 of <ulink url="https://sites.google.com/site/leventerkok/recdo.pdf">A recursive do for
+    in detail in Section 3.2 of <ulink url="https://sites.google.com/site/leventerkok/recdo.pdf">A recursive do for
     Haskell</ulink>. Segmentation improves polymorphism and reduces the size of the recursive knot. Most importantly, it avoids
     unnecessary interference caused by a fundamental issue with the so-called <emphasis>right-shrinking</emphasis>
     axiom for monadic recursion. In brief, most monads of interest (IO, strict state, etc.) do <emphasis>not</emphasis>
@@ -1522,7 +1522,7 @@ Here are some other important points in using the recursive-do notation:
     <para>Parallel list comprehensions are a natural extension to list
     comprehensions.  List comprehensions can be thought of as a nice
     syntax for writing maps and filters.  Parallel comprehensions
-    extend this to include the zipWith family.</para>
+    extend this to include the <literal>zipWith</literal> family.</para>
 
     <para>A parallel list comprehension has multiple independent
     branches of qualifier lists, each separated by a `|' symbol.  For
@@ -2922,7 +2922,7 @@ if you write <literal>import M( (+) )</literal> do you mean the
 <emphasis>function</emphasis> <literal>(+)</literal> or the
 <emphasis>type constructor</emphasis> <literal>(+)</literal>?
 The default is the former, but with <option>-XExplicitNamespaces</option> (which is implied
-by <option>-XExplicitTypeOperators</option>) GHC allows you to specify the latter
+by <option>-XTypeOperators</option>) GHC allows you to specify the latter
 by preceding it with the keyword <literal>type</literal>, thus:
 <programlisting>
 import M( type (+) )
@@ -4064,7 +4064,7 @@ can be mentioned in the <literal>deriving</literal> clause.
 <listitem><para>
 GHC has a custom solver for discharging constraints that involve
 class <literal>Typeable</literal>, and handwritten instances are forbidden.
-This ensures that the programmer cannot subert the type system by
+This ensures that the programmer cannot subvert the type system by
 writing bogus instances.
 </para></listitem>
 
@@ -4082,8 +4082,8 @@ instance (Typeable t1, .., Typeable t_n) =>
   Typeable (T t1 .. t_n)
 </programlisting>
 This rule works for any concrete type constructor, including type
-constructors with polymorhic kinds.   The only restriction is that
-if the type constructor has a polymorhic kind, then it has to be applied
+constructors with polymorphic kinds.   The only restriction is that
+if the type constructor has a polymorphic kind, then it has to be applied
 to all of its kinds parameters, and these kinds need to be concrete
 (i.e., they cannot mention kind variables).
 </para></listitem>
@@ -4512,7 +4512,7 @@ globally configurable settings in a program. For example,
     assumeRH :: a -> a
 
   -- Deterministic version of the Miller test
-  -- correctness depends on the generalized Riemann hypothesis
+  -- correctness depends on the generalised Riemann hypothesis
   isPrime :: RiemannHypothesis => Integer -> Bool
   isPrime n = assumeRH (...)
 </programlisting>
@@ -4707,12 +4707,12 @@ To get a more useful version of the Collects class, Hugs provides a mechanism
 that allows programmers to specify dependencies between the parameters of a
 multiple parameter class (For readers with an interest in theoretical
 foundations and previous work: The use of dependency information can be seen
-both as a generalization of the proposal for `parametric type classes' that was
+both as a generalisation of the proposal for `parametric type classes' that was
 put forward by Chen, Hudak, and Odersky, or as a special case of Mark Jones's
 later framework for "improvement" of qualified types. The
 underlying ideas are also discussed in a more theoretical and abstract setting
 in a manuscript [implparam], where they are identified as one point in a
-general design space for systems of implicit parameterization.).
+general design space for systems of implicit parameterisation.).
 
 To start with an abstract example, consider a declaration such as:
 <programlisting>
@@ -4944,7 +4944,7 @@ The <option>-XFlexibleInstances</option> flag implies <option>-XTypeSynonymInsta
 </itemizedlist>
 </para>
 <para>
-However, the instance declaration must still conformm to the rules for instance
+However, the instance declaration must still conform to the rules for instance
 termination: see <xref linkend="instance-termination"/>.
 </para>
 </sect3>
@@ -4960,7 +4960,7 @@ is a type variable that occurs in the head.
 <para>
 The <option>-XFlexibleContexts</option> flag relaxes this rule, as well
 as relaxing the corresponding rule for type signatures (see <xref linkend="flexible-contexts"/>).
-Specfically, <option>-XFlexibleContexts</option>, allows (well-kinded) class constraints
+Specifically, <option>-XFlexibleContexts</option>, allows (well-kinded) class constraints
 of form <literal>(C t1 ... tn)</literal> in the context of an instance declaration.
 </para>
 <para>
@@ -4968,7 +4968,7 @@ Notice that the flag does not affect equality constraints in an instance context
 they are permitted by <option>-XTypeFamilies</option> or <option>-XGADTs</option>.
 </para>
 <para>
-However, the instance declaration must still conformm to the rules for instance
+However, the instance declaration must still conform to the rules for instance
 termination: see <xref linkend="instance-termination"/>.
 </para>
 
@@ -5146,7 +5146,7 @@ makes instance inference go into a loop, because it requires the constraint
 
 <para>
 The <option>-XUndecidableInstances</option> flag is also used to lift some of the
-restricitions imposed on type family instances. See <xref linkend="type-family-decidability"/>.
+restrictions imposed on type family instances. See <xref linkend="type-family-decidability"/>.
 </para>
 
 </sect3>
@@ -5164,7 +5164,7 @@ GHC also provides a way to to loosen
 the instance resolution, by
 allowing more than one instance to match, <emphasis>provided there is a most
 specific one</emphasis>.  Moreover, it can be loosened further, by allowing more than one instance to match
-irespective of whether there is a most specific one.
+irrespective of whether there is a most specific one.
 This section gives the details.
 </para>
 <para>
@@ -5229,7 +5229,7 @@ Eliminate any candidate IX for which both of the following hold:
 
 <listitem><para>
 If exactly one non-incoherent candidate remains, select it.  If all
-remaining candidates are incoherent, select an arbitary
+remaining candidates are incoherent, select an arbitrary
 one. Otherwise the search fails (i.e. when more than one surviving candidate is not incoherent).
 </para></listitem>
 
@@ -5303,7 +5303,7 @@ to <literal>Int</literal>, in which case instance (D) would be more specific sti
 So GHC rejects the program.</para>
 <para>
 If, however, you add the flag <option>-XIncoherentInstances</option> when
-compiling the module that contians (D), GHC will instead pick (C), without
+compiling the module that contains (D), GHC will instead pick (C), without
 complaining about the problem of subsequent instantiations.
 </para>
 <para>
@@ -6329,7 +6329,7 @@ Note the following points:
 </para></listitem>
 <listitem><para>
    The default declaration must mention only type <emphasis>variables</emphasis> on the left hand side,
-   and the right hand side must mention only type varaibels bound on the left hand side.
+   and the right hand side must mention only type variables bound on the left hand side.
    However, unlike the associated type family declaration itself,
    the type variables of the default instance are independent of those of the parent class.
 </para></listitem>
@@ -6729,7 +6729,7 @@ But that is not always the case.  Consider
 <programlisting>
 type family F a
 </programlisting>
-Type family declararations have no right-hand side, but GHC must still infer a kind
+Type family declarations have no right-hand side, but GHC must still infer a kind
 for <literal>F</literal>.  Since there are no constraints, it could infer 
 <literal>F :: forall k1 k2. k1 -> k2</literal>, but that seems <emphasis>too</emphasis> 
 polymorphic.  So GHC defaults those entirely-unconstrained kind variables to <literal>*</literal> and 
@@ -6853,7 +6853,7 @@ gets defaulted to <literal>*</literal>.
 </para></listitem>
 
 <listitem><para>
-A closed type familey has a complete signature when all of its type variables
+A closed type family has a complete signature when all of its type variables
 are annotated and a return kind (with a top-level <literal>::</literal>) is supplied.
 </para></listitem>
 </itemizedlist>
@@ -6943,7 +6943,7 @@ Promotion</ulink>, which appeared at TLDI 2012.
 Standard Haskell has a rich type language. Types classify terms and serve to
 avoid many common programming mistakes. The kind language, however, is
 relatively simple, distinguishing only lifted types (kind <literal>*</literal>),
-type constructors (eg. kind <literal>* -> * -> *</literal>), and unlifted
+type constructors (e.g. kind <literal>* -> * -> *</literal>), and unlifted
 types (<xref linkend="glasgow-unboxed"/>). In particular when using advanced
 type system features, such as type families (<xref linkend="type-families"/>)
 or GADTs (<xref linkend="gadt"/>), this simple kind system is insufficient,
@@ -7168,7 +7168,7 @@ annotation (see <xref linkend="explicit-namespaces"/>).
 </para>
 
 <para>
-Here is an exampe of using type-level numeric literals to provide a safe
+Here is an example of using type-level numeric literals to provide a safe
 interface to a low-level function:
 <programlisting>
 import GHC.TypeLits
@@ -7203,7 +7203,7 @@ example = from (Point 1 2) (Get :: Label "x")
 <sect2 id="typelit-runtime">
 <title>Runtime Values for Type-Level Literals</title>
 <para>
-Sometimes it is useful to access the value-level literal assocaited with
+Sometimes it is useful to access the value-level literal associated with
 a type-level literal.  This is done with the functions
 <literal>natVal</literal> and <literal>symbolVal</literal>. For example:
 <programlisting>
@@ -7260,7 +7260,7 @@ GHC.TypeLits> natVal (Proxy :: Proxy (2 + 3))
 </para>
 <para>
 At present, GHC is quite limited in its reasoning about arithmetic:
-it will only evalute the arithmetic type functions and compare the results---
+it will only evaluate the arithmetic type functions and compare the results---
 in the same way that it does for any other type function.  In particular,
 it does not know more general facts about arithmetic, such as the commutativity
 and associativity of <literal>(+)</literal>, for example.
@@ -7550,7 +7550,7 @@ and fail.
 <para>
 So in fact we use this as our <emphasis>definition</emphasis> of ambiguity: a type
 <literal><replaceable>ty</replaceable></literal> is
-ambiguious if and only if <literal>((undefined :: <replaceable>ty</replaceable>)
+ambiguous if and only if <literal>((undefined :: <replaceable>ty</replaceable>)
 :: <replaceable>ty</replaceable>)</literal> would fail to typecheck.  We use a
 very similar test for <emphasis>inferred</emphasis> types, to ensure that they too are
 unambiguous.
@@ -7625,7 +7625,7 @@ constraints lead to types of the form <literal>(?x::t') => t</literal>, which sa
 function uses a dynamically-bound variable <literal>?x</literal>
 of type <literal>t'</literal>". For
 example, the following expresses the type of a sort function,
-implicitly parameterized by a comparison function named <literal>cmp</literal>.
+implicitly parameterised by a comparison function named <literal>cmp</literal>.
 <programlisting>
   sort :: (?cmp :: a -> a -> Bool) => [a] -> [a]
 </programlisting>
@@ -7638,8 +7638,8 @@ any valid identifier (e.g. <literal>ord ?x</literal> is a valid expression).
 Use of this construct also introduces a new
 dynamic-binding constraint in the type of the expression.
 For example, the following definition
-shows how we can define an implicitly parameterized sort function in
-terms of an explicitly parameterized <literal>sortBy</literal> function:
+shows how we can define an implicitly parameterised sort function in
+terms of an explicitly parameterised <literal>sortBy</literal> function:
 <programlisting>
   sortBy :: (a -> a -> Bool) -> [a] -> [a]
 
@@ -8005,7 +8005,7 @@ and <option>-XRank2Types</option> are synonyms for
 <option>-XRankNTypes</option>.  They used to specify finer
 distinctions that GHC no longer makes.  (They should really elicit a
 deprecation warning, but they don't, purely to avoid the need to
-library authors to change their old flags specifciations.)
+library authors to change their old flags specifications.)
 </para>
 
 <sect3 id="univ">
@@ -9157,7 +9157,7 @@ main = print "b"
     </link>. Should you so wish, it is possible to enable
     <literal>-fdefer-type-errors</literal> without enabling
     <literal>-fdefer-typed-holes</literal>, by explicitly specifying
-    <literal>-fno-defer-typed-holes</literal> on the commandline after the
+    <literal>-fno-defer-typed-holes</literal> on the command-line after the
     <literal>-fdefer-type-errors</literal> flag.
   </para>
   <para>
@@ -9427,7 +9427,7 @@ baz b = [| quux $(mkPat b) = x + y |]
 	      <para>
 		The difference in treatment of outermost and nested pattern splices is
 		because outermost splices are run at compile time. GHC can then use
-		the result of running the splice when analyzing the expressions within
+		the result of running the splice when analysing the expressions within
 		the pattern's scope. Nested splices, on the other hand, are <emphasis>not</emphasis>
 		run at compile time; they are run when the bracket is spliced in, sometime later.
 		Since nested pattern splices may refer to local variables, there is no way for GHC
@@ -9458,7 +9458,7 @@ f n = \ [haskell|y|] -> y+n
 	    <listitem>
               <para>
 		Top-level declaration splices break up a source file into
-		<emphasis>delcaration groups</emphasis>. A
+		<emphasis>declaration groups</emphasis>. A
 		<emphasis>declaration group</emphasis> is the group of
 		declarations created by a top-level declaration splice, plus
 		those following it, down to but not including the next
@@ -9906,7 +9906,7 @@ $ ./main
 <title>Arrow notation
 </title>
 
-<para>Arrows are a generalization of monads introduced by John Hughes.
+<para>Arrows are a generalisation of monads introduced by John Hughes.
 For more details, see
 <itemizedlist>
 

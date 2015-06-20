@@ -1513,16 +1513,15 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
                        , not (isDFunId id || isImplicitId id) ]
             -- We only need to keep around the external bindings
             -- (as decided by TidyPgm), since those are the only ones
-            -- that might be referenced elsewhere.
-            -- The DFunIds are in 'cls_insts' (see Note [ic_tythings] in HscTypes
-            -- Implicit Ids are implicit in tcs
+            -- that might later be looked up by name.  But we can exclude
+            --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in HscTypes
+            --    - Implicit Ids, which are implicit in tcs
+            -- c.f. TcRnDriver.runTcInteractive, which reconstructs the TypeEnv
 
-        tythings =  map AnId ext_ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) patsyns
-
-    let icontext = hsc_IC hsc_env
-        ictxt    = extendInteractiveContext icontext ext_ids tcs
-                                            cls_insts fam_insts defaults patsyns
-    return (tythings, ictxt)
+        new_tythings = map AnId ext_ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) patsyns
+        ictxt        = hsc_IC hsc_env
+        new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts fam_insts defaults
+    return (new_tythings, new_ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
 hscImport hsc_env str = runInteractiveHsc hsc_env $ do

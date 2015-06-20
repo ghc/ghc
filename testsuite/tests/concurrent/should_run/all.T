@@ -22,8 +22,12 @@ test('conc072', only_ways(['threaded2']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 # vector code must get inlined to become non-allocating
-test('T367', [reqlib('vector'), omit_ways(['ghci']), timeout_multiplier(0.001)], compile_and_run, ['-O2 -fno-omit-yields'])
-test('T367_letnoescape', [timeout_multiplier(0.02), expect_broken_for(7297,['optllvm'])], compile_and_run, ['-fno-omit-yields'])
+test('T367',
+     [reqlib('vector'), omit_ways(['ghci']), run_timeout_multiplier(0.001)],
+     compile_and_run, ['-O2 -fno-omit-yields'])
+test('T367_letnoescape',
+     [run_timeout_multiplier(0.02), expect_broken_for(7297,['optllvm'])],
+     compile_and_run, ['-fno-omit-yields'])
 
 test('T1980', normal, compile_and_run, [''])
 test('T2910', normal, compile_and_run, [''])
@@ -95,7 +99,9 @@ test('allocLimit2', normal, compile_and_run, [''])
 test('allocLimit3', [ when(opsys('mingw32'), only_ways(threaded_ways)),
                       exit_code(1) ], compile_and_run, [''])
 
-test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS') ],
+test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
+                      # ghci consumes part of set limit at startup
+                      omit_ways(['ghci']) ],
                     compile_and_run, [''])
 
 # -----------------------------------------------------------------------------

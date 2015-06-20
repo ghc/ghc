@@ -943,7 +943,7 @@ Note [Handling of deprecations]
 * We report deprecations at each *occurrence* of the deprecated thing
   (see Trac #5867)
 
-* We do not report deprectations for locally-definded names. For a
+* We do not report deprecations for locally-defined names. For a
   start, we may be exporting a deprecated thing. Also we may use a
   deprecated thing in the defn of another deprecated things.  We may
   even use a deprecated thing in the defn of a non-deprecated thing,

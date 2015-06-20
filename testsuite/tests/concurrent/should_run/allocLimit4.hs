@@ -8,6 +8,7 @@ import Control.Monad
 
 -- check that +RTS -xq is doing the right thing: the test requires
 -- +RTS -xq300k
+-- Test does not work in GHCi as it load A Lot Of Things at start
 
 main = do
   m <- newEmptyMVar
@@ -19,7 +20,7 @@ main = do
          case e of
            Left AllocationLimitExceeded{} -> do
              c <- getAllocationCounter
-             when (c < 250*1024 || c > 350*1024) $ fail "wrong limit grace"
+             when (c < 250*1024 || c > 350*1024) $ fail $ "wrong limit grace: " ++ show c
              print (length [2..])
            Right _ ->
              fail "didn't catch AllocationLimitExceeded"

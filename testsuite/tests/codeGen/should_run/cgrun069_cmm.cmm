@@ -11,23 +11,24 @@ section "rodata" { memmoveErr : bits8[] "Memmove Error Occured\n"; }
 
 memintrinTest (W_ dummy)
 {
-	W_ size, src, dst, off, alignV, set;
+	W_ size, src, dst, off, set;
 	bits8 set8;
 
-   // Need two versions as memset takes a word for historical reasons
+	// Need two versions as memset takes a word for historical reasons
 	// but really its a bits8. We check that setting has ben done correctly
 	// at the bits8 level, so need bits8 version for checking.
 	set = 4;
 	set8 = 4::bits8;
 
 	size = 1024;
-	alignV = 4;
+// Alignment must be constant expression
+#define alignV 4
 
 	("ptr" src) = foreign "C" malloc(size);
 	("ptr" dst) = foreign "C" malloc(size);
 
    // Test memset
-        prim %memset(src, set, size, alignV);
+	prim %memset(src, set, size, alignV);
 
    // Check memset worked
 	off = 0;
@@ -100,6 +101,7 @@ while3_end:
 
         return (0);
 }
+#undef alignV
 
 // ---------------------------------------------------------------------
 // Tests for unrolling
@@ -113,15 +115,14 @@ while3_end:
 // has ben done correctly at the bits8 level, so need bits8 version
 // for checking.
 #define TEST_MEMSET(ALIGN,SIZE)                                        \
-    W_ size, src, dst, off, alignV, set;                               \
+    W_ size, src, dst, off, set;                                       \
     bits8 set8;                                                        \
     set = 4;                                                           \
     set8 = 4::bits8;                                                   \
     size = SIZE;                                                       \
-    alignV = ALIGN;                                                    \
     ("ptr" src) = foreign "C" malloc(size);                            \
     ("ptr" dst) = foreign "C" malloc(size);                            \
-    prim %memset(src, set, size, alignV);                              \
+    prim %memset(src, set, size, ALIGN);                               \
     off = 0;                                                           \
 loop:                                                                  \
     if (off == size) {                                                 \
@@ -164,9 +165,8 @@ testMemset4_7  (W_ dummy) { TEST_MEMSET(4,7); }
 testMemset4_8  (W_ dummy) { TEST_MEMSET(4,8); }
 
 #define TEST_MEMCPY(ALIGN,SIZE)                                        \
-    W_ size, src, dst, off, alignV;                                    \
+    W_ size, src, dst, off;                                            \
     size = SIZE;                                                       \
-    alignV = ALIGN;                                                    \
     ("ptr" src) = foreign "C" malloc(size);                            \
     ("ptr" dst) = foreign "C" malloc(size);                            \
     off = 0;                                                           \
@@ -178,7 +178,7 @@ init:                                                                  \
     off = off + 1;                                                     \
     goto init;                                                         \
 init_end:                                                              \
-    prim %memcpy(dst, src, size, alignV);                              \
+    prim %memcpy(dst, src, size, ALIGN);                               \
     off = 0;                                                           \
 loop:                                                                  \
     if (off == size) {                                                 \

@@ -82,7 +82,7 @@ $ ghc-pkg list
     <para>An installed package is either <emphasis>exposed</emphasis>
       or <emphasis>hidden</emphasis> by default.  Packages hidden by
       default are listed in parentheses
-      (eg. <literal>(lang-1.0)</literal>), or possibly in blue if your
+      (e.g. <literal>(lang-1.0)</literal>), or possibly in blue if your
       terminal supports colour, in the output of <literal>ghc-pkg
       list</literal>.  Command-line flags, described below, allow you
       to expose a hidden package or hide an exposed one.  Only modules
@@ -1424,7 +1424,7 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
           </term>
           <listitem>
             <para>(optional freeform) A string describing the stability of the package
-            (eg. stable, provisional or experimental).</para>
+            (e.g. stable, provisional or experimental).</para>
           </listitem>
         </varlistentry>
 
@@ -1903,5 +1903,6 @@ package_id_n
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

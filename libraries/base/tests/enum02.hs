@@ -1,5 +1,9 @@
 -- !!! Testing the Int Enum instances.
-{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -F -pgmF ./enum_processor.py #-}
+-- The processor is a non-CPP-based equivalent of
+-- #define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
+-- which is not portable to clang
+
 module Main(main) where
 
 import Control.Exception
@@ -15,7 +19,6 @@ main = do
   putStrLn "Testing Enum Int64:"
   testEnumInt64
 
-#define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 
 testEnumInt8 :: IO ()
 testEnumInt8 = do

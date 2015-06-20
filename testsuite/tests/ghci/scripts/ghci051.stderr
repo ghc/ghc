@@ -1,9 +1,9 @@
 
-<interactive>:7:9:
+<interactive>:7:9: error:
     Couldn't match type ‘T’
                    with ‘Ghci1.T’
-    NB: ‘T’ is defined at <interactive>:6:1-16
-        ‘Ghci1.T’ is defined at <interactive>:3:1-14
+    NB: ‘Ghci1.T’ is defined at <interactive>:3:1-14
+        ‘T’ is defined at <interactive>:6:1-16
     Expected type: T'
       Actual type: T
     In the expression: C :: T'

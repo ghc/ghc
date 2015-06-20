@@ -278,7 +278,8 @@ class TestOptions:
        self.combined_output = False
 
        # How should the timeout be adjusted on this test?
-       self.timeout_multiplier = 1.0
+       self.compile_timeout_multiplier = 1.0
+       self.run_timeout_multiplier = 1.0
 
 # The default set of options
 global default_testopts

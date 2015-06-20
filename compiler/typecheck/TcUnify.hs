@@ -667,7 +667,7 @@ uType, uType_defer
 -- See Note [Deferred unification]
 uType_defer origin ty1 ty2
   = do { eqv <- newEq ty1 ty2
-       ; loc <- getCtLoc origin
+       ; loc <- getCtLocM origin
        ; emitSimple $ mkNonCanonical $
              CtWanted { ctev_evar = eqv
                       , ctev_pred = mkTcEqPred ty1 ty2
@@ -745,7 +745,7 @@ uType origin orig_ty1 orig_ty2
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, length tys1 == length tys2
-      = ASSERT( isDecomposableTyCon tc1 )
+      = ASSERT( isGenerativeTyCon tc1 Nominal )
         do { cos <- zipWithM (uType origin) tys1 tys2
            ; return $ mkTcTyConAppCo Nominal tc1 cos }
 
@@ -761,12 +761,12 @@ uType origin orig_ty1 orig_ty2
 
     go (AppTy s1 t1) (TyConApp tc2 ts2)
       | Just (ts2', t2') <- snocView ts2
-      = ASSERT( isDecomposableTyCon tc2 )
+      = ASSERT( mightBeUnsaturatedTyCon tc2 )
         go_app s1 t1 (TyConApp tc2 ts2') t2'
 
     go (TyConApp tc1 ts1) (AppTy s2 t2)
       | Just (ts1', t1') <- snocView ts1
-      = ASSERT( isDecomposableTyCon tc1 )
+      = ASSERT( mightBeUnsaturatedTyCon tc1 )
         go_app (TyConApp tc1 ts1') t1' s2 t2
 
         -- Anything else fails

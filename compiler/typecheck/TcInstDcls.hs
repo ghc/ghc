@@ -433,7 +433,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                      2 (pprInstanceHdr (iSpec i))
 
     -- Report an error or a warning for a `Typeable` instances.
-    -- If we are workikng on an .hs-boot file, we just report a warning,
+    -- If we are working on an .hs-boot file, we just report a warning,
     -- and ignore the instance.  We do this, to give users a chance to fix
     -- their code.
     typeable_err i =

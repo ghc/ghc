@@ -805,7 +805,7 @@ splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
 -- ^ Attempt to take a coercion application apart.
 splitAppCo_maybe (AppCo co1 co2) = Just (co1, co2)
 splitAppCo_maybe (TyConAppCo r tc cos)
-  | isDecomposableTyCon tc || cos `lengthExceeds` tyConArity tc
+  | mightBeUnsaturatedTyCon tc || cos `lengthExceeds` tyConArity tc
   , Just (cos', co') <- snocView cos
   , Just co'' <- setNominalRole_maybe co'
   = Just (mkTyConAppCo r tc cos', co'') -- Never create unsaturated type family apps!

@@ -1645,10 +1645,8 @@ genCCall
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall dflags is32Bit (PrimTarget MO_Memcpy) _
-         [dst, src,
-          (CmmLit (CmmInt n _)),
-          (CmmLit (CmmInt align _))]
+genCCall dflags is32Bit (PrimTarget (MO_Memcpy align)) _
+         [dst, src, CmmLit (CmmInt n _)]
     | fromInteger insns <= maxInlineMemcpyInsns dflags && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
@@ -1694,11 +1692,10 @@ genCCall dflags is32Bit (PrimTarget MO_Memcpy) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall dflags _ (PrimTarget MO_Memset) _
+genCCall dflags _ (PrimTarget (MO_Memset align)) _
          [dst,
           CmmLit (CmmInt c _),
-          CmmLit (CmmInt n _),
-          CmmLit (CmmInt align _)]
+          CmmLit (CmmInt n _)]
     | fromInteger insns <= maxInlineMemsetInsns dflags && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
@@ -2507,18 +2504,12 @@ outOfLineCmmOp mop res args
       let target = ForeignTarget targetExpr
                            (ForeignConvention CCallConv [] [] CmmMayReturn)
 
-      stmtToInstrs (CmmUnsafeForeignCall target (catMaybes [res]) args')
+      stmtToInstrs (CmmUnsafeForeignCall target (catMaybes [res]) args)
   where
         -- Assume we can call these functions directly, and that they're not in a dynamic library.
         -- TODO: Why is this ok? Under linux this code will be in libm.so
         --       Is is because they're really implemented as a primitive instruction by the assembler??  -- BL 2009/12/31
         lbl = mkForeignLabel fn Nothing ForeignLabelInThisPackage IsFunction
-
-        args' = case mop of
-                    MO_Memcpy    -> init args
-                    MO_Memset    -> init args
-                    MO_Memmove   -> init args
-                    _            -> args
 
         fn = case mop of
               MO_F32_Sqrt  -> fsLit "sqrtf"
@@ -2553,9 +2544,9 @@ outOfLineCmmOp mop res args
               MO_F64_Tanh  -> fsLit "tanh"
               MO_F64_Pwr   -> fsLit "pow"
 
-              MO_Memcpy    -> fsLit "memcpy"
-              MO_Memset    -> fsLit "memset"
-              MO_Memmove   -> fsLit "memmove"
+              MO_Memcpy _  -> fsLit "memcpy"
+              MO_Memset _  -> fsLit "memset"
+              MO_Memmove _ -> fsLit "memmove"
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"

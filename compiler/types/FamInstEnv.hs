@@ -951,7 +951,7 @@ normaliseType :: FamInstEnvs            -- environment with family instances
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- but *not* newtypes (which are visible to the programmer)
 -- Returns with Refl if nothing happens
--- Try to not to disturb type syonyms if possible
+-- Try to not to disturb type synonyms if possible
 
 normaliseType env role (TyConApp tc tys)
   = normaliseTcApp env role tc tys

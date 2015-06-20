@@ -17,8 +17,9 @@ module CoreUtils (
         mkAltExpr,
 
         -- * Taking expressions apart
-        findDefault, findAlt, isDefaultAlt,
-        mergeAlts, trimConArgs, filterAlts,
+        findDefault, addDefault, findAlt, isDefaultAlt,
+        mergeAlts, trimConArgs,
+        filterAlts, combineIdenticalAlts, refineDefaultAlt,
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
@@ -79,6 +80,7 @@ import TysPrim
 import DynFlags
 import FastString
 import Maybes
+import ListSetOps       ( minusList )
 import Platform
 import Util
 import Pair
@@ -453,7 +455,7 @@ mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Taking expressions apart}
+               Operations oer case alternatives
 *                                                                      *
 ************************************************************************
 
@@ -466,10 +468,13 @@ findDefault :: [(AltCon, [a], b)] -> ([(AltCon, [a], b)], Maybe b)
 findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
 findDefault alts                        =                     (alts, Nothing)
 
+addDefault :: [(AltCon, [a], b)] -> Maybe b -> [(AltCon, [a], b)]
+addDefault alts Nothing    = alts
+addDefault alts (Just rhs) = (DEFAULT, [], rhs) : alts
+
 isDefaultAlt :: (AltCon, a, b) -> Bool
 isDefaultAlt (DEFAULT, _, _) = True
 isDefaultAlt _               = False
-
 
 -- | Find the case alternative corresponding to a particular
 -- constructor: panics if no such constructor exists
@@ -487,6 +492,36 @@ findAlt con alts
           LT -> deflt   -- Missed it already; the alts are in increasing order
           EQ -> Just alt
           GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
+
+{- Note [Unreachable code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is possible (although unusual) for GHC to find a case expression
+that cannot match.  For example:
+
+     data Col = Red | Green | Blue
+     x = Red
+     f v = case x of
+              Red -> ...
+              _ -> ...(case x of { Green -> e1; Blue -> e2 })...
+
+Suppose that for some silly reason, x isn't substituted in the case
+expression.  (Perhaps there's a NOINLINE on it, or profiling SCC stuff
+gets in the way; cf Trac #3118.)  Then the full-lazines pass might produce
+this
+
+     x = Red
+     lvl = case x of { Green -> e1; Blue -> e2 })
+     f v = case x of
+             Red -> ...
+             _ -> ...lvl...
+
+Now if x gets inlined, we won't be able to find a matching alternative
+for 'Red'.  That's because 'lvl' is unreachable.  So rather than crashing
+we generate (error "Inaccessible alternative").
+
+Similar things can happen (augmented by GADTs) when the Simplifier
+filters down the matching alternatives in Simplify.rebuildCase.
+-}
 
 ---------------------------------
 mergeAlts :: [(AltCon, a, b)] -> [(AltCon, a, b)] -> [(AltCon, a, b)]
@@ -515,16 +550,15 @@ trimConArgs DEFAULT      args = ASSERT( null args ) []
 trimConArgs (LitAlt _)   args = ASSERT( null args ) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 
-filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have to manufacture a new AltCon
-           -> Type                 -- ^ Type of scrutinee (used to prune possibilities)
+filterAlts :: TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
+           -> [Type]               -- ^ And its type arguments
            -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
            -> [(AltCon, [Var], a)] -- ^ Alternatives
-           -> ([AltCon], Bool, [(AltCon, [Var], a)])
+           -> ([AltCon], [(AltCon, [Var], a)])
              -- Returns:
              --  1. Constructors that will never be encountered by the
              --     *default* case (if any).  A superset of imposs_cons
-             --  2. Whether we managed to refine the default alternative into a specific constructor (for statistics only)
-             --  3. The new alternatives, trimmed by
+             --  2. The new alternatives, trimmed by
              --        a) remove imposs_cons
              --        b) remove constructors which can't match because of GADTs
              --      and with the DEFAULT expanded to a DataAlt if there is exactly
@@ -538,98 +572,147 @@ filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have t
              -- If callers need to preserve the invariant that there is always at least one branch
              -- in a "case" statement then they will need to manually add a dummy case branch that just
              -- calls "error" or similar.
-filterAlts us ty imposs_cons alts
-  | Just (tycon, inst_tys) <- splitTyConApp_maybe ty
-  = filter_alts tycon inst_tys
-  | otherwise
-  = (imposs_cons, False, alts)
+filterAlts _tycon inst_tys imposs_cons alts
+  = (imposs_deflt_cons, addDefault trimmed_alts maybe_deflt)
   where
     (alts_wo_default, maybe_deflt) = findDefault alts
     alt_cons = [con | (con,_,_) <- alts_wo_default]
 
-    filter_alts tycon inst_tys
-      = (imposs_deflt_cons, refined_deflt, merged_alts)
-     where
-       trimmed_alts = filterOut (impossible_alt inst_tys) alts_wo_default
+    trimmed_alts = filterOut (impossible_alt inst_tys) alts_wo_default
 
-       imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
+    imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
          -- "imposs_deflt_cons" are handled
          --   EITHER by the context,
          --   OR by a non-DEFAULT branch in this case expression.
-
-       merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
-         -- We need the mergeAlts in case the new default_alt
-         -- has turned into a constructor alternative.
-         -- The merge keeps the inner DEFAULT at the front, if there is one
-         -- and interleaves the alternatives in the right order
-
-       (refined_deflt, maybe_deflt') = case maybe_deflt of
-          Nothing -> (False, Nothing)
-          Just deflt_rhs
-             | isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
-             , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
-                                           --      case x of { DEFAULT -> e }
-                                           -- and we don't want to fill in a default for them!
-             , Just all_cons <- tyConDataCons_maybe tycon
-             , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type
-                   impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
-             -> case filterOut impossible all_cons of
-                  -- Eliminate the default alternative
-                  -- altogether if it can't match:
-                  []    -> (False, Nothing)
-                  -- It matches exactly one constructor, so fill it in:
-                  [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
-                    where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
-                  _     -> (False, Just (DEFAULT, [], deflt_rhs))
-
-             | debugIsOn, isAlgTyCon tycon
-             , null (tyConDataCons tycon)
-             , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
-                   -- Check for no data constructors
-                   -- This can legitimately happen for abstract types and type families,
-                   -- so don't report that
-             -> pprTrace "prepareDefault" (ppr tycon)
-                (False, Just (DEFAULT, [], deflt_rhs))
-
-             | otherwise -> (False, Just (DEFAULT, [], deflt_rhs))
 
     impossible_alt :: [Type] -> (AltCon, a, b) -> Bool
     impossible_alt _ (con, _, _) | con `elem` imposs_cons = True
     impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                         = False
 
-{-
-Note [Unreachable code]
-~~~~~~~~~~~~~~~~~~~~~~~
-It is possible (although unusual) for GHC to find a case expression
-that cannot match.  For example:
+refineDefaultAlt :: [Unique] -> TyCon -> [Type] -> [AltCon] -> [CoreAlt] -> (Bool, [CoreAlt])
+-- Refine the default alterantive to a DataAlt,
+-- if there is a unique way to do so
+refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
+  | (DEFAULT,_,rhs) : rest_alts <- all_alts
+  , isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
+  , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
+                                --      case x of { DEFAULT -> e }
+                                -- and we don't want to fill in a default for them!
+  , Just all_cons <- tyConDataCons_maybe tycon
+  , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type
+        impossible con   = con `elem` imposs_data_cons || dataConCannotMatch tys con
+  = case filterOut impossible all_cons of
+       -- Eliminate the default alternative
+       -- altogether if it can't match:
+       []    -> (False, rest_alts)
 
-     data Col = Red | Green | Blue
-     x = Red
-     f v = case x of
-              Red -> ...
-              _ -> ...(case x of { Green -> e1; Blue -> e2 })...
+       -- It matches exactly one constructor, so fill it in:
+       [con] -> (True, mergeAlts rest_alts [(DataAlt con, ex_tvs ++ arg_ids, rhs)])
+                       -- We need the mergeAlts to keep the alternatives in the right order
+             where
+                (ex_tvs, arg_ids) = dataConRepInstPat us con tys
 
-Suppose that for some silly reason, x isn't substituted in the case
-expression.  (Perhaps there's a NOINLINE on it, or profiling SCC stuff
-gets in the way; cf Trac #3118.)  Then the full-lazines pass might produce
-this
+       -- It matches more than one, so do nothing
+       _  -> (False, all_alts)
 
-     x = Red
-     lvl = case x of { Green -> e1; Blue -> e2 })
-     f v = case x of
-             Red -> ...
-             _ -> ...lvl...
+  | debugIsOn, isAlgTyCon tycon, null (tyConDataCons tycon)
+  , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
+        -- Check for no data constructors
+        -- This can legitimately happen for abstract types and type families,
+        -- so don't report that
+  = pprTrace "prepareDefault" (ppr tycon) (False, all_alts)
 
-Now if x gets inlined, we won't be able to find a matching alternative
-for 'Red'.  That's because 'lvl' is unreachable.  So rather than crashing
-we generate (error "Inaccessible alternative").
+  | otherwise      -- The common case
+  = (False, all_alts)
 
-Similar things can happen (augmented by GADTs) when the Simplifier
-filters down the matching alternatives in Simplify.rebuildCase.
+{- Note [Combine identical alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If several alternatives are identical, merge them into a single
+DEFAULT alternative.  I've occasionally seen this making a big
+difference:
+
+     case e of               =====>     case e of
+       C _ -> f x                         D v -> ....v....
+       D v -> ....v....                   DEFAULT -> f x
+       DEFAULT -> f x
+
+The point is that we merge common RHSs, at least for the DEFAULT case.
+[One could do something more elaborate but I've never seen it needed.]
+To avoid an expensive test, we just merge branches equal to the *first*
+alternative; this picks up the common cases
+     a) all branches equal
+     b) some branches equal to the DEFAULT (which occurs first)
+
+The case where Combine Identical Alternatives transformation showed up
+was like this (base/Foreign/C/Err/Error.hs):
+
+        x | p `is` 1 -> e1
+          | p `is` 2 -> e2
+        ...etc...
+
+where @is@ was something like
+
+        p `is` n = p /= (-1) && p == n
+
+This gave rise to a horrible sequence of cases
+
+        case p of
+          (-1) -> $j p
+          1    -> e1
+          DEFAULT -> $j p
+
+and similarly in cascade for all the join points!
+
+NB: it's important that all this is done in [InAlt], *before* we work
+on the alternatives themselves, because Simpify.simplAlt may zap the
+occurrence info on the binders in the alternatives, which in turn
+defeats combineIdenticalAlts (see Trac #7360).
+
+Note [Care with impossible-constructors when combining alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have (Trac #10538)
+   data T = A | B | C
+
+   ... case x::T of
+         DEFAULT -> e1
+         A -> e2
+         B -> e1
+
+When calling combineIdentialAlts, we'll have computed that the "impossible
+constructors" for the DEFAULT alt is {A,B}, since if x is A or B we'll
+take the other alternatives.  But suppose we combine B into the DEFAULT,
+to get
+   ... case x::T of
+         DEFAULT -> e1
+         A -> e2
+Then we must be careful to trim the impossible constructors to just {A},
+else we risk compiling 'e1' wrong!
+-}
 
 
-************************************************************************
+combineIdenticalAlts :: [AltCon] -> [CoreAlt] -> (Bool, [AltCon], [CoreAlt])
+-- See Note [Combine identical alternatives]
+-- See Note [Care with impossible-constructors when combining alternatives]
+-- True <=> we did some combining, result is a single DEFAULT alternative
+combineIdenticalAlts imposs_cons ((_con1,bndrs1,rhs1) : con_alts)
+  | all isDeadBinder bndrs1    -- Remember the default
+  , not (null eliminated_alts) -- alternative comes first
+  = (True, imposs_cons', deflt_alt : filtered_alts)
+  where
+    (eliminated_alts, filtered_alts) = partition identical_to_alt1 con_alts
+    deflt_alt = (DEFAULT, [], mkTicks (concat tickss) rhs1)
+    imposs_cons' = imposs_cons `minusList` map fstOf3 eliminated_alts
+
+    cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2
+    identical_to_alt1 (_con,bndrs,rhs)
+      = all isDeadBinder bndrs && rhs `cheapEqTicked` rhs1
+    tickss = map (stripTicksT tickishFloatable . thirdOf3) eliminated_alts
+
+combineIdenticalAlts imposs_cons alts
+  = (False, imposs_cons, alts)
+
+{- *********************************************************************
 *                                                                      *
              exprIsTrivial
 *                                                                      *

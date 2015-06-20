@@ -1,7 +1,4 @@
-all: backpack-impl.pdf backpack-manual.pdf ubackpack.pdf algorithm.pdf
-
-ubackpack.pdf: ubackpack.tex
-	latexmk -pdf -latexoption=-halt-on-error -latexoption=-file-line-error -latexoption=-synctex=1 ubackpack.tex || ! rm -f $@
+all: backpack-impl.pdf backpack-manual.pdf algorithm.pdf
 
 backpack-impl.pdf: backpack-impl.tex
 	latexmk -pdf -latexoption=-halt-on-error -latexoption=-file-line-error -latexoption=-synctex=1 backpack-impl.tex || ! rm -f $@

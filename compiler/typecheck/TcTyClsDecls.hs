@@ -2303,14 +2303,7 @@ addTyThingCtxt thing
   where
     name = getName thing
     flav = case thing of
-             ATyCon tc
-                | isClassTyCon tc       -> ptext (sLit "class")
-                | isTypeFamilyTyCon tc  -> ptext (sLit "type family")
-                | isDataFamilyTyCon tc  -> ptext (sLit "data family")
-                | isTypeSynonymTyCon tc -> ptext (sLit "type")
-                | isNewTyCon tc         -> ptext (sLit "newtype")
-                | isDataTyCon tc        -> ptext (sLit "data")
-
+             ATyCon tc -> text (tyConFlavour tc)
              _ -> pprTrace "addTyThingCtxt strange" (ppr thing)
                   Outputable.empty
 

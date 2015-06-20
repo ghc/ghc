@@ -701,7 +701,7 @@ etaTyConAppCo_maybe tc (TyConAppCo _ tc2 cos2)
   = ASSERT( tc == tc2 ) Just cos2
 
 etaTyConAppCo_maybe tc co
-  | isDecomposableTyCon tc
+  | mightBeUnsaturatedTyCon tc
   , Pair ty1 ty2     <- coercionKind co
   , Just (tc1, tys1) <- splitTyConApp_maybe ty1
   , Just (tc2, tys2) <- splitTyConApp_maybe ty2

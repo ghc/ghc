@@ -260,3 +260,10 @@ ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
   </sect2>
 
 </sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; ispell-local-dictionary: "british" ***
+     ;;; End: ***
+ -->

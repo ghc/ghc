@@ -35,6 +35,8 @@
 
   * `Data.Version.Version` now has a `Generic` instance
 
+  * `IO` now has a `Monoid` instance
+
 ## 4.8.1.0  *TBA*
 
   * Bundled with GHC 7.10.2

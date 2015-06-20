@@ -9,7 +9,7 @@ module TcSMonad (
     extendWorkListCts, appendWorkList,
     selectNextWorkItem,
     workListSize, workListWantedCount,
-    updWorkListTcS, updWorkListTcS_return,
+    updWorkListTcS,
 
     -- The TcS monad
     TcS, runTcS, runTcSWithEvBinds,
@@ -41,7 +41,8 @@ module TcSMonad (
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertModel, getInertGivens,
-    emptyInert, getTcSInerts, setTcSInerts, takeInertInsolubles,
+    emptyInert, getTcSInerts, setTcSInerts, takeGivenInsolubles,
+    matchableGivens, prohibitedSuperClassSolve,
     getUnsolvedInerts,
     removeInertCts,
     addInertCan, addInertEq, insertFunEq,
@@ -115,6 +116,7 @@ import Kind
 import TcType
 import DynFlags
 import Type
+import Unify
 
 import TcEvidence
 import Class
@@ -1418,7 +1420,7 @@ Note [Kick out insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have an insoluble alpha ~ [alpha], which is insoluble
 because an occurs check.  And then we unify alpha := [Int].
-Then we really want to rewrite the insouluble to [Int] ~ [[Int]].
+Then we really want to rewrite the insoluble to [Int] ~ [[Int]].
 Now it can be decomposed.  Otherwise we end up with a "Can't match
 [Int] ~ [[Int]]" which is true, but a bit confusing because the
 outer type constructors match.
@@ -1474,15 +1476,43 @@ getInertCans = do { inerts <- getTcSInerts; return (inert_cans inerts) }
 setInertCans :: InertCans -> TcS ()
 setInertCans ics = updInertTcS $ \ inerts -> inerts { inert_cans = ics }
 
-takeInertInsolubles :: TcS Cts
--- Take the insoluble constraints out of the inert set
-takeInertInsolubles
+takeGivenInsolubles :: TcS Cts
+-- See Note [The inert set after solving Givens]
+takeGivenInsolubles
+  = updRetInertCans $ \ cans ->
+    ( inert_insols cans
+    , cans { inert_insols = emptyBag
+           , inert_funeqs = filterFunEqs isGivenCt (inert_funeqs cans) } )
+
+{- Note [The inert set after solving Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After solving the Givens we take two things out of the inert set
+
+  a) The insolubles; we return these to report inaccessible code
+     We return these separately.  We don't want to leave them in
+     the inert set, lest we onfuse them with insolubles arising from
+     solving wanteds
+
+  b) Any Derived CFunEqCans.  Derived CTyEqCans are in the
+     inert_model and do no harm.  In contrast, Derived CFunEqCans
+     get mixed up with the Wanteds later and confuse the
+     post-solve-wanted unflattening (Trac #10507).
+     E.g.  From   [G] 1 <= m, [G] m <= n
+           We get [D] 1 <= n, and we must remove it!
+         Otherwise we unflatten it more then once, and assign
+         to its fmv more than once...disaster.
+     It's ok to remove them because they turned ont not to
+     yield an insoluble, and hence have now done their work.
+-}
+
+updRetInertCans :: (InertCans -> (a, InertCans)) -> TcS a
+-- Modify the inert set with the supplied function
+updRetInertCans upd_fn
   = do { is_var <- getTcSInertsRef
        ; wrapTcS (do { inerts <- TcM.readTcRef is_var
-                     ; let cans = inert_cans inerts
-                           cans' = cans { inert_insols = emptyBag }
+                     ; let (res, cans') = upd_fn (inert_cans inerts)
                      ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
-                     ; return (inert_insols cans) }) }
+                     ; return res }) }
 
 updInertCans :: (InertCans -> InertCans) -> TcS ()
 -- Modify the inert set with the supplied function
@@ -1624,6 +1654,56 @@ getNoGivenEqs tclvl skol_tvs
           SkolemTv {} -> tv `elemVarSet` skol_tv_set
           FlatSkol {} -> not (tv `elemVarSet` local_fsks)
           _           -> False
+
+-- | Returns Given constraints that might,
+-- potentially, match the given pred. This is used when checking to see if a
+-- Given might overlap with an instance. See Note [Instance and Given overlap]
+-- in TcInteract.
+matchableGivens :: CtLoc -> PredType -> InertSet -> Cts
+matchableGivens loc_w pred (IS { inert_cans = inert_cans })
+  = filterBag matchable_given all_relevant_givens
+  where
+    -- just look in class constraints and irreds. matchableGivens does get called
+    -- for ~R constraints, but we don't need to look through equalities, because
+    -- canonical equalities are used for rewriting. We'll only get caught by
+    -- non-canonical -- that is, irreducible -- equalities.
+    all_relevant_givens :: Cts
+    all_relevant_givens
+      | Just (clas, _) <- getClassPredTys_maybe pred
+      = findDictsByClass (inert_dicts inert_cans) clas
+        `unionBags` inert_irreds inert_cans
+      | otherwise
+      = inert_irreds inert_cans
+
+    matchable_given :: Ct -> Bool
+    matchable_given ct
+      | CtGiven { ctev_loc = loc_g } <- ctev
+      , Just _ <- tcUnifyTys bind_meta_tv [ctEvPred ctev] [pred]
+      , not (prohibitedSuperClassSolve loc_g loc_w)
+      = True
+
+      | otherwise
+      = False
+      where
+        ctev = cc_ev ct
+
+    bind_meta_tv :: TcTyVar -> BindFlag
+    -- Any meta tyvar may be unified later, so we treat it as
+    -- bindable when unifying with givens. That ensures that we
+    -- conservatively assume that a meta tyvar might get unified with
+    -- something that matches the 'given', until demonstrated
+    -- otherwise.
+    bind_meta_tv tv | isMetaTyVar tv = BindMe
+                    | otherwise      = Skolem
+
+prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
+-- See Note [Solving superclass constraints] in TcInstDcls
+prohibitedSuperClassSolve from_loc solve_loc
+  | GivenOrigin (InstSC given_size) <- ctLocOrigin from_loc
+  , ScOrigin wanted_size <- ctLocOrigin solve_loc
+  = given_size >= wanted_size
+  | otherwise
+  = False
 
 {-
 Note [When does an implication have given equalities?]
@@ -2147,7 +2227,7 @@ checkForCyclicBinds ev_binds
     is_co_bind (EvBind { eb_lhs = b }) = isEqVar b
 
     edges :: [(EvBind, EvVar, [EvVar])]
-    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs)) 
+    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs))
             | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs }) <- bagToList ev_binds]
 #endif
 
@@ -2282,17 +2362,6 @@ updWorkListTcS f
        ; let new_work = f wl_curr
        ; wrapTcS (TcM.writeTcRef wl_var new_work) }
 
-updWorkListTcS_return :: (WorkList -> (a,WorkList)) -> TcS a
--- Process the work list, returning a depleted work list,
--- plus a value extracted from it (typically a work item removed from it)
-updWorkListTcS_return f
-  = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- wrapTcS (TcM.readTcRef wl_var)
-       ; traceTcS "updWorkList" (ppr wl_curr)
-       ; let (res,new_work) = f wl_curr
-       ; wrapTcS (TcM.writeTcRef wl_var new_work)
-       ; return res }
-
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs
   | null evs
@@ -2309,7 +2378,7 @@ emitWorkCt ct
 emitInsoluble :: Ct -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts.
 emitInsoluble ct
-  = do { traceTcS "Emit insoluble" (ppr ct)
+  = do { traceTcS "Emit insoluble" (ppr ct $$ pprCtLoc (ctLoc ct))
        ; updInertTcS add_insol }
   where
     this_pred = ctPred ct
@@ -2399,7 +2468,7 @@ addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
 
 checkWellStagedDFun :: PredType -> DFunId -> CtLoc -> TcS ()
 checkWellStagedDFun pred dfun_id loc
-  = wrapTcS $ TcM.setCtLoc loc $
+  = wrapTcS $ TcM.setCtLocM loc $
     do { use_stage <- TcM.getStage
        ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
   where
@@ -2679,6 +2748,7 @@ newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newWantedEvVarNC loc pty
   = do { -- checkReductionDepth loc pty
        ; new_ev <- newEvVar pty
+       ; traceTcS "Emitting new wanted" (ppr new_ev $$ pprCtLoc loc)
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
@@ -2690,7 +2760,6 @@ newWantedEvVar loc pty
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                             ; return (ctev, Cached) }
             _ -> do { ctev <- newWantedEvVarNC loc pty
-                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (ctev, Fresh) } }
 
 emitNewDerived :: CtLoc -> TcPredType -> TcS ()
@@ -2713,7 +2782,7 @@ emitNewDerivedEq :: CtLoc -> TcPredType -> TcS ()
 -- There's no caching, no lookupInInerts
 emitNewDerivedEq loc pred
   = do { ev <- newDerivedNC loc pred
-       ; traceTcS "Emitting new derived equality" (ppr ev)
+       ; traceTcS "Emitting new derived equality" (ppr ev $$ pprCtLoc loc)
        ; updWorkListTcS (extendWorkListDerived loc ev) }
 
 newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
@@ -2799,4 +2868,3 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; return (TcLetCo ev_binds new_co) }
 
         ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs) }
-

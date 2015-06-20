@@ -249,11 +249,17 @@ def signal_exit_code( val ):
 
 # -----
 
-def timeout_multiplier( val ):
-    return lambda name, opts, v=val: _timeout_multiplier(name, opts, v)
+def compile_timeout_multiplier( val ):
+    return lambda name, opts, v=val: _compile_timeout_multiplier(name, opts, v)
 
-def _timeout_multiplier( name, opts, v ):
-    opts.timeout_multiplier = v
+def _compile_timeout_multiplier( name, opts, v ):
+    opts.compile_timeout_multiplier = v
+
+def run_timeout_multiplier( val ):
+    return lambda name, opts, v=val: _run_timeout_multiplier(name, opts, v)
+
+def _run_timeout_multiplier( name, opts, v ):
+    opts.run_timeout_multiplier = v
 
 # -----
 
@@ -1053,9 +1059,9 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
 
     if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
-                                            normalise_errmsg,
-                                            normalise_whitespace),
-                           expected_stderr_file, actual_stderr_file):
+                                            normalise_errmsg),
+                           expected_stderr_file, actual_stderr_file,
+                           whitespace_normaliser=normalise_whitespace):
         return failBecause('stderr mismatch')
 
     # no problems found, this test passed
@@ -1256,7 +1262,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
            '> {errname} 2>&1'
           ).format(**locals())
 
-    result = runCmdFor(name, cmd)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.compile_timeout_multiplier)
 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
@@ -1338,7 +1344,7 @@ def simple_run( name, way, prog, args ):
     cmd = 'cd ' + opts.testdir + ' && ' + cmd
 
     # run the command
-    result = runCmdFor(name, cmd, timeout_multiplier=opts.timeout_multiplier)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1384,6 +1390,8 @@ def rts_flags(way):
 # Run a program in the interpreter and check its output
 
 def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
+    opts = getTestOpts()
+
     outname = add_suffix(name, 'interp.stdout')
     errname = add_suffix(name, 'interp.stderr')
     rm_no_fail(outname)
@@ -1449,7 +1457,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
-    result = runCmdFor(name, cmd, timeout_multiplier=getTestOpts().timeout_multiplier)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1634,58 +1642,50 @@ def check_prof_ok(name, way):
     if not os.path.exists(expected_prof_file):
         return True
     else:
-        return compare_outputs(way, 'prof',
-                               join_normalisers(normalise_whitespace,normalise_prof), \
-                               expected_prof_file, prof_file)
+        return compare_outputs(way, 'prof', normalise_prof,
+                               expected_prof_file, prof_file,
+                               whitespace_normaliser=normalise_whitespace)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
-# otherwise.
-def compare_outputs(way, kind, normaliser, expected_file, actual_file):
+# otherwise. See Note [Output comparison] for the meaning of the
+# normaliser and whitespace_normaliser parameters.
+def compare_outputs(way, kind, normaliser, expected_file, actual_file,
+                    whitespace_normaliser=lambda x:x):
+
     if os.path.exists(expected_file):
-        expected_raw = read_no_crs(expected_file)
-        # print "norm:", normaliser(expected_raw)
-        expected_str = normaliser(expected_raw)
-        expected_file_for_diff = expected_file
+        expected_str = normaliser(read_no_crs(expected_file))
+        expected_normalised_file = expected_file + ".normalised"
     else:
         expected_str = ''
-        expected_file_for_diff = '/dev/null'
+        expected_normalised_file = '/dev/null'
 
     actual_raw = read_no_crs(actual_file)
     actual_str = normaliser(actual_raw)
 
-    if expected_str == actual_str:
+    # See Note [Output comparison].
+    if whitespace_normaliser(expected_str) == whitespace_normaliser(actual_str):
         return 1
     else:
         if config.verbose >= 1 and _expect_pass(way):
             print('Actual ' + kind + ' output differs from expected:')
 
-        if expected_file_for_diff == '/dev/null':
-            expected_normalised_file = '/dev/null'
-        else:
-            expected_normalised_file = expected_file + ".normalised"
+        if expected_normalised_file != '/dev/null':
             write_file(expected_normalised_file, expected_str)
 
         actual_normalised_file = actual_file + ".normalised"
         write_file(actual_normalised_file, actual_str)
 
-        # Ignore whitespace when diffing. We should only get to this
-        # point if there are non-whitespace differences
-        #
-        # Note we are diffing the *actual* output, not the normalised
-        # output.  The normalised output may have whitespace squashed
-        # (including newlines) so the diff would be hard to read.
-        # This does mean that the diff might contain changes that
-        # would be normalised away.
         if config.verbose >= 1 and _expect_pass(way):
-            r = os.system( 'diff -uw ' + expected_file_for_diff + \
-                                   ' ' + actual_file )
+            # See Note [Output comparison].
+            r = os.system('diff -uw ' + expected_normalised_file +
+                                  ' ' + actual_normalised_file)
 
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = os.system( 'diff -u ' + expected_file_for_diff + \
-                                      ' ' + actual_file )
+                r = os.system( 'diff -u ' + expected_normalised_file + \
+                                      ' ' + actual_normalised_file )
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -1698,11 +1698,26 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file):
         else:
             return 0
 
+# Note [Output comparison]
+#
+# We do two types of output comparison:
+#
+# 1. To decide whether a test has failed. We apply a `normaliser` and an
+#    optional `whitespace_normaliser` to the expected and the actual
+#    output, before comparing the two.
+#
+# 2. To show as a diff to the user when the test indeed failed. We apply
+#    the same `normaliser` function to the outputs, to make the diff as
+#    small as possible (only showing the actual problem). But we don't
+#    apply the `whitespace_normaliser` here, because it might completely
+#    squash all whitespace, making the diff unreadable. Instead we rely
+#    on the `diff` program to ignore whitespace changes as much as
+#    possible (#10152).
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
     str = re.sub('[ \t\n]+', ' ', str)
-    return str
+    return str.strip()
 
 def normalise_errmsg( str ):
     # remove " error:" and lower-case " Warning:" to make patch for

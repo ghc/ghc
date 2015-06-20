@@ -39,7 +39,7 @@ module TyCon(
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isTypeSynonymTyCon,
-        isDecomposableTyCon,
+        mightBeUnsaturatedTyCon,
         isPromotedDataCon, isPromotedTyCon,
         isPromotedDataCon_maybe, isPromotedTyCon_maybe,
         promotableTyCon_maybe, promoteTyCon,
@@ -52,7 +52,7 @@ module TyCon(
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
-        isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
+        isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
         isImplicitTyCon,
@@ -71,6 +71,7 @@ module TyCon(
         tyConArity,
         tyConRoles,
         tyConParent,
+        tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe, famTyConFlav_maybe,
@@ -1210,7 +1211,7 @@ isAbstractTyCon _ = False
 -- algebraic
 makeTyConAbstract :: TyCon -> TyCon
 makeTyConAbstract tc@(AlgTyCon { algTcRhs = rhs })
-  = tc { algTcRhs = AbstractTyCon (isDistinctAlgRhs rhs) }
+  = tc { algTcRhs = AbstractTyCon (isGenInjAlgRhs rhs) }
 makeTyConAbstract tc = pprPanic "makeTyConAbstract" (ppr tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
@@ -1255,27 +1256,41 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isDataTyCon _ = False
 
--- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to
--- themselves, even via coercions (except for unsafeCoerce).
--- This excludes newtypes, type functions, type synonyms.
--- It relates directly to the FC consistency story:
---     If the axioms are consistent,
---     and  co : S tys ~ T tys, and S,T are "distinct" TyCons,
---     then S=T.
--- Cf Note [Pruning dead case alternatives] in Unify
-isDistinctTyCon :: TyCon -> Bool
-isDistinctTyCon (AlgTyCon {algTcRhs = rhs}) = isDistinctAlgRhs rhs
-isDistinctTyCon (FunTyCon {})               = True
-isDistinctTyCon (PrimTyCon {})              = True
-isDistinctTyCon (PromotedDataCon {})        = True
-isDistinctTyCon _                           = False
+-- | 'isInjectiveTyCon' is true of 'TyCon's for which this property holds
+-- (where X is the role passed in):
+--   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
+-- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
+-- See also Note [Decomposing equalities] in TcCanonical
+isInjectiveTyCon :: TyCon -> Role -> Bool
+isInjectiveTyCon _                             Phantom          = False
+isInjectiveTyCon (FunTyCon {})                 _                = True
+isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
+isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
+  = isGenInjAlgRhs rhs
+isInjectiveTyCon (SynonymTyCon {})             _                = False
+isInjectiveTyCon (FamilyTyCon {})              _                = False
+isInjectiveTyCon (PrimTyCon {})                _                = True
+isInjectiveTyCon (PromotedDataCon {})          _                = True
+isInjectiveTyCon (PromotedTyCon {ty_con = tc}) r
+  = isInjectiveTyCon tc r
 
-isDistinctAlgRhs :: AlgTyConRhs -> Bool
-isDistinctAlgRhs (TupleTyCon {})          = True
-isDistinctAlgRhs (DataTyCon {})           = True
-isDistinctAlgRhs (DataFamilyTyCon {})     = True
-isDistinctAlgRhs (AbstractTyCon distinct) = distinct
-isDistinctAlgRhs (NewTyCon {})            = False
+-- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
+-- (where X is the role passed in):
+--   If (T tys ~X t), then (t's head ~X T).
+-- See also Note [Decomposing equalities] in TcCanonical
+isGenerativeTyCon :: TyCon -> Role -> Bool
+isGenerativeTyCon = isInjectiveTyCon
+  -- as it happens, generativity and injectivity coincide, but there's
+  -- no a priori reason this must be the case
+
+-- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective
+-- with respect to representational equality?
+isGenInjAlgRhs :: AlgTyConRhs -> Bool
+isGenInjAlgRhs (TupleTyCon {})          = True
+isGenInjAlgRhs (DataTyCon {})           = True
+isGenInjAlgRhs (DataFamilyTyCon {})     = False
+isGenInjAlgRhs (AbstractTyCon distinct) = distinct
+isGenInjAlgRhs (NewTyCon {})            = False
 
 -- | Is this 'TyCon' that for a @newtype@
 isNewTyCon :: TyCon -> Bool
@@ -1362,19 +1377,19 @@ isTypeSynonymTyCon _                 = False
 -- right hand side to which a synonym family application can expand.
 --
 
-isDecomposableTyCon :: TyCon -> Bool
+mightBeUnsaturatedTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
---   I.e. is it injective?
+--   I.e. is it injective and generative w.r.t nominal equality?
+--   That is, if (T a b) ~N d e f, is it always the case that
+--            (T ~N d), (a ~N e) and (b ~N f)?
 -- Specifically NOT true of synonyms (open and otherwise)
--- Ultimately we may have injective associated types
--- in which case this test will become more interesting
 --
--- It'd be unusual to call isDecomposableTyCon on a regular H98
+-- It'd be unusual to call mightBeUnsaturatedTyCon on a regular H98
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
-isDecomposableTyCon (SynonymTyCon {}) = False
-isDecomposableTyCon (FamilyTyCon  {}) = False
-isDecomposableTyCon _other            = True
+mightBeUnsaturatedTyCon (SynonymTyCon {}) = False
+mightBeUnsaturatedTyCon (FamilyTyCon  {}) = False
+mightBeUnsaturatedTyCon _other            = True
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -1793,6 +1808,24 @@ instance Outputable TyCon where
   -- At the moment a promoted TyCon has the same Name as its
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
+
+tyConFlavour :: TyCon -> String
+tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+  | ClassTyCon _ <- parent = "class"
+  | otherwise = case rhs of
+                  TupleTyCon { tup_sort = sort }
+                     | isBoxed (tupleSortBoxity sort) -> "tuple"
+                     | otherwise                      -> "unboxed tuple"
+                  DataTyCon {}       -> "data type"
+                  NewTyCon {}        -> "newtype"
+                  DataFamilyTyCon {} -> "data family"
+                  AbstractTyCon {}   -> "abstract type"
+tyConFlavour (FamilyTyCon {})     = "type family"
+tyConFlavour (SynonymTyCon {})    = "type synonym"
+tyConFlavour (FunTyCon {})        = "built-in type"
+tyConFlavour (PrimTyCon {})       = "built-in type"
+tyConFlavour (PromotedDataCon {}) = "promoted data constructor"
+tyConFlavour (PromotedTyCon {})   = "promoted type constructor"
 
 pprPromotionQuote :: TyCon -> SDoc
 pprPromotionQuote (PromotedDataCon {}) = char '\''   -- Quote promoted DataCons

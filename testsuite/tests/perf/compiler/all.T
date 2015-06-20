@@ -568,11 +568,12 @@ test('T9675',
            (wordsize(32), 11220552, 25)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 53, 15),
+          [(wordsize(64), 44, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
           # 2014-10-13    53         use the mean
+          # 2014-06-15    44         reduced for some reason
             (wordsize(32), 25, 15)
           ]),
        compiler_stats_num_field('bytes allocated',

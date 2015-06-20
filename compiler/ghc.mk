@@ -384,13 +384,13 @@ ifeq "$(GhcProfiled)" "YES"
 # everywhere tends to give a hard-to-read profile, and adds lots of
 # overhead.  A better approach is to proceed top-down; identify the
 # parts of the compiler of interest, and then add further cost centres
-# as necessary.  Turn on -auto-all for individual modules like this:
+# as necessary.  Turn on -fprof-auto for individual modules like this:
 
-# compiler/main/DriverPipeline_HC_OPTS += -auto-all
-compiler/main/GhcMake_HC_OPTS        += -auto-all
-compiler/main/GHC_HC_OPTS            += -auto-all
+# compiler/main/DriverPipeline_HC_OPTS += -fprof-auto
+compiler/main/GhcMake_HC_OPTS        += -fprof-auto
+compiler/main/GHC_HC_OPTS            += -fprof-auto
 
-# or alternatively add {-# OPTIONS_GHC -auto-all #-} to the top of
+# or alternatively add {-# OPTIONS_GHC -fprof-auto #-} to the top of
 # modules you're interested in.
 
 # We seem to still build the vanilla libraries even if we say

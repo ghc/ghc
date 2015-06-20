@@ -1290,7 +1290,7 @@ test.hs:(5,4)-(6,7):
           </indexterm>
           <indexterm><primary>deprecated-flags</primary></indexterm>
           <para>Causes a warning to be emitted when a deprecated
-          commandline flag is used.</para>
+          command-line flag is used.</para>
 
           <para>This option is on by default.</para>
         </listitem>
@@ -1455,7 +1455,7 @@ foreign import "&amp;f" f :: FunPtr t
           <para>This option is on by default.  As usual you can suppress it on a per-module basis
           with <option>-fno-warn-redundant-constraints</option>.  Occasionally you may specifically
           want a function to have a more constrained signature than necessary, perhaps to
-          leave yourself wiggle-rooom for changing the implementation without changing the
+          leave yourself wiggle-room for changing the implementation without changing the
           API.  In that case, you can suppress the warning on a per-function basis, using a
           call in a dead binding.  For example:
           <programlisting>
@@ -1622,7 +1622,7 @@ f foo = foo { x = 6 }
 
           <para>This option is on by default, and warns you whenever
           the construction of a labelled field constructor isn't
-          complete, missing initializers for one or more fields. While
+          complete, missing initialisers for one or more fields. While
           not an error (the missing fields are initialised with
           bottoms), it is often an indication of a programmer error.</para>
         </listitem>
@@ -2607,7 +2607,8 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary><option>-fmax-inline-memcpy-insn</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Inline memcpy calls if they would generate no more than n pseudo instructions (default: 32).
+            <para>Inline <literal>memcpy</literal> calls if they would generate
+                  no more than n pseudo instructions (default: 32).
             </para>
           </listitem>
         </varlistentry>
@@ -2618,7 +2619,8 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary><option>-fmax-inline-memset-insns</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Inline memset calls if they would generate no more than n pseudo instructions (default: 32).
+            <para>Inline <literal>memset</literal> calls if they would generate
+                  no more than n pseudo instructions (default: 32).
             </para>
           </listitem>
         </varlistentry>
@@ -2884,11 +2886,11 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
 
             <para>Here, after GHC inlines the body of
             <literal>foldl</literal> to a call site, it will perform
-            call-pattern specialization very aggressively on
+            call-pattern specialisation very aggressively on
             <literal>foldl_loop</literal> due to the use of
             <literal>SPEC</literal> in the argument of the loop
             body. <literal>SPEC</literal> from
-            <literal>GHC.Types</literal> is specifically recognized by
+            <literal>GHC.Types</literal> is specifically recognised by
             the compiler.</para>
 
             <para>(NB: it is extremely important you use
@@ -3534,5 +3536,6 @@ data D = D !C
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->

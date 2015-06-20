@@ -1966,6 +1966,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
   softfloat) # like armv5tel-softfloat-linux-gnueabi
     $2="unknown"
     ;;
+  hardfloat) # like armv7a-hardfloat-linux-gnueabi
+    $2="unknown"
+    ;;
   *)
     #pass thru by default
     $2="$1"

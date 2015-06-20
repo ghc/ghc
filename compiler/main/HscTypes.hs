@@ -1402,12 +1402,11 @@ icPrintUnqual dflags InteractiveContext{ ic_rn_gbl_env = grenv } =
 -- to them (e.g. instances for classes or values of the type for TyCons), it's
 -- not clear whether removing them is even the appropriate behavior.
 extendInteractiveContext :: InteractiveContext
-                         -> [Id] -> [TyCon]
+                         -> [TyThing]
                          -> [ClsInst] -> [FamInst]
                          -> Maybe [Type]
-                         -> [PatSyn]
                          -> InteractiveContext
-extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults new_patsyns
+extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
                             -- a new mod_index (Trac #9426)
@@ -1417,8 +1416,8 @@ extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults new_
                             , new_fam_insts ++ old_fam_insts )
           , ic_default    = defaults }
   where
-    new_tythings = map AnId ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) new_patsyns
-    old_tythings = filterOut (shadowed_by ids) (ic_tythings ictxt)
+    new_ids = [id | AnId id <- new_tythings]
+    old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
 
     -- Discard old instances that have been fully overrridden
     -- See Note [Override identical instances in GHCi]
@@ -1427,14 +1426,15 @@ extendInteractiveContext ictxt ids tcs new_cls_insts new_fam_insts defaults new_
     old_fam_insts = filterOut (\i -> any (identicalFamInstHead i) new_fam_insts) fam_insts
 
 extendInteractiveContextWithIds :: InteractiveContext -> [Id] -> InteractiveContext
-extendInteractiveContextWithIds ictxt ids
-  | null ids  = ictxt
-  | otherwise = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
-                      , ic_tythings   = new_tythings ++ old_tythings
-                      , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings }
+-- Just a specialised version
+extendInteractiveContextWithIds ictxt new_ids
+  | null new_ids = ictxt
+  | otherwise    = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
+                         , ic_tythings   = new_tythings ++ old_tythings
+                         , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings }
   where
-    new_tythings = map AnId ids
-    old_tythings = filterOut (shadowed_by ids) (ic_tythings ictxt)
+    new_tythings = map AnId new_ids
+    old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
 
 shadowed_by :: [Id] -> TyThing -> Bool
 shadowed_by ids = shadowed
@@ -1460,10 +1460,25 @@ icExtendGblRdrEnv env tythings
                             -- the list shadow things at the back
   where
     -- One at a time, to ensure each shadows the previous ones
-    add thing env = foldl extendGlobalRdrEnv env1 (localGREsFromAvail avail)
+    add thing env
+       | is_sub_bndr thing
+       = env
+       | otherwise
+       = foldl extendGlobalRdrEnv env1 (localGREsFromAvail avail)
        where
           env1  = shadowNames env (availNames avail)
           avail = tyThingAvailInfo thing
+
+    -- Ugh! The new_tythings may include record selectors, since they
+    -- are not implicit-ids, and must appear in the TypeEnv.  But they
+    -- will also be brought into scope by the corresponding (ATyCon
+    -- tc).  And we want the latter, because that has the correct
+    -- parent (Trac #10520)
+    is_sub_bndr (AnId f) = case idDetails f of
+                             RecSelId {}  -> True
+                             ClassOpId {} -> True
+                             _            -> False
+    is_sub_bndr _ = False
 
 substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst

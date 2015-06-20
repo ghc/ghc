@@ -661,7 +661,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
         -- We could have stored the ru_rough field in the iface file
         -- but that would be redundant, I think.
         -- The only wrinkle is that we must not be deceived by
-        -- type syononyms at the top of a type arg.  Since
+        -- type synonyms at the top of a type arg.  Since
         -- we can't tell at this point, we are careful not
         -- to write them out in coreRuleToIfaceRule
     ifTopFreeName :: IfaceExpr -> Maybe Name

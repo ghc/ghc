@@ -923,7 +923,7 @@ genCCall' _ _ (PrimTarget MO_Touch) _ _
 genCCall' _ _ (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
-genCCall' dflags gcp target dest_regs args0
+genCCall' dflags gcp target dest_regs args
   = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
@@ -978,17 +978,7 @@ genCCall' dflags gcp target dest_regs args0
                                     map (widthInBytes . typeWidth) argReps
                                 GCPLinux -> roundTo 16 finalStack
 
-        -- need to remove alignment information
-        args | PrimTarget mop <- target,
-                        (mop == MO_Memcpy ||
-                         mop == MO_Memset ||
-                         mop == MO_Memmove)
-                      = init args0
-
-                      | otherwise
-                      = args0
-
-        argReps = map (cmmExprType dflags) args0
+        argReps = map (cmmExprType dflags) args
 
         roundTo a x | x `mod` a == 0 = x
                     | otherwise = x + a - (x `mod` a)
@@ -1173,9 +1163,9 @@ genCCall' dflags gcp target dest_regs args0
 
                     MO_UF_Conv w -> (fsLit $ word2FloatLabel w, False)
 
-                    MO_Memcpy    -> (fsLit "memcpy", False)
-                    MO_Memset    -> (fsLit "memset", False)
-                    MO_Memmove   -> (fsLit "memmove", False)
+                    MO_Memcpy _  -> (fsLit "memcpy", False)
+                    MO_Memset _  -> (fsLit "memset", False)
+                    MO_Memmove _ -> (fsLit "memmove", False)
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
