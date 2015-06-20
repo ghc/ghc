@@ -9,6 +9,7 @@ other dynamic, non-language, flag settings:
   -fforce-recomp
   -fimplicit-import-qualified
 warning settings:
+  -fno-warn-tabs
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: Haskell2010
@@ -26,8 +27,8 @@ with the following modifiers:
 ~~~~~~~~~~ Testing :show languages, with -XMagicHash
 base language is: Haskell2010
 with the following modifiers:
-  -XMagicHash
   -XNoDatatypeContexts
+  -XMagicHash
   -XNondecreasingIndentation
 ~~~~~~~~~~ Testing :show packages
 active package flags: none
