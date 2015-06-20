@@ -39,7 +39,8 @@ test('T4830',
      compile_and_run,
      ['-O2'])
 
-test('T3245', normal, compile_and_run, ['-O'])
+test('T3245', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+     compile_and_run, ['-O'])
 
 # Test that bytestring reading/writing isn't over-allocating.  We had
 # a bug in hGetBufNonBlocking in 6.13 that triggered this.

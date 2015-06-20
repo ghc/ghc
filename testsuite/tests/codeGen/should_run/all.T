@@ -119,7 +119,8 @@ test('CgStaticPointers',
      , when(doing_ghci(), extra_hc_opts('-fobject-code'))
      ],
      compile_and_run, [''])
-test('StaticArraySize', normal, compile_and_run, ['-O2'])
+test('StaticArraySize', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+     compile_and_run, ['-O2'])
 test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
 test('CopySmallArray', normal, compile_and_run, [''])
 test('CopySmallArrayStressTest', reqlib('random'), compile_and_run, [''])

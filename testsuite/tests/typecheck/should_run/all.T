@@ -40,7 +40,8 @@ test('tcrun020', normal, compile_and_run, [''])
 test('tcrun021', normal, compile_and_run, ['-package containers'])
 test('tcrun022', [omit_ways(['ghci']),only_compiler_types(['ghc'])],
      compile_and_run, ['-O'])
-test('tcrun023', normal, compile_and_run, ['-O'])
+test('tcrun023', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+     compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
 test('tcrun025', extra_clean(['TcRun025_B.hi', 'TcRun025_B.o']),
      multimod_compile_and_run, ['tcrun025',''])
