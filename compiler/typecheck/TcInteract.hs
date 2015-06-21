@@ -22,6 +22,7 @@ import Var
 import TcType
 import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
                    callStackTyConKey, typeableClassName )
+import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id( idType )
 import Class
 import TyCon
@@ -1810,7 +1811,7 @@ isCallStackIP loc cls tys
 -- | Assumes that we've checked that this is the 'Typeable' class,
 -- and it was applied to the correct argument.
 matchTypeableClass :: Class -> Kind -> Type -> TcS LookupInstResult
-matchTypeableClass clas _k t
+matchTypeableClass clas k t
 
   -- See Note [No Typeable for qualified types]
   | isForAllTy t                               = return NoInstance
@@ -1818,11 +1819,12 @@ matchTypeableClass clas _k t
   | Just (t1,_) <- splitFunTy_maybe t,
     isConstraintKind (typeKind t1)             = return NoInstance
 
+  | eqType k typeNatKind                       = doTyLit knownNatClassName
+  | eqType k typeSymbolKind                    = doTyLit knownSymbolClassName
+
   | Just (tc, ks) <- splitTyConApp_maybe t
   , all isKind ks                              = doTyCon tc ks
   | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
-  | Just _            <- isNumLitTy t          = mkSimpEv (EvTypeableTyLit t)
-  | Just _            <- isStrLitTy t          = mkSimpEv (EvTypeableTyLit t)
   | otherwise                                  = return NoInstance
 
   where
@@ -1830,7 +1832,8 @@ matchTypeableClass clas _k t
   doTyCon tc ks =
     case mapM kindRep ks of
       Nothing    -> return NoInstance
-      Just kReps -> mkSimpEv (EvTypeableTyCon tc kReps)
+      Just kReps ->
+        return $ GenInst [] (\_ -> EvTypeable (EvTypeableTyCon tc kReps) ) True
 
   {- Representation for an application of a type to a type-or-kind.
   This may happen when the type expression starts with a type variable.
@@ -1858,7 +1861,12 @@ matchTypeableClass clas _k t
   -- Emit a `Typeable` constraint for the given type.
   mk_typeable_pred ty = mkClassPred clas [ typeKind ty, ty ]
 
-  mkSimpEv ev = return $ GenInst [] (\_ -> EvTypeable ev) True
+  -- Given KnownNat / KnownSymbol, generate appropriate sub-goal
+  -- and make evidence for a type-level literal.
+  doTyLit c = do clas <- tcLookupClass c
+                 let p = mkClassPred clas [ t ]
+                 return $ GenInst [p] (\[i] -> EvTypeable
+                                             $ EvTypeableTyLit (EvId i,t)) True
 
 {- Note [No Typeable for polytype or for constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

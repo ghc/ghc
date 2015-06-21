@@ -739,7 +739,7 @@ data EvTypeable
     -- ^ Dictionary for type applications;  this is used when we have
     -- a type expression starting with a type variable (e.g., @Typeable (f a)@)
 
-  | EvTypeableTyLit Type
+  | EvTypeableTyLit (EvTerm,Type)
     -- ^ Dictionary for a type literal.
 
   deriving ( Data.Data, Data.Typeable )
@@ -1018,7 +1018,7 @@ evVarsOfTypeable ev =
   case ev of
     EvTypeableTyCon _ _    -> emptyVarSet
     EvTypeableTyApp e1 e2  -> evVarsOfTerms (map fst [e1,e2])
-    EvTypeableTyLit _      -> emptyVarSet
+    EvTypeableTyLit e      -> evVarsOfTerm (fst e)
 
 {-
 ************************************************************************
@@ -1103,7 +1103,7 @@ instance Outputable EvTypeable where
     case ev of
       EvTypeableTyCon tc ks    -> parens (ppr tc <+> sep (map ppr ks))
       EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
-      EvTypeableTyLit x        -> ppr x
+      EvTypeableTyLit x        -> ppr (fst x)
 
 
 ----------------------------------------------------------------------

@@ -47,7 +47,7 @@ import Type
 import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
-                  , mkBoxedTupleTy, stringTy )
+                  , mkBoxedTupleTy, stringTy, typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
 import Class
@@ -908,14 +908,9 @@ dsEvTypeable ev =
                       , mkApps (Var ctr) [ e1, e2 ]
                       )
 
-          EvTypeableTyLit ty ->
-            do str <- case (isNumLitTy ty, isStrLitTy ty) of
-                        (Just n, _) -> return (show n)
-                        (_, Just n) -> return (show n)
-                        _ -> panic "dsEvTypeable: malformed TyLit evidence"
-               ctr <- dsLookupGlobalId typeLitTypeRepName
-               tag <- mkStringExpr str
-               return (ty, mkApps (Var ctr) [ tag ])
+          EvTypeableTyLit t ->
+            do e <- tyLitRep t
+               return (snd t, e)
 
      -- TyRep -> Typeable t
      -- see also: Note [Memoising typeOf]
@@ -941,6 +936,18 @@ dsEvTypeable ev =
            method = mkCast typeableExpr co
            proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
        return (mkApps method [proxy])
+
+  -- KnownNat t -> TyRep      (also used for KnownSymbol)
+  tyLitRep (ev,t) =
+    do dict <- dsEvTerm ev
+       fun  <- dsLookupGlobalId $
+               case typeKind t of
+                 k | eqType k typeNatKind    -> typeNatTypeRepName
+                   | eqType k typeSymbolKind -> typeSymbolTypeRepName
+                   | otherwise -> panic "dsEvTypeable: unknown type lit kind"
+       let finst  = mkTyApps (Var fun) [t]
+           proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
+       return (mkApps finst [ dict, proxy ])
 
   -- This part could be cached
   tyConRep dflags mkTyCon tc =

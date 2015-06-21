@@ -51,12 +51,14 @@ module Data.Typeable.Internal (
     rnfTyCon,
     listTc, funTc,
     typeRepKinds,
-    typeLitTypeRep
+    typeNatTypeRep,
+    typeSymbolTypeRep
   ) where
 
 import GHC.Base
 import GHC.Word
 import GHC.Show
+import GHC.TypeLits
 import Data.Proxy
 
 import GHC.Fingerprint.Type
@@ -330,6 +332,13 @@ funTc :: TyCon
 funTc = typeRepTyCon (typeRep (Proxy :: Proxy (->)))
 
 
+-- | Used to make `'Typeable' instance for things of kind Nat
+typeNatTypeRep :: KnownNat a => Proxy# a -> TypeRep
+typeNatTypeRep p = typeLitTypeRep (show (natVal' p))
+
+-- | Used to make `'Typeable' instance for things of kind Symbol
+typeSymbolTypeRep :: KnownSymbol a => Proxy# a -> TypeRep
+typeSymbolTypeRep p = typeLitTypeRep (show (symbolVal' p))
 
 -- | An internal function, to make representations for type literals.
 typeLitTypeRep :: String -> TypeRep
