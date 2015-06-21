@@ -67,7 +67,7 @@ type AvailField     = AvailFld Name
 {-
 Note [Representing fields in AvailInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When -XOverloadedRecordFields is disabled (the normal case), a
+When -XAllowDuplicateRecordFields is disabled (the normal case), a
 datatype like
 
   data T = MkT { foo :: Int }
@@ -76,13 +76,13 @@ gives rise to the AvailInfo
 
   AvailTC T [T, MkT] [(foo, Nothing)],
 
-whereas if -XOverloadedRecordFields is enabled it gives
+whereas if -XAllowDuplicateRecordFields is enabled it gives
 
   AvailTC T [T, MkT] [($sel:foo:T, Just "foo")]
 
 since the label does not match the selector name.
 
-The labels in an Overloaded field list are not necessarily unique:
+The labels in a field list are not necessarily unique:
 data families allow the same parent (the family tycon) to have
 multiple distinct fields with the same label. For example,
 

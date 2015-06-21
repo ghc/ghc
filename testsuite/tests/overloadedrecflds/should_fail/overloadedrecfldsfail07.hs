@@ -1,6 +1,6 @@
 -- Test type errors contain field names, not selector names
 
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 
 data T = MkT { x :: Int }
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 
 module OverloadedRecFldsRun02_A (U(..), V(MkV, x), Unused(..), u) where
 

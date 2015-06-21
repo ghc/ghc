@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 {-# OPTIONS_GHC -fwarn-unused-binds #-}
 
 module OverloadedRecFldsFail06_A (U(..), V(..), Unused(unused), u, getX, getY, z) where

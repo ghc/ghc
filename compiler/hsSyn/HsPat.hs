@@ -282,7 +282,7 @@ data HsRecField id arg = HsRecField {
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -- A HsRecField always contains a label (in hsRecFieldLbl), which is
--- the thing the user wrote, but thanks to OverloadedRecordFields this
+-- the thing the user wrote, but thanks to AllowDuplicateRecordFields this
 -- may not unambiguously correspond to a Name.  The hsRecFieldSel is
 -- filled in by the renamer (RnPat.rnHsRecFields1) thus:
 --

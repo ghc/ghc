@@ -529,7 +529,7 @@ rnHsRecFields
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM Opt_RecordPuns
        ; disambig_ok <- xoptM Opt_DisambiguateRecordFields
-       ; overload_ok <- xoptM Opt_OverloadedRecordFields
+       ; overload_ok <- xoptM Opt_AllowDuplicateRecordFields
        ; parent <- check_disambiguation disambig_ok mb_con
        ; flds1  <- mapM (rn_fld pun_ok overload_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 {-# OPTIONS_GHC -fwarn-unused-binds -Werror #-}
 
 module Main (main, T(MkT)) where

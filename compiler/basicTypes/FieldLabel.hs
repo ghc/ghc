@@ -5,9 +5,9 @@
 
 This module defines the representation of FieldLabels as stored in
 TyCons.  As well as a selector name, these have some extra structure
-to support the OverloadedRecordFields extension.
+to support the AllowDuplicateRecordFields extension.
 
-In the normal case (with NoOverloadedRecordFields), a datatype like
+In the normal case (with NoAllowDuplicateRecordFields), a datatype like
 
     data T = MkT { foo :: Int }
 
@@ -18,7 +18,7 @@ has
                , flSelector     = foo }.
 
 In particular, the Name of the selector has the same string
-representation as the label.  If the OverloadedRecordFields extension
+representation as the label.  If AllowDuplicateRecordFields
 is enabled, however, the same declaration instead gives
 
     FieldLabel { flLabel        = "foo"

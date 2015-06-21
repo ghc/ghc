@@ -1,7 +1,7 @@
 -- Test that unambiguous constructions remain valid when
--- OverloadedRecordFields is enabled
+-- AllowDuplicateRecordFields is enabled
 
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 
 data S = MkS { x :: Int }
   deriving Show

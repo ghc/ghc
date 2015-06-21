@@ -507,13 +507,13 @@ extra information is used for identifying overloaded record fields
 during renaming.
 
 In a definition arising from a normal module (without
--XOverloadedRecordFields), par_lbl will be Nothing, meaning that the
+-XAllowDuplicateRecordFields), par_lbl will be Nothing, meaning that the
 field's label is the same as the OccName of the selector's Name.  The
 GlobalRdrEnv will contain an entry like this:
 
     "x" |->  GRE x (FldParent T Nothing) LocalDef
 
-When -XOverloadedRecordFields is enabled for the module that contains
+When -XAllowDuplicateRecordFields is enabled for the module that contains
 T, the selector's Name will be mangled (see comments in FieldLabel).
 Thus we store the actual field label in par_lbl, and the GlobalRdrEnv
 entry looks like this:

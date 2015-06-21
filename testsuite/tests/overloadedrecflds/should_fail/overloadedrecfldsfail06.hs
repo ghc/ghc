@@ -1,7 +1,7 @@
 -- Check that unused imports are reported correctly in the presence of
--- OverloadedRecordFields
+-- AllowDuplicateRecordFields
 
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 {-# OPTIONS_GHC -Werror -fwarn-unused-imports #-}
 
 import OverloadedRecFldsFail06_A (U(MkU, x, y), V(MkV, MkV2, x, y), Unused(unused), u, getX, getY)

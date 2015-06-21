@@ -1,7 +1,7 @@
--- Test that OverloadedRecordFields can be used along with
+-- Test that AllowDuplicateRecordFields can be used along with
 -- TypeFamilies (with selectors only if unambiguous)
 
-{-# LANGUAGE OverloadedRecordFields, TypeFamilies #-}
+{-# LANGUAGE AllowDuplicateRecordFields, TypeFamilies #-}
 
 data family F a
 

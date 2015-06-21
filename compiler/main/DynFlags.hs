@@ -638,6 +638,7 @@ data ExtensionFlag
    | Opt_MultiWayIf
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
+   | Opt_AllowDuplicateRecordFields
    | Opt_OverloadedRecordFields
    | Opt_EmptyCase
    | Opt_PatternSynonyms
@@ -3076,6 +3077,7 @@ xFlags = [
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "AllowAmbiguousTypes"              Opt_AllowAmbiguousTypes,
+  flagSpec "AllowDuplicateRecordFields"       Opt_AllowDuplicateRecordFields,
   flagSpec "AlternativeLayoutRule"            Opt_AlternativeLayoutRule,
   flagSpec "AlternativeLayoutRuleTransitional"
                                           Opt_AlternativeLayoutRuleTransitional,
@@ -3275,7 +3277,8 @@ impliedXFlags
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
 
     -- Overloaded record fields require field disambiguation
-    , (Opt_OverloadedRecordFields, turnOn, Opt_DisambiguateRecordFields)
+    , (Opt_OverloadedRecordFields,     turnOn, Opt_AllowDuplicateRecordFields)
+    , (Opt_AllowDuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
   ]
 
 -- Note [Documenting optimisation flags]

@@ -1,6 +1,6 @@
 -- Test ambiguous updates are rejected with appropriate error messages
 
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 
 data R = MkR { w :: Bool, x :: Int, y :: Bool }
 data S = MkS { w :: Bool, x :: Int, y :: Bool }

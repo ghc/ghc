@@ -1,7 +1,7 @@
 -- Test that importing an overloaded field and using it as a selector
 -- leads to a suitable error
 
-{-# LANGUAGE OverloadedRecordFields #-}
+{-# LANGUAGE AllowDuplicateRecordFields #-}
 
 import OverloadedRecFldsFail04_A as I
 
