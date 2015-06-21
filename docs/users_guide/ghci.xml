@@ -3380,7 +3380,11 @@ Then the interactive options are modified as follows:
   </sect1>
 
   <sect1 id="ghci-dot-files">
-    <title>The <filename>.ghci</filename> file</title>
+  <title>The <filename>.ghci</filename> and <filename>.haskeline</filename> files</title>
+
+    <sect2 id="dot-ghci-files">
+    <title>The <filename>.ghci</filename> files</title>
+
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
     </indexterm>
     <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
@@ -3536,6 +3540,21 @@ Then the interactive options are modified as follows:
         </listitem>
       </orderedlist>
     </para>
+    </sect2>
+
+    <sect2 id="dot-haskeline-file">
+      <title>The <filename>.haskeline</filename> file</title>
+
+      <indexterm><primary><filename>.haskeline</filename></primary><secondary>file</secondary>
+      </indexterm>
+      <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
+      </indexterm>
+
+      GHCi uses <ulink url="https://hackage.haskell.org/package/haskeline">Haskeline</ulink>
+      under the hood. You can configure it to, among other things, prune
+      duplicates from ghci history. See:
+      <ulink url="http://trac.haskell.org/haskeline/wiki/UserPrefs">Haskeline user preferences</ulink>.
+    </sect2>
   </sect1>
 
   <sect1 id="ghci-obj">
