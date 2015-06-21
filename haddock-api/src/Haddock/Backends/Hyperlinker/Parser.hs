@@ -40,9 +40,20 @@ data TokenType
     | TkUnknown
     deriving (Eq)
 
+-- | Turn source code string into a stream of more descriptive tokens.
+--
+-- Result should retain original file layout (including comments, whitespace,
+-- etc.), i.e. the following "law" should hold:
+--
+-- @concat . map 'tkValue' . 'parse' = id@
 parse :: String -> [Token]
 parse = tokenize . tag . chunk
 
+-- | Split raw source string to more meaningful chunks.
+--
+-- This is the initial stage of tokenization process. Each chunk is either
+-- a comment (including comment delimiters), a whitespace string, preprocessor
+-- macro (and all its content until the end of a line) or valid Haskell lexeme.
 chunk :: String -> [String]
 chunk [] = []
 chunk str@(c:_)
@@ -56,6 +67,11 @@ chunk str
   where
     chunk' (c, rest) = c:(chunk rest)
 
+-- | Split input to "first line" string and the rest of it.
+--
+-- Ideally, this should be done simply with @'break' (== '\n')@. However,
+-- Haskell also allows line-unbreaking (or whatever it is called) so things
+-- are not as simple and this function deals with that.
 spanToNewline :: String -> (String, String)
 spanToNewline [] = ([], [])
 spanToNewline ('\\':'\n':str) =
@@ -66,6 +82,16 @@ spanToNewline (c:str) =
     let (str', rest) = spanToNewline str
     in (c:str', rest)
 
+-- | Split input to whitespace string, (optional) preprocessor directive and
+-- the rest of it.
+--
+-- Again, using something like @'span' 'isSpace'@ would be nice to chunk input
+-- to whitespace. The problem is with /#/ symbol - if it is placed at the very
+-- beginning of a line, it should be recognized as preprocessor macro. In any
+-- other case, it is ordinary Haskell symbol and can be used to declare
+-- operators. Hence, while dealing with whitespace we also check whether there
+-- happens to be /#/ symbol just after a newline character - if that is the
+-- case, we begin treating the whole line as preprocessor macro.
 spanSpaceOrCpp :: String -> (String, Maybe String, String)
 spanSpaceOrCpp ('\n':'#':str) =
     let (str', rest) = spanToNewline str
@@ -76,6 +102,10 @@ spanSpaceOrCpp (c:str')
         in (c:space, mcpp, rest)
 spanSpaceOrCpp str = ("", Nothing, str)
 
+-- | Split input to comment content (including delimiters) and the rest.
+--
+-- Again, some more logic than simple 'span' is required because of Haskell
+-- comment nesting policy.
 chunkComment :: Int -> String -> (String, String)
 chunkComment _ [] = ("", "")
 chunkComment depth ('{':'-':str) =
@@ -90,6 +120,7 @@ chunkComment depth (e:str) =
     let (c, rest) = chunkComment depth str
     in (e:c, rest)
 
+-- | Assign source location for each chunk in given stream.
 tag :: [String] -> [(Span, String)]
 tag =
     reverse . snd . foldl aux (Position 1 1, [])
@@ -100,6 +131,7 @@ tag =
     move pos '\n' = pos { posRow = posRow pos + 1, posCol = 1 }
     move pos _ = pos { posCol = posCol pos + 1 }
 
+-- | Turn unrecognised chunk stream to more descriptive token stream.
 tokenize :: [(Span, String)] -> [Token]
 tokenize =
     map aux
@@ -110,6 +142,13 @@ tokenize =
         , tkSpan = sp
         }
 
+-- | Classify given string as appropriate Haskell token.
+--
+-- This method is based on Haskell 98 Report lexical structure description:
+-- https://www.haskell.org/onlinereport/lexemes.html
+--
+-- However, this is probably far from being perfect and most probably does not
+-- handle correctly all corner cases.
 classify :: String -> TokenType
 classify str
     | "--" `isPrefixOf` str = TkComment
