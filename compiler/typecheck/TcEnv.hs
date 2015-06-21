@@ -54,8 +54,8 @@ module TcEnv(
 
         -- New Ids
         newLocalName, newDFunName, newDFunName',
-        newFamInstTyConName, newFamInstTyConName',
-        newFamInstAxiomName, newFamInstAxiomName',
+        newFamInstTyConName,
+        newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where
@@ -733,20 +733,9 @@ newGlobalBinder.
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
 
-newFamInstTyConName' :: Located Name -> [LHsType RdrName] -> TcM Name
-newFamInstTyConName' (L loc name) tys
-  = mk_fam_inst_name' id loc info_string
-  where
-    info_string = occNameString (getOccName name)
-                      ++ concatMap (getDFunHsTypeKey . unLoc) tys
-
 newFamInstAxiomName :: SrcSpan -> Name -> [CoAxBranch] -> TcM Name
 newFamInstAxiomName loc name branches
   = mk_fam_inst_name mkInstTyCoOcc loc name (map coAxBranchLHS branches)
-
-newFamInstAxiomName' :: SrcSpan -> String -> TcM Name
-newFamInstAxiomName' loc info_string
-  = mk_fam_inst_name' mkInstTyCoOcc loc info_string
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss
