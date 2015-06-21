@@ -51,7 +51,6 @@ module FieldLabel ( FieldLabelString
 import OccName
 import Name
 
-import Binary
 import FastString
 import Outputable
 
@@ -80,18 +79,6 @@ data FieldLbl a = FieldLabel {
 
 instance Outputable a => Outputable (FieldLbl a) where
     ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))
-
-instance Binary a => Binary (FieldLbl a) where
-    put_ bh (FieldLabel aa ab ac) = do
-        put_ bh aa
-        put_ bh ab
-        put_ bh ac
-
-    get bh = do
-        aa <- get bh
-        ab <- get bh
-        ac <- get bh
-        return (FieldLabel aa ab ac)
 
 
 -- | Record selector OccNames are built from the underlying field name and
