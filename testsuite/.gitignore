@@ -630,7 +630,6 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/dynlibs/T5373B
 /tests/dynlibs/T5373C
 /tests/dynlibs/T5373D
-/tests/ext-core/T7239.hcr
 /tests/ffi/should_run/1288
 /tests/ffi/should_run/1679
 /tests/ffi/should_run/2276

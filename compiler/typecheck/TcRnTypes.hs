@@ -334,7 +334,7 @@ data TcGblEnv
   = TcGblEnv {
         tcg_mod     :: Module,         -- ^ Module being compiled
         tcg_src     :: HscSource,
-          -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
+          -- ^ What kind of module (regular Haskell, hs-boot, hsig)
         tcg_sig_of  :: Maybe Module,
           -- ^ Are we being compiled as a signature of an implementation?
         tcg_mod_name :: Maybe (Located ModuleName),
