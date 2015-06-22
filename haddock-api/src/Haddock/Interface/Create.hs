@@ -21,6 +21,8 @@ import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
 import Haddock.Interface.LexParseRn
+import Haddock.Backends.Hyperlinker.Ast as Hyperlinker
+import Haddock.Backends.Hyperlinker.Parser as Hyperlinker
 
 import qualified Data.Map as M
 import Data.Map (Map)
@@ -122,6 +124,8 @@ createInterface tm flags modMap instIfaceMap = do
         mkAliasMap dflags $ tm_renamed_source tm
       modWarn = moduleWarning dflags gre warnings
 
+  tokenizedSrc <- mkMaybeTokenizedSrc flags tm
+
   return $! Interface {
     ifaceMod             = mdl
   , ifaceOrigFilename    = msHsFilePath ms
@@ -145,7 +149,7 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceFamInstances    = fam_instances
   , ifaceHaddockCoverage = coverage
   , ifaceWarningMap      = warningMap
-  , ifaceTokenizedSrc    = Nothing
+  , ifaceTokenizedSrc    = tokenizedSrc
   }
 
 mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
@@ -861,6 +865,30 @@ mkVisibleNames (_, _, _, _, instMap) exports opts
 seqList :: [a] -> ()
 seqList [] = ()
 seqList (x : xs) = x `seq` seqList xs
+
+mkMaybeTokenizedSrc :: [Flag] -> TypecheckedModule
+                    -> ErrMsgGhc (Maybe [RichToken])
+mkMaybeTokenizedSrc flags tm
+    | Flag_HyperlinkedSource `elem` flags = case renamedSource tm of
+        Just src -> do
+            tokens <- liftGhcToErrMsgGhc . liftIO $ mkTokenizedSrc summary src
+            return $ Just tokens
+        Nothing -> do
+            liftErrMsg . tell . pure $ concat
+                [ "Warning: Cannot hyperlink module \""
+                , moduleNameString . ms_mod_name $ summary
+                , "\" because renamed source is not available"
+                ]
+            return Nothing
+    | otherwise = return Nothing
+  where
+    summary = pm_mod_summary . tm_parsed_module $ tm
+
+mkTokenizedSrc :: ModSummary -> RenamedSource -> IO [RichToken]
+mkTokenizedSrc ms src =
+    Hyperlinker.enrich src . Hyperlinker.parse <$> rawSrc
+  where
+    rawSrc = readFile $ msHsFilePath ms
 
 -- | Find a stand-alone documentation comment by its name.
 findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe HsDocString)
