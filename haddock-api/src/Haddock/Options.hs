@@ -21,6 +21,7 @@ module Haddock.Options (
   optContentsUrl,
   optIndexUrl,
   optCssFile,
+  optSourceCssFile,
   sourceUrls,
   wikiUrls,
   optDumpInterfaceFile,
@@ -67,6 +68,7 @@ data Flag
   | Flag_LaTeX
   | Flag_LaTeXStyle String
   | Flag_HyperlinkedSource
+  | Flag_SourceCss String
   | Flag_Help
   | Flag_Verbosity String
   | Flag_Version
@@ -119,6 +121,8 @@ options backwardsCompat =
       "output for Hoogle; you may want --package-name and --package-version too",
     Option [] ["hyperlinked-source"] (NoArg Flag_HyperlinkedSource)
       "generate highlighted and hyperlinked source code (for use with --html)",
+    Option [] ["source-css"] (ReqArg Flag_SourceCss "FILE")
+      "use custom CSS file instead of default one in hyperlinked source",
     Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL")
       "URL for a source code link on the contents\nand index pages",
     Option ['s'] (if backwardsCompat then ["source", "source-module"] else ["source-module"])
@@ -242,6 +246,8 @@ optIndexUrl flags = optLast [ url | Flag_UseIndex url <- flags ]
 optCssFile :: [Flag] -> Maybe FilePath
 optCssFile flags = optLast [ str | Flag_CSS str <- flags ]
 
+optSourceCssFile :: [Flag] -> Maybe FilePath
+optSourceCssFile flags = optLast [ str | Flag_SourceCss str <- flags ]
 
 sourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String, Maybe String)
 sourceUrls flags =

@@ -18,6 +18,7 @@ stability:            experimental
 data-dir:
   resources
 data-files:
+  html/solarized.css
   html/frames.html
   html/haddock-util.js
   html/Classic.theme/haskell_icon.gif

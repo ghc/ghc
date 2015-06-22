@@ -244,6 +244,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
+    opt_source_css       = optSourceCssFile  flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -310,7 +311,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
                   libDir
 
   when (Flag_HyperlinkedSource `elem` flags) $ do
-    ppHyperlinkedSource odir libDir Nothing visibleIfaces
+    ppHyperlinkedSource odir libDir opt_source_css visibleIfaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because
