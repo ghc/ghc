@@ -66,6 +66,7 @@ data Flag
   | Flag_WikiEntityURL String
   | Flag_LaTeX
   | Flag_LaTeXStyle String
+  | Flag_HyperlinkedSource
   | Flag_Help
   | Flag_Verbosity String
   | Flag_Version
@@ -116,6 +117,8 @@ options backwardsCompat =
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
       "output for Hoogle; you may want --package-name and --package-version too",
+    Option [] ["hyperlinked-source"] (NoArg Flag_HyperlinkedSource)
+      "generate highlighted and hyperlinked source code (for use with --html)",
     Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL")
       "URL for a source code link on the contents\nand index pages",
     Option ['s'] (if backwardsCompat then ["source", "source-module"] else ["source-module"])
