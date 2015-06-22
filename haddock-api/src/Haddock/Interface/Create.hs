@@ -145,6 +145,7 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceFamInstances    = fam_instances
   , ifaceHaddockCoverage = coverage
   , ifaceWarningMap      = warningMap
+  , ifaceTokenizedSrc    = Nothing
   }
 
 mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName

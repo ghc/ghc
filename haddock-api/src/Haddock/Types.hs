@@ -35,6 +35,7 @@ import DynFlags (ExtensionFlag, Language)
 import OccName
 import Outputable
 import Control.Monad (ap)
+import Haddock.Backends.Hyperlinker.Ast
 
 -----------------------------------------------------------------------------
 -- * Convenient synonyms
@@ -125,6 +126,10 @@ data Interface = Interface
 
     -- | Warnings for things defined in this module.
   , ifaceWarningMap :: !WarningMap
+
+    -- | Tokenized source code of module (avaliable if Haddock is invoked with
+    -- source generation flag).
+  , ifaceTokenizedSrc :: !(Maybe [RichToken])
   }
 
 type WarningMap = Map Name (Doc Name)
