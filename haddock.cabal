@@ -101,6 +101,7 @@ executable haddock
       Haddock.Backends.LaTeX
       Haddock.Backends.HaddockDB
       Haddock.Backends.Hoogle
+      Haddock.Backends.Hyperlinker
       Haddock.ModuleTree
       Haddock.Types
       Haddock.Doc

@@ -30,6 +30,7 @@ import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
+import Haddock.Backends.Hyperlinker
 import Haddock.Interface
 import Haddock.Parser
 import Haddock.Types
@@ -307,6 +308,9 @@ render dflags flags qual ifaces installedIfaces srcMap = do
   when (Flag_LaTeX `elem` flags) $ do
     ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                   libDir
+
+  when (Flag_HyperlinkedSource `elem` flags) $ do
+    ppHyperlinkedSource odir libDir Nothing visibleIfaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because
