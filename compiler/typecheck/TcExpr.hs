@@ -323,17 +323,16 @@ tcExpr app@(OpApp _ _ _ _) res_ty = tcApp app res_ty
 --      \ x -> op x expr
 
 tcExpr (SectionR op arg2) res_ty
-  = do { -- res_ty = arg1_ty -> op_res_ty
-         (co_fn, [arg1_ty], op_res_ty) <- unifyOpFunTysWrap op 1 res_ty
-         -- op_ty - arg1_ty -> new var -> op_res_ty
-       ; op_arg_ty <- tc_app_inst 1 op_res_ty
-       ; let op_ty = mkFunTy arg1_ty op_arg_ty
-       ; op' <- tcCheckFun op op_ty
-       ; (co_fn, [arg1_ty, arg2_ty], op_res_ty) <- unifyOpFunTysWrap op 2 op_ty
-       ; co_res <- unifyType (mkFunTy arg1_ty op_res_ty) res_ty
+  = do { -- res_ty = arg1_ty -> rest_ty
+         (co_fun, [arg1_ty], rest_ty) <-
+           matchExpectedFunTys (mk_app_msg op) 1 res_ty
+       ; arg2_ty <- newFlexiTyVarTy openTypeKind
+         -- op_ty = arg1_ty -> arg2_ty -> rest_ty
+       ; let op_ty = mkFunTys [arg1_ty,arg2_ty] rest_ty
+         -- typecheck op and arg2
+       ; op'   <- tcCheckFun op op_ty
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
-       ; return $ mkHsWrapCo co_res $
-         SectionR (mkLHsWrapCo co_fn op') arg2' }
+       ; return $ SectionR (mkLHsWrapCo co_fun op') arg2' }
 
 tcExpr app@(SectionL _ _) res_ty = tcApp app res_ty
 
@@ -939,7 +938,7 @@ tcAppWorker _ (L loc (SectionL arg1 op)) args res_ty
 tcAppWorker _ (L loc (SectionR op arg2)) (arg1:args) res_ty
   = do { result <- tcAppWorker' op (arg1:arg2:args) res_ty
        ; return $ stepTcAppResult result $ \op' (arg1':arg2':args') co' ->
-           NormalTcAppResult (L loc (SectionR arg2' op')) (arg1':args') co' }
+           NormalTcAppResult (L loc (SectionR op' arg2')) (arg1':args') co' }
 
 tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
   | fun_name `hasKey` tagToEnumKey
@@ -1000,13 +999,15 @@ tc_app fun args fun_ty res_ty special
 
             -- Extract its argument types
         ; (co_fun, expected_arg_tys, actual_res_ty) <- case special of
-            TcAppNormal   -> matchExpectedFunTys (mk_app_msg fun) (length args) fun_ty
-            TcAppSectionL -> -- We need return type to be of form a -> b
-                             do { (co_fun_l, expected_l, actual_res_l) <-
-                                     matchExpectedFunTys (mk_app_msg fun) (length args + 1) fun_ty
-                                ; return ( co_fun_l
-                                         , init expected_l
-                                         , mkFunTy (last expected_l) actual_res_l) }
+            TcAppNormal
+              -> matchExpectedFunTys (mk_app_msg fun) (length args) fun_ty
+            TcAppSectionL
+              -> -- We need return type to be of form a -> b
+                 do { (co_fun_l, expected_l, actual_res_l) <-
+                        matchExpectedFunTys (mk_app_msg fun) (length args + 1) fun_ty
+                    ; return ( co_fun_l
+                             , init expected_l
+                             , mkFunTy (last expected_l) actual_res_l) }
 
         ; traceTc "tc_app/2" (vcat [ppr expected_arg_tys, ppr actual_res_ty])
 
