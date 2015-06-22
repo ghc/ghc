@@ -21,6 +21,7 @@ data-files:
   html/solarized.css
   html/frames.html
   html/haddock-util.js
+  html/highlight.js
   html/Classic.theme/haskell_icon.gif
   html/Classic.theme/minus.gif
   html/Classic.theme/plus.gif

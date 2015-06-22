@@ -16,21 +16,28 @@ import qualified Text.XHtml as Html
 
 type StyleClass = String
 
-render :: Maybe FilePath -> [RichToken] -> Html
-render css tokens = header css <> body tokens
+render :: Maybe FilePath -> Maybe FilePath -> [RichToken] -> Html
+render mcss mjs tokens = header mcss mjs <> body tokens
 
 body :: [RichToken] -> Html
 body = Html.body . Html.pre . mconcat . map richToken
 
-header :: Maybe FilePath -> Html
-header Nothing = Html.noHtml
-header (Just css) =
-    Html.header $ Html.thelink Html.noHtml ! attrs
+header :: Maybe FilePath -> Maybe FilePath -> Html
+header mcss mjs
+    | isNothing mcss && isNothing mjs = Html.noHtml
+header mcss mjs =
+    Html.header $ css mcss <> js mjs
   where
-    attrs =
+    css Nothing = Html.noHtml
+    css (Just cssFile) = Html.thelink Html.noHtml !
         [ Html.rel "stylesheet"
-        , Html.href css
         , Html.thetype "text/css"
+        , Html.href cssFile
+        ]
+    js Nothing = Html.noHtml
+    js (Just jsFile) = Html.script Html.noHtml !
+        [ Html.thetype "text/javascript"
+        , Html.src jsFile
         ]
 
 richToken :: RichToken -> Html
