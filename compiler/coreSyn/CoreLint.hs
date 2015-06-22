@@ -25,6 +25,7 @@ module CoreLint (
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import CoreStats   ( coreBindsStats )
 import CoreMonad
 import Bag
 import Literal

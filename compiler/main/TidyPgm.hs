@@ -20,7 +20,8 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CorePrep
-import CoreUtils
+import CoreUtils        (rhsIsStatic)
+import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreLint
 import Literal
 import Rules
