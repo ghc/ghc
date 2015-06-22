@@ -139,7 +139,7 @@ tcExpr e res_ty | debugIsOn && isSigmaTy res_ty     -- Sanity check
 
 tcExpr (HsVar name)  res_ty = tcCheckId name res_ty
 
-tcExpr (HsApp e1 e2) res_ty = tcApp e1 [e2] res_ty
+tcExpr app@(HsApp _ _) res_ty = tcApp app res_ty
 
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
                                  ; tcWrapResult (HsLit lit) lit_ty res_ty }
@@ -280,17 +280,8 @@ was a language construct.
 See Note [seqId magic] in MkId, and
 -}
 
-tcExpr (OpApp arg1 op fix arg2) res_ty
-  | (L loc (HsVar op_name)) <- op
-  , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
-  = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
-       ; let arg2_ty = res_ty
-       ; arg1' <- tcArg op (arg1, arg1_ty, 1)
-       ; arg2' <- tcArg op (arg2, arg2_ty, 2)
-       ; op_id <- tcLookupId op_name
-       ; let op' = L loc (HsWrap (mkWpTyApps [arg1_ty, arg2_ty]) (HsVar op_id))
-       ; return $ OpApp arg1' op' fix arg2' }
-
+tcExpr app@(OpApp _ _ _ _) res_ty = tcApp app res_ty
+{-
   | (L loc (HsVar op_name)) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
@@ -326,38 +317,25 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
                 mkLHsWrapCo co_arg1 arg1')
                op' fix
                (mkLHsWrapCo co_a arg2') }
-
-  | otherwise
-  = do { traceTc "Non Application rule" (ppr op)
-       ; op' <- tcCheckFun op res_ty
-       ; (co_fn, arg_tys, op_res_ty) <- unifyOpFunTysWrap op 2 res_ty
-       ; co_res <- unifyType op_res_ty res_ty
-       ; [arg1', arg2'] <- tcArgs op [arg1, arg2] arg_tys
-       ; return $ mkHsWrapCo co_res $
-         OpApp arg1' (mkLHsWrapCo co_fn op') fix arg2' }
+-}
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --      \ x -> op x expr
 
 tcExpr (SectionR op arg2) res_ty
-  = do { op' <- tcCheckFun op res_ty
-       ; (co_fn, [arg1_ty, arg2_ty], op_res_ty) <- unifyOpFunTysWrap op 2 res_ty
+  = do { -- res_ty = arg1_ty -> op_res_ty
+         (co_fn, [arg1_ty], op_res_ty) <- unifyOpFunTysWrap op 1 res_ty
+         -- op_ty - arg1_ty -> new var -> op_res_ty
+       ; op_arg_ty <- tc_app_inst 1 op_res_ty
+       ; let op_ty = mkFunTy arg1_ty op_arg_ty
+       ; op' <- tcCheckFun op op_ty
+       ; (co_fn, [arg1_ty, arg2_ty], op_res_ty) <- unifyOpFunTysWrap op 2 op_ty
        ; co_res <- unifyType (mkFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
        ; return $ mkHsWrapCo co_res $
          SectionR (mkLHsWrapCo co_fn op') arg2' }
 
-tcExpr (SectionL arg1 op) res_ty
-  = do { op' <- tcCheckFun op res_ty
-       ; dflags <- getDynFlags      -- Note [Left sections]
-       ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
-                         | otherwise                        = 2
-
-       ; (co_fn, (arg1_ty:arg_tys), op_res_ty) <- unifyOpFunTysWrap op n_reqd_args res_ty
-       ; co_res <- unifyType (mkFunTys arg_tys op_res_ty) res_ty
-       ; arg1' <- tcArg op (arg1, arg1_ty, 1)
-       ; return $ mkHsWrapCo co_res $
-         SectionL arg1' (mkLHsWrapCo co_fn op') }
+tcExpr app@(SectionL _ _) res_ty = tcApp app res_ty
 
 tcExpr (ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
@@ -886,25 +864,95 @@ arithSeqEltType (Just fl) res_ty
 ************************************************************************
 -}
 
-tcApp :: LHsExpr Name -> [LHsExpr Name] -- Function and args
-      -> TcRhoType -> TcM (HsExpr TcId) -- Translated fun and args
+-- Some function applications have special treatment,
+--   return those directly.
+-- For the rest, return the pieces of information to assembly.
+data TcAppResult = SpecialTcAppResult (HsExpr TcId)
+                 | NormalTcAppResult  (LHsExpr TcId) [LHsExpr TcId] (HsExpr TcId -> HsExpr TcId)
 
-tcApp (L _ (HsPar e)) args res_ty
-  = tcApp e args res_ty
+stepTcAppResult :: TcAppResult
+                -> (LHsExpr TcId -> [LHsExpr TcId] -> (HsExpr TcId -> HsExpr TcId) -> TcAppResult)
+                -> TcAppResult
+stepTcAppResult s@(SpecialTcAppResult _) _ = s
+stepTcAppResult (NormalTcAppResult fun args co) f = f fun args co
 
-tcApp (L _ (HsApp e1 e2)) args res_ty
-  = tcApp e1 (e2:args) res_ty   -- Accumulate the arguments
+consumeTcAppResult :: TcAppResult
+                   -> (LHsExpr TcId -> [LHsExpr TcId] -> HsExpr TcId)
+                   -> HsExpr TcId
+consumeTcAppResult (SpecialTcAppResult e) _ = e
+consumeTcAppResult (NormalTcAppResult fun args co) f = co (f fun args)
 
-tcApp fun@(L loc (HsVar fun_name)) args res_ty
+-- The case of a left section is almost identical to app.
+-- However, we need to ensure that the result type is a function
+-- if PostfixOperators is not enabled.
+-- This is donde in tc_app, when the corresponding flag is on.
+data TcAppSpecialCase = TcAppSectionL
+                      | TcAppNormal
+
+tcApp :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId) -- Translated fun and args
+tcApp (HsApp e1 e2) res_ty
+  = do { result <- tcAppWorker' e1 [e2] res_ty
+       ; return $ consumeTcAppResult result $ \e1' [e2'] ->
+           unLoc (mkHsApp e1' e2') }
+tcApp (OpApp arg1 op fix arg2) res_ty
+  = do { result <- tcAppWorker' op [arg1,arg2] res_ty
+       ; return $ consumeTcAppResult result $ \op' [arg1',arg2'] ->
+           OpApp arg1' op' fix arg2' }
+tcApp (SectionL arg1 op) res_ty
+  = do { dflags <- getDynFlags      -- Note [Left sections]
+       ; let reqd_args | xopt Opt_PostfixOperators dflags = TcAppSectionL
+                       | otherwise                        = TcAppNormal
+       ; result <- tcAppWorker reqd_args op [arg1] res_ty
+       ; return $ consumeTcAppResult result $ \op' [arg1'] ->
+           SectionL arg1' op' }
+
+tcAppWorker' :: LHsExpr Name -> [LHsExpr Name] -> TcRhoType
+             -> TcM TcAppResult
+tcAppWorker' = tcAppWorker TcAppNormal
+
+tcAppWorker :: TcAppSpecialCase
+            -> LHsExpr Name -> [LHsExpr Name] -> TcRhoType
+            -> TcM TcAppResult
+
+tcAppWorker special (L _ (HsPar e)) args res_ty
+  = tcAppWorker special e args res_ty
+
+tcAppWorker _ (L _ (HsApp e1 e2)) args res_ty
+  = do { -- Accumulate the arguments
+         result <- tcAppWorker' e1 (e2:args) res_ty
+         -- Rebuild the application
+       ; return $ stepTcAppResult result $ \e1' (e2':args') co' ->
+           NormalTcAppResult (mkHsApp e1' e2') args' co' }
+
+tcAppWorker _ (L loc (OpApp arg1 op fix arg2)) args res_ty
+  = do { result <- tcAppWorker' op (arg1:arg2:args) res_ty
+       ; return $ stepTcAppResult result $ \op' (arg1':arg2':args') co' ->
+           NormalTcAppResult (L loc (OpApp arg1' op' fix arg2')) args' co' }
+
+-- Left section with some given arguments -> nothing special to do
+tcAppWorker _ (L loc (SectionL arg1 op)) args res_ty
+  = do { result <- tcAppWorker' op (arg1:args) res_ty
+       ; return $ stepTcAppResult result $ \op' (arg1':args') co' ->
+           NormalTcAppResult (L loc (SectionL arg1' op')) args' co' }
+
+-- Right section with some given arguments -> insert argument in second place
+tcAppWorker _ (L loc (SectionR op arg2)) (arg1:args) res_ty
+  = do { result <- tcAppWorker' op (arg1:arg2:args) res_ty
+       ; return $ stepTcAppResult result $ \op' (arg1':arg2':args') co' ->
+           NormalTcAppResult (L loc (SectionR arg2' op')) (arg1':args') co' }
+
+tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
   | fun_name `hasKey` tagToEnumKey
   , [arg] <- args
-  = tcTagToEnum loc fun_name arg res_ty
+  = do { e <- tcTagToEnum loc fun_name arg res_ty
+       ; return (SpecialTcAppResult e) }
 
   | fun_name `hasKey` seqIdKey
   , [arg1,arg2] <- args
-  = tcSeq loc fun_name arg1 arg2 res_ty
+  = do { e <- tcSeq loc fun_name arg1 arg2 res_ty
+       ; return (SpecialTcAppResult e) }
 
-  | otherwise
+  | otherwise  -- we have at least that amount of args
   = do {   -- Look for type in environment
          thing  <- tcLookup fun_name
        ; fun_ty <- case thing of
@@ -919,20 +967,19 @@ tcApp fun@(L loc (HsVar fun_name)) args res_ty
            _ -> tc_app_inst (length args) res_ty
            -- Instantiate type
        ; let (tvs, theta, rho) = tcSplitSigmaTy fun_ty
-       ; (subst, tvs') <- tcInstTyVars tvs
-       ; let tys'   = mkTyVarTys tvs'
-             theta' = substTheta subst theta
+       ; (subst, _tvs') <- tcInstTyVars tvs
+       ; let theta' = substTheta subst theta
              rho'   = substTy subst rho
            -- Run with instantiated type
-       ; theta_w <- instCallConstraints (OccurrenceOf fun_name) theta'
-       ; tc_app fun args rho' res_ty (mkLHsWrap (theta_w <.> mkWpTyApps tys')) }
+       ; _theta_w <- instCallConstraints (OccurrenceOf fun_name) theta'
+       ; tc_app fun args rho' res_ty special }
 
-tcApp fun args res_ty
+tcAppWorker special fun args res_ty
     -- Normal case, where the function is not a variable
   = do  {   -- Create function type schema
-          fun_ty <- tc_app_inst (length args) res_ty
+        ; fun_ty <- tc_app_inst (length args) res_ty
             -- Run with new type schema
-        ; tc_app fun args fun_ty res_ty id }
+        ; tc_app fun args fun_ty res_ty special }
 
 tc_app_inst :: Int -> TcSigmaType -> TcM TcRhoType
 tc_app_inst nb_args res_ty
@@ -943,15 +990,25 @@ tc_app_inst nb_args res_ty
 tc_app :: LHsExpr Name -> [LHsExpr Name]
        -> TcSigmaType  -- type pushed for the function
        -> TcRhoType    -- type pushed for the result
-       -> (LHsExpr TcId -> LHsExpr TcId)  -- post-processing fun1
-       -> TcM (HsExpr TcId)
-tc_app fun args fun_ty res_ty post_proc
-  = do  {   -- Type-check the function
+       -> TcAppSpecialCase   -- number of arrows expected in the result
+       -> TcM TcAppResult
+tc_app fun args fun_ty res_ty special
+  = do  { traceTc "tc_app/1" (vcat [ppr fun, ppr fun_ty, ppr args, ppr res_ty])
+
+            -- Type-check the function
         ; fun1 <- tcCheckFun fun fun_ty
 
             -- Extract its argument types
-        ; (co_fun, expected_arg_tys, actual_res_ty)
-              <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_ty
+        ; (co_fun, expected_arg_tys, actual_res_ty) <- case special of
+            TcAppNormal   -> matchExpectedFunTys (mk_app_msg fun) (length args) fun_ty
+            TcAppSectionL -> -- We need return type to be of form a -> b
+                             do { (co_fun_l, expected_l, actual_res_l) <-
+                                     matchExpectedFunTys (mk_app_msg fun) (length args + 1) fun_ty
+                                ; return ( co_fun_l
+                                         , init expected_l
+                                         , mkFunTy (last expected_l) actual_res_l) }
+
+        ; traceTc "tc_app/2" (vcat [ppr expected_arg_tys, ppr actual_res_ty])
 
         -- Typecheck the result, thereby propagating
         -- info (if any) from result into the argument types
@@ -964,11 +1021,12 @@ tc_app fun args fun_ty res_ty post_proc
         -- Typecheck the arguments
         ; args1 <- tcArgs fun args expected_arg_tys
 
-        -- Assemble the result
-        ; let fun2 = mkLHsWrapCo co_fun (post_proc fun1)
-              app  = mkLHsWrap (mkWpInstanceOf actual_res_ty ev_res) (foldl mkHsApp fun2 args1)
-
-        ; return (unLoc app) }
+        -- Return the pieces of the result
+        ; return $ NormalTcAppResult
+                     (mkLHsWrapCo co_fun fun1)  -- Instantiated function
+                     args1                      -- Arguments
+                                                -- Coercion to expected result type
+                     (mkHsWrap (mkWpInstanceOf actual_res_ty ev_res)) }
 
 mk_app_msg :: LHsExpr Name -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
