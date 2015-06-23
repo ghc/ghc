@@ -5956,6 +5956,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             *(Elf32_Word *) P = value - P;
             break;
 
+         case R_PPC_PLTREL24:
+            value -= 0x8000; /* See Note [.LCTOC1 in PPC PIC code] */
+            /* fallthrough */
          case R_PPC_REL24:
             delta = value - P;
 
@@ -5975,6 +5978,18 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
             *(Elf_Word *) P = (*(Elf_Word *) P & 0xfc000003)
                                           | (delta & 0x3fffffc);
+            break;
+
+         case R_PPC_REL16_LO:
+            *(Elf32_Half*) P = value - P;
+            break;
+
+         case R_PPC_REL16_HI:
+            *(Elf32_Half*) P = (value - P) >> 16;
+            break;
+
+         case R_PPC_REL16_HA:
+            *(Elf32_Half*) P = (value + 0x8000 - P) >> 16;
             break;
 #        endif
 
