@@ -21,9 +21,9 @@ sigcabal02:
 	cd q && $(SETUP) build
 	cd q && $(SETUP) copy
 	cd q && $(SETUP) register --print-ipid > ../q_ipid
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package-id "`cat p_ipid`" -package-id "`cat q_ipid`" --make Main.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package containers -package-id "`cat p_ipid`" -package-id "`cat q_ipid`" --make Main.hs
 	./Main
-	! '$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package-id "`cat p_ipid`" -package-id "`cat q_ipid`" --make ShouldFail.hs
+	! '$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package containers -package-id "`cat p_ipid`" -package-id "`cat q_ipid`" --make ShouldFail.hs
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean
 endif

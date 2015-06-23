@@ -363,7 +363,7 @@ initPackages dflags = do
                 Nothing -> readPackageConfigs dflags
                 Just db -> return $ setBatchPackageFlags dflags db
   (pkg_state, preload, this_pkg)
-        <- mkPackageState dflags pkg_db [] (thisPackage dflags)
+        <- mkPackageState dflags pkg_db []
   return (dflags{ pkgDatabase = Just pkg_db,
                   pkgState = pkg_state,
                   thisPackage = this_pkg },
@@ -885,14 +885,16 @@ mkPackageState
     :: DynFlags
     -> [PackageConfig]          -- initial database
     -> [PackageKey]              -- preloaded packages
-    -> PackageKey                -- this package
     -> IO (PackageState,
            [PackageKey],         -- new packages to preload
            PackageKey) -- this package, might be modified if the current
                       -- package is a wired-in package.
 
-mkPackageState dflags0 pkgs0 preload0 this_package = do
+mkPackageState dflags0 pkgs0 preload0 = do
   dflags <- interpretPackageEnv dflags0
+
+  -- Compute the package key
+  let this_package = thisPackage dflags
 
 {-
    Plan.
