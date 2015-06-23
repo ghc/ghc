@@ -444,8 +444,9 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
                                -- NB: must include derived errors in this test,
                                --     hence "incl_derivs"
 
-              else do { let quant_cand = approximateWC wanted_transformed
-                            meta_tvs   = filter isMetaTyVar (varSetElems (tyVarsOfCts quant_cand))
+              else do { quant_cand <- runTcSWithEvBinds null_ev_binds_var $ approximateWC wanted_transformed
+                      ; traceTc "simplifyInfer/quant_cand = " (ppr quant_cand)
+                      ; let meta_tvs = filter isMetaTyVar (varSetElems (tyVarsOfCts quant_cand))
                       ; gbl_tvs <- tcGetGlobalTyVars
                             -- Miminise quant_cand.  We are not interested in any evidence
                             -- produced, because we are going to simplify wanted_transformed
@@ -1294,10 +1295,13 @@ defaultTyVar the_tv
 
   | otherwise = return the_tv    -- The common case
 
-approximateWC :: WantedConstraints -> Cts
+approximateWC :: WantedConstraints -> TcS Cts
+approximateWC = fmap andManyCts . mapM instantiateWC . bagToList . approximateWC_
+
+approximateWC_ :: WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts
 -- See Note [ApproximateWC]
-approximateWC wc
+approximateWC_ wc
   = float_wc emptyVarSet wc
   where
     float_wc :: TcTyVarSet -> WantedConstraints -> Cts
@@ -1326,6 +1330,20 @@ approximateWC wc
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
+
+instantiateWC :: Ct -> TcS Cts
+instantiateWC ct
+  | isWantedCt ct, InstanceOfPred lhs rhs <- classifyPredType (ctPred ct)
+  = do { let loc = ctLoc ct
+       ; (_qvars, q, ty) <- splitInst lhs
+       ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
+       ; let eq = mkTcEqPred ty rhs
+       ; new_ev_ty <- newWantedEvVarNC loc eq
+       ; return $ consCts
+           (mkNonCanonical new_ev_ty)
+           (listToBag (map mkNonCanonical new_ev_qs)) }
+  | otherwise = return (singleCt ct)
+
 
 {-
 Note [ApproximateWC]
@@ -1660,7 +1678,7 @@ applyDefaultingRules wanteds
   = do { info@(default_tys, _) <- getDefaultInfo
        ; wanteds               <- TcS.zonkWC wanteds
 
-       ; let groups = findDefaultableGroups info wanteds
+       ; groups <- findDefaultableGroups info wanteds
 
        ; traceTcS "applyDefaultingRules {" $
                   vcat [ text "wanteds =" <+> ppr wanteds
@@ -1673,12 +1691,20 @@ applyDefaultingRules wanteds
 
        ; return (or something_happeneds) }
 
-findDefaultableGroups
+findDefaultableGroups :: ([Type], (Bool,Bool))
+                      -> WantedConstraints
+                      -> TcS [(TyVar, [Ct])]
+findDefaultableGroups info wanteds
+  = do { simples <- approximateWC wanteds
+       ; return (findDefaultableGroups_ info simples) }
+
+findDefaultableGroups_
     :: ( [Type]
        , (Bool,Bool) )     -- (Overloaded strings, extended default rules)
-    -> WantedConstraints   -- Unsolved (wanted or derived)
+    -- -> WantedConstraints   -- Unsolved (wanted or derived)
+    -> Cts
     -> [(TyVar, [Ct])]
-findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
+findDefaultableGroups_ (default_tys, (ovl_strings, extended_defaults)) {-wanteds-} simples
   | null default_tys
   = []
   | otherwise
@@ -1687,7 +1713,6 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     , defaultable_tyvar tv
     , defaultable_classes (map sndOf3 group) ]
   where
-    simples                = approximateWC wanteds
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
     unary_groups           = equivClasses cmp_tv unaries
 

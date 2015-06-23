@@ -387,7 +387,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
 
     go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                        ; let uids1 = map (\x -> (x, TcIdUnrestricted)) ids1
+                        ; let uids1 = map (\x -> (x, TcIdMonomorphic)) ids1
                         ; (binds2, thing) <- tcExtendLetEnv top_lvl uids1 $
                                              go sccs
                         ; return (binds1 `unionBags` binds2, thing) }

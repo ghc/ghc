@@ -1671,7 +1671,7 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
         do { (qvars, q, ty) <- splitInst lhs
              -- generate new constraints
            ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
-           ; let eq = mkTcEqPredRole Nominal ty rhs
+           ; let eq = mkTcEqPred ty rhs
            ; new_ev_ty <- newWantedEvVarNC loc eq
              -- compute the evidence for the instantiation
            ; let qvars' = map TyVarTy qvars
