@@ -763,7 +763,7 @@ The idea is that
   have (a -fs-> a) in S, which contradicts (WF2).
 
 * The extended substitution satisfies (WF1) and (WF2)
-  - (K1) plus (L1) guarantee that the extended substiution satisfies (WF1).
+  - (K1) plus (L1) guarantee that the extended substitution satisfies (WF1).
   - (T3) guarantees (WF2).
 
 * (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
