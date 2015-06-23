@@ -245,39 +245,6 @@ With PostfixOperators we don't actually require the function to take
 two arguments at all.  For example, (x `not`) means (not x); you get
 postfix operators!  Not Haskell 98, but it's less work and kind of
 useful.
-
-Note [Typing rule for ($)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-People write
-   runST $ blah
-so much, where
-   runST :: (forall s. ST s a) -> a
-that I have finally given in and written a special type-checking
-rule just for saturated appliations of ($).
-  * Infer the type of the first argument
-  * Decompose it; should be of form (arg2_ty -> res_ty),
-       where arg2_ty might be a polytype
-  * Use arg2_ty to typecheck arg2
-
-Note [Typing rule for seq]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to allow
-       x `seq` (# p,q #)
-which suggests this type for seq:
-   seq :: forall (a:*) (b:??). a -> b -> b,
-with (b:??) meaning that be can be instantiated with an unboxed tuple.
-But that's ill-kinded!  Function arguments can't be unboxed tuples.
-And indeed, you could not expect to do this with a partially-applied
-'seq'; it's only going to work when it's fully applied.  so it turns
-into
-    case x of _ -> (# p,q #)
-
-For a while I slid by by giving 'seq' an ill-kinded type, but then
-the simplifier eta-reduced an application of seq and Lint blew up
-with a kind error.  It seems more uniform to treat 'seq' as it it
-was a language construct.
-
-See Note [seqId magic] in MkId, and
 -}
 
 tcExpr app@(OpApp _ _ _ _) res_ty = tcApp app res_ty
@@ -885,6 +852,9 @@ consumeTcAppResult (NormalTcAppResult fun args co) f = co (f fun args)
 -- However, we need to ensure that the result type is a function
 -- if PostfixOperators is not enabled.
 -- This is donde in tc_app, when the corresponding flag is on.
+--
+-- The case of a leading ($) is similar to app, but we need
+-- to inject the call to ($) when writing the application.
 data TcAppSpecialCase = TcAppSectionL
                       | TcAppNormal
 
@@ -940,6 +910,37 @@ tcAppWorker _ (L loc (SectionR op arg2)) (arg1:args) res_ty
        ; return $ stepTcAppResult result $ \op' (arg1':arg2':args') co' ->
            NormalTcAppResult (L loc (SectionR op' arg2')) (arg1':args') co' }
 
+{-
+Note [Typing rule for ($)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+People write
+   runST $ blah
+so much, where
+   runST :: (forall s. ST s a) -> a
+that I have finally given in and written a special type-checking
+rule just for saturated appliations of ($).
+
+Note [Typing rule for seq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to allow
+       x `seq` (# p,q #)
+which suggests this type for seq:
+   seq :: forall (a:*) (b:??). a -> b -> b,
+with (b:??) meaning that be can be instantiated with an unboxed tuple.
+But that's ill-kinded!  Function arguments can't be unboxed tuples.
+And indeed, you could not expect to do this with a partially-applied
+'seq'; it's only going to work when it's fully applied.  so it turns
+into
+    case x of _ -> (# p,q #)
+
+For a while I slid by by giving 'seq' an ill-kinded type, but then
+the simplifier eta-reduced an application of seq and Lint blew up
+with a kind error.  It seems more uniform to treat 'seq' as it it
+was a language construct.
+
+See Note [seqId magic] in MkId, and
+-}
+
 tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
   | fun_name `hasKey` tagToEnumKey
   , [arg] <- args
@@ -951,7 +952,31 @@ tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
   = do { e <- tcSeq loc fun_name arg1 arg2 res_ty
        ; return (SpecialTcAppResult e) }
 
-  | otherwise  -- we have at least that amount of args
+  | fun_name `hasKey` dollarIdKey   -- Note [Typing rule for ($)]
+  , (actual_fun@(L loc (HsVar actual_fun_name)) : rest_args) <- args
+  = do {   -- Typing without ($)
+         actual_fun_ty <- tc_app_get_fn_ty actual_fun_name
+                            (tc_app_inst (length rest_args) res_ty)
+       ; result <- tc_app actual_fun rest_args actual_fun_ty res_ty special
+           -- Build the ($) application
+       ; dollar <- tcCheckId fun_name (mkFunTy actual_fun_ty actual_fun_ty)
+       ; return $ stepTcAppResult result $ \actual_fun' rest_args' co' ->
+           NormalTcAppResult (L loc dollar) (actual_fun' : rest_args') co' }
+
+  | otherwise  -- fallback case
+  = do { fun_ty <- tc_app_get_fn_ty fun_name
+                     (tc_app_inst (length args) res_ty)
+       ; tc_app fun args fun_ty res_ty special }
+
+tcAppWorker special fun args res_ty
+    -- Normal case, where the function is not a variable
+  = do  {   -- Create function type schema
+        ; fun_ty <- tc_app_inst (length args) res_ty
+            -- Run with new type schema
+        ; tc_app fun args fun_ty res_ty special }
+
+tc_app_get_fn_ty :: Name -> TcM TcRhoType -> TcM TcRhoType
+tc_app_get_fn_ty fun_name not_found
   = do {   -- Look for type in environment
          thing  <- tcLookup fun_name
        ; fun_ty <- case thing of
@@ -963,7 +988,7 @@ tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
              PatSynCon ps
                -> do { (_, pat_ty) <- tcPatSynBuilderOcc (OccurrenceOf fun_name) ps
                      ; return pat_ty }
-           _ -> tc_app_inst (length args) res_ty
+           _ -> not_found
            -- Instantiate type
        ; let (tvs, theta, rho) = tcSplitSigmaTy fun_ty
        ; (subst, _tvs') <- tcInstTyVars tvs
@@ -971,14 +996,7 @@ tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
              rho'   = substTy subst rho
            -- Run with instantiated type
        ; _theta_w <- instCallConstraints (OccurrenceOf fun_name) theta'
-       ; tc_app fun args rho' res_ty special }
-
-tcAppWorker special fun args res_ty
-    -- Normal case, where the function is not a variable
-  = do  {   -- Create function type schema
-        ; fun_ty <- tc_app_inst (length args) res_ty
-            -- Run with new type schema
-        ; tc_app fun args fun_ty res_ty special }
+       ; return rho' }
 
 tc_app_inst :: Int -> TcSigmaType -> TcM TcRhoType
 tc_app_inst nb_args res_ty

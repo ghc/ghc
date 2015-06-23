@@ -1652,8 +1652,7 @@ canInstanceOf ev
              mk_ct new_ev = CInstanceOfCan { cc_ev = new_ev
                                            , cc_lhs = xil, cc_rhs = xir }
        ; mb <- rewriteEvidence ev xi co
-       ; traceTcS "canInstanceOf" (vcat [ ppr ev <+> ppr lhs <+> ppr rhs
-                                        , ppr xi, ppr mb ])
+       ; traceTcS "canInstanceOf" (vcat [ ppr ev, ppr xi, ppr mb ])
        ; return (fmap mk_ct mb) }
 
 can_instance_of :: Ct -> TcS (StopOrContinue Ct)
@@ -1672,7 +1671,7 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
         do { (qvars, q, ty) <- splitInst lhs
              -- generate new constraints
            ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
-           ; let eq = mkTcEqPredRole Nominal lhs ty
+           ; let eq = mkTcEqPredRole Nominal ty rhs
            ; new_ev_ty <- newWantedEvVarNC loc eq
              -- compute the evidence for the instantiation
            ; let qvars' = map TyVarTy qvars
@@ -1680,9 +1679,12 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
                                                     (map ctev_evar new_ev_qs))
              -- emit new work
            ; emitWorkNC new_ev_qs
-           ; canEqNC new_ev_ty NomEq rhs ty }
+           ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_ty, ppr new_ev_qs ])
+           ; canEqNC new_ev_ty NomEq ty rhs }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
-can_instance_of _ = panic "can_instance_of in a non InstanceOf constraint"
+  -- already canonical
+  | otherwise = continueWith (CIrredEvCan { cc_ev = ev })
+can_instance_of _ = panic "can_instance_of in a non instanceOf constraint"
 
 can_instance_to_eq :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
 can_instance_to_eq ev lhs rhs
