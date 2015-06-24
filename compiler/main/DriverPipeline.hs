@@ -1623,12 +1623,14 @@ mkExtraObj dflags extn xs
       oFile <- newTempName dflags "o"
       writeFile cFile xs
       let rtsDetails = getPackageDetails dflags rtsPackageKey
+          pic_c_flags = picCCOpts dflags
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,
                        Option        "-o",
                        FileOption "" oFile]
-                      ++ map (FileOption "-I") (includeDirs rtsDetails))
+                      ++ map (FileOption "-I") (includeDirs rtsDetails)
+                      ++ map Option pic_c_flags)
       return oFile
 
 -- When linking a binary, we need to create a C main() function that
