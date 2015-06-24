@@ -506,7 +506,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                    in newGlobalBinder mod (mkGen (nameOccName (tyConName tycon)))
                         (nameSrcSpan (tyConName tycon))
 
-     ; let axiom = mkSingleCoAxiom rep_name tyvars fam_tc appT repTy
+     ; let axiom = mkSingleCoAxiom Nominal rep_name tyvars fam_tc appT repTy
      ; newFamInst SynFamilyInst axiom  }
 
 --------------------------------------------------------------------------------

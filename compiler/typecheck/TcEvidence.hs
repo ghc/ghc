@@ -20,7 +20,8 @@ module TcEvidence (
   EvTypeable(..),
 
   -- TcCoercion
-  TcCoercion(..), LeftOrRight(..), pickLR,
+  TcCoercion(..), TcCoercionR, TcCoercionN,
+  LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
@@ -134,6 +135,9 @@ the arguments tends to be to hand at call sites, so it's quicker than
 using, say, tcCoercionKind.
 -}
 
+type TcCoercionN = TcCoercion    -- A Nominal          corecion ~N
+type TcCoercionR = TcCoercion    -- A Representational corecion ~R
+
 data TcCoercion
   = TcRefl Role TcType
   | TcTyConAppCo Role TyCon [TcCoercion]
@@ -150,7 +154,7 @@ data TcCoercion
   | TcTransCo TcCoercion TcCoercion
   | TcNthCo Int TcCoercion
   | TcLRCo LeftOrRight TcCoercion
-  | TcSubCo TcCoercion
+  | TcSubCo TcCoercion                 -- Argument is never TcRefl
   | TcCastCo TcCoercion TcCoercion     -- co1 |> co2
   | TcLetCo TcEvBinds TcCoercion
   | TcCoercion Coercion            -- embed a Core Coercion
@@ -196,12 +200,15 @@ mkTcTyConAppCo role tc cos -- No need to expand type synonyms
 
   | otherwise = TcTyConAppCo role tc cos
 
--- input coercion is Nominal
+-- Input coercion is Nominal
 -- mkSubCo will do some normalisation. We do not do it for TcCoercions, but
 -- defer that to desugaring; just to reduce the code duplication a little bit
 mkTcSubCo :: TcCoercion -> TcCoercion
-mkTcSubCo co = ASSERT2( tcCoercionRole co == Nominal, ppr co)
-               TcSubCo co
+mkTcSubCo (TcRefl _ ty)
+  = TcRefl Representational ty
+mkTcSubCo co
+   = ASSERT2( tcCoercionRole co == Nominal, ppr co)
+     TcSubCo co
 
 -- See Note [Role twiddling functions] in Coercion
 -- | Change the role of a 'TcCoercion'. Returns 'Nothing' if this isn't

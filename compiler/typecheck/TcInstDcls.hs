@@ -571,7 +571,7 @@ tcATDefault inst_subst defined_ats (ATI fam_tc defs)
              tv_set'  = tyVarsOfTypes pat_tys'
              tvs'     = varSetElemsKvsFirst tv_set'
        ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
-       ; let axiom = mkSingleCoAxiom rep_tc_name tvs' fam_tc pat_tys' rhs'
+       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' fam_tc pat_tys' rhs'
        ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
                                               , pprCoAxiom axiom ])
        ; fam_inst <- ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' )
@@ -699,7 +699,8 @@ tcDataFamInstDecl mb_clsinfo
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
               -- freshen tyvars
               ; let (eta_tvs, eta_pats) = eta_reduce tvs' pats'
-                    axiom    = mkSingleCoAxiom axiom_name eta_tvs fam_tc eta_pats
+                    axiom    = mkSingleCoAxiom Representational
+                                               axiom_name eta_tvs fam_tc eta_pats
                                                (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent   = FamInstTyCon axiom fam_tc pats'
                     roles    = map (const Nominal) tvs'

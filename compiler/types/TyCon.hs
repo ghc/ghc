@@ -177,8 +177,9 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
 
         data T a
         data R:TInt = T1 | T2 Bool
-        axiom ax_ti : T Int ~ R:TInt
+        axiom ax_ti : T Int ~R R:TInt
 
+  Note that this is a *representational* coercion
   The R:TInt is the "representation TyCons".
   It has an AlgTyConParent of
         FamInstTyCon T [Int] ax_ti
@@ -203,7 +204,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         data R:TPair a where
           X1 :: R:TPair Int Bool
           X2 :: a -> b -> R:TPair a b
-        axiom ax_pr :: T (a,b) ~ R:TPair a b
+        axiom ax_pr :: T (a,b)  ~R  R:TPair a b
 
         $WX1 :: forall a b. a -> b -> T (a,b)
         $WX1 a b (x::a) (y::b) = X2 a b x y `cast` sym (ax_pr a b)
@@ -652,7 +653,8 @@ data TyConParent
   --  type with the type instance family
   | FamInstTyCon          -- See Note [Data type families]
         (CoAxiom Unbranched)  -- The coercion axiom.
-               -- Generally of kind   T ty1 ty2 ~ R:T a b c
+               -- A *Representational* coercion,
+               -- of kind   T ty1 ty2   ~R   R:T a b c
                -- where T is the family TyCon,
                -- and R:T is the representation TyCon (ie this one)
                -- and a,b,c are the tyConTyVars of this TyCon

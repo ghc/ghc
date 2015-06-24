@@ -1201,7 +1201,7 @@ tcTagToEnum loc fun_name arg res_ty
         -- Look through any type family
         ; fam_envs <- tcGetFamInstEnvs
         ; let (rep_tc, rep_args, coi) = tcLookupDataFamInst fam_envs tc tc_args
-             -- coi :: tc tc_args ~ rep_tc rep_args
+             -- coi :: tc tc_args ~R rep_tc rep_args
 
         ; checkTc (isEnumerationTyCon rep_tc)
                   (mk_error ty' doc2)

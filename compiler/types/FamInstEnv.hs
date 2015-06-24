@@ -551,12 +551,17 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_implicit = False
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
 
-mkSingleCoAxiom :: Name -> [TyVar] -> TyCon -> [Type] -> Type -> CoAxiom Unbranched
-mkSingleCoAxiom ax_name tvs fam_tc lhs_tys rhs_ty
+mkSingleCoAxiom :: Role -> Name
+                -> [TyVar] -> TyCon -> [Type] -> Type
+                -> CoAxiom Unbranched
+-- Make a single-branch CoAxiom, incluidng making the branch itself
+-- Used for both type family (Nominal) and data family (Representational)
+-- axioms, hence passing in the Role
+mkSingleCoAxiom role ax_name tvs fam_tc lhs_tys rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
-            , co_ax_role     = Nominal
+            , co_ax_role     = role
             , co_ax_implicit = False
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
   where
