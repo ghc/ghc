@@ -889,27 +889,26 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
+--      * data family redex
 --      * newtypes
--- using appropriate coercions.  Specifically, if
+-- returning an appropriate Representaitonal coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Maybe (co, ty')
 -- then
---   (a) co :: ty ~ ty'
---   (b) ty' is not a newtype, and is not a type-family redex
+--   (a) co :: ty ~R ty'
+--   (b) ty' is not a newtype, and is not a type-family or data-family redex
 --
 -- However, ty' can be something like (Maybe (F ty)), where
 -- (F ty) is a redex.
 --
 -- Its a bit like Type.repType, but handles type families too
--- The coercion returned is always an R coercion
 
 topNormaliseType_maybe env ty
   = topNormaliseTypeX_maybe stepper ty
   where
-    stepper
-      = unwrapNewTypeStepper
-        `composeSteppers`
-        \ rec_nts tc tys ->
-        let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
+    stepper = unwrapNewTypeStepper `composeSteppers` tyFamStepper
+
+    tyFamStepper rec_nts tc tys  -- Try to step a type/data familiy
+      = let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
         case reduceTyFamApp_maybe env Representational tc ntys of
           Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
           Nothing        -> NS_Done

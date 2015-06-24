@@ -104,7 +104,7 @@ import BasicTypes
 import DynFlags
 import ForeignCall
 import Name
-import NameSet
+import NameEnv
 import CoAxiom
 import PrelNames
 import Maybes
@@ -1827,9 +1827,10 @@ the key examples:
   Id (Id Int)    Int
   Fix Id         NO NO NO
 
-Notice that we can expand T, even though it's recursive.
-And we can expand Id (Id Int), even though the Id shows up
-twice at the outer level.
+Notice that
+ * We can expand T, even though it's recursive.
+ * We can expand Id (Id Int), even though the Id shows up
+   twice at the outer level, because Id is non-recursive
 
 So, when expanding, we keep track of when we've seen a recursive
 newtype at outermost level; and bale out if we see it again.
@@ -1837,20 +1838,37 @@ newtype at outermost level; and bale out if we see it again.
 We sometimes want to do the same for product types, so that the
 strictness analyser doesn't unbox infinitely deeply.
 
-The function that manages this is checkRecTc.
+More precisely, we keep a *count* of how many times we've seen it.
+This is to account for
+   data instance T (a,b) = MkT (T a) (T b)
+Then (Trac #10482) if we have a type like
+        T (Int,(Int,(Int,(Int,Int))))
+we can still unbox deeply enough during strictness analysis.
+We have to treat T as potentially recursive, but it's still
+good to be able to unwrap multiple layers.
+
+The function that manages all this is checkRecTc.
 -}
 
-newtype RecTcChecker = RC NameSet
+data RecTcChecker = RC !Int (NameEnv Int)
+  -- The upper bound, and the number of times
+  -- we have encountered each TyCon
 
 initRecTc :: RecTcChecker
-initRecTc = RC emptyNameSet
+-- Intialise with a fixed max bound of 100
+-- We should probably have a flag for this
+initRecTc = RC 100 emptyNameEnv
 
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
-checkRecTc (RC rec_nts) tc
-  | not (isRecursiveTyCon tc)     = Just (RC rec_nts)
-  | tc_name `elemNameSet` rec_nts = Nothing
-  | otherwise                     = Just (RC (extendNameSet rec_nts tc_name))
+checkRecTc rc@(RC bound rec_nts) tc
+  | not (isRecursiveTyCon tc)
+  = Just rc  -- Tuples are a common example here
+  | otherwise
+  = case lookupNameEnv rec_nts tc_name of
+      Just n | n >= bound -> Nothing
+             | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
+      Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
   where
     tc_name = tyConName tc

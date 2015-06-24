@@ -242,22 +242,28 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   , match : _ <- lookupFamInstEnv fam_inst_envs tc tc_args
   , FamInstMatch { fim_instance = rep_fam
                  , fim_tys      = rep_args } <- match
-  , let co_tc  = famInstAxiom rep_fam
+  , let ax     = famInstAxiom rep_fam
         rep_tc = dataFamInstRepTyCon rep_fam
-        co     = mkUnbranchedAxInstCo Representational co_tc rep_args
+        co     = mkUnbranchedAxInstCo Representational ax rep_args
   = Just (rep_tc, rep_args, co)
 
   | otherwise
   = Nothing
 
--- | Get rid of top-level newtypes, potentially looking through newtype
--- instances. Only unwraps newtypes that are in scope. This is used
--- for solving for `Coercible` in the solver. This version is careful
--- not to unwrap data/newtype instances if it can't continue unwrapping.
--- Such care is necessary for proper error messages.
+-- | 'tcTopNormaliseNewTypeTF_maybe' gets rid of top-level newtypes,
+-- potentially looking through newtype instances.
 --
--- Does not look through type families. Does not normalise arguments to a
--- tycon.
+-- It is only used by the type inference engine (specifically, when
+-- soliving 'Coercible' instances), and hence it is careful to unwrap
+-- only if the relevant data constructor is in scope.  That's why
+-- it get a GlobalRdrEnv argument.
+--
+-- It is careful not to unwrap data/newtype instances if it can't
+-- continue unwrapping.  Such care is necessary for proper error
+-- messages.
+--
+-- It does not look through type families.
+-- It does not normalise arguments to a tycon.
 --
 -- Always produces a representational coercion.
 tcTopNormaliseNewTypeTF_maybe :: FamInstEnvs
@@ -268,15 +274,16 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
 -- cf. FamInstEnv.topNormaliseType_maybe and Coercion.topNormaliseNewType_maybe
   = fmap (first TcCoercion) $ topNormaliseTypeX_maybe stepper ty
   where
-    stepper
-      = unwrap_newtype
-        `composeSteppers`
-        \ rec_nts tc tys ->
-        case tcLookupDataFamInst_maybe faminsts tc tys of
-          Just (tc', tys', co) ->
-            modifyStepResultCo (co `mkTransCo`)
-                               (unwrap_newtype rec_nts tc' tys')
-          Nothing -> NS_Done
+    stepper = unwrap_newtype `composeSteppers` unwrap_newtype_instance
+
+    -- For newtype instances we take a double step or nothing, so that
+    -- we don't return the reprsentation type of the newtype instance,
+    -- which would lead to terrible error messages
+    unwrap_newtype_instance rec_nts tc tys
+      | Just (tc', tys', co) <- tcLookupDataFamInst_maybe faminsts tc tys
+      = modifyStepResultCo (co `mkTransCo`) $
+        unwrap_newtype rec_nts tc' tys'
+      | otherwise = NS_Done
 
     unwrap_newtype rec_nts tc tys
       | data_cons_in_scope tc
