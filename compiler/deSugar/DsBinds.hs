@@ -801,7 +801,7 @@ dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
-dsHsWrapper (WpEvRevApp tm)   e = liftM (flip App e) (dsEvTerm tm)
+dsHsWrapper (WpEvRevApp tm)   e = liftM (flip mkCoreApp e) (dsEvTerm tm)
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
@@ -1159,12 +1159,12 @@ dsEvInstanceOf _  (EvInstanceOfVar v)
   = return (Var v)
 dsEvInstanceOf ty (EvInstanceOfEq co)
   = do { bndr <- newSysLocalDs ty
-       ; expr <- dsTcCoercion co (\c -> Cast (Var bndr) (mkSubCo c))
+       ; expr <- dsTcCoercion co (\c -> mkCast (Var bndr) (mkSubCo c))
        ; return (mkCoreLams [bndr] expr) }
 dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
   = do { bndr <- newSysLocalDs ty
        ; qs'  <- mapM dsEvTerm qs
-       ; let exprTy = foldl (\e t -> App e (Type t)) (Var bndr) qvars
-             exprEv = foldl App exprTy qs'
-       ; expr <- dsTcCoercion co (\c -> Cast exprEv (mkSubCo c))
+       ; let exprTy = mkCoreApps (Var bndr) (map Type qvars)
+             exprEv = mkCoreApps exprTy qs'
+       ; expr <- dsTcCoercion co (\c -> mkCast exprEv (mkSubCo c))
        ; return (mkCoreLams [bndr] expr) }
