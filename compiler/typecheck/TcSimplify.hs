@@ -1696,6 +1696,7 @@ findDefaultableGroups :: ([Type], (Bool,Bool))
                       -> TcS [(TyVar, [Ct])]
 findDefaultableGroups info wanteds
   = do { simples <- approximateWC wanteds
+       ; traceTcS "findDefaultableGroups" (ppr simples)
        ; return (findDefaultableGroups_ info simples) }
 
 findDefaultableGroups_

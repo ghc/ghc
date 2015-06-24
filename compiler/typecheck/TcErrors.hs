@@ -348,13 +348,14 @@ reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
 
                 , ("Implicit params", is_ip,       False, mkGroupReporter mkIPErr)
                 , ("Irreds",          is_irred,    False, mkGroupReporter mkIrredErr)
-                , ("Dicts",           is_dict,     False, mkGroupReporter mkDictErr) ]
+                , ("Dicts",           is_dict,     False, mkGroupReporter mkDictErr)
+                , ("Instantiation",   is_instanceof, False, mkGroupReporter mkInstanceOfErr) ]
 
     (&&&) :: (Ct->PredTree->Bool) -> (Ct->PredTree->Bool) -> (Ct->PredTree->Bool)
     (&&&) p1 p2 ct pred = p1 ct pred && p2 ct pred
 
     is_skol_eq, is_hole, is_dict,
-      is_equality, is_ip, is_irred :: Ct -> PredTree -> Bool
+      is_equality, is_ip, is_irred, is_instanceof :: Ct -> PredTree -> Bool
 
     utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigid ty1 && isRigid ty2
     utterly_wrong _ _                      = False
@@ -377,6 +378,9 @@ reportWanteds ctxt (WC { wc_simple = simples, wc_insol = insols, wc_impl = impli
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
+
+    is_instanceof _ (InstanceOfPred {}) = True
+    is_instanceof _ _                   = False
 
 
 -- isRigidEqPred :: PredTree -> Bool
@@ -1725,3 +1729,14 @@ solverDepthErrorTcS loc ty
       , text "(any upper bound you could choose might fail unpredictably with"
       , text " minor updates to GHC, so disabling the check is recommended if"
       , text " you're sure that type checking should terminate)" ]
+
+{-
+************************************************************************
+*                                                                      *
+                 Instantiation errors
+*                                                                      *
+************************************************************************
+-}
+
+mkInstanceOfErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
+mkInstanceOfErr = mkIrredErr  -- temporal way to show
