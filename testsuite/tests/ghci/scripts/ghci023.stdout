@@ -1,6 +1,8 @@
 -- testing ghci multiline commands :{ .. :}
 -- via stdin
 (1,2,3)
+-- layout rule instead of explicit braces and semicolons works too
+(1,2,3)
 catMaybes :: [Maybe a] -> [a]
 fromJust :: Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
