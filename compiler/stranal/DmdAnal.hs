@@ -431,10 +431,7 @@ in this case.
 
 In other words, for locally-bound lambdas we can infer
 one-shotness.
--}
 
-
-{-
 Note [Add demands for strict constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this program (due to Roman):
@@ -462,16 +459,22 @@ because X is strict, so its argument must be evaluated.  And if we
 
 because the seq is discarded (very early) since X is strict!
 
+We achieve the effect using addDataConStrictness.  It is called at a
+case expression, such as the pattern match on (X a) in the example
+above.  After computing how 'a' is used in the alternatives, we add an
+extra 'seqDmd' to it.  The case alternative isn't itself strict in the
+sub-components, but simply evaluating the scrutinee to HNF does force
+those sub-components.
+
+If the argument is not used at all in the alternative (i.e. it is
+Absent), then *don't* add a 'seqDmd'.  If we do, it makes it look used
+and hence it'll be passed to the worker when it doesn't need to be.
+Hence the isAbsDmd test in addDataConStrictness.
+
 There is the usual danger of reboxing, which as usual we ignore. But
 if X is monomorphic, and has an UNPACK pragma, then this optimisation
 is even more important.  We don't want the wrapper to rebox an unboxed
 argument, and pass an Int to $wfoo!
-
-We add these extra strict demands to the demand on the *scrutinee* of
-the case expression; hence the use of addDataConStrictness when
-forming scrut_dmd.  The case alternatives aren't strict in their
-sub-components, but simply evaluating the scrutinee to HNF does force
-those sub-components.
 
 
 ************************************************************************
@@ -1101,9 +1104,9 @@ addDataConStrictness con ds
     zipWith add ds strs
   where
     strs = dataConRepStrictness con
-    add dmd str | isMarkedStrict str = dmd `bothDmd` seqDmd
+    add dmd str | isMarkedStrict str
+                , not (isAbsDmd dmd) = dmd `bothDmd` seqDmd
                 | otherwise          = dmd
-    -- Yes, even if 'dmd' is Absent!
 
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
 -- Return the demands on the Ids in the [Var]
