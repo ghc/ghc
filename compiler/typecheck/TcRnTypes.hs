@@ -55,7 +55,7 @@ module TcRnTypes(
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt, isExprHoleCt, isTypeHoleCt,
+        isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -1395,6 +1395,13 @@ isHoleCt:: Ct -> Bool
 isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
+isOutOfScopeCt :: Ct -> Bool
+-- A Hole that does not have a leading underscore is
+-- simply an out-of-scope variable, and we treat that
+-- a bit differently when it comes to error reporting
+isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
+isOutOfScopeCt _ = False
+
 isExprHoleCt :: Ct -> Bool
 isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
 isExprHoleCt _ = False
@@ -1510,22 +1517,20 @@ isInsolubleStatus _            = False
 insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
-insolubleWC :: WantedConstraints -> Bool
-insolubleWC (WC { wc_impl = implics, wc_insol = insols })
-  =  anyBag trulyInsoluble  insols
+insolubleWC :: TcLevel -> WantedConstraints -> Bool
+insolubleWC tc_lvl (WC { wc_impl = implics, wc_insol = insols })
+  =  anyBag (trulyInsoluble tc_lvl) insols
   || anyBag insolubleImplic implics
 
-trulyInsoluble :: Ct -> Bool
+trulyInsoluble :: TcLevel -> Ct -> Bool
 -- The constraint is in the wc_insol set,
 -- but we do not treat as truly isoluble
 --  a) type-holes, arising from PartialTypeSignatures,
---  b) superclass constraints, arising from the emitInsoluble
---     in TcInstDcls.tcSuperClasses. In fact only equalities
---     are truly-insoluble.
+--  b) an out-of-scope variable
 -- Yuk!
-trulyInsoluble insol
-  =  isEqPred (ctPred insol)
-  && not (isTypeHoleCt insol)
+trulyInsoluble tc_lvl insol
+  =  isOutOfScopeCt insol
+  || isRigidEqPred tc_lvl (classifyPredType (ctPred insol))
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})

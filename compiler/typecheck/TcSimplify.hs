@@ -330,7 +330,8 @@ simplifyAmbiguityCheck ty wanteds
        -- inaccessible code
        ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
        ; traceTc "reportUnsolved(ambig) {" empty
-       ; unless (allow_ambiguous && not (insolubleWC final_wc))
+       ; tc_lvl <- TcRn.getTcLevel
+       ; unless (allow_ambiguous && not (insolubleWC tc_lvl final_wc))
                 (discardResult (reportUnsolved final_wc))
        ; traceTc "reportUnsolved(ambig) }" empty
 
@@ -439,7 +440,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
        ; null_ev_binds_var <- TcM.newTcEvBinds
        ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
        ; quant_pred_candidates   -- Fully zonked
-           <- if insolubleWC wanted_transformed_incl_derivs
+           <- if insolubleWC rhs_tclvl wanted_transformed_incl_derivs
               then return []   -- See Note [Quantification with errors]
                                -- NB: must include derived errors in this test,
                                --     hence "incl_derivs"
@@ -997,6 +998,7 @@ setImplicationStatus :: Implication -> TcS (Maybe Implication)
 -- Return Nothing if we can discard the implication altogether
 setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
                                     , ic_info = info
+                                    , ic_tclvl  = tc_lvl
                                     , ic_wanted = wc
                                     , ic_given = givens })
  | some_insoluble
@@ -1044,7 +1046,7 @@ setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
  where
    WC { wc_simple = simples, wc_impl = implics, wc_insol = insols } = wc
 
-   some_insoluble = insolubleWC wc
+   some_insoluble = insolubleWC tc_lvl wc
    some_unsolved = not (isEmptyBag simples && isEmptyBag insols)
                  || isNothing mb_implic_needs
 
@@ -1775,7 +1777,11 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
   where
     try_group
       | Just subst <- mb_subst
-      = do { wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
+      = do { lcl_env <- TcS.getLclEnv
+           ; let loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
+                             , ctl_env    = lcl_env
+                             , ctl_depth  = initialSubGoalDepth }
+           ; wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
                                 wanteds
            ; residual_wanted <- solveSimpleWanteds $ listToBag $
                                 map mkNonCanonical wanted_evs
@@ -1788,9 +1794,6 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       -- Make sure the kinds match too; hence this call to tcMatchTy
       -- E.g. suppose the only constraint was (Typeable k (a::k))
 
-    loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
-                , ctl_env = panic "disambigGroup:env"
-                , ctl_depth = initialSubGoalDepth }
 
 {-
 Note [Avoiding spurious errors]

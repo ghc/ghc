@@ -298,12 +298,13 @@ simplifyRule :: RuleName
 simplifyRule name lhs_wanted rhs_wanted
   = do {         -- We allow ourselves to unify environment
                  -- variables: runTcS runs with topTcLevel
-         (insoluble, _) <- runTcS $
+          tc_lvl <- getTcLevel
+       ;  (insoluble, _) <- runTcS $
              do { -- First solve the LHS and *then* solve the RHS
                   -- See Note [Solve order for RULES]
                   lhs_resid <- solveWanteds lhs_wanted
                 ; rhs_resid <- solveWanteds rhs_wanted
-                ; return (insolubleWC lhs_resid || insolubleWC rhs_resid) }
+                ; return (insolubleWC tc_lvl lhs_resid || insolubleWC tc_lvl rhs_resid) }
 
        ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
        ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_simples
