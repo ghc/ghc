@@ -46,6 +46,7 @@ module TcType (
   --------------------------------
   -- Builders
   mkPhiTy, mkSigmaTy, mkTcEqPred, mkTcReprEqPred, mkTcEqPredRole,
+  mkTcInstanceOfPred,
 
   --------------------------------
   -- Splitters
@@ -860,6 +861,9 @@ mkTcEqPredRole :: Role -> TcType -> TcType -> Type
 mkTcEqPredRole Nominal          = mkTcEqPred
 mkTcEqPredRole Representational = mkTcReprEqPred
 mkTcEqPredRole Phantom          = panic "mkTcEqPredRole Phantom"
+
+mkTcInstanceOfPred :: TcType -> TcType -> Type
+mkTcInstanceOfPred ty1 ty2 = mkTyConApp instanceOfTyCon [ty1, ty2]
 
 -- @isTauTy@ tests for nested for-alls.
 

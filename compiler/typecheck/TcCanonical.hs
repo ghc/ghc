@@ -1674,13 +1674,20 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
            ; let eq = mkTcEqPred ty rhs
            ; new_ev_ty <- newWantedEvVarNC loc eq
              -- compute the evidence for the instantiation
-           ; let qvars' = map TyVarTy qvars
+           ; let qvars' = map mkTyVarTy qvars
            ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvCoercion new_ev_ty)
                                                     (map ctev_evar new_ev_qs))
              -- emit new work
            ; emitWorkNC new_ev_qs
            ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_ty, ppr new_ev_qs ])
            ; canEqNC new_ev_ty NomEq ty rhs }
+      _ -> stopWith ev "Given/Derived instanceOf instantiation"
+  | Just _ <- splitForAllTy_maybe rhs
+  = case ev of
+      CtWanted { ctev_evar = evar, ctev_loc = loc } ->
+        do { ev_let <- deferTcSForAllInstanceOf loc lhs rhs
+           ; setWantedEvBind evar ev_let
+           ; stopWith ev "can_instance_of/LET" }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
   -- already canonical
   | otherwise = continueWith (CIrredEvCan { cc_ev = ev })

@@ -18,7 +18,7 @@ module TcEvidence (
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
-  EvInstanceOf(..), mkInstanceOfEq, mkInstanceOfInst,
+  EvInstanceOf(..), mkInstanceOfEq, mkInstanceOfInst, mkInstanceOfLet,
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -773,14 +773,23 @@ data EvInstanceOf
   = EvInstanceOfVar  EvId
   | EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
   | EvInstanceOfInst [Type] TcCoercion [EvTerm]
-  | EvInstanceOfLet  TcEvBinds  EvInstanceOf
+  | EvInstanceOfLet  [TyVar]    -- ^ type variables
+                     [EvId]     -- ^ constraint variables
+                     TcEvBinds  -- ^ inner bindings
+                     EvId       -- ^ inner instantiation constraint
     deriving ( Data.Data, Data.Typeable )
 
 mkInstanceOfEq :: Type -> TcCoercion -> EvTerm
-mkInstanceOfEq ty co = EvInstanceOf ty (EvInstanceOfEq co)
+mkInstanceOfEq ty co
+  = EvInstanceOf ty (EvInstanceOfEq co)
 
 mkInstanceOfInst :: Type -> [Type] -> TcCoercion -> [EvVar] -> EvTerm
-mkInstanceOfInst ty vars co q = EvInstanceOf ty (EvInstanceOfInst vars co (map EvId q))
+mkInstanceOfInst ty vars co q
+  = EvInstanceOf ty (EvInstanceOfInst vars co (map EvId q))
+
+mkInstanceOfLet :: Type -> [TyVar] -> [EvId] -> TcEvBinds -> EvId -> EvTerm
+mkInstanceOfLet ty tyvars qvars bnds co
+  = EvInstanceOf ty (EvInstanceOfLet tyvars qvars bnds co)
 
 {-
 Note [Coercion evidence terms]
@@ -1048,7 +1057,16 @@ evVarsOfInstanceOf ev =
     EvInstanceOfVar  v      -> unitVarSet v
     EvInstanceOfEq   co     -> coVarsOfTcCo co
     EvInstanceOfInst _ co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
-    EvInstanceOfLet  _  _   -> emptyVarSet
+    EvInstanceOfLet  _ qvars (EvBinds bs) co ->
+      (foldrBag (unionVarSet . go_bind) (unitVarSet co) bs
+       `minusVarSet` get_bndrs bs) `minusVarSet` mkVarSet qvars
+    EvInstanceOfLet  _ _ _ _ -> emptyVarSet
+  where
+    -- Similar to `coVarsOfTcCo`
+    go_bind :: EvBind -> VarSet
+    go_bind (EvBind { eb_rhs = tm }) = evVarsOfTerm tm
+    get_bndrs :: Bag EvBind -> VarSet
+    get_bndrs = foldrBag (\ (EvBind { eb_lhs = b }) bs -> extendVarSet bs b) emptyVarSet
 
 {-
 ************************************************************************
@@ -1142,8 +1160,11 @@ instance Outputable EvInstanceOf where
     case ev of
       EvInstanceOfVar  id  -> ptext (sLit "VAR")  <+> ppr id
       EvInstanceOfEq   co  -> ptext (sLit "EQ")   <+> ppr co
-      EvInstanceOfInst vars co q -> ptext (sLit "INST") <+> ppr vars <+> ppr q <+> ppr co
-      EvInstanceOfLet  b i -> ptext (sLit "LET")  <+> ppr b <+> ppr i
+      EvInstanceOfInst vars co q
+        -> ptext (sLit "INST") <+> ppr vars <+> ppr q <+> ppr co
+      EvInstanceOfLet  vars qvars b i
+        -> ptext (sLit "LET") <+> ppr vars <+> ppr qvars
+                              <+> ppr b <+> ppr i
 
 ----------------------------------------------------------------------
 -- Helper functions for dealing with IP newtype-dictionaries

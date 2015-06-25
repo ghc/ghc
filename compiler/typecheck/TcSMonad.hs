@@ -16,6 +16,7 @@ module TcSMonad (
     failTcS, tryTcS, nestTcS, nestImplicTcS, recoverTcS,
 
     runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq, splitInst,
+    deferTcSForAllInstanceOf,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -2869,6 +2870,40 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                          ; return (TcLetCo ev_binds new_co) }
 
         ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs) }
+
+deferTcSForAllInstanceOf :: CtLoc
+                         -> TcType
+                         -> TcType
+                         -> TcS EvTerm
+deferTcSForAllInstanceOf loc sigma1 sigma2
+  = do { let (qvars2, q2, ty2) = tcSplitSigmaTy sigma2
+       ; (subst2, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars qvars2
+       ; let phi = Type.substTy subst2 ty2
+             qs  = map (Type.substTy subst2) q2
+             skol_info = UnifyForAllSkol skol_tvs phi
+             pred = mkInstanceOfPred sigma1 phi
+       ; ctev <- newWantedEvVarNC loc pred
+       ; qs_ev_vars <- wrapTcS $ TcM.newEvVars qs
+       ; ev_binds_var <- newTcEvBinds
+       ; env <- wrapTcS $ TcM.getLclEnv
+       ; let ev_binds  = TcEvBinds ev_binds_var
+             new_ct    = mkNonCanonical ctev
+             new_tclvl = pushTcLevel (tcl_tclvl env)
+       ; let wc = WC { wc_simple = singleCt new_ct
+                     , wc_impl   = emptyBag
+                     , wc_insol  = emptyCts }
+             imp = Implic { ic_tclvl    = new_tclvl
+                          , ic_skols    = skol_tvs
+                          , ic_no_eqs   = True
+                          , ic_given    = qs_ev_vars
+                          , ic_wanted   = wc
+                          , ic_status   = IC_Unsolved
+                          , ic_binds    = ev_binds_var
+                          , ic_env      = env
+                          , ic_info     = skol_info }
+       ; updWorkListTcS (extendWorkListImplic imp)
+       ; return (mkInstanceOfLet sigma1 skol_tvs qs_ev_vars
+                                 ev_binds (ctEvId ctev)) }
 
 -- Split a sigma type and instantiate its variables
 splitInst :: Type -> TcS ([TyVar], ThetaType, Type)

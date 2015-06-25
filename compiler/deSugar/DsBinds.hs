@@ -1168,3 +1168,8 @@ dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
              exprEv = mkCoreApps exprTy qs'
        ; expr <- dsTcCoercion co (\c -> mkCast exprEv (mkSubCo c))
        ; return (mkCoreLams [bndr] expr) }
+dsEvInstanceOf ty (EvInstanceOfLet tyvars qvars qs rest)
+  = do { bndr <- newSysLocalDs ty
+       ; q_binds <- dsTcEvBinds qs
+       ; return (mkCoreLams (bndr : tyvars ++ qvars) $
+           mkCoreLets q_binds (mkCoreApp (Var rest) (Var bndr))) }
