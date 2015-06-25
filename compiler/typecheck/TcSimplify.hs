@@ -1578,21 +1578,20 @@ usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canon
 
       -- Float out alpha ~ ty, or ty ~ alpha
       -- which might be unified outside
-      -- See Note [Do not float kind-incompatible equalities]
+      -- See Note [Which equalities to float]
     is_meta_var_eq pred
       | EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , let k1 = typeKind ty1
-            k2 = typeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
-          (Just tv1, _) | isMetaTyVar tv1
-                        , k2 `isSubKind` k1
-                        -> True
-          (_, Just tv2) | isMetaTyVar tv2
-                        , k1 `isSubKind` k2
-                        -> True
-          _ -> False
+          (Just tv1, _) -> float_tv_eq tv1 ty2
+          (_, Just tv2) -> float_tv_eq tv2 ty1
+          _             -> False
       | otherwise
       = False
+
+    float_tv_eq tv1 ty2  -- See Note [Which equalities to float]
+      =  isMetaTyVar tv1
+      && typeKind ty2 `isSubKind` tyVarKind tv1
+      && (not (isSigTyVar tv1) || isTyVarTy ty2)
 
 {- Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1617,12 +1616,26 @@ We had a very complicated rule previously, but this is nice and
 simple.  (To see the notes, look at this Note in a version of
 TcSimplify prior to Oct 2014).
 
-Note [Do not float kind-incompatible equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
-If we float the equality outwards, we'll get *another* Derived
-insoluble equality one level out, so the same error will be reported
-twice.  So we refrain from floating such equalities.
+Note [Which equalities to float]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Which equalities should we float?  We want to float ones where there
+is a decent chance that floating outwards will allow unification to
+happen.  In particular:
+
+   Float out equalities of form (alpaha ~ ty) or (ty ~ alpha), where
+
+   * alpha is a meta-tyvar
+
+   * And the equality is kind-compatible
+
+     e.g. Consider (alpha:*) ~ (s:*->*)
+     From this we already get a Derived insoluble equality.  If we
+     floated it, we'll get *another* Derived insoluble equality one
+     level out, so the same error will be reported twice.
+
+   * And 'alpha' is not a SigTv with 'ty' being a non-tyvar.  In that
+     case, floating out won't help either, and it may affect grouping
+     of error messages.
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~
