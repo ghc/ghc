@@ -1335,8 +1335,8 @@ zonkEvInstanceOf env (EvInstanceOfEq co)
        ; return (EvInstanceOfEq co') }
 zonkEvInstanceOf env (EvInstanceOfInst tys co q)
   = do { tys' <- mapM (zonkTcTypeToType env) tys
-       ; co'  <- zonkTcCoToCo env co
-       ; q'   <- mapM (zonkEvTerm env) q
+       ; let co' = zonkIdOcc env co
+       ; q' <- mapM (zonkEvTerm env) q
        ; return (EvInstanceOfInst tys' co' q') }
 zonkEvInstanceOf env (EvInstanceOfLet tys qvars bnds i)
   = do { let qvars' = map (zonkIdOcc env) qvars

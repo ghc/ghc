@@ -772,18 +772,20 @@ data EvCallStack
 data EvInstanceOf
   = EvInstanceOfVar  EvId
   | EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
-  | EvInstanceOfInst [Type] TcCoercion [EvTerm]
-  | EvInstanceOfLet  [TyVar]    -- ^ type variables
-                     [EvId]     -- ^ constraint variables
-                     TcEvBinds  -- ^ inner bindings
-                     EvId       -- ^ inner instantiation constraint
+  | EvInstanceOfInst [Type]      -- ^ type variables to apply
+                     EvId        -- ^ witness for inner instantiation
+                     [EvTerm]    -- ^ witness for inner constraints
+  | EvInstanceOfLet  [TyVar]     -- ^ type variables
+                     [EvId]      -- ^ constraint variables
+                     TcEvBinds   -- ^ inner bindings
+                     EvId        -- ^ inner instantiation constraint
     deriving ( Data.Data, Data.Typeable )
 
 mkInstanceOfEq :: Type -> TcCoercion -> EvTerm
 mkInstanceOfEq ty co
   = EvInstanceOf ty (EvInstanceOfEq co)
 
-mkInstanceOfInst :: Type -> [Type] -> TcCoercion -> [EvVar] -> EvTerm
+mkInstanceOfInst :: Type -> [Type] -> EvId -> [EvVar] -> EvTerm
 mkInstanceOfInst ty vars co q
   = EvInstanceOf ty (EvInstanceOfInst vars co (map EvId q))
 
@@ -1056,7 +1058,7 @@ evVarsOfInstanceOf ev =
   case ev of
     EvInstanceOfVar  v      -> unitVarSet v
     EvInstanceOfEq   co     -> coVarsOfTcCo co
-    EvInstanceOfInst _ co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
+    EvInstanceOfInst _ co q -> unitVarSet co `unionVarSet` evVarsOfTerms q
     EvInstanceOfLet  _ qvars (EvBinds bs) co ->
       (foldrBag (unionVarSet . go_bind) (unitVarSet co) bs
        `minusVarSet` get_bndrs bs) `minusVarSet` mkVarSet qvars

@@ -1166,8 +1166,7 @@ dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
        ; qs'  <- mapM dsEvTerm qs
        ; let exprTy = mkCoreApps (Var bndr) (map Type qvars)
              exprEv = mkCoreApps exprTy qs'
-       ; expr <- dsTcCoercion co (\c -> mkCast exprEv (mkSubCo c))
-       ; return (mkCoreLams [bndr] expr) }
+       ; return (mkCoreLams [bndr] (mkCoreApp (Var co) exprEv)) }
 dsEvInstanceOf ty (EvInstanceOfLet tyvars qvars qs rest)
   = do { bndr <- newSysLocalDs ty
        ; q_binds <- dsTcEvBinds qs

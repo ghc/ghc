@@ -1671,16 +1671,16 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
         do { (qvars, q, ty) <- splitInst lhs
              -- generate new constraints
            ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
-           ; let eq = mkTcEqPred ty rhs
+           ; let eq = mkInstanceOfPred ty rhs
            ; new_ev_ty <- newWantedEvVarNC loc eq
              -- compute the evidence for the instantiation
            ; let qvars' = map mkTyVarTy qvars
-           ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvCoercion new_ev_ty)
+           ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvId new_ev_ty)
                                                     (map ctev_evar new_ev_qs))
              -- emit new work
            ; emitWorkNC new_ev_qs
            ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_ty, ppr new_ev_qs ])
-           ; canEqNC new_ev_ty NomEq ty rhs }
+           ; canInstanceOfNC new_ev_ty }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
   | Just _ <- splitForAllTy_maybe rhs
   = case ev of

@@ -957,7 +957,7 @@ tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
   , (actual_fun@(L loc (HsVar actual_fun_name)) : rest_args) <- args
   = do {   -- Typing without ($)
          actual_fun_ty <- tc_app_get_fn_ty actual_fun_name
-                            (tc_app_inst (length rest_args) res_ty)
+                            (tc_app_unknown_fn (length rest_args) res_ty)
        ; result <- tc_app actual_fun rest_args actual_fun_ty res_ty special
            -- Build the ($) application
        ; dollar <- tcCheckId fun_name (mkFunTy actual_fun_ty actual_fun_ty)
@@ -966,13 +966,13 @@ tcAppWorker special fun@(L loc (HsVar fun_name)) args res_ty
 
   | otherwise  -- fallback case
   = do { fun_ty <- tc_app_get_fn_ty fun_name
-                     (tc_app_inst (length args) res_ty)
+                     (tc_app_unknown_fn (length args) res_ty)
        ; tc_app fun args fun_ty res_ty special }
 
 tcAppWorker special fun args res_ty
     -- Normal case, where the function is not a variable
   = do  {   -- Create function type schema
-        ; fun_ty <- tc_app_inst (length args) res_ty
+        ; fun_ty <- tc_app_unknown_fn (length args) res_ty
             -- Run with new type schema
         ; tc_app fun args fun_ty res_ty special }
 
@@ -991,19 +991,27 @@ tc_app_get_fn_ty fun_name not_found
                      ; return pat_ty }
            _ -> not_found
            -- Instantiate type
-       ; let (tvs, theta, rho) = tcSplitSigmaTy fun_ty
-       ; (subst, _tvs') <- tcInstTyVars tvs
-       ; let theta' = substTheta subst theta
-             rho'   = substTy subst rho
+       ; (theta, rho) <- tc_app_inst fun_ty
            -- Run with instantiated type
-       ; _theta_w <- instCallConstraints (OccurrenceOf fun_name) theta'
-       ; return rho' }
+       ; _theta_w <- instCallConstraints (OccurrenceOf fun_name) theta
+       ; return rho }
 
-tc_app_inst :: Int -> TcSigmaType -> TcM TcRhoType
-tc_app_inst nb_args res_ty
+tc_app_unknown_fn :: Int -> TcSigmaType -> TcM TcRhoType
+tc_app_unknown_fn nb_args res_ty
   = do  { args_tys <- replicateM nb_args (newFlexiTyVarTy openTypeKind)
         ; let fun_ty = mkFunTys args_tys res_ty
         ; return fun_ty }
+
+tc_app_inst :: TcSigmaType -> TcM (ThetaType, TcRhoType)
+tc_app_inst sigma
+  | Just _ <- splitForAllTy_maybe sigma
+  = do { let (tvs, theta, ty) = tcSplitSigmaTy sigma
+       ; (subst, _tvs') <- tcInstTyVars tvs
+       ; let theta' = substTheta subst theta
+             ty'    = substTy subst ty
+       ; (theta'', ty'') <- tc_app_inst ty'
+       ; return (theta' ++ theta'', ty'') }
+tc_app_inst ty = return ([], ty)
 
 tc_app :: LHsExpr Name -> [LHsExpr Name]
        -> TcSigmaType  -- type pushed for the function
