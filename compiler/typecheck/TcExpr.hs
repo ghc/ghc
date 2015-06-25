@@ -874,6 +874,7 @@ tcApp (SectionL arg1 op) res_ty
        ; result <- tcAppWorker reqd_args op [arg1] res_ty
        ; return $ consumeTcAppResult result $ \op' [arg1'] ->
            SectionL arg1' op' }
+tcApp expr _ = pprPanic "tcApp shall not be called on " (ppr expr)
 
 tcAppWorker' :: LHsExpr Name -> [LHsExpr Name] -> TcRhoType
              -> TcM TcAppResult
@@ -1029,23 +1030,34 @@ tc_app fun args fun_ty res_ty special
 
         ; traceTc "tc_app/2" (vcat [ppr expected_arg_tys, ppr actual_res_ty])
 
-        -- Typecheck the result, thereby propagating
-        -- info (if any) from result into the argument types
-        -- Both actual_res_ty and res_ty are deeply skolemised
-        -- Rather like tcWrapResult, but (perhaps for historical reasons)
-        -- we do this before typechecking the arguments
-        ; ev_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
-                    emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
-
         -- Typecheck the arguments
         ; args1 <- tcArgs fun args expected_arg_tys
 
-        -- Return the pieces of the result
-        ; return $ NormalTcAppResult
-                     (mkLHsWrapCo co_fun fun1)  -- Instantiated function
-                     args1                      -- Arguments
-                                                -- Coercion to expected result type
-                     (mkHsWrap (mkWpInstanceOf actual_res_ty ev_res)) }
+        -- Both actual_res_ty and res_ty are deeply skolemised
+        -- Split in cases depending on whether res_ty is a variable or not
+        -- When it is, generate a equality constraint instead of instantiation
+        -- This is needed to compile some programs such as
+        -- > data S a = S a
+        -- > f :: [Char] -> S a
+        -- > f x = S (error x)
+        -- Without it, the `a` coming from `f` cannot be unified with
+        -- the second type variable of `error`
+        ; case getTyVar_maybe res_ty of
+          { Nothing
+              -> do { ev_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
+                        emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
+                    ; return $ NormalTcAppResult
+                       (mkLHsWrapCo co_fun fun1)  -- Instantiated function
+                       args1                      -- Arguments
+                                                  -- Coercion to expected result type
+                       (mkHsWrap (mkWpInstanceOf actual_res_ty ev_res)) }
+          ; Just _
+              -> do { co_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
+                        unifyType actual_res_ty res_ty
+                    ; return $ NormalTcAppResult
+                       (mkLHsWrapCo co_fun fun1)  -- Instantiated function
+                       args1                      -- Arguments
+                       (mkHsWrapCo co_res) } } } -- Coercion to expected result type
 
 mk_app_msg :: LHsExpr Name -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
