@@ -68,7 +68,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
               -- the RULE.  c.f. Trac #10072
 
        ; let (id_bndrs, tv_bndrs) = partition isId vars
-             id_bndrs' = [(id_bndr, TcIdMonomorphic) | id_bndr <- id_bndrs]
+             id_bndrs' = [(id_bndr, TcIdUnrestricted) | id_bndr <- id_bndrs]
        ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
             <- tcExtendTyVarEnv tv_bndrs  $
                tcExtendIdEnv    id_bndrs' $
