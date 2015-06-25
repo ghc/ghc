@@ -164,6 +164,8 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/codeGen/should_run/SizeOfSmallArray
 /tests/codeGen/should_run/StaticArraySize
 /tests/codeGen/should_run/StaticByteArraySize
+/tests/codeGen/should_run/T10521
+/tests/codeGen/should_run/T10521b
 /tests/codeGen/should_run/T1852
 /tests/codeGen/should_run/T1861
 /tests/codeGen/should_run/T2080

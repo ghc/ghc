@@ -20,7 +20,6 @@ module CmmExpr
     , emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
     , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
     , regSetToList
-    , regUsedIn
 
     , Area(..)
     , module CmmMachOp
@@ -375,17 +374,6 @@ instance DefinerOfRegs r a => DefinerOfRegs r (Maybe a) where
   foldRegsDefd dflags f set (Just x) = foldRegsDefd dflags f set x
 
 -----------------------------------------------------------------------------
--- Another reg utility
-
-regUsedIn :: CmmReg -> CmmExpr -> Bool
-_   `regUsedIn` CmmLit _         = False
-reg `regUsedIn` CmmLoad e  _     = reg `regUsedIn` e
-reg `regUsedIn` CmmReg reg'      = reg == reg'
-reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
-reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
-_   `regUsedIn` CmmStackSlot _ _ = False
-
------------------------------------------------------------------------------
 --              Global STG registers
 -----------------------------------------------------------------------------
 
@@ -398,6 +386,31 @@ data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
 vgcFlag :: CmmType -> VGcPtr
 vgcFlag ty | isGcPtrType ty = VGcPtr
            | otherwise      = VNonGcPtr
+
+{-
+Note [Overlapping global registers]
+
+The backend might not faithfully implement the abstraction of the STG
+machine with independent registers for different values of type
+GlobalReg. Specifically, certain pairs of registers (r1, r2) may
+overlap in the sense that a store to r1 invalidates the value in r2,
+and vice versa.
+
+Currently this occurs only on the x86_64 architecture where FloatReg n
+and DoubleReg n are assigned the same microarchitectural register, in
+order to allow functions to receive more Float# or Double# arguments
+in registers (as opposed to on the stack).
+
+There are no specific rules about which registers might overlap with
+which other registers, but presumably it's safe to assume that nothing
+will overlap with special registers like Sp or BaseReg.
+
+Use CmmUtils.regsOverlap to determine whether two GlobalRegs overlap
+on a particular platform. The instance Eq GlobalReg is syntactic
+equality of STG registers and does not take overlap into
+account. However it is still used in UserOfRegs/DefinerOfRegs and
+there are likely still bugs there, beware!
+-}
 
 data GlobalReg
   -- Argument and return registers
