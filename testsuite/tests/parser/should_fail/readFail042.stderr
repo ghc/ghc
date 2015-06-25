@@ -1,12 +1,8 @@
 
-readFail042.hs:9:9:
+readFail042.hs:9:9: error:
     Unexpected transform statement in a list comprehension
     Use TransformListComp
 
-readFail042.hs:9:9:
+readFail042.hs:9:9: error:
     Unexpected transform statement in a list comprehension
     Use TransformListComp
-
-readFail042.hs:11:23: Not in scope: ‘by’
-
-readFail042.hs:11:26: Not in scope: ‘x’
