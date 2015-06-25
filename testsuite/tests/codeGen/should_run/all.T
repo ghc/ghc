@@ -129,3 +129,5 @@ test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])
 test('T9340', normal, compile_and_run, [''])
 test('cgrun074', normal, compile_and_run, [''])
+test('T10521', normal, compile_and_run, [''])
+test('T10521b', normal, compile_and_run, [''])

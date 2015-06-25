@@ -401,11 +401,13 @@ type Stmt = (LocalReg, CmmExpr) -- r := e
 
 emitMultiAssign []    []    = return ()
 emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
-emitMultiAssign regs  rhss  = ASSERT( equalLength regs rhss )
-                              unscramble ([1..] `zip` (regs `zip` rhss))
+emitMultiAssign regs rhss   = do
+  dflags <- getDynFlags
+  ASSERT( equalLength regs rhss )
+    unscramble dflags ([1..] `zip` (regs `zip` rhss))
 
-unscramble :: [Vrtx] -> FCode ()
-unscramble vertices = mapM_ do_component components
+unscramble :: DynFlags -> [Vrtx] -> FCode ()
+unscramble dflags vertices = mapM_ do_component components
   where
         edges :: [ (Vrtx, Key, [Key]) ]
         edges = [ (vertex, key1, edges_from stmt1)
@@ -432,7 +434,7 @@ unscramble vertices = mapM_ do_component components
             u <- newUnique
             let (to_tmp, from_tmp) = split dflags u first_stmt
             mk_graph to_tmp
-            unscramble rest
+            unscramble dflags rest
             mk_graph from_tmp
 
         split :: DynFlags -> Unique -> Stmt -> (Stmt, Stmt)
@@ -445,8 +447,8 @@ unscramble vertices = mapM_ do_component components
         mk_graph :: Stmt -> FCode ()
         mk_graph (reg, rhs) = emitAssign (CmmLocal reg) rhs
 
-mustFollow :: Stmt -> Stmt -> Bool
-(reg, _) `mustFollow` (_, rhs) = CmmLocal reg `regUsedIn` rhs
+        mustFollow :: Stmt -> Stmt -> Bool
+        (reg, _) `mustFollow` (_, rhs) = regUsedIn dflags (CmmLocal reg) rhs
 
 -------------------------------------------------------------------------
 --      mkSwitch

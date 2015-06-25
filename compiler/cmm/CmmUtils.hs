@@ -42,6 +42,9 @@ module CmmUtils(
         cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
         cmmConstrTag1,
 
+        -- Overlap and usage
+        regsOverlap, regUsedIn,
+
         -- Liveness and bitmaps
         mkLiveness,
 
@@ -75,6 +78,7 @@ import Unique
 import UniqSupply
 import DynFlags
 import Util
+import CodeGen.Platform
 
 import Data.Word
 import Data.Maybe
@@ -393,6 +397,38 @@ cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
 -- Get constructor tag, but one based.
 cmmConstrTag1 dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 
+
+-----------------------------------------------------------------------------
+-- Overlap and usage
+
+-- | Returns True if the two STG registers overlap on the specified
+-- platform, in the sense that writing to one will clobber the
+-- other. This includes the case that the two registers are the same
+-- STG register. See Note [Overlapping global registers] for details.
+regsOverlap :: DynFlags -> CmmReg -> CmmReg -> Bool
+regsOverlap dflags (CmmGlobal g) (CmmGlobal g')
+  | Just real  <- globalRegMaybe (targetPlatform dflags) g,
+    Just real' <- globalRegMaybe (targetPlatform dflags) g',
+    real == real'
+    = True
+regsOverlap _ reg reg' = reg == reg'
+
+-- | Returns True if the STG register is used by the expression, in
+-- the sense that a store to the register might affect the value of
+-- the expression.
+--
+-- We must check for overlapping registers and not just equal
+-- registers here, otherwise CmmSink may incorrectly reorder
+-- assignments that conflict due to overlap. See Trac #10521 and Note
+-- [Overlapping global registers].
+regUsedIn :: DynFlags -> CmmReg -> CmmExpr -> Bool
+regUsedIn dflags = regUsedIn_ where
+  _   `regUsedIn_` CmmLit _         = False
+  reg `regUsedIn_` CmmLoad e  _     = reg `regUsedIn_` e
+  reg `regUsedIn_` CmmReg reg'      = regsOverlap dflags reg reg'
+  reg `regUsedIn_` CmmRegOff reg' _ = regsOverlap dflags reg reg'
+  reg `regUsedIn_` CmmMachOp _ es   = any (reg `regUsedIn_`) es
+  _   `regUsedIn_` CmmStackSlot _ _ = False
 
 --------------------------------------------
 --
