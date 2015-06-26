@@ -214,24 +214,12 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   , isJust (isDataProductTyCon_maybe tycon)
   , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_w_tc      = env { ae_rec_tc = rec_tc' }
-        env_alt       = extendAnalEnv NotTopLevel env_w_tc case_bndr case_bndr_sig
-        case_bndr_sig = cprProdSig (dataConRepArity dc)
-                -- cprProdSig: inside the alternative, the case binder has the CPR property.
-                -- Meaning that a case on it will successfully cancel.
-                -- Example:
-                --      f True  x = case x of y { I# x' -> if x' ==# 3 then y else I# 8 }
-                --      f False x = I# 3
-                --
-                -- We want f to have the CPR property:
-                --      f b x = case fw b x of { r -> I# r }
-                --      fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
-                --      fw False x = 3
-
-        (rhs_ty, rhs')                  = dmdAnal env_alt dmd rhs
-        (alt_ty1, dmds)                 = findBndrsDmds env rhs_ty bndrs
-        (alt_ty2, case_bndr_dmd)        = findBndrDmd env False alt_ty1 case_bndr
-        id_dmds                         = addCaseBndrDmd case_bndr_dmd dmds
+        env_w_tc                 = env { ae_rec_tc = rec_tc' }
+        env_alt                  = extendEnvForProdAlt env_w_tc scrut case_bndr dc bndrs
+        (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
+        (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
+        (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
+        id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
         alt_ty3 | io_hack_reqd dc bndrs = deferAfterIO alt_ty2
                 | otherwise             = alt_ty2
 
@@ -431,50 +419,6 @@ in this case.
 
 In other words, for locally-bound lambdas we can infer
 one-shotness.
-
-Note [Add demands for strict constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this program (due to Roman):
-
-    data X a = X !a
-
-    foo :: X Int -> Int -> Int
-    foo (X a) n = go 0
-     where
-       go i | i < n     = a + go (i+1)
-            | otherwise = 0
-
-We want the worker for 'foo' too look like this:
-
-    $wfoo :: Int# -> Int# -> Int#
-
-with the first argument unboxed, so that it is not eval'd each time
-around the 'go' loop (which would otherwise happen, since 'foo' is not
-strict in 'a').  It is sound for the wrapper to pass an unboxed arg
-because X is strict, so its argument must be evaluated.  And if we
-*don't* pass an unboxed argument, we can't even repair it by adding a
-`seq` thus:
-
-    foo (X a) n = a `seq` go 0
-
-because the seq is discarded (very early) since X is strict!
-
-We achieve the effect using addDataConStrictness.  It is called at a
-case expression, such as the pattern match on (X a) in the example
-above.  After computing how 'a' is used in the alternatives, we add an
-extra 'seqDmd' to it.  The case alternative isn't itself strict in the
-sub-components, but simply evaluating the scrutinee to HNF does force
-those sub-components.
-
-If the argument is not used at all in the alternative (i.e. it is
-Absent), then *don't* add a 'seqDmd'.  If we do, it makes it look used
-and hence it'll be passed to the worker when it doesn't need to be.
-Hence the isAbsDmd test in addDataConStrictness.
-
-There is the usual danger of reboxing, which as usual we ignore. But
-if X is monomorphic, and has an UNPACK pragma, then this optimisation
-is even more important.  We don't want the wrapper to rebox an unboxed
-argument, and pass an Int to $wfoo!
 
 
 ************************************************************************
@@ -1097,6 +1041,30 @@ extendSigsWithLam env id
   | otherwise
   = env
 
+extendEnvForProdAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
+-- See Note [CPR in a product case alternative]
+extendEnvForProdAlt env scrut case_bndr dc bndrs
+  = foldl do_con_arg env1 ids_w_strs
+  where
+    env1 = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
+
+    ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
+    case_bndr_sig = cprProdSig (dataConRepArity dc)
+    fam_envs      = ae_fam_envs env
+
+    do_con_arg env (id, str)
+       |  ae_virgin env || isStrictDmd (idDemandInfo id)  -- c.f. extendSigsWithLam
+          || (is_var_scrut && isMarkedStrict str)         -- See Note [CPR in a product case alternative]
+       , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
+       = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
+       | otherwise
+       = env
+
+    is_var_scrut = is_var scrut
+    is_var (Cast e _) = is_var e
+    is_var (Var v)    = isLocalId v
+    is_var _          = False
+
 addDataConStrictness :: DataCon -> [Demand] -> [Demand]
 -- See Note [Add demands for strict constructors]
 addDataConStrictness con ds
@@ -1158,7 +1126,98 @@ dumpStrSig binds = vcat (map printId ids)
   printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
              | otherwise       = empty
 
-{-
+{- Note [CPR in a product case alternative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a case alternative for a product type, we want to give some of the
+binders the CPR property.  Specifically
+
+ * The case binder; inside the alternative, the case binder always has
+   the CPR property, meaning that a case on it will successfully cancel.
+   Example:
+        f True  x = case x of y { I# x' -> if x' ==# 3
+                                           then y
+                                           else I# 8 }
+        f False x = I# 3
+
+   By giving 'y' the CPR property, we ensure that 'f' does too, so we get
+        f b x = case fw b x of { r -> I# r }
+        fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
+        fw False x = 3
+
+   Of course there is the usual risk of re-boxing: we have 'x' available
+   boxed and unboxed, but we return the unboxed verison for the wrapper to
+   box.  If the wrapper doesn't cancel with its caller, we'll end up
+   re-boxing something that we did have available in boxed form.
+
+ * Any strict binders with product type, can use
+   Note [Initial CPR for strict binders].  But we can go a little
+   further. Consider
+
+      data T = MkT !Int Int
+
+      f2 (MkT x y) | y>0       = f2 (MkT x (y-1))
+                   | otherwise = x
+
+   For $wf2 we are going to unbox the MkT *and*, since it is strict, the
+   first agument of the MkT; see Note [Add demands for strict constructors].
+   But then we don't want box it up again when returning it!  We want
+   'f2' to have the CPR property, so we give 'x' the CPR property.
+
+   It's a bit delicate because if this case is scrutinising something other
+   than an argument the original function, we really don't have the unboxed
+   version available.  E.g
+      g v = case foo v of
+              MkT x y | y>0       -> ...
+                      | otherwise -> x
+   Here we don't have the unboxed 'x' available.  Hence the is_var_scrut
+   test when making use of the strictness annoatation.  Slight ad-hoc,
+   but nothing terrible happens if we get it wrong.
+
+Note [Add demands for strict constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this program (due to Roman):
+
+    data X a = X !a
+
+    foo :: X Int -> Int -> Int
+    foo (X a) n = go 0
+     where
+       go i | i < n     = a + go (i+1)
+            | otherwise = 0
+
+We want the worker for 'foo' too look like this:
+
+    $wfoo :: Int# -> Int# -> Int#
+
+with the first argument unboxed, so that it is not eval'd each time
+around the 'go' loop (which would otherwise happen, since 'foo' is not
+strict in 'a').  It is sound for the wrapper to pass an unboxed arg
+because X is strict, so its argument must be evaluated.  And if we
+*don't* pass an unboxed argument, we can't even repair it by adding a
+`seq` thus:
+
+    foo (X a) n = a `seq` go 0
+
+because the seq is discarded (very early) since X is strict!
+
+We achieve the effect using addDataConStrictness.  It is called at a
+case expression, such as the pattern match on (X a) in the example
+above.  After computing how 'a' is used in the alternatives, we add an
+extra 'seqDmd' to it.  The case alternative isn't itself strict in the
+sub-components, but simply evaluating the scrutinee to HNF does force
+those sub-components.
+
+If the argument is not used at all in the alternative (i.e. it is
+Absent), then *don't* add a 'seqDmd'.  If we do, it makes it look used
+and hence it'll be passed to the worker when it doesn't need to be.
+Hence the isAbsDmd test in addDataConStrictness.
+
+There is the usual danger of reboxing, which as usual we ignore. But
+if X is monomorphic, and has an UNPACK pragma, then this optimisation
+is even more important.  We don't want the wrapper to rebox an unboxed
+argument, and pass an Int to $wfoo!
+
+
 Note [Initial CPR for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CPR is initialized for a lambda binder in an optimistic manner, i.e,
@@ -1167,19 +1226,92 @@ a product are used, which is checked by the value of the absence
 demand.
 
 If the binder is marked demanded with a strict demand, then give it a
-CPR signature, because in the likely event that this is a lambda on a
-fn defn [we only use this when the lambda is being consumed with a
-call demand], it'll be w/w'd and so it will be CPR-ish.  E.g.
+CPR signature. Here's a concrete example ('f1' in test T10482a),
+assuming h is strict:
 
-        f = \x::(Int,Int).  if ...strict in x... then
-                                x
-                            else
-                                (a,b)
-We want f to have the CPR property because x does, by the time f has been w/w'd
+  f1 :: Int -> Int
+  f1 x = case h x of
+          A -> x
+          B -> f1 (x-1)
+          C -> x+1
 
-Also note that we only want to do this for something that definitely
-has product type, else we may get over-optimistic CPR results
-(e.g. from \x -> x!).
+If we notice that 'x' is used strictly, we can give it the CPR
+property; and hence f1 gets the CPR property too.  It's ok to give it
+the CPR property because by the time 'x' is returned (case A above),
+it'll have been evaluated (by the wrapper of 'h' in the example), and
+so the unboxed version will be available.
+
+Moreover, if f itself is strict in x, then we'll pass x unboxed to
+f1, and so the boxed version *won't* be available; in that case it's
+more important to give 'x' the CPR property.
+
+Note that
+
+  * We only want to do this for something that definitely
+    has product type, else we may get over-optimistic CPR results
+    (e.g. from \x -> x!).
+
+  * This works for both lambda and case-alternative binders. For
+    case binders consider
+        g (Left x) = case h x of
+                       A -> x
+                       B -> ...
+                       C -> x+1
+    Since 'h' evaluates x, we'll have it available unboxed even
+    though in this case it won't be passed in unboxed.
+
+Note [CPR examples]
+~~~~~~~~~~~~~~~~~~~~
+Here are some examples, in stranal/should_compile/T10482a.
+The main point: all of these functions can have the CPR property
+
+    ------- f1 -----------
+    -- x is used strictly by h, so it'll be available
+    -- unboxed before it is returned in the True branch
+
+    f1 :: Int -> Int
+    f1 x = case h x x of
+            True  -> x
+            False -> f1 (x-1)
+
+
+    ------- f2 -----------
+    -- x is a strict field of MkT2, so we'll pass it unboxed
+    -- to $wf2, so it's available unboxed.  This depends on
+    -- the case expression analysing (a subcomponent of) one
+    -- of the original arguments to the function, so it's
+    -- a bit more delicate.
+
+    data T2 = MkT2 !Int Int
+
+    f2 :: T2 -> Int
+    f2 (MkT2 x y) | y>0       = f2 (MkT2 x (y-1))
+                  | otherwise = x
+
+
+    ------- f3 -----------
+    -- h is strict in x, so x will be unboxed before it
+    -- is rerturned in the otherwise case.
+
+    data T3 = MkT3 Int Int
+
+    f1 :: T3 -> Int
+    f1 (MkT3 x y) | h x y     = f3 (MkT3 x (y-1))
+                  | otherwise = x
+
+
+    ------- f4 -----------
+    -- Just like f2, but MkT4 can't unbox its strict
+    -- argument automatically, as f2 can
+
+    data family Foo a
+    newtype instance Foo Int = Foo Int
+
+    data T4 a = MkT4 !(Foo a) Int
+
+    f4 :: T4 Int -> Int
+    f4 (MkT4 x@(Foo v) y) | y>0       = f4 (MkT4 x (y-1))
+                          | otherwise = v
 
 
 Note [Initialising strictness]
