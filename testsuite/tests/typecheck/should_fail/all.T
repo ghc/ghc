@@ -368,3 +368,4 @@ test('T10351', normal, compile_fail, [''])
 test('T10534', extra_clean(['T10534a.hi', 'T10534a.o']),
      multimod_compile_fail, ['T10534', '-v0'])
 test('T10495', normal, compile_fail, [''])
+test('VtaFail', normal, compile_fail, [''])
