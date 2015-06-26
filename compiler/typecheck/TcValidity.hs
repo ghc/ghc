@@ -908,21 +908,33 @@ instTypeErr cls tys msg
              2 (quotes (pprClassPred cls tys)))
        2 msg
 
-{-
-validDeivPred checks for OK 'deriving' context.  See Note [Exotic
+{- Note [Valid 'deriving' predicate]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+validDerivPred checks for OK 'deriving' context.  See Note [Exotic
 derived instance contexts] in TcDeriv.  However the predicate is
 here because it uses sizeTypes, fvTypes.
 
-Also check for a bizarre corner case, when the derived instance decl
-would look like
-    instance C a b => D (T a) where ...
-Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
-problems; in particular, it's hard to compare solutions for equality
-when finding the fixpoint, and that means the inferContext loop does
-not converge.  See Trac #5287.
+It checks for three things
+
+  * No repeated variables (hasNoDups fvs)
+
+  * No type constructors.  This is done by comparing
+        sizeTypes tys == length (fvTypes tys)
+    sizeTypes counts variables and constructors; fvTypes returns variables.
+    So if they are the same, there must be no constructors.  But there
+    might be applications thus (f (g x)).
+
+  * Also check for a bizarre corner case, when the derived instance decl
+    would look like
+       instance C a b => D (T a) where ...
+    Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
+    problems; in particular, it's hard to compare solutions for equality
+    when finding the fixpoint, and that means the inferContext loop does
+   not converge.  See Trac #5287.
 -}
 
 validDerivPred :: TyVarSet -> PredType -> Bool
+-- See Note [Valid 'deriving' predicate]
 validDerivPred tv_set pred
   = case classifyPredType pred of
        ClassPred _ tys -> check_tys tys
@@ -932,7 +944,8 @@ validDerivPred tv_set pred
     check_tys tys = hasNoDups fvs
                     && sizeTypes tys == fromIntegral (length fvs)
                     && all (`elemVarSet` tv_set) fvs
-    fvs = fvType pred
+                  where
+                    fvs = fvTypes tys
 
 {-
 ************************************************************************
@@ -1001,42 +1014,39 @@ The underlying idea is that
     context has fewer type constructors than the head.
 -}
 
-leafTyConKeys :: [Unique]
-leafTyConKeys = [eqTyConKey, coercibleTyConKey, ipClassNameKey]
-
 checkInstTermination :: [TcType] -> ThetaType -> TcM ()
 -- See Note [Paterson conditions]
 checkInstTermination tys theta
   = check_preds theta
   where
-   fvs  = fvTypes tys
-   size = sizeTypes tys
+   head_fvs  = fvTypes tys
+   head_size = sizeTypes tys
 
    check_preds :: [PredType] -> TcM ()
    check_preds preds = mapM_ check preds
 
    check :: PredType -> TcM ()
    check pred
-     = case tcSplitTyConApp_maybe pred of
-         Just (tc, tys)
-           | getUnique tc `elem` leafTyConKeys
-           -> return ()  -- You can't get from equalities or implicit
-                         -- params to class predicates, so this is safe
+     = case classifyPredType pred of
+         EqPred {}    -> return ()  -- See Trac #4200.
+         IrredPred {} -> check2 pred (sizeType pred)
+         ClassPred cls tys
+           | isIPClass cls
+           -> return ()  -- You can't get to class predicates from implicit params
 
-           | isTupleTyCon tc
+           | isCTupleClass cls  -- Look inside tuple predicates; Trac #8359
            -> check_preds tys
-              -- Look inside tuple predicates; Trac #8359
 
-         _other      -- All others: other ClassPreds, IrredPred
-           | not (null bad_tvs)    -> addErrTc (noMoreMsg bad_tvs what)
-           | sizePred pred >= size -> addErrTc (smallerMsg what)
-           | otherwise             -> return ()
+           | otherwise
+           -> check2 pred (sizeTypes tys)  -- Other ClassPreds
+
+   check2 pred pred_size
+     | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what)
+     | pred_size >= head_size = addErrTc (smallerMsg what)
+     | otherwise              = return ()
      where
         what    = ptext (sLit "constraint") <+> quotes (ppr pred)
-        bad_tvs = filterOut isKindVar (fvType pred \\ fvs)
-             -- Rightly or wrongly, we only check for
-             -- excessive occurrences of *type* variables.
-             -- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
+        bad_tvs = fvType pred \\ head_fvs
 
 smallerMsg :: SDoc -> SDoc
 smallerMsg what
@@ -1248,10 +1258,7 @@ checkFamInstRhs lhsTys famInsts
       | otherwise                 = Nothing
       where
         what    = ptext (sLit "type family application") <+> quotes (pprType (TyConApp tc tys))
-        bad_tvs = filterOut isKindVar (fvTypes tys \\ fvs)
-             -- Rightly or wrongly, we only check for
-             -- excessive occurrences of *type* variables.
-             -- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
+        bad_tvs = fvTypes tys \\ fvs
 
 checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
@@ -1314,15 +1321,23 @@ famPatErr fam_tc tvs pats
 -}
 
 -- Free variables of a type, retaining repetitions, and expanding synonyms
-fvType :: Type -> [TyVar]
-fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
-fvType (TyVarTy tv)        = [tv]
-fvType (TyConApp _ tys)    = fvTypes tys
-fvType (LitTy {})          = []
-fvType (FunTy arg res)     = fvType arg ++ fvType res
-fvType (AppTy fun arg)     = fvType fun ++ fvType arg
-fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
+-- Ignore kinds altogether: rightly or wrongly, we only check for
+-- excessive occurrences of *type* variables.
+-- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
+--
+-- c.f. sizeType, which is often called side by side with fvType
+fvType, fv_type :: Type -> [TyVar]
+fvType ty | isKind ty = []
+          | otherwise = fv_type ty
+
+fv_type ty | Just exp_ty <- tcView ty = fv_type exp_ty
+fv_type (TyVarTy tv)        = [tv]
+fv_type (TyConApp _ tys)    = fvTypes tys
+fv_type (LitTy {})          = []
+fv_type (FunTy arg res)     = fv_type arg ++ fv_type res
+fv_type (AppTy fun arg)     = fv_type fun ++ fv_type arg
+fv_type (ForAllTy tyvar ty) = filter (/= tyvar) (fv_type ty)
 
 fvTypes :: [Type] -> [TyVar]
-fvTypes tys                = concat (map fvType tys)
+fvTypes tys = concat (map fvType tys)
 
