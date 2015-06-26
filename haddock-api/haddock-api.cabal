@@ -85,6 +85,7 @@ library
     Haddock.Backends.HaddockDB
     Haddock.Backends.Hoogle
     Haddock.Backends.Hyperlinker
+    Haddock.Backends.Hyperlinker.Utils
     Haddock.ModuleTree
     Haddock.Types
     Haddock.Doc
