@@ -27,6 +27,8 @@ import DataCon
 import TcEvidence
 import Name
 import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
+import Class( className )
+import PrelNames( typeableClassName )
 import Id
 import Var
 import VarSet
@@ -1342,6 +1344,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
     cannot_resolve_msg ct binds_msg
       = vcat [ addArising orig no_inst_msg
+             , nest 2 extra_note
              , vcat (pp_givens givens)
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
                (vcat [ ambig_msg, binds_msg, potential_msg ])
@@ -1376,22 +1379,19 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     ppr_skol skol_info      = ppr skol_info
 
     no_inst_msg
-      | null givens && null matches
-      = ptext (sLit "No instance for")
-        <+> pprParendType pred
-        $$ if type_has_arrow pred
-            then nest 2 $ ptext (sLit "(maybe you haven't applied a function to enough arguments?)")
-            else empty
+      | null givens && null matches = ptext (sLit "No instance for")  <+> pprParendType pred
+      | otherwise                   = ptext (sLit "Could not deduce") <+> pprParendType pred
 
-      | otherwise
-      = ptext (sLit "Could not deduce") <+> pprParendType pred
-
-    type_has_arrow (TyVarTy _)      = False
-    type_has_arrow (AppTy t1 t2)    = type_has_arrow t1 || type_has_arrow t2
-    type_has_arrow (TyConApp _ ts)  = or $ map type_has_arrow ts
-    type_has_arrow (FunTy _ _)      = True
-    type_has_arrow (ForAllTy _ t)   = type_has_arrow t
-    type_has_arrow (LitTy _)        = False
+    extra_note | any isFunTy (filterOut isKind tys)
+               = ptext (sLit "(maybe you haven't applied a function to enough arguments?)")
+               | className clas == typeableClassName  -- Avoid mysterious "No instance for (Typeable T)
+               , [_,ty] <- tys                        -- Look for (Typeable (k->*) (T k))
+               , Just (tc,_) <- tcSplitTyConApp_maybe ty
+               , not (isTypeFamilyTyCon tc)
+               = hang (ptext (sLit "GHC can't yet do polykinded"))
+                    2 (ptext (sLit "Typeable") <+> parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
+               | otherwise
+               = empty
 
     drv_fixes = case orig of
                    DerivOrigin      -> [drv_fix]

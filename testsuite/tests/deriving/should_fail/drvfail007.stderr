@@ -1,8 +1,8 @@
 
-drvfail007.hs:4:38:
+drvfail007.hs:4:38: error:
     No instance for (Eq (Int -> Int))
-      (maybe you haven't applied a function to enough arguments?)
       arising from the first field of ‘Foo’ (type ‘Int -> Int’)
+      (maybe you haven't applied a function to enough arguments?)
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself

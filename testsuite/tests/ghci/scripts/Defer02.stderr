@@ -26,9 +26,8 @@
     In an equation for ‘c’: c (C2 x) = True
 
 ../../typecheck/should_run/Defer01.hs:28:5: warning:
-    No instance for (Num (a -> a))
+    No instance for (Num (a -> a)) arising from the literal ‘1’
       (maybe you haven't applied a function to enough arguments?)
-      arising from the literal ‘1’
     In the expression: 1
     In an equation for ‘d’: d = 1
 
@@ -136,9 +135,8 @@
     In the first argument of ‘c’, namely ‘(C2 True)’
     In the first argument of ‘print’, namely ‘(c (C2 True))’
 *** Exception: ../../typecheck/should_run/Defer01.hs:28:5: error:
-    No instance for (Num (a -> a))
+    No instance for (Num (a -> a)) arising from the literal ‘1’
       (maybe you haven't applied a function to enough arguments?)
-      arising from the literal ‘1’
     In the expression: 1
     In an equation for ‘d’: d = 1
 (deferred type error)
