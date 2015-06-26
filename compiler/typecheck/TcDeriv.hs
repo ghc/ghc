@@ -1817,8 +1817,7 @@ simplifyDeriv pred tvs theta
                 -- We use *non-overlappable* (vanilla) skolems
                 -- See Note [Overlap and deriving]
 
-       ; let subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
-             skol_set   = mkVarSet tvs_skols
+       ; let skol_set = mkVarSet tvs_skols
              doc = ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- mapM (\(PredOrigin t o) -> newWanted o (substTy skol_subst t)) theta
@@ -1839,13 +1838,18 @@ simplifyDeriv pred tvs theta
                          | otherwise = Right ct
                          where p = ctPred ct
 
+       ; traceTc "simplifyDeriv 2" $
+         vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
+
        -- If we are deferring type errors, simply ignore any insoluble
        -- constraints.  They'll come up again when we typecheck the
        -- generated instance declaration
        ; defer <- goptM Opt_DeferTypeErrors
        ; unless defer (reportAllUnsolved (residual_wanted { wc_simple = bad }))
 
-       ; let min_theta = mkMinimalBySCs (bagToList good)
+       ; let min_theta  = mkMinimalBySCs (bagToList good)
+             subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+                          -- The reverse substitution (sigh)
        ; return (substTheta subst_skol min_theta) }
 
 {-
