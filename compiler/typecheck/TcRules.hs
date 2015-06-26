@@ -282,7 +282,7 @@ Deciding which equalities to quantify over is tricky:
    F is a type function.
 
 The difficulty is that it's hard to tell what is insoluble!
-So we see whether the simplificaiotn step yielded any type errors,
+So we see whether the simplification step yielded any type errors,
 and if so refrain from quantifying over *any* equalities.
 -}
 
