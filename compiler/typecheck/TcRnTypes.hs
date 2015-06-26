@@ -2067,9 +2067,10 @@ data SkolemInfo
   | ClsSkol Class       -- Bound at a class decl
 
   | InstSkol            -- Bound at an instance decl
-  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection
-                        -- from an InstSkol, giving the largest class from
-                        -- which we made a superclass selection in the chain
+  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection.
+                        -- If (C ty1 .. tyn) is the largest class from
+                        --    which we made a superclass selection in the chain,
+                        --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
   | DataSkol            -- Bound at a data type declaration
@@ -2193,7 +2194,8 @@ data CtOrigin
   | ViewPatOrigin
 
   | ScOrigin TypeSize   -- Typechecking superclasses of an instance declaration
-                        -- whose head has the given size
+                        -- If the instance head is C ty1 .. tyn
+                        --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
   | DerivOrigin         -- Typechecking deriving

@@ -999,7 +999,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_t
        ; return (ids, listToBag binds, listToBag implics) }
   where
     loc = getSrcSpan dfun_id
-    size = sizePred (mkClassPred cls inst_tys)
+    size = sizeTypes inst_tys
     tc_super (sc_pred, n)
       = do { (sc_implic, sc_ev_id) <- checkInstConstraints $ \_ ->
                                       emitWanted (ScOrigin size) sc_pred
@@ -1096,7 +1096,7 @@ generate a guaranteed-non-bottom superclass witness from:
   (sc3) a call of a dfun (always returns a dictionary constructor)
 
 The tricky case is (sc2).  We proceed by induction on the size of
-the (type of) the dictionary, defined by TcValidity.sizePred.
+the (type of) the dictionary, defined by TcValidity.sizeTypes.
 Let's suppose we are building a dictionary of size 3, and
 suppose the Superclass Invariant holds of smaller dictionaries.
 Then if we have a smaller dictionary, its immediate superclasses

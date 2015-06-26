@@ -149,7 +149,7 @@ module TcType (
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
   pprTheta, pprThetaArrowTy, pprClassPred,
 
-  TypeSize, sizePred, sizeType, sizeTypes
+  TypeSize, sizeType, sizeTypes
 
   ) where
 
@@ -1872,40 +1872,23 @@ is irreducible. See Trac #5581.
 
 type TypeSize = IntWithInf
 
-sizeType :: Type -> TypeSize
+sizeType, size_type :: Type -> TypeSize
 -- Size of a type: the number of variables and constructors
-sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
-sizeType (TyVarTy {})      = 1
-sizeType (TyConApp tc tys)
+-- Ignore kinds altogether
+sizeType ty | isKind ty = 0
+            | otherwise = size_type ty
+
+size_type ty | Just exp_ty <- tcView ty = size_type exp_ty
+size_type (TyVarTy {})      = 1
+size_type (TyConApp tc tys)
   | isTypeFamilyTyCon tc   = infinity  -- Type-family applications can
                                        -- expand to any arbitrary size
   | otherwise              = sizeTypes tys + 1
-sizeType (LitTy {})        = 1
-sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
-sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (ForAllTy _ ty)   = sizeType ty
+size_type (LitTy {})        = 1
+size_type (FunTy arg res)   = size_type arg + size_type res + 1
+size_type (AppTy fun arg)   = size_type fun + size_type arg
+size_type (ForAllTy _ ty)   = size_type ty
 
 sizeTypes :: [Type] -> TypeSize
--- IA0_NOTE: Avoid kinds.
-sizeTypes xs = sum (map sizeType tys)
-  where tys = filter (not . isKind) xs
-
--- Note [Size of a predicate]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
--- We are considering whether class constraints terminate.
--- Equality constraints and constraints for the implicit
--- parameter class always termiante so it is safe to say "size 0".
--- (Implicit parameter constraints always terminate because
--- there are no instances for them---they are only solved by
--- "local instances" in expressions).
--- See Trac #4200.
-sizePred :: PredType -> TypeSize
-sizePred p
-  = case classifyPredType p of
-      ClassPred cls tys
-        | isIPClass cls     -> 0  -- See Note [Size of a predicate]
-        | isCTupleClass cls -> maximum (0 : map sizePred tys)
-        | otherwise         -> sizeTypes tys
-      EqPred {}             -> 0  -- See Note [Size of a predicate]
-      IrredPred ty          -> sizeType ty
+sizeTypes tys = sum (map sizeType tys)
 
