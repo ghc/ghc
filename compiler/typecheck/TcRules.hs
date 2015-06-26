@@ -303,11 +303,16 @@ simplifyRule name lhs_wanted rhs_wanted
              do { -- First solve the LHS and *then* solve the RHS
                   -- See Note [Solve order for RULES]
                   lhs_resid <- solveWanteds lhs_wanted
+                ; lhs_inst <- fmap andManyCts $
+                    mapM instantiateWC (bagToList (wc_simple lhs_resid))
+                ; lhs_inst_resid <- solveWanteds lhs_resid { wc_simple = lhs_inst }
                 ; rhs_resid <- solveWanteds rhs_wanted
-                ; return (insolubleWC lhs_resid || insolubleWC rhs_resid) }
+                ; return (insolubleWC lhs_inst_resid || insolubleWC rhs_resid) }
 
        ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_simples
+       ; (zonked_lhs_inst, _) <- runTcS $ fmap andManyCts $
+           mapM instantiateWC (bagToList zonked_lhs_simples)
+       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_inst
              quantify_me  -- Note [RULE quantification over equalities]
                | insoluble = quantify_insol
                | otherwise = quantify_normal
@@ -325,6 +330,7 @@ simplifyRule name lhs_wanted rhs_wanted
               , text "lhs_wantd" <+> ppr lhs_wanted
               , text "rhs_wantd" <+> ppr rhs_wanted
               , text "zonked_lhs_simples" <+> ppr zonked_lhs_simples
+              , text "zonked_lhs_inst" <+> ppr zonked_lhs_inst
               , text "q_cts"      <+> ppr q_cts
               , text "non_q_cts"  <+> ppr non_q_cts ]
 

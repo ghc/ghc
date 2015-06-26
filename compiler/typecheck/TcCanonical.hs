@@ -1707,6 +1707,7 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
            ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_ty, ppr new_ev_qs ])
            ; canInstanceOfNC new_ev_ty }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
+    -- case InstanceOf ty (forall qvars. Q => ty)
   | Just _ <- splitForAllTy_maybe rhs
   = case ev of
       CtWanted { ctev_evar = evar, ctev_loc = loc } ->

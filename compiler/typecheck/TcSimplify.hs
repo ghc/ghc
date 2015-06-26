@@ -8,8 +8,8 @@ module TcSimplify(
        simplifyTop, simplifyInteractive,
        solveWantedsTcM,
 
-       -- For Rules we need these twoo
-       solveWanteds, runTcS
+       -- For Rules we need these three
+       solveWanteds, runTcS, instantiateWC
   ) where
 
 #include "HsVersions.h"
