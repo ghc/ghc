@@ -1,10 +1,10 @@
 module Haddock.Backends.Hyperlinker (ppHyperlinkedSource) where
 
 import Haddock.Types
-import Haddock.Utils
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Backends.Hyperlinker.Renderer
+import Haddock.Backends.Hyperlinker.Utils
 
 import Text.XHtml hiding ((</>))
 
@@ -29,7 +29,8 @@ ppHyperlinkedSource outdir libdir mstyle urls ifaces = do
 
 ppHyperlinkedModuleSource :: FilePath -> SourceURLs -> Interface -> IO ()
 ppHyperlinkedModuleSource outdir urls iface = case ifaceTokenizedSrc iface of
-    Just tokens -> writeFile path $ showHtml . render mCssFile mJsFile $ tokens
+    Just tokens ->
+        writeFile path $ showHtml . render mCssFile mJsFile urls $ tokens
     Nothing -> return ()
   where
     mCssFile = Just $ srcCssFile
@@ -49,6 +50,3 @@ highlightScript = "highlight.js"
 
 defaultCssFile :: FilePath -> FilePath
 defaultCssFile libdir = libdir </> "html" </> "solarized.css"
-
-srcModUrl :: SourceURLs -> String
-srcModUrl (_, mModSrcUrl, _, _) = fromMaybe defaultModuleSourceUrl mModSrcUrl

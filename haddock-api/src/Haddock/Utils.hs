@@ -29,7 +29,7 @@ module Haddock.Utils (
   moduleNameUrl, moduleNameUrl', moduleUrl,
   nameAnchorId,
   makeAnchorId,
-  defaultModuleSourceUrl,
+  defaultModuleSourceUrl, defaultNameSourceUrl,
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
@@ -280,6 +280,9 @@ makeAnchorId (f:r) = escape isAlpha f ++ concatMap (escape isLegal) r
 
 defaultModuleSourceUrl :: String
 defaultModuleSourceUrl = "src/%{MODULE}.html"
+
+defaultNameSourceUrl :: String
+defaultNameSourceUrl = defaultModuleSourceUrl ++ "#%{NAME}"
 
 
 -------------------------------------------------------------------------------

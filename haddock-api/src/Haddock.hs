@@ -264,7 +264,12 @@ render dflags flags qual ifaces installedIfaces srcMap = do
       | Flag_HyperlinkedSource `elem` flags = Just defaultModuleSourceUrl
       | otherwise = Nothing
 
-    srcMap' = maybe srcMap (\path -> Map.insert pkgKey path srcMap) srcEntity
+    srcMap'
+      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl srcMap
+      | Flag_HyperlinkedSource `elem` flags =
+          Map.insert pkgKey defaultNameSourceUrl srcMap
+      | otherwise = srcMap
+
     -- TODO: Get these from the interface files as with srcMap
     srcLMap' = maybe Map.empty (\path -> Map.singleton pkgKey path) srcLEntity
     sourceUrls' = (srcBase, srcModule', srcMap', srcLMap')
