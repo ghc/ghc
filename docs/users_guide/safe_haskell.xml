@@ -555,7 +555,7 @@
           <itemizedlist>
             <listitem>The module was compiled with
               <option>-XTrustworthy</option></listitem>
-            <listitem>All of M's direct <emph>safe imports</emph>are trusted by
+            <listitem>All of M's direct <emphasis>safe imports</emphasis>are trusted by
               C</listitem>
           </itemizedlist>
         </listitem>
@@ -688,14 +688,14 @@
           imports!
         </listitem>
 
-        <liteitem>
+        <listitem>
           Buggle only imports Prelude, which is compiled with
           <option>-XTrustworthy</option>. Prelude resides in the base package,
           which C trusts, and (we'll assume) all of Prelude's imports are
           trusted. So C trusts Prelude, and so C also trusts Buggle. (While
           Prelude is typically imported implicitly, it still obeys the same
           rules outlined here).
-        </liteitem>
+        </listitem>
       </itemizedlist>
       </para>
 
