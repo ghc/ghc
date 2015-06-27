@@ -299,8 +299,8 @@ zonkTopLExpr :: LHsExpr TcId -> TcM (LHsExpr Id)
 zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind
-             -> LHsBinds TcId 
-             -> Maybe (Located [LIE RdrName]) 
+             -> LHsBinds TcId
+             -> Maybe (Located [LIE RdrName])
              -> NameSet
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
              -> TcM ([Id],
@@ -1474,7 +1474,7 @@ zonkCoToCo env co
                                    do { (env', tv') <- zonkTyBndrX env tv
                                       ; co' <- zonkCoToCo env' co
                                       ; return (mkForAllCo tv' co') }
-                                   
+
 zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- This variant collects unbound type variables in a mutable variable
 -- Works on both types and kinds

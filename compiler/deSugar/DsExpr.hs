@@ -680,7 +680,7 @@ dsExpr (EWildPat      {})  = panic "dsExpr:EWildPat"
 dsExpr (EAsPat        {})  = panic "dsExpr:EAsPat"
 dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
-dsExpr (HsType        {})  = panic "dsExpr:HsType"
+dsExpr (HsType        {})  = panic "dsExpr:HsType" -- removed by typechecker
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 
 

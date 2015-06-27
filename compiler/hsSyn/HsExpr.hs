@@ -725,7 +725,7 @@ ppr_expr (HsSCC _ (_,lbl) expr)
           pprParendExpr expr ]
 
 ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
-ppr_expr (HsType id)      = ppr id
+ppr_expr (HsType ty)      = char '@' <> pprParendHsType (unLoc ty)
 
 ppr_expr (HsSpliceE s)         = pprSplice s
 ppr_expr (HsBracket b)         = pprHsBracket b
