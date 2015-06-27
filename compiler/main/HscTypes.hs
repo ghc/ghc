@@ -1934,11 +1934,29 @@ but they are mostly elaborated elsewhere
 -}
 
 ------------------ Warnings -------------------------
+
+-- data WarnItem = WI OccName WarnInfo (Located SourceText) [Located (SourceText,FastString)]
+-- data WarnInfo = Warning | DeprecTop | DeprecMeth
+
+-- Some overlap w/ 'WarningTxt'
+data WarnItem = WarnItem OccName !WarnInfo (Located SourceText) [Located (SourceText,FastString)]
+              deriving Eq
+
+data WarnInfo
+  = Warning    -- top-level  indented
+  | DeprecTop  -- top-level  indented
+  | DeprecMeth -- class-body indented
+  deriving (Eq, Enum)
+
+instance Binary WarnInfo where
+    put_ bh wi = putByte bh (fromIntegral $ fromEnum wi)
+    get bh = toEnum . fromIntegral <$> getByte bh
+
 -- | Warning information for a module
 data Warnings
   = NoWarnings                          -- ^ Nothing deprecated
   | WarnAll WarningTxt                  -- ^ Whole module deprecated
-  | WarnSome [(OccName,WarningTxt)]     -- ^ Some specific things deprecated
+  | WarnSome [WarnInfo]                 -- ^ Some specific things deprecated
 
      -- Only an OccName is needed because
      --    (1) a deprecation always applies to a binding
