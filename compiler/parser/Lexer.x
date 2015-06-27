@@ -634,8 +634,6 @@ data Token
   | ITqconid  (FastString,FastString)
   | ITqvarsym (FastString,FastString)
   | ITqconsym (FastString,FastString)
-  | ITprefixqvarsym (FastString,FastString)
-  | ITprefixqconsym (FastString,FastString)
 
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
 
@@ -1144,11 +1142,9 @@ varid span buf len =
 conid :: StringBuffer -> Int -> Token
 conid buf len = ITconid $! lexemeToFastString buf len
 
-qvarsym, qconsym, prefixqvarsym, prefixqconsym :: StringBuffer -> Int -> Token
+qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
-prefixqvarsym buf len = ITprefixqvarsym $! splitQualName buf len True
-prefixqconsym buf len = ITprefixqconsym $! splitQualName buf len True
 
 varsym, consym :: Action
 varsym = sym ITvarsym

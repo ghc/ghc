@@ -514,8 +514,6 @@ for some background.
  QCONID         { L _ (ITqconid   _) }
  QVARSYM        { L _ (ITqvarsym  _) }
  QCONSYM        { L _ (ITqconsym  _) }
- PREFIXQVARSYM  { L _ (ITprefixqvarsym  _) }
- PREFIXQCONSYM  { L _ (ITprefixqconsym  _) }
 
  IPDUPVARID     { L _ (ITdupipvarid   _) }              -- GHC extension
 
@@ -2854,7 +2852,6 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
         : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        | PREFIXQCONSYM     { sL1 $1 $! mkQual tcClsName (getPREFIXQCONSYM $1) }
         | tycon             { $1 }
 
 tycon   :: { Located RdrName }  -- Unqualified
@@ -2952,7 +2949,6 @@ qvar    :: { Located RdrName }
 qvarid :: { Located RdrName }
         : varid               { $1 }
         | QVARID              { sL1 $1 $! mkQual varName (getQVARID $1) }
-        | PREFIXQVARSYM       { sL1 $1 $! mkQual varName (getPREFIXQVARSYM $1) }
 
 -- Note that 'role' and 'family' get lexed separately regardless of
 -- the use of extensions. However, because they are listed here, this
@@ -3017,7 +3013,6 @@ special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
 qconid :: { Located RdrName }   -- Qualified or unqualified
         : conid              { $1 }
         | QCONID             { sL1 $1 $! mkQual dataName (getQCONID $1) }
-        | PREFIXQCONSYM      { sL1 $1 $! mkQual dataName (getPREFIXQCONSYM $1) }
 
 conid   :: { Located RdrName }
         : CONID                { sL1 $1 $ mkUnqual dataName (getCONID $1) }
@@ -3116,8 +3111,6 @@ getQVARID       (L _ (ITqvarid   x)) = x
 getQCONID       (L _ (ITqconid   x)) = x
 getQVARSYM      (L _ (ITqvarsym  x)) = x
 getQCONSYM      (L _ (ITqconsym  x)) = x
-getPREFIXQVARSYM (L _ (ITprefixqvarsym  x)) = x
-getPREFIXQCONSYM (L _ (ITprefixqconsym  x)) = x
 getIPDUPVARID   (L _ (ITdupipvarid   x)) = x
 getCHAR         (L _ (ITchar   _ x)) = x
 getSTRING       (L _ (ITstring _ x)) = x
