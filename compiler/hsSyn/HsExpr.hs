@@ -491,7 +491,11 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ELazyPat    (LHsExpr id) -- ~ pattern
 
-  | HsType      (LHsType id) -- Explicit type argument; e.g  f {| Int |} x y
+  -- | Use for type application in expressions.
+  -- 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+  | HsType      (LHsType id) -- Explicit type argument; e.g  f @Int x y
 
   ---------------------------------------
   -- Finally, HsWrap appears only in typechecker output

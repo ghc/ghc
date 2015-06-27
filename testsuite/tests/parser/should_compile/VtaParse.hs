@@ -1,6 +1,8 @@
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, RankNTypes, DataKinds, PolyKinds #-}
 
 module VtaParse where
+
+import Data.Proxy
 
 data Foo = Foo { first :: Int, second :: Bool} deriving Show
 
@@ -51,3 +53,15 @@ main = do
          print $ listpair @(Maybe Bool) $ (Just True) : (Just False) : (Nothing @Bool) : []
          print $ dblTuple @Foo @[Maybe Int] ((Foo 7 False), ([Just 5, Nothing]))
          print $ 12 @& 5
+
+pro :: Proxy a -> ()
+pro _ = ()
+
+x = pro @'True
+
+(@@) :: Int -> Int -> Int
+(@@) = (+)
+
+five = 3 @@ 2
+
+silly = pro {- hi! -}@Int

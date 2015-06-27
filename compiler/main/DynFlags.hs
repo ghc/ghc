@@ -643,6 +643,7 @@ data ExtensionFlag
    | Opt_PartialTypeSignatures
    | Opt_NamedWildCards
    | Opt_StaticPointers
+   | Opt_TypeApplications
    deriving (Eq, Enum, Show)
 
 type SigOf = Map ModuleName Module
@@ -3181,6 +3182,7 @@ xFlags = [
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
   flagSpec "TransformListComp"                Opt_TransformListComp,
   flagSpec "TupleSections"                    Opt_TupleSections,
+  flagSpec "TypeApplications"                 Opt_TypeApplications,
   flagSpec "TypeFamilies"                     Opt_TypeFamilies,
   flagSpec "TypeOperators"                    Opt_TypeOperators,
   flagSpec "TypeSynonymInstances"             Opt_TypeSynonymInstances,
