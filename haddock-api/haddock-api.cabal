@@ -96,6 +96,37 @@ library
     Haddock.Convert
     Paths_haddock_api
 
+test-suite spec
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Spec.hs
+  ghc-options: -Wall
+
+  hs-source-dirs:
+      test
+    , src
+
+  other-modules:
+    Haddock.Backends.Hyperlinker.ParserSpec
+
+  build-depends:
+      base >= 4.3 && < 4.9
+    , bytestring
+    , filepath
+    , directory
+    , containers
+    , deepseq
+    , array
+    , xhtml >= 3000.2 && < 3000.3
+    , Cabal >= 1.10
+    , ghc >= 7.10 && < 7.10.2
+
+    , ghc-paths
+    , haddock-library == 1.2.*
+
+    , hspec
+    , QuickCheck == 2.*
+
 source-repository head
   type:     git
   location: https://github.com/haskell/haddock.git
