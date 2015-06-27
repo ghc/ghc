@@ -29,7 +29,6 @@ module Haddock.Utils (
   moduleNameUrl, moduleNameUrl', moduleUrl,
   nameAnchorId,
   makeAnchorId,
-  defaultModuleSourceUrl, defaultNameSourceUrl,
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
@@ -276,13 +275,6 @@ makeAnchorId (f:r) = escape isAlpha f ++ concatMap (escape isLegal) r
     isLegal '.' = True
     isLegal c = isAscii c && isAlphaNum c
        -- NB: '-' is legal in IDs, but we use it as the escape char
-
-
-defaultModuleSourceUrl :: String
-defaultModuleSourceUrl = "src/%{MODULE}.html"
-
-defaultNameSourceUrl :: String
-defaultNameSourceUrl = defaultModuleSourceUrl ++ "#%{NAME}"
 
 
 -------------------------------------------------------------------------------

@@ -260,14 +260,13 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
 
     srcModule'
-      | isJust srcModule = srcModule
-      | Flag_HyperlinkedSource `elem` flags = Just defaultModuleSourceUrl
-      | otherwise = Nothing
+      | Flag_HyperlinkedSource `elem` flags = Just hypSrcModuleUrlFormat
+      | otherwise = srcModule
 
     srcMap'
-      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl srcMap
       | Flag_HyperlinkedSource `elem` flags =
-          Map.insert pkgKey defaultNameSourceUrl srcMap
+          Map.insert pkgKey hypSrcModuleNameUrlFormat srcMap
+      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl srcMap
       | otherwise = srcMap
 
     -- TODO: Get these from the interface files as with srcMap
@@ -322,7 +321,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
                   libDir
 
   when (Flag_HyperlinkedSource `elem` flags) $ do
-    ppHyperlinkedSource odir libDir opt_source_css sourceUrls' visibleIfaces
+    ppHyperlinkedSource odir libDir opt_source_css visibleIfaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because

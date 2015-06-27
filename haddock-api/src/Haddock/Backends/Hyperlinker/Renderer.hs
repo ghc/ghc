@@ -3,15 +3,12 @@ module Haddock.Backends.Hyperlinker.Renderer (render) where
 import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Ast
 import Haddock.Backends.Hyperlinker.Utils
-import Haddock.Backends.Xhtml.Types
-import Haddock.Backends.Xhtml.Utils
 
 import qualified GHC
 import qualified Name as GHC
 import qualified Unique as GHC
 
 import Data.List
-import qualified Data.Map as Map
 import Data.Maybe
 import Data.Monoid
 
@@ -20,11 +17,11 @@ import qualified Text.XHtml as Html
 
 type StyleClass = String
 
-render :: Maybe FilePath -> Maybe FilePath -> SourceURLs -> [RichToken] -> Html
-render mcss mjs urls tokens = header mcss mjs <> body urls tokens
+render :: Maybe FilePath -> Maybe FilePath -> [RichToken] -> Html
+render mcss mjs tokens = header mcss mjs <> body tokens
 
-body :: SourceURLs -> [RichToken] -> Html
-body urls = Html.body . Html.pre . mconcat . map (richToken urls)
+body :: [RichToken] -> Html
+body = Html.body . Html.pre . mconcat . map richToken
 
 header :: Maybe FilePath -> Maybe FilePath -> Html
 header mcss mjs
@@ -39,18 +36,18 @@ header mcss mjs =
         , Html.href cssFile
         ]
     js Nothing = Html.noHtml
-    js (Just jsFile) = Html.script Html.noHtml !
+    js (Just scriptFile) = Html.script Html.noHtml !
         [ Html.thetype "text/javascript"
-        , Html.src jsFile
+        , Html.src scriptFile
         ]
 
-richToken :: SourceURLs -> RichToken -> Html
-richToken _ (RichToken tok Nothing) =
+richToken :: RichToken -> Html
+richToken (RichToken tok Nothing) =
     tokenSpan tok ! attrs
   where
     attrs = [ multiclass . tokenStyle . tkType $ tok ]
-richToken urls (RichToken tok (Just det)) =
-    externalAnchor det . internalAnchor det . hyperlink urls det $ content
+richToken (RichToken tok (Just det)) =
+    externalAnchor det . internalAnchor det . hyperlink det $ content
   where
     content = tokenSpan tok ! [ multiclass style]
     style = (tokenStyle . tkType) tok ++ richTokenStyle det
@@ -92,37 +89,30 @@ internalAnchor (RtkBind name) content =
 internalAnchor _ content = content
 
 externalAnchorIdent :: GHC.Name -> String
-externalAnchorIdent = GHC.occNameString . GHC.nameOccName
+externalAnchorIdent = hypSrcNameUrl
 
 internalAnchorIdent :: GHC.Name -> String
 internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
 
-hyperlink :: SourceURLs -> TokenDetails -> Html -> Html
-hyperlink urls details = case rtkName details of
+hyperlink :: TokenDetails -> Html -> Html
+hyperlink details = case rtkName details of
     Left name ->
         if GHC.isInternalName name
         then internalHyperlink name
-        else externalNameHyperlink urls name
+        else externalNameHyperlink name
     Right name -> externalModHyperlink name
 
 internalHyperlink :: GHC.Name -> Html -> Html
 internalHyperlink name content =
     Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
-externalNameHyperlink :: SourceURLs -> GHC.Name -> Html -> Html
-externalNameHyperlink urls name =
-    case Map.lookup key $ srcNameUrlMap urls of
-        Just url -> externalNameHyperlink' url name
-        Nothing -> id
+externalNameHyperlink :: GHC.Name -> Html -> Html
+externalNameHyperlink name content =
+    Html.anchor content ! [ Html.href href ]
   where
-    key = GHC.modulePackageKey . GHC.nameModule $ name
-
-externalNameHyperlink' :: String -> GHC.Name -> Html -> Html
-externalNameHyperlink' url name content =
-    Html.anchor content ! [ Html.href $ href ]
-  where
-    mdl = GHC.nameModule name
-    href = spliceURL Nothing (Just mdl) (Just name) Nothing url
+    href = hypSrcModuleNameUrl (GHC.nameModule name) name
 
 externalModHyperlink :: GHC.ModuleName -> Html -> Html
-externalModHyperlink _ = id -- TODO
+externalModHyperlink mdl content =
+    Html.anchor content ! [ Html.href $ hypSrcModuleUrl' mdl ]
+
