@@ -38,7 +38,7 @@ data TokenType
     | TkCpp
     | TkPragma
     | TkUnknown
-    deriving (Eq)
+    deriving (Show, Eq)
 
 -- | Turn source code string into a stream of more descriptive tokens.
 --
