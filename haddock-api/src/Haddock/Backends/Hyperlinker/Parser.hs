@@ -63,7 +63,9 @@ chunk str@(c:_)
 chunk str
     | "--" `isPrefixOf` str = chunk' $ spanToNewline str
     | "{-" `isPrefixOf` str = chunk' $ chunkComment 0 str
-    | otherwise = chunk' $ head $ lex str
+    | otherwise = case lex str of
+        (tok:_) -> chunk' tok
+        [] -> [str]
   where
     chunk' (c, rest) = c:(chunk rest)
 
