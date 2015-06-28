@@ -580,7 +580,9 @@ skolemiseUnboundMetaTyVar tv details
               new_tv_name = if isWildcardVar tv
                             then generaliseWildcardVarName tv_name
                             else tv_name
-              final_name = mkInternalName uniq new_tv_name span
+                -- NB: make a System name. See Note [Visible type application]
+                -- in TcExpr
+              final_name = mkSystemNameAt uniq new_tv_name span
               final_kind = defaultKind kind
               final_tv   = mkTcTyVar final_name final_kind details
 

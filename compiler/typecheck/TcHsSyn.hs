@@ -289,7 +289,7 @@ zonkTyBndrX :: ZonkEnv -> TyVar -> TcM (ZonkEnv, TyVar)
 -- then we add it to the envt, so all occurrences are replaced
 zonkTyBndrX env tv
   = do { ki <- zonkTcTypeToType env (tyVarKind tv)
-       ; let tv' = mkTyVar (tyVarName tv) ki
+       ; let tv' = mkTyVar (toInternalName $ tyVarName tv) ki
        ; return (extendTyZonkEnv1 env tv', tv') }
 
 zonkTopExpr :: HsExpr TcId -> TcM (HsExpr Id)
@@ -1402,7 +1402,10 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
                  ; case cts of
                       Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
                                             zonkTcTypeToType env (tyVarKind tv)
-                                  ; zonk_unbound_tyvar (setTyVarKind tv kind) }
+                                    -- See Note [Visible type application]
+                                    -- in TcExpr about the toInternalTyVar
+                                  ; zonk_unbound_tyvar (toInternalTyVar $
+                                                        setTyVarKind tv kind) }
                       Indirect ty -> do { zty <- zonkTcTypeToType env ty
                                         -- Small optimisation: shortern-out indirect steps
                                         -- so that the old type may be more easily collected.
@@ -1413,7 +1416,9 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
   where
     lookup_in_env    -- Look up in the env just as we do for Ids
       = case lookupVarEnv tv_env tv of
-          Nothing  -> return (mkTyVarTy tv)
+                        -- See Note [Visible type application]
+                        -- in TcExpr about the toInternalTyVar
+          Nothing  -> return (mkTyVarTy $ toInternalTyVar tv)
           Just tv' -> return (mkTyVarTy tv')
 
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type

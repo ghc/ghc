@@ -62,7 +62,7 @@ module Var (
 
         -- ** Modifying 'TyVar's
         setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
-        updateTyVarKindM
+        updateTyVarKindM, toInternalTyVar
 
     ) where
 
@@ -289,6 +289,11 @@ updateTyVarKindM :: (Monad m) => (Kind -> m Kind) -> TyVar -> m TyVar
 updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
+
+-- | Change a tyvar's name to be Internal. Used in the final zonk.
+-- See also Note [Visible type application] in TcExpr
+toInternalTyVar :: TyVar -> TyVar
+toInternalTyVar tv = setTyVarName tv (toInternalName (getName tv))
 
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
