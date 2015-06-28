@@ -123,6 +123,13 @@ externalNameHyperlink pkg srcs name content
     mdl = GHC.nameModule name
     namePkg = GHC.modulePackageKey mdl
 
+-- TODO: Implement module hyperlinks.
+--
+-- Unfortunately, 'ModuleName' is not enough to provide viable cross-package
+-- hyperlink. And the problem is that GHC AST does not have other information
+-- on imported modules, so for the time being, we do not provide such reference
+-- either.
 externalModHyperlink :: GHC.ModuleName -> Html -> Html
-externalModHyperlink mdl content =
-    Html.anchor content ! [ Html.href $ hypSrcModuleUrl' mdl ]
+externalModHyperlink _ content =
+    content
+    --Html.anchor content ! [ Html.href $ hypSrcModuleUrl' mdl ]
