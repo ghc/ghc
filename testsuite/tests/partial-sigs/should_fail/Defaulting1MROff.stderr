@@ -1,6 +1,6 @@
 
-Defaulting1MROff.hs:6:1:
+Defaulting1MROff.hs:6:1: error:
     No instance for (Num w_)
     When checking that ‘alpha’ has the inferred type
-      alpha :: forall w_. w_
+      alpha :: forall w_0. w_0
     Probable cause: the inferred type is ambiguous

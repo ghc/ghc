@@ -1,18 +1,18 @@
 
 ExtraTcsUntch.hs:23:18: error:
-    Couldn't match expected type ‘F Int’ with actual type ‘[[t]]’
+    Couldn't match expected type ‘F Int’ with actual type ‘[[t0]]’
     Relevant bindings include
-      x :: [t] (bound at ExtraTcsUntch.hs:21:3)
-      f :: [t] -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
+      x :: [t0] (bound at ExtraTcsUntch.hs:21:3)
+      f :: [t0] -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
     In the first argument of ‘h’, namely ‘[x]’
     In the expression: h [x]
     In an equation for ‘g1’: g1 _ = h [x]
 
 ExtraTcsUntch.hs:25:38: error:
-    Couldn't match expected type ‘F Int’ with actual type ‘[[t]]’
+    Couldn't match expected type ‘F Int’ with actual type ‘[[t0]]’
     Relevant bindings include
-      x :: [t] (bound at ExtraTcsUntch.hs:21:3)
-      f :: [t] -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
+      x :: [t0] (bound at ExtraTcsUntch.hs:21:3)
+      f :: [t0] -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
     In the first argument of ‘h’, namely ‘[[undefined]]’
     In the expression: h [[undefined]]
     In the expression: (h [[undefined]], op x [y])

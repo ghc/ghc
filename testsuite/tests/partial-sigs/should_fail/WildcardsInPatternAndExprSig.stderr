@@ -1,38 +1,38 @@
 
 WildcardsInPatternAndExprSig.hs:4:18: error:
-    Found hole: _a :: w_c
-    Where: ‘w_c’ is a rigid type variable bound by
-                 the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
-                 at WildcardsInPatternAndExprSig.hs:4:1
+    Found hole: _a :: w_c0
+    Where: ‘w_c0’ is a rigid type variable bound by
+                  the inferred type of bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
+                  at WildcardsInPatternAndExprSig.hs:4:1
     To use the inferred type, enable PartialTypeSignatures
     Relevant bindings include
-      bar :: Maybe [w_c] -> w_c -> [w_c]
+      bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
         (bound at WildcardsInPatternAndExprSig.hs:4:1)
     In a pattern type signature: _a
     In the pattern: x :: _a
     In the pattern: [x :: _a]
 
 WildcardsInPatternAndExprSig.hs:4:25: error:
-    Found hole: _ :: [w_c]
-    Where: ‘w_c’ is a rigid type variable bound by
-                 the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
-                 at WildcardsInPatternAndExprSig.hs:4:1
+    Found hole: _ :: [w_c0]
+    Where: ‘w_c0’ is a rigid type variable bound by
+                  the inferred type of bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
+                  at WildcardsInPatternAndExprSig.hs:4:1
     To use the inferred type, enable PartialTypeSignatures
     Relevant bindings include
-      bar :: Maybe [w_c] -> w_c -> [w_c]
+      bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
         (bound at WildcardsInPatternAndExprSig.hs:4:1)
     In a pattern type signature: _
     In the pattern: [x :: _a] :: _
     In the pattern: Just ([x :: _a] :: _)
 
 WildcardsInPatternAndExprSig.hs:4:38: error:
-    Found hole: _b :: w_c
-    Where: ‘w_c’ is a rigid type variable bound by
-                 the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
-                 at WildcardsInPatternAndExprSig.hs:4:1
+    Found hole: _b :: w_c0
+    Where: ‘w_c0’ is a rigid type variable bound by
+                  the inferred type of bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
+                  at WildcardsInPatternAndExprSig.hs:4:1
     To use the inferred type, enable PartialTypeSignatures
     Relevant bindings include
-      bar :: Maybe [w_c] -> w_c -> [w_c]
+      bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
         (bound at WildcardsInPatternAndExprSig.hs:4:1)
     In a pattern type signature: Maybe [_b]
     In the pattern: Just ([x :: _a] :: _) :: Maybe [_b]
@@ -41,14 +41,14 @@ WildcardsInPatternAndExprSig.hs:4:38: error:
           = [x, z] :: [_d]
 
 WildcardsInPatternAndExprSig.hs:4:49: error:
-    Found hole: _c :: w_c
-    Where: ‘w_c’ is a rigid type variable bound by
-                 the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
-                 at WildcardsInPatternAndExprSig.hs:4:1
+    Found hole: _c :: w_c0
+    Where: ‘w_c0’ is a rigid type variable bound by
+                  the inferred type of bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
+                  at WildcardsInPatternAndExprSig.hs:4:1
     To use the inferred type, enable PartialTypeSignatures
     Relevant bindings include
-      x :: w_c (bound at WildcardsInPatternAndExprSig.hs:4:13)
-      bar :: Maybe [w_c] -> w_c -> [w_c]
+      x :: w_c0 (bound at WildcardsInPatternAndExprSig.hs:4:13)
+      bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
         (bound at WildcardsInPatternAndExprSig.hs:4:1)
     In a pattern type signature: _c
     In the pattern: z :: _c
@@ -57,15 +57,15 @@ WildcardsInPatternAndExprSig.hs:4:49: error:
           = [x, z] :: [_d]
 
 WildcardsInPatternAndExprSig.hs:4:66: error:
-    Found hole: _d :: w_c
-    Where: ‘w_c’ is a rigid type variable bound by
-                 the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
-                 at WildcardsInPatternAndExprSig.hs:4:1
+    Found hole: _d :: w_c0
+    Where: ‘w_c0’ is a rigid type variable bound by
+                  the inferred type of bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
+                  at WildcardsInPatternAndExprSig.hs:4:1
     To use the inferred type, enable PartialTypeSignatures
     Relevant bindings include
-      z :: w_c (bound at WildcardsInPatternAndExprSig.hs:4:44)
-      x :: w_c (bound at WildcardsInPatternAndExprSig.hs:4:13)
-      bar :: Maybe [w_c] -> w_c -> [w_c]
+      z :: w_c0 (bound at WildcardsInPatternAndExprSig.hs:4:44)
+      x :: w_c0 (bound at WildcardsInPatternAndExprSig.hs:4:13)
+      bar :: Maybe [w_c0] -> w_c0 -> [w_c0]
         (bound at WildcardsInPatternAndExprSig.hs:4:1)
     In an expression type signature: [_d]
     In the expression: [x, z] :: [_d]

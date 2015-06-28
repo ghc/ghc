@@ -1,15 +1,15 @@
 
-T7594.hs:33:12:
-    Couldn't match type ‘b’ with ‘IO ()’
-      ‘b’ is untouchable
+T7594.hs:33:12: error:
+    Couldn't match type ‘b0’ with ‘IO ()’
+      ‘b0’ is untouchable
         inside the constraints: (:&:) c0 Real a
-        bound by a type expected by the context: (:&:) c0 Real a => a -> b
+        bound by a type expected by the context: (:&:) c0 Real a => a -> b0
         at T7594.hs:33:8-19
-      ‘b’ is a rigid type variable bound by
-          the inferred type of bar2 :: b at T7594.hs:33:1
+    ‘b0’ is a rigid type variable bound by
+         the inferred type of bar2 :: b0 at T7594.hs:33:1
     Possible fix: add a type signature for ‘bar2’
-    Expected type: a -> b
+    Expected type: a -> b0
       Actual type: a -> IO ()
-    Relevant bindings include bar2 :: b (bound at T7594.hs:33:1)
+    Relevant bindings include bar2 :: b0 (bound at T7594.hs:33:1)
     In the first argument of ‘app’, namely ‘print’
     In the expression: app print q2

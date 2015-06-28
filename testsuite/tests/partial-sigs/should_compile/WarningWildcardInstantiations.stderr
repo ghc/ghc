@@ -8,14 +8,15 @@ Dependent packages: [base-4.8.2.0, ghc-prim-0.4.0.0,
                      integer-gmp-1.0.0.0]
 
 WarningWildcardInstantiations.hs:5:14: warning:
-    Found hole: _a :: w_a
-    Where: ‘w_a’ is a rigid type variable bound by
-                 the inferred type of foo :: (Enum w_a, Show w_a) => w_a -> String
-                 at WarningWildcardInstantiations.hs:6:1
+    Found hole: _a :: w_a0
+    Where: ‘w_a0’ is a rigid type variable bound by
+                  the inferred type of
+                  foo :: (Enum w_a0, Show w_a0) => w_a0 -> String
+                  at WarningWildcardInstantiations.hs:6:1
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:5:18: warning:
-    Found hole ‘_’ with inferred constraints: Enum w_a
+    Found hole ‘_’ with inferred constraints: Enum w_a0
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:5:30: warning:
@@ -23,25 +24,25 @@ WarningWildcardInstantiations.hs:5:30: warning:
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:8:8: warning:
-    Found hole: _ :: w_
-    Where: ‘w_’ is a rigid type variable bound by
-                the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
-                at WarningWildcardInstantiations.hs:9:1
+    Found hole: _ :: w_0
+    Where: ‘w_0’ is a rigid type variable bound by
+                 the inferred type of bar :: w_0 -> (w_0 -> w_1) -> w_1
+                 at WarningWildcardInstantiations.hs:9:1
     In the type signature for ‘bar’: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:13: warning:
-    Found hole: _ :: w_ -> w_1
-    Where: ‘w_’ is a rigid type variable bound by
-                the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
-                at WarningWildcardInstantiations.hs:9:1
+    Found hole: _ :: w_0 -> w_1
+    Where: ‘w_0’ is a rigid type variable bound by
+                 the inferred type of bar :: w_0 -> (w_0 -> w_1) -> w_1
+                 at WarningWildcardInstantiations.hs:9:1
            ‘w_1’ is a rigid type variable bound by
-                 the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
+                 the inferred type of bar :: w_0 -> (w_0 -> w_1) -> w_1
                  at WarningWildcardInstantiations.hs:9:1
     In the type signature for ‘bar’: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:18: warning:
     Found hole: _ :: w_1
     Where: ‘w_1’ is a rigid type variable bound by
-                 the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
+                 the inferred type of bar :: w_0 -> (w_0 -> w_1) -> w_1
                  at WarningWildcardInstantiations.hs:9:1
     In the type signature for ‘bar’: _ -> _ -> _

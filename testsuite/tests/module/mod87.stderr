@@ -1,3 +1,3 @@
 
 mod87.hs:4:5: error:
-    Data constructor not in scope: Left :: Char -> t
+    Data constructor not in scope: Left :: Char -> t0

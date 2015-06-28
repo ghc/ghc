@@ -11,4 +11,4 @@ mc14.hs:14:16: error:
     In a stmt of a monad comprehension: then group using f
     In the expression: [() | f <- functions, then group using f]
 
-mc14.hs:14:49: error: Variable not in scope: f :: [a] -> m (t0 a)
+mc14.hs:14:49: error: Variable not in scope: f :: [a] -> m0 (t0 a)

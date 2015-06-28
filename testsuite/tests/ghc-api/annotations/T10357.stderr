@@ -4,7 +4,7 @@ Test10357.hs:4:13: error: Variable not in scope: one
 Test10357.hs:4:19: error: Variable not in scope: x
 
 Test10357.hs:5:7: error:
-    Variable not in scope: multPoly :: t3 -> t4 -> t
+    Variable not in scope: multPoly :: t3 -> t4 -> t9
 
 Test10357.hs:6:10: error:
     Variable not in scope: poly :: t0 -> [Double] -> t3
@@ -24,7 +24,7 @@ Test10357.hs:7:24: error:
     Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:7:43: error:
-    Variable not in scope: multPoly :: t7 -> t -> t5
+    Variable not in scope: multPoly :: t7 -> t9 -> t5
 
 Test10357.hs:8:19: error:
     Variable not in scope: poly :: t2 -> [Double] -> t8
@@ -34,4 +34,4 @@ Test10357.hs:8:24: error:
     Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:8:43: error:
-    Variable not in scope: multPoly :: t8 -> t -> t6
+    Variable not in scope: multPoly :: t8 -> t9 -> t6

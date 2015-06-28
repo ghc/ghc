@@ -1,19 +1,19 @@
 
-gadt7.hs:16:38:
-    Couldn't match expected type ‘t’ with actual type ‘r’
-      ‘r’ is untouchable
+gadt7.hs:16:38: error:
+    Couldn't match expected type ‘t0’ with actual type ‘r0’
+      ‘r0’ is untouchable
         inside the constraints: t1 ~ Int
         bound by a pattern with constructor: K :: T Int,
                  in a case alternative
         at gadt7.hs:16:33
-      ‘r’ is a rigid type variable bound by
-          the inferred type of i1b :: T t1 -> r -> t at gadt7.hs:16:1
-      ‘t’ is a rigid type variable bound by
-          the inferred type of i1b :: T t1 -> r -> t at gadt7.hs:16:1
+    ‘r0’ is a rigid type variable bound by
+         the inferred type of i1b :: T t1 -> r0 -> t0 at gadt7.hs:16:1
+    ‘t0’ is a rigid type variable bound by
+         the inferred type of i1b :: T t1 -> r0 -> t0 at gadt7.hs:16:1
     Possible fix: add a type signature for ‘i1b’
     Relevant bindings include
-      y1 :: r (bound at gadt7.hs:16:16)
-      y :: r (bound at gadt7.hs:16:7)
-      i1b :: T t1 -> r -> t (bound at gadt7.hs:16:1)
+      y1 :: r0 (bound at gadt7.hs:16:16)
+      y :: r0 (bound at gadt7.hs:16:7)
+      i1b :: T t1 -> r0 -> t0 (bound at gadt7.hs:16:1)
     In the expression: y1
     In a case alternative: K -> y1

@@ -1,10 +1,10 @@
 
-T2693.hs:11:7:
+T2693.hs:11:7: error:
     Couldn't match expected type ‘TFn a’ with actual type ‘TFn a0’
     NB: ‘TFn’ is a type function, and may not be injective
     The type variable ‘a0’ is ambiguous
     When checking that ‘x’ has the inferred type
-      x :: forall a. TFn a
+      x :: forall a0. TFn a0
     Probable cause: the inferred type is ambiguous
     In the expression:
       do { let Just x = ...;
@@ -15,21 +15,21 @@ T2693.hs:11:7:
                  let n = ...;
                  return () }
 
-T2693.hs:19:15:
+T2693.hs:19:15: error:
     Couldn't match expected type ‘(a5, b0)’ with actual type ‘TFn a2’
     The type variables ‘b0’, ‘a2’, ‘a5’ are ambiguous
     Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
     In the first argument of ‘fst’, namely ‘x’
     In the first argument of ‘(+)’, namely ‘fst x’
 
-T2693.hs:19:23:
+T2693.hs:19:23: error:
     Couldn't match expected type ‘(a3, a5)’ with actual type ‘TFn a4’
     The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
     Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
     In the first argument of ‘snd’, namely ‘x’
     In the second argument of ‘(+)’, namely ‘snd x’
 
-T2693.hs:29:20:
+T2693.hs:29:20: error:
     Couldn't match type ‘TFn a0’ with ‘PVR a1’
     The type variables ‘a0’, ‘a1’ are ambiguous
     Expected type: () -> Maybe (PVR a1)

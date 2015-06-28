@@ -1,8 +1,8 @@
 type role A phantom phantom
-data A (x :: k) (y :: k1)
+data A (x :: k0) (y :: k1)
   	-- Defined at <interactive>:3:1
-A :: k -> k1 -> *
+A :: k0 -> k1 -> *
 type role T phantom
-data T (a :: k) where
-  MkT :: forall (k :: BOX) (a :: k) a1. a1 -> T a
+data T (a :: k0) where
+  MkT :: forall (k0 :: BOX) (a :: k0) a1. a1 -> T a
   	-- Defined at <interactive>:7:1

@@ -15,4 +15,4 @@ maybeToList :: Maybe a -> [a]
 data Maybe a = Nothing | Just a
 -- via readFile
 (True,False)
-id :: a -> a
+id :: a0 -> a0

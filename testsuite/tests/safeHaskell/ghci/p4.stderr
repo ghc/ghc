@@ -3,6 +3,6 @@
     Not in scope: ‘System.IO.Unsafe.unsafePerformIO’
 
 <interactive>:7:9: error:
-    Variable not in scope: x :: IO Integer -> t
+    Variable not in scope: x :: IO Integer -> t0
 
 <interactive>:8:1: error: Variable not in scope: y

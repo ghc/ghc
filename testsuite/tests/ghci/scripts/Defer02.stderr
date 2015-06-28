@@ -32,9 +32,9 @@
     In an equation for ‘d’: d = 1
 
 ../../typecheck/should_run/Defer01.hs:31:5: warning:
-    Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
+    Couldn't match expected type ‘Char -> t0’ with actual type ‘Char’
     Relevant bindings include
-      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
+      f :: t0 (bound at ../../typecheck/should_run/Defer01.hs:31:1)
     The function ‘e’ is applied to one argument,
     but its type ‘Char’ has none
     In the expression: e 'q'
@@ -53,10 +53,10 @@
     In the expression: (x, 'c')
 
 ../../typecheck/should_run/Defer01.hs:39:17: warning:
-    Couldn't match expected type ‘Bool’ with actual type ‘T a’
+    Couldn't match expected type ‘Bool’ with actual type ‘T a2’
     Relevant bindings include
-      a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
-      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
+      a :: a2 (bound at ../../typecheck/should_run/Defer01.hs:39:3)
+      i :: a2 -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
     In the first argument of ‘not’, namely ‘(K a)’
     In the expression: (not (K a))
 
@@ -141,9 +141,9 @@
     In an equation for ‘d’: d = 1
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:31:5: error:
-    Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
+    Couldn't match expected type ‘Char -> t0’ with actual type ‘Char’
     Relevant bindings include
-      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
+      f :: t0 (bound at ../../typecheck/should_run/Defer01.hs:31:1)
     The function ‘e’ is applied to one argument,
     but its type ‘Char’ has none
     In the expression: e 'q'
@@ -162,10 +162,10 @@
     In the expression: (x, 'c')
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:39:17: error:
-    Couldn't match expected type ‘Bool’ with actual type ‘T a’
+    Couldn't match expected type ‘Bool’ with actual type ‘T a2’
     Relevant bindings include
-      a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
-      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
+      a :: a2 (bound at ../../typecheck/should_run/Defer01.hs:39:3)
+      i :: a2 -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
     In the first argument of ‘not’, namely ‘(K a)’
     In the expression: (not (K a))
 (deferred type error)

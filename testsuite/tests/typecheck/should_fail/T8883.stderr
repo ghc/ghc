@@ -1,9 +1,9 @@
 
 T8883.hs:20:14: error:
-    Could not deduce (Functor (PF a)) arising from a use of ‘fmap’
-    from the context: Regular a
+    Could not deduce (Functor (PF a0)) arising from a use of ‘fmap’
+    from the context: Regular a0
       bound by the inferred type of
-               fold :: Regular a => (PF a b -> b) -> a -> b
+               fold :: Regular a0 => (PF a0 b0 -> b0) -> a0 -> b0
       at T8883.hs:20:1-33
     In the first argument of ‘(.)’, namely ‘fmap (fold f)’
     In the second argument of ‘(.)’, namely ‘fmap (fold f) . from’

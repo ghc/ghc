@@ -6,7 +6,7 @@ T8142.hs:6:18: error:
     Expected type: Nu ((,) t) -> Nu g
       Actual type: Nu ((,) t0) -> Nu g0
     When checking that ‘h’ has the inferred type
-      h :: forall t (g :: * -> *). Nu ((,) t) -> Nu g
+      h :: forall t0 (g0 :: * -> *). Nu ((,) t0) -> Nu g0
     Probable cause: the inferred type is ambiguous
     In an equation for ‘tracer’:
         tracer
@@ -15,10 +15,10 @@ T8142.hs:6:18: error:
               h = (\ (_, b) -> ((outI . fmap h) b)) . out
 
 T8142.hs:6:57: error:
-    Couldn't match type ‘Nu ((,) t)’ with ‘g (Nu ((,) t))’
-    Expected type: Nu ((,) t) -> (t, g (Nu ((,) t)))
-      Actual type: Nu ((,) t) -> (t, Nu ((,) t))
+    Couldn't match type ‘Nu ((,) t0)’ with ‘g0 (Nu ((,) t0))’
+    Expected type: Nu ((,) t0) -> (t0, g0 (Nu ((,) t0)))
+      Actual type: Nu ((,) t0) -> (t0, Nu ((,) t0))
     Relevant bindings include
-      h :: Nu ((,) t) -> Nu g (bound at T8142.hs:6:18)
+      h :: Nu ((,) t0) -> Nu g0 (bound at T8142.hs:6:18)
     In the second argument of ‘(.)’, namely ‘out’
     In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out

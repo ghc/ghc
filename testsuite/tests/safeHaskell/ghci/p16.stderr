@@ -9,7 +9,7 @@
     In the newtype declaration for ‘T2’
 
 <interactive>:19:9: error:
-    Data constructor not in scope: T2 :: T -> t
+    Data constructor not in scope: T2 :: T -> t0
     Perhaps you meant ‘T1’ (line 13)
 
 <interactive>:22:4: error: Variable not in scope: y

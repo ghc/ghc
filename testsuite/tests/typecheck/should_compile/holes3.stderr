@@ -1,9 +1,9 @@
 
 holes3.hs:3:5: error:
-    Found hole: _ :: t
-    Where: ‘t’ is a rigid type variable bound by
-               the inferred type of f :: t at holes3.hs:3:1
-    Relevant bindings include f :: t (bound at holes3.hs:3:1)
+    Found hole: _ :: t0
+    Where: ‘t0’ is a rigid type variable bound by
+                the inferred type of f :: t0 at holes3.hs:3:1
+    Relevant bindings include f :: t0 (bound at holes3.hs:3:1)
     In the expression: _
     In an equation for ‘f’: f = _
 

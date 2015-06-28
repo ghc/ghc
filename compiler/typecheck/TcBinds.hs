@@ -33,14 +33,14 @@ import ConLike
 import Inst( deeplyInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
-import Type( pprSigmaTypeExtraCts )
+import Type( pprSigmaTypeExtraCts, tidyOpenTypes )
 import TyCon
 import TcType
 import TysPrim
 import Id
 import Var
 import VarSet
-import VarEnv( TidyEnv )
+import VarEnv( TidyEnv, emptyTidyEnv )
 import Module
 import Name
 import NameSet
@@ -745,9 +745,11 @@ completeTheta inferred_theta
     mk_msg inferred_diff suppress_hint
        = vcat [ hang ((text "Found hole") <+> quotes (char '_'))
                    2 (text "with inferred constraints:")
-                      <+> pprTheta inferred_diff
+                      <+> pprTheta tidy_diff
               , if suppress_hint then empty else pts_hint
               , typeSigCtxt sig ]
+      where
+        (_, tidy_diff) = tidyOpenTypes emptyTidyEnv inferred_diff
 
 {-
 Note [Partial type signatures and generalisation]

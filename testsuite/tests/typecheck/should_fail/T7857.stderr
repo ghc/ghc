@@ -1,8 +1,8 @@
 
-T7857.hs:8:11:
+T7857.hs:8:11: error:
     Could not deduce (PrintfType r0) arising from a use of ‘printf’
-    from the context: PrintfArg t
-      bound by the inferred type of g :: PrintfArg t => t -> b
+    from the context: PrintfArg t0
+      bound by the inferred type of g :: PrintfArg t0 => t0 -> b0
       at T7857.hs:8:1-21
     The type variable ‘r0’ is ambiguous
     Note: there are several potential instances:
