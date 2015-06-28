@@ -67,6 +67,24 @@ parseSpec = do
             , TkIdentifier, TkSpace, TkGlyph, TkSpace, TkIdentifier
             ]
 
+    it "should parse do-notation syntax" $ do
+        "do { foo <- getLine; putStrLn foo }" `shouldParseTo`
+            [ TkKeyword, TkSpace, TkSpecial, TkSpace
+            , TkIdentifier, TkSpace, TkGlyph, TkSpace
+            , TkIdentifier, TkSpecial, TkSpace
+            , TkIdentifier, TkSpace, TkIdentifier, TkSpace, TkSpecial
+            ]
+
+        unlines
+            [ "do"
+            , "    foo <- getLine"
+            , "    putStrLn foo"
+            ] `shouldParseTo`
+            [ TkKeyword, TkSpace, TkIdentifier
+            , TkSpace, TkGlyph, TkSpace, TkIdentifier, TkSpace
+            , TkIdentifier, TkSpace, TkIdentifier, TkSpace
+            ]
+
 
 shouldParseTo :: String -> [TokenType] -> Expectation
 str `shouldParseTo` tokens = map tkType (parse str) `shouldBe` tokens
