@@ -2936,10 +2936,25 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
           <listitem>
             <para><emphasis>On by default.</emphasis>
             Specialise each type-class-overloaded function defined in this
-            module for the types at which it is called in this module.  Also
-            specialise imported functions that have an INLINABLE pragma
-            (<xref linkend="inlinable-pragma"/>) for the types at which they
-            are called in this module.
+            module for the types at which it is called in this module. If
+            <literal>-fcross-module-specialise</literal> is set imported
+            functions that have an INLINABLE pragma
+            (<xref linkend="inlinable-pragma"/>) will be specialised as well.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fcross-module-specialise</option>
+            <indexterm><primary><option>-fcross-module-specialise</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Specialise <literal>INLINABLE</literal> (<xreg linked="inlinable-pragma"/>)
+            type-class-overloaded functions imported from other modules for the
+            types at which they are called in this module. Note that specialisation must
+            be enabled (by <literal>-fspecialise</literal>) for this to have any effect.
             </para>
           </listitem>
         </varlistentry>

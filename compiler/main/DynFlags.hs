@@ -342,6 +342,7 @@ data GeneralFlag
    | Opt_FloatIn
    | Opt_Specialise
    | Opt_SpecialiseAggressively
+   | Opt_CrossModuleSpecialise
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_LiberateCase
@@ -2990,6 +2991,7 @@ fFlags = [
   flagSpec "spec-constr"                      Opt_SpecConstr,
   flagSpec "specialise"                       Opt_Specialise,
   flagSpec "specialise-aggressively"          Opt_SpecialiseAggressively,
+  flagSpec "cross-module-specialise"          Opt_CrossModuleSpecialise,
   flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
@@ -3314,6 +3316,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_IgnoreAsserts)
     , ([1,2],   Opt_Loopification)
     , ([1,2],   Opt_Specialise)
+    , ([1,2],   Opt_CrossModuleSpecialise)
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_UnboxSmallStrictFields)
 
