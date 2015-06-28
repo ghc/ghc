@@ -47,6 +47,26 @@ parseSpec = do
         "x # y" `shouldParseTo`
             [TkIdentifier, TkSpace, TkCpp, TkSpace,TkIdentifier]
 
+    it "should distinguish basic language constructs" $ do
+        "(* 2) <$> (\"abc\", foo)" `shouldParseTo`
+            [ TkSpecial, TkOperator, TkSpace, TkNumber, TkSpecial
+            , TkSpace, TkOperator, TkSpace
+            , TkSpecial, TkString, TkSpecial, TkSpace, TkIdentifier, TkSpecial
+            ]
+        "let foo' = foo in foo' + foo'" `shouldParseTo`
+            [ TkKeyword, TkSpace, TkIdentifier
+            , TkSpace, TkGlyph, TkSpace
+            , TkIdentifier, TkSpace, TkKeyword, TkSpace
+            , TkIdentifier, TkSpace, TkOperator, TkSpace, TkIdentifier
+            ]
+        "square x = y^2 where y = x" `shouldParseTo`
+            [ TkIdentifier, TkSpace, TkIdentifier
+            , TkSpace, TkGlyph, TkSpace
+            , TkIdentifier, TkOperator, TkNumber
+            , TkSpace, TkKeyword, TkSpace
+            , TkIdentifier, TkSpace, TkGlyph, TkSpace, TkIdentifier
+            ]
+
 
 shouldParseTo :: String -> [TokenType] -> Expectation
 str `shouldParseTo` tokens = map tkType (parse str) `shouldBe` tokens
