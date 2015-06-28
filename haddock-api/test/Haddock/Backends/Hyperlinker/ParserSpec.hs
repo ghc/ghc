@@ -2,6 +2,7 @@ module Haddock.Backends.Hyperlinker.ParserSpec (main, spec) where
 
 
 import Test.Hspec
+import Test.QuickCheck
 
 import Haddock.Backends.Hyperlinker.Parser
 
@@ -17,6 +18,12 @@ spec = do
 
 parseSpec :: Spec
 parseSpec = do
+
+    it "is total" $
+        property $ \src -> length (parse src) `shouldSatisfy` (>= 0)
+
+    it "retains file layout" $
+        property $ \src -> concatMap tkValue (parse src) == src
 
     context "when parsing single-line comments" $ do
 
