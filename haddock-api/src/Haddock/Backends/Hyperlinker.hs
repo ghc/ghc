@@ -8,33 +8,34 @@ import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Utils
 
 import Text.XHtml hiding ((</>))
+import GHC
 
 import Data.Maybe
 import System.Directory
 import System.FilePath
 
-ppHyperlinkedSource :: FilePath -> FilePath
-                    -> Maybe FilePath
-                    -> [Interface]
+ppHyperlinkedSource :: FilePath -> FilePath -> Maybe FilePath
+                    -> PackageKey -> SrcMap -> [Interface]
                     -> IO ()
-ppHyperlinkedSource outdir libdir mstyle ifaces = do
+ppHyperlinkedSource outdir libdir mstyle pkg srcs ifaces = do
     createDirectoryIfMissing True srcdir
     let cssFile = fromMaybe (defaultCssFile libdir) mstyle
     copyFile cssFile $ srcdir </> srcCssFile
     copyFile (libdir </> "html" </> highlightScript) $
         srcdir </> highlightScript
-    mapM_ (ppHyperlinkedModuleSource srcdir) ifaces
+    mapM_ (ppHyperlinkedModuleSource srcdir pkg srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir
 
-ppHyperlinkedModuleSource :: FilePath -> Interface -> IO ()
-ppHyperlinkedModuleSource srcdir iface = case ifaceTokenizedSrc iface of
-    Just tokens ->
-        writeFile path $ showHtml . render mCssFile mJsFile $ tokens
-    Nothing -> return ()
+ppHyperlinkedModuleSource :: FilePath
+                          -> PackageKey -> SrcMap -> Interface
+                          -> IO ()
+ppHyperlinkedModuleSource srcdir pkg srcs iface =
+    case ifaceTokenizedSrc iface of
+        Just tokens -> writeFile path . showHtml . render' $ tokens
+        Nothing -> return ()
   where
-    mCssFile = Just $ srcCssFile
-    mJsFile = Just $ highlightScript
+    render' = render (Just srcCssFile) (Just highlightScript) pkg srcs
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
 
 srcCssFile :: FilePath

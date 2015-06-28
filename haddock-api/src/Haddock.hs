@@ -321,7 +321,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
                   libDir
 
   when (Flag_HyperlinkedSource `elem` flags) $ do
-    ppHyperlinkedSource odir libDir opt_source_css visibleIfaces
+    ppHyperlinkedSource odir libDir opt_source_css pkgKey srcMap visibleIfaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because
