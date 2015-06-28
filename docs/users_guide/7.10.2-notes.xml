@@ -47,6 +47,12 @@
        </listitem>
        <listitem>
           <para>
+            A bug which caused the simplifier to produce code which
+            segfaulted at runtime has been fixed (issue #10538).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A type-system bug which could allow a user to write
             <literal>unsafeCoerce</literal> has been fixed (issue
             #9858).
@@ -112,7 +118,7 @@
        </listitem>
        <listitem>
           <para>
-            The SMP runtime is now enabled on AArch64 (issue #10525).
+            The SMP runtime and GHCi are now enabled on AArch64 (issue #10525).
           </para>
        </listitem>
        <listitem>
@@ -148,6 +154,26 @@
             A bug in the event manager which could cause 'multi-shot'
             event registrations to only fire once has been fixed
             (issue #10317).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            Support for PowerPC relocations has been added (issue
+            #10402).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A lurking bug in the code generator which could cause
+            incorrect assembly code to be generated due to register
+            aliasing issues has been fixed (issue #10521).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in the runtime system which could cause a deadlock
+            when scheduling garbage collections has been fixed (issue
+            #10545).
           </para>
        </listitem>
        <listitem>
@@ -238,8 +264,17 @@
        </listitem>
         <listitem>
             <para>
+                A bug in the simplifier which can cause it to totally
+                fail to compile certain programs that get 'very large'
+                at compile time is known (<ulink
+                url="https://ghc.haskell.org/trac/ghc/ticket/10527">issue
+                #10527</ulink>).
+           </para>
+       </listitem>
+        <listitem>
+            <para>
                 GHC's LLVM backend does not support LLVM 3.4 (<ulink
-		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>)
+		url="https://ghc.haskell.org/trac/ghc/ticket/9929">issue #9929</ulink>).
            </para>
        </listitem>
         <listitem>
