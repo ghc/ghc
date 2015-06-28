@@ -3,6 +3,10 @@ var styleForRule = function (rule) {
 	var sheets = document.styleSheets;
 	for (var s = 0; s < sheets.length; s++) {
 		var rules = sheets[s].cssRules;
+		if (rules === null) {
+			return null;
+		}
+
 		for (var r = 0; r < rules.length; r++) {
 			if (rules[r].selectorText == rule) {
 				return rules[r].style;
@@ -12,7 +16,13 @@ var styleForRule = function (rule) {
 };
 
 var highlight = function () {
-	var color = styleForRule("a:hover")["background-color"];
+	/*
+	 * Chrome for security reasons disallows to read .cssRules property.
+	 * So, we are forced to pick some color and set it as a highlight.
+	 */
+	var style = styleForRule("a:hover");
+	var color = style !== null ? style["background-color"] : "#808080";
+
 	var links = document.getElementsByTagName('a');
 	for (var i = 0; i < links.length; i++) {
 		var that = links[i];
