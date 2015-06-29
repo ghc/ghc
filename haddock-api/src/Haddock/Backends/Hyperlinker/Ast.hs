@@ -107,17 +107,22 @@ binds =
 -- | Obtain details map for top-level declarations.
 decls :: GHC.RenamedSource -> DetailsMap
 decls (group, _, _, _) = concatMap ($ group)
-    [ map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
+    [ concat . map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
     , everything (<|>) fun
     ]
   where
-    typ (GHC.L _ t) =
-        let (GHC.L sspan name) = GHC.tcdLName t
-        in (sspan, RtkDecl name)
+    typ (GHC.L _ t) = case t of
+        GHC.DataDecl (GHC.L sspan name) _ defn _ ->
+            [(sspan, RtkDecl name)] ++ concatMap con (GHC.dd_cons defn)
+        _ ->
+            let (GHC.L sspan name) = GHC.tcdLName t
+            in pure (sspan, RtkDecl name)
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
+    con (GHC.L _ t) = flip map (GHC.con_names t) $
+        \(GHC.L sspan name) -> (sspan, RtkDecl name)
 
 -- | Obtain details map for import declarations.
 --
