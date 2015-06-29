@@ -50,6 +50,6 @@ a:link, a:visited {
 	border-bottom: 1px solid #eee8d5;
 }
 
-a:hover {
+a:hover, a.hover-highlight {
 	background-color: #eee8d5;
 }
