@@ -102,6 +102,8 @@ binds =
     pat term = case cast term of
         (Just (GHC.L sspan (GHC.VarPat name))) ->
             pure (sspan, RtkBind name)
+        (Just (GHC.L _ (GHC.ConPatIn (GHC.L sspan name) _))) ->
+            pure (sspan, RtkVar name)
         _ -> empty
 
 -- | Obtain details map for top-level declarations.
