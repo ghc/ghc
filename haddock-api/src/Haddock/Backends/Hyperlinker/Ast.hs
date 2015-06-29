@@ -112,17 +112,19 @@ decls (group, _, _, _) = concatMap ($ group)
     ]
   where
     typ (GHC.L _ t) = case t of
-        GHC.DataDecl (GHC.L sspan name) _ defn _ ->
-            [(sspan, RtkDecl name)] ++ concatMap con (GHC.dd_cons defn)
-        _ ->
-            let (GHC.L sspan name) = GHC.tcdLName t
-            in pure (sspan, RtkDecl name)
+        GHC.DataDecl name _ defn _ ->
+            [decl name] ++ concatMap con (GHC.dd_cons defn)
+        _ -> pure . decl $ GHC.tcdLName t
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
-    con (GHC.L _ t) = flip map (GHC.con_names t) $
-        \(GHC.L sspan name) -> (sspan, RtkDecl name)
+    con (GHC.L _ t) =
+        map decl (GHC.con_names t) ++ everything (<|>) fld t
+    fld term = case cast term of
+        Just field -> map decl $ GHC.cd_fld_names field
+        Nothing -> empty
+    decl (GHC.L sspan name) = (sspan, RtkDecl name)
 
 -- | Obtain details map for import declarations.
 --
