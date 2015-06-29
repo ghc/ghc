@@ -219,15 +219,20 @@ ExtraMakefileSanityChecks = NO
 INTEGER_LIBRARY=integer-gmp
 
 # We build the libraries at least the "vanilla" way (way "v")
+# Technically we don't need the v way if DYNAMIC_GHC_PROGRAMS is YES,
+# but with -dynamic-too it's cheap, and makes life easier.
 GhcLibWays = v
 
 # In addition to the normal sequential way, the default is to also build
 # profiled prelude libraries
-GhcLibWays += p
+# $(if $(filter ...)) allows controlling this expression from build.mk.
+GhcLibWays += $(if $(filter $(BUILD_PROF_LIBS),NO),,p)
 
-ifeq "$(PlatformSupportsSharedLibs)" "YES"
-GhcLibWays += dyn
-endif
+# Backward compatibility: although it would be cleaner to test for
+# PlatformSupportsSharedLibs, or perhaps a new variable BUILD_SHARED_LIBS,
+# some users currently expect that DYNAMIC_GHC_PROGRAMS=NO in build.mk implies
+# that dyn is not added to GhcLibWays.
+GhcLibWays += $(if $(filter $(DYNAMIC_GHC_PROGRAMS),NO),,dyn)
 
 # Handy way to test whether we're building shared libs or not.
 BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))

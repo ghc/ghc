@@ -72,8 +72,6 @@ V = 1
 # Uncomment the following line to enable building DPH
 #BUILD_DPH=YES
 
-GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
-
 # Uncomment the following to force `integer-gmp` to use the in-tree GMP 5.0.4
 # (other sometimes useful configure-options: `--with-gmp-{includes,libraries}`)
 #libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
@@ -84,21 +82,16 @@ ifeq "$(BuildFlavour)" "perf"
 
 # perf matches the default settings, repeated here for comparison:
 
-SRC_HC_OPTS     = -O -H64m
-GhcStage1HcOpts = -O
-GhcStage2HcOpts = -O2
-GhcLibHcOpts    = -O2
+SRC_HC_OPTS        = -O -H64m
+GhcStage1HcOpts    = -O
+GhcStage2HcOpts    = -O2
+GhcLibHcOpts       = -O2
+BUILD_PROF_LIBS    = YES
 #SplitObjs
 #HADDOCK_DOCS
 #BUILD_DOCBOOK_HTML
 #BUILD_DOCBOOK_PS
 #BUILD_DOCBOOK_PDF
-
-GhcLibWays  = v
-GhcLibWays += p
-ifeq "$(PlatformSupportsSharedLibs)" "YES"
-GhcLibWays += dyn
-endif
 
 endif
 
@@ -106,17 +99,16 @@ endif
 
 ifeq "$(BuildFlavour)" "perf-llvm"
 
-SRC_HC_OPTS     = -O -H64m -fllvm
-GhcStage1HcOpts = -O -fllvm
-GhcStage2HcOpts = -O2 -fllvm
-GhcLibHcOpts    = -O2
+SRC_HC_OPTS        = -O -H64m -fllvm
+GhcStage1HcOpts    = -O -fllvm
+GhcStage2HcOpts    = -O2 -fllvm
+GhcLibHcOpts       = -O2
+BUILD_PROF_LIBS    = YES
 #SplitObjs
 #HADDOCK_DOCS
 #BUILD_DOCBOOK_HTML
 #BUILD_DOCBOOK_PS
 #BUILD_DOCBOOK_PDF
-
-GhcLibWays     += p
 
 endif
 
@@ -128,13 +120,12 @@ SRC_HC_OPTS        = -O -H64m -fllvm
 GhcStage1HcOpts    = -O2
 GhcStage2HcOpts    = -O2 -fllvm
 GhcLibHcOpts       = -O2
+BUILD_PROF_LIBS    = YES
 #SplitObjs
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
-
-GhcLibWays        += p
 
 INTEGER_LIBRARY      = integer-simple
 Stage1Only           = YES
@@ -151,6 +142,7 @@ SRC_HC_OPTS        = -H64m -O0
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0
 GhcLibHcOpts       = -O0
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -167,6 +159,7 @@ SRC_HC_OPTS        = -H64m -O0
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0
 GhcLibHcOpts       = -O
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -183,6 +176,7 @@ SRC_HC_OPTS        = -H64m -O0 -fllvm
 GhcStage1HcOpts    = -O -fllvm
 GhcStage2HcOpts    = -O0 -fllvm
 GhcLibHcOpts       = -O -fllvm
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -199,6 +193,7 @@ SRC_HC_OPTS        = -H64m -O0
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0 -fllvm
 GhcLibHcOpts       = -O -fllvm
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -220,13 +215,13 @@ SRC_HC_OPTS        = -H64m -O0
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O
 GhcLibHcOpts       = -O
+BUILD_PROF_LIBS    = YES
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 
-GhcLibWays        += p
 GhcProfiled        = YES
 
 endif
@@ -239,6 +234,7 @@ SRC_HC_OPTS        = -H64m -O
 GhcStage1HcOpts    = -O0 -DDEBUG
 GhcStage2HcOpts    = -O
 GhcLibHcOpts       = -O -dcore-lint
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -257,6 +253,7 @@ SRC_HC_OPTS        = -H64m -O
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0 -DDEBUG
 GhcLibHcOpts       = -O -dcore-lint
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -275,6 +272,7 @@ SRC_HC_OPTS        = -O -H64m
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0
 GhcLibHcOpts       = -O2
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -291,6 +289,7 @@ SRC_HC_OPTS        = -O -H64m
 GhcStage1HcOpts    = -O -fllvm
 GhcStage2HcOpts    = -O0 -fllvm
 GhcLibHcOpts       = -O2 -fllvm
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
@@ -307,6 +306,7 @@ SRC_HC_OPTS        = -O -H64m
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0
 GhcLibHcOpts       = -O2
+BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
