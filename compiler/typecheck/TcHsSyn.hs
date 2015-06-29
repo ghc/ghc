@@ -1322,7 +1322,8 @@ zonkEvBind env (EvBind { eb_lhs = var, eb_rhs = term, eb_is_given = is_given })
          -- This has a very big effect on some programs (eg Trac #5030)
        ; term' <- case getEqPredTys_maybe (idType var') of
            Just (r, ty1, ty2) | ty1 `eqType` ty2
-                  -> return (EvCoercion (mkTcReflCo r ty1))
+                  -> do { ty1' <- zonkTcTypeToType env ty1
+                        ; return (EvCoercion (mkTcReflCo r ty1')) }
            _other -> zonkEvTerm env term
 
       ; return (EvBind { eb_lhs = var', eb_rhs = term', eb_is_given = is_given }) }
@@ -1339,10 +1340,11 @@ zonkEvInstanceOf env (EvInstanceOfInst tys co q)
        ; q' <- mapM (zonkEvTerm env) q
        ; return (EvInstanceOfInst tys' co' q') }
 zonkEvInstanceOf env (EvInstanceOfLet tys qvars bnds i)
-  = do { let qvars' = map (zonkIdOcc env) qvars
-       ; (env', bnds') <- zonkTcEvBinds env bnds
-       ; let i' = zonkIdOcc env' i
-       ; return (EvInstanceOfLet tys qvars' bnds' i') }
+  = do { (env', tys') <- zonkTyBndrsX env tys
+       ; let qvars' = map (zonkIdOcc env') qvars
+       ; (env'', bnds') <- zonkTcEvBinds env' bnds
+       ; let i' = zonkIdOcc env'' i
+       ; return (EvInstanceOfLet tys' qvars' bnds' i') }
 
 {-
 ************************************************************************

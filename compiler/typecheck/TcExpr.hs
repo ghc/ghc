@@ -1050,7 +1050,7 @@ tc_app fun args fun_ty res_ty special
         -- > f x = S (error x)
         -- Without it, the `a` coming from `f` cannot be unified with
         -- the second type variable of `error`
-        ; case getTyVar_maybe res_ty of
+        ; case getTyVar_maybe actual_res_ty of
           { Nothing
               -> do { ev_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
                         emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
@@ -1065,7 +1065,7 @@ tc_app fun args fun_ty res_ty special
                     ; return $ NormalTcAppResult
                        (mkLHsWrapCo co_fun fun1)  -- Instantiated function
                        args1                      -- Arguments
-                       (mkHsWrapCo co_res) } } } -- Coercion to expected result type
+                       (mkHsWrapCo co_res) } } }  -- Coercion to expected result type
 
 mk_app_msg :: LHsExpr Name -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)

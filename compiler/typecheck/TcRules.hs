@@ -299,20 +299,19 @@ simplifyRule :: RuleName
 simplifyRule name lhs_wanted rhs_wanted
   = do {         -- We allow ourselves to unify environment
                  -- variables: runTcS runs with topTcLevel
-         (insoluble, _) <- runTcS $
+         ((insoluble, lhs_extra), _) <- runTcS $
              do { -- First solve the LHS and *then* solve the RHS
                   -- See Note [Solve order for RULES]
                   lhs_resid <- solveWanteds lhs_wanted
+                ; let lhs_resid_simple = wc_simple lhs_resid
                 ; lhs_inst <- fmap andManyCts $
-                    mapM instantiateWC (bagToList (wc_simple lhs_resid))
+                    mapM instantiateWC (bagToList lhs_resid_simple)
                 ; lhs_inst_resid <- solveWanteds lhs_resid { wc_simple = lhs_inst }
                 ; rhs_resid <- solveWanteds rhs_wanted
-                ; return (insolubleWC lhs_inst_resid || insolubleWC rhs_resid) }
+                ; return (insolubleWC lhs_inst_resid || insolubleWC rhs_resid, lhs_inst) }
 
-       ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
-       ; (zonked_lhs_inst, _) <- runTcS $ fmap andManyCts $
-           mapM instantiateWC (bagToList zonked_lhs_simples)
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_inst
+       ; zonked_lhs <- zonkSimples (wc_simple lhs_wanted `unionBags` lhs_extra)
+       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs
              quantify_me  -- Note [RULE quantification over equalities]
                | insoluble = quantify_insol
                | otherwise = quantify_normal
@@ -322,6 +321,8 @@ simplifyRule name lhs_wanted rhs_wanted
              quantify_normal ct
                | EqPred NomEq t1 t2 <- classifyPredType (ctPred ct)
                = not (t1 `tcEqType` t2)
+               | InstanceOfPred _ _ <- classifyPredType (ctPred ct)
+               = False
                | otherwise
                = True
 
@@ -329,8 +330,7 @@ simplifyRule name lhs_wanted rhs_wanted
          vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
               , text "lhs_wantd" <+> ppr lhs_wanted
               , text "rhs_wantd" <+> ppr rhs_wanted
-              , text "zonked_lhs_simples" <+> ppr zonked_lhs_simples
-              , text "zonked_lhs_inst" <+> ppr zonked_lhs_inst
+              , text "zonked_lhs" <+> ppr zonked_lhs
               , text "q_cts"      <+> ppr q_cts
               , text "non_q_cts"  <+> ppr non_q_cts ]
 
