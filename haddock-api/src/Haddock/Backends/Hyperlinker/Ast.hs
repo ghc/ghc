@@ -69,10 +69,16 @@ enrichToken _ _ = Nothing
 -- | Obtain details map for variables ("normally" used identifiers).
 variables :: GHC.RenamedSource -> DetailsMap
 variables =
-    everything (<|>) var
+    everything (<|>) (var `combine` rec)
   where
     var term = case cast term of
         (Just (GHC.L sspan (GHC.HsVar name))) ->
+            pure (sspan, RtkVar name)
+        (Just (GHC.L _ (GHC.RecordCon (GHC.L sspan name) _ _))) ->
+            pure (sspan, RtkVar name)
+        _ -> empty
+    rec term = case cast term of
+        Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LHsExpr GHC.Name) _) ->
             pure (sspan, RtkVar name)
         _ -> empty
 
