@@ -1226,19 +1226,20 @@ tc_check_id orig id_name res_ty
                -> do { (expr, actual_ty) <- case cl of
                           RealDataCon con -> inst_data_con con
                           PatSynCon ps    -> tcPatSynBuilderOcc orig ps
-                     ; co <- unifyType res_ty actual_ty
-                     ; return (mkHsWrap (mkWpCast co) expr) }
+                     ; co <- unifyType actual_ty res_ty
+                     ; return (mkHsWrapCo co expr) }
 
              _ -> failWithTc $
                   ppr thing <+> ptext (sLit "used where a value identifier was expected") }
   where
     inst_normal_id orig id res_ty flavor
       = do { let actual_ty = idType id
-           ; case flavor of
-               TcIdMonomorphic
-                 -> do { co <- unifyType res_ty actual_ty
-                       ; return (mkHsWrap (mkWpCast co) (HsVar id)) }
-               TcIdUnrestricted
+           ; case (res_ty `eqType` actual_ty, flavor) of
+               (True, _) -> return (HsVar id)
+               (False, TcIdMonomorphic)
+                 -> do { co <- unifyType actual_ty res_ty
+                       ; return (mkHsWrapCo co (HsVar id)) }
+               (False, TcIdUnrestricted)
                  -> do { ev <- emitWanted orig (mkInstanceOfPred actual_ty res_ty)
                        ; return (mkHsWrap (mkWpInstanceOf actual_ty ev) (HsVar id)) } }
 
