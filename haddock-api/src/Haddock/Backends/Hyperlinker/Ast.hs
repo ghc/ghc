@@ -102,7 +102,11 @@ binds =
     pat term = case cast term of
         (Just (GHC.L sspan (GHC.VarPat name))) ->
             pure (sspan, RtkBind name)
-        (Just (GHC.L _ (GHC.ConPatIn (GHC.L sspan name) _))) ->
+        (Just (GHC.L _ (GHC.ConPatIn (GHC.L sspan name) recs))) ->
+            [(sspan, RtkVar name)] ++ everything (<|>) rec recs
+        _ -> empty
+    rec term = case cast term of
+        (Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LPat GHC.Name) _)) ->
             pure (sspan, RtkVar name)
         _ -> empty
 
