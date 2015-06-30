@@ -83,8 +83,8 @@ diff mdl ref out = do
     result <- system $ cmd ++ " " ++ refFile ++ " " ++ outFile
     unless (result == ExitSuccess) $ die "Failed to run `diff` command."
   where
-    refFile = outDir </> takeFileName mdl </> ".ref.nolinks"
-    outFile = outDir </> takeFileName mdl </> ".nolinks"
+    refFile = outDir </> takeBaseName mdl ++ ".ref.nolinks"
+    outFile = outDir </> takeBaseName mdl ++ ".nolinks"
 
 
 
