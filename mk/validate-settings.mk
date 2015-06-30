@@ -31,8 +31,6 @@ SplitObjs       = NO
 NoFibWays       =
 STRIP_CMD       = :
 
-CHECK_PACKAGES = YES
-
 # We want to install DPH when validating, so that we can test it
 InstallExtraPackages = YES
 

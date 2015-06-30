@@ -302,9 +302,6 @@ SplitObjs=$(SupportsSplitObjs)
 # Whether to install the extra packages
 InstallExtraPackages = NO
 
-# Run "ghc-pkg check" on each package
-CHECK_PACKAGES = NO
-
 # ----------------------------------------------------------------------------
 
 # There are a number of things which technically depend on GHC (e.g. if
