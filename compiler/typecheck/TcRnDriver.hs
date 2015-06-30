@@ -1298,7 +1298,7 @@ check_main dflags tcg_env
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; main_expr
                 <- addErrCtxt mainCtxt    $
-                   tcMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
+                   tcPolyExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -1795,12 +1795,13 @@ tcRnExpr hsc_env rdr_expr
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     ((_tc_expr, res_ty), tclvl, lie) <- pushLevelAndCaptureConstraints $
-                                        tcInferRho rn_expr ;
+                                        tcInferSigma rn_expr ;
+    (_wrap , res_tau) <- topInstantiate GeneraliseOrigin res_ty
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $
                                       {-# SCC "simplifyInfer" #-}
                                       simplifyInfer tclvl
                                                     False {- No MR for now -}
-                                                    [(fresh_it, res_ty)]
+                                                    [(fresh_it, res_tau)]
                                                     lie ;
     -- Wanted constraints from static forms
     stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;
@@ -1808,7 +1809,7 @@ tcRnExpr hsc_env rdr_expr
     -- Ignore the dictionary bindings
     _ <- simplifyInteractive (andWC stWC lie_top) ;
 
-    let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
+    let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_tau) } ;
     ty <- zonkTcType all_expr_ty ;
 
     -- We normalise type families, so that the type of an expression is the

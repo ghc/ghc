@@ -72,8 +72,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
             <- tcExtendTyVarEnv tv_bndrs $
                tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
-                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
-                  ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
+                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferSigma lhs)
+                  ; (rhs', rhs_wanted) <- captureConstraints (tcPolyExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
        ; (lhs_evs, other_lhs_wanted) <- simplifyRule (snd $ unLoc name)
@@ -330,4 +330,3 @@ simplifyRule name lhs_wanted rhs_wanted
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_simple = non_q_cts }) }
-

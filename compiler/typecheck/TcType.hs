@@ -21,7 +21,7 @@ module TcType (
   --------------------------------
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
-  TcTyVar, TcTyVarSet, TcUpsType, TcKind, TcCoVar,
+  TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel,
@@ -64,7 +64,7 @@ module TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
   pickyEqType, tcEqType, tcEqKind,
-  isSigmaTy, isUpsTy, isRhoTy, isOverloadedTy,
+  isSigmaTy, isRhoTy, isOverloadedTy,
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
@@ -82,7 +82,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
+  mkMinimalBySCs, transSuperClasses, transSuperClassesPred, 
   immSuperClasses,
   isImprovementPred,
 
@@ -200,21 +200,20 @@ import Control.Applicative (Applicative(..))
 The type checker divides the generic Type world into the
 following more structured beasts:
 
-sigma ::= forall {tyvars}. upsilon
-        -- A sigma type is a type quantified over inferred tyvars.
+sigma ::= forall tyvars. phi
+        -- A sigma type is a qualified type
         --
         -- Note that even if 'tyvars' is empty, theta
         -- may not be: e.g.   (?x::Int) => Int
 
-upsilon ::= forall tyvars. phi
-        -- An upsilon type is quantified over specified tyvars.
+        -- Note that 'sigma' is in prenex form:
+        -- all the foralls are at the front.
+        -- A 'phi' type has no foralls to the right of
+        -- an arrow
 
-        -- A 'phi' type has no forall over inferred variables to the right of
-        -- an arrow.
+phi :: theta => rho
 
-phi ::= theta => rho
-
-rho ::= sigma -> upsilon
+rho ::= sigma -> rho
      |  tau
 
 -- A 'tau' type has no quantification anywhere
@@ -236,12 +235,12 @@ type TcType = Type      -- A TcType can have mutable type variables
         -- a cannot occur inside a MutTyVar in T; that is,
         -- T is "flattened" before quantifying over a
 
+-- These types do not have boxy type variables in them
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
 type TcRhoType      = TcType  -- Note [TcRhoType]
 type TcTauType      = TcType
-type TcUpsType      = TcType  -- Note [TcUpsType]
 type TcKind         = Kind
 type TcTyVarSet     = TyVarSet
 
@@ -253,12 +252,6 @@ A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
   NO     forall a. a ->  Int
   NO     Eq a => a -> a
   NO     Int -> forall a. a -> Int
-
-Note [TcUpsType]
-~~~~~~~~~~~~~~~~
-Denoted by an upsilon in the "Visible type application" paper. Has no
-inferred type variables at the top, or to the right of an arrow. Known
-quantification is just fine, as are constraints.
 
 
 ************************************************************************
@@ -915,15 +908,6 @@ However, they are non-monadic and do not follow through mutable type
 variables.  It's up to you to make sure this doesn't matter.
 -}
 
--- | Attempts to take a forall type apart, returning the bound type variable
--- and the remainder of the type
-tcSplitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
-tcSplitForAllTy_maybe ty = splitFAT_m ty
-  where
-    splitFAT_m ty | Just ty' <- tcView ty = splitFAT_m ty'
-    splitFAT_m (ForAllTy tyvar ty)        = Just (tyvar, ty)
-    splitFAT_m _                          = Nothing
-
 tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty = split ty ty []
    where
@@ -1287,8 +1271,8 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty
-              | impredicative || isTauTyCon tc
+          OC_OK ty 
+              | impredicative || isTauTyCon tc 
               -> return ty  -- First try to eliminate the tyvar from the args
               | otherwise
               -> OC_Forall  -- A type synonym with a forall on the RHS
@@ -1338,7 +1322,7 @@ Note [Kind polymorphic type classes]
     class C f where...   -- C :: forall k. k -> Constraint
     g :: forall (f::*). C f => f -> f
 
-Here the (C f) in the signature is really (C * f), and we
+Here the (C f) in the signature is really (C * f), and we 
 don't want to complain that the * isn't a type variable!
 -}
 
@@ -1359,7 +1343,7 @@ checkValidClsArgs flexible_contexts kts
   | otherwise         = all hasTyVarHead tys
   where
     (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
-
+   
 hasTyVarHead :: Type -> Bool
 -- Returns true of (a t1 .. tn), where 'a' is a type variable
 hasTyVarHead ty                 -- Haskell 98 allows predicates of form
@@ -1417,7 +1401,7 @@ immSuperClasses cls tys
 
 isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
-isImprovementPred ty
+isImprovementPred ty 
   = case classifyPredType ty of
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
@@ -1433,20 +1417,13 @@ isImprovementPred ty
 -}
 
 isSigmaTy :: TcType -> Bool
--- isSigmaTy returns true of any type quantified over inferred types. It doesn't
+-- isSigmaTy returns true of any qualified type.  It doesn't
 -- *necessarily* have any foralls.  E.g
 --        f :: (?x::Int) => Int -> Int
 isSigmaTy ty | Just ty' <- tcView ty = isSigmaTy ty'
-isSigmaTy (ForAllTy tv _) = isInferredTy tv
-isSigmaTy _               = False
-
--- | Returns True if there are any quantifications or constraints at the
--- beginning of the type.
-isUpsTy :: TcType -> Bool
-isUpsTy ty | Just ty' <- tcView ty = isUpsType ty'
-isUpsTy (ForAllTy {}) = True
-isUpsTy (FunTy a _)   = isPredTy a
-isUpsTy _             = False
+isSigmaTy (ForAllTy _ _) = True
+isSigmaTy (FunTy a _)    = isPredTy a
+isSigmaTy _              = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
@@ -1914,3 +1891,4 @@ size_type (ForAllTy _ ty)   = size_type ty
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
+

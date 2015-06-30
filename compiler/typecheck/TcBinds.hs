@@ -16,7 +16,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  badBootDeclErr, mkExport ) where
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
-import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
+import {-# SOURCE #-} TcExpr  ( tcPolyExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
@@ -30,7 +30,7 @@ import TcHsType
 import TcPat
 import TcMType
 import ConLike
-import Inst( deeplyInstantiate )
+import Inst( topInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import Type( pprSigmaTypeExtraCts, tidyOpenTypes )
@@ -245,7 +245,7 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
        = do { ty <- newFlexiTyVarTy openTypeKind
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcMonoExpr expr ty
+            ; expr' <- tcPolyExpr expr ty
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind (Right ip_id) d)) }
     tc_ip_bind _ (IPBind (Right {}) _) = panic "tc_ip_bind"
@@ -920,8 +920,8 @@ Some wrinkles
 
 1. We don't use full-on tcSubType, because that does co and contra
    variance and that in turn will generate too complex a LHS for the
-   RULE.  So we use a single invocation of deeplySkolemise /
-   deeplyInstantiate in tcSpecWrapper.  (Actually I think that even
+   RULE.  So we use a single invocation of skolemise /
+   topInstantiate in tcSpecWrapper.  (Actually I think that even
    the "deeply" stuff may be too much, because it introduces lambdas,
    though I think it can be made to work without too much trouble.)
 
@@ -1049,7 +1049,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
                <- tcSkolemise SkolemiseDeeply ctxt spec_ty $ \ _ spec_tau ->
-                  do { (inst_wrap, tau) <- deeplyInstantiate orig poly_ty
+                  do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType spec_tau tau
                             -- Deliberately ignore the evidence
                             -- See Note [Handling SPECIALISE pragmas],

@@ -18,7 +18,7 @@ module TcPat ( tcLetPat, TcSigFun, TcPragFun
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRho)
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigma )
 
 import HsSyn
 import TcHsSyn
@@ -538,7 +538,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
          -- Here, we infer a rho type for it,
          -- which replaces the leading foralls and constraints
          -- with fresh unification variables.
-        ; (expr',expr'_inferred) <- tcInferRho expr
+        ; (expr',expr'_inferred) <- tcInferSigma expr
 
          -- next, we check that expr is coercible to `overall_pat_ty -> pat_ty`
          -- NOTE: this forces pat_ty to be a monotype (because we use a unification
@@ -546,13 +546,13 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
          -- (view -> f)    where view :: _ -> forall b. b
          -- we will only be able to use view at one instantation in the
          -- rest of the view
-        ; (expr_co, pat_ty) <- tcInfer $ \ pat_ty ->
-                unifyType expr'_inferred (mkFunTy overall_pat_ty pat_ty)
+        ; (expr_wrap, pat_ty) <- tcInfer $ \ pat_ty ->
+                tcSubTypeDS expr'_inferred (mkFunTy overall_pat_ty pat_ty)
 
          -- pattern must have pat_ty
         ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
 
-        ; return (ViewPat (mkLHsWrapCo expr_co expr') pat' overall_pat_ty, res) }
+        ; return (ViewPat (mkLHsWrap expr_wrap expr') pat' overall_pat_ty, res) }
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
@@ -630,7 +630,7 @@ tc_pat _ (LitPat simple_lit) pat_ty thing_inside
 -- Overloaded patterns: n, and n+k
 tc_pat _ (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
-        ; lit'    <- newOverloadedLit orig over_lit pat_ty
+        ; (wrap, lit') <- newOverloadedLit (Actual PatOrigin) over_lit pat_ty
         ; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
         ; mb_neg' <- case mb_neg of
                         Nothing  -> return Nothing      -- Positive literal
@@ -639,18 +639,19 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
                             do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
                                ; return (Just neg') }
         ; res <- thing_inside
-        ; return (NPat (L l lit') mb_neg' eq', res) }
+        ; return (NPat (L l (mkHsWrapPat wrap lit')) mb_neg' eq', res) }
 
 tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
   = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; let pat_ty' = idType bndr_id
               orig    = LiteralOrigin lit
-        ; lit' <- newOverloadedLit orig lit pat_ty'
+        ; (wrap_lit, lit') <- newOverloadedLit (Actual PatOrigin) lit pat_ty'
 
         -- The '>=' and '-' parts are re-mappable syntax
         ; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
         ; minus' <- tcSyntaxOp orig minus (mkFunTys [pat_ty', pat_ty'] pat_ty')
-        ; let pat' = NPlusKPat (L nm_loc bndr_id) (L loc lit') ge' minus'
+        ; let pat' = NPlusKPat (L nm_loc bndr_id) (L loc (mkHsWrapPat wrap_lit lit'))
+                               ge' minus'
 
         -- The Report says that n+k patterns must be in Integral
         -- We may not want this when using re-mappable syntax, though (ToDo?)
@@ -925,7 +926,7 @@ matchExpectedConTy data_tc pat_ty
   | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
          -- Comments refer to Note [Matching constructor patterns]
          -- co_tc :: forall a. T [a] ~ T7 a
-  = do { (wrap, pat_ty) <- shallowInstantiate PatOrigin pat_ty
+  = do { (wrap, pat_ty) <- topInstantiate PatOrigin pat_ty
 
        ; (subst, tvs') <- tcInstTyVars (tyConTyVars data_tc)
              -- tys = [ty1,ty2]

@@ -8,8 +8,8 @@ c%
 
 {-# LANGUAGE CPP #-}
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
-                tcInferRho, tcInferRhoNC,
+module TcExpr ( tcPolyExpr, tcPolyExprNC,
+                tcInferSigma, tcInferSigmaNC,
                 tcSyntaxOp, tcCheckId,
                 addExprErrCtxt) where
 
@@ -85,34 +85,15 @@ tcPolyExpr expr res_ty
   = addExprErrCtxt expr $
     do { traceTc "tcPolyExpr" (ppr res_ty); tcPolyExprNC expr res_ty }
 
-tcPolyExprNC expr res_ty
-  = do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; (gen_fn, expr') <- tcSkolemise SkolemiseInferred GenSigCtxt res_ty $
-                            \ _ ups ->
-                            tcMonoExprNC expr ups
-       ; return (mkLHsWrap gen_fn expr') }
+tcPolyExprNC (L loc expr) res_ty
+  = setSrcSpan loc $
+    do { traceTc "tcPolyExprNC" (ppr res_ty)
+       ; expr' <- tcExpr expr res_ty
+       ; return (L loc expr') }
 
 ---------------
-tcMonoExpr, tcMonoExprNC
-    :: LHsExpr Name      -- Expression to type check
-    -> TcUpsType         -- Expected type (could be a type variable)
-                         -- Definitely no inferred foralls at the top,
-                         -- but there might be specified foralls
-    -> TcM (LHsExpr TcId)
-
-tcMonoExpr expr res_ty
-  = addErrCtxt (exprCtxt expr) $
-    tcMonoExprNC expr res_ty
-
-tcMonoExprNC (L loc expr) res_ty
-  = ASSERT( not (isSigmaTy res_ty) )
-    setSrcSpan loc $
-    do  { expr' <- tcExpr expr res_ty
-        ; return (L loc expr') }
-
----------------
-tcInferUps, tcInferUpsNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcUpsType)
--- Infer an *upsilon*-type.  This is, in effect, a special case
+tcInferSigma, tcInferSigmaNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
+-- Infer an *sigma*-type.  This is, in effect, a special case
 -- for ids and partial applications, so that if
 --     f :: Int -> forall b. (forall a. a -> a -> b) -> b
 -- then we can infer
@@ -120,14 +101,14 @@ tcInferUps, tcInferUpsNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcUpsType)
 -- And that in turn is useful
 --  (a) for the function part of any application (see tcApp)
 --  (b) for the special rule for '$'
-tcInferUps expr = addErrCtxt (exprCtxt expr) (tcInferUpsNC expr)
+tcInferSigma expr = addErrCtxt (exprCtxt expr) (tcInferSigmaNC expr)
 
-tcInferUpsNC (L loc expr)
+tcInferSigmaNC (L loc expr)
   = setSrcSpan loc $
-    do { (expr', ups) <- tcInfer (tcExpr expr)
-       ; return (L loc expr', ups) }
+    do { (expr', sigma) <- tcInfer (tcExpr expr)
+       ; return (L loc expr', sigma) }
 
-tcUnboundId :: OccName -> TcUpsType -> TcM (HsExpr TcId)
+tcUnboundId :: OccName -> TcSigmaType -> TcM (HsExpr TcId)
 -- Typechedk an occurrence of an unbound Id
 --
 -- Some of these started life as a true hole "_".  Others might simply
@@ -154,10 +135,7 @@ tcUnboundId occ res_ty
 ************************************************************************
 -}
 
-tcExpr :: HsExpr Name -> TcUpsType -> TcM (HsExpr TcId)
-tcExpr e res_ty | debugIsOn && isSigmaTy res_ty     -- Sanity check
-                = pprPanic "tcExpr: sigma" (ppr res_ty $$ ppr e)
-
+tcExpr :: HsExpr Name -> TcSigmaType -> TcM (HsExpr TcId)
 tcExpr (HsVar name)     res_ty = tcCheckId name res_ty
 tcExpr (HsUnboundVar v) res_ty = tcUnboundId v res_ty
 
@@ -168,29 +146,29 @@ tcExpr (HsApp e1 e2) res_ty
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
                                  ; tcWrapResult (HsLit lit) lit_ty res_ty }
 
-tcExpr (HsPar expr)  res_ty = do { expr' <- tcMonoExprNC expr res_ty
+tcExpr (HsPar expr)  res_ty = do { expr' <- tcPolyExprNC expr res_ty
                                  ; return (HsPar expr') }
 
 tcExpr (HsSCC src lbl expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
+  = do { expr' <- tcPolyExpr expr res_ty
        ; return (HsSCC src lbl expr') }
 
 tcExpr (HsTickPragma src info expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
+  = do { expr' <- tcPolyExpr expr res_ty
        ; return (HsTickPragma src info expr') }
 
 tcExpr (HsCoreAnn src lbl expr) res_ty
-  = do  { expr' <- tcMonoExpr expr res_ty
+  = do  { expr' <- tcPolyExpr expr res_ty
         ; return (HsCoreAnn src lbl expr') }
 
 tcExpr (HsOverLit lit) res_ty
-  = do  { lit' <- newOverloadedLit (LiteralOrigin lit) lit res_ty
-        ; return (HsOverLit lit') }
+  = do  { (wrap,  lit') <- newOverloadedLit (LiteralOrigin lit) lit res_ty
+        ; return (mkHsWrap wrap $ HsOverLit lit') }
 
 tcExpr (NegApp expr neg_expr) res_ty
   = do  { neg_expr' <- tcSyntaxOp NegateOrigin neg_expr
                                   (mkFunTy res_ty res_ty)
-        ; expr' <- tcMonoExpr expr res_ty
+        ; expr' <- tcPolyExpr expr res_ty
         ; return (NegApp expr' neg_expr') }
 
 tcExpr (HsIPVar x) res_ty
@@ -227,15 +205,15 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
       ; tcExtendTyVarEnv nwc_tvs $ do {
         sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
       ; (gen_fn, expr')
-            <- tcSkolemise SkolemiseInferred ExprSigCtxt sig_tc_ty $
+            <- tcSkolemise SkolemiseTop ExprSigCtxt sig_tc_ty $
                \ skol_tvs res_ty ->
 
-                  -- Remember to extend the lexical type-variable environment
-                  -- See Note [More instantiated than scoped] in TcBinds
+                  -- Remember to extend the lexical type-variable environment;
+                  -- indeed, this is the only reason we skolemise here at all
                tcExtendTyVarEnv2
                   [(n,tv) | (Just n, tv) <- findScopedTyVars sig_ty sig_tc_ty skol_tvs] $
 
-               tcMonoExprNC expr res_ty
+               tcPolyExprNC expr res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
@@ -317,7 +295,7 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
   | (L loc (HsVar op_name)) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
-       ; (arg1', arg1_ty) <- tcInferUps arg1
+       ; (arg1', arg1_ty) <- tcInferSigma arg1
 
        ; let doc = ptext (sLit "The first argument of ($) takes")
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
@@ -325,28 +303,23 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
-         -- where arg2_ty maybe polymorphic; that's the point
+         -- where arg2_sigma maybe polymorphic; that's the point
 
-       ; (wrap_arg2, (arg2', a2_ty, co_a)) <-
-           -- arg2_sigma may have inferred quantified variables.
-           -- so we skolemise them
-           tcSkolemise SkolemiseInferred GenSigCtxt arg2_sigma $
-           \ _ arg2_ups ->
-           do { arg2' <- tcArg op (arg2, arg2_ups, 2)
+       arg2' <- tcArg op (arg2, arg2_sigma, 2)
 
-                -- Make sure that the argument type has kind '*'
-                --    ($) :: forall (a2:*) (r:Open). (a2->r) -> a2 -> r
-                -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
-                --    (which gives a seg fault)
-                -- We do this by unifying with a MetaTv; but of course
-                -- it must allow foralls in the type it unifies with (hence ReturnTv)!
-                --
-                -- The *result* type can have any kind (Trac #8739),
-                -- so we don't need to check anything for that
-              ; a2_tv <- newReturnTyVar liftedTypeKind
-              ; let a2_ty = mkTyVarTy a2_tv
-              ; co_a <- unifyType arg2_ups a2_ty   -- arg2 ~ a2
-              ; return (arg2', a2_ty, co_a) }
+         -- Make sure that the argument type has kind '*'
+         --    ($) :: forall (a2:*) (r:Open). (a2->r) -> a2 -> r
+         -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
+         --    (which gives a seg fault)
+         -- We do this by unifying with a MetaTv; but of course
+         -- it must allow foralls in the type it unifies with (hence ReturnTv)!
+         --
+         -- The *result* type can have any kind (Trac #8739),
+         -- so we don't need to check anything for that
+       ; a2_tv <- newReturnTyVar liftedTypeKind
+       ; let a2_ty = mkTyVarTy a2_tv
+       ; co_a <- unifyType arg2_sigma a2_ty    -- arg2_sigma ~N a2_ty
+       ; return (arg2', a2_ty, co_a) }
 
        ; wrap_res <- tcSubType op_res_ty res_ty    -- op_res -> res
 
@@ -354,18 +327,16 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; let op' = L loc (HsWrap (mkWpTyApps [a2_ty, res_ty]) (HsVar op_id))
              -- arg1' :: arg1_ty
              -- wrap_arg1 :: arg1_ty "->" (arg2_sigma -> op_res_ty)
-             -- wrap_arg2 :: arg2_ups "->" arg2_sigma
              -- wrap_res :: op_res_ty "->" res_ty
-             -- co_a :: arg2_ups ~ a2_ty
+             -- co_a :: arg2_sigma ~N a2_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (a2_ty -> res_ty)
-             wrap1 = mkWpFun (wrap_arg2 <.> mkWpCast (mkTcSymCo co_a))
-                             wrap_res a2_ty res_ty
-                     <.> wrap_arg1 -- :: arg2_sigma -> op_res_ty
+             wrap1 = mkWpFun (coToHsWrapper (mkTcSymCo co_a))
+                       wrap_res a2_ty res_ty <.> wrap_arg1
 
-             -- arg2' :: arg2_ups
-             -- co_a :: arg2_ups ~ a2_ty
+             -- arg2' :: arg2_sigma
+             -- wrap_a :: a2_ty "->" arg2_sigma
        ; return $
          OpApp (mkLHsWrap wrap1 arg1')
                op' fix
@@ -459,7 +430,7 @@ tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
 
 tcExpr (HsLet binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
-                             tcMonoExpr expr res_ty
+                             tcPolyExpr expr res_ty
         ; return (HsLet binds' expr') }
 
 tcExpr (HsCase scrut matches) exp_ty
@@ -472,7 +443,7 @@ tcExpr (HsCase scrut matches) exp_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          (scrut', scrut_ty) <- tcInferUps scrut
+          (scrut', scrut_ty) <- tcInferSigma scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
         ; matches' <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
@@ -482,15 +453,13 @@ tcExpr (HsCase scrut matches) exp_ty
                       mc_body = tcBody }
 
 tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
-  = do { pred' <- tcMonoExpr pred boolTy
-       ; (wrap, (b1', b2')) <-
-            -- with res_ty being potentially higher-rank, we need
-            -- to skolemise to avoid preferring one branch over the other
-           tcSkolemise SkolemiseTop GenSigCtxt res_ty $ \_ res_rho ->
-            do { b1' <- tcMonoExpr b1 res_rho
-               ; b2' <- tcMonoExpr b2 res_rho
-               ; return (b1', b2') }
-       ; return $ mkHsWrap wrap $ HsIf Nothing pred' b1' b2' }
+  = do { pred' <- tcPolyExpr pred boolTy
+       ; -- with res_ty being potentially higher-rank, we need
+         -- to skolemise to avoid preferring one branch over the other
+         tcSkolemiseExpr SkolemiseDeeply res_ty $ \ res_rho ->
+         do { b1' <- tcPolyExpr b1 res_rho
+            ; b2' <- tcPolyExpr b2 res_rho
+            ; return $ HsIf Nothing pred' b1' b2' } }
 
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
   = do { (wrap, fun', [pred', b1', b2'])
@@ -500,15 +469,13 @@ tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
     herald = text "Rebindable" <+> quotes (text "if") <+> text "takes"
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { (wrap, (alts', res_rho)) <-
-            tcSkolemise SkolemiseTop GenSigCtxt res_ty $ \_ res_rho ->
-            do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_rho) alts
-               ; return (alts', res_rho) }
-       ; return $ mkHsWrap wrap $ HsMultiIf res_rho alts' }
+  = do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
+       ; return $ HsMultiIf res_ty alts' }
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
 
 tcExpr (HsDo do_or_lc stmts _) res_ty
-  = tcDoStmts do_or_lc stmts res_ty
+  = tcSkolemiseExpr SkolemiseTop res_ty $ \res_rho ->
+    tcDoStmts do_or_lc stmts res_rho
 
 tcExpr (HsProc pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
@@ -568,9 +535,9 @@ tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
         -- Check for missing fields
         ; checkMissingFields data_con rbinds
 
-        ; (con_expr, con_ups) <- tcInferId con_name
+        ; (con_expr, con_sigma) <- tcInferId con_name
         ; (con_wrap, con_tau) <-
-            shallowInstantiate (OccurrenceOf con_name) con_ups
+            topInstantiate (OccurrenceOf con_name) con_sigma
               -- a shallow instantiation should really be enough for
               -- a data constructor.
         ; let arity = dataConSourceArity data_con
@@ -771,7 +738,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
         -- STEP 5
         -- Typecheck the thing to be updated, and the bindings
-        ; record_expr' <- tcMonoExpr record_expr scrut_ty
+        ; record_expr' <- tcPolyExpr record_expr scrut_ty
         ; rbinds'      <- tcRecordBinds con1 con1_arg_tys' rbinds
 
         -- STEP 6: Deal with the stupid theta
@@ -868,7 +835,7 @@ tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
 ************************************************************************
 -}
 
-tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
+tcExpr other _ = pprPanic "tcPolyExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
   -- Also HsTcBracketOut, HsQuasiQuoteE
 
@@ -880,7 +847,7 @@ tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
 ************************************************************************
 -}
 
-tcArithSeq :: Maybe (SyntaxExpr Name) -> ArithSeqInfo Name -> TcUpsType
+tcArithSeq :: Maybe (SyntaxExpr Name) -> ArithSeqInfo Name -> TcSigmaType
            -> TcM (HsExpr TcId)
 
 tcArithSeq witness seq@(From expr) res_ty
@@ -939,7 +906,7 @@ tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
                      -- or leave out to get exactly that message
       -> CtOrigin
       -> LHsExpr Name -> [LHsExpr Name] -- Function and args
-      -> TcUpsType -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
+      -> TcSigmaType -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
            -- (wrap, fun, args). For an ordinary function application,
            -- these should be assembled as (wrap (fun args)).
            -- But OpApp is slightly different, so that's why the caller
@@ -962,13 +929,13 @@ tcApp _ _ (L loc (HsVar fun)) args res_ty
 
 tcApp m_herald orig fun args res_ty
   = do  {   -- Type-check the function
-        ; (fun1, fun_ups) <- tcInferFun fun
+        ; (fun1, fun_sigma) <- tcInferFun fun
 
             -- Extract its argument types
         ; (wrap_fun, expected_arg_tys, actual_res_ty)
               <- matchExpectedFunTys (Actual orig)
                    (m_herald `orElse` mk_app_msg fun)
-                   (length args) fun_ups
+                   (length args) fun_sigma
 
         -- Typecheck the result, thereby propagating
         -- info (if any) from result into the argument types
@@ -992,7 +959,7 @@ mk_op_msg :: LHsExpr Name -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 
 ----------------
-tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcUpsType)
+tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
 -- Infer type of a function
 tcInferFun (L loc (HsVar name))
   = do { (fun, ty) <- setSrcSpan loc (tcInferId name)
@@ -1000,15 +967,14 @@ tcInferFun (L loc (HsVar name))
        ; return (L loc fun, ty) }
 
 tcInferFun fun
-  = do { (fun, fun_ty) <- tcInfer (tcMonoExpr fun)
+  = do { (fun, fun_ty) <- tcInfer (tcPolyExpr fun)
 
          -- Zonk the function type carefully, to expose any polymorphism
          -- E.g. (( \(x::forall a. a->a). blah ) e)
          -- We can see the rank-2 type of the lambda in time to generalise e
        ; fun_ty' <- zonkTcType fun_ty
 
-       ; (wrap, rho) <- instantiateInferred AppOrigin fun_ty'
-       ; return (mkLHsWrap wrap fun, rho) }
+       ; return (fun, fun_ty') }
 
 ----------------
 tcArgs :: LHsExpr Name                          -- The function (for error messages)
@@ -1035,12 +1001,12 @@ tcTupArgs args tys
                                          ; return (L l (Present expr')) }
 
 ---------------------------
-tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
+tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcSigmaType -> TcM (HsExpr TcId)
 -- Typecheck a syntax operator, checking that it has the specified type
 -- The operator is always a variable at this stage (i.e. renamer output)
 -- This version assumes res_ty is a monotype
-tcSyntaxOp orig (HsVar op) res_ty = do { (expr, rho) <- tcInferIdWithOrig orig op
-                                       ; tcWrapResult expr rho res_ty }
+tcSyntaxOp orig (HsVar op) res_ty = do { (expr, ty) <- tcInferIdWithOrig orig op
+                                       ; tcWrapResult expr ty res_ty }
 tcSyntaxOp _ other         _      = pprPanic "tcSyntaxOp" (ppr other)
 
 {-
@@ -1129,7 +1095,7 @@ TODO (RAE): Update this Note in the (* :: *) branch when merging.
 ************************************************************************
 -}
 
-tcCheckId :: Name -> TcRhoType -> TcM (HsExpr TcId)
+tcCheckId :: Name -> TcSigmaType -> TcM (HsExpr TcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
@@ -1137,13 +1103,13 @@ tcCheckId name res_ty
          tcWrapResult expr actual_res_ty res_ty }
 
 ------------------------
-tcInferId :: Name -> TcM (HsExpr TcId, TcRhoType)
+tcInferId :: Name -> TcM (HsExpr TcId, TcSigmaType)
 -- Infer type, and deeply instantiate
 tcInferId n = tcInferIdWithOrig (OccurrenceOf n) n
 
 ------------------------
-tcInferIdWithOrig :: CtOrigin -> Name -> TcM (HsExpr TcId, TcRhoType)
--- Look up an occurrence of an Id, and instantiate it (deeply)
+tcInferIdWithOrig :: CtOrigin -> Name -> TcM (HsExpr TcId, TcSigmaType)
+-- Look up an occurrence of an Id
 
 tcInferIdWithOrig orig id_name
   | id_name `hasKey` tagToEnumKey
@@ -1159,13 +1125,13 @@ tcInferIdWithOrig orig id_name
   | otherwise
   = tc_infer_id orig id_name
 
-tc_infer_assert :: DynFlags -> CtOrigin -> TcM (HsExpr TcId, TcRhoType)
+tc_infer_assert :: DynFlags -> CtOrigin -> TcM (HsExpr TcId, TcSigmaType)
 -- Deal with an occurrence of 'assert'
 -- See Note [Adding the implicit parameter to 'assert']
 tc_infer_assert dflags orig
   = do { sloc <- getSrcSpanM
        ; assert_error_id <- tcLookupId assertErrorName
-       ; (wrap, id_rho) <- deeplyInstantiate orig (idType assert_error_id)
+       ; (wrap, id_rho) <- topInstantiate orig (idType assert_error_id)
        ; let (arg_ty, res_ty) = case tcSplitFunTy_maybe id_rho of
                                    Nothing      -> pprPanic "assert type" (ppr id_rho)
                                    Just arg_res -> arg_res
@@ -1174,7 +1140,7 @@ tc_infer_assert dflags orig
                        (L sloc (srcSpanPrimLit dflags sloc))
                 , res_ty) }
 
-tc_infer_id :: CtOrigin -> Name -> TcM (HsExpr TcId, TcRhoType)
+tc_infer_id :: CtOrigin -> Name -> TcM (HsExpr TcId, TcSigmaType)
 -- Return type is deeply instantiated
 tc_infer_id orig id_name
  = do { thing <- tcLookup id_name
@@ -1182,39 +1148,43 @@ tc_infer_id orig id_name
              ATcId { tct_id = id }
                -> do { check_naughty id        -- Note [Local record selectors]
                      ; checkThLocalId id
-                     ; inst_normal_id id }
+                     ; return_id id }
 
              AGlobal (AnId id)
                -> do { check_naughty id
-                     ; inst_normal_id id }
+                     ; return_id id }
                     -- A global cannot possibly be ill-staged
                     -- nor does it need the 'lifting' treatment
                     -- hence no checkTh stuff here
 
              AGlobal (AConLike cl) -> case cl of
-                 RealDataCon con -> inst_data_con con
+                 RealDataCon con -> return_data_con con
                  PatSynCon ps    -> tcPatSynBuilderOcc orig ps
 
              _ -> failWithTc $
                   ppr thing <+> ptext (sLit "used where a value identifier was expected") }
   where
-    inst_normal_id id
-      = do { (wrap, rho) <- deeplyInstantiate orig (idType id)
-           ; return (mkHsWrap wrap (HsVar id), rho) }
+    return_id id = return (HsVar id, idType id)
 
-    inst_data_con con
-       -- For data constructors,
-       --   * Must perform the stupid-theta check
-       --   * No need to deeply instantiate because type has all foralls at top
-       = do { let wrap_id           = dataConWrapId con
-                  (tvs, theta, rho) = tcSplitSigmaTy (idType wrap_id)
-            ; (subst, tvs') <- tcInstTyVars tvs
-            ; let tys'   = mkTyVarTys tvs'
-                  theta' = substTheta subst theta
-                  rho'   = substTy subst rho
-            ; wrap <- instCall orig tys' theta'
-            ; addDataConStupidTheta con tys'
-            ; return (mkHsWrap wrap (HsVar wrap_id), rho') }
+    return_data_con con
+       -- For data constructors, must perform the stupid-theta check
+      | null stupid_theta
+      = return_id con_wrapper_id
+
+      | otherwise
+       -- See Note [Instantiating stupid theta]
+      = do { let (tvs, theta, rho) = tcSplitSigmaTy (idType con_wrapper_id)
+           ; (subst, tvs') <- tcInstTyVars tvs
+           ; let tys'   = mkTyVarTys tvs'
+                 theta' = substTheta subst theta
+                 rho'   = substTy subst rho
+           ; wrap <- instCall orig tys' theta'
+           ; addDataConStupidTheta con tys'
+           ; return (mkHsWrap wrap (HsVar con_wrapper_id), rho') }
+
+      where
+        con_wrapper_id = dataConWrapId con
+        stupid_theta   = dataConStupidTheta con
 
     check_naughty id
       | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel id)
@@ -1260,47 +1230,68 @@ Usually that coercion is hidden inside the wrappers for
 constructors of F [Int] but here we have to do it explicitly.
 
 It's all grotesquely complicated.
+
+Note [Instantiating stupid theta]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally, when we infer the type of an Id, we don't instantiate,
+because we wish to allow for visible type application later on.
+But if a datacon has a stupid theta, we're a bit stuck. We need
+to emit the stupid theta constraints with instantiated types. It's
+difficult to defer this to the lazy instantiation, because a stupid
+theta has no spot to put it in a type. So we just instantiate eagerly
+in this case. Thus, users cannot use visible type application with
+a data constructor sporting a stupid theta. I won't feel so bad for
+the users that complain.
+
 -}
 
 tcSeq :: SrcSpan -> Name -> LHsExpr Name -> LHsExpr Name
-      -> TcRhoType -> TcM (HsExpr TcId)
+      -> TcSigmaType -> TcM (HsExpr TcId)
 -- (seq e1 e2) :: res_ty
 -- We need a special typing rule because res_ty can be unboxed
 tcSeq loc fun_name arg1 arg2 res_ty
+  -- if res_ty has any foralls, this really should require ImpredicativeTypes.
+  -- Perhaps the right thing to do is to deeplySkolemise res_ty if
+  -- ImpredicativeTypes isn't specified. But I'll hold off on this for now.
   = do  { fun <- tcLookupId fun_name
-        ; (arg1', arg1_ty) <- tcInfer (tcMonoExpr arg1)
-        ; arg2' <- tcMonoExpr arg2 res_ty
+        ; (arg1', arg1_ty) <- tcInfer (tcPolyExpr arg1)
+        ; arg2' <- tcPolyExpr arg2 res_ty
         ; let fun'    = L loc (HsWrap ty_args (HsVar fun))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
         ; return (HsApp (L loc (HsApp fun' arg1')) arg2') }
 
-tcTagToEnum :: SrcSpan -> Name -> LHsExpr Name -> TcRhoType -> TcM (HsExpr TcId)
+tcTagToEnum :: SrcSpan -> Name -> LHsExpr Name -> TcSigmaType -> TcM (HsExpr TcId)
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
 tcTagToEnum loc fun_name arg res_ty
-  = do  { fun <- tcLookupId fun_name
-        ; ty' <- zonkTcType res_ty
+    -- If SkolemiseTop and SkolemiseDeeply would do different things, then
+    -- we clearly don't have an enumeration. Do the cheaper one.
+  = tcSkolemiseExpr SkolemiseTop res_ty $ \res_rho ->
+    do { fun <- tcLookupId fun_name
+       ; ty' <- zonkTcType res_rho
 
-        -- Check that the type is algebraic
-        ; let mb_tc_app = tcSplitTyConApp_maybe ty'
-              Just (tc, tc_args) = mb_tc_app
-        ; checkTc (isJust mb_tc_app)
-                  (mk_error ty' doc1)
+       -- Check that the type is algebraic
+       ; let mb_tc_app = tcSplitTyConApp_maybe ty'
+             Just (tc, tc_args) = mb_tc_app
+       ; checkTc (isJust mb_tc_app)
+                 (mk_error ty' doc1)
 
-        -- Look through any type family
-        ; fam_envs <- tcGetFamInstEnvs
-        ; let (rep_tc, rep_args, coi) = tcLookupDataFamInst fam_envs tc tc_args
-             -- coi :: tc tc_args ~R rep_tc rep_args
+       -- Look through any type family
+       ; fam_envs <- tcGetFamInstEnvs
+       ; let (rep_tc, rep_args, coi)
+               = tcLookupDataFamInst fam_envs tc tc_args
+            -- coi :: tc tc_args ~R rep_tc rep_args
 
-        ; checkTc (isEnumerationTyCon rep_tc)
-                  (mk_error ty' doc2)
+       ; checkTc (isEnumerationTyCon rep_tc)
+                 (mk_error ty' doc2)
 
-        ; arg' <- tcMonoExpr arg intPrimTy
-        ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
-              rep_ty = mkTyConApp rep_tc rep_args
+       ; arg' <- tcPolyExpr arg intPrimTy
+       ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
+             rep_ty = mkTyConApp rep_tc rep_args
 
-        ; return (mkHsWrapCoR (mkTcSymCo $ TcCoercion coi) $ HsApp fun' arg') }
-                  -- coi is a Representational coercion
+       ; return (mkHsWrapCoR (mkTcSymCo $ TcCoercion coi) $
+                 HsApp fun' arg') }
+            -- coi is a Representational coercion
   where
     doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")
                 , ptext (sLit "e.g. (tagToEnum# x) :: Bool") ]
@@ -1494,6 +1485,25 @@ checkMissingFields data_con rbinds
                           field_strs
 
     field_strs = dataConSrcBangs data_con
+
+{-
+************************************************************************
+*                                                                      *
+    Skolemisation
+*                                                                      *
+************************************************************************
+-}
+
+-- | Convenient wrapper for skolemising a type during typechecking an expression.
+-- Always does uses a 'GenSigCtxt'.
+tcSkolemiseExpr :: SkolemiseMode
+                -> TcSigmaType
+                -> (TcRhoType -> TcM (HsExpr TcId))
+                -> (TcM (HsExpr TcId))
+tcSkolemiseExpr mode res_ty thing_inside
+  = do { (wrap, expr) <- tcSkolemise mode GenSigCtxt res_ty $
+                         \_ rho -> thing_inside rho
+       ; return (mkHsWrap wrap expr) }
 
 {-
 ************************************************************************

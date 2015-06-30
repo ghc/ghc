@@ -399,16 +399,17 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
 
-tcPatSynBuilderOcc :: CtOrigin -> PatSyn -> TcM (HsExpr TcId, TcRhoType)
+tcPatSynBuilderOcc :: CtOrigin -> PatSyn -> TcM (HsExpr TcId, TcSigmaType)
 -- The result type should be fully instantiated
 tcPatSynBuilderOcc orig ps
   | Just (builder_id, add_void_arg) <- builder
-  = do { (wrap, rho) <- deeplyInstantiate orig (idType builder_id)
-       ; let inst_fun = mkHsWrap wrap (HsVar builder_id)
+  = do { let inst_fun = HsVar builder_id
        ; if add_void_arg
-         then return ( HsApp (noLoc inst_fun) (nlHsVar voidPrimId)
-                     , tcFunResultTy rho )
-         else return ( inst_fun, rho ) }
+         then do { (wrap, rho) <- topInstantiate orig (idType builder_id)
+                 ; return ( HsApp (noLoc $ mkHsWrap wrap inst_fun)
+                                  (nlHsVar voidPrimId)
+                          , tcFunResultTy rho ) }
+         else return (inst_fun, idType builder_id) }
 
   | otherwise  -- Unidirectional
   = failWithTc $

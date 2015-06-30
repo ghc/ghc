@@ -10,7 +10,7 @@ The @Inst@ type: dictionaries or method instances
 
 module Inst (
        skolemise, SkolemiseMode(..),
-       deeplySkolemise, deeplyInstantiate,
+       topInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
        emitWanted, emitWanteds,
@@ -153,14 +153,9 @@ data SkolemiseMode
     -- constraints, from the top type and to the right of arrows.
     -- See also 'deeplySkolemise'
 
-  | SkolemiseInferred
-    -- ^ Skolemise all inferred variables, but not specified variables,
-    -- at the top level only. Stops when it encounters a specified variable.
-
   | SkolemiseTop
-    -- ^ Skolemise all inferred and specified variables and all
-    -- constraints, at the top level only. Does not look past
-    -- non-constraint arrows.
+    -- ^ Skolemise all variables and all constraints, at the top level only.
+    -- Does not look past non-constraint arrows.
 
 -- | Skolemise a type according to the provided 'SkolemiseMode'.
 -- The caller will likely want to bind the returns variables and
@@ -168,38 +163,29 @@ data SkolemiseMode
 skolemise :: SkolemiseMode -> TcSigmaType
           -> TcM (HsWrapper, [TyVar], [EvVar], TcType)
 skolemise SkolemiseDeeply   = deeplySkolemise
-skolemise SkolemiseInferred = topSkolemise False
-skolemise SkolemiseTop      = topSkolemise True
+skolemise SkolemiseTop      = topSkolemise
 
--- | Skolemise top-level inferred quantified variables and their constraints.
-topSkolemise :: Bool  -- ^ True  <=> skolemise all variables;
-                      --   False <=> skolemise only inferred
-             -> TcSigmaType
-             -> TcM (HsWrapper, [TyVar], [EvVar], TcUpsType)
-topSkolemise skol_all sigma
+-- | Skolemise top-level quantified variables and constraints.
+topSkolemise :: TcSigmaType
+             -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
+topSkolemise sigma
   | null tvs && null theta
   = return (idHsWrapper, [], [], rho)
 
   | otherwise
-  = do { let (skol_tvs, leave_tvs) = span should_skol tvs
-             skol_theta
-               | null leave_tvs = theta
-               | otherwise      = []
-       ; (subst, skol_tvs') <- tcInstSkolTyVars skol_tvs
-       ; let skol_theta' = substTheta subst skol_theta
-             ups'        = substTy    subst (mkForAllTys leave_tvs rho)
-       ; ev_vars <- newEvVars skol_theta'
-       ; (wrap, inner_tvs', inner_ev_vars, inner_ups) <-
-           if null leave_tvs  -- if we haven't hit an unskolemizable tv,
-                              -- then recur, worrying about types like
-                              -- forall a. Num a => forall b. Ord b => ...
-           then topSkolemise skol_all ups'
-           else return ( idHsWrapper, [], [], ups' )
+  = do { (subst, tvs') <- tcInstSkolTyVars tvs
+       ; let theta' = substTheta subst theta
+             rho'   = substTy    subst rho
+       ; ev_vars <- newEvVars theta'
+       ; (wrap, inner_tvs', inner_ev_vars, inner_rho) <-
+           topSkolemise skol_all rho'
+               -- This handles types like
+               -- forall a. Num a => forall b. Ord b => ...
 
-       ; return ( mkWpTyLams skol_tvs' <.> mkWpLams ev_vars <.> wrap
-                , skol_tvs' ++ inner_tvs'
+       ; return ( mkWpTyLams tvs' <.> mkWpLams ev_vars <.> wrap
+                , tvs' ++ inner_tvs'
                 , ev_vars ++ inner_ev_vars
-                , inner_ups ) }
+                , inner_rho ) }
   where
     (tvs, theta, rho) = tcSplitSigmaTy sigma
 
@@ -229,14 +215,14 @@ deeplySkolemise ty
   | otherwise
   = return (idHsWrapper, [], [], ty)
 
--- | Instantiate all outer type variables (both specified and inferred)
+-- | Instantiate all outer type variables
 -- and any context. Never looks through arrows.
-shallowInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
--- if    shallowInstantiate ty = (wrap, rho)
+topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+-- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho
 
-shallowInstantiate orig ty
+topInstantiate orig ty
   | Just (tvs, theta, rho) <- tcSplitSigmaTy_maybe ty
   = do { (subst, tvs') <- tcInstTyVars tvs
        ; let theta' = substTheta subst theta
@@ -246,18 +232,10 @@ shallowInstantiate orig ty
                                        , text "with" <+> ppr tvs'
                                        , text "theta:" <+>  ppr theta' ])
          -- account for types like forall a. Num a => forall b. Ord b => ...
-       ; (wrap2, rho2) <- shallowInstantiate orig (substTy subst rho)
+       ; (wrap2, rho2) <- topInstantiate orig (substTy subst rho)
        ; return (wrap2 <.> wrap1, rho2) }
 
   | otherwise = return (idHsWrapper, ty)
-
--- | Instantiate all inferred type variables. Stops at the first thing
--- that isn't an inferred type variable. Never looks through arrows.
-instantiateInferred :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcUpsType)
--- if    instantiateInferred ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho
-
 
 {-
 ************************************************************************
@@ -334,39 +312,18 @@ instStupidTheta orig theta
 *                                                                      *
 ************************************************************************
 
-In newOverloadedLit we convert directly to an Int or Integer if we
-know that's what we want.  This may save some time, by not
-temporarily generating overloaded literals, but it won't catch all
-cases (the rest are caught in lookupInst).
 -}
 
-newOverloadedLit :: CtOrigin
-                 -> HsOverLit Name
-                 -> TcRhoType
-                 -> TcM (HsOverLit TcId)
-newOverloadedLit orig lit res_ty
-    = do dflags <- getDynFlags
-         newOverloadedLit' dflags orig lit res_ty
 
-newOverloadedLit' :: DynFlags
-                  -> CtOrigin
-                  -> HsOverLit Name
-                  -> TcRhoType
-                  -> TcM (HsOverLit TcId)
-newOverloadedLit' dflags orig
-  lit@(OverLit { ol_val = val, ol_rebindable = rebindable
+-- Does not handle things that 'shortCutLit' can handle. See also
+-- newOverloadedLit in TcUnify
+newNonTrivialOverloadedLit :: CtOrigin
+                           -> HsOverLit Name
+                           -> TcSigmaType
+                           -> TcM (HsOverLit TcId)
+newNonTrivialOverloadedLit orig
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindalbe
                , ol_witness = meth_name }) res_ty
-
-  | not rebindable
-  , Just expr <- shortCutLit dflags val res_ty
-        -- Do not generate a LitInst for rebindable syntax.
-        -- Reason: If we do, tcSimplify will call lookupInst, which
-        --         will call tcSyntaxName, which does unification,
-        --         which tcSimplify doesn't like
-  = return (lit { ol_witness = expr, ol_type = res_ty
-                , ol_rebindable = rebindable })
-
-  | otherwise
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; fi' <- tcSyntaxOp orig meth_name (mkFunTy lit_ty res_ty)

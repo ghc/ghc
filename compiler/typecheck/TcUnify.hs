@@ -77,7 +77,7 @@ HsWrappers are oriented accordingly.
 data ExpOrAct = Expected
               | Actual   CtOrigin
 
-exposeRhoType :: ExpOrAct -> TcUpsType
+exposeRhoType :: ExpOrAct -> TcSigmaType
               -> (TcRhoType -> TcM (HsWrapper, a))
               -> TcM (HsWrapper, a)
 exposeRhoType Expected ty thing_inside
@@ -85,7 +85,7 @@ exposeRhoType Expected ty thing_inside
             tcSkolemise SkolemiseTop GenSigCtxt ty $ \_ -> thing_inside
        ; return (wrap1 <.> wrap2, result) }
 exposeRhoType (Actual orig) ty thing_inside
-  = do { (wrap1, rho) <- shallowInstantiate orig ty
+  = do { (wrap1, rho) <- topInstantiate orig ty
        ; (wrap2, result) <- thing_inside rho
        ; return (wrap2 <.> wrap1, result) }
 
@@ -94,8 +94,8 @@ exposeRhoType (Actual orig) ty thing_inside
 -- match this up with the type passed in. This function does the right
 -- expected/actual thing.
 matchUnificationType :: ExpOrAct
-                     -> TcRhoType  -- ^ t1, the "unification" type
-                     -> TcUpsType  -- ^ t2, the passed-in type
+                     -> TcRhoType    -- ^ t1, the "unification" type
+                     -> TcSigmaType  -- ^ t2, the passed-in type
                      -> TcM HsWrapper
                         -- ^ Expected: t1 "->" t2
                         -- ^ Actual:   t2 "->" t1
@@ -129,7 +129,7 @@ This is used to construct a message of form
 
 Note [matchExpectedFunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-matchExpectedFunTys checks that an upsilon has the form
+matchExpectedFunTys checks that a sigma has the form
 of an n-ary function.  It passes the decomposed type to the
 thing_inside, and returns a wrapper to coerce between the two types
 
@@ -139,8 +139,9 @@ namely:
         A function definition
      An operator section
 
-matchExpectedFunTys *instantiates* the upsilon type to find an arrow.
-It does *not* skolemise. If you want skolemisation, do it yourself.
+matchExpectedFunTys requires you to specify whether to *instantiate*
+or *skolemise* the sigma type to find an arrow.
+Do this by passing (Actual _) or Expected, respectively.
 
 Why does this matter? Consider these bidirectional typing rules:
 
@@ -154,16 +155,15 @@ G |- e2 <== u1[taus / as]
 G |- e1 e2 ==> u2[taus / as]
 
 In DownAbs, we want to skolemise, which typing rules represent by just
-ignoring the quantification. In App, we want to instantiate. Instantiation
-is more common here, so that's what the function does.
+ignoring the quantification. In App, we want to instantiate.
 
 -}
 
 matchExpectedFunTys :: ExpOrAct
                     -> SDoc     -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
-                    -> TcUpsType
-                    -> TcM (HsWrapper, [TcSigmaType], TcUpsType)
+                    -> TcSigmaType
+                    -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
 
 -- If    matchExpectFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty "->" (t1 -> ... -> tn -> ty_r)
@@ -272,14 +272,14 @@ we are ok.
 -}
 
 ----------------------
-matchExpectedListTy :: ExpOrAct -> TcUpsType -> TcM (HsWrapper, TcRhoType)
+matchExpectedListTy :: ExpOrAct -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- Special case for lists
 matchExpectedListTy ea exp_ty
  = do { (co, [elt_ty]) <- matchExpectedTyConApp ea listTyCon exp_ty
       ; return (co, elt_ty) }
 
 ----------------------
-matchExpectedPArrTy :: ExpOrAct -> TcUpsType -> TcM (HsWrapper, TcRhoType)
+matchExpectedPArrTy :: ExpOrAct -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- Special case for parrs
 matchExpectedPArrTy ea exp_ty
   = do { (co, [elt_ty]) <- matchExpectedTyConApp ea parrTyCon exp_ty
@@ -290,7 +290,7 @@ matchExpectedTyConApp :: ExpOrAct
                       -> TyCon
                          -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
 
-                      -> TcUpsType            -- orig_ty
+                      -> TcSigmaType          -- orig_ty
                       -> TcM (HsWrapper,
                               [TcSigmaType])  -- Element types, k1 k2 k3 a b c
 
@@ -308,6 +308,8 @@ matchExpectedTyConApp ea tc orig_ty
     go ty
        | not (null tvs && null theta)
        = exposeRhoType ea ty go
+      where
+        (tvs, theta, _) = tcSplitSigmaTy ty
 
     go ty
        | Just ty' <- tcView ty
@@ -349,44 +351,91 @@ matchExpectedTyConApp ea tc orig_ty
     (arg_kinds, res_kind) = splitKindFunTys body
 
 ----------------------
-matchExpectedAppTy :: TcRhoType                         -- orig_ty
-                   -> TcM (TcCoercion,                   -- m a ~ orig_ty
-                           (TcSigmaType, TcSigmaType))  -- Returns m, a
+matchExpectedAppTys :: Arity
+                    -> TcSigmaType                      -- orig_ty
+                    -> TcM ( HsWrapper                  -- m a1 a2 "->" orig_ty
+                           , TcTauType                  -- m
+                           , [TcTauType])               -- [a1, a2]
 -- If the incoming type is a mutable type variable of kind k, then
--- matchExpectedAppTy returns a new type variable (m: * -> k); note the *.
+-- matchExpectedAppTys returns a new type variable (m: *^n -> k); note the *.
+-- Only runs in "Expected" mode, with skolemisation, never instantiation.
 
-matchExpectedAppTy orig_ty
-  = go orig_ty
+matchExpectedAppTys n orig_ty
+  = do { (wrap, mb_stuff) <- exposeRhoType Expected orig_ty (go n)
+       ; case mb_stuff of
+            Just (co, fun_ty, arg_tys) ->
+              return (wrap <.> coToHsWrapper co, fun_ty, reverse arg_tys)
+            Nothing -> defer
   where
-    go ty
-      | Just ty' <- tcView ty = go ty'
+    go 0 ty = return (Just (mkTcNomReflCo ty, ty, []))
+
+    go n ty
+      | Just ty' <- tcView ty = go n ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
+      = do { (inner_co, inner_fun_ty, arg_tys) <- go (n-1) fun_ty
+           ; return $ Just ( mkTcAppCo inner_co (mkTcNomReflCo arg_ty)
+                           , inner_fun_ty, arg_ty : arg_tys ) }
 
     go (TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty -> go ty
-               Flexi       -> defer }
+               Flexi       -> return Nothing }
 
-    go _ = defer
+    go _ = return Nothing
 
     -- Defer splitting by generating an equality constraint
-    defer = do { ty1 <- newFlexiTyVarTy kind1
-               ; ty2 <- newFlexiTyVarTy kind2
-               ; co <- unifyType (mkAppTy ty1 ty2) orig_ty
-               ; return (co, (ty1, ty2)) }
+    defer = do { fun_ty  <- newFlexiTyVarTy fun_kind
+               ; arg_tys <- newFlexiTyVarTys n liftedTypeKind
+               ; wrap <- tcSubType (mkAppTys fun_ty arg_tys) orig_ty
+               ; return (wrap, fun_ty, arg_tys) }
 
     orig_kind = typeKind orig_ty
-    kind1 = mkArrowKind liftedTypeKind (defaultKind orig_kind)
-    kind2 = liftedTypeKind    -- m :: * -> k
+    fun_kind  = mkArrowKinds (nOfThem n liftedTypeKind) (defaultKind orig_kind)
+                              -- m :: * -> k
                               -- arg type :: *
         -- The defaultKind is a bit smelly.  If you remove it,
         -- try compiling        f x = do { x }
         -- and you'll get a kind mis-match.  It smells, but
         -- not enough to lose sleep over.
+
+{-
+In newOverloadedLit we convert directly to an Int or Integer if we
+know that's what we want.  This may save some time, by not
+temporarily generating overloaded literals, but it won't catch all
+cases (the rest are caught in lookupInst).
+
+This is here because of its dependency on the Expected/Actual
+functions above.
+-}
+
+newOverloadedLit :: ExpOrAct
+                 -> HsOverLit Name
+                 -> TcSigmaType
+                 -> TcM (HsWrapper, HsOverLit TcId)
+newOverloadedLit ea
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindable
+               , old_witness = meth_name }) res_ty
+  | not rebindable
+    -- all built-in overloaded lits are not higher-rank, so skolemise.
+    -- this is necessary for shortCutLit.
+  = exposeRhoType ea res_ty $ \ res_rho -> liftM (idHsWrapper,) $
+    do { dflags <- getDynFlags
+       ; case shortCutLit dflags val res_rho of
+        -- Do not generate a LitInst for rebindable syntax.
+        -- Reason: If we do, tcSimplify will call lookupInst, which
+        --         will call tcSyntaxName, which does unification,
+        --         which tcSimplify doesn't like
+           Just expr -> return (lit { ol_witness = expr, ol_type = res_rho
+                                    , ol_rebindable = False })
+           Nothing   -> newOverloadedLit' orig lit res_rho }
+
+  | otherwise
+  = do { lit' <- newNonTrivialOverloadedLit (LiteralOrigin lit) lit res_ty
+       ; return (idHsWrapper, lit') }
+
 
 {-
 ************************************************************************
@@ -568,7 +617,7 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected
        ; return (coToHsWrapper cow) }
 
 -----------------
-tcWrapResult :: HsExpr TcId -> TcUpsType -> TcUpsType -> TcM (HsExpr TcId)
+tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcSigmaType -> TcM (HsExpr TcId)
 tcWrapResult expr actual_ty res_ty
   = do { cow <- tcSubType GenSigCtxt actual_ty res_ty
        ; return (mkHsWrap cow expr) }
