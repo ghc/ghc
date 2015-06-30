@@ -566,7 +566,7 @@ tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
 ------------------------
 -- Lists, tuples, arrays
 tc_pat penv (ListPat pats _ Nothing) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTyR pat_ty
+  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
                                      pats penv thing_inside
         ; return (mkHsWrapPat coi (ListPat pats' elt_ty Nothing) pat_ty, res)
@@ -575,14 +575,14 @@ tc_pat penv (ListPat pats _ Nothing) pat_ty thing_inside
 tc_pat penv (ListPat pats _ (Just (_,e))) pat_ty thing_inside
   = do  { list_pat_ty <- newFlexiTyVarTy liftedTypeKind
         ; e' <- tcSyntaxOp ListOrigin e (mkFunTy pat_ty list_pat_ty)
-        ; (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTyR list_pat_ty
+        ; (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy list_pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
                                      pats penv thing_inside
         ; return (mkHsWrapPat coi (ListPat pats' elt_ty (Just (pat_ty,e'))) list_pat_ty, res)
         }
 
 tc_pat penv (PArrPat pats _) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTyR pat_ty
+  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTy pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
                                      pats penv thing_inside
         ; return (mkHsWrapPat coi (PArrPat pats' elt_ty) pat_ty, res)
@@ -590,7 +590,7 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
 
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
   = do  { let tc = tupleTyCon boxity (length pats)
-        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConAppR tc) pat_ty
+        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
         ; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
         ; dflags <- getDynFlags
@@ -788,7 +788,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
           -- Instantiate the constructor type variables [a->ty]
           -- This may involve doing a family-instance coercion,
           -- and building a wrapper
-        ; (wrap, ctxt_res_tys) <- matchExpectedPatTy (matchExpectedConTy tycon) pat_ty
+        ; (wrap, ctxt_res_tys) <- matchExpectedConTy tycon pat_ty
 
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
@@ -904,52 +904,30 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
 ----------------------------
-downgrade :: (TcRhoType -> TcM (TcCoercionN, a))
-          -> TcRhoType -> TcM (TcCoercionR, a)
-downgrade f a = do { (co,res) <- f a; return (mkTcSubCo co, res) }
-
-matchExpectedListTyR :: TcRhoType -> TcM (TcCoercionR, TcRhoType)
-matchExpectedListTyR = downgrade matchExpectedListTy
-matchExpectedPArrTyR :: TcRhoType -> TcM (TcCoercionR, TcRhoType)
-matchExpectedPArrTyR = downgrade matchExpectedPArrTy
-matchExpectedTyConAppR :: TyCon -> TcRhoType -> TcM (TcCoercionR, [TcSigmaType])
-matchExpectedTyConAppR tc = downgrade (matchExpectedTyConApp tc)
-
-----------------------------
-matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionR, a))
-                    -> TcRhoType -> TcM (HsWrapper, a)
+-- | Convenient wrapper for calling a matchExpctedXXX function
+matchExpectedPatTy :: (ExpOrAct -> TcRhoType -> TcM (HsWrapper, a))
+                    -> TcSigmaType -> TcM (HsWrapper, a)
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~R inner_ty
 matchExpectedPatTy inner_match pat_ty
-  | null tvs && null theta
-  = do { (co, res) <- inner_match pat_ty   -- 'co' is Representational
-       ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr co $$ ppr (isTcReflCo co))
-       ; return (coToHsWrapperR (mkTcSymCo co), res) }
-         -- The Sym is because the inner_match returns a coercion
-         -- that is the other way round to matchExpectedPatTy
-
-  | otherwise
-  = do { (subst, tvs') <- tcInstTyVars tvs
-       ; wrap1 <- instCall PatOrigin (mkTyVarTys tvs') (substTheta subst theta)
-       ; (wrap2, arg_tys) <- matchExpectedPatTy inner_match (TcType.substTy subst tau)
-       ; return (wrap2 <.> wrap1, arg_tys) }
-  where
-    (tvs, theta, tau) = tcSplitSigmaTy pat_ty
+  = do { (wrap, res) <- inner_match (Actual PatOrigin) pat_ty
+       ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr wrap)
+       ; return (wrap, res) }
 
 ----------------------------
 matchExpectedConTy :: TyCon      -- The TyCon that this data
                                  -- constructor actually returns
-                   -> TcRhoType  -- The type of the pattern
-                   -> TcM (TcCoercionR, [TcSigmaType])
+                   -> TcSigmaType  -- The type of the pattern
+                   -> TcM (HsWrapper, [TcSigmaType])
 -- See Note [Matching constructor patterns]
--- Returns a coercion : T ty1 ... tyn ~ pat_ty
--- This is the same way round as matchExpectedListTy etc
--- but the other way round to matchExpectedPatTy
+-- Returns a wrapper : pat_ty "->" T ty1 ... tyn
 matchExpectedConTy data_tc pat_ty
   | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
          -- Comments refer to Note [Matching constructor patterns]
          -- co_tc :: forall a. T [a] ~ T7 a
-  = do { (subst, tvs') <- tcInstTyVars (tyConTyVars data_tc)
+  = do { (wrap, pat_ty) <- shallowInstantiate PatOrigin pat_ty
+
+       ; (subst, tvs') <- tcInstTyVars (tyConTyVars data_tc)
              -- tys = [ty1,ty2]
 
        ; traceTc "matchExpectedConTy" (vcat [ppr data_tc,
@@ -957,16 +935,19 @@ matchExpectedConTy data_tc pat_ty
                                              ppr fam_tc, ppr fam_args])
        ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
              -- co1 : T (ty1,ty2) ~N pat_ty
+             -- could use tcSubType here... but it's the wrong way round
+             -- for actual vs. expected in error messages.
 
        ; let tys' = mkTyVarTys tvs'
              co2 = mkTcUnbranchedAxInstCo Representational co_tc tys'
              -- co2 : T (ty1,ty2) ~R T7 ty1 ty2
 
-       ; return (mkTcSymCo co2 `mkTcTransCo` mkTcSubCo co1, tys') }
+       ; return ( wrap <.> (coToHsWrapperR $
+                            mkTcSubCo (mkTcSymCo co1) `mkTcTransCo` co2)
+                , tys') }
 
   | otherwise
-  = matchExpectedTyConAppR data_tc pat_ty
-             -- coi : T tys ~R pat_ty
+  = matchExpectedTyConApp (Actual PatOrigin) data_tc pat_ty
 
 {-
 Note [Matching constructor patterns]

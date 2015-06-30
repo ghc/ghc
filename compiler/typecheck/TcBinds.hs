@@ -863,13 +863,13 @@ Note [Handling SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea is this:
 
-   f:: Num a => a -> b -> a
+   foo :: Num a => a -> b -> a
    {-# SPECIALISE foo :: Int -> b -> Int #-}
 
 We check that
-   (forall a. Num a => a -> a)
+   (forall a b. Num a => a -> b -> a)
       is more polymorphic than
-   Int -> Int
+   forall b. Int -> b -> Int
 (for which we could use tcSubType, but see below), generating a HsWrapper
 to connect the two, something like
       wrap = /\b. <hole> Int b dNumInt
@@ -1048,7 +1048,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcGen ctxt spec_ty $ \ _ spec_tau ->
+               <- tcSkolemise SkolemiseDeeply ctxt spec_ty $ \ _ spec_tau ->
                   do { (inst_wrap, tau) <- deeplyInstantiate orig poly_ty
                      ; _ <- unifyType spec_tau tau
                             -- Deliberately ignore the evidence

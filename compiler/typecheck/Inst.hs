@@ -9,7 +9,8 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP #-}
 
 module Inst (
-       deeplySkolemise, deeplyInstantiate, 
+       skolemise, SkolemiseMode(..),
+       deeplySkolemise, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
        emitWanted, emitWanteds,
@@ -145,6 +146,67 @@ ToDo: this eta-abstraction plays fast and loose with termination,
       fix this
 -}
 
+-- | How should we skolemise a type?
+data SkolemiseMode
+  = SkolemiseDeeply
+    -- ^ Skolemise all inferred and specified variables, and all
+    -- constraints, from the top type and to the right of arrows.
+    -- See also 'deeplySkolemise'
+
+  | SkolemiseInferred
+    -- ^ Skolemise all inferred variables, but not specified variables,
+    -- at the top level only. Stops when it encounters a specified variable.
+
+  | SkolemiseTop
+    -- ^ Skolemise all inferred and specified variables and all
+    -- constraints, at the top level only. Does not look past
+    -- non-constraint arrows.
+
+-- | Skolemise a type according to the provided 'SkolemiseMode'.
+-- The caller will likely want to bind the returns variables and
+-- givens. The 'HsWrapper' returned has type @skol_ty -> sigma@.
+skolemise :: SkolemiseMode -> TcSigmaType
+          -> TcM (HsWrapper, [TyVar], [EvVar], TcType)
+skolemise SkolemiseDeeply   = deeplySkolemise
+skolemise SkolemiseInferred = topSkolemise False
+skolemise SkolemiseTop      = topSkolemise True
+
+-- | Skolemise top-level inferred quantified variables and their constraints.
+topSkolemise :: Bool  -- ^ True  <=> skolemise all variables;
+                      --   False <=> skolemise only inferred
+             -> TcSigmaType
+             -> TcM (HsWrapper, [TyVar], [EvVar], TcUpsType)
+topSkolemise skol_all sigma
+  | null tvs && null theta
+  = return (idHsWrapper, [], [], rho)
+
+  | otherwise
+  = do { let (skol_tvs, leave_tvs) = span should_skol tvs
+             skol_theta
+               | null leave_tvs = theta
+               | otherwise      = []
+       ; (subst, skol_tvs') <- tcInstSkolTyVars skol_tvs
+       ; let skol_theta' = substTheta subst skol_theta
+             ups'        = substTy    subst (mkForAllTys leave_tvs rho)
+       ; ev_vars <- newEvVars skol_theta'
+       ; (wrap, inner_tvs', inner_ev_vars, inner_ups) <-
+           if null leave_tvs  -- if we haven't hit an unskolemizable tv,
+                              -- then recur, worrying about types like
+                              -- forall a. Num a => forall b. Ord b => ...
+           then topSkolemise skol_all ups'
+           else return ( idHsWrapper, [], [], ups' )
+
+       ; return ( mkWpTyLams skol_tvs' <.> mkWpLams ev_vars <.> wrap
+                , skol_tvs' ++ inner_tvs'
+                , ev_vars ++ inner_ev_vars
+                , inner_ups ) }
+  where
+    (tvs, theta, rho) = tcSplitSigmaTy sigma
+
+    should_skol
+      | skol_all  = const True
+      | otherwise = isInferredTv
+
 deeplySkolemise
   :: TcSigmaType
   -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
@@ -167,32 +229,35 @@ deeplySkolemise ty
   | otherwise
   = return (idHsWrapper, [], [], ty)
 
-deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
---   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
--- In general if
--- if    deeplyInstantiate ty = (wrap, rho)
+-- | Instantiate all outer type variables (both specified and inferred)
+-- and any context. Never looks through arrows.
+shallowInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+-- if    shallowInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho
 
-deeplyInstantiate orig ty
-  | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
+shallowInstantiate orig ty
+  | Just (tvs, theta, rho) <- tcSplitSigmaTy_maybe ty
   = do { (subst, tvs') <- tcInstTyVars tvs
-       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
        ; let theta' = substTheta subst theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
-       ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
-                                                , text "type" <+> ppr ty
-                                                , text "with" <+> ppr tvs'
-                                                , text "args:" <+> ppr ids1
-                                                , text "theta:" <+>  ppr theta' ])
-       ; (wrap2, rho2) <- deeplyInstantiate orig (substTy subst rho)
-       ; return (mkWpLams ids1
-                    <.> wrap2
-                    <.> wrap1
-                    <.> mkWpEvVarApps ids1,
-                 mkFunTys arg_tys rho2) }
+       ; traceTc "Instantiating" (vcat [ text "origin" <+> pprCtOrigin orig
+                                       , text "type" <+> ppr ty
+                                       , text "with" <+> ppr tvs'
+                                       , text "theta:" <+>  ppr theta' ])
+         -- account for types like forall a. Num a => forall b. Ord b => ...
+       ; (wrap2, rho2) <- shallowInstantiate orig (substTy subst rho)
+       ; return (wrap2 <.> wrap1, rho2) }
 
   | otherwise = return (idHsWrapper, ty)
+
+-- | Instantiate all inferred type variables. Stops at the first thing
+-- that isn't an inferred type variable. Never looks through arrows.
+instantiateInferred :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcUpsType)
+-- if    instantiateInferred ty = (wrap, rho)
+-- and   e :: ty
+-- then  wrap e :: rho
+
 
 {-
 ************************************************************************

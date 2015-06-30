@@ -59,7 +59,7 @@ same number of arguments before using @tcMatches@ to do the work.
 Note [Polymorphic expected type for tcMatchesFun]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 tcMatchesFun may be given a *sigma* (polymorphic) type
-so it must be prepared to use tcGen to skolemise it.
+so it must be prepared to use tcSkolemise to skolemise it.
 See Note [sig_tau may be polymorphic] in TcPat.
 -}
 
@@ -79,7 +79,8 @@ tcMatchesFun fun_name inf matches exp_ty
         ; checkArgs fun_name matches
 
         ; (wrap_gen, (wrap_fun, group))
-            <- tcGen (FunSigCtxt fun_name True) exp_ty $ \ _ exp_rho ->
+            <- tcSkolemise SkolemiseInferred (FunSigCtxt fun_name True) exp_ty
+               $ \ _ exp_rho ->
                   -- Note [Polymorphic expected type for tcMatchesFun]
                matchFunTys herald arity exp_rho $ \ pat_tys rhs_ty ->
                tcMatches match_ctxt pat_tys rhs_ty matches
@@ -145,9 +146,10 @@ matchFunTys
 -- could probably be un-CPSd, like matchExpectedTyConApp
 
 matchFunTys herald arity res_ty thing_inside
-  = do  { (co, pat_tys, res_ty) <- matchExpectedFunTys herald arity res_ty
+  = do  { (wrap, pat_tys, res_ty) <-
+             matchExpectedFunTys Expected herald arity res_ty
         ; res <- thing_inside pat_tys res_ty
-        ; return (coToHsWrapper (mkTcSymCo co), res) }
+        ; return (wrap, res) }
 
 {-
 ************************************************************************

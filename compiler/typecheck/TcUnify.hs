@@ -10,7 +10,7 @@ Type subsumption and unification
 
 module TcUnify (
   -- Full-blown subsumption
-  tcWrapResult, tcGen,
+  tcWrapResult, tcSkolemise, SkolemiseMode(..),
   tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
   checkConstraints,
 
@@ -65,6 +65,46 @@ import Control.Monad
 *                                                                      *
 ************************************************************************
 
+The matchExpected functions operate in one of two modes: "Expected" mode,
+where the provided type is skolemised before matching, and "Actual" mode,
+where the provided type is instantiated before matching. The produced
+HsWrappers are oriented accordingly.
+
+-}
+
+-- | 'Bool' cognate that determines if a type being considered is an
+-- expected type or an actual type.
+data ExpOrAct = Expected
+              | Actual   CtOrigin
+
+exposeRhoType :: ExpOrAct -> TcUpsType
+              -> (TcRhoType -> TcM (HsWrapper, a))
+              -> TcM (HsWrapper, a)
+exposeRhoType Expected ty thing_inside
+  = do { (wrap1, (wrap2, result)) <-
+            tcSkolemise SkolemiseTop GenSigCtxt ty $ \_ -> thing_inside
+       ; return (wrap1 <.> wrap2, result) }
+exposeRhoType (Actual orig) ty thing_inside
+  = do { (wrap1, rho) <- shallowInstantiate orig ty
+       ; (wrap2, result) <- thing_inside rho
+       ; return (wrap2 <.> wrap1, result) }
+
+-- | In the "defer" case of the matchExpectedXXX functions, we create
+-- a type built from unification variables and then use tcSubType to
+-- match this up with the type passed in. This function does the right
+-- expected/actual thing.
+matchUnificationType :: ExpOrAct
+                     -> TcRhoType  -- ^ t1, the "unification" type
+                     -> TcUpsType  -- ^ t2, the passed-in type
+                     -> TcM HsWrapper
+                        -- ^ Expected: t1 "->" t2
+                        -- ^ Actual:   t2 "->" t1
+matchUnificationType Expected unif_ty other_ty
+  = tcSubType GenSigCtxt unif_ty other_ty
+matchUnificationType (Actual _) unif_ty other_ty
+  = tcSubTypeDS GenSigCtxt other_ty unif_ty
+
+{-
 Note [Herald for matchExpectedFunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'herald' always looks like:
@@ -89,7 +129,7 @@ This is used to construct a message of form
 
 Note [matchExpectedFunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-matchExpectedFunTys checks that an (Expected rho) has the form
+matchExpectedFunTys checks that an upsilon has the form
 of an n-ary function.  It passes the decomposed type to the
 thing_inside, and returns a wrapper to coerce between the two types
 
@@ -99,18 +139,34 @@ namely:
         A function definition
      An operator section
 
-This is not (currently) where deep skolemisation occurs;
-matchExpectedFunTys does not skolmise nested foralls in the
-expected type, because it expects that to have been done already
+matchExpectedFunTys *instantiates* the upsilon type to find an arrow.
+It does *not* skolemise. If you want skolemisation, do it yourself.
+
+Why does this matter? Consider these bidirectional typing rules:
+
+G, x:s1 |- e <== u2
+--------------------------------- :: DownAbs
+G |- \x.e <== forall as. (s1 -> u2)
+
+G |- e1 ==> forall as. (forall {bs}. u1) -> u2
+G |- e2 <== u1[taus / as]
+-------------------------------------------- App
+G |- e1 e2 ==> u2[taus / as]
+
+In DownAbs, we want to skolemise, which typing rules represent by just
+ignoring the quantification. In App, we want to instantiate. Instantiation
+is more common here, so that's what the function does.
+
 -}
 
-matchExpectedFunTys :: SDoc     -- See Note [Herald for matchExpectedFunTys]
+matchExpectedFunTys :: ExpOrAct
+                    -> SDoc     -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
-                    -> TcRhoType
-                    -> TcM (TcCoercionN, [TcSigmaType], TcRhoType)
+                    -> TcUpsType
+                    -> TcM (HsWrapper, [TcSigmaType], TcUpsType)
 
--- If    matchExpectFunTys n ty = (co, [t1,..,tn], ty_r)
--- then  co : ty ~N (t1 -> ... -> tn -> ty_r)
+-- If    matchExpectFunTys n ty = (wrap, [t1,..,tn], ty_r)
+-- then  wrap : ty "->" (t1 -> ... -> tn -> ty_r)
 --
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
@@ -119,22 +175,32 @@ matchExpectedFunTys :: SDoc     -- See Note [Herald for matchExpectedFunTys]
 -- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
 -- hide the forall inside a meta-variable
 
-matchExpectedFunTys herald arity orig_ty
-  = go arity orig_ty
+matchExpectedFunTys ea herald = go
   where
     -- If     go n ty = (co, [t1,..,tn], ty_r)
-    -- then   co : ty ~ t1 -> .. -> tn -> ty_r
+    -- then   Actual:   wrap : ty "->" (t1 -> .. -> tn -> ty_r)
+    --        Expected: wrap : (t1 -> .. -> tn -> ty_r) "->" ty
 
     go n_req ty
-      | n_req == 0 = return (mkTcNomReflCo ty, [], ty)
+      | n_req == 0 = return (idHsWrapper, [], ty)
+
+    go n_req ty
+      | not (null tvs && null theta)
+      = do { (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
+             do { (inner_wrap, arg_tys, res_ty) <- go n_req rho
+                ; return (inner_wrap, (arg_tys, res_ty)) }
+           ; return (wrap, arg_tys, res_ty) }
+      where
+        (tvs, theta, _) = tcSplitSigmaTy ty
 
     go n_req ty
       | Just ty' <- tcView ty = go n_req ty'
 
     go n_req (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
-      = do { (co, tys, ty_r) <- go (n_req-1) res_ty
-           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg_ty) co, arg_ty:tys, ty_r) }
+      = do { (wrap_res, tys, ty_r) <- go (n_req-1) res_ty
+           ; return ( mkWpFun idHsWrapper wrap_res
+                    , arg_ty:tys, ty_r ) }
 
     go n_req ty@(TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -169,8 +235,9 @@ matchExpectedFunTys herald arity orig_ty
       = do { arg_tys <- mapM new_ty_var_ty (nOfThem n_req openTypeKind)
                         -- See Note [Foralls to left of arrow]
            ; res_ty  <- new_ty_var_ty openTypeKind
-           ; co   <- unifyType fun_ty (mkFunTys arg_tys res_ty)
-           ; return (co, arg_tys, res_ty) }
+           ; let unif_fun_ty = mkFunTys arg_tys res_ty
+           ; wrap    <- matchUnificationType ea unif_fun_ty fun_ty
+           ; return (wrap, arg_tys, res_ty) }
       where
         new_ty_var_ty | is_return = newReturnTyVarTy
                       | otherwise = newFlexiTyVarTy
@@ -205,40 +272,50 @@ we are ok.
 -}
 
 ----------------------
-matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
+matchExpectedListTy :: ExpOrAct -> TcUpsType -> TcM (HsWrapper, TcRhoType)
 -- Special case for lists
-matchExpectedListTy exp_ty
- = do { (co, [elt_ty]) <- matchExpectedTyConApp listTyCon exp_ty
+matchExpectedListTy ea exp_ty
+ = do { (co, [elt_ty]) <- matchExpectedTyConApp ea listTyCon exp_ty
       ; return (co, elt_ty) }
 
 ----------------------
-matchExpectedPArrTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
+matchExpectedPArrTy :: ExpOrAct -> TcUpsType -> TcM (HsWrapper, TcRhoType)
 -- Special case for parrs
-matchExpectedPArrTy exp_ty
-  = do { (co, [elt_ty]) <- matchExpectedTyConApp parrTyCon exp_ty
+matchExpectedPArrTy ea exp_ty
+  = do { (co, [elt_ty]) <- matchExpectedTyConApp ea parrTyCon exp_ty
        ; return (co, elt_ty) }
 
 ---------------------
-matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
-                      -> TcRhoType            -- orig_ty
-                      -> TcM (TcCoercionN,    -- T k1 k2 k3 a b c ~N orig_ty
+matchExpectedTyConApp :: ExpOrAct
+                      -> TyCon
+                         -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
+
+                      -> TcUpsType            -- orig_ty
+                      -> TcM (HsWrapper,
                               [TcSigmaType])  -- Element types, k1 k2 k3 a b c
+
+-- Expected: wrapper : T k1 k2 k3 a b c "->" orig_ty
+-- Actual:   wrapper : orig_ty "->" T k1 k2 k3 a b c
 
 -- It's used for wired-in tycons, so we call checkWiredInTyCon
 -- Precondition: never called with FunTyCon
 -- Precondition: input type :: *
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
-matchExpectedTyConApp tc orig_ty
+matchExpectedTyConApp ea tc orig_ty
   = go orig_ty
   where
+    go ty
+       | not (null tvs && null theta)
+       = exposeRhoType ea ty go
+
     go ty
        | Just ty' <- tcView ty
        = go ty'
 
     go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
-       = return (mkTcNomReflCo ty, args)
+       = return (idHsWrapper, args)
 
     go (TyVarTy tv)
        | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -263,8 +340,10 @@ matchExpectedTyConApp tc orig_ty
             do { kappa_tys <- mapM (const newMetaKindVar) kvs
                ; let arg_kinds' = map (substKiWith kvs kappa_tys) arg_kinds
                ; tau_tys <- mapM newFlexiTyVarTy arg_kinds'
-               ; co <- unifyType (mkTyConApp tc (kappa_tys ++ tau_tys)) orig_ty
-               ; return (co, kappa_tys ++ tau_tys) }
+               ; let arg_tys = kappa_tys ++ arg_tys
+                     unif_ty = mkTyConApp tc arg_tys
+               ; wrap <- matchUnificationType ea unif_ty orig_ty
+               ; return (wrap, arg_tys) }
 
     (kvs, body)           = splitForAllTys (tyConKind tc)
     (arg_kinds, res_kind) = splitKindFunTys body
@@ -333,11 +412,26 @@ It returns a coercion function
 which takes an HsExpr of type actual_ty into one of type
 expected_ty.
 
+These functions do not actually check for subsumption. They check if
+expected_ty is an appropriate annotation to use for something of type
+actual_ty. This difference matters when thinking about visible type
+application. For example,
+
+   forall a. a -> forall b. b -> b
+      DOES NOT SUBSUME
+   forall a b. a -> b -> b
+
+because the type arguments appear in a different order. (Neither does
+it work the other way around.) BUT, these types are appropriate annotations
+for one another. Because the user directs annotations, it's OK if some
+arguments shuffle around -- after all, it's what the user wants.
+Bottom line: none of this changes with visible type application.
+
 There are a number of wrinkles (below).
 
 Notice that Wrinkle 1 and 2 both require eta-expansion, which technically
 may increase termination.  We just put up with this, in exchange for getting
-more predicatble type inference.
+more predictable type inference.
 
 Wrinkle 1: Note [Deep skolemisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -345,7 +439,7 @@ We want   (forall a. Int -> a -> a)  <=  (Int -> forall a. a->a)
 (see section 4.6 of "Practical type inference for higher rank types")
 So we must deeply-skolemise the RHS before we instantiate the LHS.
 
-That is why tc_sub_type starts with a call to tcGen (which does the
+That is why tc_sub_type starts with a call to tcSkolemise (which does the
 deep skolemisation), and then calls the DS variant (which assumes
 that expected_ty is deeply skolemised)
 
@@ -440,7 +534,8 @@ tc_sub_type origin ctxt ty_actual ty_expected
        ; return (coToHsWrapper cow) }
 
   | otherwise  -- See Note [Deep skolemisation]
-  = do { (sk_wrap, inner_wrap) <- tcGen ctxt ty_expected $ \ _ sk_rho ->
+  = do { (sk_wrap, inner_wrap) <- tcSkolemise SkolemiseDeeply ctxt ty_expected $
+                                  \ _ sk_rho ->
                                   tc_sub_type_ds origin ctxt ty_actual sk_rho
        ; return (sk_wrap <.> inner_wrap) }
 
@@ -473,10 +568,9 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected
        ; return (coToHsWrapper cow) }
 
 -----------------
-tcWrapResult :: HsExpr TcId -> TcRhoType -> TcRhoType -> TcM (HsExpr TcId)
+tcWrapResult :: HsExpr TcId -> TcUpsType -> TcUpsType -> TcM (HsExpr TcId)
 tcWrapResult expr actual_ty res_ty
-  = do { cow <- tcSubTypeDS GenSigCtxt actual_ty res_ty
-                -- Both types are deeply skolemised
+  = do { cow <- tcSubType GenSigCtxt actual_ty res_ty
        ; return (mkHsWrap cow expr) }
 
 -----------------------------------
@@ -518,19 +612,25 @@ tcInfer tc_check
 ************************************************************************
 -}
 
-tcGen :: UserTypeCtxt -> TcType
-      -> ([TcTyVar] -> TcRhoType -> TcM result)
-      -> TcM (HsWrapper, result)
+-- | Take an "expected type" and strip off quantifiers to expose the
+-- type underneath, binding the new skolems for the @thing_inside@.
+-- The 'SkolemiseMode' parameter tells 'tcSkolemise' which quantifiers
+-- to skolemise. The returned 'HsWrapper' has type
+-- @specific_ty -> expected_ty@.
+tcSkolemise :: SkolemiseMode
+            -> UserTypeCtxt -> TcSigmaType
+            -> ([TcTyVar] -> TcType -> TcM result)
+            -> TcM (HsWrapper, result)
         -- The expression has type: spec_ty -> expected_ty
 
-tcGen ctxt expected_ty thing_inside
+tcSkolemise mode ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
-  = do  { traceTc "tcGen" Outputable.empty
-        ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
+  = do  { traceTc "tcSkolemise" Outputable.empty
+        ; (wrap, tvs', given, rho') <- skolemise mode expected_ty
 
         ; when debugIsOn $
-              traceTc "tcGen" $ vcat [
+              traceTc "tcSkolemise" $ vcat [
                            text "expected_ty" <+> ppr expected_ty,
                            text "inst ty" <+> ppr tvs' <+> ppr rho' ]
 
@@ -568,7 +668,7 @@ checkConstraints skol_info skol_tvs given thing_inside
   | null skol_tvs && null given
   = do { res <- thing_inside; return (emptyTcEvBinds, res) }
       -- Just for efficiency.  We check every function argument with
-      -- tcPolyExpr, which uses tcGen and hence checkConstraints.
+      -- tcPolyExpr, which uses tcSkolemise and hence checkConstraints.
 
   | otherwise
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
