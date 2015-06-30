@@ -20,13 +20,15 @@ import Distribution.Simple.Utils hiding (die)
 
 
 baseDir, rootDir :: FilePath
-baseDir = takeDirectory __FILE__ 
+baseDir = takeDirectory __FILE__
 rootDir = baseDir </> ".."
 
-srcDir, refDir, outDir :: FilePath
+srcDir, refDir, outDir, refDir', outDir' :: FilePath
 srcDir = baseDir </> "src"
 refDir = baseDir </> "ref"
 outDir = baseDir </> "out"
+refDir' = refDir </> "src"
+outDir' = outDir </> "src"
 
 haddockPath :: FilePath
 haddockPath = rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
@@ -51,6 +53,7 @@ main = do
         [ "--odir=" ++ outDir
         , "--no-warnings"
         , "--hyperlinked-source"
+        , "--pretty-html"
         ] ++ args' ++ mods'
 
     forM_ mods' $ check True
@@ -72,8 +75,8 @@ check strict mdl = do
     else do
         putStrLn $ "Pass: " ++ mdl ++ " (no reference file)"
   where
-    refFile = refDir </> takeBaseName mdl ++ ".html"
-    outFile = outDir </> takeBaseName mdl ++ ".html"
+    refFile = refDir' </> takeBaseName mdl ++ ".html"
+    outFile = outDir' </> takeBaseName mdl ++ ".html"
 
 
 diff :: FilePath -> FilePath -> IO ()
