@@ -94,6 +94,7 @@ GhcLibHcOpts    = -O2
 #BUILD_DOCBOOK_PS
 #BUILD_DOCBOOK_PDF
 
+GhcLibWays  = v
 GhcLibWays += p
 ifeq "$(PlatformSupportsSharedLibs)" "YES"
 GhcLibWays += dyn
