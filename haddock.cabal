@@ -29,6 +29,8 @@ extra-source-files:
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
+  hypsrc-test/src/*.hs
+  hypsrc-test/ref/*.html
   latex-test/src/Simple/*.hs
   latex-test/ref/Simple/*.tex
   latex-test/ref/Simple/*.sty
@@ -118,6 +120,13 @@ test-suite html-test
   default-language: Haskell2010
   main-is:          run.lhs
   hs-source-dirs:   html-test
+  build-depends:    base, directory, process, filepath, Cabal
+
+test-suite hypsrc-test
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          run.hs
+  hs-source-dirs:   hypsrc-test
   build-depends:    base, directory, process, filepath, Cabal
 
 test-suite latex-test
