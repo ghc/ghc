@@ -1293,7 +1293,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 # from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run( name, way, prog, args ):
+def simple_run(name, way, prog, extra_run_opts):
     opts = getTestOpts()
 
     # figure out what to use for stdin
@@ -1319,7 +1319,9 @@ def simple_run( name, way, prog, args ):
 
     stats_file = name + '.stats'
     if len(opts.stats_range_fields) > 0:
-        args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+        stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+    else:
+        stats_args = ''
 
     if opts.no_stdin:
         stdin_comes_from = ''
@@ -1333,8 +1335,10 @@ def simple_run( name, way, prog, args ):
         redirection        = ' > {0} 2> {1}'.format(run_stdout, run_stderr)
         redirection_append = ' >> {0} 2>> {1}'.format(run_stdout, run_stderr)
 
-    cmd = prog + ' ' + args + ' '  \
+    # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
+    cmd = prog + stats_args + ' '  \
         + my_rts_flags + ' '       \
+        + extra_run_opts + ' '     \
         + stdin_comes_from         \
         + redirection
 
