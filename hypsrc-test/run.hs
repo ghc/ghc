@@ -18,6 +18,8 @@ import System.Process
 import Distribution.Verbosity
 import Distribution.Simple.Utils hiding (die)
 
+import Utils
+
 
 baseDir, rootDir :: FilePath
 baseDir = takeDirectory __FILE__
@@ -64,14 +66,9 @@ check strict mdl = do
     hasReference <- doesFileExist refFile
     if hasReference
     then do
-        out <- readFile outFile
         ref <- readFile refFile
-        if out == ref
-        then putStrLn $ "Pass: " ++ mdl
-        else do
-            putStrLn $ "Fail: " ++ mdl
-            diff refFile outFile
-            when strict $ die "Aborting further tests."
+        out <- readFile outFile
+        compareOutput strict mdl ref out
     else do
         putStrLn $ "Pass: " ++ mdl ++ " (no reference file)"
   where
@@ -79,13 +76,33 @@ check strict mdl = do
     outFile = outDir' </> takeBaseName mdl ++ ".html"
 
 
-diff :: FilePath -> FilePath -> IO ()
-diff fileA fileB = do
+compareOutput :: Bool -> FilePath -> String -> String -> IO ()
+compareOutput strict mdl ref out = do
+    if ref' == out'
+    then putStrLn $ "Pass: " ++ mdl
+    else do
+        putStrLn $ "Fail: " ++ mdl
+        diff mdl ref' out'
+        when strict $ die "Aborting further tests."
+  where
+    ref' = stripLocalReferences ref
+    out' = stripLocalReferences out
+
+
+diff :: FilePath -> String -> String -> IO ()
+diff mdl ref out = do
     colorDiffPath <- findProgramLocation silent "colordiff"
     let cmd = fromMaybe "diff" colorDiffPath
 
-    result <- system $ cmd ++ " " ++ fileA ++ " " ++ fileB
+    writeFile refFile ref
+    writeFile outFile out
+
+    result <- system $ cmd ++ " " ++ refFile ++ " " ++ outFile
     unless (result == ExitSuccess) $ die "Failed to run `diff` command."
+  where
+    refFile = outDir </> takeFileName mdl </> ".ref.nolinks"
+    outFile = outDir </> takeFileName mdl </> ".nolinks"
+
 
 
 getAllSrcModules :: IO [FilePath]
