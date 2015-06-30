@@ -39,9 +39,9 @@ main = do
 
     (args, mods) <- partition ("-" `isPrefixOf`) <$> getArgs
     let args' = filter (\arg -> not $ arg == "--all" || arg == "-a") args
-    mods' <- map (srcDir </>) <$> if "--all" `elem` args || "-a" `elem` args
-        then getAllSrcModules
-        else return mods
+    mods' <- map (srcDir </>) <$> case args of
+        [] -> getAllSrcModules
+        _ -> return $ map (++ ".hs") mods
 
     putHaddockVersion
     putGhcVersion
