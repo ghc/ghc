@@ -2,13 +2,11 @@
 {-# LANGUAGE CPP #-}
 
 
-import Control.Applicative
 import Control.Monad
 
 import Data.List
 import Data.Maybe
 
-import System.IO
 import System.Directory
 import System.Environment
 import System.Exit
@@ -19,21 +17,6 @@ import Distribution.Verbosity
 import Distribution.Simple.Utils hiding (die)
 
 import Utils
-
-
-baseDir, rootDir :: FilePath
-baseDir = takeDirectory __FILE__
-rootDir = baseDir </> ".."
-
-srcDir, refDir, outDir, refDir', outDir' :: FilePath
-srcDir = baseDir </> "src"
-refDir = baseDir </> "ref"
-outDir = baseDir </> "out"
-refDir' = refDir </> "src"
-outDir' = outDir </> "src"
-
-haddockPath :: FilePath
-haddockPath = rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
 
 
 main :: IO ()
@@ -107,9 +90,9 @@ diff mdl ref out = do
 
 getAllSrcModules :: IO [FilePath]
 getAllSrcModules =
-    filter isValid <$> getDirectoryContents srcDir
+    filter isHaskellFile <$> getDirectoryContents srcDir
   where
-    isValid = (== ".hs") . takeExtension
+    isHaskellFile = (== ".hs") . takeExtension
 
 
 putHaddockVersion :: IO ()
@@ -128,8 +111,8 @@ putGhcVersion = do
 
 runHaddock :: [String] -> IO ()
 runHaddock args = do
-    env <- Just <$> getEnvironment
-    handle <- runProcess haddockPath args Nothing env Nothing Nothing Nothing
+    menv <- Just <$> getEnvironment
+    handle <- runProcess haddockPath args Nothing menv Nothing Nothing Nothing
     waitForSuccess handle $ "Failed to invoke haddock with " ++ show args
 
 

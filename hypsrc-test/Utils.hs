@@ -1,11 +1,32 @@
+{-# LANGUAGE CPP #-}
+
+
 module Utils
-    ( stripLocalAnchors
-    , stripLocalLinks
-    , stripLocalReferences
+    ( baseDir, rootDir
+    , srcDir, refDir, outDir, refDir', outDir'
+    , haddockPath
+    , stripLocalAnchors, stripLocalLinks, stripLocalReferences
     ) where
 
 
 import Data.List
+
+import System.FilePath
+
+
+baseDir, rootDir :: FilePath
+baseDir = takeDirectory __FILE__
+rootDir = baseDir </> ".."
+
+srcDir, refDir, outDir, refDir', outDir' :: FilePath
+srcDir = baseDir </> "src"
+refDir = baseDir </> "ref"
+outDir = baseDir </> "out"
+refDir' = refDir </> "src"
+outDir' = outDir </> "src"
+
+haddockPath :: FilePath
+haddockPath = rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
 
 
 replaceBetween :: Eq a => [a] -> a -> [a] -> [a] -> [a]
