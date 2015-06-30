@@ -319,9 +319,14 @@ matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercion, [TcType], TcType)
 matchExpectedCmdArgs 0 ty
   = return (mkTcNomReflCo ty, [], ty)
 matchExpectedCmdArgs n ty
-  = do { (co1, [ty1, ty2]) <- matchExpectedTyConApp pairTyCon ty
+  = do { (wrap1, [ty1, ty2]) <- matchExpectedTyConApp Expected pairTyCon ty
+       ; let co1 = unwrap_co wrap1 ty
        ; (co2, tys, res_ty) <- matchExpectedCmdArgs (n-1) ty2
        ; return (mkTcTyConAppCo Nominal pairTyCon [co1, co2], ty1:tys, res_ty) }
+  where
+    unwrap_co WpHole      t = mkTcNomReflCo t
+    unwrap_co (WpCast co) _ = co
+    unwrap_co wrap        _ = pprPanic "matchExpectedCmdArgs" (ppr wrap)
 
 {-
 ************************************************************************

@@ -6,12 +6,12 @@
 Type subsumption and unification
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TupleSections #-}
 
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcSkolemise, SkolemiseMode(..),
-  tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
+  tcSubTypeHR, tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
   checkConstraints,
 
   -- Various unifications
@@ -21,12 +21,14 @@ module TcUnify (
   --------------------------------
   -- Holes
   tcInfer,
+  ExpOrAct(..),
   matchExpectedListTy,
   matchExpectedPArrTy,
   matchExpectedTyConApp,
-  matchExpectedAppTy,
+  matchExpectedAppTys,
   matchExpectedFunTys,
   matchExpectedFunKind,
+  newOverloadedLit,
   wrapFunResCoercion
 
   ) where
@@ -38,9 +40,10 @@ import TypeRep
 import TcMType
 import TcRnMonad
 import TcType
+import TcHsSyn ( shortCutLit )
 import Type
 import TcEvidence
-import Name ( isSystemName )
+import Name ( Name, isSystemName )
 import Inst
 import Kind
 import TyCon
@@ -175,7 +178,7 @@ matchExpectedFunTys :: ExpOrAct
 -- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
 -- hide the forall inside a meta-variable
 
-matchExpectedFunTys ea herald = go
+matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
   where
     -- If     go n ty = (co, [t1,..,tn], ty_r)
     -- then   Actual:   wrap : ty "->" (t1 -> .. -> tn -> ty_r)
@@ -199,7 +202,10 @@ matchExpectedFunTys ea herald = go
     go n_req (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
       = do { (wrap_res, tys, ty_r) <- go (n_req-1) res_ty
-           ; return ( mkWpFun idHsWrapper wrap_res
+           ; let rhs_ty = case ea of
+                   Expected -> res_ty
+                   Actual _ -> mkFunTys tys ty_r
+           ; return ( mkWpFun idHsWrapper wrap_res arg_ty rhs_ty
                     , arg_ty:tys, ty_r ) }
 
     go n_req ty@(TyVarTy tv)
@@ -315,7 +321,7 @@ matchExpectedTyConApp ea tc orig_ty
        | Just ty' <- tcView ty
        = go ty'
 
-    go ty@(TyConApp tycon args)
+    go (TyConApp tycon args)
        | tc == tycon  -- Common case
        = return (idHsWrapper, args)
 
@@ -342,7 +348,7 @@ matchExpectedTyConApp ea tc orig_ty
             do { kappa_tys <- mapM (const newMetaKindVar) kvs
                ; let arg_kinds' = map (substKiWith kvs kappa_tys) arg_kinds
                ; tau_tys <- mapM newFlexiTyVarTy arg_kinds'
-               ; let arg_tys = kappa_tys ++ arg_tys
+               ; let arg_tys = kappa_tys ++ tau_tys
                      unif_ty = mkTyConApp tc arg_tys
                ; wrap <- matchUnificationType ea unif_ty orig_ty
                ; return (wrap, arg_tys) }
@@ -361,11 +367,12 @@ matchExpectedAppTys :: Arity
 -- Only runs in "Expected" mode, with skolemisation, never instantiation.
 
 matchExpectedAppTys n orig_ty
-  = do { (wrap, mb_stuff) <- exposeRhoType Expected orig_ty (go n)
+  = do { (wrap, mb_stuff) <- tcSkolemise SkolemiseTop GenSigCtxt orig_ty $
+                             \ _ rho -> go n rho
        ; case mb_stuff of
             Just (co, fun_ty, arg_tys) ->
               return (wrap <.> coToHsWrapper co, fun_ty, reverse arg_tys)
-            Nothing -> defer
+            Nothing -> defer }
   where
     go 0 ty = return (Just (mkTcNomReflCo ty, ty, []))
 
@@ -373,23 +380,26 @@ matchExpectedAppTys n orig_ty
       | Just ty' <- tcView ty = go n ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = do { (inner_co, inner_fun_ty, arg_tys) <- go (n-1) fun_ty
-           ; return $ Just ( mkTcAppCo inner_co (mkTcNomReflCo arg_ty)
-                           , inner_fun_ty, arg_ty : arg_tys ) }
+      = do { mb_stuff <- go (n-1) fun_ty
+           ; return $ case mb_stuff of
+               Just (inner_co, inner_fun_ty, arg_tys)
+                 -> Just ( mkTcAppCo inner_co (mkTcNomReflCo arg_ty)
+                         , inner_fun_ty, arg_ty : arg_tys )
+               Nothing -> Nothing }
 
-    go (TyVarTy tv)
+    go n (TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty -> go ty
+               Indirect ty -> go n ty
                Flexi       -> return Nothing }
 
-    go _ = return Nothing
+    go _ _ = return Nothing
 
     -- Defer splitting by generating an equality constraint
     defer = do { fun_ty  <- newFlexiTyVarTy fun_kind
                ; arg_tys <- newFlexiTyVarTys n liftedTypeKind
-               ; wrap <- tcSubType (mkAppTys fun_ty arg_tys) orig_ty
+               ; wrap <- tcSubTypeHR (mkAppTys fun_ty arg_tys) orig_ty
                ; return (wrap, fun_ty, arg_tys) }
 
     orig_kind = typeKind orig_ty
@@ -416,8 +426,7 @@ newOverloadedLit :: ExpOrAct
                  -> TcSigmaType
                  -> TcM (HsWrapper, HsOverLit TcId)
 newOverloadedLit ea
-  lit@(OverLit { ol_val = val, ol_rebindable = rebindable
-               , old_witness = meth_name }) res_ty
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindable }) res_ty
   | not rebindable
     -- all built-in overloaded lits are not higher-rank, so skolemise.
     -- this is necessary for shortCutLit.
@@ -430,11 +439,13 @@ newOverloadedLit ea
         --         which tcSimplify doesn't like
            Just expr -> return (lit { ol_witness = expr, ol_type = res_rho
                                     , ol_rebindable = False })
-           Nothing   -> newOverloadedLit' orig lit res_rho }
+           Nothing   -> newNonTrivialOverloadedLit orig lit res_rho }
 
   | otherwise
-  = do { lit' <- newNonTrivialOverloadedLit (LiteralOrigin lit) lit res_ty
+  = do { lit' <- newNonTrivialOverloadedLit orig lit res_ty
        ; return (idHsWrapper, lit') }
+  where
+    orig = LiteralOrigin lit
 
 
 {-
@@ -524,6 +535,10 @@ The following happens:
 So it's important that we unify beta := forall a. a->a, rather than
 skolemising the type.
 -}
+
+-- | Use this wrapper for 'tcSubType' in higher-rank situations.
+tcSubTypeHR :: TcSigmaType -> TcSigmaType -> TcM HsWrapper
+tcSubTypeHR = tcSubType GenSigCtxt
 
 tcSubType :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected

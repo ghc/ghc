@@ -1,7 +1,7 @@
 module TcExpr where
 import HsSyn    ( HsExpr, LHsExpr )
 import Name     ( Name )
-import TcType   ( TcType, TcRhoType, TcSigmaType )
+import TcType   ( TcType, TcSigmaType )
 import TcRnTypes( TcM, TcId, CtOrigin )
 
 tcPolyExpr, tcPolyExprNC ::

@@ -26,6 +26,7 @@ module HsUtils(
   coToHsWrapper, coToHsWrapperR, mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdCast,
+  WrappableThing(..),
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -511,6 +512,35 @@ mkHsWrapPatCo co pat ty | isTcReflCo co = pat
 
 mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
+
+{-
+************************************************************************
+*                                                                      *
+   WrappableThing
+*                                                                      *
+************************************************************************
+
+This class is used in one place, but it's quite hard to refactor away
+from using a class. The one place is in tcMatches, where we sometimes
+have an HsExpr and sometimes have a HsCmd. We need to wrap one of these
+things, but only if its an HsExpr. Suggestions for refactoring are
+welcome.
+
+-}
+
+-- | Can this be wrapped by an 'HsWrapper'?
+class WrappableThing thing where
+  wrapThing :: HsWrapper -> thing id -> thing id
+
+instance WrappableThing HsExpr where
+  wrapThing = mkHsWrap
+
+-- So, this is a lie. But the whole arrow thing uses only tau-types, and wrappers
+-- will come up only in higher-rank situations. So this is safe.
+instance WrappableThing HsCmd where
+  wrapThing wrap cmd
+    = ASSERT( isIdHsWrapper wrap )
+      cmd
 
 {-
 l

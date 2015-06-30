@@ -15,7 +15,7 @@ module Inst (
        newWanted, newWanteds,
        emitWanted, emitWanteds,
 
-       newOverloadedLit, mkOverLit,
+       newNonTrivialOverloadedLit, mkOverLit,
 
        newClsInst,
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
@@ -177,8 +177,7 @@ topSkolemise sigma
        ; let theta' = substTheta subst theta
              rho'   = substTy    subst rho
        ; ev_vars <- newEvVars theta'
-       ; (wrap, inner_tvs', inner_ev_vars, inner_rho) <-
-           topSkolemise skol_all rho'
+       ; (wrap, inner_tvs', inner_ev_vars, inner_rho) <- topSkolemise rho'
                -- This handles types like
                -- forall a. Num a => forall b. Ord b => ...
 
@@ -188,10 +187,6 @@ topSkolemise sigma
                 , inner_rho ) }
   where
     (tvs, theta, rho) = tcSplitSigmaTy sigma
-
-    should_skol
-      | skol_all  = const True
-      | otherwise = isInferredTv
 
 deeplySkolemise
   :: TcSigmaType
@@ -223,7 +218,7 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- then  wrap e :: rho
 
 topInstantiate orig ty
-  | Just (tvs, theta, rho) <- tcSplitSigmaTy_maybe ty
+  | not (null tvs && null theta)
   = do { (subst, tvs') <- tcInstTyVars tvs
        ; let theta' = substTheta subst theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
@@ -236,6 +231,8 @@ topInstantiate orig ty
        ; return (wrap2 <.> wrap1, rho2) }
 
   | otherwise = return (idHsWrapper, ty)
+  where
+    (tvs, theta, rho) = tcSplitSigmaTy ty
 
 {-
 ************************************************************************
@@ -322,8 +319,8 @@ newNonTrivialOverloadedLit :: CtOrigin
                            -> TcSigmaType
                            -> TcM (HsOverLit TcId)
 newNonTrivialOverloadedLit orig
-  lit@(OverLit { ol_val = val, ol_rebindable = rebindalbe
-               , ol_witness = meth_name }) res_ty
+  lit@(OverLit { ol_val = val, ol_witness = meth_name
+               , ol_rebindable = rebindable }) res_ty
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; fi' <- tcSyntaxOp orig meth_name (mkFunTy lit_ty res_ty)
@@ -332,8 +329,8 @@ newNonTrivialOverloadedLit orig
                 -- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
                 -- However this'll be picked up by tcSyntaxOp if necessary
         ; let witness = HsApp (noLoc fi') (noLoc (HsLit hs_lit))
-        ; return (lit { ol_witness = witness, ol_type = res_ty
-                      , ol_rebindable = rebindable }) }
+        ; return (lit { ol_witness = witness, ol_type = res_ty,
+                        ol_rebindable = rebindable }) }
 
 ------------
 mkOverLit :: OverLitVal -> TcM HsLit

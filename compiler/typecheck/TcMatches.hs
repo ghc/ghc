@@ -15,7 +15,7 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
        ) where
 
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma,
-                                tcCheckId, tcPolyExpr )
+                                tcCheckId, tcPolyExpr, tcPolyExprNC )
 
 import HsSyn
 import BasicTypes
@@ -166,7 +166,7 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
   | [match] <- matches
   = do { match' <- tcMatch ctxt pat_tys rhs_ty match
-         return (MG { mg_alts    = [match']
+       ; return (MG { mg_alts    = [match']
                     , mg_arg_tys = pat_tys
                     , mg_res_ty  = rhs_ty
                     , mg_origin  = origin }) }
@@ -193,8 +193,8 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
       = L loc (alt { m_grhss = wrap_grhss wrap (m_grhss alt) })
     wrap_grhss wrap grhss
       = grhss { grhssGRHSs = map (wrap_grhs wrap) (grhssGRHSs grhss) }
-    wrap_ghrs wrap (L loc (GRHS guards rhs))
-      = L loc (GRHS guards (wrapThing rhs))
+    wrap_grhs wrap (L loc (GRHS guards (L loc' rhs)))
+      = L loc (GRHS guards (L loc' (wrapThing wrap rhs)))
 
 -------------
 tcMatch :: (Outputable (body Name)) => TcMatchCtxt body

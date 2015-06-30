@@ -1071,8 +1071,8 @@ patterns in each equation.
 
 data MatchGroup id body
   = MG { mg_alts    :: [LMatch id body]  -- The alternatives
-       , mg_arg_tys :: [PostTc id TcSigmaType]  -- Types of the arguments, t1..tn
-       , mg_res_ty  :: PostTc id TcSigmaType    -- Type of the result, tr
+       , mg_arg_tys :: [PostTc id Type]  -- Types of the arguments, t1..tn
+       , mg_res_ty  :: PostTc id Type    -- Type of the result, tr
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
@@ -1976,32 +1976,3 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
-
-{-
-************************************************************************
-*                                                                      *
-   WrappableThing
-*                                                                      *
-************************************************************************
-
-This class is used in one place, but it's quite hard to refactor away
-from using a class. The one place is in tcMatches, where we sometimes
-have an HsExpr and sometimes have a HsCmd. We need to wrap one of these
-things, but only if its an HsExpr. Suggestions for refactoring are
-welcome.
-
--}
-
--- | Can this be wrapped by an 'HsWrapper'?
-class WrappableThing thing where
-  wrapThing :: HsWrapper -> thing id -> thing id
-
-instance WrappableThing HsExpr where
-  wrapThing = mkHsWrap
-
--- So, this is a lie. But the whole arrow thing uses only tau-types, and wrappers
--- will come up only in higher-rank situations. So this is safe.
-instance WrappableThing HsCmd where
-  wrapThing wrap cmd
-    = ASSERT( isIdHsWrapper wrap )
-      cmd

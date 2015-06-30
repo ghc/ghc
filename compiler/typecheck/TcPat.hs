@@ -547,7 +547,8 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
          -- we will only be able to use view at one instantation in the
          -- rest of the view
         ; (expr_wrap, pat_ty) <- tcInfer $ \ pat_ty ->
-                tcSubTypeDS expr'_inferred (mkFunTy overall_pat_ty pat_ty)
+                tcSubTypeDS GenSigCtxt expr'_inferred
+                            (mkFunTy overall_pat_ty pat_ty)
 
          -- pattern must have pat_ty
         ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
@@ -590,7 +591,8 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
 
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
   = do  { let tc = tupleTyCon boxity (length pats)
-        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
+        ; (coi, arg_tys) <- matchExpectedPatTy (flip matchExpectedTyConApp tc)
+                              pat_ty
         ; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
         ; dflags <- getDynFlags
@@ -639,7 +641,7 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
                             do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
                                ; return (Just neg') }
         ; res <- thing_inside
-        ; return (NPat (L l (mkHsWrapPat wrap lit')) mb_neg' eq', res) }
+        ; return (mkHsWrapPat wrap (NPat (L l lit') mb_neg' eq') pat_ty, res) }
 
 tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
   = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
@@ -650,8 +652,11 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
         -- The '>=' and '-' parts are re-mappable syntax
         ; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
         ; minus' <- tcSyntaxOp orig minus (mkFunTys [pat_ty', pat_ty'] pat_ty')
-        ; let pat' = NPlusKPat (L nm_loc bndr_id) (L loc (mkHsWrapPat wrap_lit lit'))
-                               ge' minus'
+        ; let pat' = mkHsWrapPat wrap_lit
+                                 (NPlusKPat (L nm_loc bndr_id)
+                                            (L loc lit')
+                                            ge' minus')
+                                 pat_ty
 
         -- The Report says that n+k patterns must be in Integral
         -- We may not want this when using re-mappable syntax, though (ToDo?)

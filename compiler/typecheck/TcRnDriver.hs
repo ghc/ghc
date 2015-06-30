@@ -65,6 +65,7 @@ import TcForeign
 import TcInstDcls
 import TcIface
 import TcMType
+import Inst   ( topInstantiate )
 import MkIface
 import TcSimplify
 import TcTyClsDecls
@@ -1796,7 +1797,7 @@ tcRnExpr hsc_env rdr_expr
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     ((_tc_expr, res_ty), tclvl, lie) <- pushLevelAndCaptureConstraints $
                                         tcInferSigma rn_expr ;
-    (_wrap , res_tau) <- topInstantiate GeneraliseOrigin res_ty
+    (_wrap, res_tau) <- topInstantiate GeneraliseOrigin res_ty ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $
                                       {-# SCC "simplifyInfer" #-}
                                       simplifyInfer tclvl

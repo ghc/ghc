@@ -157,7 +157,6 @@ tcTypedBracket brack@(TExpBr expr) res_ty
 
        ; (_, expr_ty) <- topInstantiate ThBrackOrigin expr_ty
        ; meta_ty <- tcTExpTy expr_ty
-       ; wrap <- tcSubType meta_ty res_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResult (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
@@ -417,7 +416,7 @@ When a variable is used, we compare
 tcSpliceExpr splice@(HsTypedSplice name expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
     setSrcSpan (getLoc expr)    $
-    tcSkolemiseExpr SkolemiseDeeply res_ty $ \ res_rho $ do
+    tcSkolemiseExpr SkolemiseDeeply res_ty $ \ res_rho -> do
     { stage <- getStage
     ; case stage of
         Splice {}            -> tcTopSplice expr res_rho
@@ -546,7 +545,7 @@ runAnnotation target expr = do
               ; let specialised_to_annotation_wrapper_expr
                       = L loc (HsWrap wrapper (HsVar to_annotation_wrapper_id))
               ; return (L loc (HsApp specialised_to_annotation_wrapper_expr $
-                                     mkHsWrap expr'_wrapper expr')) }
+                                     mkLHsWrap expr'_wrapper expr')) }
 
     -- Run the appropriately wrapped expression to get the value of
     -- the annotation and its dictionaries. The return value is of
