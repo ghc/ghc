@@ -59,9 +59,6 @@ library
 
   exposed-modules:
     Documentation.Haddock
-    Haddock.Backends.Hyperlinker.Parser
-    Haddock.Backends.Hyperlinker.Renderer
-    Haddock.Backends.Hyperlinker.Ast
 
   other-modules:
     Haddock
@@ -85,6 +82,9 @@ library
     Haddock.Backends.HaddockDB
     Haddock.Backends.Hoogle
     Haddock.Backends.Hyperlinker
+    Haddock.Backends.Hyperlinker.Ast
+    Haddock.Backends.Hyperlinker.Parser
+    Haddock.Backends.Hyperlinker.Renderer
     Haddock.Backends.Hyperlinker.Utils
     Haddock.ModuleTree
     Haddock.Types
