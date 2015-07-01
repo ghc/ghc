@@ -21,6 +21,7 @@ main :: IO ()
 main = do
     putStrLn . show $ foo x y
     putStrLn . show $ quux z
+    putStrLn . show $ Identifiers.norf x y z
   where
     x = 10
     y = 20
