@@ -20,6 +20,7 @@ module IfaceSyn (
 
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
+        ifaceConDeclFields,
         ifaceDeclFingerprints,
 
         -- Free Names
@@ -329,14 +330,15 @@ visibleIfConDecls IfDataFamTyCon       = []
 visibleIfConDecls (IfDataTyCon cs _ _) = cs
 visibleIfConDecls (IfNewTyCon c   _ _) = [c]
 
-ifaceConDeclFields :: OccName -> IfaceConDecls -> [FieldLbl OccName]
-ifaceConDeclFields tc x = map (\ lbl -> mkFieldLabelOccs lbl tc is_overloaded) lbls
+ifaceConDeclFields :: IfaceConDecls -> [FieldLbl OccName]
+ifaceConDeclFields x = case x of
+    IfAbstractTyCon {}                    -> []
+    IfDataFamTyCon  {}                    -> []
+    IfDataTyCon cons is_overloaded labels -> help cons  is_overloaded labels
+    IfNewTyCon  con  is_overloaded labels -> help [con] is_overloaded labels
   where
-    (is_overloaded, lbls) = case x of
-                              IfAbstractTyCon {}        -> (False, [])
-                              IfDataFamTyCon  {}        -> (False, [])
-                              IfDataTyCon _ is_o labels -> (is_o, labels)
-                              IfNewTyCon  _ is_o labels -> (is_o, labels)
+    help (dc:_) is_overloaded = map (\ lbl -> mkFieldLabelOccs lbl (ifConOcc dc) is_overloaded)
+    help [] _ = error "ifaceConDeclFields: data type has no constructors!"
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
@@ -630,7 +632,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     show_con dc
       | ok_con dc = Just $ pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls dc
       | otherwise = Nothing
-    fls = ifaceConDeclFields tycon condecls
+    fls = ifaceConDeclFields condecls
 
     mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
     -- See Note [Result type of a data family GADT]

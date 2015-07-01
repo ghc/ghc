@@ -588,22 +588,22 @@ getLocalNonValBinders fixity_env
            -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_tc overload_ok tc_decl -- NOT for type/data instances
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
-             ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
-             ; let main_occ = nameOccName main_name
-             ; flds' <- mapM (new_rec_sel overload_ok main_occ) flds
+             ; names@(main_name : sub_names) <- mapM newTopSrcBinder bndrs
+             ; flds' <- mapM (new_rec_sel overload_ok sub_names) flds
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
                      _                            -> []
                    avail_flds = fieldLabelsToAvailFields flds'
              ; return (AvailTC main_name names avail_flds, fld_env) }
 
-    new_rec_sel :: Bool -> OccName -> LFieldOcc RdrName -> RnM FieldLabel
-    new_rec_sel overload_ok tc (L loc (FieldOcc fld _)) =
+    new_rec_sel :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
+    new_rec_sel _ [] _ = error "new_rec_sel: datatype has no constructors!"
+    new_rec_sel overload_ok (dc:_) (L loc (FieldOcc fld _)) =
       do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
          ; return $ fl { flSelector = sel_name } }
       where
         lbl     = occNameFS $ rdrNameOcc fld
-        fl      = mkFieldLabelOccs lbl tc overload_ok
+        fl      = mkFieldLabelOccs lbl (nameOccName dc) overload_ok
         sel_occ = flSelector fl
 
     -- Calculate the mapping from constructor names to fields, which
@@ -655,10 +655,7 @@ getLocalNonValBinders fixity_env
         = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders ti_decl
              ; sub_names <- mapM newTopSrcBinder bndrs
-             ; let rep_tycon = expectJust "getLocalNonValBinders/new_di" $
-                                 dfid_rep_tycon ti_decl
-                   rep_tc_occ = rdrNameOcc rep_tycon
-             ; flds' <- mapM (new_rec_sel overload_ok rep_tc_occ) flds
+             ; flds' <- mapM (new_rec_sel overload_ok sub_names) flds
              ; let avail    = AvailTC (unLoc main_name) sub_names
                                   (fieldLabelsToAvailFields flds')
                                   -- main_name is not bound here!

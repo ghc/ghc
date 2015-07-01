@@ -305,9 +305,9 @@ data HsRecField id arg = HsRecField {
 -- update will have
 --
 --     hsRecFieldLbl = "x"
---     hsRecFieldSel = Right [(S, $sel:x:S), (T, $sel:x:T)]
+--     hsRecFieldSel = Right [(S, $sel:x:MkS), (T, $sel:x:MkT)]
 --
--- and the typechecker will determine that $sel:x:S is meant.
+-- and the typechecker will determine that $sel:x:MkS is meant.
 --
 -- It would be nice if we could enforce in the types that ambiguous
 -- fields occur only in record updates, and only between the renamer

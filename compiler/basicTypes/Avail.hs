@@ -78,7 +78,7 @@ gives rise to the AvailInfo
 
 whereas if -XAllowDuplicateRecordFields is enabled it gives
 
-  AvailTC T [T, MkT] [($sel:foo:T, Just "foo")]
+  AvailTC T [T, MkT] [($sel:foo:MkT, Just "foo")]
 
 since the label does not match the selector name.
 
@@ -93,7 +93,7 @@ multiple distinct fields with the same label. For example,
 gives rise to
 
   AvailTC F [F, MkFInt, MkFBool]
-    [($sel:foo:R:FInt, Just "foo"), ($sel:foo:R:FBool, Just "foo")].
+    [($sel:foo:MkFInt, Just "foo"), ($sel:foo:MkFBool, Just "foo")].
 -}
 
 -- | Compare lexicographically

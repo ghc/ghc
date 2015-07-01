@@ -578,10 +578,10 @@ labelFieldOcc (FieldOcc _ fl) = fl
 Note [ConDeclField names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A ConDeclField contains a list of field names: these always include
-the field label as the user wrote it in the first component of the
-pair.  After the renamer, it will additionally contain the Name of the
-selector function in the second component.
+A ConDeclField contains a list of field occurrences: these always
+include the field label as the user wrote it.  After the renamer, it
+will additionally contain the identity of the selector function in the
+second component.
 
 Due to AllowDuplicateRecordFields, the OccName of the selector function
 may have been mangled, which is why we keep the original field label
@@ -591,7 +591,7 @@ separately.  For example, when AllowDuplicateRecordFields is enabled
 
 gives
 
-    ConDeclField { cd_fld_names = [("x", $sel:x:T)], ... }.
+    ConDeclField { cd_fld_names = [L _ (FieldOcc "x" $sel:x:MkT)], ... }.
 -}
 
 -----------------------

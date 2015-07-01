@@ -518,7 +518,7 @@ T, the selector's Name will be mangled (see comments in FieldLabel).
 Thus we store the actual field label in par_lbl, and the GlobalRdrEnv
 entry looks like this:
 
-    "x" |->  GRE $sel:x:T (FldParent T (Just "x")) LocalDef
+    "x" |->  GRE $sel:x:MkT (FldParent T (Just "x")) LocalDef
 
 Note that the OccName used when adding a GRE to the environment
 (greOccName) now depends on the parent field: for FldParent it is the

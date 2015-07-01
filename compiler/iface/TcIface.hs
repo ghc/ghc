@@ -497,17 +497,13 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
         IfDataFamTyCon  -> return DataFamilyTyCon
-        IfDataTyCon cons is_overloaded fs -> do  { field_lbls <- mapM (tc_field_lbl is_overloaded) fs
-                                                 ; data_cons <- mapM (tc_con_decl field_lbls) cons
-                                                 ; return (mkDataTyConRhs data_cons) }
-        IfNewTyCon  con  is_overloaded fs -> do  { field_lbls <- mapM (tc_field_lbl is_overloaded) fs
-                                                 ; data_con <- (tc_con_decl field_lbls) con
-                                                 ; mkNewTyConRhs tycon_name tycon data_con }
+        IfDataTyCon cons _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
+                                    ; data_cons  <- mapM (tc_con_decl field_lbls) cons
+                                    ; return (mkDataTyConRhs data_cons) }
+        IfNewTyCon  con  _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
+                                    ; data_con  <- tc_con_decl field_lbls con
+                                    ; mkNewTyConRhs tycon_name tycon data_con }
   where
-    tc_field_lbl :: Bool -> FieldLabelString -> IfL FieldLabel
-    tc_field_lbl is_overloaded lbl = traverse lookupIfaceTop
-                                   $ mkFieldLabelOccs lbl (nameOccName tycon_name) is_overloaded
-
     tc_con_decl field_lbls (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_tvs,
                          ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
