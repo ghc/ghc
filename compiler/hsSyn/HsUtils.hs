@@ -759,18 +759,16 @@ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
     ++ getSelectorNames (foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls
                         `mappend` foldMap hsLInstDeclBinders inst_decls)
   where
-    getSelectorNames :: ([Located Name], [(LFieldOcc Name, Located Name)]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (flSelector . labelFieldOcc . unLoc . fst) fs
+    getSelectorNames :: ([Located Name], [LFieldOcc Name]) -> [Name]
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (flSelector . labelFieldOcc . unLoc) fs
 
 -------------------
-hsLTyClDeclBinders :: Located (TyClDecl name) ->
-                          ([Located name], [(LFieldOcc name, Located name)])
--- ^ Returns all the /binding/ names of the decl.
--- The first one is guaranteed to be the name of the decl. The first component
--- represents all binding names except fields; the second represents fields as
--- (occurrence, tycon name) triples. For record fields
--- mentioned in multiple constructors, the SrcLoc will be from the first
--- occurrence.  We use the equality to filter out duplicate field names.
+hsLTyClDeclBinders :: Located (TyClDecl name) -> ([Located name], [LFieldOcc name])
+-- ^ Returns all the /binding/ names of the decl.  The first one is
+-- guaranteed to be the name of the decl. The first component
+-- represents all binding names except record fields; the second
+-- represents field occurrences. For record fields mentioned in
+-- multiple constructors, the SrcLoc will be from the first occurrence.
 --
 -- Each returned (Located name) has a SrcSpan for the /whole/ declaration.
 -- See Note [SrcSpan for binders]
@@ -785,7 +783,7 @@ hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
        [ L mem_loc mem_name | L mem_loc (TypeSig ns _ _) <- sigs, L _ mem_name <- ns ]
     , [])
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
-  = (\ (xs, ys) -> (L loc name : xs, ys)) $ withTyCon (L loc name) $ hsDataDefnBinders defn
+  = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
 
 -------------------
 hsForeignDeclsBinders :: [LForeignDecl name] -> [Located name]
@@ -810,8 +808,7 @@ addPatSynBndr bind pss
   = pss
 
 -------------------
-hsLInstDeclBinders :: LInstDecl name
-                   -> ([Located name], [(LFieldOcc name, Located name)])
+hsLInstDeclBinders :: LInstDecl name -> ([Located name], [LFieldOcc name])
 hsLInstDeclBinders (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } }))
   = foldMap (hsDataFamInstBinders . unLoc) dfis
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
@@ -820,23 +817,20 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataFamInstBinders :: DataFamInstDecl name ->
-                            ([Located name], [(LFieldOcc name, Located name)])
-hsDataFamInstBinders (DataFamInstDecl { dfid_tycon = tycon_name, dfid_defn = defn })
-  = withTyCon tycon_name (hsDataDefnBinders defn)
+hsDataFamInstBinders :: DataFamInstDecl name -> ([Located name], [LFieldOcc name])
+hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
+  = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataDefnBinders :: HsDataDefn name ->
-                         ([Located name], [LFieldOcc name])
+hsDataDefnBinders :: HsDataDefn name -> ([Located name], [LFieldOcc name])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
-hsConDeclsBinders :: [LConDecl name] ->
-                         ([Located name], [LFieldOcc name])
+hsConDeclsBinders :: [LConDecl name] -> ([Located name], [LFieldOcc name])
   -- See hsLTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
@@ -860,10 +854,8 @@ hsConDeclsBinders cons = go id cons
                 (map (L loc . unLoc) names ++ ns, fs)
                   where (ns, fs) = go remSeen rs
 
-withTyCon :: name -> (a, [r]) -> (a, [(r, name)])
-withTyCon tycon_name (xs, ys) = (xs, map (\ r -> (r, tycon_name)) ys)
-
 {-
+
 Note [SrcSpan for binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 When extracting the (Located RdrNme) for a binder, at least for the

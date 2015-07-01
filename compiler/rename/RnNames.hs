@@ -590,7 +590,7 @@ getLocalNonValBinders fixity_env
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
              ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
              ; let main_occ = nameOccName main_name
-             ; flds' <- mapM (new_rec_sel overload_ok main_occ . fst) flds
+             ; flds' <- mapM (new_rec_sel overload_ok main_occ) flds
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
                      _                            -> []
@@ -658,7 +658,7 @@ getLocalNonValBinders fixity_env
              ; let rep_tycon = expectJust "getLocalNonValBinders/new_di" $
                                  dfid_rep_tycon ti_decl
                    rep_tc_occ = rdrNameOcc rep_tycon
-             ; flds' <- mapM (new_rec_sel overload_ok rep_tc_occ . fst) flds
+             ; flds' <- mapM (new_rec_sel overload_ok rep_tc_occ) flds
              ; let avail    = AvailTC (unLoc main_name) sub_names
                                   (fieldLabelsToAvailFields flds')
                                   -- main_name is not bound here!
