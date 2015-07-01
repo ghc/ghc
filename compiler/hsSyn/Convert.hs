@@ -273,7 +273,6 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
 
        ; returnJustL $ InstD $ DataFamInstD
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc'
-                                         , dfid_rep_tycon = placeHolderRepTyCon
                                          , dfid_pats = typats'
                                          , dfid_defn = defn
                                          , dfid_fvs = placeHolderNames } }}
@@ -288,7 +287,6 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnJustL $ InstD $ DataFamInstD
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc'
-                                         , dfid_rep_tycon = placeHolderRepTyCon
                                          , dfid_pats = typats'
                                          , dfid_defn = defn
                                          , dfid_fvs = placeHolderNames } }}

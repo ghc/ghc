@@ -40,7 +40,6 @@ module HsDecls (
   TyFamEqn(..), TyFamInstEqn, LTyFamInstEqn, TyFamDefltEqn, LTyFamDefltEqn,
   HsTyPats,
   LClsInstDecl, ClsInstDecl(..),
-  placeHolderRepTyCon,
 
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
@@ -1088,7 +1087,6 @@ type LDataFamInstDecl name = Located (DataFamInstDecl name)
 data DataFamInstDecl name
   = DataFamInstDecl
        { dfid_tycon     :: Located name
-       , dfid_rep_tycon :: Maybe name  -- See Note [Assigning names to instance declarations] in RnSource
        , dfid_pats      :: HsTyPats   name       -- LHS
        , dfid_defn      :: HsDataDefn name       -- RHS
        , dfid_fvs       :: PostRn name NameSet } -- Free vars for dependency analysis
@@ -1102,10 +1100,6 @@ data DataFamInstDecl name
     -- For details on above see note [Api annotations] in ApiAnnotation
   deriving( Typeable )
 deriving instance (DataId name) => Data (DataFamInstDecl name)
-
--- | Used for dfid_rep_tycon in DataFamInstDecl prior to the renamer
-placeHolderRepTyCon :: Maybe name
-placeHolderRepTyCon = Nothing
 
 
 ----------------- Class instances -------------

@@ -76,10 +76,10 @@ Checks the @(..)@ etc constraints in the export list.
 -- does NOT assume that anything is in scope already
 rnSrcDecls :: Maybe FreeVars -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
-rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
+rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                                        hs_splcds  = splice_decls,
                                        hs_tyclds  = tycl_decls,
-                                       hs_instds  = inst_decls0,
+                                       hs_instds  = inst_decls,
                                        hs_derivds = deriv_decls,
                                        hs_fixds   = fix_decls,
                                        hs_warnds  = warn_decls,
@@ -89,18 +89,13 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
                                        hs_ruleds  = rule_decls,
                                        hs_vects   = vect_decls,
                                        hs_docs    = docs })
-
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
    --     FastStrings to FixItems.
    --     Also checks for duplicates.
    local_fix_env <- makeMiniFixityEnv fix_decls ;
 
-   -- (B) See Note [Assigning names to instance declarations]
-   inst_decls <- assignInstDeclNames inst_decls0 ;
-   let { group = group0 { hs_instds = inst_decls } } ;
-
-   -- (C) Bring top level binders (and their fixities) into scope,
+   -- (B) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get done in step (D)
    --     with collectHsIdBinders. However *do* include
    --
@@ -236,56 +231,6 @@ addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 
 rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
 rnList f xs = mapFvRn (wrapLocFstM f) xs
-
-{-
-Note [Assigning names to instance declarations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Here we generate OccNames for the representation tycons of data
-families, and store them in the dfid_rep_tycon field of
-DataFamInstDecl.  This has to happen prior to getLocalNonValBinders,
-because we need them in order to bring overloaded record fields into
-scope.
-
-FIXME: it should be possible to do the same thing for ClsInstDecl and
-TyFamInstDecl, and hence get rid of the tcg_dfun_n mutable reference
-altogether (along with newDFunName and newFamInstTyConName).  However,
-this requires some refactoring of the uses in TcDeriv and TcGenGenerics.
--}
-
-assignInstDeclNames :: [LInstDecl RdrName] -> RnM [LInstDecl RdrName]
-assignInstDeclNames ds = do
-    ref <- fmap tcg_dfun_n getGblEnv
-    occs <- readTcRef ref
-    let (ds', occs') = runState (traverse (traverse assignNamesInstDecl) ds) occs
-    writeTcRef ref occs'
-    return ds'
-
-assignNamesInstDecl :: InstDecl RdrName -> State OccSet (InstDecl RdrName)
-assignNamesInstDecl (ClsInstD     cid)  = ClsInstD     <$> assignNamesClsInstDecl     cid
-assignNamesInstDecl (DataFamInstD dfid) = DataFamInstD <$> assignNamesDataFamInstDecl dfid
-assignNamesInstDecl (TyFamInstD tfid)   = return $ TyFamInstD tfid
-
-assignNamesClsInstDecl :: ClsInstDecl RdrName -> State OccSet (ClsInstDecl RdrName)
-assignNamesClsInstDecl cid = do
-    datafam_insts <- traverse (traverse assignNamesDataFamInstDecl) (cid_datafam_insts cid)
-    return cid { cid_datafam_insts = datafam_insts }
-
-assignNamesDataFamInstDecl :: DataFamInstDecl RdrName -> State OccSet (DataFamInstDecl RdrName)
-assignNamesDataFamInstDecl dfid = do
-    occ <- assignOccName (mkInstTyTcOcc info_string)
-    return dfid { dfid_rep_tycon = Just $ mkRdrUnqual occ }
-  where
-    info_string = occNameString (rdrNameOcc $ unLoc $ dfid_tycon dfid)
-                    ++ concatMap (getDFunHsTypeKey . unLoc) (hswb_cts (dfid_pats dfid))
-
-assignOccName :: (OccSet -> OccName) -> State OccSet OccName
-assignOccName f = do
-  occs <- get
-  let occ = f occs
-  put (extendOccSet occs occ)
-  return occ
-
 
 {-
 *********************************************************
@@ -666,16 +611,11 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
                   -> DataFamInstDecl RdrName
                   -> RnM (DataFamInstDecl Name, FreeVars)
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
-                                          , dfid_rep_tycon = mb_rep_tycon
                                           , dfid_pats  = HsWB { hswb_cts = pats }
                                           , dfid_defn  = defn })
   = do { (tycon', pats', defn', fvs) <-
            rnFamInstDecl (TyDataCtx tycon) mb_cls tycon pats defn rnDataDefn
-       ; mod <- getModule
-       ; let rep_tycon = expectJust "rnDataFamInstDecl" mb_rep_tycon
-       ; rep_tycon' <- newGlobalBinder mod (rdrNameOcc rep_tycon) (getLoc tycon)
        ; return (DataFamInstDecl { dfid_tycon = tycon'
-                                 , dfid_rep_tycon = Just rep_tycon'
                                  , dfid_pats  = pats'
                                  , dfid_defn  = defn'
                                  , dfid_fvs   = fvs }, fvs) }

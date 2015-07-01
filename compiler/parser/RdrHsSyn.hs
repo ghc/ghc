@@ -226,7 +226,6 @@ mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD (
                   DataFamInstDecl { dfid_tycon = tc
-                                  , dfid_rep_tycon = placeHolderRepTyCon
                                   , dfid_pats = mkHsWithBndrs tparams
                                   , dfid_defn = defn, dfid_fvs = placeHolderNames }))) }
 
