@@ -25,6 +25,7 @@ data TokenDetails
     | RtkBind GHC.Name
     | RtkDecl GHC.Name
     | RtkModule GHC.ModuleName
+    deriving (Eq)
 
 rtkName :: TokenDetails -> Either GHC.Name GHC.ModuleName
 rtkName (RtkVar name) = Left name
