@@ -496,6 +496,7 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsType      (LHsType id) -- Explicit type argument; e.g  f @Int x y
+  | HsTypeOut   (LHsType Name)  -- just for pretty-printing
 
   ---------------------------------------
   -- Finally, HsWrap appears only in typechecker output
@@ -726,6 +727,7 @@ ppr_expr (HsSCC _ (_,lbl) expr)
 
 ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
 ppr_expr (HsType ty)      = char '@' <> pprParendHsType (unLoc ty)
+ppr_expr (HsTypeOut ty)   = char '@' <> pprParendHsType (unLoc ty)
 
 ppr_expr (HsSpliceE s)         = pprSplice s
 ppr_expr (HsBracket b)         = pprHsBracket b
@@ -820,6 +822,8 @@ hsExprNeedsParens (HsRnBracketOut {}) = False
 hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
+hsExprNeedsParens (HsType {})         = False
+hsExprNeedsParens (HsTypeOut {})      = False
 hsExprNeedsParens _ = True
 
 

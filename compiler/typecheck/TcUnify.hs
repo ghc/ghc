@@ -26,7 +26,7 @@ module TcUnify (
   matchExpectedPArrTy,
   matchExpectedTyConApp,
   matchExpectedAppTys,
-  matchExpectedFunTys,
+  matchExpectedFunTys, matchExpectedFunTys_Args,
   matchExpectedFunKind,
   newOverloadedLit,
   wrapFunResCoercion
@@ -34,6 +34,8 @@ module TcUnify (
   ) where
 
 #include "HsVersions.h"
+
+import {-# SOURCE #-} TcHsType ( tcCheckLHsType )
 
 import HsSyn
 import TypeRep
@@ -54,7 +56,7 @@ import VarSet
 import ErrUtils
 import DynFlags
 import BasicTypes
-import Maybes ( isJust )
+import Maybes ( isJust, expectJust )
 import Util
 import Outputable
 import FastString
@@ -162,11 +164,35 @@ ignoring the quantification. In App, we want to instantiate.
 
 -}
 
+-- | Wrapper for 'match_fun_tys', to be used unless you have visible
+-- type arguments to pass in.
 matchExpectedFunTys :: ExpOrAct
-                    -> SDoc     -- See Note [Herald for matchExpectedFunTys]
+                    -> SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> TcSigmaType
                     -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+matchExpectedFunTys ea herald n orig_ty
+  = match_fun_tys ea herald (panic "matchExpectedFunTys")
+                  (nOfThem n Nothing) orig_ty
+
+-- | Wrapper for 'match_fun_tys', to be used when you do have visible
+-- type arugments to pass in.
+matchExpectedFunTys_Args :: CtOrigin
+                         -> SDoc  -- See Note [Herald for matchExpectedFunTys]
+                         -> LHsExpr Name  -- the function (for errors)
+                         -> [LHsExpr Name]
+                         -> TcSigmaType
+                         -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+matchExpectedFunTys_Args orig herald orig_fun args orig_ty
+  = match_fun_tys (Actual orig) herald orig_fun (map Just args) orig_ty
+
+match_fun_tys
+  :: ExpOrAct
+  -> SDoc          -- See Note [Herald for matchExpectedFunTys]
+  -> LHsExpr Name  -- the function expression; only used when there are type args
+  -> [Maybe (LHsExpr Name)]
+  -> TcSigmaType
+  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
 
 -- If    matchExpectFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty "->" (t1 -> ... -> tn -> ty_r)
@@ -178,42 +204,61 @@ matchExpectedFunTys :: ExpOrAct
 -- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
 -- hide the forall inside a meta-variable
 
-matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
+match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
   where
     -- If     go n ty = (co, [t1,..,tn], ty_r)
     -- then   Actual:   wrap : ty "->" (t1 -> .. -> tn -> ty_r)
     --        Expected: wrap : (t1 -> .. -> tn -> ty_r) "->" ty
 
-    go n_req ty
-      | n_req == 0 = return (idHsWrapper, [], ty)
+    go [] ty = return (idHsWrapper, [], ty)
 
-    go n_req ty
+    go (arg:args) ty
+      | Just (Just hs_ty_arg) <- fmap isLHsTypeExpr_maybe arg
+      = do { let origin = case ea of Expected    -> panic "match_fun_tys"
+                                     Actual orig -> orig
+           ; (wrap1, upsilon_ty) <- topInstantiateInferred origin ty
+               -- wrap1 :: ty "->" upsilon_ty
+           ; case tcSplitForAllTy_maybe upsilon_ty of
+               Just (tv, inner_ty) ->
+                 ASSERT( isSpecifiedTyVar tv )
+                 do { let kind = tyVarKind tv
+                    ; ty_arg <- tcCheckLHsType hs_ty_arg kind
+                    ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
+                    ; (inner_wrap, arg_tys, res_ty) <- go args insted_ty
+                        -- inner_wrap :: insted_ty "->" arg_tys -> res_ty
+                    ; let inst_wrap = mkWpTyApps [ty_arg]
+                        -- inst_wrap :: upsilon_ty "->" insted_ty
+                    ; return ( inner_wrap <.> inst_wrap <.> wrap1
+                             , arg_tys, res_ty ) }
+               Nothing -> ty_app_err upsilon_ty hs_ty_arg }
+
+    go args ty
       | not (null tvs && null theta)
       = do { (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
-             do { (inner_wrap, arg_tys, res_ty) <- go n_req rho
+             do { (inner_wrap, arg_tys, res_ty) <- go args rho
                 ; return (inner_wrap, (arg_tys, res_ty)) }
            ; return (wrap, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go n_req ty
-      | Just ty' <- tcView ty = go n_req ty'
+    go args ty
+      | Just ty' <- tcView ty = go args ty'
 
-    go n_req (FunTy arg_ty res_ty)
+    go (_arg:args) (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
-      = do { (wrap_res, tys, ty_r) <- go (n_req-1) res_ty
+      = do { (wrap_res, tys, ty_r) <- go args res_ty
            ; let rhs_ty = case ea of
                    Expected -> res_ty
                    Actual _ -> mkFunTys tys ty_r
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty rhs_ty
                     , arg_ty:tys, ty_r ) }
 
-    go n_req ty@(TyVarTy tv)
+    go args ty@(TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go n_req ty'
-               Flexi        -> defer n_req ty (isReturnTyVar tv) }
+               Indirect ty' -> go args ty'
+               Flexi        -> defer args ty (isReturnTyVar tv) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -230,15 +275,16 @@ matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also Trac #9605.
-    go n_req ty = addErrCtxtM mk_ctxt $
-                  defer n_req ty False
+    go args ty = addErrCtxtM mk_ctxt $
+                 defer args ty False
 
     ------------
     -- If we decide that a ReturnTv (see Note [ReturnTv] in TcType) should
     -- really be a function type, then we need to allow the argument and
     -- result types also to be ReturnTvs.
-    defer n_req fun_ty is_return
-      = do { arg_tys <- mapM new_ty_var_ty (nOfThem n_req openTypeKind)
+    defer args fun_ty is_return
+      = do { check_for_type_args args  -- fails if there are any type args
+           ; arg_tys <- mapM new_ty_var_ty (map (const openTypeKind) args)
                         -- See Note [Foralls to left of arrow]
            ; res_ty  <- new_ty_var_ty openTypeKind
            ; let unif_fun_ty = mkFunTys arg_tys res_ty
@@ -249,6 +295,16 @@ matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
                       | otherwise = newFlexiTyVarTy
 
     ------------
+    check_for_type_args args
+      = when (any (maybe False isLHsTypeExpr) args) $
+        failWith $
+        vcat [ text "Cannot apply" <+> quotes (ppr orig_fun) <+>
+                 text "to arguments"
+             , nest 4 (sep (map (pprParendExpr .
+                                 expectJust "check_for_type_args") orig_args))
+             , hang (text "I do not know enough about the function's type")
+                  2 (ppr orig_ty) ]
+
     mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt env = do { (env', ty) <- zonkTidyTcType env orig_ty
                      ; let (args, _) = tcSplitFunTys ty
@@ -256,8 +312,9 @@ matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
                            (env'', orig_ty') = tidyOpenType env' orig_ty
                      ; return (env'', mk_msg orig_ty' ty n_actual) }
 
+    arity = length orig_args
     mk_msg orig_ty ty n_args
-      = herald <+> speakNOf arity (ptext (sLit "argument")) <> comma $$
+      = herald <+> speakNOf arity (text "argument") <> comma $$
         if n_args == arity
           then ptext (sLit "its type is") <+> quotes (pprType orig_ty) <>
                comma $$
@@ -265,6 +322,11 @@ matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
           else sep [ptext (sLit "but its type") <+> quotes (pprType ty),
                     if n_args == 0 then ptext (sLit "has none")
                     else ptext (sLit "has only") <+> speakN n_args]
+
+    ty_app_err ty arg
+      = failWith $
+        text "Cannot not apply expression of type" <+> quotes (ppr ty) $$
+        text "to a visible type argument" <+> quotes (ppr arg)
 
 {-
 Note [Foralls to left of arrow]
@@ -608,6 +670,25 @@ tc_sub_type_ds :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcRhoType -> TcM Hs
 -- Just like tcSubType, but with the additional precondition that
 -- ty_expected is deeply skolemised
 tc_sub_type_ds origin ctxt ty_actual ty_expected
+  | Just tv_expected <- tcGetTyVar_maybe ty_expected
+  , isMetaTyVar tv_expected
+  = do { dflags <- getDynFlags
+       ; (in_wrap, in_rho) <- case metaTyVarInfo tv_expected of
+                                TauTv _
+                                  | not (xopt Opt_ImpredicativeTypes dflags)
+                                  -> deeplyInstantiate origin ty_actual
+     -- We've avoided instantiating ty_actual just in case ty_expected is
+     -- polymorphic. But we've now assiduously determined that it is *not*
+     -- polymorphic. So instantiate away. This is needed for e.g. test
+     -- typecheck/should_compile/T4284.
+
+                                _ -> return (idHsWrapper, ty_actual)
+
+         -- Even if it's not a TauTv, we want to go straight to
+         -- uType, so that a ReturnTv can unify with a polytype
+       ; cow <- uType origin in_rho ty_expected
+       ; return (coToHsWrapper cow <.> in_wrap) }
+
   | Just (act_arg, act_res) <- tcSplitFunTy_maybe ty_actual
   , Just (exp_arg, exp_res) <- tcSplitFunTy_maybe ty_expected
   = -- See Note [Co/contra-variance of subsumption checking]
@@ -617,14 +698,10 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected
            -- arg_wrap :: exp_arg ~ act_arg
            -- res_wrap :: act-res ~ exp_res
 
-  | (tvs, theta, in_rho) <- tcSplitSigmaTy ty_actual
+  | (tvs, theta, _) <- tcSplitSigmaTy ty_actual
   , not (null tvs && null theta)
-  = do { (subst, tvs') <- tcInstTyVars tvs
-       ; let tys'    = mkTyVarTys tvs'
-             theta'  = substTheta subst theta
-             in_rho' = substTy subst in_rho
-       ; in_wrap   <- instCall origin tys' theta'
-       ; body_wrap <- tcSubTypeDS_NC ctxt in_rho' ty_expected
+  = do { (in_wrap, in_rho) <- topInstantiate origin ty_actual
+       ; body_wrap <- tcSubTypeDS_NC ctxt in_rho ty_expected
        ; return (body_wrap <.> in_wrap) }
 
   | otherwise   -- Revert to unification

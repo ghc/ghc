@@ -231,12 +231,8 @@ tcExpr Up (ExprWithTySig expr sig_ty wcs) res_ty
       ; tcWrapResult inner_expr sig_tc_ty res_ty } }
 
 tcExpr _ (HsType ty) _
-  = failWithTc (text "Can't handle type argument:" <+> ppr ty)
-        -- This is the syntax for type applications that I was planning
-        -- but there are difficulties (e.g. what order for type args)
-        -- so it's not enabled yet.
-        -- Can't eliminate it altogether from the parser, because the
-        -- same parser parses *patterns*.
+  = failWithTc (sep [ text "Type argument used outside of a function argument:"
+                    , ppr ty ])
 
 {-
 ************************************************************************
@@ -927,44 +923,44 @@ tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
            -- But OpApp is slightly different, so that's why the caller
            -- must assemble
 
-tcApp m_herald orig (L _ (HsPar e)) args res_ty
-  = tcApp m_herald orig e args res_ty
+tcApp m_herald orig orig_fun orig_args res_ty
+  = go orig_fun orig_args
+  where
+    go (L _ (HsPar e))     args = go e  args
+    go (L _ (HsApp e1 e2)) args = go e1 (e2:args)
 
-tcApp m_herald orig (L _ (HsApp e1 e2)) args res_ty
-  = tcApp m_herald orig e1 (e2:args) res_ty   -- Accumulate the arguments
+    go (L loc (HsVar fun)) args
+      | fun `hasKey` tagToEnumKey
+      , count (not . isLHsTypeExpr) args == 1
+      = tcTagToEnum loc fun args res_ty
 
-tcApp _ _ (L loc (HsVar fun)) args res_ty
-  | fun `hasKey` tagToEnumKey
-  , [arg] <- args
-  = tcTagToEnum loc fun arg res_ty
+      | fun `hasKey` seqIdKey
+      , count (not . isLHsTypeExpr) args == 2
+      = tcSeq loc fun args res_ty
 
-  | fun `hasKey` seqIdKey
-  , [arg1,arg2] <- args
-  = tcSeq loc fun arg1 arg2 res_ty
+    go fun args
+      = do {   -- Type-check the function
+           ; (fun1, fun_sigma) <- tcInferFun fun
 
-tcApp m_herald orig fun args res_ty
-  = do  {   -- Type-check the function
-        ; (fun1, fun_sigma) <- tcInferFun fun
+               -- Extract its argument types
+           ; (wrap_fun, expected_arg_tys, actual_res_ty)
+                 <- matchExpectedFunTys_Args orig
+                      (m_herald `orElse` mk_app_msg fun)
+                      fun args fun_sigma
 
-            -- Extract its argument types
-        ; (wrap_fun, expected_arg_tys, actual_res_ty)
-              <- matchExpectedFunTys (Actual orig)
-                   (m_herald `orElse` mk_app_msg fun)
-                   (length args) fun_sigma
+           -- Typecheck the result, thereby propagating
+           -- info (if any) from result into the argument types
+           -- Both actual_res_ty and res_ty are deeply skolemised
+           -- Rather like tcWrapResult, but (perhaps for historical reasons)
+           -- we do this before typechecking the arguments
+           ; wrap_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
+                         tcSubTypeDS_NC GenSigCtxt actual_res_ty res_ty
 
-        -- Typecheck the result, thereby propagating
-        -- info (if any) from result into the argument types
-        -- Both actual_res_ty and res_ty are deeply skolemised
-        -- Rather like tcWrapResult, but (perhaps for historical reasons)
-        -- we do this before typechecking the arguments
-        ; wrap_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
-                      tcSubTypeDS_NC GenSigCtxt actual_res_ty res_ty
+           -- Typecheck the arguments
+           ; args1 <- tcArgs fun args expected_arg_tys
 
-        -- Typecheck the arguments
-        ; args1 <- tcArgs fun args expected_arg_tys
-
-        -- Assemble the result
-        ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
+           -- Assemble the result
+           ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
 
 mk_app_msg :: LHsExpr Name -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
@@ -996,8 +992,20 @@ tcArgs :: LHsExpr Name                          -- The function (for error messa
        -> [LHsExpr Name] -> [TcSigmaType]       -- Actual arguments and expected arg types
        -> TcM [LHsExpr TcId]                    -- Resulting args
 
-tcArgs fun args expected_arg_tys
-  = mapM (tcArg fun) (zip3 args expected_arg_tys [1..])
+tcArgs fun orig_args orig_arg_tys = go 1 orig_args orig_arg_tys
+  where
+    go _ [] [] = return []
+    go n (arg:args) all_arg_tys
+      | Just hs_ty <- isLHsTypeExpr_maybe arg
+      = do { args' <- go (n+1) args all_arg_tys
+           ; return (L (getLoc arg) (HsTypeOut hs_ty) : args') }
+
+    go n (arg:args) (arg_ty:arg_tys)
+      = do { arg'  <- tcArg fun (arg, arg_ty, n)
+           ; args' <- go (n+1) args arg_tys
+           ; return (arg':args') }
+
+    go _ _ _ = pprPanic "tcArgs" (ppr fun $$ ppr orig_args $$ ppr orig_arg_tys)
 
 ----------------
 tcArg :: LHsExpr Name                           -- The function (for error messages)
@@ -1139,7 +1147,9 @@ tcInferIdWithOrig orig id_name
          else tc_infer_assert dflags orig }
 
   | otherwise
-  = tc_infer_id orig id_name
+  = do { (expr, ty) <- tc_infer_id orig id_name
+       ; traceTc "tcInferIdWithOrig" (ppr id_name <+> dcolon <+> ppr ty)
+       ; return (expr, ty) }
 
 tc_infer_assert :: DynFlags -> CtOrigin -> TcM (HsExpr TcId, TcSigmaType)
 -- Deal with an occurrence of 'assert'
@@ -1261,24 +1271,64 @@ the users that complain.
 
 -}
 
-tcSeq :: SrcSpan -> Name -> LHsExpr Name -> LHsExpr Name
+tcSeq :: SrcSpan -> Name -> [LHsExpr Name]
       -> TcRhoType -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
 -- (seq e1 e2) :: res_ty
 -- We need a special typing rule because res_ty can be unboxed
-tcSeq loc fun_name arg1 arg2 res_ty
+tcSeq loc fun_name args res_ty
   = do  { fun <- tcLookupId fun_name
-        ; (arg1', arg1_ty) <- tcInfer (tcPolyExpr arg1)
+        ; (arg1_ty, args1) <- case args of
+            (ty_arg_expr1 : args1)
+              | Just hs_ty_arg1 <- isLHsTypeExpr_maybe ty_arg_expr1
+              -> do { ty_arg1 <- tcHsLiftedType hs_ty_arg1
+                    ; return (ty_arg1, args1) }
+
+            _ -> do { arg_ty1 <- newReturnTyVarTy liftedTypeKind
+                    ; return (arg_ty1, args) }
+
+        ; (arg1, arg2) <- case args1 of
+            [ty_arg_expr2, term_arg1, term_arg2]
+              | Just hs_ty_arg2 <- isLHsTypeExpr_maybe ty_arg_expr2
+              -> do { ty_arg2 <- tcHsOpenType hs_ty_arg2
+                    ; _ <- unifyType ty_arg2 res_ty
+                    ; return (term_arg1, term_arg2) }
+            [term_arg1, term_arg2] -> return (term_arg1, term_arg2)
+            _ -> too_many_args
+
+        ; arg1' <- tcPolyExpr arg1 arg1_ty
+        ; res_ty <- zonkTcType res_ty   -- just in case we learned something
+                                        -- interesting about it
         ; arg2' <- tcPolyExpr arg2 res_ty
         ; let fun'    = L loc (HsWrap ty_args (HsVar fun))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
         ; return (idHsWrapper, fun', [arg1', arg2']) }
+  where
+    too_many_args :: TcM a
+    too_many_args
+      = failWith $
+        hang (text "Too many type arguments to seq:")
+           2 (sep (map pprParendExpr args))
 
-tcTagToEnum :: SrcSpan -> Name -> LHsExpr Name -> TcRhoType
+
+tcTagToEnum :: SrcSpan -> Name -> [LHsExpr Name] -> TcRhoType
             -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
-tcTagToEnum loc fun_name arg res_ty
+tcTagToEnum loc fun_name args res_ty
   = do { fun <- tcLookupId fun_name
+
+       ; arg <- case args of
+           [ty_arg_expr, term_arg]
+             | Just hs_ty_arg <- isLHsTypeExpr_maybe ty_arg_expr
+             -> do { ty_arg <- tcHsLiftedType hs_ty_arg
+                   ; _ <- unifyType ty_arg res_ty
+                     -- other than influencing res_ty, we just
+                     -- don't care about a type arg passed in.
+                     -- So drop the evidence.
+                   ; return term_arg }
+           [term_arg] -> return term_arg
+           _          -> too_many_args
+
        ; ty' <- zonkTcType res_ty
 
        -- Check that the type is algebraic
@@ -1312,6 +1362,12 @@ tcTagToEnum loc fun_name arg res_ty
       = hang (ptext (sLit "Bad call to tagToEnum#")
                <+> ptext (sLit "at type") <+> ppr ty)
            2 what
+
+    too_many_args :: TcM a
+    too_many_args
+      = failWith $
+        hang (text "Too many type arguments to tagToEnum#:")
+           2 (sep (map pprParendExpr args))
 
 {-
 ************************************************************************

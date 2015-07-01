@@ -1704,7 +1704,7 @@ checkValidClass cls
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
 
         ; unless constrained_class_methods $
-          mapM_ check_constraint (tail (theta1 ++ theta2)) 
+          mapM_ check_constraint (tail (theta1 ++ theta2))
 
         ; case dm of
             GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
@@ -1949,11 +1949,12 @@ mkRecSelBind (tycon, sel_name)
     is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tvs)
     (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys (varSetElemsKvsFirst $
-                                       data_tvs `extendVarSetList` field_tvs) $
+           | otherwise  = mkForAllTys (varSetElemsKvsFirst data_tvs) $
                           mkPhiTy (dataConStupidTheta con1) $   -- Urgh!
-                          mkPhiTy field_theta               $   -- Urgh!
-                          mkFunTy data_ty field_tau
+                          mkFunTy data_ty                   $
+                          mkForAllTys field_tvs             $
+                          mkPhiTy field_theta               $
+                          field_tau
 
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
@@ -2005,14 +2006,14 @@ tyConFields tc
 {-
 Note [Polymorphic selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When a record has a polymorphic field, we pull the foralls out to the front.
-   data T = MkT { f :: forall a. [a] -> a }
-Then f :: forall a. T -> [a] -> a
-NOT  f :: T -> forall a. [a] -> a
+We take care to build the type of a polymorphic selector in the right
+order, so that visible type application works.
 
-This is horrid.  It's only needed in deeply obscure cases, which I hate.
-The only case I know is test tc163, which is worth looking at.  It's far
-from clear that this test should succeed at all!
+  data Ord a => T a = MkT { field :: forall b. (Num a, Show b) => (a, b) }
+
+We want
+
+  field :: forall a. Ord a => T a -> forall b. (Num a, Show b) => (a, b)
 
 Note [Naughty record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2164,7 +2165,7 @@ classFunDepsErr cls
 
 badMethPred :: Id -> TcPredType -> SDoc
 badMethPred sel_id pred
-  = vcat [ hang (ptext (sLit "Constraint") <+> quotes (ppr pred) 
+  = vcat [ hang (ptext (sLit "Constraint") <+> quotes (ppr pred)
                  <+> ptext (sLit "in the type of") <+> quotes (ppr sel_id))
               2 (ptext (sLit "constrains only the class type variables"))
          , ptext (sLit "Use ConstrainedClassMethods to allow it") ]

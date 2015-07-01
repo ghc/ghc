@@ -215,7 +215,9 @@ dsExpr (HsLamCase arg matches)
        ; return $ Lam arg_var $ bindNonRec discrim_var (Var arg_var) matching_code }
 
 dsExpr (HsApp fun arg)
-  = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
+    -- ignore type arguments here; they're in the wrappers instead at this point
+  | isLHsTypeExpr arg = dsLExpr fun
+  | otherwise         = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
 
 
 {-
@@ -681,6 +683,7 @@ dsExpr (EAsPat        {})  = panic "dsExpr:EAsPat"
 dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 dsExpr (HsType        {})  = panic "dsExpr:HsType" -- removed by typechecker
+dsExpr (HsTypeOut     {})  = panic "dsExpr:HsTypeOut" -- handled in HsApp case
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 
 

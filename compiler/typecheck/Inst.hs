@@ -10,7 +10,7 @@ The @Inst@ type: dictionaries or method instances
 
 module Inst (
        skolemise, SkolemiseMode(..),
-       topInstantiate,
+       topInstantiate, topInstantiateInferred, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
        emitWanted, emitWanteds,
@@ -216,23 +216,83 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho
+topInstantiate = top_instantiate True
 
-topInstantiate orig ty
+-- | Instantiate all outer *inferred* type variables
+-- and any context. Never looks through arrows or specified type variables.
+-- Used for visible type application.
+topInstantiateInferred :: CtOrigin -> TcSigmaType
+                       -> TcM (HsWrapper, TcSigmaType)
+-- if    topInstantiate ty = (wrap, rho)
+-- and   e :: ty
+-- then  wrap e :: rho
+topInstantiateInferred = top_instantiate False
+
+top_instantiate :: Bool   -- True <=> instantiate *all* variables
+                -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+top_instantiate inst_all orig ty
   | not (null tvs && null theta)
-  = do { (subst, tvs') <- tcInstTyVars tvs
-       ; let theta' = substTheta subst theta
-       ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
-       ; traceTc "Instantiating" (vcat [ text "origin" <+> pprCtOrigin orig
-                                       , text "type" <+> ppr ty
-                                       , text "with" <+> ppr tvs'
-                                       , text "theta:" <+>  ppr theta' ])
+  = do { let (inst_tvs, leave_tvs) = span should_inst tvs
+             inst_theta
+               | null leave_tvs = theta
+               | otherwise      = []
+       ; (subst, inst_tvs') <- tcInstTyVars inst_tvs
+       ; let inst_theta' = substTheta subst inst_theta
+             sigma'      = substTy    subst (mkForAllTys leave_tvs rho)
+
+       ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
+       ; traceTc "Instantiating (inferred only)"
+                 (vcat [ text "origin" <+> pprCtOrigin orig
+                       , text "type" <+> ppr ty
+                       , text "with" <+> ppr inst_tvs'
+                       , text "theta:" <+>  ppr inst_theta' ])
+
+       ; (wrap2, rho2) <-
+           if null leave_tvs
+
          -- account for types like forall a. Num a => forall b. Ord b => ...
-       ; (wrap2, rho2) <- topInstantiate orig (substTy subst rho)
+           then top_instantiate inst_all orig sigma'
+
+         -- but don't loop if there were any un-inst'able tyvars
+           else return (idHsWrapper, sigma')
+
        ; return (wrap2 <.> wrap1, rho2) }
 
   | otherwise = return (idHsWrapper, ty)
   where
     (tvs, theta, rho) = tcSplitSigmaTy ty
+
+    should_inst
+      | inst_all  = const True
+      | otherwise = isInferredTyVar
+
+deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+--   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
+-- In general if
+-- if    deeplyInstantiate ty = (wrap, rho)
+-- and   e :: ty
+-- then  wrap e :: rho
+
+deeplyInstantiate orig ty
+  | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
+  = do { (subst, tvs') <- tcInstTyVars tvs
+       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
+       ; let theta' = substTheta subst theta
+       ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
+       ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
+                                                , text "type" <+> ppr ty
+                                                , text "with" <+> ppr tvs'
+                                                , text "args:" <+> ppr ids1
+                                                , text "theta:" <+>  ppr theta' ])
+       ; (wrap2, rho2) <- deeplyInstantiate orig (substTy subst rho)
+       ; return (mkWpLams ids1
+                    <.> wrap2
+                    <.> wrap1
+                    <.> mkWpEvVarApps ids1,
+                 mkFunTys arg_tys rho2) }
+
+  | otherwise = return (idHsWrapper, ty)
+
 
 {-
 ************************************************************************

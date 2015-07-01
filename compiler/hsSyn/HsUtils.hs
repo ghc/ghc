@@ -25,7 +25,7 @@ module HsUtils(
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   coToHsWrapper, coToHsWrapperR, mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
-  mkLHsPar, mkHsCmdCast,
+  mkLHsPar, mkHsCmdCast, isLHsTypeExpr_maybe, isLHsTypeExpr,
   WrappableThing(..),
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps,
@@ -406,6 +406,20 @@ nlHsFunTy a b           = noLoc (HsFunTy a b)
 
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
+
+-- | Extract a type argument from an HsExpr
+isLHsTypeExpr_maybe :: LHsExpr name -> Maybe (LHsType name)
+isLHsTypeExpr_maybe (L _ (HsPar e))      = isLHsTypeExpr_maybe e
+isLHsTypeExpr_maybe (L _ (HsType ty))    = Just ty
+  -- the HsTypeOut case is ill-typed. We never need it here anyway.
+isLHsTypeExpr_maybe _                    = Nothing
+
+-- | Is an expression a visible type application?
+isLHsTypeExpr :: LHsExpr name -> Bool
+isLHsTypeExpr (L _ (HsPar e))     = isLHsTypeExpr e
+isLHsTypeExpr (L _ (HsType _))    = True
+isLHsTypeExpr (L _ (HsTypeOut _)) = True
+isLHsTypeExpr _                   = False
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack

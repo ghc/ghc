@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, PolyKinds,
+             TypeFamilies, RankNTypes #-}
 
 -- tests about visible type application
 
@@ -7,8 +8,8 @@ module Vta1 where
 quad :: a -> b -> c -> d -> (a, b, c, d)
 quad = (,,,)
 
-silly :: (a, Bool, Char, b)
-silly = quad @_ @Bool @Char @_ 5 True 'a' "Hello"
+-- silly :: (a, Bool, Char, b)
+-- silly = quad @_ @Bool @Char @_ 5 True 'a' "Hello"
 
 pairup_nosig x y = (x, y)
 
@@ -48,7 +49,6 @@ mapSame fun (x:xs) = fun @b x : (mapSame @b fun xs)
 pair :: forall a. a-> (forall b. b -> (a, b))
 pair x y = (x, y)
 
-a = pair @Int @Bool 3 True
 b = pair @Int 3 @Bool True
 c = mapSame id [1,2,3]
 d = pair 3 @Bool True
@@ -87,10 +87,10 @@ newtype N = MkN { unMkN :: forall a. Show a => a -> String }
 
 n = MkN show
 
-boo = unMkN @Bool n
+boo = unMkN n @Bool
 
 boo2 :: forall (a :: * -> *) . Proxy a -> Bool
 boo2 _ = False
 
-base = boo2 Proxy
-bar'= boo2 @Maybe Proxy -- should work
+base = boo2 P
+bar'= boo2 @Maybe P -- should work

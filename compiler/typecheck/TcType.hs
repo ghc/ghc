@@ -38,6 +38,7 @@ module TcType (
   isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
+  isInferredTyVar, isSpecifiedTyVar,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
@@ -51,6 +52,7 @@ module TcType (
   -- Splitters
   -- These are important because they do not look through newtypes
   tcView,
+  tcSplitForAllTy_maybe,
   tcSplitForAllTys, tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
@@ -82,7 +84,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred, 
+  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
   immSuperClasses,
   isImprovementPred,
 
@@ -818,6 +820,14 @@ isRuntimeUnkSkol x
   | isTcTyVar x, RuntimeUnk <- tcTyVarDetails x = True
   | otherwise                                   = False
 
+-- | Is this TyVar inferred by GHC? (Used with visible type application)
+isInferredTyVar :: TyVar -> Bool
+isInferredTyVar = isSystemName . tyVarName
+
+-- | Is this TyVar specified by the user? (Used with visible type application)
+isSpecifiedTyVar :: TyVar -> Bool
+isSpecifiedTyVar = isInternalName . tyVarName
+
 {-
 ************************************************************************
 *                                                                      *
@@ -907,6 +917,11 @@ These tcSplit functions are like their non-Tc analogues, but
 However, they are non-monadic and do not follow through mutable type
 variables.  It's up to you to make sure this doesn't matter.
 -}
+
+tcSplitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
+tcSplitForAllTy_maybe ty | Just ty' <- tcView ty = tcSplitForAllTy_maybe ty'
+tcSplitForAllTy_maybe (ForAllTy tv ty) = Just (tv, ty)
+tcSplitForAllTy_maybe _                = Nothing
 
 tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty = split ty ty []
@@ -1271,8 +1286,8 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty 
-              | impredicative || isTauTyCon tc 
+          OC_OK ty
+              | impredicative || isTauTyCon tc
               -> return ty  -- First try to eliminate the tyvar from the args
               | otherwise
               -> OC_Forall  -- A type synonym with a forall on the RHS
@@ -1322,7 +1337,7 @@ Note [Kind polymorphic type classes]
     class C f where...   -- C :: forall k. k -> Constraint
     g :: forall (f::*). C f => f -> f
 
-Here the (C f) in the signature is really (C * f), and we 
+Here the (C f) in the signature is really (C * f), and we
 don't want to complain that the * isn't a type variable!
 -}
 
@@ -1343,7 +1358,7 @@ checkValidClsArgs flexible_contexts kts
   | otherwise         = all hasTyVarHead tys
   where
     (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
-   
+
 hasTyVarHead :: Type -> Bool
 -- Returns true of (a t1 .. tn), where 'a' is a type variable
 hasTyVarHead ty                 -- Haskell 98 allows predicates of form
@@ -1401,7 +1416,7 @@ immSuperClasses cls tys
 
 isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
-isImprovementPred ty 
+isImprovementPred ty
   = case classifyPredType ty of
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
@@ -1891,4 +1906,3 @@ size_type (ForAllTy _ ty)   = size_type ty
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
-

@@ -768,6 +768,9 @@ zonkExpr env (HsWrap co_fn expr)
 zonkExpr _ (HsUnboundVar v)
   = return (HsUnboundVar v)
 
+  -- nothing to do here. The payload is an LHsType, not a Type.
+zonkExpr _ e@(HsTypeOut {}) = return e
+
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
 -------------------------------------------------------------------------

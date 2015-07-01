@@ -174,19 +174,12 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcM (Located (body TcId)) }
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
-  | [match] <- matches
-  = do { match' <- tcMatch ctxt pat_tys rhs_ty match
-       ; return (MG { mg_alts    = [match']
-                    , mg_arg_tys = pat_tys
-                    , mg_res_ty  = rhs_ty
-                    , mg_origin  = origin }) }
-
-  | otherwise
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
     do  { (wrap, group) <-
-             -- if there are several matches, we skolemise the result type,
+             -- we skolemise the result type
              -- so that no one branch takes precedence over others in
              -- higher-rank situations
+             -- (this is also needed for e.g. typecheck/should_compile/T700)
              tcSkolemise SkolemiseDeeply GenSigCtxt rhs_ty $ \_ rhs_rho ->
              do { matches' <- mapM (tcMatch ctxt pat_tys rhs_rho) matches
                 ; return (MG { mg_alts    = matches'
