@@ -704,15 +704,15 @@ rnConDeclFields fls doc fields = mapFvRn (rnField fls doc) fields
 rnField :: [FieldLabel] -> HsDocContext -> LConDeclField RdrName
         -> RnM (LConDeclField Name, FreeVars)
 rnField fls doc (L l (ConDeclField names ty haddock_doc))
-  = do { let new_names = map lookupField names
+  = do { let new_names = map (fmap lookupField) names
        ; (new_ty, fvs) <- rnLHsType doc ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
        ; return (L l (ConDeclField new_names new_ty new_haddock_doc), fvs) }
   where
-    lookupField :: (Located RdrName, PlaceHolder) -> (Located RdrName, Name)
-    lookupField (l_rdr_name, _) = (l_rdr_name, flSelector fl)
+    lookupField :: FieldOcc RdrName -> FieldOcc Name
+    lookupField (FieldOcc rdr _) = FieldOcc rdr fl
       where
-        lbl = occNameFS $ rdrNameOcc $ unLoc l_rdr_name
+        lbl = occNameFS $ rdrNameOcc rdr
         fl  = expectJust "rnField" $ find ((== lbl) . flLabel) fls
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)

@@ -590,15 +590,15 @@ getLocalNonValBinders fixity_env
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
              ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
              ; let main_occ = nameOccName main_name
-             ; flds' <- mapM (new_rec_sel overload_ok main_occ . fstOf3) flds
+             ; flds' <- mapM (new_rec_sel overload_ok main_occ . fst) flds
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
                      _                            -> []
                    avail_flds = fieldLabelsToAvailFields flds'
              ; return (AvailTC main_name names avail_flds, fld_env) }
 
-    new_rec_sel :: Bool -> OccName -> Located RdrName -> RnM FieldLabel
-    new_rec_sel overload_ok tc (L loc fld) =
+    new_rec_sel :: Bool -> OccName -> LFieldOcc RdrName -> RnM FieldLabel
+    new_rec_sel overload_ok tc (L loc (FieldOcc fld _)) =
       do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
          ; return $ fl { flSelector = sel_name } }
       where
@@ -624,7 +624,7 @@ getLocalNonValBinders fixity_env
               find (\ n -> nameOccName n == rdrNameOcc rdr) names
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
-        find_con_decl_fld  (L _ rdr, _)
+        find_con_decl_fld  (L _ (FieldOcc rdr _))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
@@ -658,7 +658,7 @@ getLocalNonValBinders fixity_env
              ; let rep_tycon = expectJust "getLocalNonValBinders/new_di" $
                                  dfid_rep_tycon ti_decl
                    rep_tc_occ = rdrNameOcc rep_tycon
-             ; flds' <- mapM (new_rec_sel overload_ok rep_tc_occ . fstOf3) flds
+             ; flds' <- mapM (new_rec_sel overload_ok rep_tc_occ . fst) flds
              ; let avail    = AvailTC (unLoc main_name) sub_names
                                   (fieldLabelsToAvailFields flds')
                                   -- main_name is not bound here!

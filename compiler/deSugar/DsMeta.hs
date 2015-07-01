@@ -50,6 +50,7 @@ import CoreUtils
 import SrcLoc
 import Unique
 import BasicTypes
+import FieldLabel
 import Outputable
 import Bag
 import DynFlags
@@ -1866,7 +1867,9 @@ repConstr con (RecCon (L _ ips))
          ; rep2 recCName [unC con, unC arg_vtys] }
     where
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
-      rep_one_ip t n = do { MkC v  <- lookupOcc (snd n)
+
+      rep_one_ip :: LBangType Name -> LFieldOcc Name -> DsM (Core a)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (flSelector $ labelFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varStrictTypeName [v,ty] }
 

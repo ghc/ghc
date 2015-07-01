@@ -33,7 +33,7 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
-        FieldOcc(..),
+        FieldOcc(..), LFieldOcc, rdrNameFieldOcc, labelFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
@@ -545,7 +545,7 @@ type LConDeclField name = Located (ConDeclField name)
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_names :: [(Located RdrName, PostRn name Name)],
+  = ConDeclField { cd_fld_names :: [LFieldOcc name],
                                    -- ^ See Note [ConDeclField names]
                    cd_fld_type :: LBangType name,
                    cd_fld_doc  :: Maybe LHsDocString }
@@ -555,15 +555,23 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
 
+
+type LFieldOcc name = Located (FieldOcc name)
+
 -- | Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the 'FieldLbl' including the selector function.
 data FieldOcc name = FieldOcc RdrName (PostRn name (FieldLbl name))
+deriving instance (DataId name) => Data (FieldOcc name)
 
 instance Outputable (FieldOcc name) where
-  ppr (FieldOcc rdr _) = ppr rdr
+  ppr = ppr . rdrNameFieldOcc
 
-deriving instance (DataId name) => Data (FieldOcc name)
+rdrNameFieldOcc :: FieldOcc name -> RdrName
+rdrNameFieldOcc (FieldOcc rdr _) = rdr
+
+labelFieldOcc :: FieldOcc name -> PostRn name (FieldLbl name)
+labelFieldOcc (FieldOcc _ fl) = fl
 
 
 {-
@@ -925,8 +933,8 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
                                  cd_fld_doc = doc }))
         = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
-    ppr_names [(n,_)] = ppr n
-    ppr_names ns = sep (punctuate comma (map (ppr.fst) ns))
+    ppr_names [n] = ppr n
+    ppr_names ns = sep (punctuate comma (map ppr ns))
 
 {-
 Note [Printing KindedTyVars]
