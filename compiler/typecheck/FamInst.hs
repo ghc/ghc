@@ -202,12 +202,12 @@ then we have a coercion (ie, type instance of family instance coercion)
 which implies that :R42T was declared as 'data instance T [a]'.
 -}
 
-tcLookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> Maybe FamInstMatch
+tcLookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> Maybe (FamInstMatch l)
 tcLookupFamInst fam_envs tycon tys
   | not (isOpenFamilyTyCon tycon)
   = Nothing
   | otherwise
-  = case lookupFamInstEnv fam_envs tycon tys of
+  = case lookupFamInstEnv fam_envs tycon tys noLazyEqs of
       match : _ -> Just match
       []        -> Nothing
 
@@ -238,7 +238,7 @@ tcLookupDataFamInst_maybe :: FamInstEnvs -> TyCon -> [TcType]
 -- and returns a coercion between the two: co :: F [a] ~R FList a
 tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   | isDataFamilyTyCon tc
-  , match : _ <- lookupFamInstEnv fam_inst_envs tc tc_args
+  , match : _ <- lookupFamInstEnv fam_inst_envs tc tc_args noLazyEqs
   , FamInstMatch { fim_instance = rep_fam
                  , fim_tys      = rep_args } <- match
   , let co_tc  = famInstAxiom rep_fam
@@ -369,7 +369,7 @@ checkForConflicts inst_envs fam_inst
        ; unless no_conflicts $ conflictInstErr fam_inst conflicts
        ; return no_conflicts }
 
-conflictInstErr :: FamInst -> [FamInstMatch] -> TcRn ()
+conflictInstErr :: FamInst -> [FamInstMatch l] -> TcRn ()
 conflictInstErr fam_inst conflictingMatch
   | (FamInstMatch { fim_instance = confInst }) : _ <- conflictingMatch
   = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))

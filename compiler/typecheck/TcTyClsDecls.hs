@@ -1352,7 +1352,8 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT _ res_ty)
         -- So we return ([a,b,z], [x,y], [a~(x,y),b~z], T [(x,y)] z z)
   = (univ_tvs, ex_tvs, eq_spec, res_ty)
   where
-    Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty
+    Just result = tcMatchTy (mkVarSet tmpl_tvs) noLazyEqs res_tmpl res_ty
+    subst = mr_subst result
                 -- This 'Just' pattern is sure to match, because if not
                 -- checkValidDataCon will complain first.
                 -- But care: this only works if the result of rejigConRes
@@ -1553,11 +1554,12 @@ checkValidClosedCoAxiom (CoAxiom { co_ax_branches = branches, co_ax_tc = tc })
 checkFieldCompat :: Name -> DataCon -> DataCon -> TyVarSet
                  -> Type -> Type -> Type -> Type -> TcM ()
 checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
-  = do  { checkTc (isJust mb_subst1) (resultTypeMisMatch fld con1 con2)
-        ; checkTc (isJust mb_subst2) (fieldTypeMisMatch fld con1 con2) }
+  = do  { checkTc (isJust mb_result1) (resultTypeMisMatch fld con1 con2)
+        ; checkTc (isJust mb_result2) (fieldTypeMisMatch fld con1 con2) }
   where
-    mb_subst1 = tcMatchTy tvs1 res1 res2
-    mb_subst2 = tcMatchTyX tvs1 (expectJust "checkFieldCompat" mb_subst1) fty1 fty2
+    mb_result1 = tcMatchTy tvs1 noLazyEqs res1 res2
+    mb_result2 = tcMatchTyX tvs1 (expectJust "checkFieldCompat" (fmap mr_subst mb_result1))
+                            noLazyEqs fty1 fty2
 
 -------------------------------
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
@@ -1578,6 +1580,7 @@ checkValidDataCon dflags existential_ok tc con
               , ppr orig_res_ty <+> dcolon <+> ppr (typeKind orig_res_ty)])
 
         ; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
+                                     noLazyEqs
                                      res_ty_tmpl
                                      orig_res_ty))
                   (badDataConTyCon con res_ty_tmpl orig_res_ty)
@@ -1704,7 +1707,7 @@ checkValidClass cls
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
 
         ; unless constrained_class_methods $
-          mapM_ check_constraint (tail (theta1 ++ theta2)) 
+          mapM_ check_constraint (tail (theta1 ++ theta2))
 
         ; case dm of
             GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
@@ -2164,7 +2167,7 @@ classFunDepsErr cls
 
 badMethPred :: Id -> TcPredType -> SDoc
 badMethPred sel_id pred
-  = vcat [ hang (ptext (sLit "Constraint") <+> quotes (ppr pred) 
+  = vcat [ hang (ptext (sLit "Constraint") <+> quotes (ppr pred)
                  <+> ptext (sLit "in the type of") <+> quotes (ppr sel_id))
               2 (ptext (sLit "constrains only the class type variables"))
          , ptext (sLit "Use ConstrainedClassMethods to allow it") ]

@@ -24,7 +24,9 @@ module InstEnv (
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
         memberInstEnv, instIsVisible,
         classInstances, orphNamesOfClsInst, instanceBindFun,
-        instanceCantMatch, roughMatchTcs
+        instanceCantMatch, roughMatchTcs,
+
+        LazyEqs, noLazyEqs
     ) where
 
 #include "HsVersions.h"
@@ -507,8 +509,8 @@ identicalClsInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = t
                      (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tvs = tvs2, is_tys = tys2 })
   =  cls_nm1 == cls_nm2
   && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
-  && isJust (tcMatchTys (mkVarSet tvs1) tys1 tys2)
-  && isJust (tcMatchTys (mkVarSet tvs2) tys2 tys1)
+  && isJust (tcMatchTys (mkVarSet tvs1) noLazyEqs tys1 tys2)
+  && isJust (tcMatchTys (mkVarSet tvs2) noLazyEqs tys2 tys1)
 
 {-
 ************************************************************************
@@ -722,12 +724,12 @@ type DFunInstType = Maybe Type
         -- Nothing   => Instantiate with any type of this tyvar's kind
         -- See Note [DFunInstType: instantiating types]
 
-type InstMatch = (ClsInst, [DFunInstType])
+type InstMatch l = (ClsInst, [DFunInstType], LazyEqs l)
 
-type ClsInstLookupResult
-     = ( [InstMatch]     -- Successful matches
+type ClsInstLookupResult l
+     = ( [InstMatch l]   -- Successful matches
        , [ClsInst]       -- These don't match but do unify
-       , [InstMatch] )   -- Unsafe overlapped instances under Safe Haskell
+       , [InstMatch l] ) -- Unsafe overlapped instances under Safe Haskell
                          -- (see Note [Safe Haskell Overlapping Instances] in
                          -- TcSimplify).
 
@@ -754,8 +756,8 @@ lookupUniqueInstEnv :: InstEnvs
                     -> Class -> [Type]
                     -> Either MsgDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
-  = case lookupInstEnv False instEnv cls tys of
-      ([(inst, inst_tys)], _, _)
+  = case lookupInstEnv False instEnv cls tys noLazyEqs of
+      ([(inst, inst_tys, _)], _, _)
              | noFlexiVar -> Right (inst, inst_tys')
              | otherwise  -> Left $ ptext (sLit "flexible type variable:") <+>
                                     (ppr $ mkTyConApp (classTyCon cls) tys)
@@ -767,7 +769,8 @@ lookupUniqueInstEnv instEnv cls tys
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> VisibleOrphanModules   -- But filter against this
                -> Class -> [Type]  -- What we are looking for
-               -> ([InstMatch],    -- Successful matches
+               -> LazyEqs l        -- We might use these lazy equalities
+               -> ([InstMatch l],  -- Successful matches
                    [ClsInst])     -- These don't match but do unify
 -- The second component of the result pair happens when we look up
 --      Foo [a]
@@ -779,7 +782,7 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- but Foo [Int] is a unifier.  This gives the caller a better chance of
 -- giving a suitable error message
 
-lookupInstEnv' ie vis_mods cls tys
+lookupInstEnv' ie vis_mods cls tys leqs
   = lookup ie
   where
     rough_tcs  = roughMatchTcs tys
@@ -800,8 +803,9 @@ lookupInstEnv' ie vis_mods cls tys
       | instanceCantMatch rough_tcs mb_tcs
       = find ms us rest
 
-      | Just subst <- tcMatchTys tpl_tv_set tpl_tys tys
-      = find ((item, map (lookup_tv subst) tpl_tvs) : ms) us rest
+      | Just subst <- tcMatchTys tpl_tv_set leqs tpl_tys tys
+      = find (( item, map (lookup_tv (mr_subst subst)) tpl_tvs
+              , mr_lazy_eqs subst ) : ms) us rest
 
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances] and Note [Incoherent instances]
@@ -834,7 +838,8 @@ lookupInstEnv' ie vis_mods cls tys
 lookupInstEnv :: Bool              -- Check Safe Haskell overlap restrictions
               -> InstEnvs          -- External and home package inst-env
               -> Class -> [Type]   -- What we are looking for
-              -> ClsInstLookupResult
+              -> LazyEqs l         -- We might use these lazy equalities
+              -> ClsInstLookupResult l
 -- ^ See Note [Rules for instance lookup]
 -- ^ See Note [Safe Haskell Overlapping Instances] in TcSimplify
 -- ^ See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
@@ -844,10 +849,11 @@ lookupInstEnv check_overlap_safe
                         , ie_visible = vis_mods })
               cls
               tys
+              leqs
   = (final_matches, final_unifs, unsafe_overlapped)
   where
-    (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
-    (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
+    (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys leqs
+    (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys leqs
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
     final_matches = foldr insert_overlapping [] all_matches
@@ -876,7 +882,7 @@ lookupInstEnv check_overlap_safe
     -- trust. So 'Safe' instances can only overlap instances from the
     -- same module. A same instance origin policy for safe compiled
     -- instances.
-    check_safe (inst,_)
+    check_safe (inst,_,_)
         = case check_overlap_safe && unsafeTopInstance inst of
                 -- make sure it only overlaps instances from the same module
                 True -> go [] all_matches
@@ -884,7 +890,7 @@ lookupInstEnv check_overlap_safe
                 False -> []
         where
             go bad [] = bad
-            go bad (i@(x,_):unchecked) =
+            go bad (i@(x,_,_):unchecked) =
                 if inSameMod x || isOverlappable x
                     then go bad unchecked
                     else go (i:bad) unchecked
@@ -905,13 +911,13 @@ lookupInstEnv check_overlap_safe
         (isOrphan (is_orphan inst) || classArity (is_cls inst) > 1)
 
 ---------------
-is_incoherent :: InstMatch -> Bool
-is_incoherent (inst, _) = case overlapMode (is_flag inst) of
-                            Incoherent _ -> True
-                            _            -> False
+is_incoherent :: InstMatch l -> Bool
+is_incoherent (inst, _, _) = case overlapMode (is_flag inst) of
+                               Incoherent _ -> True
+                               _            -> False
 
 ---------------
-insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
+insert_overlapping :: InstMatch l -> [InstMatch l] -> [InstMatch l]
 -- ^ Add a new solution, knocking out strictly less specific ones
 -- See Note [Rules for instance lookup]
 insert_overlapping new_item [] = [new_item]
@@ -942,11 +948,11 @@ insert_overlapping new_item (old_item : old_items)
 
     -- `instB` can be instantiated to match `instA`
     -- or the two are equal
-    (instA,_) `more_specific_than` (instB,_)
-      = isJust (tcMatchTys (mkVarSet (is_tvs instB))
+    (instA,_,_) `more_specific_than` (instB,_,_)
+      = isJust (tcMatchTys (mkVarSet (is_tvs instB)) noLazyEqs
                (is_tys instB) (is_tys instA))
 
-    (instA, _) `can_override` (instB, _)
+    (instA,_,_) `can_override` (instB,_,_)
        =  hasOverlappingFlag  (overlapMode (is_flag instA))
        || hasOverlappableFlag (overlapMode (is_flag instB))
        -- Overlap permitted if either the more specific instance

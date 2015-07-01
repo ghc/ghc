@@ -15,7 +15,8 @@ import TcFlatten
 import VarSet
 import Type
 import Kind ( isKind, isConstraintKind )
-import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
+import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId,
+                LazyEqs, noLazyEqs )
 import CoAxiom(sfInteractTop, sfInteractInert)
 
 import Var
@@ -1202,25 +1203,29 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
    = do { dflags <- getDynFlags
         ; lkup_inst_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_inst_res of
-               GenInst preds _ s -> do { emitNewDeriveds dict_loc preds
-                                       ; unless s $
-                                           insertSafeOverlapFailureTcS work_item
-                                       ; stopWith fl "Dict/Top (solved)" }
+               GenInst preds _ s qs -> do { emitNewDeriveds dict_loc preds
+                                          ; qs_evs <- mapM (newWantedEvVarNC dict_loc) qs
+                                          ; emitWorkNC qs_evs
+                                          ; unless s $
+                                              insertSafeOverlapFailureTcS work_item
+                                          ; stopWith fl "Dict/Top (solved)" }
 
-               NoInstance        -> do { -- If there is no instance, try improvement
-                                         try_fundep_improvement
-                                       ; continueWith work_item } }
+               NoInstance           -> do { -- If there is no instance, try improvement
+                                            try_fundep_improvement
+                                          ; continueWith work_item } }
 
   | otherwise  -- Wanted, but not cached
    = do { dflags <- getDynFlags
         ; lkup_inst_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_inst_res of
-               GenInst theta mk_ev s -> do { addSolvedDict fl cls xis
-                                           ; unless s $
-                                               insertSafeOverlapFailureTcS work_item
-                                           ; solve_from_instance theta mk_ev }
-               NoInstance            -> do { try_fundep_improvement
-                                           ; continueWith work_item } }
+               GenInst theta mk_ev s qs -> do { addSolvedDict fl cls xis
+                                              ; qs_evs <- mapM (newWantedEvVarNC dict_loc) qs
+                                              ; emitWorkNC qs_evs
+                                              ; unless s $
+                                                  insertSafeOverlapFailureTcS work_item
+                                              ; solve_from_instance theta mk_ev }
+               NoInstance               -> do { try_fundep_improvement
+                                              ; continueWith work_item } }
    where
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc fl
@@ -1612,10 +1617,11 @@ type SafeOverlapping = Bool
 data LookupInstResult
   = NoInstance
   | GenInst [TcPredType] ([EvId] -> EvTerm) SafeOverlapping
+            [TcPredType]  -- extra constraints derived from instantiation
 
 instance Outputable LookupInstResult where
-  ppr NoInstance       = text "NoInstance"
-  ppr (GenInst ev _ s) = text "GenInst" <+> ppr ev <+> ss
+  ppr NoInstance          = text "NoInstance"
+  ppr (GenInst ev _ s qs) = text "GenInst" <+> ppr ev <+> ss <+> ppr qs
     where ss = text $ if s then "[safe]" else "[unsafe]"
 
 
@@ -1665,7 +1671,7 @@ matchClassInst _ _ clas [ ty ] _
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
     , let ev_tm = mkEvCast (EvLit evLit) (mkTcSymCo (mkTcTransCo co_dict co_rep))
-    = return $ GenInst [] (\_ -> ev_tm) True
+    = return $ GenInst [] (\_ -> ev_tm) True []
 
     | otherwise
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
@@ -1675,7 +1681,7 @@ matchClassInst _ _ clas ts _
   | isCTupleClass clas
   , let data_con = tyConSingleDataCon (classTyCon clas)
         tuple_ev = EvDFunApp (dataConWrapId data_con) ts
-  = return (GenInst ts tuple_ev True)
+  = return (GenInst ts tuple_ev True [])
             -- The dfun is the data constructor!
 
 matchClassInst _ _ clas [k,t] _
@@ -1683,10 +1689,13 @@ matchClassInst _ _ clas [k,t] _
   = matchTypeableClass clas k t
 
 matchClassInst dflags _ clas tys loc
-   = do { traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred ]
-        ; instEnvs <- getInstEnvs
+   = do { instEnvs <- getInstEnvs
+        ; inertCans <- getInertCans
+        ; lazyEqs <- inerts_to_lazy_eqs (inert_irreds inertCans)
+        ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
+                                           , text "lazy_eqs =" <+> ppr lazyEqs ]
         ; let safeOverlapCheck = safeHaskell dflags `elem` [Sf_Safe, Sf_Trustworthy]
-              (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
+              (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys lazyEqs
               safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
         ; case (matches, unify, safeHaskFail) of
 
@@ -1697,14 +1706,16 @@ matchClassInst dflags _ clas tys loc
                       ; return NoInstance }
 
             -- A single match (& no safe haskell failure)
-            ([(ispec, inst_tys)], [], False)
+            ([(ispec, inst_tys, extra_eqs)], [], False)
                 -> do   { let dfun_id = instanceDFunId ispec
+                              qs = extract_lazy_eqs extra_eqs
                         ; traceTcS "matchClass success" $
                           vcat [text "dict" <+> ppr pred,
                                 text "witness" <+> ppr dfun_id
-                                               <+> ppr (idType dfun_id) ]
+                                               <+> ppr (idType dfun_id),
+                                text "instantiation" <+> ppr qs ]
                                   -- Record that this dfun is needed
-                        ; match_one (null unsafeOverlaps) dfun_id inst_tys }
+                        ; match_one (null unsafeOverlaps) dfun_id inst_tys qs }
 
             -- More than one matches (or Safe Haskell fail!). Defer any
             -- reactions of a multitude until we learn more about the reagent
@@ -1716,12 +1727,32 @@ matchClassInst dflags _ clas tys loc
    where
      pred = mkClassPred clas tys
 
-     match_one :: SafeOverlapping -> DFunId -> [DFunInstType] -> TcS LookupInstResult
+     match_one :: SafeOverlapping -> DFunId -> [DFunInstType] -> [TcPredType]
+               -> TcS LookupInstResult
                   -- See Note [DFunInstType: instantiating types] in InstEnv
-     match_one so dfun_id mb_inst_tys
+     match_one so dfun_id mb_inst_tys eqs
        = do { checkWellStagedDFun pred dfun_id loc
             ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
-            ; return $ GenInst theta (EvDFunApp dfun_id tys) so }
+            ; return $ GenInst theta (EvDFunApp dfun_id tys) so eqs }
+
+     inerts_to_lazy_eqs :: Cts -> TcS (LazyEqs [TcPredType])
+     inerts_to_lazy_eqs = flatMapBagM $ \ct ->
+       case (ctEvidence ct, classifyPredType (ctPred ct)) of
+         (CtWanted { }, InstanceOfPred lhs rhs)
+           | Just _ <- getTyVar_maybe lhs
+           -- InstanceOf var sigma --> var ~ sigma
+           -> return $ unitBag (lhs, rhs, [mkTcEqPredRole Nominal lhs rhs])
+           | Just _ <- getTyVar_maybe rhs
+           -- InstanceOf sigma var -> instantiate sigma
+           -> do { (_qvars, q, ty) <- splitInst lhs
+                 ; return $ unitBag (rhs, ty, mkTcEqPredRole Nominal rhs ty : q) }
+           | otherwise
+           -> pprPanic "malformed irred InstanceOf" (ppr (ctPred ct))
+         _ -> return noLazyEqs
+
+     extract_lazy_eqs :: LazyEqs [TcPredType] -> [TcPredType]
+     extract_lazy_eqs leqs = concatMap (\(_,_,qs) -> qs) (bagToList leqs)
+
 
 
 {- Note [Instance and Given overlap]
@@ -1846,7 +1877,7 @@ matchTypeableClass clas _k t
     | otherwise
     = return $ GenInst [mk_typeable_pred f, mk_typeable_pred tk]
                        (\[t1,t2] -> EvTypeable $ EvTypeableTyApp (EvId t1,f) (EvId t2,tk))
-                       True
+                       True []
 
   -- Representation for concrete kinds.  We just use the kind itself,
   -- but first check to make sure that it is "simple" (i.e., made entirely
@@ -1858,7 +1889,7 @@ matchTypeableClass clas _k t
   -- Emit a `Typeable` constraint for the given type.
   mk_typeable_pred ty = mkClassPred clas [ typeKind ty, ty ]
 
-  mkSimpEv ev = return $ GenInst [] (\_ -> EvTypeable ev) True
+  mkSimpEv ev = return $ GenInst [] (\_ -> EvTypeable ev) True []
 
 {- Note [No Typeable for polytype or for constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

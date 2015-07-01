@@ -22,6 +22,8 @@ module FamInstEnv (
         lookupFamInstEnv, lookupFamInstEnvConflicts,
         isDominatedBy,
 
+        LazyEqs, noLazyEqs,
+
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
@@ -383,8 +385,8 @@ identicalFamInstHead (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
     brs2 = coAxiomBranches ax2
 
     identical_branch br1 br2
-      =  isJust (tcMatchTys tvs1 lhs1 lhs2)
-      && isJust (tcMatchTys tvs2 lhs2 lhs1)
+      =  isJust (tcMatchTys tvs1 noLazyEqs lhs1 lhs2)
+      && isJust (tcMatchTys tvs2 noLazyEqs lhs2 lhs1)
       where
         tvs1 = mkVarSet (coAxBranchTyVars br1)
         tvs2 = mkVarSet (coAxBranchTyVars br2)
@@ -589,12 +591,13 @@ we return the matching instance '(FamInst{.., fi_tycon = :R42T}, Int)'.
 
 -- when matching a type family application, we get a FamInst,
 -- and the list of types the axiom should be applied to
-data FamInstMatch = FamInstMatch { fim_instance :: FamInst
-                                 , fim_tys      :: [Type]
-                                 }
+data FamInstMatch l = FamInstMatch { fim_instance :: FamInst
+                                   , fim_tys      :: [Type]
+                                   , fim_lazy_eqs :: LazyEqs l
+                                   }
   -- See Note [Over-saturated matches]
 
-instance Outputable FamInstMatch where
+instance Outputable (FamInstMatch l) where
   ppr (FamInstMatch { fim_instance = inst
                     , fim_tys      = tys })
     = ptext (sLit "match with") <+> parens (ppr inst) <+> ppr tys
@@ -602,18 +605,19 @@ instance Outputable FamInstMatch where
 lookupFamInstEnv
     :: FamInstEnvs
     -> TyCon -> [Type]          -- What we are looking for
-    -> [FamInstMatch]           -- Successful matches
+    -> LazyEqs l                -- We might use these lazy equalities
+    -> [FamInstMatch l]         -- Successful matches
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookupFamInstEnv
    = lookup_fam_inst_env match
    where
-     match _ tpl_tvs tpl_tys tys = tcMatchTys tpl_tvs tpl_tys tys
+     match _ tpl_tvs tpl_tys tys leqs = tcMatchTys tpl_tvs leqs tpl_tys tys
 
 lookupFamInstEnvConflicts
     :: FamInstEnvs
     -> FamInst          -- Putative new instance
-    -> [FamInstMatch]   -- Conflicting matches (don't look at the fim_tys field)
+    -> [FamInstMatch l] -- Conflicting matches (don't look at the fim_tys field)
 -- E.g. when we are about to add
 --    f : type instance F [a] = a->a
 -- we do (lookupFamInstConflicts f [b])
@@ -622,12 +626,12 @@ lookupFamInstEnvConflicts
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
-  = lookup_fam_inst_env my_unify envs fam tys
+  = lookup_fam_inst_env my_unify envs fam tys noLazyEqs
   where
     (fam, tys) = famInstSplitLHS fam_inst
         -- In example above,   fam tys' = F [b]
 
-    my_unify (FamInst { fi_axiom = old_axiom }) tpl_tvs tpl_tys _
+    my_unify (FamInst { fi_axiom = old_axiom }) tpl_tvs tpl_tys _ _
        = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
                   (ppr fam <+> ppr tys) $$
                   (ppr tpl_tvs <+> ppr tpl_tys) )
@@ -659,17 +663,19 @@ Note [Family instance overlap conflicts]
 
 ------------------------------------------------------------
 -- Might be a one-way match or a unifier
-type MatchFun =  FamInst                -- The FamInst template
-              -> TyVarSet -> [Type]     --   fi_tvs, fi_tys of that FamInst
-              -> [Type]                 -- Target to match against
-              -> Maybe TvSubst
+type MatchFun l =  FamInst                -- The FamInst template
+                 -> TyVarSet -> [Type]     --   fi_tvs, fi_tys of that FamInst
+                -> [Type]                 -- Target to match against
+                -> LazyEqs l              -- We might use these lazy equalities
+                -> Maybe (MatchResult l)
 
 lookup_fam_inst_env'          -- The worker, local to this module
-    :: MatchFun
+    :: MatchFun l
     -> FamInstEnv
     -> TyCon -> [Type]        -- What we are looking for
-    -> [FamInstMatch]
-lookup_fam_inst_env' match_fun ie fam match_tys
+    -> LazyEqs l
+    -> [FamInstMatch l]
+lookup_fam_inst_env' match_fun ie fam match_tys leqs
   | isOpenFamilyTyCon fam
   , Just (FamIE insts) <- lookupUFM ie fam
   = find insts    -- The common case
@@ -684,9 +690,10 @@ lookup_fam_inst_env' match_fun ie fam match_tys
       = find rest
 
         -- Proper check
-      | Just subst <- match_fun item (mkVarSet tpl_tvs) tpl_tys match_tys1
+      | Just subst <- match_fun item (mkVarSet tpl_tvs) tpl_tys match_tys1 leqs
       = (FamInstMatch { fim_instance = item
-                      , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2 })
+                      , fim_tys      = substTyVars (mr_subst subst) tpl_tvs `chkAppend` match_tys2
+                      , fim_lazy_eqs = mr_lazy_eqs subst })
         : find rest
 
         -- No match => try next
@@ -714,16 +721,17 @@ lookup_fam_inst_env' match_fun ie fam match_tys
       = (roughMatchTcs pre_match_tys1, pre_match_tys1, pre_match_tys2)
 
 lookup_fam_inst_env           -- The worker, local to this module
-    :: MatchFun
+    :: MatchFun l
     -> FamInstEnvs
     -> TyCon -> [Type]          -- What we are looking for
-    -> [FamInstMatch]           -- Successful matches
+    -> LazyEqs l                -- We might use these lazy equalities
+    -> [FamInstMatch l]         -- Successful matches
 
 -- Precondition: the tycon is saturated (or over-saturated)
 
-lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
-  =  lookup_fam_inst_env' match_fun home_ie fam tys
-  ++ lookup_fam_inst_env' match_fun pkg_ie  fam tys
+lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys leqs
+  =  lookup_fam_inst_env' match_fun home_ie fam tys leqs
+  ++ lookup_fam_inst_env' match_fun pkg_ie  fam tys leqs
 
 {-
 Note [Over-saturated matches]
@@ -767,7 +775,7 @@ isDominatedBy branch branches
     where
       lhs = coAxBranchLHS branch
       match (CoAxBranch { cab_tvs = tvs, cab_lhs = tys })
-        = isJust $ tcMatchTys (mkVarSet tvs) tys lhs
+        = isJust $ tcMatchTys (mkVarSet tvs) noLazyEqs tys lhs
 
 {-
 ************************************************************************
@@ -783,7 +791,8 @@ but we also need to handle closed ones when normalising a type:
 reduceTyFamApp_maybe :: FamInstEnvs
                      -> Role              -- Desired role of result coercion
                      -> TyCon -> [Type]
-                     -> Maybe (Coercion, Type)
+                     -> LazyEqs l
+                     -> Maybe (Coercion, Type, LazyEqs l)
 -- Attempt to do a *one-step* reduction of a type-family application
 --    but *not* newtypes
 -- Works on type-synonym families always; data-families only if
@@ -795,7 +804,7 @@ reduceTyFamApp_maybe :: FamInstEnvs
 -- The TyCon can be oversaturated.
 -- Works on both open and closed families
 
-reduceTyFamApp_maybe envs role tc tys
+reduceTyFamApp_maybe envs role tc tys leqs
   | Phantom <- role
   = Nothing
 
@@ -807,54 +816,56 @@ reduceTyFamApp_maybe envs role tc tys
        -- unwrap data families as well as type-synonym families;
        -- otherwise only type-synonym families
   , FamInstMatch { fim_instance = fam_inst
-                 , fim_tys =      inst_tys } : _ <- lookupFamInstEnv envs tc tys
+                 , fim_tys =      inst_tys
+                 , fim_lazy_eqs = lazy_eqs } : _ <- lookupFamInstEnv envs tc tys leqs
       -- NB: Allow multiple matches because of compatible overlap
 
   = let ax     = famInstAxiom fam_inst
         co     = mkUnbranchedAxInstCo role ax inst_tys
         ty     = pSnd (coercionKind co)
-    in Just (co, ty)
+    in Just (co, ty, lazy_eqs)
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
-  , Just (ind, inst_tys) <- chooseBranch ax tys
+  , Just (ind, inst_tys, lazy_eqs) <- chooseBranch ax tys leqs
   = let co     = mkAxInstCo role ax ind inst_tys
         ty     = pSnd (coercionKind co)
-    in Just (co, ty)
+    in Just (co, ty, lazy_eqs)
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
   , Just (coax,ts,ty) <- sfMatchFam ax tys
   = let co = mkAxiomRuleCo coax ts []
-    in Just (co, ty)
+    in Just (co, ty, noLazyEqs)
 
   | otherwise
   = Nothing
 
 -- The axiom can be oversaturated. (Closed families only.)
-chooseBranch :: CoAxiom Branched -> [Type] -> Maybe (BranchIndex, [Type])
-chooseBranch axiom tys
+chooseBranch :: CoAxiom Branched -> [Type] -> LazyEqs l -> Maybe (BranchIndex, [Type], LazyEqs l)
+chooseBranch axiom tys leqs
   = do { let num_pats = coAxiomNumPats axiom
              (target_tys, extra_tys) = splitAt num_pats tys
              branches = coAxiomBranches axiom
-       ; (ind, inst_tys) <- findBranch (fromBranchList branches) 0 target_tys
-       ; return (ind, inst_tys ++ extra_tys) }
+       ; (ind, inst_tys, lazy_eqs) <- findBranch (fromBranchList branches) 0 target_tys leqs
+       ; return (ind, inst_tys ++ extra_tys, lazy_eqs) }
 
 -- The axiom must *not* be oversaturated
 findBranch :: [CoAxBranch]             -- branches to check
            -> BranchIndex              -- index of current branch
            -> [Type]                   -- target types
-           -> Maybe (BranchIndex, [Type])
+           -> LazyEqs l
+           -> Maybe (BranchIndex, [Type], LazyEqs l)
 findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = incomps }
-              : rest) ind target_tys
-  = case tcMatchTys (mkVarSet tpl_tvs) tpl_lhs target_tys of
+              : rest) ind target_tys leqs
+  = case tcMatchTys (mkVarSet tpl_tvs) leqs tpl_lhs target_tys of
       Just subst -- matching worked. now, check for apartness.
         |  all (isSurelyApart
                 . tcUnifyTysFG instanceBindFun flattened_target
                 . coAxBranchLHS) incomps
         -> -- matching worked & we're apart from all incompatible branches. success
-           Just (ind, substTyVars subst tpl_tvs)
+           Just (ind, substTyVars (mr_subst subst) tpl_tvs, mr_lazy_eqs subst)
 
       -- failure. keep looking
-      _ -> findBranch rest (ind+1) target_tys
+      _ -> findBranch rest (ind+1) target_tys leqs
 
   where isSurelyApart SurelyApart = True
         isSurelyApart _           = False
@@ -865,7 +876,7 @@ findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = inc
                                  map (tyVarsOfTypes . coAxBranchLHS) incomps)
 
 -- fail if no branches left
-findBranch [] _ _ = Nothing
+findBranch [] _ _ _ = Nothing
 
 {-
 ************************************************************************
@@ -905,9 +916,9 @@ topNormaliseType_maybe env ty
         `composeSteppers`
         \ rec_nts tc tys ->
         let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
-          Nothing        -> NS_Done
+        case reduceTyFamApp_maybe env Representational tc ntys noLazyEqs of
+          Just (co, rhs, _) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
+          Nothing           -> NS_Done
 
 ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
@@ -919,7 +930,7 @@ normaliseTcApp env role tc tys
   = if isReflCo co2 then (args_co,                 mkTyConApp tc ntys)
                     else (args_co `mkTransCo` co2, mkAppTys ninst_rhs ntys')
 
-  | Just (first_co, ty') <- reduceTyFamApp_maybe env role tc ntys
+  | Just (first_co, ty', _) <- reduceTyFamApp_maybe env role tc ntys noLazyEqs
   , (rest_co,nty) <- normaliseType env role ty'
   = (args_co `mkTransCo` first_co `mkTransCo` rest_co, nty)
 

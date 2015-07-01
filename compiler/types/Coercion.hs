@@ -81,7 +81,7 @@ module Coercion (
 
 #include "HsVersions.h"
 
-import Unify    ( MatchEnv(..), matchList )
+import Unify    ( MatchEnv(..), matchList, noLazyEqs )
 import TypeRep
 import qualified Type
 import Type hiding( substTy, substTyVarBndr, extendTvSubst )
@@ -1777,13 +1777,15 @@ liftCoMatch tmpls ty co
       Just cenv -> Just (LCS in_scope cenv)
       Nothing   -> Nothing
   where
-    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
+    menv     = ME { me_tmpls = tmpls
+                  , me_env = mkRnEnv2 in_scope
+                  , me_lazy_eqs = noLazyEqs }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyCoVarsOfCo co)
     -- Like tcMatchTy, assume all the interesting variables
     -- in ty are in tmpls
 
 -- | 'ty_co_match' does all the actual work for 'liftCoMatch'.
-ty_co_match :: MatchEnv -> LiftCoEnv -> Type -> Coercion -> Maybe LiftCoEnv
+ty_co_match :: MatchEnv l -> LiftCoEnv -> Type -> Coercion -> Maybe LiftCoEnv
 ty_co_match menv subst ty co
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co
 
@@ -1830,7 +1832,7 @@ ty_co_match menv subst ty co
   | Just co' <- pushRefl co = ty_co_match menv subst ty co'
   | otherwise               = Nothing
 
-ty_co_matches :: MatchEnv -> LiftCoEnv -> [Type] -> [Coercion] -> Maybe LiftCoEnv
+ty_co_matches :: MatchEnv l -> LiftCoEnv -> [Type] -> [Coercion] -> Maybe LiftCoEnv
 ty_co_matches menv = matchList (ty_co_match menv)
 
 pushRefl :: Coercion -> Maybe Coercion

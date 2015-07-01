@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module Vectorise.Utils.Base 
+module Vectorise.Utils.Base
   ( voidType
   , newLocalVVar
 
@@ -18,12 +18,12 @@ module Vectorise.Utils.Base
   , unwrapNewTypeBodyOfPDataWrap
   , wrapNewTypeBodyOfPDatasWrap
   , unwrapNewTypeBodyOfPDatasWrap
-  
+
   , pdataReprTyCon
   , pdataReprTyConExact
   , pdatasReprTyConExact
   , pdataUnwrapScrut
-  
+
   , preprFamInst
 ) where
 
@@ -206,10 +206,10 @@ unwrapNewTypeBodyOfPDatasWrap e ty
 -- The type for which we look up a 'PData' instance may be more specific than the type in the
 -- instance declaration.  In that case the second component of the result will be more specific than
 -- a set of distinct type variables.
--- 
+--
 pdataReprTyCon :: Type -> VM (TyCon, [Type])
-pdataReprTyCon ty 
-  = do 
+pdataReprTyCon ty
+  = do
     { FamInstMatch { fim_instance = famInst
                    , fim_tys      = tys } <- builtin pdataTyCon >>= (`lookupFamInst` [ty])
     ; return (dataFamInstRepTyCon famInst, tys)
@@ -258,5 +258,5 @@ pdataUnwrapScrut (ve, le)
 
 -- |Get the representation tycon of the 'PRepr' type family for a given type.
 --
-preprFamInst :: Type -> VM FamInstMatch
+preprFamInst :: Type -> VM (FamInstMatch l)
 preprFamInst ty = builtin preprTyCon >>= (`lookupFamInst` [ty])

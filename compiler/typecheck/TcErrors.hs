@@ -1279,7 +1279,7 @@ mkDictErr ctxt cts
     lookup_cls_inst inst_envs ct
       = do { tys_flat <- mapM quickFlattenTy tys
                 -- Note [Flattening in error message generation]
-           ; return (ct, lookupInstEnv True inst_envs clas tys_flat) }
+           ; return (ct, lookupInstEnv True inst_envs clas tys_flat noLazyEqs) }
       where
         (clas, tys) = getClassPredTys (ctPred ct)
 
@@ -1292,7 +1292,7 @@ mkDictErr ctxt cts
       where
         min_preds = mkMinimalBySCs (map ctPred cts)
 
-mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
+mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult l)
             -> TcM (ReportErrCtxt, SDoc)
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Left clas), otherwise return (Right pred)
@@ -1312,8 +1312,8 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     orig          = ctLocOrigin (ctLoc ct)
     pred          = ctPred ct
     (clas, tys)   = getClassPredTys pred
-    ispecs        = [ispec | (ispec, _) <- matches]
-    unsafe_ispecs = [ispec | (ispec, _) <- unsafe_overlapped]
+    ispecs        = [ispec | (ispec, _, _) <- matches]
+    unsafe_ispecs = [ispec | (ispec, _, _) <- unsafe_overlapped]
     givens        = getUserGivens ctxt
     all_tyvars    = all isTyVarTy tys
 
@@ -1420,7 +1420,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                       ev_var_matches ty = case getClassPredTys_maybe ty of
                          Just (clas', tys')
                            | clas' == clas
-                           , Just _ <- tcMatchTys (tyVarsOfTypes tys) tys tys'
+                           , Just _ <- tcMatchTys (tyVarsOfTypes tys) noLazyEqs tys tys'
                            -> True
                            | otherwise
                            -> any ev_var_matches (immSuperClasses clas' tys')

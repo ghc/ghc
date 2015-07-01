@@ -8,7 +8,9 @@ module Unify (
         --      respects newtypes (rather than looking through them)
         tcMatchTy, tcMatchTys, tcMatchTyX,
         ruleMatchTyX, tcMatchPreds,
+        MatchResult, MatchResult'(..),
 
+        LazyEqs, noLazyEqs,
         MatchEnv(..), matchList,
 
         typesCantMatch,
@@ -22,6 +24,7 @@ module Unify (
 
 #include "HsVersions.h"
 
+import Bag
 import Var
 import VarEnv
 import VarSet
@@ -65,74 +68,106 @@ Matching is much tricker than you might think.
    The necessary locals accumulate in the RnEnv2.
 -}
 
-data MatchEnv
+type LazyEqs l = Bag (Type, Type, l)
+
+noLazyEqs :: LazyEqs l
+noLazyEqs = emptyBag
+
+data MatchEnv l
   = ME  { me_tmpls :: VarSet    -- Template variables
         , me_env   :: RnEnv2    -- Renaming envt for nested foralls
+        , me_lazy_eqs :: LazyEqs l  -- Lazy equalities to apply when matching vars
         }                       --   In-scope set includes template variables
     -- Nota Bene: MatchEnv isn't specific to Types.  It is used
     --            for matching terms and coercions as well as types
 
+data MatchResult' s l
+  = MatchResult { mr_subst :: s
+                , mr_lazy_eqs :: LazyEqs l }
+
+type MatchResult l = MatchResult' TvSubst l
+type MatchResultEnv l = MatchResult' TvSubstEnv l
+
+mrMapSubst :: (a -> b) -> MatchResult' a l -> MatchResult' b l
+mrMapSubst f m = m { mr_subst = f (mr_subst m) }
+
 tcMatchTy :: TyVarSet           -- Template tyvars
+          -> LazyEqs l          -- Lazy equalities
           -> Type               -- Template
           -> Type               -- Target
-          -> Maybe TvSubst      -- One-shot; in principle the template
+          -> Maybe (MatchResult l)  -- One-shot; in principle the template
                                 -- variables could be free in the target
 
-tcMatchTy tmpls ty1 ty2
-  = case match menv emptyTvSubstEnv ty1 ty2 of
-        Just subst_env -> Just (TvSubst in_scope subst_env)
-        Nothing        -> Nothing
+tcMatchTy tmpls leqs ty1 ty2
+  = case match menv initial ty1 ty2 of
+        Just env -> Just $ mrMapSubst (TvSubst in_scope) env
+        Nothing  -> Nothing
   where
-    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
+    menv     = ME { me_tmpls = tmpls
+                  , me_env = mkRnEnv2 in_scope
+                  , me_lazy_eqs = leqs }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
+    initial  = MatchResult emptyTvSubstEnv emptyBag
         -- We're assuming that all the interesting
         -- tyvars in ty1 are in tmpls
 
 tcMatchTys :: TyVarSet          -- Template tyvars
+           -> LazyEqs l         -- Lazy equalities
            -> [Type]            -- Template
            -> [Type]            -- Target
-           -> Maybe TvSubst     -- One-shot; in principle the template
+           -> Maybe (MatchResult l) -- One-shot; in principle the template
                                 -- variables could be free in the target
 
-tcMatchTys tmpls tys1 tys2
-  = case match_tys menv emptyTvSubstEnv tys1 tys2 of
-        Just subst_env -> Just (TvSubst in_scope subst_env)
-        Nothing        -> Nothing
+tcMatchTys tmpls leqs tys1 tys2
+  = case match_tys menv initial tys1 tys2 of
+        Just env -> Just $ mrMapSubst (TvSubst in_scope) env
+        Nothing  -> Nothing
   where
-    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
+    menv     = ME { me_tmpls = tmpls
+                  , me_env = mkRnEnv2 in_scope
+                  , me_lazy_eqs = leqs }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
+    initial  = MatchResult emptyTvSubstEnv emptyBag
         -- We're assuming that all the interesting
         -- tyvars in tys1 are in tmpls
 
 -- This is similar, but extends a substitution
 tcMatchTyX :: TyVarSet          -- Template tyvars
            -> TvSubst           -- Substitution to extend
+           -> LazyEqs l         -- Lazy equalities
            -> Type              -- Template
            -> Type              -- Target
-           -> Maybe TvSubst
-tcMatchTyX tmpls (TvSubst in_scope subst_env) ty1 ty2
-  = case match menv subst_env ty1 ty2 of
-        Just subst_env -> Just (TvSubst in_scope subst_env)
-        Nothing        -> Nothing
+           -> Maybe (MatchResult l)
+tcMatchTyX tmpls (TvSubst in_scope subst_env) leqs ty1 ty2
+  = case match menv initial ty1 ty2 of
+        Just env -> Just $ mrMapSubst (TvSubst in_scope) env
+        Nothing  -> Nothing
   where
-    menv = ME {me_tmpls = tmpls, me_env = mkRnEnv2 in_scope}
+    menv = ME { me_tmpls = tmpls
+              , me_env = mkRnEnv2 in_scope
+              , me_lazy_eqs = leqs }
+    initial = MatchResult subst_env leqs
 
 tcMatchPreds
         :: [TyVar]                      -- Bind these
+        -> LazyEqs l                    -- Lazy equalities
         -> [PredType] -> [PredType]
-        -> Maybe TvSubstEnv
-tcMatchPreds tmpls ps1 ps2
-  = matchList (match menv) emptyTvSubstEnv ps1 ps2
+        -> Maybe (MatchResultEnv l)
+tcMatchPreds tmpls leqs ps1 ps2
+  = matchList (match menv) initial ps1 ps2
   where
-    menv = ME { me_tmpls = mkVarSet tmpls, me_env = mkRnEnv2 in_scope_tyvars }
+    menv = ME { me_tmpls = mkVarSet tmpls
+              , me_env = mkRnEnv2 in_scope_tyvars
+              , me_lazy_eqs = leqs }
     in_scope_tyvars = mkInScopeSet (tyVarsOfTypes ps1 `unionVarSet` tyVarsOfTypes ps2)
+    initial = MatchResult emptyTvSubstEnv emptyBag
 
 -- This one is called from the expression matcher, which already has a MatchEnv in hand
-ruleMatchTyX :: MatchEnv
-         -> TvSubstEnv          -- Substitution to extend
+ruleMatchTyX :: MatchEnv l
+         -> MatchResultEnv l    -- Substitution to extend
          -> Type                -- Template
          -> Type                -- Target
-         -> Maybe TvSubstEnv
+         -> Maybe (MatchResultEnv l)
 
 ruleMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2      -- Rename for export
 
@@ -147,19 +182,19 @@ ruleMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2      -- Rename for ex
 --
 -- This function handles binders, see 'RnEnv2' for more details on
 -- how that works.
-match :: MatchEnv       -- For the most part this is pushed downwards
-      -> TvSubstEnv     -- Substitution so far:
+match :: MatchEnv l     -- For the most part this is pushed downwards
+      -> MatchResultEnv l -- Substitution so far:
                         --   Domain is subset of template tyvars
                         --   Free vars of range is subset of
                         --      in-scope set of the RnEnv2
       -> Type -> Type   -- Template and target respectively
-      -> Maybe TvSubstEnv
+      -> Maybe (MatchResultEnv l)
 
 match menv subst ty1 ty2 | Just ty1' <- coreView ty1 = match menv subst ty1' ty2
                          | Just ty2' <- coreView ty2 = match menv subst ty1 ty2'
 
 match menv subst (TyVarTy tv1) ty2
-  | Just ty1' <- lookupVarEnv subst tv1'        -- tv1' is already bound
+  | Just ty1' <- lookupVarEnv (mr_subst subst) tv1'        -- tv1' is already bound
   = if eqTypeX (nukeRnEnvL rn_env) ty1' ty2
         -- ty1 has no locally-bound variables, hence nukeRnEnvL
     then Just subst
@@ -174,7 +209,7 @@ match menv subst (TyVarTy tv1) ty2
                         -- are a subset of the in-scope set in @me_env menv@.)
     else do { subst1 <- match_kind menv subst (tyVarKind tv1) (typeKind ty2)
                         -- Note [Matching kinds]
-            ; return (extendVarEnv subst1 tv1' ty2) }
+            ; return $ mrMapSubst (\s -> extendVarEnv s tv1' ty2) subst1 }
 
    | otherwise  -- tv1 is not a template tyvar
    = case ty2 of
@@ -203,13 +238,23 @@ match menv subst (AppTy ty1a ty1b) ty2
 
 match _ subst (LitTy x) (LitTy y) | x == y  = return subst
 
+match menv subst ty1 ty2@(TyVarTy _)
+  = let leqs = filterBag (\(x,_,_) -> x == ty2) (me_lazy_eqs menv)
+     in case foldrBag go Nothing leqs of
+          Nothing -> Nothing
+          Just (subst', repl', info') -> Just $
+            subst' { mr_lazy_eqs = (ty2, repl', info') `consBag` mr_lazy_eqs subst'}
+  where
+    go _ solution@(Just _) = solution
+    go (_, repl, info) Nothing   = fmap (\x -> (x, repl, info)) (match menv subst ty1 repl)
+
 match _ _ _ _
   = Nothing
 
 
 
 --------------
-match_kind :: MatchEnv -> TvSubstEnv -> Kind -> Kind -> Maybe TvSubstEnv
+match_kind :: MatchEnv l -> MatchResultEnv l -> Kind -> Kind -> Maybe (MatchResultEnv l)
 -- Match the kind of the template tyvar with the kind of Type
 -- Note [Matching kinds]
 match_kind menv subst k1 k2
@@ -234,7 +279,7 @@ match_kind menv subst k1 k2
 -- thing to do.  C.f. Note [Matching variable types] in Rules.hs
 
 --------------
-match_tys :: MatchEnv -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv
+match_tys :: MatchEnv l -> MatchResultEnv l -> [Type] -> [Type] -> Maybe (MatchResultEnv l)
 match_tys menv subst tys1 tys2 = matchList (match menv) subst tys1 tys2
 
 --------------

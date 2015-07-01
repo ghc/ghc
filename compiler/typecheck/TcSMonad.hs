@@ -142,7 +142,6 @@ import UniqFM
 import Maybes ( orElse, firstJusts )
 
 import TrieMap
-import Control.Arrow ( first )
 import Control.Monad( ap, when, unless, MonadPlus(..) )
 import MonadUtils
 import Data.IORef
@@ -184,7 +183,8 @@ we keep them in a separate list.
 
 -- See Note [WorkList priorities]
 data WorkList
-  = WL { wl_eqs     :: [Ct]
+  = WL { wl_inst    :: [Ct]
+       , wl_eqs     :: [Ct]
        , wl_funeqs  :: [Ct]  -- LIFO stack of goals
        , wl_rest    :: [Ct]
        , wl_deriv   :: [CtEvidence]  -- Implicitly non-canonical
@@ -194,23 +194,27 @@ data WorkList
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs = eqs1, wl_funeqs = funeqs1, wl_rest = rest1
+    (WL { wl_inst = inst1, wl_eqs = eqs1, wl_funeqs = funeqs1, wl_rest = rest1
         , wl_deriv = ders1, wl_implics = implics1 })
-    (WL { wl_eqs = eqs2, wl_funeqs = funeqs2, wl_rest = rest2
+    (WL { wl_inst = inst2, wl_eqs = eqs2, wl_funeqs = funeqs2, wl_rest = rest2
         , wl_deriv = ders2, wl_implics = implics2 })
-   = WL { wl_eqs     = eqs1     ++ eqs2
+   = WL { wl_inst    = inst1    ++ inst2
+        , wl_eqs     = eqs1     ++ eqs2
         , wl_funeqs  = funeqs1  ++ funeqs2
         , wl_rest    = rest1    ++ rest2
         , wl_deriv   = ders1    ++ ders2
         , wl_implics = implics1 `unionBags`   implics2 }
 
 workListSize :: WorkList -> Int
-workListSize (WL { wl_eqs = eqs, wl_funeqs = funeqs, wl_deriv = ders, wl_rest = rest })
-  = length eqs + length funeqs + length rest + length ders
+workListSize (WL { wl_inst = inst, wl_eqs = eqs, wl_funeqs = funeqs, wl_deriv = ders, wl_rest = rest })
+  = length inst + length eqs + length funeqs + length rest + length ders
 
 workListWantedCount :: WorkList -> Int
-workListWantedCount (WL { wl_eqs = eqs, wl_rest = rest })
-  = count isWantedCt eqs + count isWantedCt rest
+workListWantedCount (WL { wl_inst = inst, wl_eqs = eqs, wl_rest = rest })
+  = count isWantedCt inst + count isWantedCt eqs + count isWantedCt rest
+
+extendWorkListInstanceOf :: Ct -> WorkList -> WorkList
+extendWorkListInstanceOf ct wl = wl { wl_inst = ct : wl_inst wl }
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
 extendWorkListEq ct wl = wl { wl_eqs = ct : wl_eqs wl }
@@ -248,6 +252,8 @@ extendWorkListCt ct wl
        -> extendWorkListFunEq ct wl
      EqPred {}
        -> extendWorkListEq ct wl
+     InstanceOfPred {}
+       -> extendWorkListInstanceOf ct wl
 
      _ -> extendWorkListNonEq ct wl
 
@@ -261,12 +267,13 @@ isEmptyWorkList (WL { wl_eqs = eqs, wl_funeqs = funeqs
   = null eqs && null rest && null funeqs && isEmptyBag implics && null ders
 
 emptyWorkList :: WorkList
-emptyWorkList = WL { wl_eqs  = [], wl_rest = []
+emptyWorkList = WL { wl_inst = [], wl_eqs  = [], wl_rest = []
                    , wl_funeqs = [], wl_deriv = [], wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> Maybe (Ct, WorkList)
-selectWorkItem wl@(WL { wl_eqs = eqs, wl_funeqs = feqs
-                      , wl_rest = rest })
+selectWorkItem wl@(WL { wl_inst = inst, wl_eqs = eqs
+                      , wl_funeqs = feqs, wl_rest = rest })
+  | ct:cts <- inst = Just (ct, wl { wl_inst   = cts })
   | ct:cts <- eqs  = Just (ct, wl { wl_eqs    = cts })
   | ct:fes <- feqs = Just (ct, wl { wl_funeqs = fes })
   | ct:cts <- rest = Just (ct, wl { wl_rest   = cts })
@@ -300,10 +307,12 @@ selectNextWorkItem
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WL { wl_eqs = eqs, wl_funeqs = feqs
+  ppr (WL { wl_inst = inst, wl_eqs = eqs, wl_funeqs = feqs
           , wl_rest = rest, wl_implics = implics, wl_deriv = ders })
    = text "WL" <+> (braces $
-     vcat [ ppUnless (null eqs) $
+     vcat [ ppUnless (null inst) $
+            ptext (sLit "InstanceOf =") <+> vcat (map ppr inst)
+          , ppUnless (null eqs) $
             ptext (sLit "Eqs =") <+> vcat (map ppr eqs)
           , ppUnless (null feqs) $
             ptext (sLit "Funeqs =") <+> vcat (map ppr feqs)
@@ -1283,7 +1292,8 @@ kickOutRewritable new_fr new_tv
                        , inert_model    = model }
                      -- Leave the model unchanged
 
-    kicked_out = WL { wl_eqs    = tv_eqs_out
+    kicked_out = WL { wl_inst   = []
+                    , wl_eqs    = tv_eqs_out
                     , wl_funeqs = feqs_out
                     , wl_deriv  = []
                     , wl_rest   = bagToList (dicts_out `andCts` irs_out
@@ -2810,8 +2820,8 @@ matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (TcCoercion, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
 matchFamTcM tycon args
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
-       ; return $ fmap (first TcCoercion) $
-         reduceTyFamApp_maybe fam_envs Nominal tycon args }
+       ; return $ fmap (\(x,y,_) -> (TcCoercion x, y)) $
+         reduceTyFamApp_maybe fam_envs Nominal tycon args noLazyEqs }
 
 {-
 Note [Residual implications]

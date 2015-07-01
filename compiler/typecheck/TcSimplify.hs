@@ -40,7 +40,7 @@ import TrieMap       () -- DV: for now
 import TyCon         ( isTypeFamilyTyCon )
 import Type          ( classifyPredType, isIPClass, PredTree(..)
                      , getClassPredTys_maybe, EqRel(..) )
-import Unify         ( tcMatchTy )
+import Unify         ( tcMatchTy, mr_subst, noLazyEqs )
 import Util
 import Var
 import VarSet
@@ -1788,8 +1788,8 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
                 ; disambigGroup default_tys group } }
   where
     try_group
-      | Just subst <- mb_subst
-      = do { wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
+      | Just mr <- mb_subst
+      = do { wanted_evs <- mapM (newWantedEvVarNC loc . substTy (mr_subst mr) . ctPred)
                                 wanteds
            ; residual_wanted <- solveSimpleWanteds $ listToBag $
                                 map mkNonCanonical wanted_evs
@@ -1798,7 +1798,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       = return False
 
     tmpl_tvs = extendVarSet (tyVarsOfType (tyVarKind the_tv)) the_tv
-    mb_subst = tcMatchTy tmpl_tvs (mkTyVarTy the_tv) default_ty
+    mb_subst = tcMatchTy tmpl_tvs noLazyEqs (mkTyVarTy the_tv) default_ty
       -- Make sure the kinds match too; hence this call to tcMatchTy
       -- E.g. suppose the only constraint was (Typeable k (a::k))
 

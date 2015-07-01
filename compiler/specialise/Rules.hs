@@ -45,7 +45,7 @@ import VarEnv
 import VarSet
 import Name             ( Name, NamedThing(..) )
 import NameEnv
-import Unify            ( ruleMatchTyX, MatchEnv(..) )
+import Unify            ( ruleMatchTyX, MatchEnv(..), MatchResult'(..), noLazyEqs )
 import BasicTypes       ( Activation, CompilerPhase, isActive )
 import StaticFlags      ( opt_PprStyle_Debug )
 import DynFlags         ( DynFlags )
@@ -873,11 +873,14 @@ match_ty :: RuleMatchEnv
 -- We only want to replace (f T) with f', not (f Int).
 
 match_ty renv subst ty1 ty2
-  = do  { tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
-        ; return (subst { rs_tv_subst = tv_subst' }) }
+  = do  { tv_subst' <- Unify.ruleMatchTyX menv mrenv ty1 ty2
+        ; return (subst { rs_tv_subst = Unify.mr_subst tv_subst' }) }
   where
     tv_subst = rs_tv_subst subst
-    menv = ME { me_tmpls = rv_tmpls renv, me_env = rv_lcl renv }
+    mrenv = MatchResult tv_subst noLazyEqs
+    menv = ME { me_tmpls = rv_tmpls renv
+              , me_env = rv_lcl renv
+              , me_lazy_eqs = Unify.noLazyEqs }
 
 {-
 Note [Expanding variables]

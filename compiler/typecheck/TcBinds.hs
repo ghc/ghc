@@ -311,7 +311,7 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- declared with complete type signatures
                 -- Do not extend the TcIdBinderStack; instead
                 -- we extend it on a per-rhs basis in tcExtendForRhs
-        ; tcExtendLetEnvIds top_lvl [(idName id, id, TcIdUnrestricted) | id <- poly_ids] $ do
+        ; tcExtendLetEnvIds top_lvl [( idName id, id, TcIdUnrestricted) | id <- poly_ids] $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
@@ -428,9 +428,18 @@ tc_single top_lvl sig_fn prag_fn lbind thing_inside
   = do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
                                       NonRecursive NonRecursive
                                       [lbind]
-       ; let uids = map (\x -> (x, TcIdUnrestricted)) ids
+       ; traceTc "tc_single/binds" (ppr binds1)
+       ; traceTc "tc_single/ids" (ppr ids)
+       ; traceTc "tc_single/ids_types" (ppr (map idType ids))
+       ; let uids = map (\x -> (x, choose_tc_id_flavour x)) ids
        ; thing <- tcExtendLetEnv top_lvl uids thing_inside
        ; return (binds1, thing) }
+  where
+    choose_tc_id_flavour v
+      | Just _ <- tcGetTyVar_maybe (idType v)
+      = TcIdMonomorphic
+      | otherwise
+      = TcIdUnrestricted
 
 -- | No signature or a partial signature
 noCompleteSig :: Maybe TcSigInfo -> Bool

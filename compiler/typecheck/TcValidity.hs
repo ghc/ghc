@@ -26,7 +26,7 @@ import TcMType
 import TysWiredIn ( coercibleClass, eqTyConName )
 import PrelNames
 import Type
-import Unify( tcMatchTyX )
+import Unify( tcMatchTyX, noLazyEqs, mr_subst )
 import Kind
 import CoAxiom
 import Class
@@ -1146,8 +1146,8 @@ checkConsistentFamInst (Just (clas, mini_env)) fam_tc at_tvs at_tys
     check_arg :: (TyVar, Type) -> TvSubst -> TcM TvSubst
     check_arg (fam_tc_tv, at_ty) subst
       | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
-      = case tcMatchTyX at_tv_set subst at_ty inst_ty of
-           Just subst | all_distinct subst -> return subst
+      = case tcMatchTyX at_tv_set subst noLazyEqs at_ty inst_ty of
+           Just result | all_distinct subst -> return (mr_subst result)
            _ -> failWithTc $ wrongATArgErr at_ty inst_ty
                 -- No need to instantiate here, because the axiom
                 -- uses the same type variables as the assocated class

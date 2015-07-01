@@ -515,8 +515,8 @@ addLocalInst (home_ie, my_insts) ispec
                inst_envs       = InstEnvs { ie_global  = global_ie
                                           , ie_local   = home_ie'
                                           , ie_visible = tcVisibleOrphanMods tcg_env }
-               (matches, _, _) = lookupInstEnv False inst_envs cls tys
-               dups            = filter (identicalClsInstHead ispec) (map fst matches)
+               (matches, _, _) = lookupInstEnv False inst_envs cls tys noLazyEqs
+               dups            = filter (identicalClsInstHead ispec) (map (\(x,_,_) -> x) matches)
 
              -- Check functional dependencies
          ; case checkFunDeps inst_envs ispec of
