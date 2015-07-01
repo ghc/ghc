@@ -51,7 +51,7 @@ import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
 import SrcLoc
-import Util
+import Util hiding ( Direction )   -- TODO (RAE): Remove "hiding"
 import ListSetOps
 import Maybes
 import ErrUtils
@@ -198,15 +198,16 @@ tcExpr _ (HsLam match) res_ty
         ; return (mkHsWrap co_fn (HsLam match')) }
 
 tcExpr _ e@(HsLamCase _ matches) res_ty
-  = do { (wrap, expr) <-
-            matchExpectedFunTys msg 1 res_ty $ \ [arg_ty] body_ty ->
-            do { matches' <- tcMatchesCase match_ctxt arg_ty matches body_ty
-               ; return $ HsLamCase arg_ty matches' }
-       ; return (mkHsWrap wrap expr) }
+   -- the tcSkolemiseExpr call is necessary because matchExpectedFunTys
+   -- won't skolemise to uncover an arrow
+  = tcSkolemiseExpr SkolemiseTop res_ty $ \ res_ty ->
+    do {(wrap, [arg_ty], body_ty) <-
+            matchExpectedFunTys Expected msg 1 res_ty
+       ; matches' <- tcMatchesCase match_ctxt arg_ty matches body_ty
+       ; return $ mkHsWrap wrap $ HsLamCase arg_ty matches' }
   where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
-
 
 tcExpr Up (ExprWithTySig expr sig_ty wcs) res_ty
  = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
@@ -1020,7 +1021,7 @@ tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcSigmaType -> TcM (HsExpr TcId)
 -- The operator is always a variable at this stage (i.e. renamer output)
 -- This version assumes res_ty is a monotype
 tcSyntaxOp orig (HsVar op) res_ty = do { (expr, ty) <- tcInferIdWithOrig orig op
-                                       ; wrap <- tcSubType ty res_ty
+                                       ; wrap <- tcSubType GenSigCtxt ty res_ty
                                        ; return (mkHsWrap wrap expr) }
 tcSyntaxOp _ other         _      = pprPanic "tcSyntaxOp" (ppr other)
 
@@ -1278,7 +1279,7 @@ tcTagToEnum :: SrcSpan -> Name -> LHsExpr Name -> TcRhoType
 -- See Note [tagToEnum#]   Urgh!
 tcTagToEnum loc fun_name arg res_ty
   = do { fun <- tcLookupId fun_name
-       ; ty' <- zonkTcType res_rho
+       ; ty' <- zonkTcType res_ty
 
        -- Check that the type is algebraic
        ; let mb_tc_app = tcSplitTyConApp_maybe ty'
@@ -1299,7 +1300,7 @@ tcTagToEnum loc fun_name arg res_ty
        ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
              rep_ty = mkTyConApp rep_tc rep_args
 
-       ; return (coToHsWrapperR (mkTcSymCo $ TcCoercion coi), fun', arg') }
+       ; return (coToHsWrapperR (mkTcSymCo $ TcCoercion coi), fun', [arg']) }
                  -- coi is a Representational coercion
   where
     doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")

@@ -125,21 +125,31 @@ tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss res_ty
     match_ctxt = MC { mc_what = PatBindRhs,
                       mc_body = tcBody }
 
-matchFunTys
-  :: SDoc       -- See Note [Herald for matchExpecteFunTys] in TcUnify
-  -> Arity
-  -> TcSigmaType
-  -> ([TcSigmaType] -> TcSigmaType -> TcM a)
-  -> TcM (HsWrapper, a)
+matchFunTys :: SDoc       -- See Note [Herald for matchExpecteFunTys] in TcUnify
+            -> Arity
+            -> TcSigmaType
+            -> ([TcSigmaType] -> TcSigmaType -> TcM a)
+            -> TcM (HsWrapper, a)
 
--- Written in CPS style for historical reasons;
--- could probably be un-CPSd, like matchExpectedTyConApp
+matchFunTys _herald 0 res_ty thing_inside
+ = do { result <- thing_inside [] res_ty
+      ; return (idHsWrapper, result) }
 
 matchFunTys herald arity res_ty thing_inside
-  = do  { (wrap, pat_tys, res_ty) <-
-             matchExpectedFunTys Expected herald arity res_ty
-        ; res <- thing_inside pat_tys res_ty
-        ; return (wrap, res) }
+  = do { (wrap1, (wrap2, result)) <-
+           tcSkolemise SkolemiseTop GenSigCtxt res_ty $ \_ res_ty ->
+       do { (fun_wrap, [arg_ty], inner_res_ty) <-
+               matchExpectedFunTys Expected herald 1 res_ty
+               -- fun_wrap :: (arg_ty -> inner_res_ty) "->" res_ty
+          ; (inner_wrap, result) <-
+              matchFunTys herald (arity-1) inner_res_ty $ \arg_tys final_res_ty ->
+              thing_inside (arg_ty:arg_tys) final_res_ty
+              -- inner_wrap ::
+              --   (arg_ty1 ... arg_ty2 -> final_res_ty) "->" inner_res_ty
+          ; return ( fun_wrap <.>
+                     (mkWpFun idHsWrapper inner_wrap arg_ty inner_res_ty)
+                   , result ) }
+       ; return (wrap1 <.> wrap2, result) }
 
 {-
 ************************************************************************

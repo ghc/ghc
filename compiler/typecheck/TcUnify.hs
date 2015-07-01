@@ -95,26 +95,17 @@ exposeRhoType (Actual orig) ty thing_inside
 -- | In the "defer" case of the matchExpectedXXX functions, we create
 -- a type built from unification variables and then use tcSubType to
 -- match this up with the type passed in. This function does the right
--- expected/actual thing. Written using CPS so that anything that happens
--- in thing_inside can cause unification with the skolems.
+-- expected/actual thing.
 matchUnificationType :: ExpOrAct
                      -> TcRhoType    -- ^ t1, the "unification" type
                      -> TcSigmaType  -- ^ t2, the passed-in type
-                     -> TcM a
-                     -> TcM (HsWrapper, a)
+                     -> TcM HsWrapper
                         -- ^ Expected: t1 "->" t2
                         -- ^ Actual:   t2 "->" t1
-matchUnificationType Expected unif_ty other_ty thing_inside
-  = do { (wrap1, (wrap2, result)) <-
-            tcSkolemise SkolemiseDeeply GenSigCtxt other_ty $ \_ other_rho ->
-            do { wrap <- tcSubTypeDS GenSigCtxt unif_ty other_rho
-               ; result <- thing_inside
-               ; return (wrap, result) }
-       ; return (wrap1 <.> wrap2, result) }
-matchUnificationType (Actual _) unif_ty other_ty thing_inside
-  = do { wrap <- tcSubTypeDS GenSigCtxt other_ty unif_ty
-       ; result <- thing_inside
-       ; return (wrap, thing_inside) }
+matchUnificationType Expected unif_ty other_ty
+  = tcSubType GenSigCtxt unif_ty other_ty
+matchUnificationType (Actual _) unif_ty other_ty
+  = tcSubTypeDS GenSigCtxt other_ty unif_ty
 
 {-
 Note [Herald for matchExpectedFunTys]
@@ -139,24 +130,21 @@ This is used to construct a message of form
    The function 'f' is applied to two arguments
    but its type `Int -> Int' has only one
 
-Note [matchExpectedFunTys vs matchActualFunTys]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These functions check that a sigma has the form
+Note [matchExpectedFunTys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+matchExpectedFunTys checks that a sigma has the form
 of an n-ary function.  It passes the decomposed type to the
-thing_inside, and returns a wrapper to coerce between the two types.
-(or, in the case of matchActualFunTys, all of this is returned)
+thing_inside, and returns a wrapper to coerce between the two types
 
-They're used wherever a language construct must have a functional type,
+It's used wherever a language construct must have a functional type,
 namely:
         A lambda expression
         A function definition
      An operator section
 
-The difference is whether you want to *instantiate* or *skolemise*
-quantified variables. (Expected = skolemise; Actual = instantiate)
-The skolemise version must be written in CPS so that the skolems
-are available for unification in the thing_inside. Without CPS, the
-TcLevels would be wrong, and you'd have untouchable-variable problems.
+matchExpectedFunTys requires you to specify whether to *instantiate*
+or *skolemise* the sigma type to find an arrow.
+Do this by passing (Actual _) or Expected, respectively.
 
 Why does this matter? Consider these bidirectional typing rules:
 
@@ -174,36 +162,14 @@ ignoring the quantification. In App, we want to instantiate.
 
 -}
 
--- always does *skolemisation* to uncover arrows
-matchExpectedFunTys :: SDoc  -- See Note [Herald for matchExpectedFunTys]
+matchExpectedFunTys :: ExpOrAct
+                    -> SDoc     -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> TcSigmaType
-                    -> ([TcSigmaType] -> TcSigmaType -> TcM a)
-                    -> TcM (HsWrapper, a)
-matchExpectedFunTys = match_fun_tys Expected
+                    -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
 
--- always does *instantiation* to uncover arrows
-matchActualFunTys :: CtOrigin
-                  -> SDoc   -- See Note [Herald for matchExpectedFunTys]
-                  -> Arity
-                  -> TcSigmaType
-                  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
-matchActualFunTys orig herald n ty
-  = do { (wrap, (arg_tys, res_ty)) <-
-            match_fun_tys (Actual orig) herald n ty $
-            \arg_tys res_ty -> return (arg_tys, res_ty)
-       ; return (wrap, arg_tys, res_ty) }
-
-match_fun_tys :: ExpOrAct
-              -> SDoc     -- See Note [Herald for matchExpectedFunTys]
-              -> Arity
-              -> TcSigmaType
-              -> ([TcSigmaType] -> TcSigmaType -> TcM a)
-              -> TcM (HsWrapper, a)
-
--- If    match_fun_tys n ty continues with ([t1,..,tn], ty_r)
--- then  Actual :   wrap : ty "->" (t1 -> ... -> tn -> ty_r)
---       Expected : wrap : (t1 -> ... -> tn -> ty_r) "->" ty
+-- If    matchExpectFunTys n ty = (wrap, [t1,..,tn], ty_r)
+-- then  wrap : ty "->" (t1 -> ... -> tn -> ty_r)
 --
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
@@ -212,39 +178,42 @@ match_fun_tys :: ExpOrAct
 -- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
 -- hide the forall inside a meta-variable
 
-match_fun_tys ea herald arity orig_ty thing_inside
-  = go [] arity orig_ty
+matchExpectedFunTys ea herald arity orig_ty = go arity orig_ty
   where
     -- If     go n ty = (co, [t1,..,tn], ty_r)
     -- then   Actual:   wrap : ty "->" (t1 -> .. -> tn -> ty_r)
     --        Expected: wrap : (t1 -> .. -> tn -> ty_r) "->" ty
 
-    go arg_tys 0 ty = do { result <- thing_inside (reverse arg_tys) ty
-                         ; return (idHsWrapper, result) }
+    go n_req ty
+      | n_req == 0 = return (idHsWrapper, [], ty)
 
-    go arg_tys n_req ty
+    go n_req ty
       | not (null tvs && null theta)
-      = exposeRhoType ea ty $ \rho -> go arg_tys n_req rho
+      = do { (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
+             do { (inner_wrap, arg_tys, res_ty) <- go n_req rho
+                ; return (inner_wrap, (arg_tys, res_ty)) }
+           ; return (wrap, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go arg_tys n_req ty
-      | Just ty' <- tcView ty = go arg_tys n_req ty'
+    go n_req ty
+      | Just ty' <- tcView ty = go n_req ty'
 
-    go arg_tys n_req (FunTy arg_ty res_ty)
+    go n_req (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
-      = do { (wrap_res, result) <- go (arg_ty:arg_tys) (n_req-1) res_ty
+      = do { (wrap_res, tys, ty_r) <- go (n_req-1) res_ty
            ; let rhs_ty = case ea of
                    Expected -> res_ty
                    Actual _ -> mkFunTys tys ty_r
-           ; return (mkWpFun idHsWrapper wrap_res arg_ty rhs_ty, result) }
+           ; return ( mkWpFun idHsWrapper wrap_res arg_ty rhs_ty
+                    , arg_ty:tys, ty_r ) }
 
-    go arg_tys n_req ty@(TyVarTy tv)
+    go n_req ty@(TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go arg_tys n_req ty'
-               Flexi        -> defer arg_tys n_req ty (isReturnTyVar tv) }
+               Indirect ty' -> go n_req ty'
+               Flexi        -> defer n_req ty (isReturnTyVar tv) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -261,20 +230,20 @@ match_fun_tys ea herald arity orig_ty thing_inside
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also Trac #9605.
-    go arg_tys n_req ty = addErrCtxtM mk_ctxt $
-                          defer arg_tys n_req ty False
+    go n_req ty = addErrCtxtM mk_ctxt $
+                  defer n_req ty False
 
     ------------
     -- If we decide that a ReturnTv (see Note [ReturnTv] in TcType) should
     -- really be a function type, then we need to allow the argument and
     -- result types also to be ReturnTvs.
-    defer arg_tys n_req fun_ty is_return
-      = do { more_arg_tys <- mapM new_ty_var_ty (nOfThem n_req openTypeKind)
+    defer n_req fun_ty is_return
+      = do { arg_tys <- mapM new_ty_var_ty (nOfThem n_req openTypeKind)
                         -- See Note [Foralls to left of arrow]
            ; res_ty  <- new_ty_var_ty openTypeKind
-           ; let unif_fun_ty = mkFunTys more_arg_tys res_ty
-           ; matchUnificationType ea unif_fun_ty fun_ty $
-             thing_inside (reverse arg_tys ++ more_arg_tys) res_ty }
+           ; let unif_fun_ty = mkFunTys arg_tys res_ty
+           ; wrap    <- matchUnificationType ea unif_fun_ty fun_ty
+           ; return (wrap, arg_tys, res_ty) }
       where
         new_ty_var_ty | is_return = newReturnTyVarTy
                       | otherwise = newFlexiTyVarTy
