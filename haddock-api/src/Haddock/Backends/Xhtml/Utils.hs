@@ -41,11 +41,19 @@ import Module   ( Module, ModuleName, moduleName, moduleNameString )
 import Name     ( getOccString, nameOccName, isValOcc )
 
 
+-- | Replace placeholder string elements with provided values.
+--
+-- Used to generate URL for customized external paths, usually provided with
+-- @--source-module@, @--source-entity@ and related command-line arguments.
+--
+-- >>> spliceURL Nothing mmod mname Nothing "output/%{MODULE}.hs#%{NAME}"
+-- "output/Foo.hs#foo"
 spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name ->
              Maybe SrcSpan -> String -> String
 spliceURL mfile mmod = spliceURL' mfile (moduleName <$> mmod)
 
 
+-- | Same as 'spliceURL' but takes 'ModuleName' instead of 'Module'.
 spliceURL' :: Maybe FilePath -> Maybe ModuleName -> Maybe GHC.Name ->
               Maybe SrcSpan -> String -> String
 spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
