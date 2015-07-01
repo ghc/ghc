@@ -516,7 +516,7 @@ extendGlobalRdrEnvRn avails new_fixities
 ********************************************************************* -}
 
 getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
-    -> RnM ((TcGblEnv, TcLclEnv), NameSet, [(Name, [FieldLabel])])
+    -> RnM ((TcGblEnv, TcLclEnv), NameSet)
 -- Get all the top-level binders bound the group *except*
 -- for value bindings, which are treated separately
 -- Specifically we return AvailInfo for
@@ -559,9 +559,14 @@ getLocalNonValBinders fixity_env
                           availsToNameSet tc_avails
               flds      = concat nti_fldss ++ concat tc_fldss
         ; traceRn (text "getLocalNonValBinders 2" <+> ppr avails)
-        ; envs <- extendGlobalRdrEnvRn avails fixity_env
+        ; (tcg_env, tcl_env) <- extendGlobalRdrEnvRn avails fixity_env
 
-        ; return (envs, new_bndrs, flds) } }
+        -- Extend tcg_field_env with new fields (this used to be the
+        -- work of extendRecordFieldEnv)
+        ; let field_env = extendNameEnvList (tcg_field_env tcg_env) flds
+              envs      = (tcg_env { tcg_field_env = field_env }, tcl_env)
+
+        ; return (envs, new_bndrs) } }
   where
     ValBindsIn _val_binds val_sigs = binds
 

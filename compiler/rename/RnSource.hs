@@ -111,17 +111,11 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
    --        * For hs-boot files, include the value signatures
    --          Again, they have no value declarations
    --
-   (tc_envs, tc_bndrs, flds) <- getLocalNonValBinders local_fix_env group ;
+   (tc_envs, tc_bndrs) <- getLocalNonValBinders local_fix_env group ;
 
    setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
-
-   -- (C) Extract the mapping from data constructors to field names and
-   --     extend the record field env.
-   --     This depends on the data constructors and field names being in
-   --     scope from (B) above
-   inNewEnv (extendRecordFieldEnv flds) $ \ _ -> do {
 
    -- (D1) Bring pattern synonyms into scope.
    --      Need to do this before (D2) because rnTopBindsLHS
@@ -227,7 +221,7 @@ rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
    traceRn (text "finish rnSrc" <+> ppr rn_group) ;
    traceRn (text "finish Dus" <+> ppr src_dus ) ;
    return (final_tcg_env, rn_group)
-                    }}}}}
+                    }}}}
 
 -- some utils because we do this a bunch above
 -- compute and install the new env
@@ -1490,24 +1484,6 @@ deprecRecSyntax decl
 
 badRecResTy :: SDoc -> SDoc
 badRecResTy doc = ptext (sLit "Malformed constructor signature") $$ doc
-
-{-
-*********************************************************
-*                                                      *
-\subsection{Support code for type/data declarations}
-*                                                      *
-*********************************************************
-
-Get the mapping from constructors to fields for this module.
-This used to be complicated, but now all the work is done by
-RnNames.getLocalNonValBinders.
--}
-
-extendRecordFieldEnv :: [(Name, [FieldLabel])] -> TcM TcGblEnv
-extendRecordFieldEnv flds
-  = do  { tcg_env <- getGblEnv
-        ; let field_env' = extendNameEnvList (tcg_field_env tcg_env) flds
-        ; return (tcg_env { tcg_field_env = field_env' }) }
 
 {-
 *********************************************************
