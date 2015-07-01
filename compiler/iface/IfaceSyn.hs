@@ -332,13 +332,13 @@ visibleIfConDecls (IfNewTyCon c   _ _) = [c]
 
 ifaceConDeclFields :: IfaceConDecls -> [FieldLbl OccName]
 ifaceConDeclFields x = case x of
-    IfAbstractTyCon {}                    -> []
-    IfDataFamTyCon  {}                    -> []
-    IfDataTyCon cons is_overloaded labels -> help cons  is_overloaded labels
-    IfNewTyCon  con  is_overloaded labels -> help [con] is_overloaded labels
+    IfAbstractTyCon {}              -> []
+    IfDataFamTyCon  {}              -> []
+    IfDataTyCon cons is_over labels -> map (help cons  is_over) labels
+    IfNewTyCon  con  is_over labels -> map (help [con] is_over) labels
   where
-    help (dc:_) is_overloaded = map (\ lbl -> mkFieldLabelOccs lbl (ifConOcc dc) is_overloaded)
-    help [] _ = error "ifaceConDeclFields: data type has no constructors!"
+    help (dc:_) is_over lbl = mkFieldLabelOccs lbl (ifConOcc dc) is_over
+    help [] _ _ = error "ifaceConDeclFields: data type has no constructors!"
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
