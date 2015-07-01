@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 
 module Polymorphism where
@@ -53,3 +54,13 @@ norf = undefined
 
 norf' :: forall a. a -> (forall a. Ord a => a -> a) -> a
 norf' = undefined
+
+
+plugh :: forall a. a -> a
+plugh x = x :: a
+
+thud :: forall a b. (a -> b) -> a -> (a, b)
+thud f x =
+    (x :: a, y) :: (a, b)
+  where
+    y = (f :: a -> b) x :: b
