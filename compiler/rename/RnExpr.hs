@@ -30,6 +30,7 @@ import RnPat
 import DynFlags
 import BasicTypes       ( FixityDirection(..), Fixity(..), minPrecedence )
 import PrelNames
+import FieldLabel
 
 import Name
 import NameSet
@@ -109,7 +110,8 @@ rnExpr (HsVar v)
               | otherwise
               -> finishHsVar name ;
            Just (Right ((_, sel_name):ns)) -> ASSERT( null ns )
-                                              return (HsSingleRecFld v sel_name, unitFV sel_name) ;
+                                              -- AMG TODO push up into lookupOccRn_overloaded? False is wrong!
+                                              return (HsSingleRecFld (FieldOcc v (FieldLabel (occNameFS $ rdrNameOcc v) False sel_name)), unitFV sel_name) ;
            Just (Right [])                 -> error "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)

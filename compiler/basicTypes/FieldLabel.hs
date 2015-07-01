@@ -39,7 +39,12 @@ dfuns/axioms differ.  Each FieldLabel value is unique to its type
 constructor.
 -}
 
-{-# LANGUAGE CPP, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module FieldLabel ( FieldLabelString
                   , FieldLabelEnv
@@ -53,6 +58,8 @@ import Name
 
 import FastString
 import Outputable
+
+import Data.Data
 
 #if __GLASGOW_HASKELL__ < 709
 import Data.Foldable ( Foldable )
@@ -76,6 +83,7 @@ data FieldLbl a = FieldLabel {
       flSelector     :: a                 -- ^ Record selector function
     }
   deriving (Functor, Foldable, Traversable)
+deriving instance Data a => Data (FieldLbl a)
 
 instance Outputable a => Outputable (FieldLbl a) where
     ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))

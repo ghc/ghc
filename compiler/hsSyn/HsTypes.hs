@@ -33,6 +33,8 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
+        FieldOcc(..),
+
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
 
@@ -70,6 +72,7 @@ import TysWiredIn
 import PrelNames( ipClassName )
 import HsDoc
 import BasicTypes
+import FieldLabel
 import SrcLoc
 import StaticFlags
 import Outputable
@@ -551,6 +554,17 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
       -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
+
+-- | Represents an *occurrence* of an unambiguous field.  We store
+-- both the 'RdrName' the user originally wrote, and after the
+-- renamer, the 'FieldLbl' including the selector function.
+data FieldOcc name = FieldOcc RdrName (PostRn name (FieldLbl name))
+
+instance Outputable (FieldOcc name) where
+  ppr (FieldOcc rdr _) = ppr rdr
+
+deriving instance (DataId name) => Data (FieldOcc name)
+
 
 {-
 Note [ConDeclField names]

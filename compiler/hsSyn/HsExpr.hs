@@ -135,6 +135,8 @@ data HsExpr id
                              -- Turned into HsVar by type checker, to support deferred
                              --   type errors.  (The HsUnboundVar only has an OccName.)
 
+  | HsSingleRecFld (FieldOcc id) -- ^ Variable that corresponds to a record selector
+
   | HsIPVar   HsIPName       -- ^ Implicit parameter
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
 
@@ -300,9 +302,6 @@ data HsExpr id
                 [PostTc id Type]   --              and  *output* record type
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
-
-  -- | Used to attach a selector id to non-overloaded fields
-  | HsSingleRecFld RdrName id
 
   -- | Expression with an explicit type signature. @e :: type@
   --
@@ -773,7 +772,7 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
-ppr_expr (HsSingleRecFld f _) = ppr f
+ppr_expr (HsSingleRecFld f) = ppr f
 
 {-
 HsSyn records exactly where the user put parens, with HsPar.

@@ -762,8 +762,8 @@ tcExpr (RecordUpd record_expr rbnds _ _ _) res_ty
           RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
                     relevant_cons scrut_inst_tys result_inst_tys  }
 
-tcExpr (HsSingleRecFld f sel_name) res_ty
-    = tcCheckRecSelId f sel_name res_ty
+tcExpr (HsSingleRecFld f) res_ty
+    = tcCheckRecSelId f res_ty
 
 {-
 ************************************************************************
@@ -947,8 +947,8 @@ tcInferFun (L loc (HsVar name))
                -- Don't wrap a context around a plain Id
        ; return (L loc fun, ty) }
 
-tcInferFun (L loc (HsSingleRecFld lbl name))
-  = do { (fun, ty) <- setSrcSpan loc (tcInferRecSelId lbl name)
+tcInferFun (L loc (HsSingleRecFld f))
+  = do { (fun, ty) <- setSrcSpan loc (tcInferRecSelId f)
                -- Don't wrap a context around a plain Id
        ; return (L loc fun, ty) }
 
@@ -1044,10 +1044,10 @@ tcCheckId name res_ty
        ; addErrCtxtM (funResCtxt False (HsVar name) actual_res_ty res_ty) $
          tcWrapResult expr actual_res_ty res_ty }
 
-tcCheckRecSelId :: RdrName -> Name -> TcRhoType -> TcM (HsExpr TcId)
-tcCheckRecSelId lbl name res_ty
-  = do { (expr, actual_res_ty) <- tcInferRecSelId lbl name
-       ; addErrCtxtM (funResCtxt False (HsSingleRecFld lbl name) actual_res_ty res_ty) $
+tcCheckRecSelId :: FieldOcc Name -> TcRhoType -> TcM (HsExpr TcId)
+tcCheckRecSelId f res_ty
+  = do { (expr, actual_res_ty) <- tcInferRecSelId f
+       ; addErrCtxtM (funResCtxt False (HsSingleRecFld f) actual_res_ty res_ty) $
          tcWrapResult expr actual_res_ty res_ty }
 
 ------------------------
@@ -1055,8 +1055,8 @@ tcInferId :: Name -> TcM (HsExpr TcId, TcRhoType)
 -- Infer type, and deeply instantiate
 tcInferId n = tcInferIdWithOrig (OccurrenceOf n) (nameRdrName n) n
 
-tcInferRecSelId :: RdrName -> Name -> TcM (HsExpr TcId, TcRhoType)
-tcInferRecSelId lbl n = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl n
+tcInferRecSelId :: FieldOcc Name -> TcM (HsExpr TcId, TcRhoType)
+tcInferRecSelId (FieldOcc lbl fl) = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl (flSelector fl)
 
 ------------------------
 tcInferIdWithOrig :: CtOrigin -> RdrName -> Name ->

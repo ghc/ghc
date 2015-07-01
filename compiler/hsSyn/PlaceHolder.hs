@@ -12,6 +12,7 @@ import NameSet
 import RdrName
 import Var
 import Coercion
+import FieldLabel
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -99,6 +100,7 @@ type DataId id =
   , Data (PostRn id Bool)
   , Data (PostRn id Name)
   , Data (PostRn id [Name])
+  , Data (PostRn id (FieldLbl id))
 
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
