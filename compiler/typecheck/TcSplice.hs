@@ -121,7 +121,7 @@ import GHC.Exts         ( unsafeCoerce# )
 
 tcTypedBracket   :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
 tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> TcRhoType -> TcM (HsExpr TcId)
-tcSpliceExpr     :: HsSplice Name  -> TcSigmaType -> TcM (HsExpr TcId)
+tcSpliceExpr     :: HsSplice Name  -> TcRhoType -> TcM (HsExpr TcId)
         -- None of these functions add constraints to the LIE
 
 -- runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)
@@ -415,13 +415,12 @@ When a variable is used, we compare
 
 tcSpliceExpr splice@(HsTypedSplice name expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
-    setSrcSpan (getLoc expr)    $
-    tcSkolemiseExpr SkolemiseDeeply res_ty $ \ res_rho -> do
+    setSrcSpan (getLoc expr)    $ do
     { stage <- getStage
     ; case stage of
-        Splice {}            -> tcTopSplice expr res_rho
-        Comp                 -> tcTopSplice expr res_rho
-        Brack pop_stage pend -> tcNestedSplice pop_stage pend name expr res_rho }
+        Splice {}            -> tcTopSplice expr res_ty
+        Comp                 -> tcTopSplice expr res_ty
+        Brack pop_stage pend -> tcNestedSplice pop_stage pend name expr res_ty }
 tcSpliceExpr splice _
   = pprPanic "tcSpliceExpr" (ppr splice)
 
