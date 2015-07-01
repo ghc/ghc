@@ -99,7 +99,7 @@ types =
 -- clauses).
 binds :: GHC.RenamedSource -> DetailsMap
 binds =
-    everything (<|>) (fun `combine` pat)
+    everything (<|>) (fun `combine` pat `combine` tvar)
   where
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name)) ->
@@ -116,6 +116,12 @@ binds =
     rec term = case cast term of
         (Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LPat GHC.Name) _)) ->
             pure (sspan, RtkVar name)
+        _ -> empty
+    tvar term = case cast term of
+        (Just (GHC.L sspan (GHC.UserTyVar name))) ->
+            pure (sspan, RtkBind name)
+        (Just (GHC.L _ (GHC.KindedTyVar (GHC.L sspan name) _))) ->
+            pure (sspan, RtkBind name)
         _ -> empty
 
 -- | Obtain details map for top-level declarations.
