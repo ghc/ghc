@@ -37,6 +37,7 @@ import CoreUnfold
 import CoreFVs
 import UniqSupply
 import Digraph
+import Pair
 
 import PrelNames
 import TysPrim ( mkProxyPrimTy )
@@ -801,6 +802,12 @@ dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
+dsHsWrapper (WpEvRevApp tm@(EvInstanceOf _ _)) e
+  = do { coreTm <- dsEvTerm tm
+       ; case splitFunTy_maybe (exprType coreTm) of
+           -- Do not generate instantiation if type remains the same
+           Just (ty1, ty2) | ty1 == ty2 -> return e
+           _ -> return (mkCoreApp coreTm e) }
 dsHsWrapper (WpEvRevApp tm)   e = liftM (flip mkCoreApp e) (dsEvTerm tm)
 
 --------------------------------------
@@ -1154,21 +1161,32 @@ Maybe simpleOpt should be smarter.  But it seems like a good plan
 to simply never generate the redundant box/unbox in the first place.
 -}
 
+-- In order to get a smaller term to simplify,
+-- we apply a direct simplification at this point,
+-- removing all identity coercions and instantiations.
 dsEvInstanceOf :: Type -> EvInstanceOf -> DsM CoreExpr
 dsEvInstanceOf _  (EvInstanceOfVar v)
   = return (Var v)
 dsEvInstanceOf ty (EvInstanceOfEq co)
   = do { bndr <- newSysLocalDs ty
-       ; expr <- dsTcCoercion co (\c -> mkCast (Var bndr) (mkSubCo c))
+       ; expr <- dsTcCoercion co $ \c ->
+           case coercionKind c of
+            Pair ty1 ty2 | ty1 == ty2 -> Var bndr
+            _ ->  mkCast (Var bndr) (mkSubCo c)
        ; return (mkCoreLams [bndr] expr) }
 dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
   = do { bndr <- newSysLocalDs ty
        ; qs'  <- mapM dsEvTerm qs
        ; let exprTy = mkCoreApps (Var bndr) (map Type qvars)
              exprEv = mkCoreApps exprTy qs'
-       ; return (mkCoreLams [bndr] (mkCoreApp (Var co) exprEv)) }
+             inner  = case splitFunTy_maybe (exprType (Var co)) of
+                        Just (ty1, ty2) | ty1 == ty2 -> exprEv
+                        _ -> mkCoreApp (Var co) exprEv
+       ; return (mkCoreLams [bndr] inner) }
 dsEvInstanceOf ty (EvInstanceOfLet tyvars qvars qs rest)
   = do { bndr <- newSysLocalDs ty
        ; q_binds <- dsTcEvBinds qs
-       ; return (mkCoreLams (bndr : tyvars ++ qvars) $
-           mkCoreLets q_binds (mkCoreApp (Var rest) (Var bndr))) }
+       ; let inner = case splitFunTy_maybe (exprType (Var rest)) of
+                       Just (ty1, ty2) | ty1 == ty2 -> Var bndr
+                       _ -> mkCoreApp (Var rest) (Var bndr)
+       ; return $ mkCoreLams (bndr : tyvars ++ qvars) (mkCoreLets q_binds inner) }

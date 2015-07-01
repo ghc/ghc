@@ -428,9 +428,6 @@ tc_single top_lvl sig_fn prag_fn lbind thing_inside
   = do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
                                       NonRecursive NonRecursive
                                       [lbind]
-       ; traceTc "tc_single/binds" (ppr binds1)
-       ; traceTc "tc_single/ids" (ppr ids)
-       ; traceTc "tc_single/ids_types" (ppr (map idType ids))
        ; let uids = map (\x -> (x, choose_tc_id_flavour x)) ids
        ; thing <- tcExtendLetEnv top_lvl uids thing_inside
        ; return (binds1, thing) }
