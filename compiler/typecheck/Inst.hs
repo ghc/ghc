@@ -232,13 +232,14 @@ top_instantiate :: Bool   -- True <=> instantiate *all* variables
                 -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 top_instantiate inst_all orig ty
   | not (null tvs && null theta)
-  = do { let (inst_tvs, leave_tvs) = span should_inst tvs
-             inst_theta
-               | null leave_tvs = theta
-               | otherwise      = []
+  = do { let (inst_tvs, leave_tvs)     = span should_inst tvs
+             (inst_theta, leave_theta)
+               | null leave_tvs = (theta, [])
+               | otherwise      = ([], theta)
        ; (subst, inst_tvs') <- tcInstTyVars inst_tvs
        ; let inst_theta' = substTheta subst inst_theta
-             sigma'      = substTy    subst (mkForAllTys leave_tvs rho)
+             sigma'      = substTy    subst (mkForAllTys leave_tvs $
+                                             mkFunTys leave_theta rho)
 
        ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
        ; traceTc "Instantiating (inferred only)"

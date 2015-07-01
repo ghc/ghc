@@ -216,6 +216,7 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
       | Just (Just hs_ty_arg) <- fmap isLHsTypeExpr_maybe arg
       = do { let origin = case ea of Expected    -> panic "match_fun_tys"
                                      Actual orig -> orig
+           ; traceTc "RAE1" (ppr arg $$ ppr args $$ ppr ty)
            ; (wrap1, upsilon_ty) <- topInstantiateInferred origin ty
                -- wrap1 :: ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -224,6 +225,7 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                  do { let kind = tyVarKind tv
                     ; ty_arg <- tcCheckLHsType hs_ty_arg kind
                     ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
+                    ; traceTc "RAE3" (ppr upsilon_ty $$ ppr tv $$ ppr inner_ty $$ ppr insted_ty $$ ppr ty_arg)
                     ; (inner_wrap, arg_tys, res_ty) <- go args insted_ty
                         -- inner_wrap :: insted_ty "->" arg_tys -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
@@ -234,7 +236,8 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
 
     go args ty
       | not (null tvs && null theta)
-      = do { (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
+      = do { traceTc "RAE2" (ppr args $$ ppr ty)
+           ; (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
              do { (inner_wrap, arg_tys, res_ty) <- go args rho
                 ; return (inner_wrap, (arg_tys, res_ty)) }
            ; return (wrap, arg_tys, res_ty) }
