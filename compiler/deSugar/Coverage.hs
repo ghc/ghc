@@ -461,16 +461,15 @@ addBinTickLHsExpr boxLabel (L pos e0)
 -- Decoarate an HsExpr with ticks
 
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
-addTickHsExpr e@(HsVar id) = do freeVar id; return e
-addTickHsExpr e@(HsIPVar _) = return e
-addTickHsExpr e@(HsOverLit _) = return e
-addTickHsExpr e@(HsLit _) = return e
-addTickHsExpr (HsLam matchgroup) =
-        liftM HsLam (addTickMatchGroup True matchgroup)
-addTickHsExpr (HsLamCase ty mgs) =
-        liftM (HsLamCase ty) (addTickMatchGroup True mgs)
-addTickHsExpr (HsApp e1 e2) =
-        liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
+addTickHsExpr e@(HsVar id)       = do freeVar id; return e
+addTickHsExpr (HsUnboundVar {})  = panic "addTickHsExpr.HsUnboundVar"
+addTickHsExpr e@(HsIPVar _)      = return e
+addTickHsExpr e@(HsOverLit _)    = return e
+addTickHsExpr e@(HsLit _)        = return e
+addTickHsExpr (HsLam matchgroup) = liftM HsLam (addTickMatchGroup True matchgroup)
+addTickHsExpr (HsLamCase ty mgs) = liftM (HsLamCase ty) (addTickMatchGroup True mgs)
+addTickHsExpr (HsApp e1 e2)      = liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
+
 addTickHsExpr (OpApp e1 e2 fix e3) =
         liftM4 OpApp
                 (addTickLHsExpr e1)
@@ -599,7 +598,6 @@ addTickHsExpr (HsWrap w e) =
                 (addTickHsExpr e)       -- explicitly no tick on inside
 
 addTickHsExpr e@(HsType _) = return e
-addTickHsExpr (HsUnboundVar {}) = panic "addTickHsExpr.HsUnboundVar"
 
 -- Others dhould never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)

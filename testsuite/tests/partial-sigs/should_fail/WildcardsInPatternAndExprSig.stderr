@@ -1,6 +1,6 @@
 
-WildcardsInPatternAndExprSig.hs:4:18:
-    Found hole ‘_a’ with type: w_c
+WildcardsInPatternAndExprSig.hs:4:18: error:
+    Found hole: _a :: w_c
     Where: ‘w_c’ is a rigid type variable bound by
                  the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
                  at WildcardsInPatternAndExprSig.hs:4:1
@@ -12,8 +12,8 @@ WildcardsInPatternAndExprSig.hs:4:18:
     In the pattern: x :: _a
     In the pattern: [x :: _a]
 
-WildcardsInPatternAndExprSig.hs:4:25:
-    Found hole ‘_’ with type: [w_c]
+WildcardsInPatternAndExprSig.hs:4:25: error:
+    Found hole: _ :: [w_c]
     Where: ‘w_c’ is a rigid type variable bound by
                  the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
                  at WildcardsInPatternAndExprSig.hs:4:1
@@ -25,8 +25,8 @@ WildcardsInPatternAndExprSig.hs:4:25:
     In the pattern: [x :: _a] :: _
     In the pattern: Just ([x :: _a] :: _)
 
-WildcardsInPatternAndExprSig.hs:4:38:
-    Found hole ‘_b’ with type: w_c
+WildcardsInPatternAndExprSig.hs:4:38: error:
+    Found hole: _b :: w_c
     Where: ‘w_c’ is a rigid type variable bound by
                  the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
                  at WildcardsInPatternAndExprSig.hs:4:1
@@ -40,8 +40,8 @@ WildcardsInPatternAndExprSig.hs:4:38:
         bar (Just ([x :: _a] :: _) :: Maybe [_b]) (z :: _c)
           = [x, z] :: [_d]
 
-WildcardsInPatternAndExprSig.hs:4:49:
-    Found hole ‘_c’ with type: w_c
+WildcardsInPatternAndExprSig.hs:4:49: error:
+    Found hole: _c :: w_c
     Where: ‘w_c’ is a rigid type variable bound by
                  the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
                  at WildcardsInPatternAndExprSig.hs:4:1
@@ -56,8 +56,8 @@ WildcardsInPatternAndExprSig.hs:4:49:
         bar (Just ([x :: _a] :: _) :: Maybe [_b]) (z :: _c)
           = [x, z] :: [_d]
 
-WildcardsInPatternAndExprSig.hs:4:66:
-    Found hole ‘_d’ with type: w_c
+WildcardsInPatternAndExprSig.hs:4:66: error:
+    Found hole: _d :: w_c
     Where: ‘w_c’ is a rigid type variable bound by
                  the inferred type of bar :: Maybe [w_c] -> w_c -> [w_c]
                  at WildcardsInPatternAndExprSig.hs:4:1

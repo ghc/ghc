@@ -47,7 +47,7 @@ import Type
 import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
-                  , mkBoxedTupleTy, stringTy )
+                  , mkBoxedTupleTy, stringTy, typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
 import Class
@@ -444,6 +444,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
            Right (rule_bndrs, _fn, args) -> do
 
        { dflags <- getDynFlags
+       ; this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
              unf_fvs   = stableUnfoldingVars fn_unf `orElse` emptyVarSet
              in_scope  = mkInScopeSet (unf_fvs `unionVarSet` exprsFreeVars args)
@@ -451,7 +452,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
-             rule =  mkRule False {- Not auto -} is_local_id
+             rule =  mkRule this_mod False {- Not auto -} is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
                         rule_bndrs args
@@ -907,14 +908,9 @@ dsEvTypeable ev =
                       , mkApps (Var ctr) [ e1, e2 ]
                       )
 
-          EvTypeableTyLit ty ->
-            do str <- case (isNumLitTy ty, isStrLitTy ty) of
-                        (Just n, _) -> return (show n)
-                        (_, Just n) -> return (show n)
-                        _ -> panic "dsEvTypeable: malformed TyLit evidence"
-               ctr <- dsLookupGlobalId typeLitTypeRepName
-               tag <- mkStringExpr str
-               return (ty, mkApps (Var ctr) [ tag ])
+          EvTypeableTyLit t ->
+            do e <- tyLitRep t
+               return (snd t, e)
 
      -- TyRep -> Typeable t
      -- see also: Note [Memoising typeOf]
@@ -940,6 +936,18 @@ dsEvTypeable ev =
            method = mkCast typeableExpr co
            proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
        return (mkApps method [proxy])
+
+  -- KnownNat t -> TyRep      (also used for KnownSymbol)
+  tyLitRep (ev,t) =
+    do dict <- dsEvTerm ev
+       fun  <- dsLookupGlobalId $
+               case typeKind t of
+                 k | eqType k typeNatKind    -> typeNatTypeRepName
+                   | eqType k typeSymbolKind -> typeSymbolTypeRepName
+                   | otherwise -> panic "dsEvTypeable: unknown type lit kind"
+       let finst  = mkTyApps (Var fun) [t]
+           proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
+       return (mkApps finst [ dict, proxy ])
 
   -- This part could be cached
   tyConRep dflags mkTyCon tc =

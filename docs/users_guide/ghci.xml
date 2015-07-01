@@ -437,10 +437,10 @@ Prelude>
           <listitem>
             <para>The variable's type is not polymorphic, is not
               <literal>()</literal>, and is an instance of
-              <literal>Show</literal></para>
+              <literal>Show</literal>.</para>
           </listitem>
         </itemizedlist>
-      <indexterm><primary><option>-fprint-bind-result</option></primary></indexterm><indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm>.
+      <indexterm><primary><option>-fprint-bind-result</option></primary></indexterm><indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm>
       </para>
 
       <para>Of course, you can also bind normal non-IO expressions
@@ -477,9 +477,9 @@ Prelude>
         <para>However, this quickly gets tedious when defining functions
         with multiple clauses, or groups of mutually recursive functions,
         because the complete definition has to be given on a single line,
-        using explicit braces and semicolons instead of layout:</para>
+        using explicit semicolons instead of layout:</para>
 <screen>
-Prelude> let { f op n [] = n ; f op n (h:t) = h `op` f op n t }
+Prelude> let f op n [] = n ; f op n (h:t) = h `op` f op n t
 Prelude> f (+) 0 [1..3]
 6
 Prelude>
@@ -489,18 +489,14 @@ Prelude>
       <literal>:}</literal> (each on a single line of its own):</para>
 <screen>
 Prelude> :{
-Prelude| let { g op n [] = n
-Prelude|     ; g op n (h:t) = h `op` g op n t
-Prelude|     }
+Prelude| let g op n [] = n
+Prelude|     g op n (h:t) = h `op` g op n t
 Prelude| :}
 Prelude> g (*) 1 [1..3]
 6
 </screen>
       <para>Such multiline commands can be used with any GHCi command,
-      and the lines between <literal>:{</literal> and
-      <literal>:}</literal> are simply merged into a single line for
-      interpretation. That implies that each such group must form a single
-      valid command when merged, and that no layout rule is used.
+      and note that the layout rule is in effect.
       The main purpose of multiline commands is not to replace module
       loading but to make definitions in .ghci-files (see <xref
       linkend="ghci-dot-files"/>) more readable and maintainable.</para>
@@ -575,7 +571,7 @@ Prelude>
 </screen>
 
        <para>Explicit braces and semicolons can be used instead of
-         layout, as usual:</para>
+         layout:</para>
 
 <screen>
 Prelude> do {
@@ -3380,7 +3376,11 @@ Then the interactive options are modified as follows:
   </sect1>
 
   <sect1 id="ghci-dot-files">
-    <title>The <filename>.ghci</filename> file</title>
+  <title>The <filename>.ghci</filename> and <filename>.haskeline</filename> files</title>
+
+    <sect2 id="dot-ghci-files">
+    <title>The <filename>.ghci</filename> files</title>
+
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
     </indexterm>
     <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
@@ -3536,6 +3536,21 @@ Then the interactive options are modified as follows:
         </listitem>
       </orderedlist>
     </para>
+    </sect2>
+
+    <sect2 id="dot-haskeline-file">
+      <title>The <filename>.haskeline</filename> file</title>
+
+      <indexterm><primary><filename>.haskeline</filename></primary><secondary>file</secondary>
+      </indexterm>
+      <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
+      </indexterm>
+
+      GHCi uses <ulink url="https://hackage.haskell.org/package/haskeline">Haskeline</ulink>
+      under the hood. You can configure it to, among other things, prune
+      duplicates from ghci history. See:
+      <ulink url="http://trac.haskell.org/haskeline/wiki/UserPrefs">Haskeline user preferences</ulink>.
+    </sect2>
   </sect1>
 
   <sect1 id="ghci-obj">

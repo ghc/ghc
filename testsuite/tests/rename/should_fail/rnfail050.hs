@@ -4,7 +4,7 @@
 
 module RnFail048 where
 
-functions :: [forall a. [a] -> [a]]
+functions :: [[a] -> [a]]
 functions = [take 4, take 5]
 
 output = [() | f <- functions, then f]

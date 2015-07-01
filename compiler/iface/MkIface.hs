@@ -69,7 +69,6 @@ import Demand
 import Coercion( tidyCo )
 import Annotations
 import CoreSyn
-import CoreFVs
 import Class
 import Kind
 import TyCon
@@ -272,7 +271,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 
         fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
         warns       = src_warns
-        iface_rules = map (coreRuleToIfaceRule this_mod) rules
+        iface_rules = map coreRuleToIfaceRule rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         iface_vect_info = flattenVectInfo vect_info
@@ -1938,15 +1937,15 @@ toIfUnfolding _ _
   = Nothing
 
 --------------------------
-coreRuleToIfaceRule :: Module -> CoreRule -> IfaceRule
-coreRuleToIfaceRule _ (BuiltinRule { ru_fn = fn})
+coreRuleToIfaceRule :: CoreRule -> IfaceRule
+coreRuleToIfaceRule (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
     bogusIfaceRule fn
 
-coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
-                                     ru_act = act, ru_bndrs = bndrs,
-                                     ru_args = args, ru_rhs = rhs,
-                                     ru_auto = auto })
+coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
+                            ru_act = act, ru_bndrs = bndrs,
+                            ru_args = args, ru_rhs = rhs,
+                            ru_orphan = orph, ru_auto = auto })
   = IfaceRule { ifRuleName  = name, ifActivation = act,
                 ifRuleBndrs = map toIfaceBndr bndrs,
                 ifRuleHead  = fn,
@@ -1962,15 +1961,6 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
     do_arg (Type ty)     = IfaceType (toIfaceType (deNoteType ty))
     do_arg (Coercion co) = IfaceCo   (toIfaceCoercion co)
     do_arg arg           = toIfaceExpr arg
-
-        -- Compute orphanhood.  See Note [Orphans] in InstEnv
-        -- A rule is an orphan only if none of the variables
-        -- mentioned on its left-hand side are locally defined
-    lhs_names = nameSetElems (ruleLhsOrphNames rule)
-
-    orph = case filter (nameIsLocalOrFrom mod) lhs_names of
-                        (n : _) -> NotOrphan (nameOccName n)
-                        []      -> IsOrphan
 
 bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name

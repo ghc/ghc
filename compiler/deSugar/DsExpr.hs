@@ -192,6 +192,7 @@ dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e)              = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)            = return (varToCoreExpr var)   -- See Note [Desugaring vars]
+dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
 dsExpr (HsIPVar _)            = panic "dsExpr: HsIPVar"
 dsExpr (HsLit lit)            = dsLit lit
 dsExpr (HsOverLit lit)        = dsOverLit lit
@@ -217,7 +218,6 @@ dsExpr (HsLamCase arg matches)
 dsExpr (HsApp fun arg)
   = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
 
-dsExpr (HsUnboundVar _) = panic "dsExpr: HsUnboundVar"
 
 {-
 Note [Desugaring vars]

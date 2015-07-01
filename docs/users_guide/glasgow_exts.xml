@@ -8779,15 +8779,39 @@ be suppressed entirely by <option>-fnowarn-typed-holes</option>).
 <para>
 The result is that a hole will behave
 like <literal>undefined</literal>, but with the added benefits that it shows a
-warning at compile time and will show another warning message if it gets
-evaluated at runtime.. This behaviour follows that of the
+warning at compile time, and will show the same message if it gets
+evaluated at runtime. This behaviour follows that of the
 <literal>-fdefer-type-errors</literal> option, which implies
 <literal>-fdefer-typed-holes</literal>. See <xref linkend="defer-type-errors"/>.
 </para>
 </listitem>
 
 <listitem><para>
-Unbound identifiers with the same name are never unified, even within the 
+All unbound identifiers are treated as typed holes, <emphasis>whether or not they
+start with an underscore</emphasis>.  The only difference is in the error message:
+<programlisting>
+cons z = z : True : _x : y
+</programlisting>
+yields the errors
+<programlisting>
+Foo.hs:5:15: error:
+    Found hole: _x :: Bool
+    Relevant bindings include
+      p :: Bool (bound at Foo.hs:3:6)
+      cons :: Bool -> [Bool] (bound at Foo.hs:3:1)
+
+Foo.hs:5:20: error:
+    Variable not in scope: y :: [Bool]
+</programlisting>
+More information is given for explicit holes (i.e. ones that start with an underscore),
+than for out-of-scope variables, because the latter are often
+unintended typos, so the extra information is distracting.
+If you the detailed information, use a leading underscore to
+make explicit your intent to use a hole.
+</para></listitem>
+
+<listitem><para>
+Unbound identifiers with the same name are never unified, even within the
 same function, but shown individually.
 For example:
 <programlisting>
@@ -8824,9 +8848,18 @@ is a perfectly legal variable, and its behaviour is unchanged when it is in scop
 <programlisting>
 f _x = _x + 1
 </programlisting>
-does not elict any errors.  Only a variable starting with an underscore <emphasis>that is not in scope</emphasis>
-is treated as an error (which it always was), albeit now with a more informative error message
+does not elict any errors.  Only a variable <emphasis>that is not in scope</emphasis>
+(whether or not it starts with an underscore)
+is treated as an error (which it always was), albeit now with a more informative error message.
 </para></listitem>
+
+<listitem><para>
+Unbound data constructors used in expressions behave exactly as above.
+However, unbound data constructors used in <emphasis>patterns</emphasis> cannot
+be deferred, and instead bring compilation to a halt.  (In implementation terms, they
+are reported by the renamer rather than the type checker.)
+</para></listitem>
+
 </itemizedlist>
 </para>
 

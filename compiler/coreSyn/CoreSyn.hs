@@ -67,9 +67,13 @@ module CoreSyn (
         -- ** Operations on annotations
         deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
 
+        -- * Orphanhood
+        IsOrphan(..), isOrphan, notOrphan,
+
         -- * Core rule data types
         CoreRule(..), RuleBase,
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
+        RuleEnv(..), mkRuleEnv, emptyRuleEnv,
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -88,7 +92,7 @@ import Var
 import Type
 import Coercion
 import Name
-import NameEnv( NameEnv )
+import NameEnv( NameEnv, emptyNameEnv )
 import Literal
 import DataCon
 import Module
@@ -99,6 +103,7 @@ import FastString
 import Outputable
 import Util
 import SrcLoc     ( RealSrcSpan, containsSpan )
+import Binary
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -693,6 +698,84 @@ tickishContains t1 t2
 {-
 ************************************************************************
 *                                                                      *
+                Orphans
+*                                                                      *
+************************************************************************
+-}
+
+-- | Is this instance an orphan?  If it is not an orphan, contains an 'OccName'
+-- witnessing the instance's non-orphanhood.
+-- See Note [Orphans]
+data IsOrphan
+  = IsOrphan
+  | NotOrphan OccName -- The OccName 'n' witnesses the instance's non-orphanhood
+                      -- In that case, the instance is fingerprinted as part
+                      -- of the definition of 'n's definition
+    deriving (Data, Typeable)
+
+-- | Returns true if 'IsOrphan' is orphan.
+isOrphan :: IsOrphan -> Bool
+isOrphan IsOrphan = True
+isOrphan _ = False
+
+-- | Returns true if 'IsOrphan' is not an orphan.
+notOrphan :: IsOrphan -> Bool
+notOrphan NotOrphan{} = True
+notOrphan _ = False
+
+instance Binary IsOrphan where
+    put_ bh IsOrphan = putByte bh 0
+    put_ bh (NotOrphan n) = do
+        putByte bh 1
+        put_ bh n
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return IsOrphan
+            _ -> do
+                n <- get bh
+                return $ NotOrphan n
+
+{-
+Note [Orphans]
+~~~~~~~~~~~~~~
+Class instances, rules, and family instances are divided into orphans
+and non-orphans.  Roughly speaking, an instance/rule is an orphan if
+its left hand side mentions nothing defined in this module.  Orphan-hood
+has two major consequences
+
+ * A module that contains orphans is called an "orphan module".  If
+   the module being compiled depends (transitively) on an oprhan
+   module M, then M.hi is read in regardless of whether M is oherwise
+   needed. This is to ensure that we don't miss any instance decls in
+   M.  But it's painful, because it means we need to keep track of all
+   the orphan modules below us.
+
+ * A non-orphan is not finger-printed separately.  Instead, for
+   fingerprinting purposes it is treated as part of the entity it
+   mentions on the LHS.  For example
+      data T = T1 | T2
+      instance Eq T where ....
+   The instance (Eq T) is incorprated as part of T's fingerprint.
+
+   In constrast, orphans are all fingerprinted together in the
+   mi_orph_hash field of the ModIface.
+
+   See MkIface.addFingerprints.
+
+Orphan-hood is computed
+  * For class instances:
+      when we make a ClsInst
+    (because it is needed during instance lookup)
+
+  * For rules and family instances:
+       when we generate an IfaceRule (MkIface.coreRuleToIfaceRule)
+                     or IfaceFamInst (MkIface.instanceToIfaceInst)
+-}
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Transformation rules}
 *                                                                      *
 ************************************************************************
@@ -705,6 +788,20 @@ but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
 type RuleBase = NameEnv [CoreRule]
         -- The rules are unordered;
         -- we sort out any overlaps on lookup
+
+-- | A full rule environment which we can apply rules from.  Like a 'RuleBase',
+-- but it also includes the set of visible orphans we use to filter out orphan
+-- rules which are not visible (even though we can see them...)
+data RuleEnv
+    = RuleEnv { re_base          :: RuleBase
+              , re_visible_orphs :: ModuleSet
+              }
+
+mkRuleEnv :: RuleBase -> [Module] -> RuleEnv
+mkRuleEnv rules vis_orphs = RuleEnv rules (mkModuleSet vis_orphs)
+
+emptyRuleEnv :: RuleEnv
+emptyRuleEnv = RuleEnv emptyNameEnv emptyModuleSet
 
 -- | A 'CoreRule' is:
 --
@@ -738,17 +835,26 @@ data CoreRule
                                 --   @False@ <=> generated at the users behest
                                 --   Main effect: reporting of orphan-hood
 
+        ru_origin :: !Module,    -- ^ 'Module' the rule was defined in, used
+                                -- to test if we should see an orphan rule.
+
+        ru_orphan :: !IsOrphan,
+                                -- ^ Whether or not the rule is an orphan.
+
         ru_local :: Bool        -- ^ @True@ iff the fn at the head of the rule is
                                 -- defined in the same module as the rule
                                 -- and is not an implicit 'Id' (like a record selector,
-                                -- class operation, or data constructor)
-
-                -- NB: ru_local is *not* used to decide orphan-hood
-                --      c.g. MkIface.coreRuleToIfaceRule
+                                -- class operation, or data constructor).  This
+                                -- is different from 'ru_orphan', where a rule
+                                -- can avoid being an orphan if *any* Name in
+                                -- LHS of the rule was defined in the same
+                                -- module as the rule.
     }
 
   -- | Built-in rules are used for constant folding
   -- and suchlike.  They have no free variables.
+  -- A built-in rule is always visible (there is no such thing as
+  -- an orphan built-in rule.)
   | BuiltinRule {
         ru_name  :: RuleName,   -- ^ As above
         ru_fn    :: Name,       -- ^ As above

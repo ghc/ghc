@@ -29,6 +29,7 @@ module InstEnv (
 
 #include "HsVersions.h"
 
+import CoreSyn (IsOrphan(..), isOrphan, notOrphan)
 import Module
 import Class
 import Var
@@ -44,7 +45,6 @@ import BasicTypes
 import UniqFM
 import Util
 import Id
-import Binary
 import FastString
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
@@ -274,82 +274,6 @@ instanceCantMatch (Just t : ts) (Just a : as) = t/=a || instanceCantMatch ts as
 instanceCantMatch _             _             =  False  -- Safe
 
 {-
-************************************************************************
-*                                                                      *
-                Orphans
-*                                                                      *
-************************************************************************
--}
-
--- | Is this instance an orphan?  If it is not an orphan, contains an 'OccName'
--- witnessing the instance's non-orphanhood.
--- See Note [Orphans]
-data IsOrphan
-  = IsOrphan
-  | NotOrphan OccName  -- The OccName 'n' witnesses the instance's non-orphanhood
-                       -- In that case, the instance is fingerprinted as part
-                       -- of the definition of 'n's definition
-    deriving (Data, Typeable)
-
--- | Returns true if 'IsOrphan' is orphan.
-isOrphan :: IsOrphan -> Bool
-isOrphan IsOrphan = True
-isOrphan _ = False
-
--- | Returns true if 'IsOrphan' is not an orphan.
-notOrphan :: IsOrphan -> Bool
-notOrphan NotOrphan{} = True
-notOrphan _ = False
-
-instance Binary IsOrphan where
-    put_ bh IsOrphan = putByte bh 0
-    put_ bh (NotOrphan n) = do
-        putByte bh 1
-        put_ bh n
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> return IsOrphan
-            _ -> do
-                n <- get bh
-                return $ NotOrphan n
-
-{-
-Note [Orphans]
-~~~~~~~~~~~~~~
-Class instances, rules, and family instances are divided into orphans
-and non-orphans.  Roughly speaking, an instance/rule is an orphan if
-its left hand side mentions nothing defined in this module.  Orphan-hood
-has two major consequences
-
- * A module that contains orphans is called an "orphan module".  If
-   the module being compiled depends (transitively) on an oprhan
-   module M, then M.hi is read in regardless of whether M is oherwise
-   needed. This is to ensure that we don't miss any instance decls in
-   M.  But it's painful, because it means we need to keep track of all
-   the orphan modules below us.
-
- * A non-orphan is not finger-printed separately.  Instead, for
-   fingerprinting purposes it is treated as part of the entity it
-   mentions on the LHS.  For example
-      data T = T1 | T2
-      instance Eq T where ....
-   The instance (Eq T) is incorprated as part of T's fingerprint.
-
-   In constrast, orphans are all fingerprinted together in the
-   mi_orph_hash field of the ModIface.
-
-   See MkIface.addFingerprints.
-
-Orphan-hood is computed
-  * For class instances:
-      when we make a ClsInst
-    (because it is needed during instance lookup)
-
-  * For rules and family instances:
-       when we generate an IfaceRule (MkIface.coreRuleToIfaceRule)
-                     or IfaceFamInst (MkIface.instanceToIfaceInst)
-
 Note [When exactly is an instance decl an orphan?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   (see MkIface.instanceToIfaceInst, which implements this)

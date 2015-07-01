@@ -318,8 +318,14 @@ newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { let size = sizePred (mkClassPred cls xis)
-             loc' = case ctLocOrigin loc of
+  = do { let size = sizeTypes xis
+             loc' | isCTupleClass cls
+                  = loc   -- For tuple predicates, just take them apart, without
+                          -- adding their (large) size into the chain.  When we
+                          -- get down to a base predicate, we'll include its size.
+                          -- Trac #10335
+                  | otherwise
+                  = case ctLocOrigin loc of
                        GivenOrigin InstSkol
                          -> loc { ctl_origin = GivenOrigin (InstSC size) }
                        GivenOrigin (InstSC n)

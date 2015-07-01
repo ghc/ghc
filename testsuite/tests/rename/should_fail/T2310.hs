@@ -2,4 +2,4 @@
 
 module Foo where
 
-foo = let c = \ x :: a -> (x :: a) in co
+foo = let c = \ (x :: a) -> (x :: a) in co

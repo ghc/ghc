@@ -1,3 +1,8 @@
 
+RnStaticPointersFail02.hs:5:5: error:
+    No instance for (Typeable t0) arising from a static form
+    In the expression: static T
+    In an equation for ‘f’: f = static T
+
 RnStaticPointersFail02.hs:5:12: error:
-    Not in scope: data constructor ‘T’
+    Data constructor not in scope: T

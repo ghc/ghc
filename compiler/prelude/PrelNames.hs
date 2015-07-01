@@ -212,7 +212,8 @@ basicKnownKeyNames
         mkTyConName,
         mkPolyTyConAppName,
         mkAppTyName,
-        typeLitTypeRepName,
+        typeNatTypeRepName,
+        typeSymbolTypeRepName,
 
         -- Dynamic
         toDynName,
@@ -1021,14 +1022,17 @@ typeableClassName
   , mkTyConName
   , mkPolyTyConAppName
   , mkAppTyName
-  , typeLitTypeRepName
+  , typeNatTypeRepName
+  , typeSymbolTypeRepName
   :: Name
 typeableClassName     = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
 typeRepTyConName      = tcQual  tYPEABLE_INTERNAL (fsLit "TypeRep")        typeRepTyConKey
 mkTyConName           = varQual tYPEABLE_INTERNAL (fsLit "mkTyCon")        mkTyConKey
 mkPolyTyConAppName    = varQual tYPEABLE_INTERNAL (fsLit "mkPolyTyConApp") mkPolyTyConAppKey
 mkAppTyName           = varQual tYPEABLE_INTERNAL (fsLit "mkAppTy")        mkAppTyKey
-typeLitTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeLitTypeRep") typeLitTypeRepKey
+typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
+typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
+
 
 -- Dynamic
 toDynName :: Name
@@ -1874,16 +1878,18 @@ proxyHashKey = mkPreludeMiscIdUnique 502
 mkTyConKey
   , mkPolyTyConAppKey
   , mkAppTyKey
-  , typeLitTypeRepKey
+  , typeNatTypeRepKey
+  , typeSymbolTypeRepKey
   :: Unique
-mkTyConKey        = mkPreludeMiscIdUnique 503
-mkPolyTyConAppKey = mkPreludeMiscIdUnique 504
-mkAppTyKey        = mkPreludeMiscIdUnique 505
-typeLitTypeRepKey = mkPreludeMiscIdUnique 506
+mkTyConKey            = mkPreludeMiscIdUnique 503
+mkPolyTyConAppKey     = mkPreludeMiscIdUnique 504
+mkAppTyKey            = mkPreludeMiscIdUnique 505
+typeNatTypeRepKey     = mkPreludeMiscIdUnique 506
+typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 507
 
 -- Dynamic
 toDynIdKey :: Unique
-toDynIdKey = mkPreludeMiscIdUnique 507
+toDynIdKey = mkPreludeMiscIdUnique 508
 
 {-
 ************************************************************************

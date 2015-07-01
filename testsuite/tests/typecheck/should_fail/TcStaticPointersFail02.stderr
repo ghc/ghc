@@ -7,7 +7,7 @@ TcStaticPointersFail02.hs:9:6: error:
 
 TcStaticPointersFail02.hs:12:6: error:
     No instance for (Typeable (Monad m => a -> m a))
-      (maybe you haven't applied a function to enough arguments?)
       arising from a static form
+      (maybe you haven't applied a function to enough arguments?)
     In the expression: static return
     In an equation for ‘f2’: f2 = static return

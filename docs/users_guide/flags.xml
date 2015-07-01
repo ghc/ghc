@@ -2163,6 +2163,13 @@
           </row>
 
           <row>
+            <entry><option>-fcross-module-specialise</option></entry>
+            <entry>Turn on specialisation of overloaded functions imported from other modules.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-cross-module-specialise</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fstatic-argument-transformation</option></entry>
             <entry>Turn on the static argument transformation.</entry>
             <entry>dynamic</entry>

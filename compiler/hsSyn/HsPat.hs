@@ -357,8 +357,17 @@ pprParendLPat :: (OutputableBndr name) => LPat name -> SDoc
 pprParendLPat (L _ p) = pprParendPat p
 
 pprParendPat :: (OutputableBndr name) => Pat name -> SDoc
-pprParendPat p | hsPatNeedsParens p = parens (pprPat p)
-               | otherwise          = pprPat p
+pprParendPat p = getPprStyle $ \ sty ->
+                 if need_parens sty p
+                 then parens (pprPat p)
+                 else  pprPat p
+  where
+    need_parens sty p
+      | CoPat {} <- p          -- In debug style we print the cast
+      , debugStyle sty = True  -- (see pprHsWrapper) so parens are needed
+      | otherwise      = hsPatNeedsParens p
+                         -- But otherwise the CoPat is discarded, so it
+                         -- is the pattern inside that matters.  Sigh.
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
 pprPat (VarPat var)           = pprPatBndr var
@@ -554,7 +563,7 @@ hsPatNeedsParens p@(ConPatOut {})    = conPatNeedsParens (pat_args p)
 hsPatNeedsParens (SigPatIn {})       = True
 hsPatNeedsParens (SigPatOut {})      = True
 hsPatNeedsParens (ViewPat {})        = True
-hsPatNeedsParens (CoPat {})          = True
+hsPatNeedsParens (CoPat _ p _)       = hsPatNeedsParens p
 hsPatNeedsParens (WildPat {})        = False
 hsPatNeedsParens (VarPat {})         = False
 hsPatNeedsParens (LazyPat {})        = False

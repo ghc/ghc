@@ -6,6 +6,9 @@ type Foo = (int)
 -- other interesting cases
 type Foo2 = (integerr)
 
+-- These two out-of-scope errors aren't caught until
+-- the type checker, so they aren't reported at all
+-- becuase the renamer aborts compilation
 foo3 = bar
 foo4 = Fun
 

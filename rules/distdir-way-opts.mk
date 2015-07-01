@@ -87,13 +87,12 @@ $4_USE_PACKAGE_KEY=NO
 endif
 endif
 
-ifeq "$($4_USE_PACKAGE_KEY)" "NO"
 $1_$2_$4_DEP_OPTS = \
- $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg))
+ $$(foreach pkg,$$($1_$2_DEP_IPIDS),-package-id $$(pkg))
+
+ifeq "$($4_USE_PACKAGE_KEY)" "NO"
 $4_THIS_PACKAGE_KEY = -package-name
 else
-$1_$2_$4_DEP_OPTS = \
- $$(foreach pkg,$$($1_$2_DEP_KEYS),-package-key $$(pkg))
 $4_THIS_PACKAGE_KEY = -this-package-key
 endif
 
@@ -186,11 +185,11 @@ ifneq "$4" "0"
 ifeq "$$(TargetElf)" "YES"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_KEYS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_LIB_NAMES),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
 else ifeq "$$(TargetOS_CPP)" "darwin"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_KEYS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_LIB_NAMES),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
 endif
 endif
 endif

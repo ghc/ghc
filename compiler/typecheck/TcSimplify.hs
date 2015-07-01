@@ -330,7 +330,8 @@ simplifyAmbiguityCheck ty wanteds
        -- inaccessible code
        ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
        ; traceTc "reportUnsolved(ambig) {" empty
-       ; unless (allow_ambiguous && not (insolubleWC final_wc))
+       ; tc_lvl <- TcRn.getTcLevel
+       ; unless (allow_ambiguous && not (insolubleWC tc_lvl final_wc))
                 (discardResult (reportUnsolved final_wc))
        ; traceTc "reportUnsolved(ambig) }" empty
 
@@ -439,7 +440,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
        ; null_ev_binds_var <- TcM.newTcEvBinds
        ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
        ; quant_pred_candidates   -- Fully zonked
-           <- if insolubleWC wanted_transformed_incl_derivs
+           <- if insolubleWC rhs_tclvl wanted_transformed_incl_derivs
               then return []   -- See Note [Quantification with errors]
                                -- NB: must include derived errors in this test,
                                --     hence "incl_derivs"
@@ -997,6 +998,7 @@ setImplicationStatus :: Implication -> TcS (Maybe Implication)
 -- Return Nothing if we can discard the implication altogether
 setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
                                     , ic_info = info
+                                    , ic_tclvl  = tc_lvl
                                     , ic_wanted = wc
                                     , ic_given = givens })
  | some_insoluble
@@ -1044,7 +1046,7 @@ setImplicationStatus implic@(Implic { ic_binds = EvBindsVar ev_binds_var _
  where
    WC { wc_simple = simples, wc_impl = implics, wc_insol = insols } = wc
 
-   some_insoluble = insolubleWC wc
+   some_insoluble = insolubleWC tc_lvl wc
    some_unsolved = not (isEmptyBag simples && isEmptyBag insols)
                  || isNothing mb_implic_needs
 
@@ -1578,21 +1580,20 @@ usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canon
 
       -- Float out alpha ~ ty, or ty ~ alpha
       -- which might be unified outside
-      -- See Note [Do not float kind-incompatible equalities]
+      -- See Note [Which equalities to float]
     is_meta_var_eq pred
       | EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , let k1 = typeKind ty1
-            k2 = typeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
-          (Just tv1, _) | isMetaTyVar tv1
-                        , k2 `isSubKind` k1
-                        -> True
-          (_, Just tv2) | isMetaTyVar tv2
-                        , k1 `isSubKind` k2
-                        -> True
-          _ -> False
+          (Just tv1, _) -> float_tv_eq tv1 ty2
+          (_, Just tv2) -> float_tv_eq tv2 ty1
+          _             -> False
       | otherwise
       = False
+
+    float_tv_eq tv1 ty2  -- See Note [Which equalities to float]
+      =  isMetaTyVar tv1
+      && typeKind ty2 `isSubKind` tyVarKind tv1
+      && (not (isSigTyVar tv1) || isTyVarTy ty2)
 
 {- Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1617,12 +1618,26 @@ We had a very complicated rule previously, but this is nice and
 simple.  (To see the notes, look at this Note in a version of
 TcSimplify prior to Oct 2014).
 
-Note [Do not float kind-incompatible equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
-If we float the equality outwards, we'll get *another* Derived
-insoluble equality one level out, so the same error will be reported
-twice.  So we refrain from floating such equalities.
+Note [Which equalities to float]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Which equalities should we float?  We want to float ones where there
+is a decent chance that floating outwards will allow unification to
+happen.  In particular:
+
+   Float out equalities of form (alpaha ~ ty) or (ty ~ alpha), where
+
+   * alpha is a meta-tyvar
+
+   * And the equality is kind-compatible
+
+     e.g. Consider (alpha:*) ~ (s:*->*)
+     From this we already get a Derived insoluble equality.  If we
+     floated it, we'll get *another* Derived insoluble equality one
+     level out, so the same error will be reported twice.
+
+   * And 'alpha' is not a SigTv with 'ty' being a non-tyvar.  In that
+     case, floating out won't help either, and it may affect grouping
+     of error messages.
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1762,7 +1777,11 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
   where
     try_group
       | Just subst <- mb_subst
-      = do { wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
+      = do { lcl_env <- TcS.getLclEnv
+           ; let loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
+                             , ctl_env    = lcl_env
+                             , ctl_depth  = initialSubGoalDepth }
+           ; wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
                                 wanteds
            ; residual_wanted <- solveSimpleWanteds $ listToBag $
                                 map mkNonCanonical wanted_evs
@@ -1775,9 +1794,6 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       -- Make sure the kinds match too; hence this call to tcMatchTy
       -- E.g. suppose the only constraint was (Typeable k (a::k))
 
-    loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
-                , ctl_env = panic "disambigGroup:env"
-                , ctl_depth = initialSubGoalDepth }
 
 {-
 Note [Avoiding spurious errors]

@@ -553,7 +553,10 @@ runGHCi paths maybe_exprs = do
                                    -- this used to be topHandlerFastExit, see #2228
             runInputTWithPrefs defaultPrefs defaultSettings $ do
                 -- make `ghc -e` exit nonzero on invalid input, see Trac #7962
-                runCommands' hdle (Just $ hdle (toException $ ExitFailure 1) >> return ()) (return Nothing)
+                _ <- runCommands' hdle
+                     (Just $ hdle (toException $ ExitFailure 1) >> return ())
+                     (return Nothing)
+                return ()
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -712,12 +715,16 @@ installInteractivePrint (Just ipFun) exprmode = do
 
 -- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands = runCommands' handler Nothing
+runCommands gCmd = runCommands' handler Nothing gCmd >> return ()
 
 runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
              -> Maybe (GHCi ()) -- ^ Source error handler
-             -> InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands' eh sourceErrorHandler gCmd = do
+             -> InputT GHCi (Maybe String)
+             -> InputT GHCi (Maybe Bool)
+         -- We want to return () here, but have to return (Maybe Bool)
+         -- because gmask is not polymorphic enough: we want to use
+         -- unmask at two different types.
+runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
     b <- ghandle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
@@ -726,12 +733,12 @@ runCommands' eh sourceErrorHandler gCmd = do
                                       return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
-            (runOneCommand eh gCmd)
+            (unmask $ runOneCommand eh gCmd)
     case b of
-      Nothing -> return ()
+      Nothing -> return Nothing
       Just success -> do
         when (not success) $ maybe (return ()) lift sourceErrorHandler
-        runCommands' eh sourceErrorHandler gCmd
+        unmask $ runCommands' eh sourceErrorHandler gCmd
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.

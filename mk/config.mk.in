@@ -48,10 +48,6 @@ NO_INCLUDE_PKGDATA = NO
 # The compiler used to build GHC is $(GHC).  To change the actual compiler
 # used, re-configure with --with-ghc=<path-to-ghc>.
 
-# Extra ways in which to build the compiler (for example, you might want to
-# build a profiled compiler so you can see where it spends its time)
-GhcCompilerWays=
-
 # Extra option flags to pass to the compiler that compiles the compiler
 # (Ones that are essential are wired into compiler/Makefile)
 # Typical options to use here:
@@ -71,16 +67,6 @@ GhcHcOpts=-Rghc-timing
 GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
-
-# These options modify whether or not a built compiler for a bootstrap
-# stage defaults to using the new code generation path.  The new
-# code generation path is a bit slower, so for development just
-# GhcStage2DefaultNewCodegen=YES, but it's also a good idea to try
-# building all libraries and the stage2 compiler with the
-# new code generator, which involves GhcStage1DefaultNewCodegen=YES.
-GhcStage1DefaultNewCodegen=NO
-GhcStage2DefaultNewCodegen=NO
-GhcStage3DefaultNewCodegen=NO
 
 GhcDebugged=NO
 GhcDynamic=NO
@@ -315,9 +301,6 @@ SplitObjs=$(SupportsSplitObjs)
 
 # Whether to install the extra packages
 InstallExtraPackages = NO
-
-# Run "ghc-pkg check" on each package
-CHECK_PACKAGES = NO
 
 # ----------------------------------------------------------------------------
 

@@ -55,7 +55,7 @@ module TcRnTypes(
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt, isExprHoleCt, isTypeHoleCt,
+        isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -334,7 +334,7 @@ data TcGblEnv
   = TcGblEnv {
         tcg_mod     :: Module,         -- ^ Module being compiled
         tcg_src     :: HscSource,
-          -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
+          -- ^ What kind of module (regular Haskell, hs-boot, hsig)
         tcg_sig_of  :: Maybe Module,
           -- ^ Are we being compiled as a signature of an implementation?
         tcg_mod_name :: Maybe (Located ModuleName),
@@ -1399,6 +1399,13 @@ isHoleCt:: Ct -> Bool
 isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
+isOutOfScopeCt :: Ct -> Bool
+-- A Hole that does not have a leading underscore is
+-- simply an out-of-scope variable, and we treat that
+-- a bit differently when it comes to error reporting
+isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
+isOutOfScopeCt _ = False
+
 isExprHoleCt :: Ct -> Bool
 isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
 isExprHoleCt _ = False
@@ -1514,22 +1521,20 @@ isInsolubleStatus _            = False
 insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
-insolubleWC :: WantedConstraints -> Bool
-insolubleWC (WC { wc_impl = implics, wc_insol = insols })
-  =  anyBag trulyInsoluble  insols
+insolubleWC :: TcLevel -> WantedConstraints -> Bool
+insolubleWC tc_lvl (WC { wc_impl = implics, wc_insol = insols })
+  =  anyBag (trulyInsoluble tc_lvl) insols
   || anyBag insolubleImplic implics
 
-trulyInsoluble :: Ct -> Bool
+trulyInsoluble :: TcLevel -> Ct -> Bool
 -- The constraint is in the wc_insol set,
 -- but we do not treat as truly isoluble
 --  a) type-holes, arising from PartialTypeSignatures,
---  b) superclass constraints, arising from the emitInsoluble
---     in TcInstDcls.tcSuperClasses. In fact only equalities
---     are truly-insoluble.
+--  b) an out-of-scope variable
 -- Yuk!
-trulyInsoluble insol
-  =  isEqPred (ctPred insol)
-  && not (isTypeHoleCt insol)
+trulyInsoluble tc_lvl insol
+  =  isOutOfScopeCt insol
+  || isRigidEqPred tc_lvl (classifyPredType (ctPred insol))
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
@@ -2066,9 +2071,10 @@ data SkolemInfo
   | ClsSkol Class       -- Bound at a class decl
 
   | InstSkol            -- Bound at an instance decl
-  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection
-                        -- from an InstSkol, giving the largest class from
-                        -- which we made a superclass selection in the chain
+  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection.
+                        -- If (C ty1 .. tyn) is the largest class from
+                        --    which we made a superclass selection in the chain,
+                        --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
   | DataSkol            -- Bound at a data type declaration
@@ -2193,7 +2199,8 @@ data CtOrigin
   | ViewPatOrigin
 
   | ScOrigin TypeSize   -- Typechecking superclasses of an instance declaration
-                        -- whose head has the given size
+                        -- If the instance head is C ty1 .. tyn
+                        --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
   | DerivOrigin         -- Typechecking deriving

@@ -39,8 +39,8 @@ import DsMonad
 import Id
 import ConLike
 import DataCon
-import RdrName
 import Name
+import RdrName
 import TyCon
 import Type
 import TcEvidence
@@ -127,8 +127,16 @@ tcInferRhoNC (L loc expr)
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
-tcHole :: OccName -> TcRhoType -> TcM (HsExpr TcId)
-tcHole occ res_ty
+tcUnboundId :: OccName -> TcRhoType -> TcM (HsExpr TcId)
+-- Typechedk an occurrence of an unbound Id
+--
+-- Some of these started life as a true hole "_".  Others might simply
+-- be variables that accidentally have no binding site
+--
+-- We turn all of them into HsVar, since HsUnboundVar can't contain an
+-- Id; and indeed the evidence for the CHoleCan does bind it, so it's
+-- not unbound any more!
+tcUnboundId occ res_ty
  = do { ty <- newFlexiTyVarTy liftedTypeKind
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
@@ -150,7 +158,8 @@ tcExpr :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId)
 tcExpr e res_ty | debugIsOn && isSigmaTy res_ty     -- Sanity check
                 = pprPanic "tcExpr: sigma" (ppr res_ty $$ ppr e)
 
-tcExpr (HsVar name)  res_ty = tcCheckId name res_ty
+tcExpr (HsVar name)     res_ty = tcCheckId name res_ty
+tcExpr (HsUnboundVar v) res_ty = tcUnboundId v res_ty
 
 tcExpr (HsApp e1 e2) res_ty = tcApp e1 [e2] res_ty
 
@@ -238,8 +247,6 @@ tcExpr (HsType ty) _
         -- so it's not enabled yet.
         -- Can't eliminate it altogether from the parser, because the
         -- same parser parses *patterns*.
-tcExpr (HsUnboundVar v) res_ty
-  = tcHole (rdrNameOcc v) res_ty
 
 {-
 ************************************************************************
@@ -1200,7 +1207,7 @@ tcTagToEnum loc fun_name arg res_ty
         -- Look through any type family
         ; fam_envs <- tcGetFamInstEnvs
         ; let (rep_tc, rep_args, coi) = tcLookupDataFamInst fam_envs tc tc_args
-             -- coi :: tc tc_args ~ rep_tc rep_args
+             -- coi :: tc tc_args ~R rep_tc rep_args
 
         ; checkTc (isEnumerationTyCon rep_tc)
                   (mk_error ty' doc2)

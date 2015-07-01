@@ -104,6 +104,10 @@ test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
 
+test('performGC', [ only_ways(['threaded1','threaded2'])
+                  , extra_run_opts('400 +RTS -qg -RTS') ],
+                    compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 

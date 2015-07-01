@@ -229,7 +229,7 @@ endif
 ifeq "$(GhcDebugged)" "YES"
 WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_debug
 endif
-WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_dyn_LIB_NAME
+WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_dyn_LIB_FILE
 
 # -----------------------------------------------------------------------------
 # Compilation Flags
@@ -908,7 +908,7 @@ install_packages: rts/dist/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts")
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
 	$(foreach p, $(INSTALL_DYNLIBS), \
-	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_dist-install_PACKAGE_KEY)"))
+	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_dist-install_LIB_NAME)"))
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \

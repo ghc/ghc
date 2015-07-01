@@ -1,2 +1,2 @@
 {-# OPTIONS_GHC -fplugin RuleDefiningPlugin #-}
-module Plugins07a where
+module T10420a where

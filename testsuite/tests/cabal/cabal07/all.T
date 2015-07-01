@@ -4,7 +4,7 @@ else:
    cleanup = ''
 
 def normaliseContainersPackage(str):
-    return re.sub('containers-[^@]+@conta_[A-Za-z0-9]+', 'containers-<VERSION>@conta_<HASH>', str)
+    return re.sub('containers-[^@]+@[A-Za-z0-9]+', 'containers-<VERSION>@<HASH>', str)
 
 test('cabal07',
      normalise_errmsg_fun(normaliseContainersPackage),

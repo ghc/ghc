@@ -1871,6 +1871,7 @@ withoutAnnots pass guts = do
       withoutFlag corem =
         liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>
                                 getUniqueSupplyM <*> getModule <*>
+                                getVisibleOrphanMods <*>
                                 getPrintUnqualified <*> pure corem
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes

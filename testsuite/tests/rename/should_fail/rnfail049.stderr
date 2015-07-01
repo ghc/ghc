@@ -1,2 +1,2 @@
 
-rnfail049.hs:12:49: Not in scope: ‘f’
+rnfail049.hs:12:49: error: Variable not in scope: f :: [a] -> [[a]]

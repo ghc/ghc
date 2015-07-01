@@ -15,7 +15,7 @@ module RnEnv (
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         lookupOccRn_overloaded,
-        reportUnboundName,
+        reportUnboundName, unknownNameSuggestions,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
         lookupSigCtxtOccRn,
@@ -966,6 +966,7 @@ addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 addUsedRdrName warn_if_deprec gre rdr
   = do { unless (isLocalGRE gre) $
          do { env <- getGblEnv
+            ; traceRn (text "addUsedRdrName 1" <+> ppr gre)
             ; updMutVar (tcg_used_rdrnames env)
                         (\s -> Set.insert rdr s) }
 
@@ -979,6 +980,7 @@ addUsedRdrNames :: [RdrName] -> RnM ()
 -- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
 addUsedRdrNames rdrs
   = do { env <- getGblEnv
+       ; traceRn (text "addUsedRdrName 2" <+> ppr rdrs)
        ; updMutVar (tcg_used_rdrnames env)
                    (\s -> foldr Set.insert s rdrs) }
 
@@ -1630,12 +1632,16 @@ unboundName wl rdr = unboundNameX wl rdr Outputable.empty
 
 unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
-  = do  { show_helpful_errors <- goptM Opt_HelpfulErrors
-        ; let what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
+  = do  { dflags <- getDynFlags
+        ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
+              what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
               err = unknownNameErr what rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
-          else do { suggestions <- unknownNameSuggestErr where_look rdr_name
+          else do { local_env  <- getLocalRdrEnv
+                  ; global_env <- getGlobalRdrEnv
+                  ; let suggestions = unknownNameSuggestions_ where_look
+                                         dflags global_env local_env rdr_name
                   ; addErr (err $$ suggestions) }
         ; return (mkUnboundName rdr_name) }
 
@@ -1652,27 +1658,33 @@ type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc
      -- Right ispec =>  imported as specified by ispec
 
-unknownNameSuggestErr :: WhereLooking -> RdrName -> RnM SDoc
-unknownNameSuggestErr where_look tried_rdr_name
-  = do { local_env <- getLocalRdrEnv
-       ; global_env <- getGlobalRdrEnv
-       ; dflags <- getDynFlags
+unknownNameSuggestions :: DynFlags
+                       -> GlobalRdrEnv -> LocalRdrEnv
+                       -> RdrName -> SDoc
+-- Called from the typechecker (TcErrors)
+-- when we find an unbound variable
+unknownNameSuggestions = unknownNameSuggestions_ WL_Any
 
-       ; let all_possibilities :: [(String, (RdrName, HowInScope))]
-             all_possibilities
-                =  [ (showPpr dflags r, (r, Left loc))
-                   | (r,loc) <- local_possibilities local_env ]
-                ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
-
-             suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
-             perhaps = ptext (sLit "Perhaps you meant")
-             extra_err = case suggest of
-                           []  -> Outputable.empty
-                           [p] -> perhaps <+> pp_item p
-                           ps  -> sep [ perhaps <+> ptext (sLit "one of these:")
-                                      , nest 2 (pprWithCommas pp_item ps) ]
-       ; return extra_err }
+unknownNameSuggestions_ :: WhereLooking -> DynFlags
+                        -> GlobalRdrEnv -> LocalRdrEnv
+                        -> RdrName -> SDoc
+unknownNameSuggestions_ where_look dflags global_env
+                        local_env tried_rdr_name
+  = case suggest of
+      []  -> Outputable.empty
+      [p] -> perhaps <+> pp_item p
+      ps  -> sep [ perhaps <+> ptext (sLit "one of these:")
+                 , nest 2 (pprWithCommas pp_item ps) ]
   where
+    all_possibilities :: [(String, (RdrName, HowInScope))]
+    all_possibilities
+       =  [ (showPpr dflags r, (r, Left loc))
+          | (r,loc) <- local_possibilities local_env ]
+       ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
+
+    suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
+    perhaps = ptext (sLit "Perhaps you meant")
+
     pp_item :: (RdrName, HowInScope) -> SDoc
     pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
         where loc' = case loc of

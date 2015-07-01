@@ -1,7 +1,7 @@
 # coding=utf8
 
 def normaliseTransformersPackageKey(str):
-    return re.sub('trans_[A-Za-z0-9]+', 'trans_<HASH>', str)
+    return re.sub('transformers-[^@]+@[A-Za-z0-9]+', 'transformers-<VERSION>@<HASH>', str)
 
 setTestOpts(when(compiler_profiled(), skip))
 

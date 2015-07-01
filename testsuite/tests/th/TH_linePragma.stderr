@@ -1,2 +1,2 @@
 
-virtual file:42:1: Not in scope: ‘doesntExist’
+virtual file:42:1: error: Variable not in scope: doesntExist

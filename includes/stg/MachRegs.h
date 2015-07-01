@@ -170,6 +170,12 @@
 #define REG_R6    r9
 #define REG_SpLim r15
 
+/*
+Map both Fn and Dn to register xmmn so that we can pass a function any
+combination of up to six Float# or Double# arguments without touching
+the stack. See Note [Overlapping global registers] for implications.
+*/
+
 #define REG_F1    xmm1
 #define REG_F2    xmm2
 #define REG_F3    xmm3

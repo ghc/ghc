@@ -27,6 +27,7 @@ module CoreMonad (
     -- ** Reading from the monad
     getHscEnv, getRuleBase, getModule,
     getDynFlags, getOrigNameCache, getPackageFamInstEnv,
+    getVisibleOrphanMods,
     getPrintUnqualified,
 
     -- ** Writing to the monad
@@ -518,6 +519,7 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
+        cr_visible_orphan_mods :: !ModuleSet,
         cr_print_unqual :: PrintUnqualified,
 #ifdef GHCI
         cr_globals :: (MVar PersistentLinkerState, Bool)
@@ -595,10 +597,11 @@ runCoreM :: HscEnv
          -> RuleBase
          -> UniqSupply
          -> Module
+         -> ModuleSet
          -> PrintUnqualified
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base us mod print_unqual m = do
+runCoreM hsc_env rule_base us mod orph_imps print_unqual m = do
         glbls <- saveLinkerGlobals
         liftM extract $ runIOEnv (reader glbls) $ unCoreM m state
   where
@@ -606,6 +609,7 @@ runCoreM hsc_env rule_base us mod print_unqual m = do
             cr_hsc_env = hsc_env,
             cr_rule_base = rule_base,
             cr_module = mod,
+            cr_visible_orphan_mods = orph_imps,
             cr_globals = glbls,
             cr_print_unqual = print_unqual
         }
@@ -667,6 +671,9 @@ getHscEnv = read cr_hsc_env
 
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
+
+getVisibleOrphanMods :: CoreM ModuleSet
+getVisibleOrphanMods = read cr_visible_orphan_mods
 
 getPrintUnqualified :: CoreM PrintUnqualified
 getPrintUnqualified = read cr_print_unqual

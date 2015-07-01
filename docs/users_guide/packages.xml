@@ -1118,6 +1118,21 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           necessarily holds).</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>--package-key</option>
+          <indexterm><primary>
+              <option>--package-key</option>
+            </primary></indexterm>
+        </term>
+        <listitem>
+          <para>Causes <literal>ghc-pkg</literal> to interpret arguments
+          as package keys (e.g., an identifier like
+          <literal>I5BErHzyOm07EBNpKBEeUv</literal>).  Package keys are
+          used to prefix symbol names GHC produces (e.g., <literal>6VWy06pWzzJq9evDvK2d4w6_DataziByteStringziInternal_unsafePackLenChars_info</literal>), so if you need to figure out what package a symbol belongs to, use <literal>ghc-pkg</literal> with this flag.</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 

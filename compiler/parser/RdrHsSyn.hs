@@ -999,9 +999,10 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
         -- not be any OpApps inside the e's
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
 -- Splits (f ! g a b) into (f, [(! g), a, b])
-splitBang (L loc (OpApp l_arg bang@(L _ (HsVar op)) _ r_arg))
-  | op == bang_RDR = Just (l_arg, L loc (SectionR bang arg1) : argns)
+splitBang (L _ (OpApp l_arg bang@(L _ (HsVar op)) _ r_arg))
+  | op == bang_RDR = Just (l_arg, L l' (SectionR bang arg1) : argns)
   where
+    l' = combineLocs bang arg1
     (arg1,argns) = split_bang r_arg []
     split_bang (L _ (HsApp f e)) es = split_bang f (e:es)
     split_bang e                 es = (e,es)

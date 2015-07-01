@@ -286,7 +286,9 @@ rnHsTyKi isType _doc (HsWildCardTy (AnonWildCard PlaceHolder))
     do { loc <- getSrcSpanM
        ; uniq <- newUnique
        ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
-       ; return (HsWildCardTy (AnonWildCard name), unitFV name) }
+       ; return (HsWildCardTy (AnonWildCard name), emptyFVs) }
+         -- emptyFVs: this occurrence does not refer to a
+         --           binding, so don't treat it as a free variable
 
 rnHsTyKi isType doc (HsWildCardTy (NamedWildCard rdr_name))
   = ASSERT( isType )
@@ -298,7 +300,9 @@ rnHsTyKi isType doc (HsWildCardTy (NamedWildCard rdr_name))
          failWith $ text "Unexpected wild card:" <+> quotes (ppr rdr_name) $$
                     docOfHsDocContext doc
        ; name <- rnTyVar isType rdr_name
-       ; return (HsWildCardTy (NamedWildCard name), unitFV name) }
+       ; return (HsWildCardTy (NamedWildCard name), emptyFVs) }
+         -- emptyFVs: this occurrence does not refer to a
+         --           binding, so don't treat it as a free variable
 
 --------------
 rnHsTyKiForAll :: Bool -> HsDocContext -> HsType RdrName

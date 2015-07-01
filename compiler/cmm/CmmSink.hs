@@ -510,11 +510,8 @@ okToInline _ _ _ = True
 
 -- -----------------------------------------------------------------------------
 
--- | @conflicts (r,e) stmt@ is @False@ if and only if the assignment
--- @r = e@ can be safely commuted past @stmt@.
---
--- We only sink "r = G" assignments right now, so conflicts is very simple:
---
+-- | @conflicts (r,e) node@ is @False@ if and only if the assignment
+-- @r = e@ can be safely commuted past statement @node@.
 conflicts :: DynFlags -> Assignment -> CmmNode O x -> Bool
 conflicts dflags (r, rhs, addr) node
 
@@ -548,13 +545,15 @@ conflicts dflags (r, rhs, addr) node
 -- Cmm expression
 globalRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
 globalRegistersConflict dflags expr node =
-    foldRegsDefd dflags (\b r -> b || (CmmGlobal r) `regUsedIn` expr) False node
+    foldRegsDefd dflags (\b r -> b || regUsedIn dflags (CmmGlobal r) expr)
+                 False node
 
 -- Returns True if node defines any local registers that are used in the
 -- Cmm expression
 localRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
 localRegistersConflict dflags expr node =
-    foldRegsDefd dflags (\b r -> b || (CmmLocal  r) `regUsedIn` expr) False node
+    foldRegsDefd dflags (\b r -> b || regUsedIn dflags (CmmLocal  r) expr)
+                 False node
 
 -- Note [Sinking and calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -693,7 +692,7 @@ loadAddr dflags e w =
   case e of
    CmmReg r       -> regAddr dflags r 0 w
    CmmRegOff r i  -> regAddr dflags r i w
-   _other | CmmGlobal Sp `regUsedIn` e -> StackMem
+   _other | regUsedIn dflags (CmmGlobal Sp) e -> StackMem
           | otherwise -> AnyMem
 
 regAddr :: DynFlags -> CmmReg -> Int -> Width -> AbsMem

@@ -45,7 +45,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 6710234312, 5)
+          [(wordsize(64), 7413958344, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -65,6 +65,7 @@ test('haddock.Cabal',
             # 2014-10-04: 6019839624 (x86_64/Linux - Burning Bridges, Cabal update)
             # 2014-12-14: 6387320816 (x86_64/Linux) - Update to Haddock 2.16
             # 2015-01-22: 6710234312 (x86_64/Linux) - Cabal updated
+            # 2015-06-29: 7413958344 (x86_64/Linux) due to #10482, not yet investigated
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
@@ -86,7 +87,7 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 36740649320, 10)
+          [(wordsize(64), 40624322224, 10)
             # 2012P-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -96,6 +97,7 @@ test('haddock.compiler',
             # 2014-09-10: 30353349160 (amd64/Linux) post-AMP cleanup
             # 2014-11-22: 33562468736 (amd64/Linux)
             # 2015-06-02: 36740649320 (amd64/Linux) unknown cause
+            # 2015-06-29: 40624322224 (amd64/Linux) due to #10482, not yet investigated
 
           ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)

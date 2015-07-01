@@ -31,7 +31,8 @@
 --       parseState = mkPState flags buffer location
 -- @
 module Parser (parseModule, parseImport, parseStatement,
-               parseDeclaration, parseExpression, parseTypeSignature,
+               parseDeclaration, parseExpression, parsePattern,
+               parseTypeSignature,
                parseFullStmt, parseStmt, parseIdentifier,
                parseType, parseHeader) where
 
@@ -561,6 +562,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseStatement stmt
 %name parseDeclaration topdecl
 %name parseExpression exp
+%name parsePattern pat
 %name parseTypeSignature sigdecl
 %name parseFullStmt   stmt
 %name parseStmt   maybe_stmt

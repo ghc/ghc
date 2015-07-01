@@ -12,10 +12,16 @@ instance Functor (B t) where
 
 newtype H f = H (f ())
 
-h :: _ => _
+h1 :: _ => _
 -- h :: Functor m => (a -> b) -> m a -> H m
-h f b = (H . fmap (const ())) (fmap f b)
+h1 f b = (H . fmap (const ())) (fmap f b)
 
 h2 :: _
 -- h2 :: Functor m => (a -> b) -> m a -> H m
 h2 f b = (H . fmap (const ())) (fmap f b)
+
+app1 :: H (B t)
+app1 = h1 (H . I) (B ())
+
+app2 :: H (B t)
+app2 = h2 (H . I) (B ())
