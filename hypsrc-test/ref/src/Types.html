@@ -1,0 +1,937 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><link rel="stylesheet" type="text/css" href="style.css"
+     /><script type="text/javascript" src="highlight.js"
+    ></script
+    ></head
+  ><body
+  ><pre
+    ><span class="hs-pragma"
+      >{-# LANGUAGE TypeFamilies #-}</span
+      ><span class=""
+      >
+
+
+</span
+      ><span class="hs-keyword"
+      >module</span
+      ><span class=""
+      > </span
+      ><span class="hs-identifier"
+      >Types</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span class=""
+      >
+
+
+</span
+      ><span class="hs-keyword"
+      >data</span
+      ><span class=""
+      > </span
+      ><a name="Quux"
+      ><a href="Types.html#Quux"
+	><span class="hs-identifier"
+	  >Quux</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><a name="Bar"
+      ><a href="Types.html#Bar"
+	><span class="hs-identifier"
+	  >Bar</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >|</span
+      ><span class=""
+      > </span
+      ><a name="Baz"
+      ><a href="Types.html#Baz"
+	><span class="hs-identifier"
+	  >Baz</span
+	  ></a
+	></a
+      ><span class=""
+      >
+
+</span
+      ><span class="hs-keyword"
+      >newtype</span
+      ><span class=""
+      > </span
+      ><a name="Foo"
+      ><a href="Types.html#Foo"
+	><span class="hs-identifier"
+	  >Foo</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><a name="Foo"
+      ><a href="Types.html#Foo"
+	><span class="hs-identifier"
+	  >Foo</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      >
+
+</span
+      ><span class="hs-keyword"
+      >type</span
+      ><span class=""
+      > </span
+      ><a name="FooQuux"
+      ><a href="Types.html#FooQuux"
+	><span class="hs-identifier"
+	  >FooQuux</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      >
+</span
+      ><span class="hs-keyword"
+      >type</span
+      ><span class=""
+      > </span
+      ><a name="QuuxFoo"
+      ><a href="Types.html#QuuxFoo"
+	><span class="hs-identifier"
+	  >QuuxFoo</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      >
+
+
+</span
+      ><span class="hs-keyword"
+      >data</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >family</span
+      ><span class=""
+      > </span
+      ><a name="Norf"
+      ><a href="Types.html#Norf"
+	><span class="hs-identifier"
+	  >Norf</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><a name="local-0"
+      ><a href="#local-0"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><a name="local-0"
+      ><a href="#local-0"
+	><span class="hs-identifier"
+	  >b</span
+	  ></a
+	></a
+      ><span class=""
+      >
+
+</span
+      ><span class="hs-keyword"
+      >data</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >instance</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf"
+      ><span class="hs-identifier hs-type"
+	>Norf</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><a name="NFQ"
+      ><a href="Types.html#NFQ"
+	><span class="hs-identifier"
+	  >NFQ</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      >
+</span
+      ><span class="hs-keyword"
+      >data</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >instance</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf"
+      ><span class="hs-identifier hs-type"
+	>Norf</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><a name="NQF"
+      ><a href="Types.html#NQF"
+	><span class="hs-identifier"
+	  >NQF</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      >
+
+
+</span
+      ><span class="hs-keyword"
+      >type</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >family</span
+      ><span class=""
+      > </span
+      ><a name="Norf%27"
+      ><a href="Types.html#Norf%27"
+	><span class="hs-identifier"
+	  >Norf'</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><a name="local-0"
+      ><a href="#local-0"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><a name="local-0"
+      ><a href="#local-0"
+	><span class="hs-identifier"
+	  >b</span
+	  ></a
+	></a
+      ><span class=""
+      >
+
+</span
+      ><span class="hs-keyword"
+      >type</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >instance</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf%27"
+      ><span class="hs-identifier hs-type"
+	>Norf'</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      >
+</span
+      ><span class="hs-keyword"
+      >type</span
+      ><span class=""
+      > </span
+      ><span class="hs-keyword"
+      >instance</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf%27"
+      ><span class="hs-identifier hs-type"
+	>Norf'</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      >
+
+
+</span
+      ><span class="hs-identifier"
+      >norf1</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf"
+      ><span class="hs-identifier hs-type"
+	>Norf</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span class=""
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span class=""
+      >
+</span
+      ><a name="norf1"
+      ><a href="Types.html#norf1"
+	><span class="hs-identifier"
+	  >norf1</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#NFQ"
+      ><span class="hs-identifier hs-var"
+	>NFQ</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Bar"
+      ><span class="hs-identifier hs-var"
+	>Bar</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >0</span
+      ><span class=""
+      >
+</span
+      ><span class="hs-identifier"
+      >norf1</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#NFQ"
+      ><span class="hs-identifier hs-var"
+	>NFQ</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Baz"
+      ><span class="hs-identifier hs-var"
+	>Baz</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >1</span
+      ><span class=""
+      >
+
+</span
+      ><span class="hs-identifier"
+      >norf2</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf"
+      ><span class="hs-identifier hs-type"
+	>Norf</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span class=""
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span class=""
+      >
+</span
+      ><a name="norf2"
+      ><a href="Types.html#norf2"
+	><span class="hs-identifier"
+	  >norf2</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#NQF"
+      ><span class="hs-identifier hs-var"
+	>NQF</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Bar"
+      ><span class="hs-identifier hs-var"
+	>Bar</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >0</span
+      ><span class=""
+      >
+</span
+      ><span class="hs-identifier"
+      >norf2</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#NQF"
+      ><span class="hs-identifier hs-var"
+	>NQF</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Baz"
+      ><span class="hs-identifier hs-var"
+	>Baz</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >1</span
+      ><span class=""
+      >
+
+
+</span
+      ><span class="hs-identifier"
+      >norf1'</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf%27"
+      ><span class="hs-identifier hs-type"
+	>Norf'</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span class=""
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span class=""
+      >
+</span
+      ><a name="norf1%27"
+      ><a href="Types.html#norf1%27"
+	><span class="hs-identifier"
+	  >norf1'</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Bar"
+      ><span class="hs-identifier hs-var"
+	>Bar</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >0</span
+      ><span class=""
+      >
+</span
+      ><span class="hs-identifier"
+      >norf1'</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Baz"
+      ><span class="hs-identifier hs-var"
+	>Baz</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >1</span
+      ><span class=""
+      >
+
+</span
+      ><span class="hs-identifier"
+      >norf2'</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Norf%27"
+      ><span class="hs-identifier hs-type"
+	>Norf'</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Quux"
+      ><span class="hs-identifier hs-type"
+	>Quux</span
+	></a
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-type"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span class=""
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span class=""
+      >
+</span
+      ><a name="norf2%27"
+      ><a href="Types.html#norf2%27"
+	><span class="hs-identifier"
+	  >norf2'</span
+	  ></a
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Bar"
+      ><span class="hs-identifier hs-var"
+	>Bar</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >0</span
+      ><span class=""
+      >
+</span
+      ><span class="hs-identifier"
+      >norf2'</span
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Types.html#Baz"
+      ><span class="hs-identifier hs-var"
+	>Baz</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span class=""
+      > </span
+      ><a href="Types.html#Foo"
+      ><span class="hs-identifier hs-var"
+	>Foo</span
+	></a
+      ><span class=""
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span class="hs-special"
+      >)</span
+      ><span class=""
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span class=""
+      > </span
+      ><span class="hs-number"
+      >1</span
+      ><span class=""
+      >
+</span
+      ></pre
+    ></body
+  ></html
+>
