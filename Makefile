@@ -119,7 +119,7 @@ ifeq "$(mingw32_TARGET_OS)" "1"
 	$(MAKE) --no-print-directory -f ghc.mk windows-binary-dist-prep
 else
 	rm -f bindist-list
-	$(MAKE) --no-print-directory -f ghc.mk bindist BINDIST=YES
+	$(MAKE) --no-print-directory -f ghc.mk bindist-list BINDIST=YES
 	$(MAKE) --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
 

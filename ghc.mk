@@ -946,7 +946,7 @@ ifneq "$(CLEANING)" "YES"
 # This rule seems to hold some files open on Windows which prevents
 # cleaning, perhaps due to the $(wildcard).
 
-$(eval $(call bindist,.,\
+$(eval $(call bindist-list,.,\
     LICENSE \
     README \
     INSTALL \
