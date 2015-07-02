@@ -131,7 +131,8 @@ binds =
 decls :: GHC.RenamedSource -> DetailsMap
 decls (group, _, _, _) = concatMap ($ group)
     [ concat . map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
-    , everything (<|>) (fun `combine` con `combine` ins)
+    , everything (<|>) fun . GHC.hs_valds
+    , everything (<|>) (con `combine` ins)
     ]
   where
     typ (GHC.L _ t) = case t of
