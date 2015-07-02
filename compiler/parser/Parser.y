@@ -8,14 +8,6 @@
 -- ---------------------------------------------------------------------------
 
 {
-{-# LANGUAGE BangPatterns #-} -- required for versions of Happy before 1.18.6
-{-# OPTIONS -Wwarn -w #-}
--- The above warning suppression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.
 -- A common usage pattern is to initialize the parser state with a given string

@@ -43,15 +43,17 @@
 {
 -- XXX The above flags turn off warnings in the generated code:
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
--- But alex still generates some code that causes the "lazy unlifted bindings"
--- warning, and old compilers don't know about it so we can't easily turn
--- it off, so for now we use the sledge hammer:
-{-# OPTIONS_GHC -w #-}
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+-- The above warning suppression flags are a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+-- for details
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -77,13 +79,14 @@ module Lexer (
   ) where
 
 -- base
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative
+#endif
 import Control.Monad
 import Data.Bits
-import Data.Char
+import Data.Char hiding (ord)
 import Data.List
 import Data.Maybe
-import Data.Ratio
 import Data.Word
 
 -- bytestring
@@ -92,10 +95,6 @@ import Data.ByteString (ByteString)
 -- containers
 import Data.Map (Map)
 import qualified Data.Map as Map
-
--- data/typeable
-import Data.Data
-import Data.Typeable
 
 -- compiler/utils
 import Bag

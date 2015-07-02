@@ -872,9 +872,11 @@ AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
 
 
 dnl
-dnl Check for Happy and version.  If we're building GHC, then we need
-dnl at least Happy version 1.19.  If there's no installed Happy, we look
+dnl Check for Happy and version.
+dnl If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
+dnl If you increase the minimum version requirement, please also update:
+dnl https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Tools
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
 [FP_PATH_PROG(HappyCmd,happy,)
@@ -899,8 +901,9 @@ AC_SUBST(HappyVersion)
 ])
 
 dnl
-dnl Check for Alex and version.  If we're building GHC, then we need
-dnl at least Alex version 2.1.1.
+dnl Check for Alex and version.
+dnl If you increase the minimum version requirement, please also update:
+dnl https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Tools
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [

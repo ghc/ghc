@@ -11,9 +11,12 @@
 -----------------------------------------------------------------------------
 
 {
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS -Wwarn -w #-}
--- The above -Wwarn suppression flag is a temporary kludge.
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+-- The above warning suppression flags are a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
@@ -35,7 +38,7 @@ import Util
 --import TRACE
 
 import Data.Word
-import Data.Char
+import Data.Char hiding (ord)
 }
 
 $whitechar   = [\ \t\n\r\f\v\xa0] -- \xa0 is Unicode no-break space

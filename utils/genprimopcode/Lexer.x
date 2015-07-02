@@ -1,8 +1,11 @@
 
 {
-{-# LANGUAGE BangPatterns #-} -- required for versions of Alex before 2.3.4
-{-# OPTIONS -w -Wwarn #-}
--- The above warning suppression flag is a temporary kludge.
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+-- The above warning suppression flags are a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
@@ -10,11 +13,12 @@
 
 module Lexer (lex_tok) where
 
-import ParserM (ParserM (..), mkT, mkTv, Token(..), St, start_code,
+import ParserM (ParserM (..), mkT, mkTv, Token(..), start_code,
                 set_start_code,
                 inc_brace_depth, dec_brace_depth,
-                show_pos, position, input,
-                AlexInput, alexGetChar, alexGetByte, alexInputPrevChar)
+                show_pos, position,
+                AlexInput, alexGetByte)
+import qualified ParserM as ParserM (input)
 }
 
 words :-
@@ -81,7 +85,7 @@ get_tok = ParserM $ \i st ->
        AlexError _ -> Left ("Lexical error at " ++ show_pos (position i))
        AlexSkip i' _ -> case get_tok of
                             ParserM f -> f i' st
-       AlexToken i' l a -> case a $ take l $ input i of
+       AlexToken i' l a -> case a $ take l $ ParserM.input i of
                                ParserM f -> f i' st
 
 lex_tok :: (Token -> ParserM a) -> ParserM a
