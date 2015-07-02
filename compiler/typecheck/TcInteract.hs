@@ -1735,24 +1735,23 @@ matchClassInst dflags _ clas tys loc
             ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
             ; return $ GenInst theta (EvDFunApp dfun_id tys) so eqs }
 
-     inerts_to_lazy_eqs :: Cts -> TcS (LazyEqs [TcPredType])
-     inerts_to_lazy_eqs = flatMapBagM $ \ct ->
-       case (ctEvidence ct, classifyPredType (ctPred ct)) of
-         (CtWanted { }, InstanceOfPred lhs rhs)
-           | Just _ <- getTyVar_maybe lhs
-           -- InstanceOf var sigma --> var ~ sigma
-           -> return $ unitBag (lhs, rhs, [mkTcEqPredRole Nominal lhs rhs])
-           | Just _ <- getTyVar_maybe rhs
-           -- InstanceOf sigma var -> instantiate sigma
-           -> do { (_qvars, q, ty) <- splitInst lhs
-                 ; return $ unitBag (rhs, ty, mkTcEqPredRole Nominal rhs ty : q) }
-           | otherwise
-           -> pprPanic "malformed irred InstanceOf" (ppr (ctPred ct))
-         _ -> return noLazyEqs
-
      extract_lazy_eqs :: LazyEqs [TcPredType] -> [TcPredType]
      extract_lazy_eqs leqs = concatMap (\(_,_,qs) -> qs) (bagToList leqs)
 
+inerts_to_lazy_eqs :: Cts -> TcS (LazyEqs [TcPredType])
+inerts_to_lazy_eqs = flatMapBagM $ \ct ->
+  case (ctEvidence ct, classifyPredType (ctPred ct)) of
+    (CtWanted { }, InstanceOfPred lhs rhs)
+      | Just _ <- getTyVar_maybe lhs
+      -- InstanceOf var sigma --> var ~ sigma
+      -> return $ unitBag (lhs, rhs, [mkTcEqPredRole Nominal lhs rhs])
+      | Just _ <- getTyVar_maybe rhs
+      -- InstanceOf sigma var -> instantiate sigma
+      -> do { (_qvars, q, ty) <- splitInst lhs
+            ; return $ unitBag (rhs, ty, mkTcEqPredRole Nominal ty rhs : q) }
+      | otherwise
+      -> pprPanic "malformed irred InstanceOf" (ppr (ctPred ct))
+    _ -> return noLazyEqs
 
 
 {- Note [Instance and Given overlap]
