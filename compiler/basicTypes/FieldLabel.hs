@@ -71,8 +71,9 @@ type FieldLabel = FieldLbl Name
 
 -- | Fields in an algebraic record type
 data FieldLbl a = FieldLabel {
-      flLabel        :: FieldLabelString, -- ^ Label of the field
-      flIsOverloaded :: Bool,             -- ^ Is this field overloaded?
+      flLabel        :: FieldLabelString, -- ^ User-visible label of the field
+      flIsOverloaded :: Bool,             -- ^ Was AllowDuplicateRecordFields on
+                                          --   in the defining module for this datatype?
       flSelector     :: a                 -- ^ Record selector function
     }
   deriving (Functor, Foldable, Traversable)
