@@ -1,5 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
+
 
 module Haddock.Backends.Hyperlinker.Ast
     ( enrich
@@ -135,6 +137,7 @@ decls (group, _, _, _) = concatMap ($ group)
     typ (GHC.L _ t) = case t of
         GHC.DataDecl name _ _ _ -> pure . decl $ name
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
+        GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
         _ -> pure . decl $ GHC.tcdLName t
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
@@ -152,6 +155,8 @@ decls (group, _, _, _) = concatMap ($ group)
     fld term = case cast term of
         Just field -> map decl $ GHC.cd_fld_names field
         Nothing -> empty
+    sig (GHC.L _ (GHC.TypeSig names _ _)) = map decl names
+    sig _ = []
     decl (GHC.L sspan name) = (sspan, RtkDecl name)
     tyref (GHC.L sspan name) = (sspan, RtkType name)
 
