@@ -129,7 +129,7 @@ binds =
 decls :: GHC.RenamedSource -> DetailsMap
 decls (group, _, _, _) = concatMap ($ group)
     [ concat . map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
-    , everything (<|>) (fun `combine` con)
+    , everything (<|>) (fun `combine` con `combine` ins)
     ]
   where
     typ (GHC.L _ t) = case t of
@@ -144,10 +144,16 @@ decls (group, _, _, _) = concatMap ($ group)
         (Just cdcl) ->
             map decl (GHC.con_names cdcl) ++ everything (<|>) fld cdcl
         Nothing -> empty
+    ins term = case cast term of
+        (Just (GHC.DataFamInstD inst)) -> pure . tyref $ GHC.dfid_tycon inst
+        (Just (GHC.TyFamInstD (GHC.TyFamInstDecl (GHC.L _ eqn) _))) ->
+            pure . tyref $ GHC.tfe_tycon eqn
+        _ -> empty
     fld term = case cast term of
         Just field -> map decl $ GHC.cd_fld_names field
         Nothing -> empty
     decl (GHC.L sspan name) = (sspan, RtkDecl name)
+    tyref (GHC.L sspan name) = (sspan, RtkType name)
 
 -- | Obtain details map for import declarations.
 --

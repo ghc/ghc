@@ -197,6 +197,7 @@ keywords =
     , "type"
     , "where"
     , "forall"
+    , "family"
     , "mdo"
     ]
 
