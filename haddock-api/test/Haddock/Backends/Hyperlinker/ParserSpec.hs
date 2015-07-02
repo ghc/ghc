@@ -52,7 +52,7 @@ parseSpec = do
     it "should recognize preprocessor directives" $ do
         "\n#define foo bar" `shouldParseTo` [TkSpace, TkCpp]
         "x # y" `shouldParseTo`
-            [TkIdentifier, TkSpace, TkCpp, TkSpace,TkIdentifier]
+            [TkIdentifier, TkSpace, TkOperator, TkSpace,TkIdentifier]
 
     it "should distinguish basic language constructs" $ do
         "(* 2) <$> (\"abc\", foo)" `shouldParseTo`
