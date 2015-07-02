@@ -156,17 +156,17 @@ classify str
     | "--" `isPrefixOf` str = TkComment
     | "{-#" `isPrefixOf` str = TkPragma
     | "{-" `isPrefixOf` str = TkComment
-classify (c:_)
+classify str@(c:_)
     | isSpace c = TkSpace
     | isDigit c = TkNumber
     | c `elem` special = TkSpecial
+    | str `elem` glyphs = TkGlyph
+    | all (`elem` symbols) str = TkOperator
     | c == '#' = TkCpp
     | c == '"' = TkString
     | c == '\'' = TkChar
 classify str
     | str `elem` keywords = TkKeyword
-    | str `elem` glyphs = TkGlyph
-    | all (`elem` symbols) str = TkOperator
     | isIdentifier str = TkIdentifier
     | otherwise = TkUnknown
 
