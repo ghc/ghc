@@ -129,20 +129,21 @@ binds =
 decls :: GHC.RenamedSource -> DetailsMap
 decls (group, _, _, _) = concatMap ($ group)
     [ concat . map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
-    , everything (<|>) fun
+    , everything (<|>) (fun `combine` con)
     ]
   where
     typ (GHC.L _ t) = case t of
-        GHC.DataDecl name _ defn _ ->
-            [decl name] ++ concatMap con (GHC.dd_cons defn)
+        GHC.DataDecl name _ _ _ -> pure . decl $ name
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         _ -> pure . decl $ GHC.tcdLName t
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
-    con (GHC.L _ t) =
-        map decl (GHC.con_names t) ++ everything (<|>) fld t
+    con term = case cast term of
+        (Just cdcl) ->
+            map decl (GHC.con_names cdcl) ++ everything (<|>) fld cdcl
+        Nothing -> empty
     fld term = case cast term of
         Just field -> map decl $ GHC.cd_fld_names field
         Nothing -> empty
