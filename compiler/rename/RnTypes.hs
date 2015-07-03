@@ -554,7 +554,7 @@ rnLHsTypeWithWildCards doc ty
   = do { -- When there is a wild card at the end of the context, remove it and
          -- add its location as the extra-constraints wild card in the
          -- HsForAllTy.
-         let ty' = extractExtraCtsWc `fmap` ty
+         let ty' = extractExtraCtsWc `fmap` flattenTopLevelLHsForAllTy ty
 
        ; checkValidPartialType doc ty'
 
