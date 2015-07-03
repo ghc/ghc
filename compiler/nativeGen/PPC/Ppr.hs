@@ -39,10 +39,10 @@ import Unique                ( pprUnique, Uniquable(..) )
 import Platform
 import FastString
 import Outputable
+import DynFlags
 
 import Data.Word
 import Data.Bits
-
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -54,12 +54,17 @@ pprNatCmmDecl (CmmData section dats) =
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   case topInfoTable proc of
     Nothing ->
+       sdocWithPlatform $ \platform ->
        case blocks of
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
            pprSectionHeader Text $$
-           pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+           (case platformArch platform of
+              ArchPPC_64 ELF_V1 -> pprFunctionDescriptor lbl
+              ArchPPC_64 ELF_V2 -> pprFunctionPrologue lbl
+              _ -> pprLabel lbl) $$ -- blocks guaranteed not null,
+                                     -- so label needed
            vcat (map (pprBasicBlock top_info) blocks)
 
     Just (Statics info_lbl _) ->
@@ -80,6 +85,35 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
                   <+> ppr (mkDeadStripPreventer info_lbl)
              else empty)
 
+
+pprFunctionDescriptor :: CLabel -> SDoc
+pprFunctionDescriptor lab = pprGloblDecl lab
+                        $$  text ".section \".opd\",\"aw\""
+                        $$  text ".align 3"
+                        $$  ppr lab <> char ':'
+                        $$  text ".quad ."
+                        <> ppr lab
+                        <> text ",.TOC.@tocbase,0"
+                        $$  text ".previous"
+                        $$  text ".type "
+                        <> ppr lab
+                        <> text ", @function"
+                        $$  char '.'
+                        <> ppr lab
+                        <> char ':'
+
+pprFunctionPrologue :: CLabel ->SDoc
+pprFunctionPrologue lab =  pprGloblDecl lab
+                        $$  text ".type "
+                        <> ppr lab
+                        <> text ", @function"
+                        $$ ppr lab <> char ':'
+                        $$ text "0:\taddis\t" <> pprReg toc
+                        <> text ",12,.TOC.-0b@ha"
+                        $$ text "\taddi\t" <> pprReg toc
+                        <> char ',' <> pprReg toc <> text ",.TOC.-0b@l"
+                        $$ text "\t.localentry\t" <> ppr lab
+                        <> text ",.-" <> ppr lab
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
@@ -208,6 +242,7 @@ pprSize x
                 II8        -> sLit "b"
                 II16        -> sLit "h"
                 II32        -> sLit "w"
+                II64        -> sLit "d"
                 FF32        -> sLit "fs"
                 FF64        -> sLit "fd"
                 _        -> panic "PPC.Ppr.pprSize: no match")
@@ -257,6 +292,18 @@ pprImm (HA i)
     then hcat [ text "ha16(", pprImm i, rparen ]
     else pprImm i <> text "@ha"
 
+pprImm (HIGHERA i)
+  = sdocWithPlatform $ \platform ->
+    if platformOS platform == OSDarwin
+    then panic "PPC.pprImm: highera not implemented on Darwin"
+    else pprImm i <> text "@highera"
+
+pprImm (HIGHESTA i)
+  = sdocWithPlatform $ \platform ->
+    if platformOS platform == OSDarwin
+    then panic "PPC.pprImm: highesta not implemented on Darwin"
+    else pprImm i <> text "@highesta"
+
 
 pprAddr :: AddrMode -> SDoc
 pprAddr (AddrRegReg r1 r2)
@@ -270,18 +317,25 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 pprSectionHeader :: Section -> SDoc
 pprSectionHeader seg =
  sdocWithPlatform $ \platform ->
- let osDarwin = platformOS platform == OSDarwin in
+ let osDarwin = platformOS platform == OSDarwin
+     ppc64    = not $ target32Bit platform
+ in
  case seg of
   Text              -> text ".text\n\t.align 2"
-  Data              -> text ".data\n\t.align 2"
+  Data
+   | ppc64          -> text ".data\n.align 3"
+   | otherwise      -> text ".data\n.align 2"
   ReadOnlyData
    | osDarwin       -> text ".const\n\t.align 2"
+   | ppc64          -> text ".section .rodata\n\t.align 3"
    | otherwise      -> text ".section .rodata\n\t.align 2"
   RelocatableReadOnlyData
    | osDarwin       -> text ".const_data\n\t.align 2"
+   | ppc64          -> text ".data\n\t.align 3"
    | otherwise      -> text ".data\n\t.align 2"
   UninitialisedData
    | osDarwin       -> text ".const_data\n\t.align 2"
+   | ppc64          -> text ".section .bss\n\t.align 3"
    | otherwise      -> text ".section .bss\n\t.align 2"
   ReadOnlyData16
    | osDarwin       -> text ".const\n\t.align 4"
@@ -293,32 +347,38 @@ pprSectionHeader seg =
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
   = sdocWithDynFlags $ \dflags ->
-    vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit)
+    vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit dflags)
     where
         imm = litToImm lit
+        archPPC_64 dflags = not $ target32Bit $ targetPlatform dflags
 
-        ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm imm]
+        ppr_item II8   _ _ = [ptext (sLit "\t.byte\t") <> pprImm imm]
 
-        ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm imm]
+        ppr_item II32  _ _ = [ptext (sLit "\t.long\t") <> pprImm imm]
 
-        ppr_item FF32 (CmmFloat r _)
+        ppr_item II64 _ dflags
+           | archPPC_64 dflags = [ptext (sLit "\t.quad\t") <> pprImm imm]
+
+
+        ppr_item FF32 (CmmFloat r _) _
            = let bs = floatToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
 
-        ppr_item FF64 (CmmFloat r _)
+        ppr_item FF64 (CmmFloat r _) _
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
 
-        ppr_item II16 _        = [ptext (sLit "\t.short\t") <> pprImm imm]
+        ppr_item II16 _ _      = [ptext (sLit "\t.short\t") <> pprImm imm]
 
-        ppr_item II64 (CmmInt x _)  =
+        ppr_item II64 (CmmInt x _) dflags
+           | not(archPPC_64 dflags) =
                 [ptext (sLit "\t.long\t")
                     <> int (fromIntegral 
                         (fromIntegral (x `shiftR` 32) :: Word32)),
                  ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
-        ppr_item _ _
+        ppr_item _ _ _
                 = panic "PPC.Ppr.pprDataItem: no match"
 
 
@@ -365,6 +425,7 @@ pprInstr (LD sz reg addr) = hcat [
             II8  -> sLit "bz"
             II16 -> sLit "hz"
             II32 -> sLit "wz"
+            II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
             _         -> panic "PPC.Ppr.pprInstr: no match"
@@ -383,6 +444,7 @@ pprInstr (LA sz reg addr) = hcat [
             II8  -> sLit "ba"
             II16 -> sLit "ha"
             II32 -> sLit "wa"
+            II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
             _         -> panic "PPC.Ppr.pprInstr: no match"
@@ -551,10 +613,14 @@ pprInstr (ADDE reg1 reg2 reg3) = pprLogic (sLit "adde") reg1 reg2 (RIReg reg3)
 pprInstr (SUBF reg1 reg2 reg3) = pprLogic (sLit "subf") reg1 reg2 (RIReg reg3)
 pprInstr (SUBFC reg1 reg2 reg3) = pprLogic (sLit "subfc") reg1 reg2 (RIReg reg3)
 pprInstr (SUBFE reg1 reg2 reg3) = pprLogic (sLit "subfe") reg1 reg2 (RIReg reg3)
+pprInstr (MULLD reg1 reg2 ri@(RIReg _)) = pprLogic (sLit "mulld") reg1 reg2 ri
 pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic (sLit "mullw") reg1 reg2 ri
+pprInstr (MULLD reg1 reg2 ri@(RIImm _)) = pprLogic (sLit "mull") reg1 reg2 ri
 pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic (sLit "mull") reg1 reg2 ri
 pprInstr (DIVW reg1 reg2 reg3) = pprLogic (sLit "divw") reg1 reg2 (RIReg reg3)
+pprInstr (DIVD reg1 reg2 reg3) = pprLogic (sLit "divd") reg1 reg2 (RIReg reg3)
 pprInstr (DIVWU reg1 reg2 reg3) = pprLogic (sLit "divwu") reg1 reg2 (RIReg reg3)
+pprInstr (DIVDU reg1 reg2 reg3) = pprLogic (sLit "divdu") reg1 reg2 (RIReg reg3)
 
 pprInstr (MULLW_MayOflo reg1 reg2 reg3) = vcat [
          hcat [ ptext (sLit "\tmullwo\t"), pprReg reg1, ptext (sLit ", "),
@@ -565,8 +631,17 @@ pprInstr (MULLW_MayOflo reg1 reg2 reg3) = vcat [
                                           pprReg reg1, ptext (sLit ", "),
                                           ptext (sLit "2, 31, 31") ]
     ]
+pprInstr (MULLD_MayOflo reg1 reg2 reg3) = vcat [
+         hcat [ ptext (sLit "\tmulldo\t"), pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg2, ptext (sLit ", "),
+                                          pprReg reg3 ],
+         hcat [ ptext (sLit "\tmfxer\t"),  pprReg reg1 ],
+         hcat [ ptext (sLit "\trlwinm\t"), pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg1, ptext (sLit ", "),
+                                          ptext (sLit "2, 31, 31") ]
+    ]
 
-            -- for some reason, "andi" doesn't exist.
+        -- for some reason, "andi" doesn't exist.
         -- we'll use "andi." instead.
 pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
         char '\t',
@@ -582,6 +657,17 @@ pprInstr (AND reg1 reg2 ri) = pprLogic (sLit "and") reg1 reg2 ri
 
 pprInstr (OR reg1 reg2 ri) = pprLogic (sLit "or") reg1 reg2 ri
 pprInstr (XOR reg1 reg2 ri) = pprLogic (sLit "xor") reg1 reg2 ri
+
+pprInstr (ORIS reg1 reg2 imm) = hcat [
+        char '\t',
+        ptext (sLit "oris"),
+        char '\t',
+        pprReg reg1,
+        ptext (sLit ", "),
+        pprReg reg2,
+        ptext (sLit ", "),
+        pprImm imm
+    ]
 
 pprInstr (XORIS reg1 reg2 imm) = hcat [
         char '\t',
@@ -607,17 +693,33 @@ pprInstr (EXTS sz reg1 reg2) = hcat [
 pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
 pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
 
-pprInstr (SLW reg1 reg2 ri) = pprLogic (sLit "slw") reg1 reg2 (limitShiftRI ri)
+pprInstr (SL sz reg1 reg2 ri) =
+         let op = case sz of
+                       II32 -> "slw"
+                       II64 -> "sld"
+                       _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
+         in pprLogic (sLit op) reg1 reg2 (limitShiftRI sz ri)
 
-pprInstr (SRW reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
+pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
     -- Handle the case where we are asked to shift a 32 bit register by
     -- less than zero or more than 31 bits. We convert this into a clear
     -- of the destination register.
     -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
     pprInstr (XOR reg1 reg2 (RIReg reg2))
-pprInstr (SRW reg1 reg2 ri) = pprLogic (sLit "srw") reg1 reg2 (limitShiftRI ri)
+pprInstr (SR sz reg1 reg2 ri) =
+         let op = case sz of
+                       II32 -> "srw"
+                       II64 -> "srd"
+                       _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
+         in pprLogic (sLit op) reg1 reg2 (limitShiftRI sz ri)
 
-pprInstr (SRAW reg1 reg2 ri) = pprLogic (sLit "sraw") reg1 reg2 (limitShiftRI ri)
+pprInstr (SRA sz reg1 reg2 ri) =
+         let op = case sz of
+                       II32 -> "sraw"
+                       II64 -> "srad"
+                       _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
+         in pprLogic (sLit op) reg1 reg2 (limitShiftRI sz ri)
+
 pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
         ptext (sLit "\trlwinm\t"),
         pprReg reg1,
@@ -649,6 +751,8 @@ pprInstr (FCMP reg1 reg2) = hcat [
     ]
 
 pprInstr (FCTIWZ reg1 reg2) = pprUnary (sLit "fctiwz") reg1 reg2
+pprInstr (FCTIDZ reg1 reg2) = pprUnary (sLit "fctidz") reg1 reg2
+pprInstr (FCFID reg1 reg2) = pprUnary (sLit "fcfid") reg1 reg2
 pprInstr (FRSP reg1 reg2) = pprUnary (sLit "frsp") reg1 reg2
 
 pprInstr (CRNOR dst src1 src2) = hcat [
@@ -679,7 +783,21 @@ pprInstr (FETCHPC reg) = vcat [
         hcat [ ptext (sLit "1:\tmflr\t"), pprReg reg ]
     ]
 
+pprInstr (FETCHTOC reg lab) = vcat [
+        hcat [ ptext (sLit "0:\taddis\t"), pprReg reg,
+               ptext (sLit ",12,.TOC.-0b@ha") ],
+        hcat [ ptext (sLit "\taddi\t"), pprReg reg,
+               char ',', pprReg reg,
+               ptext (sLit ",.TOC.-0b@l") ],
+        hcat [ ptext (sLit "\t.localentry\t"),
+               ppr lab,
+               ptext (sLit ",.-"),
+               ppr lab]
+    ]
+
 pprInstr LWSYNC = ptext (sLit "\tlwsync")
+
+pprInstr NOP = ptext (sLit "\tnop")
 
 -- pprInstr _ = panic "pprInstr (ppc)"
 
@@ -734,9 +852,12 @@ pprFSize FF64     = empty
 pprFSize FF32     = char 's'
 pprFSize _        = panic "PPC.Ppr.pprFSize: no match"
 
-    -- limit immediate argument for shift instruction to range 0..31
-limitShiftRI :: RI -> RI
-limitShiftRI (RIImm (ImmInt i)) | i > 31 || i < 0 =
+    -- limit immediate argument for shift instruction to range 0..63
+    -- for 64 bit size and 0..32 otherwise
+limitShiftRI :: Size -> RI -> RI
+limitShiftRI II64 (RIImm (ImmInt i)) | i > 63 || i < 0 =
   panic $ "PPC.Ppr: Shift by " ++ show i ++ " bits is not allowed."
-limitShiftRI x = x
+limitShiftRI II32 (RIImm (ImmInt i)) | i > 31 || i < 0 =
+  panic $ "PPC.Ppr: 32 bit: Shift by " ++ show i ++ " bits is not allowed."
+limitShiftRI _ x = x
 

@@ -166,18 +166,18 @@ nativeCodeGen dflags this_mod modLoc h us cmms
             => NcgImpl statics instr jumpDest -> IO UniqSupply
        nCG' ncgImpl = nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
    in case platformArch platform of
-      ArchX86     -> nCG' (x86NcgImpl    dflags)
-      ArchX86_64  -> nCG' (x86_64NcgImpl dflags)
-      ArchPPC     -> nCG' (ppcNcgImpl    dflags)
-      ArchSPARC   -> nCG' (sparcNcgImpl  dflags)
-      ArchARM {}  -> panic "nativeCodeGen: No NCG for ARM"
-      ArchARM64   -> panic "nativeCodeGen: No NCG for ARM64"
-      ArchPPC_64  -> panic "nativeCodeGen: No NCG for PPC 64"
-      ArchAlpha   -> panic "nativeCodeGen: No NCG for Alpha"
-      ArchMipseb  -> panic "nativeCodeGen: No NCG for mipseb"
-      ArchMipsel  -> panic "nativeCodeGen: No NCG for mipsel"
-      ArchUnknown -> panic "nativeCodeGen: No NCG for unknown arch"
-      ArchJavaScript -> panic "nativeCodeGen: No NCG for JavaScript"
+      ArchX86       -> nCG' (x86NcgImpl    dflags)
+      ArchX86_64    -> nCG' (x86_64NcgImpl dflags)
+      ArchPPC       -> nCG' (ppcNcgImpl    dflags)
+      ArchSPARC     -> nCG' (sparcNcgImpl  dflags)
+      ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
+      ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
+      ArchPPC_64 _  -> nCG' (ppcNcgImpl    dflags)
+      ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
+      ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
+      ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
+      ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
+      ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
 
 x86NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics) X86.Instr.Instr X86.Instr.JumpDest
 x86NcgImpl dflags

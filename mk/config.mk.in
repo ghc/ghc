@@ -145,9 +145,9 @@ GhcUnregisterised=@Unregisterised@
 # (as well as a C backend)
 #
 # Target platforms supported:
-#   i386, powerpc
+#   i386, powerpc, powerpc64, sparc
 #   IOS and AIX are not supported
-ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
+ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc)))
 OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(patsubst aix,,$(TargetOS_CPP)))))
 
 GhcWithNativeCodeGen := $(strip\
@@ -158,7 +158,7 @@ HaveLibDL = @HaveLibDL@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
-ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc arm aarch64)))
+ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le arm aarch64)))
 
 GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
@@ -166,7 +166,7 @@ GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised
 # has support for this OS/ARCH combination.
 
 OsSupportsGHCi=$(strip $(patsubst $(TargetOS_CPP), YES, $(findstring $(TargetOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
-ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc sparc64 arm aarch64)))
+ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc sparc64 arm aarch64)))
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
@@ -179,7 +179,7 @@ endif
 # (see TABLES_NEXT_TO_CODE in the RTS).  Whether we actually compile for
 # TABLES_NEXT_TO_CODE depends on whether we're building unregisterised
 # code or not, which may be decided by options to the compiler later.
-ifneq "$(findstring $(TargetArch_CPP)X, ia64X powerpc64X)" ""
+ifneq "$(findstring $(TargetArch_CPP)X, ia64X powerpc64X powerpc64leX)" ""
 GhcEnableTablesNextToCode=NO
 else
 GhcEnableTablesNextToCode=YES

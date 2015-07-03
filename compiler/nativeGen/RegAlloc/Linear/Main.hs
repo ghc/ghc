@@ -211,7 +211,7 @@ linearRegAlloc dflags entry_ids block_live sccs
       ArchPPC        -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchARM _ _ _  -> panic "linearRegAlloc ArchARM"
       ArchARM64      -> panic "linearRegAlloc ArchARM64"
-      ArchPPC_64     -> panic "linearRegAlloc ArchPPC_64"
+      ArchPPC_64 _   -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchAlpha      -> panic "linearRegAlloc ArchAlpha"
       ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"

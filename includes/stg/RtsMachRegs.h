@@ -41,7 +41,8 @@
 
 #define MACHREGS_i386     i386_HOST_ARCH
 #define MACHREGS_x86_64   x86_64_HOST_ARCH
-#define MACHREGS_powerpc  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH || rs6000_HOST_ARCH)
+#define MACHREGS_powerpc  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH \
+        || powerpc64le_HOST_ARCH || rs6000_HOST_ARCH)
 #define MACHREGS_sparc    sparc_HOST_ARCH
 #define MACHREGS_arm      arm_HOST_ARCH
 #define MACHREGS_aarch64  aarch64_HOST_ARCH

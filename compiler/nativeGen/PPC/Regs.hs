@@ -37,7 +37,7 @@ module PPC.Regs (
         fits16Bits,
         makeImmediate,
         fReg,
-        sp, r3, r4, r27, r28, r30,
+        sp, toc, r3, r4, r11, r12, r27, r28, r30,
         f1, f20, f21,
 
         allocatableRegs
@@ -64,8 +64,8 @@ import FastBool
 import FastTypes
 import Platform
 
-import Data.Word        ( Word8, Word16, Word32 )
-import Data.Int         ( Int8, Int16, Int32 )
+import Data.Word        ( Word8, Word16, Word32, Word64 )
+import Data.Int         ( Int8, Int16, Int32, Int64 )
 
 
 -- squeese functions for the graph allocator -----------------------------------
@@ -147,6 +147,8 @@ data Imm
         | LO Imm
         | HI Imm
         | HA Imm        {- high halfword adjusted -}
+        | HIGHERA Imm
+        | HIGHESTA Imm
 
 
 strImmLit :: String -> Imm
@@ -269,9 +271,11 @@ fits16Bits x = x >= -32768 && x < 32768
 makeImmediate :: Integral a => Width -> Bool -> a -> Maybe Imm
 makeImmediate rep signed x = fmap ImmInt (toI16 rep signed)
     where
+        narrow W64 False = fromIntegral (fromIntegral x :: Word64)
         narrow W32 False = fromIntegral (fromIntegral x :: Word32)
         narrow W16 False = fromIntegral (fromIntegral x :: Word16)
         narrow W8  False = fromIntegral (fromIntegral x :: Word8)
+        narrow W64 True  = fromIntegral (fromIntegral x :: Int64)
         narrow W32 True  = fromIntegral (fromIntegral x :: Int32)
         narrow W16 True  = fromIntegral (fromIntegral x :: Int16)
         narrow W8  True  = fromIntegral (fromIntegral x :: Int8)
@@ -285,6 +289,12 @@ makeImmediate rep signed x = fmap ImmInt (toI16 rep signed)
         toI16 W32 False
             | narrowed >= 0 && narrowed < 65536 = Just narrowed
             | otherwise = Nothing
+        toI16 W64 True
+            | narrowed >= -32768 && narrowed < 32768 = Just narrowed
+            | otherwise = Nothing
+        toI16 W64 False
+            | narrowed >= 0 && narrowed < 65536 = Just narrowed
+            | otherwise = Nothing
         toI16 _ _  = Just narrowed
 
 
@@ -296,10 +306,13 @@ point registers.
 fReg :: Int -> RegNo
 fReg x = (32 + x)
 
-sp, r3, r4, r27, r28, r30, f1, f20, f21 :: Reg
+sp, toc, r3, r4, r11, r12, r27, r28, r30, f1, f20, f21 :: Reg
 sp      = regSingle 1
+toc     = regSingle 2
 r3      = regSingle 3
 r4      = regSingle 4
+r11     = regSingle 11
+r12     = regSingle 12
 r27     = regSingle 27
 r28     = regSingle 28
 r30     = regSingle 30
