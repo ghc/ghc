@@ -482,8 +482,13 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
             [gre] -> do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
                           -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
-            []    -> do { addErr (unknownSubordinateErr doc rdr_name)
-                        ; return (mkUnboundName rdr_name) }
+            []    -> do { ns <- lookupQualifiedNameGHCi rdr_name
+                        ; case ns of {
+                                (n:_) -> return n ;
+                                -- Unlikely to be more than one...?
+                                [] -> do
+                        { addErr (unknownSubordinateErr doc rdr_name)
+                        ; return (mkUnboundName rdr_name) } } }
             gres  -> do { addNameClashErrRn rdr_name gres
                         ; return (gre_name (head gres)) } }
   where
