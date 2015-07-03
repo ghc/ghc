@@ -1179,11 +1179,15 @@ simplCast env body co0 cont0
                 -- But it isn't a common case.
                 --
                 -- Example of use: Trac #995
-         = do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
-              ; cont'                <- addCoerce co2 cont
+         = do { let arg' = substExprS arg_se arg
+                           -- It's important that this is lazy, because this argument
+                           -- may be disarded if turns out to be the argument of
+                           -- (\_ -> e)     This can make a huge difference;
+                           -- see Trac #10527
+              ; cont' <- addCoerce co2 cont
               ; return (ApplyToVal { sc_arg  = mkCast arg' (mkSymCo co1)
-                                   , sc_env  = arg_se'
-                                   , sc_dup  = dup'
+                                   , sc_env  = zapSubstEnv arg_se
+                                   , sc_dup  = dup
                                    , sc_cont = cont' }) }
          where
            -- we split coercion t1->t2 ~ s1->s2 into t1 ~ s1 and

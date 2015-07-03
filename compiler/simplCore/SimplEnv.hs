@@ -23,6 +23,7 @@ module SimplEnv (
 
         SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
 
+        substExprS,
         simplNonRecBndr, simplRecBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getTvSubst,
@@ -537,6 +538,72 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         Just _ -> pprPanic "lookupRecBndr" (ppr v)
         Nothing -> refineFromInScope in_scope v
 
+
+substExprS :: SimplEnv -> CoreExpr -> CoreExpr
+-- This entire substExprS thing is called in just one place
+-- but we can't use substExpr because it uses a different shape
+-- of substitution  Better solution coming in HEAD.
+substExprS env expr
+  = go expr
+  where
+    go (Var v) = case substId env v of
+                   DoneId v'            -> Var v'
+                   DoneEx e             -> e
+                   ContEx tvs cvs ids e -> substExprS (setSubstEnv env tvs cvs ids) e
+
+    go (Type ty)       = Type (substTy env ty)
+    go (Coercion co)   = Coercion (substCo env co)
+    go (Lit lit)       = Lit lit
+    go (App fun arg)   = App (go fun) (go arg)
+    go (Tick tickish e) = mkTick (substTickishS env tickish) (go e)
+    go (Cast e co)     = Cast (go e) (substCo env co)
+       -- Do not optimise even identity coercions
+       -- Reason: substitution applies to the LHS of RULES, and
+       --         if you "optimise" an identity coercion, you may
+       --         lose a binder. We optimise the LHS of rules at
+       --         construction time
+
+    go (Lam bndr body) = Lam bndr' (substExprS env' body)
+                       where
+                         (env', bndr') = substBndr env bndr
+
+    go (Let bind body) = Let bind' (substExprS env' body)
+                       where
+                         (env', bind') = substBindS env bind
+
+    go (Case scrut bndr ty alts)
+      = Case (go scrut) bndr' (substTy env ty)
+                              (map (go_alt env') alts)
+      where
+       (env', bndr') = substBndr env bndr
+
+    go_alt env (con, bndrs, rhs) = (con, bndrs', substExprS env' rhs)
+                                 where
+                                   (env', bndrs') = substBndrs env bndrs
+
+substTickishS :: SimplEnv -> Tickish Id -> Tickish Id
+substTickishS env (Breakpoint n ids) = Breakpoint n (map do_one ids)
+ where
+   do_one = getIdFromTrivialExpr . substExprS env . Var  -- Ugh
+substTickishS _subst other = other
+
+-- | Apply a substitution to an entire 'CoreBind', additionally returning an updated 'Subst'
+-- that should be used by subsequent substitutions.
+substBindS :: SimplEnv -> CoreBind -> (SimplEnv, CoreBind)
+
+substBindS env (NonRec bndr rhs) = (env', NonRec bndr' (substExprS env rhs))
+                                 where
+                                   (env', bndr') = substBndr env bndr
+
+substBindS env (Rec pairs)
+  = (env', Rec (bndrs' `zip` rhss'))
+  where
+    (bndrs, rhss)  = unzip pairs
+    (env', bndrs') = substBndrs env bndrs
+    rhss'          = map (substExprS env') rhss
+    -- No need for the complexity of CoreSubst.substRecBndrs, because
+    -- we zap all IdInfo that depends on free variables
+
 {-
 ************************************************************************
 *                                                                      *
@@ -545,13 +612,17 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 ************************************************************************
 
 
-These functions are in the monad only so that they can be made strict via seq.
+* substBndr, substBndrs: non-monadic version
+
+* sinplBndr, simplBndrs: monadic version, only so that they
+                         can be made strict via seq.
+
 -}
 
+-------------
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
 
--------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda and case-bound variables
 -- Clone Id if necessary, substitute type
@@ -564,14 +635,12 @@ simplBinder env bndr
   | otherwise     = do  { let (env', id) = substIdBndr env bndr
                         ; seqId id `seq` return (env', id) }
 
----------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
 simplNonRecBndr env id
   = do  { let (env1, id1) = substIdBndr env id
         ; seqId id1 `seq` return (env1, id1) }
 
----------------
 simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
@@ -579,6 +648,14 @@ simplRecBndrs env@(SimplEnv {}) ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
+substBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substBndr env bndr
+  | isTyVar bndr  = substTyVarBndr env bndr
+  | otherwise     = substIdBndr env bndr
+
+substBndrs :: SimplEnv -> [InBndr] -> (SimplEnv, [OutBndr])
+substBndrs  env bndrs = mapAccumL substBndr env bndrs
+
 substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
 substIdBndr env bndr
