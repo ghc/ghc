@@ -55,6 +55,7 @@ module Util (
         isEqual, eqListBy, eqMaybeBy,
         thenCmp, cmpList,
         removeSpaces,
+        (<&&>), (<||>),
 
         -- * Edit distance
         fuzzyMatch, fuzzyLookup,
@@ -115,6 +116,10 @@ import Data.List        hiding (group)
 import FastTypes
 #endif
 
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative (Applicative)
+#endif
+import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime )
@@ -652,6 +657,15 @@ cmpList cmp (a:as) (b:bs)
 
 removeSpaces :: String -> String
 removeSpaces = dropWhileEndLE isSpace . dropWhile isSpace
+
+-- Boolean operators lifted to Applicative
+(<&&>) :: Applicative f => f Bool -> f Bool -> f Bool
+(<&&>) = liftA2 (&&)
+infixr 3 <&&> -- same as (&&)
+
+(<||>) :: Applicative f => f Bool -> f Bool -> f Bool
+(<||>) = liftA2 (||)
+infixr 2 <||> -- same as (||)
 
 {-
 ************************************************************************
