@@ -37,6 +37,9 @@
 
   * `IO` now has a `Monoid` instance
 
+  * Generalize `Debug.Trace.{traceM, traceShowM}` from `Monad` to `Applicative`
+    (#10023)
+
 ## 4.8.1.0  *TBA*
 
   * Bundled with GHC 7.10.2
