@@ -1753,7 +1753,7 @@
   <sect2>
     <title>Optimisation levels</title>
 
-    <para>These options are described in more detail in <xref linkend="options-optimise"/></para>
+    <para>These options are described in more detail in <xref linkend="options-optimise"/>.</para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">

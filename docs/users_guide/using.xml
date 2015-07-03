@@ -2105,6 +2105,29 @@ _  = rhs3        -- No warning: lone wild-card pattern
     <emphasis>machine-specific</emphasis> optimisations to be turned
     on/off.</para>
 
+    <para>Most of these options are boolean and have options to turn them both
+    &ldquo;on&rdquo; and &ldquo;off&rdquo; (beginning with the prefix
+    <option>no-</option>). For instance, while <option>-fspecialise</option>
+    enables specialisation, <option>-fno-specialise</option> disables it. When
+    multiple flags for the same option appear in the command-line they are
+    evaluated from left to right. For instance <option>-fno-specialise
+    -fspecialise</option> will enable specialisation.
+    </para>
+
+    <para>It is important to note that the <option>-O*</option> flags are roughly
+    equivalent to combinations of <option>-f*</option> flags. For this reason,
+    the effect of the <option>-O*</option> and <option>-f*</option> flags is
+    dependent upon the order in which they occur on the command line.
+    </para>
+
+    <para>For instance, take the example of <option>-fno-specialise
+    -O1</option>. Despite the <option>-fno-specialise</option> appearing in the
+    command line, specialisation will still be enabled. This is the case
+    as <option>-O1</option> implies <option>-fspecialise</option>, overriding
+    the previous flag. By contrast, <option>-O1 -fno-specialise</option> will
+    compile without specialisation, as one would expect.
+    </para>
+
     <sect2 id="optimise-pkgs">
       <title><option>-O*</option>: convenient &ldquo;packages&rdquo; of optimisation flags.</title>
 
