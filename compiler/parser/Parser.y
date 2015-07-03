@@ -90,10 +90,10 @@ import Util             ( looksLikePackageName )
 
 }
 
-{- Last updated: 30 Mar 2015
+{- Last updated: 21 Jun 2015
 
-Conflicts: 50 shift/reduce
-           2  reduce/reduce
+Conflicts: 49 shift/reduce
+           6  reduce/reduce
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -155,7 +155,7 @@ The case for '->' involves view patterns rather than type operators:
 
 -------------------------------------------------------------------------------
 
-state 118 contains 15 shift/reduce conflicts.
+state 120 contains 15 shift/reduce conflicts.
 
         exp -> infixexp . '::' sigtype                      (rule 414)
         exp -> infixexp . '-<' exp                          (rule 415)
@@ -180,7 +180,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 276 contains 1 shift/reduce conflicts.
+state 281 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 214)
 
@@ -198,7 +198,7 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 285 contains 11 shift/reduce conflicts.
+state 290 contains 11 shift/reduce conflicts.
 
     *** type -> btype .                                     (rule 281)
         type -> btype . qtyconop type                       (rule 282)
@@ -215,7 +215,7 @@ Same as State 49, but minus the context productions.
 
 -------------------------------------------------------------------------------
 
-state 320 contains 1 shift/reduce conflicts.
+state 326 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail                      (rule 502)
         sysdcon -> '(' commas . ')'                         (rule 610)
@@ -230,7 +230,7 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 372 contains 1 shift/reduce conflicts.
+state 378 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail                      (rule 502)
         sysdcon -> '(#' commas . '#)'                       (rule 612)
@@ -242,7 +242,7 @@ Same as State 320 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 400 contains 1 shift/reduce conflicts.
+state 406 contains 1 shift/reduce conflicts.
 
         exp10 -> 'let' binds . 'in' exp                     (rule 423)
         exp10 -> 'let' binds . 'in' error                   (rule 438)
@@ -256,7 +256,7 @@ TODO: Why?
 -------------------------------------------------------------------------------
 
 
-state 462 contains 1 shift/reduce conflicts.
+state 470 contains 1 shift/reduce conflicts.
 
     *** strict_mark -> '{-# NOUNPACK' '#-}' .               (rule 268)
         strict_mark -> '{-# NOUNPACK' '#-}' . '!'           (rule 270)
@@ -267,7 +267,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 463 contains 1 shift/reduce conflicts.
+state 471 contains 1 shift/reduce conflicts.
 
     *** strict_mark -> '{-# UNPACK' '#-}' .                 (rule 267)
         strict_mark -> '{-# UNPACK' '#-}' . '!'             (rule 269)
@@ -278,7 +278,7 @@ Same as State 462
 
 -------------------------------------------------------------------------------
 
-state 494 contains 1 shift/reduce conflicts.
+state 502 contains 1 shift/reduce conflicts.
 
         context -> btype '~' btype .                        (rule 279)
     *** type -> btype '~' btype .                           (rule 285)
@@ -290,7 +290,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 629 contains 1 shift/reduce conflicts.
+state 637 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .                                    (rule 462)
         dbind -> ipvar . '=' exp                            (rule 587)
@@ -305,7 +305,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 696 contains 1 shift/reduce conflicts.
+state 704 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 214)
 
@@ -322,7 +322,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 769 contains 1 shift/reduce conflicts.
+state 775 contains 1 shift/reduce conflicts.
 
     *** type -> btype '~' btype .                           (rule 285)
         btype -> btype . atype                              (rule 299)
@@ -333,7 +333,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 952 contains 1 shift/reduce conflicts.
+state 958 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp       (rule 525)
         transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 526)
@@ -345,7 +345,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 1229 contains 1 reduce/reduce conflicts.
+state 1237 contains 1 reduce/reduce conflicts.
 
     *** tyconsym -> ':' .                                   (rule 642)
         consym -> ':' .                                     (rule 712)
@@ -356,7 +356,7 @@ TODO: Same as State 1230
 
 -------------------------------------------------------------------------------
 
-state 1230 contains 1 reduce/reduce conflicts.
+state 1238 contains 1 reduce/reduce conflicts.
 
     *** tyconsym -> CONSYM .                                (rule 640)
         consym -> CONSYM .                                  (rule 711)
@@ -366,6 +366,46 @@ state 1230 contains 1 reduce/reduce conflicts.
 TODO: Why?  (NB: This one has been around for a while; it's quite puzzling
     because we really shouldn't get confused between tyconsym and consym.
     Trace the state machine, maybe?)
+
+-------------------------------------------------------------------------------
+state 1259 contains 1 reduce/reduce conflicts.
+
+        *** tyconsym -> '-' .                                   (rule 651)
+        varsym -> '-' .                                         (rule 694)
+
+        Conflict : ')'
+
+Introduced in "Refactor tuple constraints"
+      (ffc21506894c7887d3620423aaf86bc6113a1071)
+-------------------------------------------------------------------------------
+state 1260 contains 1 reduce/reduce conflicts.
+
+        *** tyconsym -> '-' .                                   (rule 651)
+        varsym -> '-' .                                         (rule 694)
+
+        Conflict: ')'
+
+Same as 1259
+
+-------------------------------------------------------------------------------
+state 1261 contains 1 reduce/reduce conflicts.
+
+        *** tyconsym -> VARSYM .                                (rule 648)
+        varsym_no_minus -> VARSYM .                             (rule 695)
+
+  Conflict: ')'
+
+Same as 1260
+
+-------------------------------------------------------------------------------
+state 1262 contains 1 reduce/reduce conflicts.
+
+        *** qtyconsym -> QVARSYM .                              (rule 645)
+        qvarsym1 -> QVARSYM .                                   (rule 692)
+
+        Conflict: ')'
+
+Same as 1260
 
 -- -----------------------------------------------------------------------------
 -- API Annotations
@@ -832,63 +872,63 @@ ops     :: { Located (OrdList (Located RdrName)) }
 
 topdecls :: { OrdList (LHsDecl RdrName) }
         : topdecls ';' topdecl        {% addAnnotation (oll $1) AnnSemi (gl $2)
-                                         >> return ($1 `appOL` $3) }
+                                         >> return ($1 `appOL` unitOL $3) }
         | topdecls ';'                {% addAnnotation (oll $1) AnnSemi (gl $2)
                                          >> return $1 }
-        | topdecl                     { $1 }
+        | topdecl                     { unitOL $1 }
 
-topdecl :: { OrdList (LHsDecl RdrName) }
-        : cl_decl                               { unitOL (sL1 $1 (TyClD (unLoc $1))) }
-        | ty_decl                               { unitOL (sL1 $1 (TyClD (unLoc $1))) }
-        | inst_decl                             { unitOL (sL1 $1 (InstD (unLoc $1))) }
-        | stand_alone_deriving                  { unitOL (sLL $1 $> (DerivD (unLoc $1))) }
-        | role_annot                            { unitOL (sL1 $1 (RoleAnnotD (unLoc $1))) }
-        | 'default' '(' comma_types0 ')'    {% amsu (sLL $1 $> (DefD (DefaultDecl $3)))
+topdecl :: { LHsDecl RdrName }
+        : cl_decl                               { sL1 $1 (TyClD (unLoc $1)) }
+        | ty_decl                               { sL1 $1 (TyClD (unLoc $1)) }
+        | inst_decl                             { sL1 $1 (InstD (unLoc $1)) }
+        | stand_alone_deriving                  { sLL $1 $> (DerivD (unLoc $1)) }
+        | role_annot                            { sL1 $1 (RoleAnnotD (unLoc $1)) }
+        | 'default' '(' comma_types0 ')'    {% ams (sLL $1 $> (DefD (DefaultDecl $3)))
                                                          [mj AnnDefault $1
                                                          ,mop $2,mcp $4] }
-        | 'foreign' fdecl          {% amsu (sLL $1 $> (snd $ unLoc $2))
+        | 'foreign' fdecl          {% ams (sLL $1 $> (snd $ unLoc $2))
                                            (mj AnnForeign $1:(fst $ unLoc $2)) }
-        | '{-# DEPRECATED' deprecations '#-}'   {% amsu (sLL $1 $> $ WarningD (Warnings (getDEPRECATED_PRAGs $1) (fromOL $2)))
+        | '{-# DEPRECATED' deprecations '#-}'   {% ams (sLL $1 $> $ WarningD (Warnings (getDEPRECATED_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# WARNING' warnings '#-}'          {% amsu (sLL $1 $> $ WarningD (Warnings (getWARNING_PRAGs $1) (fromOL $2)))
+        | '{-# WARNING' warnings '#-}'          {% ams (sLL $1 $> $ WarningD (Warnings (getWARNING_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# RULES' rules '#-}'               {% amsu (sLL $1 $> $ RuleD (HsRules (getRULES_PRAGs $1) (fromOL $2)))
+        | '{-# RULES' rules '#-}'               {% ams (sLL $1 $> $ RuleD (HsRules (getRULES_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# VECTORISE' qvar '=' exp '#-}' {% amsu (sLL $1 $> $ VectD (HsVect (getVECT_PRAGs $1) $2 $4))
+        | '{-# VECTORISE' qvar '=' exp '#-}' {% ams (sLL $1 $> $ VectD (HsVect (getVECT_PRAGs $1) $2 $4))
                                                     [mo $1,mj AnnEqual $3
                                                     ,mc $5] }
-        | '{-# NOVECTORISE' qvar '#-}'       {% amsu (sLL $1 $> $ VectD (HsNoVect (getNOVECT_PRAGs $1) $2))
+        | '{-# NOVECTORISE' qvar '#-}'       {% ams (sLL $1 $> $ VectD (HsNoVect (getNOVECT_PRAGs $1) $2))
                                                      [mo $1,mc $3] }
         | '{-# VECTORISE' 'type' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_PRAGs $1) False $3 Nothing))
                                     [mo $1,mj AnnType $2,mc $4] }
 
         | '{-# VECTORISE_SCALAR' 'type' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_SCALAR_PRAGs $1) True $3 Nothing))
                                     [mo $1,mj AnnType $2,mc $4] }
 
         | '{-# VECTORISE' 'type' gtycon '=' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_PRAGs $1) False $3 (Just $5)))
                                     [mo $1,mj AnnType $2,mj AnnEqual $4,mc $6] }
         | '{-# VECTORISE_SCALAR' 'type' gtycon '=' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_SCALAR_PRAGs $1) True $3 (Just $5)))
                                     [mo $1,mj AnnType $2,mj AnnEqual $4,mc $6] }
 
         | '{-# VECTORISE' 'class' gtycon '#-}'
-                                         {% amsu (sLL $1 $>  $ VectD (HsVectClassIn (getVECT_PRAGs $1) $3))
+                                         {% ams (sLL $1 $>  $ VectD (HsVectClassIn (getVECT_PRAGs $1) $3))
                                                  [mo $1,mj AnnClass $2,mc $4] }
-        | annotation { unitOL $1 }
-        | decl_no_th                            { unLoc $1 }
+        | annotation { $1 }
+        | decl_no_th                            { $1 }
 
         -- Template Haskell Extension
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp                              { unitOL (sLL $1 $> $ mkSpliceDecl $1) }
+        | infixexp                              { sLL $1 $> $ mkSpliceDecl $1 }
 
 -- Type classes
 --
@@ -1223,8 +1263,8 @@ ptype :: { Located ([AddAnn]
 
 -- Declaration in class bodies
 --
-decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
-decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
+decl_cls  :: { LHsDecl RdrName }
+decl_cls  : at_decl_cls                 { $1 }
           | decl                        { $1 }
 
           -- A 'default' signature used with the generic-programming extension
@@ -1232,22 +1272,22 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
                     {% do { (TypeSig l ty _) <- checkValSig $2 $4
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr ty)
-                          ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
+                          ; ams (sLL $1 $> $ SigD (GenericSig l ty))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
 decls_cls :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
                                              then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                                    , unLoc $3))
+                                                                    , unitOL $3))
                                              else ams (lastOL (snd $ unLoc $1)) [mj AnnSemi $2]
                                            >> return (sLL $1 $> (fst $ unLoc $1
-                                                                ,(snd $ unLoc $1) `appOL` unLoc $3)) }
+                                                                ,(snd $ unLoc $1) `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
                                              then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
                                                                                    ,snd $ unLoc $1))
                                              else ams (lastOL (snd $ unLoc $1)) [mj AnnSemi $2]
                                            >> return (sLL $1 $>  (unLoc $1)) }
-          | decl_cls                    { sL1 $1 ([],unLoc $1) }
+          | decl_cls                    { sL1 $1 ([], unitOL $1) }
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
@@ -1271,7 +1311,7 @@ where_cls :: { Located ([AddAnn]
 --
 decl_inst  :: { Located (OrdList (LHsDecl RdrName)) }
 decl_inst  : at_decl_inst               { sLL $1 $> (unitOL (sL1 $1 (InstD (unLoc $1)))) }
-           | decl                       { $1 }
+           | decl                       { sLL $1 $> (unitOL $1) }
 
 decls_inst :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }   -- Reversed
            : decls_inst ';' decl_inst   {% if isNilOL (snd $ unLoc $1)
@@ -1310,10 +1350,10 @@ where_inst :: { Located ([AddAnn]
 decls   :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
         : decls ';' decl    {% if isNilOL (snd $ unLoc $1)
                                  then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                        , unLoc $3))
+                                                        , unitOL $3))
                                  else do ams (lastOL $ snd $ unLoc $1) [mj AnnSemi $2]
                                            >> return (
-                                          let { this = unLoc $3;
+                                          let { this = unitOL $3;
                                                 rest = snd $ unLoc $1;
                                                 these = rest `appOL` this }
                                           in rest `seq` this `seq` these `seq`
@@ -1323,7 +1363,7 @@ decls   :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
                                                           ,snd $ unLoc $1)))
                                   else ams (lastOL $ snd $ unLoc $1) [mj AnnSemi $2]
                                            >> return (sLL $1 $> (unLoc $1)) }
-        | decl                          { sL1 $1 ([],unLoc $1) }
+        | decl                          { sL1 $1 ([], unitOL $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
 decllist :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
@@ -1975,14 +2015,14 @@ docdecld :: { LDocDecl }
         | docnamed                              { sL1 $1 (case (unLoc $1) of (n, doc) -> DocCommentNamed n doc) }
         | docsection                            { sL1 $1 (case (unLoc $1) of (n, doc) -> DocGroup n doc) }
 
-decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
+decl_no_th :: { LHsDecl RdrName }
         : sigdecl               { $1 }
 
         | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar bang_RDR)) $2) };
                                         pat <- checkPattern empty e;
                                         _ <- ams (sLL $1 $> ())
                                                (fst $ unLoc $3);
-                                        return $ sLL $1 $> $ unitOL $ sLL $1 $> $ ValD $
+                                        return $ sLL $1 $> $ ValD $
                                             PatBind pat (snd $ unLoc $3)
                                                     placeHolderType
                                                     placeHolderNames
@@ -1998,17 +2038,17 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
                                           (PatBind (L lh _lhs) _rhs _ _ _) ->
                                                 ams (L lh ()) (fst $2) >> return () } ;
                                         _ <- ams (L l ()) (ann ++ (fst $ unLoc $3));
-                                        return $! (sL l (unitOL $! (sL l $ ValD r))) } }
-        | pattern_synonym_decl  { sLL $1 $> $ unitOL $1 }
-        | docdecl               { sLL $1 $> $ unitOL $1 }
+                                        return $! (sL l $ ValD r) } }
+        | pattern_synonym_decl  { $1 }
+        | docdecl               { $1 }
 
-decl    :: { Located (OrdList (LHsDecl RdrName)) }
+decl    :: { LHsDecl RdrName }
         : decl_no_th            { $1 }
 
         -- Why do we only allow naked declaration splices in top-level
         -- declarations and not here? Short answer: because readFail009
         -- fails terribly with a panic in cvBindsAndSigs otherwise.
-        | splice_exp            { sLL $1 $> $ unitOL (sLL $1 $> $ mkSpliceDecl $1) }
+        | splice_exp            { sLL $1 $> $ mkSpliceDecl $1 }
 
 rhs     :: { Located ([AddAnn],GRHSs RdrName (LHsExpr RdrName)) }
         : '=' exp wherebinds    { sL (comb3 $1 $2 $3)
@@ -2027,30 +2067,30 @@ gdrh :: { LGRHS RdrName (LHsExpr RdrName) }
         : '|' guardquals '=' exp  {% ams (sL (comb2 $1 $>) $ GRHS (unLoc $2) $4)
                                          [mj AnnVbar $1,mj AnnEqual $3] }
 
-sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
+sigdecl :: { LHsDecl RdrName }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp '::' sigtypedoc
                         {% do s <- checkValSig $1 $3
                         ; _ <- ams (sLL $1 $> ()) [mj AnnDcolon $2]
-                        ; return (sLL $1 $> $ unitOL (sLL $1 $> $ SigD s)) }
+                        ; return (sLL $1 $> $ SigD s) }
 
         | var ',' sig_vars '::' sigtypedoc
            {% do { let sig = TypeSig ($1 : reverse (unLoc $3)) $5 PlaceHolder
                  ; addAnnotation (gl $1) AnnComma (gl $2)
-                 ; ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD sig ])
+                 ; ams ( sLL $1 $> $ SigD sig )
                        [mj AnnDcolon $4] } }
 
         | infix prec ops
-              {% ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD
+              {% ams (sLL $1 $> $ SigD
                         (FixSig (FixitySig (fromOL $ unLoc $3)
-                                (Fixity (unLoc $2) (unLoc $1)))) ])
+                                (Fixity (unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
 
-        | pattern_synonym_sig   { sLL $1 $> $ unitOL $ sLL $1 $> . SigD . unLoc $ $1 }
+        | pattern_synonym_sig   { sLL $1 $> . SigD . unLoc $ $1 }
 
         | '{-# INLINE' activation qvar '#-}'
-                {% ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (InlineSig $3
+                {% ams ((sLL $1 $> $ SigD (InlineSig $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
@@ -2059,25 +2099,24 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                              (EmptyInlineSpec, FunLike) (snd $2)
-                  in sLL $1 $> $
-                            toOL [ sLL $1 $> $ SigD (SpecSig $3 (fromOL $5) inl_prag) ])
+                  in sLL $1 $> $ SigD (SpecSig $3 (fromOL $5) inl_prag))
                     (mo $1:mj AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-             {% ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD (SpecSig $3 (fromOL $5)
+             {% ams (sLL $1 $> $ SigD (SpecSig $3 (fromOL $5)
                                (mkInlinePragma (getSPEC_INLINE_PRAGs $1)
-                                               (getSPEC_INLINE $1) (snd $2))) ])
+                                               (getSPEC_INLINE $1) (snd $2))))
                        (mo $1:mj AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
-                {% ams (sLL $1 $> $ unitOL (sLL $1 $>
-                                  $ SigD (SpecInstSig (getSPEC_PRAGs $1) $3)))
+                {% ams (sLL $1 $>
+                                  $ SigD (SpecInstSig (getSPEC_PRAGs $1) $3))
                        [mo $1,mj AnnInstance $2,mc $4] }
 
         -- AZ TODO: Do we need locations in the name_formula_opt?
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) (snd $2))))
+            {% ams (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) (snd $2)))
                    (mo $1:mc $3:fst $2) }
 
 activation :: { ([AddAnn],Maybe Activation) }
