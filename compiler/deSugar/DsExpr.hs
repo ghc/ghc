@@ -499,7 +499,7 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
         -- hence TcType.tcSplitFunTys
 
         mk_arg (arg_ty, fl)
-          = case findField (rec_flds rbinds) (flLabel fl) of
+          = case findField (rec_flds rbinds) (flSelector fl) of
               (rhs:rhss) -> ASSERT( null rhss )
                             dsLExpr rhs
               []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
@@ -549,7 +549,7 @@ But if x::T a b, then
 So we need to cast (T a Int) to (T a b).  Sigh.
 -}
 
-dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
+dsExpr expr@(RecordUpd record_expr fields
                        cons_to_upd in_inst_tys out_inst_tys)
   | null fields
   = dsLExpr record_expr
@@ -575,13 +575,13 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
   where
-    ds_field :: LHsRecField Id (LHsExpr Id) -> DsM (Name, Id, CoreExpr)
+    ds_field :: LHsRecUpdField Id -> DsM (Name, Id, CoreExpr)
       -- Clone the Id in the HsRecField, because its Name is that
-      -- of the record selector, and we must not make that a lcoal binder
+      -- of the record selector, and we must not make that a local binder
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf Trac #2735
-    ds_field (L _ rec_field) = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
-                                  ; let fld_id = unLoc (hsRecFieldId rec_field)
+    ds_field (L _ rec_field) = do { rhs <- dsLExpr (hsRecUpdFieldArg rec_field)
+                                  ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
                                   ; lcl_id <- newSysLocalDs (idType fld_id)
                                   ; return (idName fld_id, lcl_id, rhs) }
 
@@ -686,9 +686,10 @@ dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 dsExpr (HsSingleRecFld{})  = panic "dsExpr: HsSingleRecFld"
 
 
-findField :: [LHsRecField Id arg] -> FieldLabelString -> [arg]
-findField rbinds lbl
-  = [hsRecFieldArg x | L _ x <- rbinds, occNameFS (rdrNameOcc (unLoc (hsRecFieldLbl x))) == lbl]
+findField :: [LHsRecField Id arg] -> Name -> [arg]
+findField rbinds sel
+  = [hsRecFieldArg fld | L _ fld <- rbinds
+                       , sel == idName (unLoc $ hsRecFieldId fld) ]
 
 {-
 %--------------------------------------------------------------------

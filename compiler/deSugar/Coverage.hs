@@ -543,7 +543,7 @@ addTickHsExpr (RecordCon id ty rec_binds) =
 addTickHsExpr (RecordUpd e rec_binds cons tys1 tys2) =
         liftM5 RecordUpd
                 (addTickLHsExpr e)
-                (addTickHsRecordBinds rec_binds)
+                (addTickHsRecordUpd rec_binds)
                 (return cons) (return tys1) (return tys2)
 
 addTickHsExpr (ExprWithTySigOut e ty) =
@@ -901,9 +901,17 @@ addTickHsRecordBinds (HsRecFields fields dd)
   = do  { fields' <- mapM process fields
         ; return (HsRecFields fields' dd) }
   where
-    process (L l (HsRecField lbl sel expr doc))
+    process (L l (HsRecField ids expr doc))
         = do { expr' <- addTickLHsExpr expr
-             ; return (L l (HsRecField lbl sel expr' doc)) }
+             ; return (L l (HsRecField ids expr' doc)) }
+
+addTickHsRecordUpd :: [LHsRecUpdField Id] -> TM [LHsRecUpdField Id]
+addTickHsRecordUpd = mapM process
+  where
+    process (L l (HsRecUpdField lbl sel expr doc))
+        = do { expr' <- addTickLHsExpr expr
+             ; return (L l (HsRecUpdField lbl sel expr' doc)) }
+
 
 addTickArithSeqInfo :: ArithSeqInfo Id -> TM (ArithSeqInfo Id)
 addTickArithSeqInfo (From e1) =

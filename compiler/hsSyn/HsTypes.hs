@@ -33,7 +33,8 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
-        FieldOcc(..), LFieldOcc, rdrNameFieldOcc, labelFieldOcc,
+        FieldOcc(..), LFieldOcc, mkFieldOcc,
+        rdrNameFieldOcc, labelFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
@@ -566,6 +567,9 @@ deriving instance (DataId name) => Data (FieldOcc name)
 
 instance Outputable (FieldOcc name) where
   ppr = ppr . rdrNameFieldOcc
+
+mkFieldOcc :: RdrName -> FieldOcc RdrName
+mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
 rdrNameFieldOcc :: FieldOcc name -> RdrName
 rdrNameFieldOcc (FieldOcc rdr _) = rdr

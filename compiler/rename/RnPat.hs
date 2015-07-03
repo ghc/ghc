@@ -21,6 +21,7 @@ module RnPat (-- main entry points
               isTopRecNameMaker,
 
               rnHsRecFields, HsRecFieldContext(..),
+              rnHsRecUpdFields,
 
               -- CpsRn monad
               CpsRn, liftCps,
@@ -525,24 +526,16 @@ rnHsRecFields
 --   b) fills in puns and dot-dot stuff
 -- When we we've finished, we've renamed the LHS, but not the RHS,
 -- of each x=e binding
+--
+-- This is used for record construction and pattern-matching, but not updates.
 
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM Opt_RecordPuns
        ; disambig_ok <- xoptM Opt_DisambiguateRecordFields
-       ; overload_ok <- xoptM Opt_AllowDuplicateRecordFields
        ; parent <- check_disambiguation disambig_ok mb_con
-       ; flds1  <- mapM (rn_fld pun_ok overload_ok parent) flds
+       ; flds1  <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
-
-       -- Check for an empty record update  e {}
-       -- NB: don't complain about e { .. }, because rn_dotdot has done that already
-       ; case ctxt of
-           HsRecFieldUpd | Nothing <- dotdot
-                         , null flds
-                         -> addErr emptyUpdateErr
-           _ -> return ()
-
        ; let all_flds | null dotdot_flds = flds1
                       | otherwise        = flds1 ++ dotdot_flds
        ; return (all_flds, mkFVs (getFieldIds all_flds)) }
@@ -560,27 +553,18 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
             Nothing  -> ptext (sLit "constructor field name")
             Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
 
-    rn_fld pun_ok overload_ok parent (L l (HsRecField { hsRecFieldLbl = L loc lbl
-                                                      , hsRecFieldArg = arg
-                                                      , hsRecPun = pun }))
-      = do { sel <- setSrcSpan loc $ case parent of
-                      -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record updates] in TcExpr
-                      NoParent | overload_ok ->
-                          do { mb <- lookupOccRn_overloaded overload_ok lbl
-                             ; case mb of
-                                 Nothing -> do { addErr (unknownSubordinateErr doc lbl)
-                                               ; return (Right []) }
-                                 Just r  -> return r }
-                      _ -> fmap Left $ lookupSubBndrOcc True parent doc lbl
+    rn_fld :: Bool -> Parent -> LHsRecField RdrName (Located arg) -> RnM (LHsRecField Name (Located arg))
+    rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl _)
+                                          , hsRecFieldArg = arg
+                                          , hsRecPun      = pun }))
+      = do { sel <- setSrcSpan loc $ lookupSubBndrOcc True parent doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                              ; return (L loc (mk_arg lbl)) }
                      else return arg
-           ; return (L l (HsRecField { hsRecFieldLbl = L loc lbl
-                                     , hsRecFieldSel = sel
+           ; return (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl (FieldLabel (occNameFS $ rdrNameOcc lbl) False sel)) -- AMG TODO is_overloaded
                                      , hsRecFieldArg = arg'
-                                     , hsRecPun = pun })) }
+                                     , hsRecPun      = pun })) }
 
     rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
               -> Maybe Name     -- The constructor (Nothing for an update
@@ -620,7 +604,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    where
                      rdr = mkVarUnqual lbl
 
-                 dot_dot_gres = [ (lbl, head gres)
+                 dot_dot_gres = [ (lbl, fl, head gres)
                                 | fl <- con_fields
                                 , let lbl = flLabel fl
                                 , let sel = flSelector fl
@@ -631,15 +615,13 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ]
 
-           ; addUsedRdrNames (map (greUsedRdrName . snd) dot_dot_gres)
+           ; addUsedRdrNames (map (\ (_, _, gre) -> greUsedRdrName gre) dot_dot_gres) -- AMG TODO wrong
            ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc arg_rdr
-                        , hsRecFieldSel = Left fld
+                        { hsRecFieldLbl = L loc (FieldOcc arg_rdr fl)
                         , hsRecFieldArg = L loc (mk_arg arg_rdr)
                         , hsRecPun      = False })
-                    | (lbl, gre) <- dot_dot_gres
-                    , let fld     = gre_name gre
-                          arg_rdr = mkVarUnqual lbl ] }
+                    | (lbl, fl, _) <- dot_dot_gres
+                    , let arg_rdr = mkVarUnqual lbl ] }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM Parent
     -- When disambiguation is on,
@@ -668,11 +650,71 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         -- Each list in dup_fields is non-empty
     (_, dup_flds) = removeDups compare (getFieldLbls flds)
 
-getFieldIds :: [LHsRecField id arg] -> [id]
-getFieldIds flds = mapMaybe (fmap unLoc . hsRecFieldId_maybe . unLoc) flds
+
+rnHsRecUpdFields
+    :: [LHsRecUpdField RdrName]
+    -> RnM ([LHsRecUpdField Name], FreeVars)
+rnHsRecUpdFields flds
+  = do { pun_ok        <- xoptM Opt_RecordPuns
+       ; overload_ok   <- xoptM Opt_AllowDuplicateRecordFields
+       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
+       ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
+
+       -- Check for an empty record update  e {}
+       -- NB: don't complain about e { .. }, because rn_dotdot has done that already
+       ; when (null flds) $ addErr emptyUpdateErr
+
+       ; return (flds1, plusFVs fvss) }
+  where
+    doc = ptext (sLit "constructor field name")
+
+    rn_fld pun_ok overload_ok (L l (HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
+                                                  , hsRecUpdFieldArg = arg
+                                                  , hsRecUpdPun      = pun }))
+      = do { sel <- setSrcSpan loc $
+                      -- Defer renaming of overloaded fields to the typechecker
+                      -- See Note [Disambiguating record updates] in TcExpr
+                      if overload_ok
+                          then do { mb <- lookupOccRn_overloaded overload_ok lbl
+                                  ; case mb of
+                                      Nothing -> do { addErr (unknownSubordinateErr doc lbl)
+                                                    ; return (Right []) }
+                                      Just r  -> return r }
+                          else fmap Left $ lookupSubBndrOcc True NoParent doc lbl
+           ; arg' <- if pun
+                     then do { checkErr pun_ok (badPun (L loc lbl))
+                             ; return (L loc (HsVar lbl)) }
+                     else return arg
+           ; (arg'', fvs) <- rnLExpr arg'
+
+           ; let fvs' = case sel of
+                          Left sel_name -> fvs `addOneFV` sel_name
+                          Right _       -> fvs
+
+           ; return (L l (HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
+                                        , hsRecUpdFieldSel = sel
+                                        , hsRecUpdFieldArg = arg''
+                                        , hsRecUpdPun      = pun }), fvs') }
+
+    dup_flds :: [[RdrName]]
+        -- Each list represents a RdrName that occurred more than once
+        -- (the list contains all occurrences)
+        -- Each list in dup_fields is non-empty
+    (_, dup_flds) = removeDups compare (getFieldUpdLbls flds)
+
+
+
+getFieldIds :: [LHsRecField Name arg] -> [Name]
+getFieldIds flds = map (unLoc . hsRecFieldId . unLoc) flds
+
+getFieldUpdIds :: [LHsRecUpdField Name] -> [Name]
+getFieldUpdIds flds = mapMaybe (fmap unLoc . hsRecUpdFieldId_maybe . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
-getFieldLbls flds = map (unLoc . hsRecFieldLbl . unLoc) flds
+getFieldLbls flds = map (rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+
+getFieldUpdLbls :: [LHsRecUpdField id] -> [RdrName]
+getFieldUpdLbls flds = map (unLoc . hsRecUpdFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,

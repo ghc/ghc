@@ -292,7 +292,7 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordUpd   (LHsExpr id)
-                (HsRecordBinds id)
+                [LHsRecUpdField id]
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
 --                                 -- a match that does the job
                 [DataCon]          -- Filled in by the type checker to the
@@ -702,7 +702,7 @@ ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd aexp rbinds _ _ _)
-  = hang (pprLExpr aexp) 2 (ppr rbinds)
+  = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig _)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)

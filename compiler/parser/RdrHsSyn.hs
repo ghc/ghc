@@ -1180,11 +1180,14 @@ mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp _ (fs,dd)
-  = return (RecordUpd exp (mk_rec_fields fs dd) [] [] [])
+  = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs) [] [] [])
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
+
+mk_rec_upd_field :: HsRecField RdrName (LHsExpr RdrName) -> HsRecUpdField RdrName
+mk_rec_upd_field (HsRecField (L loc (FieldOcc id _)) arg pun) = HsRecUpdField (L loc id) hsRecUpdFieldSelMissing arg pun
 
 mkInlinePragma :: String -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma

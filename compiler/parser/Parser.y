@@ -2694,13 +2694,13 @@ fbinds1 :: { ([AddAnn],([LHsRecField RdrName (LHsExpr RdrName)], Bool)) }
         | '..'                          { ([mj AnnDotdot $1],([],   True)) }
 
 fbind   :: { LHsRecField RdrName (LHsExpr RdrName) }
-        : qvar '=' texp {% ams  (sLL $1 $> $ HsRecField $1 hsRecFieldSelMissing $3 False)
+        : qvar '=' texp {% ams  (sLL $1 $> $ HsRecField (fmap mkFieldOcc $1) $3 False)
                                 [mj AnnEqual $2] }
                         -- RHS is a 'texp', allowing view patterns (Trac #6038)
                         -- and, incidentaly, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
-        | qvar          { sLL $1 $> $ HsRecField $1 hsRecFieldSelMissing placeHolderPunRhs True }
+        | qvar          { sLL $1 $> $ HsRecField (fmap mkFieldOcc $1) placeHolderPunRhs True }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 

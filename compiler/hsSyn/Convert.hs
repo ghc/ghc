@@ -272,8 +272,7 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
                                , dd_cons = cons', dd_derivs = derivs' }
 
        ; returnJustL $ InstD $ DataFamInstD
-           { dfid_inst = DataFamInstDecl { dfid_tycon = tc'
-                                         , dfid_pats = typats'
+           { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn
                                          , dfid_fvs = placeHolderNames } }}
 
@@ -286,8 +285,7 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
                                , dd_kindSig = Nothing
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnJustL $ InstD $ DataFamInstD
-           { dfid_inst = DataFamInstDecl { dfid_tycon = tc'
-                                         , dfid_pats = typats'
+           { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn
                                          , dfid_fvs = placeHolderNames } }}
 
@@ -698,8 +696,8 @@ cvtl e = wrapL (cvt e)
                               ; flds' <- mapM cvtFld flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds' <- mapM cvtFld flds
-                              ; return $ RecordUpd e' (HsRecFields flds' Nothing) [] [] [] }
+                              ; flds' <- mapM cvtUpdFld flds
+                              ; return $ RecordUpd e' flds' [] [] [] }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
 
 {- Note [Dropping constructors]
@@ -721,10 +719,17 @@ which we don't want.
 cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLoc $ HsRecField { hsRecFieldLbl = v'
-                                     , hsRecFieldSel = hsRecFieldSelMissing
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc v'
                                      , hsRecFieldArg = e'
-                                     , hsRecPun = False}) }
+                                     , hsRecPun      = False}) }
+
+cvtUpdFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecUpdField RdrName)
+cvtUpdFld (v,e)
+  = do  { v' <- vNameL v; e' <- cvtl e
+        ; return (noLoc $ HsRecUpdField { hsRecUpdFieldLbl = v'
+                                        , hsRecUpdFieldSel = hsRecUpdFieldSelMissing
+                                        , hsRecUpdFieldArg = e'
+                                        , hsRecUpdPun = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -940,10 +945,9 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (noLoc $ HsRecField { hsRecFieldLbl = s'
-                                     , hsRecFieldSel = hsRecFieldSelMissing
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc s'
                                      , hsRecFieldArg = p'
-                                     , hsRecPun = False}) }
+                                     , hsRecPun      = False}) }
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.

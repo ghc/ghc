@@ -259,7 +259,7 @@ rnExpr (RecordCon con_id _ rbinds)
 
 rnExpr (RecordUpd expr rbinds _ _ _)
   = do  { (expr', fvExpr) <- rnLExpr expr
-        ; (rbinds', fvRbinds) <- rnHsRecBinds HsRecFieldUpd rbinds
+        ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
         ; return (RecordUpd expr' rbinds' [] [] [],
                   fvExpr `plusFV` fvRbinds) }
 

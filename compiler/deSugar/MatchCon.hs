@@ -204,7 +204,8 @@ compatible_pats _                 _                 = True -- Prefix or infix co
 
 same_fields :: HsRecFields Id (LPat Id) -> HsRecFields Id (LPat Id) -> Bool
 same_fields flds1 flds2
-  = all2 (\(L _ f1) (L _ f2) -> hsRecFieldSel f1 == hsRecFieldSel f2)
+  = all2 (\(L _ f1) (L _ f2)
+                          -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
          (rec_flds flds1) (rec_flds flds2)
 
 

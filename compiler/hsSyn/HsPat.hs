@@ -12,6 +12,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
@@ -19,9 +20,11 @@ module HsPat (
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField(..), LHsRecField,
-        hsRecFieldSelMissing,
-        hsRecFieldId, hsRecFieldId_maybe,
-        hsRecFields, hsRecFieldsUnambiguous,
+        HsRecUpdField(..), LHsRecUpdField,
+        hsRecFields, hsRecFieldId,
+        hsRecUpdFieldSelMissing,
+        hsRecUpdFieldId, hsRecUpdFieldId_maybe,
+        hsRecUpdFields, hsRecUpdFieldsUnambiguous,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -37,7 +40,7 @@ import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr
 -- friends:
 import HsBinds
 import HsLit
-import PlaceHolder ( PostTc,DataId )
+import PlaceHolder ( PostRn,PostTc,DataId )
 import HsTypes
 import TcEvidence
 import BasicTypes
@@ -238,7 +241,8 @@ data HsRecFields id arg         -- A bunch of record fields
         -- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [LHsRecField id arg],
                   rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id, Data arg) => Data (HsRecFields id arg)
 
 -- Note [DotDot fields]
 -- ~~~~~~~~~~~~~~~~~~~~
@@ -259,17 +263,28 @@ type LHsRecField id arg = Located (HsRecField id arg)
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 data HsRecField id arg = HsRecField {
-        hsRecFieldLbl :: Located RdrName,
-        hsRecFieldSel :: Either id [(id, id)], -- Note [HsRecField selector]
+        hsRecFieldLbl  :: LFieldOcc id,
         hsRecFieldArg :: arg,           -- Filled in by renamer
         hsRecPun      :: Bool           -- Note [Punning]
-  } deriving (Data, Typeable)
+  } deriving (Typeable)
+deriving instance (DataId id, Data arg) => Data (HsRecField id arg)
+
+type LHsRecUpdField id = Located (HsRecUpdField id)
+
+-- AMG TODO document
+data HsRecUpdField id = HsRecUpdField {
+        hsRecUpdFieldLbl :: Located RdrName,
+        hsRecUpdFieldSel :: Either id [(id, id)], -- ^ Note [HsRecField selector]
+        hsRecUpdFieldArg :: LHsExpr id,
+        hsRecUpdPun      :: Bool                  -- ^ Note [Punning]
+  } deriving (Typeable)
+deriving instance (DataId id) => Data (HsRecUpdField id)
 
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~
 -- If you write T { x, y = v+1 }, the HsRecFields will be
---      HsRecField x x x True ...
---      HsRecField y y (v+1) False ...
+--      HsRecField x x True ...
+--      HsRecField y (v+1) False ...
 -- That is, for "punned" field x is expanded (in the renamer)
 -- to x=x; but with a punning flag so we can detect it later
 -- (e.g. when pretty printing)
@@ -313,25 +328,31 @@ data HsRecField id arg = HsRecField {
 -- fields occur only in record updates, and only between the renamer
 -- and the typechecker, but this is not yet implemented.
 
-hsRecFieldSelMissing :: Either id [(id, id)]
-hsRecFieldSelMissing = Right []
+hsRecFields :: PostRn id (FieldLbl id) ~ FieldLbl id => HsRecFields id arg -> [id]
+hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
 
-hsRecFields :: HsRecFields id arg -> [(FieldLabelString, Either id [(id, id)])]
-hsRecFields rbinds = map (toFld . unLoc) (rec_flds rbinds)
+hsRecFieldId :: PostRn id (FieldLbl id) ~ FieldLbl id => HsRecField id arg -> Located id
+hsRecFieldId = fmap (flSelector . labelFieldOcc) . hsRecFieldLbl
+
+hsRecUpdFieldSelMissing :: Either id [(id, id)]
+hsRecUpdFieldSelMissing = Right []
+
+hsRecUpdFields :: [LHsRecUpdField id] -> [(FieldLabelString, Either id [(id, id)])]
+hsRecUpdFields = map (toFld . unLoc)
   where
-    toFld x = ( occNameFS . rdrNameOcc . unLoc . hsRecFieldLbl $ x
-              , hsRecFieldSel x)
+    toFld x = ( occNameFS . rdrNameOcc . unLoc . hsRecUpdFieldLbl $ x
+              , hsRecUpdFieldSel x)
 
-hsRecFieldsUnambiguous :: HsRecFields id arg -> [(FieldLabelString, id)]
-hsRecFieldsUnambiguous = map outOfLeftField . hsRecFields
+hsRecUpdFieldsUnambiguous :: [LHsRecUpdField id] -> [(FieldLabelString, id)]
+hsRecUpdFieldsUnambiguous = map outOfLeftField . hsRecUpdFields
   where outOfLeftField (l, Left x)  = (l, x)
-        outOfLeftField (_, Right _) = error "hsRecFieldsUnambigous"
+        outOfLeftField (_, Right _) = error "hsRecUpdFieldsUnambigous"
 
-hsRecFieldId_maybe :: HsRecField id arg -> Maybe (Located id)
-hsRecFieldId_maybe x = either (Just . L (getLoc (hsRecFieldLbl x))) (const Nothing) (hsRecFieldSel x)
+hsRecUpdFieldId_maybe :: HsRecUpdField id -> Maybe (Located id)
+hsRecUpdFieldId_maybe x = either (Just . L (getLoc (hsRecUpdFieldLbl x))) (const Nothing) (hsRecUpdFieldSel x)
 
-hsRecFieldId :: HsRecField id arg -> Located id
-hsRecFieldId = expectJust "hsRecFieldId" . hsRecFieldId_maybe
+hsRecUpdFieldId :: HsRecUpdField id -> Located id
+hsRecUpdFieldId = expectJust "hsRecUpdFieldId" . hsRecUpdFieldId_maybe
 
 {-
 ************************************************************************
@@ -410,7 +431,7 @@ pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
 pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
 pprConArgs (RecCon rpats)   = ppr rpats
 
-instance (Outputable arg)
+instance (OutputableBndr id, Outputable arg)
       => Outputable (HsRecFields id arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
@@ -419,11 +440,18 @@ instance (Outputable arg)
         where
           dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
 
-instance (Outputable arg)
+instance (OutputableBndr id, Outputable arg)
       => Outputable (HsRecField id arg) where
   ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
+
+instance (OutputableBndr id)
+      => Outputable (HsRecUpdField id) where
+  ppr (HsRecUpdField { hsRecUpdFieldLbl = f, hsRecUpdFieldArg = arg,
+                    hsRecUpdPun = pun })
+    = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
+
 
 {-
 ************************************************************************

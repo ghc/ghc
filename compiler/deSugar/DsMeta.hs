@@ -1081,7 +1081,7 @@ repE (RecordCon c _ flds)
         repRecCon x fs }
 repE (RecordUpd e flds _ _ _)
  = do { x <- repLE e;
-        fs <- repFields flds;
+        fs <- repUpdFields flds;
         repRecUpd x fs }
 
 repE (ExprWithTySig e ty _) = do { e1 <- repLE e; t1 <- repLTy ty; repSigExp e1 t1 }
@@ -1163,6 +1163,14 @@ repFields (HsRecFields { rec_flds = flds })
     rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldId fld)
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
+
+repUpdFields :: [LHsRecUpdField Name] -> DsM (Core [TH.Q TH.FieldExp])
+repUpdFields = repList fieldExpQTyConName rep_fld
+  where
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecUpdFieldId fld)
+                           ; e  <- repLE (hsRecUpdFieldArg fld)
+                           ; repFieldExp fn e }
+
 
 
 -----------------------------------------------------------------------------
