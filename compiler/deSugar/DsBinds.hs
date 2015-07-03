@@ -629,6 +629,9 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
    split_lets e
+     | Let (NonRec d (Var r)) _body <- e
+     , isDictId d, isDictId r
+     = ([], e)
      | Let (NonRec d r) body <- e
      , isDictId d
      , (bs, body') <- split_lets body
@@ -1162,7 +1165,7 @@ to simply never generate the redundant box/unbox in the first place.
 dsEvInstanceOf :: Type -> EvInstanceOf -> CoreExpr -> DsM CoreExpr
 dsEvInstanceOf ty ev e
   = do { e' <- dsEvInstanceOf' ev e
-       ; return $ if False -- ty == exprType e'
+       ; return $ if ty == exprType e'
                   then e  -- No conversion needed
                   else e' }
 
@@ -1173,7 +1176,7 @@ dsEvInstanceOf' (EvInstanceOfVar v) e
 dsEvInstanceOf' (EvInstanceOfEq co) e
   = do { dsTcCoercion co $ \c ->
            case coercionKind c of
-            -- Pair ty1 ty2 | ty1 == ty2 -> e  -- No conversion needed
+            Pair ty1 ty2 | ty1 == ty2 -> e  -- No conversion needed
             _ ->  mkCast e (mkSubCo c) }
 dsEvInstanceOf' (EvInstanceOfInst qvars co qs) e
   = do { qs'  <- mapM dsEvTerm qs
@@ -1181,13 +1184,13 @@ dsEvInstanceOf' (EvInstanceOfInst qvars co qs) e
        ; let exprTy = mkCoreApps e (map Type qvars)
              exprEv = mkCoreApps exprTy qs'
        ; return $ case splitFunTy_maybe (exprType (Var co')) of
-                         -- Just (ty1, ty2) | ty1 == ty2 -> exprEv
+                         Just (ty1, ty2) | ty1 == ty2 -> exprEv
                          _ -> mkCoreApp (Var co') exprEv }
 dsEvInstanceOf' (EvInstanceOfLet tyvars qvars qs rest) e
   = do { q_binds <- dsTcEvBinds qs
        ; let rest' = setIdIsInstantiationFn rest True
        ; let inner = case splitFunTy_maybe (exprType (Var rest')) of
-                       -- Just (ty1, ty2) | ty1 == ty2 -> e
+                       Just (ty1, ty2) | ty1 == ty2 -> e
                        _ -> mkCoreApp (Var rest') e
        ; return $ mkCoreLams (tyvars ++ qvars) (mkCoreLets q_binds inner) }
 

@@ -273,14 +273,10 @@ zonkEvBndr :: ZonkEnv -> EvVar -> TcM EvVar
 -- Does not extend the ZonkEnv
 zonkEvBndr env var
   = do { let var_ty = varType var
-           -- Remember whether the variable was instantiation fn.
-       ; let var' = case classifyPredType (var_ty) of
-                      InstanceOfPred {} -> setIdIsInstantiationFn var True
-                      _ -> var
        ; ty <-
            {-# SCC "zonkEvBndr_zonkTcTypeToType" #-}
            zonkTcTypeToType env var_ty
-       ; return (setVarType var' ty) }
+       ; return (setVarType var ty) }
 
 zonkEvVarOcc :: ZonkEnv -> EvVar -> EvVar
 zonkEvVarOcc env v = zonkIdOcc env v

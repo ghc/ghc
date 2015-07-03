@@ -834,7 +834,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- may change radically
 
 simpleOptExpr expr
-  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
+  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr) $
     simpleOptExprWith init_subst expr
   where
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
@@ -1025,9 +1025,6 @@ maybe_substitute subst b r
   , not (isStableUnfolding (idUnfolding b))
   , not (isExportedId b)
   , not (isUnLiftedType (idType b)) || exprOkForSpeculation r
-  = Just (extendIdSubst subst b r)
-
-  | idIsInstantiationFn b
   = Just (extendIdSubst subst b r)
 
   | otherwise
