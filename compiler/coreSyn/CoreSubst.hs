@@ -952,11 +952,17 @@ simple_app subst (Lam b e) (a:as)
   where
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
-simple_app subst (Var v) as
+simple_app subst e@(Var v) as
   | isCompulsoryUnfolding (idUnfolding v)
   , isAlwaysActive (idInlineActivation v)
   -- See Note [Unfold compulsory unfoldings in LHSs]
   =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
+  -- Instantiation functions are always inlined
+  | idIsInstantiationFn v, isLocalId v, c:cs <- as
+  = case lookupIdSubst (text "simpleOptExpr") subst v of
+      Lam b e -> simple_app (extendIdSubst subst b c) e cs
+      Var v' | v == v' -> foldl App (simple_opt_expr subst e) as
+      e' -> simple_app subst e' as
 simple_app subst (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
   | t `tickishScopesLike` SoftScope
@@ -1019,6 +1025,9 @@ maybe_substitute subst b r
   , not (isStableUnfolding (idUnfolding b))
   , not (isExportedId b)
   , not (isUnLiftedType (idType b)) || exprOkForSpeculation r
+  = Just (extendIdSubst subst b r)
+
+  | idIsInstantiationFn b
   = Just (extendIdSubst subst b r)
 
   | otherwise

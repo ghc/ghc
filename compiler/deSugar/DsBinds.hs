@@ -802,12 +802,7 @@ dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
-dsHsWrapper (WpEvRevApp tm@(EvInstanceOf _ _)) e
-  = do { coreTm <- dsEvTerm tm
-       ; case splitFunTy_maybe (exprType coreTm) of
-           -- Do not generate instantiation if type remains the same
-           Just (ty1, ty2) | ty1 == ty2 -> return e
-           _ -> return (mkCoreApp coreTm e) }
+dsHsWrapper (WpEvRevApp (EvInstanceOf ty ev)) e = dsEvInstanceOf ty ev e
 dsHsWrapper (WpEvRevApp tm)   e = liftM (flip mkCoreApp e) (dsEvTerm tm)
 
 --------------------------------------
@@ -873,7 +868,7 @@ dsEvTerm (EvCallStack cs) = dsEvCallStack cs
 
 dsEvTerm (EvTypeable ev) = dsEvTypeable ev
 
-dsEvTerm (EvInstanceOf ty ev) = dsEvInstanceOf ty ev
+dsEvTerm (EvInstanceOf ty ev) = dsEvInstanceOfBndr ty ev
 
 dsEvTypeable :: EvTypeable -> DsM CoreExpr
 dsEvTypeable ev =
@@ -1164,29 +1159,40 @@ to simply never generate the redundant box/unbox in the first place.
 -- In order to get a smaller term to simplify,
 -- we apply a direct simplification at this point,
 -- removing all identity coercions and instantiations.
-dsEvInstanceOf :: Type -> EvInstanceOf -> DsM CoreExpr
-dsEvInstanceOf _  (EvInstanceOfVar v)
-  = return (Var v)
-dsEvInstanceOf ty (EvInstanceOfEq co)
-  = do { bndr <- newSysLocalDs ty
-       ; expr <- dsTcCoercion co $ \c ->
+dsEvInstanceOf :: Type -> EvInstanceOf -> CoreExpr -> DsM CoreExpr
+dsEvInstanceOf ty ev e
+  = do { e' <- dsEvInstanceOf' ev e
+       ; return $ if False -- ty == exprType e'
+                  then e  -- No conversion needed
+                  else e' }
+
+dsEvInstanceOf' :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
+dsEvInstanceOf' (EvInstanceOfVar v) e
+  = let v' = setIdIsInstantiationFn v True
+    in return (mkCoreApp (Var v') e)
+dsEvInstanceOf' (EvInstanceOfEq co) e
+  = do { dsTcCoercion co $ \c ->
            case coercionKind c of
-            Pair ty1 ty2 | ty1 == ty2 -> Var bndr
-            _ ->  mkCast (Var bndr) (mkSubCo c)
-       ; return (mkCoreLams [bndr] expr) }
-dsEvInstanceOf ty (EvInstanceOfInst qvars co qs)
-  = do { bndr <- newSysLocalDs ty
-       ; qs'  <- mapM dsEvTerm qs
-       ; let exprTy = mkCoreApps (Var bndr) (map Type qvars)
+            -- Pair ty1 ty2 | ty1 == ty2 -> e  -- No conversion needed
+            _ ->  mkCast e (mkSubCo c) }
+dsEvInstanceOf' (EvInstanceOfInst qvars co qs) e
+  = do { qs'  <- mapM dsEvTerm qs
+       ; let co' = setIdIsInstantiationFn co True
+       ; let exprTy = mkCoreApps e (map Type qvars)
              exprEv = mkCoreApps exprTy qs'
-             inner  = case splitFunTy_maybe (exprType (Var co)) of
-                        Just (ty1, ty2) | ty1 == ty2 -> exprEv
-                        _ -> mkCoreApp (Var co) exprEv
-       ; return (mkCoreLams [bndr] inner) }
-dsEvInstanceOf ty (EvInstanceOfLet tyvars qvars qs rest)
+       ; return $ case splitFunTy_maybe (exprType (Var co')) of
+                         -- Just (ty1, ty2) | ty1 == ty2 -> exprEv
+                         _ -> mkCoreApp (Var co') exprEv }
+dsEvInstanceOf' (EvInstanceOfLet tyvars qvars qs rest) e
+  = do { q_binds <- dsTcEvBinds qs
+       ; let rest' = setIdIsInstantiationFn rest True
+       ; let inner = case splitFunTy_maybe (exprType (Var rest')) of
+                       -- Just (ty1, ty2) | ty1 == ty2 -> e
+                       _ -> mkCoreApp (Var rest') e
+       ; return $ mkCoreLams (tyvars ++ qvars) (mkCoreLets q_binds inner) }
+
+dsEvInstanceOfBndr :: Type -> EvInstanceOf -> DsM CoreExpr
+dsEvInstanceOfBndr ty ev
   = do { bndr <- newSysLocalDs ty
-       ; q_binds <- dsTcEvBinds qs
-       ; let inner = case splitFunTy_maybe (exprType (Var rest)) of
-                       Just (ty1, ty2) | ty1 == ty2 -> Var bndr
-                       _ -> mkCoreApp (Var rest) (Var bndr)
-       ; return $ mkCoreLams (bndr : tyvars ++ qvars) (mkCoreLets q_binds inner) }
+       ; expr <- dsEvInstanceOf ty ev (Var bndr)
+       ; return $ mkCoreLams [bndr] expr }

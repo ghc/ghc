@@ -35,6 +35,7 @@ module IdInfo (
         -- ** Demand and strictness Info
         strictnessInfo, setStrictnessInfo,
         demandInfo, setDemandInfo, pprStrictness,
+        isInstantiationFn, setIsInstantiationFn,
 
         -- ** Unfolding Info
         unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
@@ -91,7 +92,8 @@ infixl  1 `setSpecInfo`,
           `setOccInfo`,
           `setCafInfo`,
           `setStrictnessInfo`,
-          `setDemandInfo`
+          `setDemandInfo`,
+          `setIsInstantiationFn`
 
 {-
 ************************************************************************
@@ -189,8 +191,9 @@ data IdInfo
         strictnessInfo  :: StrictSig,      --  ^ A strictness signature
 
         demandInfo      :: Demand,       -- ^ ID demand information
-        callArityInfo :: !ArityInfo    -- ^ How this is called.
+        callArityInfo :: !ArityInfo,     -- ^ How this is called.
                                          -- n <=> all calls have at least n arguments
+        isInstantiationFn :: Bool
     }
 
 -- Setters
@@ -232,6 +235,9 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
+setIsInstantiationFn :: IdInfo -> Bool -> IdInfo
+setIsInstantiationFn info ifn = ifn `seq` info { isInstantiationFn = ifn }
+
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
@@ -245,7 +251,8 @@ vanillaIdInfo
             occInfo             = NoOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
-            callArityInfo     = unknownArity
+            callArityInfo       = unknownArity,
+            isInstantiationFn   = False
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
