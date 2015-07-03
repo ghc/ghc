@@ -33,7 +33,7 @@
 module Parser (parseModule, parseImport, parseStatement,
                parseDeclaration, parseExpression, parsePattern,
                parseTypeSignature,
-               parseFullStmt, parseStmt, parseIdentifier,
+               parseStmt, parseIdentifier,
                parseType, parseHeader) where
 
 -- base
@@ -604,7 +604,6 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseExpression exp
 %name parsePattern pat
 %name parseTypeSignature sigdecl
-%name parseFullStmt   stmt
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
 %name parseType ctype
