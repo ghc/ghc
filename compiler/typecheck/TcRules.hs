@@ -310,7 +310,12 @@ simplifyRule name lhs_wanted rhs_wanted
                 ; rhs_resid <- solveWanteds rhs_wanted
                 ; return (insolubleWC lhs_inst_resid || insolubleWC rhs_resid, lhs_inst) }
 
-       ; zonked_lhs <- zonkSimples (wc_simple lhs_wanted `unionBags` lhs_extra)
+       ; zonked_simple <- zonkSimples (wc_simple lhs_wanted)
+       ; zonked_extra <- zonkSimples lhs_extra
+         -- Remove those extra constraints which were already in the initial set
+       ; let same_type x y = ctPred x == ctPred y
+             none_with_same_type x = not (anyBag (same_type x) zonked_simple)
+             zonked_lhs = zonked_simple `unionBags` filterBag none_with_same_type zonked_extra
        ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs
              quantify_me  -- Note [RULE quantification over equalities]
                | insoluble = quantify_insol
