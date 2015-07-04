@@ -1,4 +1,3 @@
-# exhausts Hugs's heap (CAF leak)
 test('life_space_leak',
      [when(fast(), skip),
       extra_clean(['Main.hi', 'Main.o'])],

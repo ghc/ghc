@@ -144,7 +144,7 @@ test('tc140', normal, compile, [''])
 test('tc141', normal, compile_fail, [''])
 test('tc142', normal, compile, [''])
 test('tc143', normal, compile, [''])
-test('tc144', omit_compiler_types(['hugs']), compile, [''])	# Hugs loops
+test('tc144', normal, compile, [''])
 test('tc145', normal, compile, [''])
 test('tc146', normal, compile, [''])
 test('tc147', normal, compile, [''])
