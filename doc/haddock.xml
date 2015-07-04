@@ -577,8 +577,8 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
         <term>
-          <indexterm><primary><option>--source-style</option></primary></indexterm>
-          <option>--source-style=<replaceable>style</replaceable></option>
+          <indexterm><primary><option>--source-css</option></primary></indexterm>
+          <option>--source-css=<replaceable>style</replaceable></option>
         </term>
         <listitem>
           <para>Use custom CSS file for sources rendered by the
