@@ -597,6 +597,10 @@ nextInputLine show_prompt is_tty
 checkFileAndDirPerms :: FilePath -> IO Bool
 checkFileAndDirPerms file = do
   file_ok <- checkPerms file
+  -- Do not check dir perms when .ghci doesn't exist, otherwise GHCi will
+  -- print some confusing and useless warnings in some cases (e.g. in
+  -- travis). Note that we can't add a test for this, as all ghci tests should
+  -- run with -ignore-dot-ghci, which means we never get here.
   if file_ok then checkPerms (getDirectory file) else return False
   where
   getDirectory f = case takeDirectory f of
