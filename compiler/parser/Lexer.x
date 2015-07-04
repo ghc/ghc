@@ -45,6 +45,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-tabs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
@@ -84,7 +85,7 @@ import Control.Applicative
 #endif
 import Control.Monad
 import Data.Bits
-import Data.Char hiding (ord)
+import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word

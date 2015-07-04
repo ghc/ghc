@@ -13,6 +13,7 @@
 {
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-tabs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 -- The above warning suppression flags are a temporary kludge.
@@ -37,7 +38,7 @@ import Util
 --import TRACE
 
 import Data.Word
-import Data.Char hiding (ord)
+import Data.Char
 }
 
 $whitechar   = [\ \t\n\r\f\v\xa0] -- \xa0 is Unicode no-break space
