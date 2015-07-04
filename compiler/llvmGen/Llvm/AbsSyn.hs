@@ -209,6 +209,14 @@ data LlvmExpression
   | Extract LlvmVar LlvmVar
 
   {- |
+    Extract a scalar element from a structure
+      * val: The structure
+      * idx: The index of the scalar within the structure
+    Corresponds to "extractvalue" instruction.
+  -}
+  | ExtractV LlvmVar Int
+
+  {- |
     Insert a scalar element into a vector
       * val:   The source vector
       * elt:   The scalar to insert
