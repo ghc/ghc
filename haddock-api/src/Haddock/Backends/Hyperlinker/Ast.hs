@@ -137,9 +137,9 @@ decls (group, _, _, _) = concatMap ($ group)
   where
     typ (GHC.L _ t) = case t of
         GHC.DataDecl name _ _ _ -> pure . decl $ name
+        GHC.SynDecl name _ _ _ -> pure . decl $ name
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
-        _ -> pure . decl $ GHC.tcdLName t
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
