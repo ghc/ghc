@@ -2167,8 +2167,6 @@ addTabWarning srcspan
                 then s{tab_first = tf', tab_count = tc'}
                 else s
        in POk s' ()
-addTabWarning _
-  = P $ \s -> POk s ()
 
 mkTabWarning :: PState -> Maybe ErrMsg
 mkTabWarning PState{tab_first=tf, tab_count=tc, dflags=d} =
