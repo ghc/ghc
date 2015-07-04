@@ -1,1 +1,0 @@
-ERROR "drvfail007.hs":4 - An instance of Eq (Int -> Int) is required to derive Eq Foo
