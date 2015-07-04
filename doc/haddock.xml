@@ -530,6 +530,43 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
         <term>
+          <indexterm><primary><option>--hyperlinked-source</option></primary></indexterm>
+          <option>--hyperlinked-source</option>
+        </term>
+        <listitem>
+          <para>Generate hyperlinked source code (as HTML web page). All
+          rendered files will be put into
+          <filename class='directory'>src/</filename> subfolder of output
+          directory.</para>
+          <para>Usually, this should be used in combination with
+          <option>--html</option> option - generated documentation will then
+          contain references to appropriate code fragments. Previously, this
+          behaviour could be achieved by generating sources using external
+          tool and specifying <option>--source-base</option>,
+          <option>--source-module</option>, <option>--source-entity</option>
+          and related options. Note that these flags are ignored once
+          <option>--hyperlinked-source</option> is set.</para>
+          <para>In order to make cross-package source hyperlinking possible,
+          appropriate source paths have to be set up when providing
+          interface files using <option>--read-interface</option>
+          option.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <indexterm><primary><option>--source-style</option></primary></indexterm>
+          <option>--source-style=<replaceable>style</replaceable></option>
+        </term>
+        <listitem>
+          <para>Use custom CSS file for sources rendered by the
+          <option>--hyperlinked-source</option> option. If no custom style
+          file is provided, Haddock will use default one.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <indexterm><primary><option>-S</option></primary></indexterm>
           <option>-S</option>
         </term>
