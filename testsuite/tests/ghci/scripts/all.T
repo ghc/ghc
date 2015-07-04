@@ -212,10 +212,8 @@ test('T10122', normal, ghci_script, ['T10122.script'])
 
 test('T10321', normal, ghci_script, ['T10321.script'])
 
-test('T10408A', normal, run_command,
-    ['$MAKE -s --no-print-directory T10408A'])
-test('T10408B', normal, run_command,
-    ['$MAKE -s --no-print-directory T10408B'])
+test('T10408', normal, run_command,
+    ['$MAKE -s --no-print-directory T10408'])
 test('T10248', normal, ghci_script, ['T10248.script'])
 test('T10110', normal, ghci_script, ['T10110.script'])
 test('T10322', normal, ghci_script, ['T10322.script'])

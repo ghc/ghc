@@ -434,14 +434,14 @@ T2566::
 mode001:
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --make --help        | sed '2,$$d'
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --make        | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --help | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --interactive | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --help -ignore-dot-ghci | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --interactive -ignore-dot-ghci | sed '2,$$d'
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --version --help     | sed "s/, version.*//"
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --version        | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --version | sed "s/, version.*//"
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --version --interactive | sed "s/, version.*//"
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --show-options | grep -- --interactive | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --show-options --interactive | grep -- --interactive | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --version -ignore-dot-ghci | sed "s/, version.*//"
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --version --interactive -ignore-dot-ghci | sed "s/, version.*//"
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --show-options -ignore-dot-ghci | grep -- --interactive | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --show-options --interactive -ignore-dot-ghci | grep -- --interactive | sed '2,$$d'
 
 # Test for building DLLs with ghc -shared, see #2745
 shared001:

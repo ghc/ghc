@@ -428,7 +428,7 @@ test('T9938B',
      ['$MAKE -s --no-print-directory T9938B'])
 
 test('T9963', exit_code(1), run_command,
-     ['{compiler} --interactive --print-libdir'])
+     ['{compiler} --interactive -ignore-dot-ghci --print-libdir'])
 
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.
