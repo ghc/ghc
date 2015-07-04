@@ -159,6 +159,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           _ -> return flags
 
   unless (Flag_NoWarnings `elem` flags) $ do
+    hypSrcWarnings flags
     forM_ (warnings args) $ \warning -> do
       hPutStrLn stderr warning
 
@@ -489,6 +490,35 @@ shortcutFlags flags = do
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
       ++ "Ported to use the GHC API by David Waern 2006-2008\n"
+
+
+-- | Generate some warnings about potential misuse of @--hyperlinked-source@.
+hypSrcWarnings :: [Flag] -> IO ()
+hypSrcWarnings flags = do
+
+    when (hypSrc && any isSourceUrlFlag flags) $
+        hPutStrLn stderr $ concat
+            [ "Warning: "
+            , "--source-* options are ignored when "
+            , "--hyperlinked-source is enabled."
+            ]
+
+    when (not hypSrc && any isSourceCssFlag flags) $
+        hPutStrLn stderr $ concat
+            [ "Warning: "
+            , "source CSS file is specified but "
+            , "--hyperlinked-source is disabled."
+            ]
+
+  where
+    hypSrc = Flag_HyperlinkedSource `elem` flags
+    isSourceUrlFlag (Flag_SourceBaseURL _) = True
+    isSourceUrlFlag (Flag_SourceModuleURL _) = True
+    isSourceUrlFlag (Flag_SourceEntityURL _) = True
+    isSourceUrlFlag (Flag_SourceLEntityURL _) = True
+    isSourceUrlFlag _ = False
+    isSourceCssFlag (Flag_SourceCss _) = True
+    isSourceCssFlag _ = False
 
 
 updateHTMLXRefs :: [(DocPaths, InterfaceFile)] -> IO ()
