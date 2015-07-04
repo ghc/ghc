@@ -345,11 +345,27 @@
       <varlistentry>
         <term>
           <indexterm><primary><option>-i</option></primary></indexterm>
-          <option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable>
+          <option>-i</option> <replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>-i</option></primary></indexterm>
+          <option>-i</option> <replaceable>docpath</replaceable>,<replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>-i</option></primary></indexterm>
+          <option>-i</option> <replaceable>docpath</replaceable>,<replaceable>srcpath</replaceable>,<replaceable>file</replaceable>
         </term>
         <term>
           <indexterm><primary><option>--read-interface</option></primary></indexterm>
-          <option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable>
+          <option>--read-interface</option>=<replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--read-interface</option></primary></indexterm>
+          <option>--read-interface</option>=<replaceable>docpath</replaceable>,<replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--read-interface</option></primary></indexterm>
+          <option>--read-interface</option>=<replaceable>docpath</replaceable>,<replaceable>srcpath</replaceable>,<replaceable>file</replaceable>
         </term>
         <listitem>
           <para>Read the interface file in
@@ -357,18 +373,24 @@
           produced by running Haddock with the
           <option>--dump-interface</option> option.  The interface
           describes a set of modules whose HTML documentation is
-          located in <replaceable>path</replaceable> (which may be a
-          relative pathname).  The <replaceable>path</replaceable> is
-          optional, and defaults to <quote>.</quote>.</para>
+          located in <replaceable>docpath</replaceable> (which may be a
+          relative pathname).  The <replaceable>docpath</replaceable> is
+          optional, and defaults to <quote>.</quote>. The
+          <replaceable>srcpath</replaceable> is optional but has no default
+          value.</para>
 
           <para>This option allows Haddock to produce separate sets of
           documentation with hyperlinks between them.  The
-          <replaceable>path</replaceable> is used to direct hyperlinks
+          <replaceable>docpath</replaceable> is used to direct hyperlinks
           to point to the right files; so make sure you don't move the
           HTML files later or these links will break.  Using a
-          relative <replaceable>path</replaceable> means that a
+          relative <replaceable>docpath</replaceable> means that a
           documentation subtree can still be moved around without
           breaking links.</para>
+
+          <para>Similarly to <replaceable>docpath</replaceable>, <replaceable>srcpath</replaceable> is used generate cross-package hyperlinks but
+          within sources rendered with <option>--hyperlinked-source</option>
+          option.</para>
 
           <para>Multiple <option>--read-interface</option> options may
           be given.</para>
