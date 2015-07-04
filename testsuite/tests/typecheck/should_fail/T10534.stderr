@@ -1,15 +1,15 @@
 
-T10534a.hs:9:10: error:
-    Could not deduce: a ~ b
-    from the context: Coercible (DF a) (DF b)
-      bound by the type signature for:
-               silly :: Coercible (DF a) (DF b) => a -> b
+T10534a.hs:9:10:
+    Could not deduce (a ~ b)
+    from the context (Coercible (DF a) (DF b))
+      bound by the type signature for
+                 silly :: Coercible (DF a) (DF b) => a -> b
       at T10534a.hs:9:10-42
       ‘a’ is a rigid type variable bound by
-          the type signature for: silly :: Coercible (DF a) (DF b) => a -> b
+          the type signature for silly :: Coercible (DF a) (DF b) => a -> b
           at T10534a.hs:9:10
       ‘b’ is a rigid type variable bound by
-          the type signature for: silly :: Coercible (DF a) (DF b) => a -> b
+          the type signature for silly :: Coercible (DF a) (DF b) => a -> b
           at T10534a.hs:9:10
     arising from trying to show that the representations of
       ‘DF a’ and
