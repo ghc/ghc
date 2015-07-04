@@ -11,7 +11,6 @@
 -----------------------------------------------------------------------------
 
 {
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-tabs #-}
@@ -190,7 +189,7 @@ begin :: Int -> Action
 begin code _span _str _len = do pushLexState code; lexToken
 
 pop :: Action
-pop _span _buf _len = do popLexState; lexToken
+pop _span _buf _len = popLexState >> lexToken
 
 special_char :: Action
 special_char span buf len = return (L span (CmmT_SpecChar (currentChar buf)))
@@ -291,16 +290,14 @@ setLine code span buf len = do
   setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
         -- subtract one: the line number refers to the *following* line
   -- trace ("setLine "  ++ show line) $ do
-  popLexState
-  pushLexState code
+  popLexState >> pushLexState code
   lexToken
 
 setFile :: Int -> Action
 setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
   setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
-  popLexState
-  pushLexState code
+  popLexState >> pushLexState code
   lexToken
 
 -- -----------------------------------------------------------------------------
