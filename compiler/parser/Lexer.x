@@ -637,8 +637,6 @@ data Token
   | ITqconid  (FastString,FastString)
   | ITqvarsym (FastString,FastString)
   | ITqconsym (FastString,FastString)
-  | ITprefixqvarsym (FastString,FastString)
-  | ITprefixqconsym (FastString,FastString)
 
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
 
@@ -1147,11 +1145,9 @@ varid span buf len =
 conid :: StringBuffer -> Int -> Token
 conid buf len = ITconid $! lexemeToFastString buf len
 
-qvarsym, qconsym, prefixqvarsym, prefixqconsym :: StringBuffer -> Int -> Token
+qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
-prefixqvarsym buf len = ITprefixqvarsym $! splitQualName buf len True
-prefixqconsym buf len = ITprefixqconsym $! splitQualName buf len True
 
 varsym, consym :: Action
 varsym = sym ITvarsym
@@ -1652,11 +1648,6 @@ quasiquote_error start = do
 
 -- -----------------------------------------------------------------------------
 -- Warnings
-
-warn :: WarningFlag -> SDoc -> Action
-warn option warning srcspan _buf _len = do
-    addWarning option (RealSrcSpan srcspan) warning
-    lexToken
 
 warnTab :: Action
 warnTab srcspan _buf _len = do
