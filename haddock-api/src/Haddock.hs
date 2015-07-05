@@ -229,8 +229,10 @@ renderStep dflags flags qual pkgs interfaces = do
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-    extSrcMap = Map.fromList
-      [ (ifModule ifile, path) | ((_, Just path), ifile) <- pkgs ]
+    extSrcMap = Map.fromList $ do
+      ((_, Just path), ifile) <- pkgs
+      iface <- ifInstalledIfaces ifile
+      return (instMod iface, path)
   render dflags flags qual interfaces installedIfaces extSrcMap
 
 
