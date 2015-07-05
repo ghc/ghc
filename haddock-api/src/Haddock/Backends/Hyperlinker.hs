@@ -8,7 +8,6 @@ import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Utils
 
 import Text.XHtml hiding ((</>))
-import GHC
 
 import Data.Maybe
 import System.Directory
@@ -24,30 +23,28 @@ ppHyperlinkedSource :: FilePath -- ^ Output directory
                     -> FilePath -- ^ Resource directory
                     -> Maybe FilePath -- ^ Custom CSS file path
                     -> Bool -- ^ Flag indicating whether to pretty-print HTML
-                    -> PackageKey -- ^ Package for which we create source
-                    -> SrcMap -- ^ Paths to external sources
+                    -> SrcMap -- ^ Paths to sources
                     -> [Interface] -- ^ Interfaces for which we create source
                     -> IO ()
-ppHyperlinkedSource outdir libdir mstyle pretty pkg srcs ifaces = do
+ppHyperlinkedSource outdir libdir mstyle pretty srcs ifaces = do
     createDirectoryIfMissing True srcdir
     let cssFile = fromMaybe (defaultCssFile libdir) mstyle
     copyFile cssFile $ srcdir </> srcCssFile
     copyFile (libdir </> "html" </> highlightScript) $
         srcdir </> highlightScript
-    mapM_ (ppHyperlinkedModuleSource srcdir pretty pkg srcs) ifaces
+    mapM_ (ppHyperlinkedModuleSource srcdir pretty srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir
 
 -- | Generate hyperlinked source for particular interface.
-ppHyperlinkedModuleSource :: FilePath -> Bool
-                          -> PackageKey -> SrcMap -> Interface
+ppHyperlinkedModuleSource :: FilePath -> Bool -> SrcMap -> Interface
                           -> IO ()
-ppHyperlinkedModuleSource srcdir pretty pkg srcs iface =
+ppHyperlinkedModuleSource srcdir pretty srcs iface =
     case ifaceTokenizedSrc iface of
         Just tokens -> writeFile path . html . render' $ tokens
         Nothing -> return ()
   where
-    render' = render (Just srcCssFile) (Just highlightScript) pkg srcs
+    render' = render (Just srcCssFile) (Just highlightScript) srcs
     html = if pretty then renderHtml else showHtml
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
 

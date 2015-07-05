@@ -14,7 +14,7 @@
 -- Reading and writing the .haddock interface file
 -----------------------------------------------------------------------------
 module Haddock.InterfaceFile (
-  InterfaceFile(..), ifPackageKey,
+  InterfaceFile(..), ifModule, ifPackageKey,
   readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
   writeInterfaceFile, binaryInterfaceVersion, binaryInterfaceVersionCompatibility
 ) where
@@ -51,11 +51,14 @@ data InterfaceFile = InterfaceFile {
 }
 
 
-ifPackageKey :: InterfaceFile -> PackageKey
-ifPackageKey if_ =
+ifModule :: InterfaceFile -> Module
+ifModule if_ =
   case ifInstalledIfaces if_ of
     [] -> error "empty InterfaceFile"
-    iface:_ -> modulePackageKey $ instMod iface
+    iface:_ -> instMod iface
+
+ifPackageKey :: InterfaceFile -> PackageKey
+ifPackageKey = modulePackageKey . ifModule
 
 
 binaryInterfaceMagic :: Word32

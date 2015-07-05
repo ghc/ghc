@@ -23,10 +23,9 @@ import qualified Text.XHtml as Html
 type StyleClass = String
 
 
-render :: Maybe FilePath -> Maybe FilePath
-       -> GHC.PackageKey -> SrcMap -> [RichToken]
+render :: Maybe FilePath -> Maybe FilePath -> SrcMap -> [RichToken]
        -> Html
-render mcss mjs pkg srcs tokens = header mcss mjs <> body pkg srcs tokens
+render mcss mjs srcs tokens = header mcss mjs <> body srcs tokens
 
 
 data TokenGroup
@@ -53,11 +52,11 @@ groupTokens ((RichToken tok (Just det)):rest) =
     same _ = False
 
 
-body :: GHC.PackageKey -> SrcMap -> [RichToken] -> Html
-body pkg srcs tokens =
+body :: SrcMap -> [RichToken] -> Html
+body srcs tokens =
     Html.body . Html.pre $ hypsrc
   where
-    hypsrc = mconcat . map (tokenGroup pkg srcs) . groupTokens $ tokens
+    hypsrc = mconcat . map (tokenGroup srcs) . groupTokens $ tokens
 
 
 header :: Maybe FilePath -> Maybe FilePath -> Html
@@ -79,13 +78,13 @@ header mcss mjs =
         ]
 
 
-tokenGroup :: GHC.PackageKey -> SrcMap -> TokenGroup -> Html
-tokenGroup _ _ (GrpNormal tok) =
+tokenGroup :: SrcMap -> TokenGroup -> Html
+tokenGroup _ (GrpNormal tok) =
     tokenSpan tok ! attrs
   where
     attrs = [ multiclass . tokenStyle . tkType $ tok ]
-tokenGroup pkg srcs (GrpRich det tokens) =
-    externalAnchor det . internalAnchor det . hyperlink pkg srcs det $ content
+tokenGroup srcs (GrpRich det tokens) =
+    externalAnchor det . internalAnchor det . hyperlink srcs det $ content
   where
     content = mconcat . map (richToken det) $ tokens
 
@@ -140,28 +139,27 @@ externalAnchorIdent = hypSrcNameUrl
 internalAnchorIdent :: GHC.Name -> String
 internalAnchorIdent = ("local-" ++) . show . GHC.getKey . GHC.nameUnique
 
-hyperlink :: GHC.PackageKey -> SrcMap -> TokenDetails -> Html -> Html
-hyperlink pkg srcs details = case rtkName details of
+hyperlink :: SrcMap -> TokenDetails -> Html -> Html
+hyperlink srcs details = case rtkName details of
     Left name ->
         if GHC.isInternalName name
         then internalHyperlink name
-        else externalNameHyperlink pkg srcs name
+        else externalNameHyperlink srcs name
     Right name -> externalModHyperlink name
 
 internalHyperlink :: GHC.Name -> Html -> Html
 internalHyperlink name content =
     Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
-externalNameHyperlink :: GHC.PackageKey -> SrcMap -> GHC.Name -> Html -> Html
-externalNameHyperlink pkg srcs name content
-    | namePkg == pkg = Html.anchor content !
+externalNameHyperlink :: SrcMap -> GHC.Name -> Html -> Html
+externalNameHyperlink srcs name content = case Map.lookup mdl srcs of
+    Just SrcLocal -> Html.anchor content !
         [ Html.href $ hypSrcModuleNameUrl mdl name ]
-    | Just path <- Map.lookup namePkg srcs = Html.anchor content !
+    Just (SrcExternal path) -> Html.anchor content !
         [ Html.href $ path </> hypSrcModuleNameUrl mdl name ]
-    | otherwise = content
+    Nothing -> content
   where
     mdl = GHC.nameModule name
-    namePkg = GHC.modulePackageKey mdl
 
 -- TODO: Implement module hyperlinks.
 --

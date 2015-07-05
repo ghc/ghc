@@ -46,6 +46,7 @@ import Data.List (isPrefixOf)
 import Control.Exception
 import Data.Maybe
 import Data.IORef
+import Data.Map (Map)
 import qualified Data.Map as Map
 import System.IO
 import System.Exit
@@ -228,13 +229,14 @@ renderStep dflags flags qual pkgs interfaces = do
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-    srcMap = Map.fromList [ (ifPackageKey if_, x) | ((_, Just x), if_) <- pkgs ]
-  render dflags flags qual interfaces installedIfaces srcMap
+    extSrcMap = Map.fromList
+      [ (ifModule ifile, path) | ((_, Just path), ifile) <- pkgs ]
+  render dflags flags qual interfaces installedIfaces extSrcMap
 
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
-render dflags flags qual ifaces installedIfaces srcMap = do
+render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> Map Module FilePath -> IO ()
+render dflags flags qual ifaces installedIfaces extSrcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -264,15 +266,20 @@ render dflags flags qual ifaces installedIfaces srcMap = do
       | Flag_HyperlinkedSource `elem` flags = Just hypSrcModuleUrlFormat
       | otherwise = srcModule
 
-    srcMap'
+    srcMap = Map.union
+      (Map.map SrcExternal extSrcMap)
+      (Map.fromList [ (ifaceMod iface, SrcLocal) | iface <- ifaces ])
+
+    pkgSrcMap = Map.mapKeys modulePackageKey extSrcMap
+    pkgSrcMap'
       | Flag_HyperlinkedSource `elem` flags =
-          Map.insert pkgKey hypSrcModuleNameUrlFormat srcMap
-      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl srcMap
-      | otherwise = srcMap
+          Map.insert pkgKey hypSrcModuleNameUrlFormat pkgSrcMap
+      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl pkgSrcMap
+      | otherwise = pkgSrcMap
 
     -- TODO: Get these from the interface files as with srcMap
     srcLMap' = maybe Map.empty (\path -> Map.singleton pkgKey path) srcLEntity
-    sourceUrls' = (srcBase, srcModule', srcMap', srcLMap')
+    sourceUrls' = (srcBase, srcModule', pkgSrcMap', srcLMap')
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags flags
@@ -322,7 +329,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
                   libDir
 
   when (Flag_HyperlinkedSource `elem` flags) $ do
-    ppHyperlinkedSource odir libDir opt_source_css pretty pkgKey srcMap ifaces
+    ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because
