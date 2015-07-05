@@ -306,3 +306,15 @@ test('T9839_02', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_
 test('T9839_03', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -Px')],
                 compile_and_run,
                 [''])
+
+test('T9839_04', [ only_ways(prof_ways), ignore_output, exit_code(0), extra_run_opts('+RTS -xc')],
+                compile_and_run,
+                [''])
+
+test('T9839_05', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xcx')],
+                compile_and_run,
+                [''])
+
+test('T9839_06', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xtx')],
+                compile_and_run,
+                [''])
