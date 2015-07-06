@@ -4,6 +4,7 @@ module Haddock.Backends.Hyperlinker.Utils
     , hypSrcModuleUrlFormat, hypSrcModuleNameUrlFormat,
     ) where
 
+
 import Haddock.Backends.Xhtml.Utils
 
 import GHC

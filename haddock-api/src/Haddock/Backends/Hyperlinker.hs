@@ -3,6 +3,7 @@ module Haddock.Backends.Hyperlinker
     , module Haddock.Backends.Hyperlinker.Utils
     ) where
 
+
 import Haddock.Types
 import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Utils

@@ -35,7 +35,8 @@ import DynFlags (ExtensionFlag, Language)
 import OccName
 import Outputable
 import Control.Monad (ap)
-import Haddock.Backends.Hyperlinker.Ast
+
+import Haddock.Backends.Hyperlinker.Types
 
 -----------------------------------------------------------------------------
 -- * Convenient synonyms

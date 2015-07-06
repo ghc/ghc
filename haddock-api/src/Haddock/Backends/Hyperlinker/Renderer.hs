@@ -1,8 +1,8 @@
 module Haddock.Backends.Hyperlinker.Renderer (render) where
 
+
 import Haddock.Types
-import Haddock.Backends.Hyperlinker.Parser
-import Haddock.Backends.Hyperlinker.Ast
+import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Utils
 
 import qualified GHC

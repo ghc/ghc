@@ -3,12 +3,10 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
-module Haddock.Backends.Hyperlinker.Ast
-    ( enrich
-    , RichToken(..), TokenDetails(..), rtkName
-    ) where
+module Haddock.Backends.Hyperlinker.Ast (enrich) where
 
-import Haddock.Backends.Hyperlinker.Parser
+
+import Haddock.Backends.Hyperlinker.Types
 
 import qualified GHC
 
@@ -16,25 +14,6 @@ import Control.Applicative
 import Data.Data
 import Data.Maybe
 
-data RichToken = RichToken
-    { rtkToken :: Token
-    , rtkDetails :: Maybe TokenDetails
-    }
-
-data TokenDetails
-    = RtkVar GHC.Name
-    | RtkType GHC.Name
-    | RtkBind GHC.Name
-    | RtkDecl GHC.Name
-    | RtkModule GHC.ModuleName
-    deriving (Eq)
-
-rtkName :: TokenDetails -> Either GHC.Name GHC.ModuleName
-rtkName (RtkVar name) = Left name
-rtkName (RtkType name) = Left name
-rtkName (RtkBind name) = Left name
-rtkName (RtkDecl name) = Left name
-rtkName (RtkModule name) = Right name
 
 -- | Add more detailed information to token stream using GHC API.
 enrich :: GHC.RenamedSource -> [Token] -> [RichToken]

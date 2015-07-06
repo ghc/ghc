@@ -21,6 +21,7 @@ import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
 import Haddock.Interface.LexParseRn
+import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Ast as Hyperlinker
 import Haddock.Backends.Hyperlinker.Parser as Hyperlinker
 

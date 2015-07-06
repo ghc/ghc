@@ -1,44 +1,12 @@
-module Haddock.Backends.Hyperlinker.Parser
-    ( parse
-    , Token(..), TokenType(..)
-    , Position(..), Span(..)
-    ) where
+module Haddock.Backends.Hyperlinker.Parser (parse) where
+
 
 import Data.Char
 import Data.List
 import Data.Maybe
 
-data Token = Token
-    { tkType :: TokenType
-    , tkValue :: String
-    , tkSpan :: Span
-    }
+import Haddock.Backends.Hyperlinker.Types
 
-data Position = Position
-    { posRow :: !Int
-    , posCol :: !Int
-    }
-
-data Span = Span
-    { spStart :: Position
-    , spEnd :: Position
-    }
-
-data TokenType
-    = TkIdentifier
-    | TkKeyword
-    | TkString
-    | TkChar
-    | TkNumber
-    | TkOperator
-    | TkGlyph
-    | TkSpecial
-    | TkSpace
-    | TkComment
-    | TkCpp
-    | TkPragma
-    | TkUnknown
-    deriving (Show, Eq)
 
 -- | Turn source code string into a stream of more descriptive tokens.
 --
