@@ -756,16 +756,10 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
 -- is unconditionally disabled. -- krc 1/2007
 --
 --
--- A single-entry (non-updatable) thunk can actually be entered
--- more than once in a parallel program, if work is duplicated
--- by two threads both entering the same updatable thunk before
--- the other has blackholed it. So, we must not eagerly
--- blackhole non-updatable thunks, or the second thread to
--- enter one will become blocked indefinitely. (They are not
--- blackholed by lazy blackholing either, since they have no
--- associated update frame.) See Trac #10414.
-
 -- Static closures are never themselves black-holed.
+--
+-- We also never black-hole non-updatable thunks.
+-- See Note [Black-holing non-updatable thunks]
 
 blackHoleOnEntry :: ClosureInfo -> Bool
 blackHoleOnEntry cl_info
@@ -778,6 +772,62 @@ blackHoleOnEntry cl_info
         LFLetNoEscape                   -> False
         LFThunk _ _no_fvs updatable _ _ -> updatable
         _other -> panic "blackHoleOnEntry"      -- Should never happen
+
+{-
+Note [Black-holing non-updatable thunks]
+=========================================
+
+We cannot black-hole non-updatable thunks otherwise we run into issues like
+#10414. A single-entry (non-updatable) thunk can actually be entered more than
+once in a parallel program, if work is duplicated by two threads both entering
+the same updatable thunk before the other has blackholed it. So, we must not
+eagerly blackhole non-updatable thunks, or the second thread to enter one will
+become blocked indefinitely. (They are not blackholed by lazy blackholing
+either, since they have no associated update frame.)
+
+For instance, let's consider the following value (in pseudo-Core, example due to
+Reid Barton),
+
+    x = \u []  concat [[1], []]
+
+with the following definitions,
+
+    concat x = case x of
+        []       -> []
+        (:) x xs -> (++) x (concat xs)
+
+    (++) xs ys = case xs of
+        []         -> ys
+        (:) x rest -> (:) x ((++) rest ys)
+
+Where we use the syntax @\u []@ to denote an updatable thunk and @\s []@ to
+denote a single-entry (i.e. non-updatable) thunk. After a thread evaluates @x@
+to WHNF and calls @(++)@ the heap will contain the following thunks,
+
+    x = 1 : y
+    y = \u []  (++) [] z
+    z = \s []  concat []
+
+Now that the stage is set, consider the follow evaluations by two racing threads
+A and B,
+
+  1. Both threads enter @y@ before either is able to replace it with an
+     indirection
+
+  2. Thread A does the case analysis in @(++)@ and consequently enters @z@,
+     replacing it with a black-hole
+
+  3. At some later point thread B does the same case analysis and also attempts
+     to enter @z@. However, it finds that it has been replaced with a black-hole
+     so it blocks.
+
+  4. Thread A eventually finishes evaluating @z@ (to @[]@) and updates @y@
+     accordingly. It does *not* update @z@, however, as it is single-entry. This
+     leaves Thread B blocked forever on a black-hole which will never be
+     updated.
+
+To avoid this sort of condition we never black-hole non-updatable thunks.
+-}
 
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
