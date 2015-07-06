@@ -49,7 +49,6 @@
 {-# OPTIONS_GHC -fno-warn-tabs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 -- The above warning suppression flags are a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -1358,12 +1357,12 @@ lex_string_prag mkTok span _buf _len
 lex_string_tok :: Action
 lex_string_tok span buf _len = do
   tok <- lex_string ""
-  end <- getSrcLoc
   (AI end bufEnd) <- getInput
   let
     tok' = case tok of
             ITprimstring _ bs -> ITprimstring src bs
             ITstring _ s -> ITstring src s
+            _ -> panic "lex_string_tok"
     src = lexemeToString buf (cur bufEnd - cur buf)
   return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')
 
@@ -2321,7 +2320,7 @@ alternativeLayoutRuleToken t
                     setNextToken t
                     lexTokenAlr
              -}
-             (_, ALRLayout _ col : ls, Just expectingOCurly)
+             (_, ALRLayout _ col : _ls, Just expectingOCurly)
               | (thisCol > col) ||
                 (thisCol == col &&
                  isNonDecreasingIntentation expectingOCurly) ->
@@ -2679,6 +2678,7 @@ commentToAnnotation (L l (ITdocOptions s))      = L l (AnnDocOptions s)
 commentToAnnotation (L l (ITdocOptionsOld s))   = L l (AnnDocOptionsOld s)
 commentToAnnotation (L l (ITlineComment s))     = L l (AnnLineComment s)
 commentToAnnotation (L l (ITblockComment s))    = L l (AnnBlockComment s)
+commentToAnnotation _                           = panic "commentToAnnotation"
 
 -- ---------------------------------------------------------------------
 
