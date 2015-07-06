@@ -129,5 +129,7 @@ test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])
 test('T9340', normal, compile_and_run, [''])
 test('cgrun074', normal, compile_and_run, [''])
+test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2'])],
+     compile_and_run, ['-feager-blackholing'])
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])

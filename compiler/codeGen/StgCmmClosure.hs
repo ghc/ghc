@@ -754,6 +754,16 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
 -- was on. But it didn't work, and it wasn't strictly necessary
 -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING
 -- is unconditionally disabled. -- krc 1/2007
+--
+--
+-- A single-entry (non-updatable) thunk can actually be entered
+-- more than once in a parallel program, if work is duplicated
+-- by two threads both entering the same updatable thunk before
+-- the other has blackholed it. So, we must not eagerly
+-- blackhole non-updatable thunks, or the second thread to
+-- enter one will become blocked indefinitely. (They are not
+-- blackholed by lazy blackholing either, since they have no
+-- associated update frame.) See Trac #10414.
 
 -- Static closures are never themselves black-holed.
 
@@ -766,7 +776,7 @@ blackHoleOnEntry cl_info
   = case closureLFInfo cl_info of
         LFReEntrant _ _ _ _          -> False
         LFLetNoEscape                   -> False
-        LFThunk _ _no_fvs _updatable _ _ -> True
+        LFThunk _ _no_fvs updatable _ _ -> updatable
         _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isStaticClosure :: ClosureInfo -> Bool
