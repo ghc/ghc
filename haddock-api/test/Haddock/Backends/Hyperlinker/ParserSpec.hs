@@ -5,6 +5,7 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Haddock.Backends.Hyperlinker.Parser
+import Haddock.Backends.Hyperlinker.Types
 
 
 main :: IO ()

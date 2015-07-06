@@ -146,7 +146,7 @@ decls (group, _, _, _) = concatMap ($ group)
 -- import lists.
 imports :: GHC.RenamedSource -> DetailsMap
 imports src@(_, imps, _, _) =
-    everything (<|>) ie src ++ map (imp . GHC.unLoc) imps
+    everything (<|>) ie src ++ mapMaybe (imp . GHC.unLoc) imps
   where
     ie term = case cast term of
         (Just (GHC.IEVar v)) -> pure $ var v
@@ -156,9 +156,10 @@ imports src@(_, imps, _, _) =
         _ -> empty
     typ (GHC.L sspan name) = (sspan, RtkType name)
     var (GHC.L sspan name) = (sspan, RtkVar name)
-    imp idecl =
+    imp idecl | not . GHC.ideclImplicit $ idecl =
         let (GHC.L sspan name) = GHC.ideclName idecl
-        in (sspan, RtkModule name)
+        in Just (sspan, RtkModule name)
+    imp _ = Nothing
 
 -- | Check whether token stream span matches GHC source span.
 --
