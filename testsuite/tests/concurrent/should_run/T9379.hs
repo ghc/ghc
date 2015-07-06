@@ -1,6 +1,6 @@
 import Control.Exception
 import Control.Concurrent
-import GHC.Conc
+import Control.Concurrent.STM
 import Foreign.StablePtr
 
 main :: IO ()
@@ -9,8 +9,6 @@ main = do
   _ <- newStablePtr tv
   t <- mask_ $ forkIO (blockSTM tv)
   killThread t
-
-check b = if b then return () else retry
 
 blockSTM :: TVar Bool -> IO ()
 blockSTM tv = do
