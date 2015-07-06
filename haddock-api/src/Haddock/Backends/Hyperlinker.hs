@@ -1,11 +1,13 @@
 module Haddock.Backends.Hyperlinker
     ( ppHyperlinkedSource
+    , module Haddock.Backends.Hyperlinker.Types
     , module Haddock.Backends.Hyperlinker.Utils
     ) where
 
 
 import Haddock.Types
 import Haddock.Backends.Hyperlinker.Renderer
+import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Utils
 
 import Text.XHtml hiding ((</>))

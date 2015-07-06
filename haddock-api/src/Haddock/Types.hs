@@ -51,7 +51,6 @@ type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
 type InstMap       = Map SrcSpan Name
 type FixMap        = Map Name Fixity
-type SrcMap        = Map Module SrcPath
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
 
@@ -271,14 +270,6 @@ unrenameDocForDecl (doc, fnArgsDoc) =
 
 -- | Type of environment used to cross-reference identifiers in the syntax.
 type LinkEnv = Map Name Module
-
--- | Path for making cross-package hyperlinks in generated sources.
---
--- Used in 'SrcMap' to determine whether module originates in current package
--- or in an external package.
-data SrcPath
-  = SrcExternal FilePath
-  | SrcLocal
 
 -- | Extends 'Name' with cross-reference information.
 data DocName
