@@ -268,7 +268,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
       | Flag_HyperlinkedSource `elem` flags = Just hypSrcModuleUrlFormat
       | otherwise = srcModule
 
-    srcMap = Map.union
+    srcMap = mkSrcMap $ Map.union
       (Map.map SrcExternal extSrcMap)
       (Map.fromList [ (ifaceMod iface, SrcLocal) | iface <- ifaces ])
 

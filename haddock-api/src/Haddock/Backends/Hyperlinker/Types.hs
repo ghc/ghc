@@ -4,6 +4,7 @@ module Haddock.Backends.Hyperlinker.Types where
 import qualified GHC
 
 import Data.Map (Map)
+import qualified Data.Map as Map
 
 
 data Token = Token
@@ -66,7 +67,10 @@ rtkName (RtkModule name) = Right name
 -- Used in 'SrcMap' to determine whether module originates in current package
 -- or in an external package.
 data SrcPath
-  = SrcExternal FilePath
-  | SrcLocal
+    = SrcExternal FilePath
+    | SrcLocal
 
-type SrcMap = Map GHC.Module SrcPath
+type SrcMap = (Map GHC.Module SrcPath, Map GHC.ModuleName SrcPath)
+
+mkSrcMap :: Map GHC.Module SrcPath -> SrcMap
+mkSrcMap srcs = (srcs, Map.mapKeys GHC.moduleName srcs)

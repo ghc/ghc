@@ -144,14 +144,14 @@ hyperlink srcs details = case rtkName details of
         if GHC.isInternalName name
         then internalHyperlink name
         else externalNameHyperlink srcs name
-    Right name -> externalModHyperlink name
+    Right name -> externalModHyperlink srcs name
 
 internalHyperlink :: GHC.Name -> Html -> Html
 internalHyperlink name content =
     Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
 externalNameHyperlink :: SrcMap -> GHC.Name -> Html -> Html
-externalNameHyperlink srcs name content = case Map.lookup mdl srcs of
+externalNameHyperlink (srcs, _) name content = case Map.lookup mdl srcs of
     Just SrcLocal -> Html.anchor content !
         [ Html.href $ hypSrcModuleNameUrl mdl name ]
     Just (SrcExternal path) -> Html.anchor content !
@@ -160,13 +160,10 @@ externalNameHyperlink srcs name content = case Map.lookup mdl srcs of
   where
     mdl = GHC.nameModule name
 
--- TODO: Implement module hyperlinks.
---
--- Unfortunately, 'ModuleName' is not enough to provide viable cross-package
--- hyperlink. And the problem is that GHC AST does not have other information
--- on imported modules, so for the time being, we do not provide such reference
--- either.
-externalModHyperlink :: GHC.ModuleName -> Html -> Html
-externalModHyperlink _ content =
-    content
-    --Html.anchor content ! [ Html.href $ hypSrcModuleUrl' mdl ]
+externalModHyperlink :: SrcMap -> GHC.ModuleName -> Html -> Html
+externalModHyperlink (_, srcs) name content = case Map.lookup name srcs of
+    Just SrcLocal -> Html.anchor content !
+        [ Html.href $ hypSrcModuleUrl' name ]
+    Just (SrcExternal path) -> Html.anchor content !
+        [ Html.href $ path </> hypSrcModuleUrl' name ]
+    Nothing -> content
