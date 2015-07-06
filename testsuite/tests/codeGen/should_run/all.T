@@ -133,5 +133,7 @@ test('cgrun074', normal, compile_and_run, [''])
 test('CmmSwitchTest', when(fast(), skip), compile_and_run, [''])
 test('T10245', expect_broken(10246), compile_and_run, [''])
 test('T10246', expect_broken(10246), compile_and_run, [''])
+test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2'])],
+     compile_and_run, ['-feager-blackholing'])
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
