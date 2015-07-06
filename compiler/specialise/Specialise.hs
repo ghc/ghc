@@ -970,8 +970,10 @@ specBind rhs_env (NonRec fn rhs) body_uds
              (free_uds, dump_dbs, float_all) = dumpBindUDs [fn] combined_uds
                 -- See Note [From non-recursive to recursive]
 
-             final_binds | isEmptyBag dump_dbs = [NonRec b r | (b,r) <- pairs]
-                         | otherwise = [Rec (flattenDictBinds dump_dbs pairs)]
+             final_binds :: [DictBind]
+             final_binds
+               | isEmptyBag dump_dbs = [mkDB $ NonRec b r | (b,r) <- pairs]
+               | otherwise = [flattenDictBinds dump_dbs pairs]
 
          ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
@@ -980,7 +982,7 @@ specBind rhs_env (NonRec fn rhs) body_uds
            else
              -- No call in final_uds mentions bound variables,
              -- so we can just leave the binding here
-              return (final_binds, free_uds) }
+              return (map fst final_binds, free_uds) }
 
 
 specBind rhs_env (Rec pairs) body_uds
@@ -1001,13 +1003,13 @@ specBind rhs_env (Rec pairs) body_uds
                         ; return (bndrs2, spec_defns2 ++ spec_defns1, uds2) }
 
        ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs bndrs uds3
-             bind = Rec (flattenDictBinds dumped_dbs $
-                         spec_defns3 ++ zip bndrs3 rhss')
+             bind = flattenDictBinds dumped_dbs
+                                     (spec_defns3 ++ zip bndrs3 rhss')
 
        ; if float_all then
               return ([], final_uds `snocDictBind` bind)
            else
-              return ([bind], final_uds) }
+              return ([fst bind], final_uds) }
 
 
 ---------------------------
@@ -1245,7 +1247,7 @@ bindAuxiliaryDicts
         -> [DictId] -> [CoreExpr]   -- Original dict bndrs, and the witnessing expressions
         -> [DictId]                 -- A cloned dict-id for each dict arg
         -> (SpecEnv,                -- Substitute for all orig_dicts
-            [CoreBind],             -- Auxiliary dict bindings
+            [DictBind],             -- Auxiliary dict bindings
             [CoreExpr])             -- Witnessing expressions (all trivial)
 -- Bind any dictionary arguments to fresh names, to preserve sharing
 bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
@@ -1256,14 +1258,15 @@ bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
     env' = env { se_subst = CoreSubst.extendIdSubstList subst (orig_dict_ids `zip` spec_dict_args)
                , se_interesting = interesting `unionVarSet` interesting_dicts }
 
-    interesting_dicts = mkVarSet [ dx_id | NonRec dx_id dx <- dx_binds
+    interesting_dicts = mkVarSet [ dx_id | (NonRec dx_id dx, _) <- dx_binds
                                  , interestingDict env dx ]
                   -- See Note [Make the new dictionaries interesting]
 
+    go :: [CoreExpr] -> [CoreBndr] -> ([DictBind], [CoreExpr])
     go [] _  = ([], [])
     go (dx:dxs) (dx_id:dx_ids)
       | exprIsTrivial dx = (dx_binds, dx:args)
-      | otherwise        = (NonRec dx_id dx : dx_binds, Var dx_id : args)
+      | otherwise        = (mkDB (NonRec dx_id dx) : dx_binds, Var dx_id : args)
       where
         (dx_binds, args) = go dxs dx_ids
              -- In the first case extend the substitution but not bindings;
@@ -1593,9 +1596,9 @@ instance Outputable UsageDetails where
                 [ptext (sLit "binds") <+> equals <+> ppr dbs,
                  ptext (sLit "calls") <+> equals <+> ppr calls]))
 
+-- | A 'DictBind' is a binding along with a cached set containing its free
+-- variables (both type variables and dictionaries)
 type DictBind = (CoreBind, VarSet)
-        -- The set is the free vars of the binding
-        -- both tyvars and dicts
 
 type DictExpr = CoreExpr
 
@@ -1808,9 +1811,11 @@ plusUDList = foldr plusUDs emptyUDs
 _dictBindBndrs :: Bag DictBind -> [Id]
 _dictBindBndrs dbs = foldrBag ((++) . bindersOf . fst) [] dbs
 
+-- | Construct a 'DictBind' from a 'CoreBind'
 mkDB :: CoreBind -> DictBind
 mkDB bind = (bind, bind_fvs bind)
 
+-- | Identify the free variables of a 'CoreBind'
 bind_fvs :: CoreBind -> VarSet
 bind_fvs (NonRec bndr rhs) = pair_fvs (bndr,rhs)
 bind_fvs (Rec prs)         = foldl delVarSet rhs_fvs bndrs
@@ -1826,27 +1831,34 @@ pair_fvs (bndr, rhs) = exprFreeVars rhs `unionVarSet` idFreeVars bndr
         --      type T a = Int
         --      x :: T a = 3
 
-flattenDictBinds :: Bag DictBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
+-- | Flatten a set of 'DictBind's and some other binding pairs into a single
+-- recursive binding, including some additional bindings.
+flattenDictBinds :: Bag DictBind -> [(Id,CoreExpr)] -> DictBind
 flattenDictBinds dbs pairs
-  = foldrBag add pairs dbs
+  = (Rec bindings, fvs)
   where
-    add (NonRec b r,_) pairs = (b,r) : pairs
-    add (Rec prs1, _)  pairs = prs1 ++ pairs
+    (bindings, fvs) = foldrBag add
+                               ([], emptyVarSet)
+                               (dbs `snocBag` mkDB (Rec pairs))
+    add (NonRec b r, fvs') (pairs, fvs) =
+      ((b,r) : pairs, fvs `unionVarSet` fvs')
+    add (Rec prs1,   fvs') (pairs, fvs) =
+      (prs1 ++ pairs, fvs `unionVarSet` fvs')
 
-snocDictBinds :: UsageDetails -> [CoreBind] -> UsageDetails
+snocDictBinds :: UsageDetails -> [DictBind] -> UsageDetails
 -- Add ud_binds to the tail end of the bindings in uds
 snocDictBinds uds dbs
   = uds { ud_binds = ud_binds uds `unionBags`
-                     foldr (consBag . mkDB) emptyBag dbs }
+                     foldr consBag emptyBag dbs }
 
-consDictBind :: CoreBind -> UsageDetails -> UsageDetails
-consDictBind bind uds = uds { ud_binds = mkDB bind `consBag` ud_binds uds }
+consDictBind :: DictBind -> UsageDetails -> UsageDetails
+consDictBind bind uds = uds { ud_binds = bind `consBag` ud_binds uds }
 
 addDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
 addDictBinds binds uds = uds { ud_binds = listToBag binds `unionBags` ud_binds uds }
 
-snocDictBind :: UsageDetails -> CoreBind -> UsageDetails
-snocDictBind uds bind = uds { ud_binds = ud_binds uds `snocBag` mkDB bind }
+snocDictBind :: UsageDetails -> DictBind -> UsageDetails
+snocDictBind uds bind = uds { ud_binds = ud_binds uds `snocBag` bind }
 
 wrapDictBinds :: Bag DictBind -> [CoreBind] -> [CoreBind]
 wrapDictBinds dbs binds
