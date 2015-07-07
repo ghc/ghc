@@ -215,7 +215,7 @@ collapseSection id_ state classes = [ identifier sid, theclass cs ]
 collapseToggle :: String -> [HtmlAttr]
 collapseToggle id_ = [ strAttr "onclick" js ]
   where js = "toggleSection('" ++ id_ ++ "')";
-  
+
 -- | Attributes for an area that toggles a collapsed area,
 -- and displays a control.
 collapseControl :: String -> Bool -> String -> [HtmlAttr]

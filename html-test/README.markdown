@@ -1,7 +1,7 @@
 This is a testsuite for Haddock that uses the concept of "golden files". That
 is, it compares output files against a set of reference files.
 
-To add a new test: 
+To add a new test:
 
  1. Create a module in the `html-test/src` directory.
 

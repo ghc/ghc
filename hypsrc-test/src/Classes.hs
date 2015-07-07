@@ -16,7 +16,7 @@ instance Foo [a] where
 
 class Foo a => Foo' a where
     quux :: (a, a) -> a
-    quux (x, y) = norf [x, y] 
+    quux (x, y) = norf [x, y]
 
     norf :: [a] -> a
     norf = quux . baz . sum . map bar
