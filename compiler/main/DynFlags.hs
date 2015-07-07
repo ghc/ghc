@@ -3228,6 +3228,12 @@ default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =
   case (platformOS platform, platformArch platform) of
     (OSDarwin, ArchX86_64) -> [Opt_PIC]
+    (OSOpenBSD, ArchX86_64) -> [Opt_PIC] -- Due to PIE support in
+                                         -- OpenBSD since 5.3 release
+                                         -- (1 May 2013) we need to
+                                         -- always generate PIC. See
+                                         -- #10597 for more
+                                         -- information.
     _                      -> []
 
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
