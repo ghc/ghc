@@ -101,7 +101,9 @@ type DataId id =
   , Data (PostRn id Name)
   , Data (PostRn id [Name])
   , Data (PostRn id (FieldLbl id))
+  , Data (PostRn id [id])
 
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
+  , Data (PostTc id id)
   )

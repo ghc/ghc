@@ -1008,9 +1008,9 @@ zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField TcId] -> TcM [LHsRecUpdField TcId
 zonkRecUpdFields env = mapM zonk_rbind
   where
     zonk_rbind (L l fld)
-      = do { new_id   <- zonkIdBndr env (unLoc (hsRecUpdFieldId fld))
+      = do { new_ids  <- mapM (zonkIdBndr env) (hsRecUpdFieldSel fld)
            ; new_expr <- zonkLExpr env (hsRecUpdFieldArg fld)
-           ; return (L l (fld { hsRecUpdFieldSel = Left new_id
+           ; return (L l (fld { hsRecUpdFieldSel = new_ids
                               , hsRecUpdFieldArg = new_expr })) }
 
 -------------------------------------------------------------------------

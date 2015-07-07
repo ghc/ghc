@@ -727,7 +727,7 @@ cvtUpdFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecUpdField RdrName)
 cvtUpdFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
         ; return (noLoc $ HsRecUpdField { hsRecUpdFieldLbl = v'
-                                        , hsRecUpdFieldSel = hsRecUpdFieldSelMissing
+                                        , hsRecUpdFieldSel = PlaceHolder
                                         , hsRecUpdFieldArg = e'
                                         , hsRecUpdPun = False}) }
 

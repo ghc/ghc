@@ -1187,7 +1187,7 @@ mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
 mk_rec_upd_field :: HsRecField RdrName (LHsExpr RdrName) -> HsRecUpdField RdrName
-mk_rec_upd_field (HsRecField (L loc (FieldOcc id _)) arg pun) = HsRecUpdField (L loc id) hsRecUpdFieldSelMissing arg pun
+mk_rec_upd_field (HsRecField (L loc (FieldOcc id _)) arg pun) = HsRecUpdField (L loc id) PlaceHolder arg pun
 
 mkInlinePragma :: String -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma

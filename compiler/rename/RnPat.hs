@@ -692,7 +692,9 @@ rnHsRecUpdFields flds
                           Right _       -> fvs
 
            ; return (L l (HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
-                                        , hsRecUpdFieldSel = sel
+                                        , hsRecUpdFieldSel = case sel of
+                                                               Left sel_name -> [sel_name]
+                                                               Right xs      -> map snd xs
                                         , hsRecUpdFieldArg = arg''
                                         , hsRecUpdPun      = pun }), fvs') }
 
@@ -706,9 +708,6 @@ rnHsRecUpdFields flds
 
 getFieldIds :: [LHsRecField Name arg] -> [Name]
 getFieldIds flds = map (unLoc . hsRecFieldId . unLoc) flds
-
-getFieldUpdIds :: [LHsRecUpdField Name] -> [Name]
-getFieldUpdIds flds = mapMaybe (fmap unLoc . hsRecUpdFieldId_maybe . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds = map (rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds

@@ -22,9 +22,9 @@ module HsPat (
         HsRecFields(..), HsRecField(..), LHsRecField,
         HsRecUpdField(..), LHsRecUpdField,
         hsRecFields, hsRecFieldId,
-        hsRecUpdFieldSelMissing,
-        hsRecUpdFieldId, hsRecUpdFieldId_maybe,
-        hsRecUpdFields, hsRecUpdFieldsUnambiguous,
+        -- hsRecUpdFields,
+        hsRecUpdFieldsUnambiguous,
+        hsRecUpdFieldId,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -259,24 +259,27 @@ deriving instance (DataId id, Data arg) => Data (HsRecFields id arg)
 --                     and the remainder being 'filled in' implicitly
 
 type LHsRecField id arg = Located (HsRecField id arg)
--- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
 
+-- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
+--
 -- For details on above see note [Api annotations] in ApiAnnotation
 data HsRecField id arg = HsRecField {
         hsRecFieldLbl  :: LFieldOcc id,
-        hsRecFieldArg :: arg,           -- Filled in by renamer
-        hsRecPun      :: Bool           -- Note [Punning]
+        hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
+        hsRecPun      :: Bool           -- ^ Note [Punning]
   } deriving (Typeable)
 deriving instance (DataId id, Data arg) => Data (HsRecField id arg)
 
 type LHsRecUpdField id = Located (HsRecUpdField id)
 
--- AMG TODO document
+-- | Represents an record field update; these differ from 'HsRecField'
+-- (used for record construction and pattern matching) in that they
+-- cannot have dot-dot patterns but can have ambiguous selectors.
 data HsRecUpdField id = HsRecUpdField {
         hsRecUpdFieldLbl :: Located RdrName,
-        hsRecUpdFieldSel :: Either id [(id, id)], -- ^ Note [HsRecField selector]
-        hsRecUpdFieldArg :: LHsExpr id,
-        hsRecUpdPun      :: Bool                  -- ^ Note [Punning]
+        hsRecUpdFieldSel :: PostRn id [id], -- ^ Note [HsRecUpdField selector]
+        hsRecUpdFieldArg :: LHsExpr id,   -- ^ Filled in by renamer when punning
+        hsRecUpdPun      :: Bool          -- ^ Note [Punning]
   } deriving (Typeable)
 deriving instance (DataId id) => Data (HsRecUpdField id)
 
@@ -293,21 +296,17 @@ deriving instance (DataId id) => Data (HsRecUpdField id)
 --    T { A.x } means T { A.x = x }
 
 
--- Note [HsRecField selector]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [HsRecUpdField selector]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--- A HsRecField always contains a label (in hsRecFieldLbl), which is
--- the thing the user wrote, but thanks to AllowDuplicateRecordFields this
--- may not unambiguously correspond to a Name.  The hsRecFieldSel is
--- filled in by the renamer (RnPat.rnHsRecFields1) thus:
---
---  * If the field is unambiguous, it uses `Left sel_name`
---
---  * If the field is ambiguous, there are multiple fields with the
---    correct label in scope, it uses `Right xs` where `xs` is a list of
---    (parent name, selector name) pairs.
---
--- The typechecker (tcExpr) then disambiguates the record update.
+-- A HsRecUpdField always contains a label (in hsRecUpdFieldLbl)
+-- giving the thing the user wrote, but thanks to
+-- AllowDuplicateRecordFields this may not unambiguously correspond to
+-- a Name.  The hsRecUpdFieldSel is filled in by the renamer
+-- (RnPat.rnHsRecUpdFields) to contain a list of the candidate
+-- selector function names.  The typechecker (tcExpr) then
+-- disambiguates the record update, so after the typechecker the list
+-- will always be a singleton.
 --
 -- For example, suppose we have:
 --
@@ -316,17 +315,17 @@ deriving instance (DataId id) => Data (HsRecUpdField id)
 --
 --     f z = (z { x = 3 }) :: S
 --
--- After the renamer, the HsRecField corresponding to the record
+-- After the renamer, the HsRecUpdField corresponding to the record
 -- update will have
 --
---     hsRecFieldLbl = "x"
---     hsRecFieldSel = Right [(S, $sel:x:MkS), (T, $sel:x:MkT)]
+--     hsRecUpdFieldLbl = "x"
+--     hsRecUpdFieldSel = [$sel:x:MkS, $sel:x:MkT]
 --
 -- and the typechecker will determine that $sel:x:MkS is meant.
 --
--- It would be nice if we could enforce in the types that ambiguous
--- fields occur only in record updates, and only between the renamer
--- and the typechecker, but this is not yet implemented.
+-- We fill in hsRecUpdFieldSel in the renamer, rather than just doing
+-- the lookup in the typechecker, so that completely unambiguous
+-- updates can be represented by 'DsMeta.repUpdFields'.
 
 hsRecFields :: PostRn id (FieldLbl id) ~ FieldLbl id => HsRecFields id arg -> [id]
 hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
@@ -334,25 +333,28 @@ hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
 hsRecFieldId :: PostRn id (FieldLbl id) ~ FieldLbl id => HsRecField id arg -> Located id
 hsRecFieldId = fmap (flSelector . labelFieldOcc) . hsRecFieldLbl
 
-hsRecUpdFieldSelMissing :: Either id [(id, id)]
-hsRecUpdFieldSelMissing = Right []
-
+{-
 hsRecUpdFields :: [LHsRecUpdField id] -> [(FieldLabelString, Either id [(id, id)])]
 hsRecUpdFields = map (toFld . unLoc)
   where
     toFld x = ( occNameFS . rdrNameOcc . unLoc . hsRecUpdFieldLbl $ x
               , hsRecUpdFieldSel x)
+-}
 
-hsRecUpdFieldsUnambiguous :: [LHsRecUpdField id] -> [(FieldLabelString, id)]
-hsRecUpdFieldsUnambiguous = map outOfLeftField . hsRecUpdFields
-  where outOfLeftField (l, Left x)  = (l, x)
-        outOfLeftField (_, Right _) = error "hsRecUpdFieldsUnambigous"
+hsRecUpdFieldsUnambiguous :: PostRn id [id] ~ [id] =>
+                             [LHsRecUpdField id] -> [(FieldLabelString, id)]
+hsRecUpdFieldsUnambiguous = map $ \ (L _ x) -> case hsRecUpdFieldSel x of
+    [sel_name] -> (occNameFS $ rdrNameOcc $ unLoc $ hsRecUpdFieldLbl x, sel_name)
+    _          -> error "hsRecUpdFieldsUnambigous"
 
-hsRecUpdFieldId_maybe :: HsRecUpdField id -> Maybe (Located id)
-hsRecUpdFieldId_maybe x = either (Just . L (getLoc (hsRecUpdFieldLbl x))) (const Nothing) (hsRecUpdFieldSel x)
+hsRecUpdFieldId_maybe :: PostRn id [id] ~ [id] => HsRecUpdField id -> Maybe (Located id)
+hsRecUpdFieldId_maybe x = case hsRecUpdFieldSel x of
+                            [sel_name] -> Just $ L (getLoc (hsRecUpdFieldLbl x)) sel_name
+                            _          -> Nothing
 
-hsRecUpdFieldId :: HsRecUpdField id -> Located id
+hsRecUpdFieldId :: PostRn id [id] ~ [id] => HsRecUpdField id -> Located id
 hsRecUpdFieldId = expectJust "hsRecUpdFieldId" . hsRecUpdFieldId_maybe
+
 
 {-
 ************************************************************************
