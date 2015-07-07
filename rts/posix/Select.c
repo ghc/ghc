@@ -375,6 +375,12 @@ awaitEvent(rtsBool wait)
 
       prev = NULL;
       {
+          /*
+           * The queue is being rebuilt in this loop:
+           * 'blocked_queue_hd' will contain already
+           * traversed blocked TSOs. As a result you
+           * can't use functions accessing 'blocked_queue_hd'.
+           */
           for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
               next = tso->_link;
               int fd;
@@ -412,8 +418,8 @@ awaitEvent(rtsBool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Killing blocked thread %lu on bad fd=%i\n",
                                  (unsigned long)tso->id, fd));
-                  throwToSingleThreaded(&MainCapability, tso,
-                                        (StgClosure *)blockedOnBadFD_closure);
+                  raiseAsync(&MainCapability, tso,
+                      (StgClosure *)blockedOnBadFD_closure, rtsFalse, NULL);
                   break;
               case RTS_FD_IS_READY:
                   IF_DEBUG(scheduler,
