@@ -47,7 +47,7 @@ library
     , array
     , xhtml >= 3000.2 && < 3000.3
     , Cabal >= 1.10
-    , ghc >= 7.10 && < 7.10.2
+    , ghc >= 7.10 && < 7.12
 
     , ghc-paths
     , haddock-library == 1.2.*
@@ -113,8 +113,7 @@ test-suite spec
   build-depends:
       base >= 4.3 && < 4.9
     , containers
-    , ghc >= 7.10 && < 7.10.2
-
+    , ghc >= 7.10 && < 7.12
     , hspec
     , QuickCheck == 2.*
 
