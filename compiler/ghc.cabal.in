@@ -259,6 +259,7 @@ Library
         CoreTidy
         CoreUnfold
         CoreUtils
+        CoreSeq
         MkCore
         PprCore
         Check
