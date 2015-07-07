@@ -1,5 +1,12 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.8.2.0  *Oct 2015*
+
+  * Bundled with GHC 7.10.3
+
+  * Exported `GiveGCStats`, `DoCostCentres`, `DoHeapProfile`, `DoTrace`,
+    `RtsTime`, and `RtsNat` from `GHC.RTS.Flags`
+
 ## 4.8.1.0  *Jul 2015*
 
   * Bundled with GHC 7.10.2
