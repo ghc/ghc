@@ -56,6 +56,7 @@ module Control.Exception (
         RecSelError(..),
         RecUpdError(..),
         ErrorCall(..),
+        TypeError(..),
 
         -- * Throwing exceptions
         throw,

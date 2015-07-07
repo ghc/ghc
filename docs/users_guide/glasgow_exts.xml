@@ -9196,11 +9196,11 @@ main = print "b"
   </para>
   <para>
     At runtime, whenever a term containing a type error would need to be
-    evaluated, the error is converted into a runtime exception.
-    Note that type errors are deferred as much as possible during runtime, but
-    invalid coercions are never performed, even when they would ultimately
-    result in a value of the correct type. For example, given the following
-    code:
+    evaluated, the error is converted into a runtime exception of type
+    <literal>TypeError</literal>. Note that type errors are deferred as much
+    as possible during runtime, but invalid coercions are never performed,
+    even when they would ultimately result in a value of the correct type.
+    For example, given the following code:
 <programlisting>
 x :: Int
 x = 0
@@ -9211,7 +9211,7 @@ y = x
 z :: Int
 z = y
 </programlisting>
-    evaluating <literal>z</literal> will result in a runtime type error.
+    evaluating <literal>z</literal> will result in a runtime <literal>TypeError</literal>.
   </para>
 </sect2>
 <sect2><title>Deferred type errors in GHCi</title>

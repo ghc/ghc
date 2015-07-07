@@ -119,3 +119,4 @@ test('T9497b-run', [exit_code(1)], compile_and_run, ['-fdefer-typed-holes -fno-w
 test('T9497c-run', [exit_code(1)], compile_and_run, ['-fdefer-type-errors -fno-warn-typed-holes'])
 test('T9858c', normal, compile_and_run, [''])
 test('T9858d', normal, compile_and_run, [''])
+test('T10284', exit_code(1), compile_and_run, [''])

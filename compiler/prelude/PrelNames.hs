@@ -1634,7 +1634,9 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
-    unpackCStringFoldrIdKey, unpackCStringIdKey :: Unique
+    unpackCStringFoldrIdKey, unpackCStringIdKey,
+    typeErrorIdKey :: Unique
+
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey                  = mkPreludeMiscIdUnique  2
@@ -1657,6 +1659,7 @@ unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 18
 unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 19
 unpackCStringIdKey            = mkPreludeMiscIdUnique 20
 voidPrimIdKey                 = mkPreludeMiscIdUnique 21
+typeErrorIdKey                = mkPreludeMiscIdUnique 22
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,

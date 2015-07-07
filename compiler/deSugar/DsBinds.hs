@@ -854,7 +854,7 @@ dsEvTerm (EvSuperClass d n)
 
 dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
   where
-    errorId = rUNTIME_ERROR_ID
+    errorId = tYPE_ERROR_ID
     litMsg  = Lit (MachStr (fastStringToByteString msg))
 
 dsEvTerm (EvLit l) =
