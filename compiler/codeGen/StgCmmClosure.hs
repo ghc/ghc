@@ -778,12 +778,12 @@ Note [Black-holing non-updatable thunks]
 =========================================
 
 We cannot black-hole non-updatable thunks otherwise we run into issues like
-#10414. A single-entry (non-updatable) thunk can actually be entered more than
-once in a parallel program, if work is duplicated by two threads both entering
-the same updatable thunk before the other has blackholed it. So, we must not
-eagerly blackhole non-updatable thunks, or the second thread to enter one will
-become blocked indefinitely. (They are not blackholed by lazy blackholing
-either, since they have no associated update frame.)
+Trac #10414. A single-entry (non-updatable) thunk can actually be entered more
+than once in a parallel program, if work is duplicated by two threads both
+entering the same updatable thunk before the other has blackholed it. So, we
+must not eagerly blackhole non-updatable thunks, or the second thread to enter
+one will become blocked indefinitely. (They are not blackholed by lazy
+blackholing either, since they have no associated update frame.)
 
 For instance, let's consider the following value (in pseudo-Core, example due to
 Reid Barton),
