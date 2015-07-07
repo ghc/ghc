@@ -318,3 +318,8 @@ test('T9839_05', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_
 test('T9839_06', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xtx')],
                 compile_and_run,
                 [''])
+
+# ignore_output as RTS reports slightly different error messages
+# in 'epoll' and 'select' backends on reading from EBADF
+# mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
+test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, [''])
