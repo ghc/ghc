@@ -211,9 +211,8 @@ threadPaused(Capability *cap, StgTSO *tso)
     maybePerformBlockedException (cap, tso);
     if (tso->what_next == ThreadKilled) { return; }
 
-    // NB. Blackholing is *compulsory*, we must either do lazy
-    // blackholing, or eager blackholing consistently.  See Note
-    // [upd-black-hole] in sm/Scav.c.
+    // NB. Updatable thunks *must* be blackholed, either by eager blackholing or
+    // lazy blackholing.  See Note [upd-black-hole] in sm/Scav.c.
 
     stack_end = tso->stackobj->stack + tso->stackobj->stack_size;
 
@@ -244,6 +243,8 @@ threadPaused(Capability *cap, StgTSO *tso)
 #ifdef THREADED_RTS
         retry:
 #endif
+            // Note [suspend duplicate work]
+            //
             // If the info table is a WHITEHOLE or a BLACKHOLE, then
             // another thread has claimed it (via the SET_INFO()
             // below), or is in the process of doing so.  In that case
