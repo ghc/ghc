@@ -42,6 +42,9 @@
 
   * Generalise `forever` from `Monad` to `Applicative`
 
+  * Exported `GiveGCStats`, `DoCostCentres`, `DoHeapProfile`, `DoTrace`,
+    `RtsTime`, and `RtsNat` from `GHC.RTS.Flags`
+
 ## 4.8.1.0  *TBA*
 
   * Bundled with GHC 7.10.2
