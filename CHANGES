@@ -21,6 +21,8 @@ Changes in version 2.16.1
 
  * Fix alignment of Source link for instances in Firefox (#384)
 
+ * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
