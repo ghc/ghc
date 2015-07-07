@@ -19,6 +19,12 @@
 void blockedThrowTo (Capability *cap,
                      StgTSO *target, MessageThrowTo *msg);
 
+StgTSO* raiseAsync (Capability *cap,
+                    StgTSO *tso,
+                    StgClosure *exception,
+                    rtsBool stop_at_atomically,
+                    StgUpdateFrame *stop_here);
+
 void throwToSingleThreaded (Capability *cap,
                             StgTSO *tso,
                             StgClosure *exception);

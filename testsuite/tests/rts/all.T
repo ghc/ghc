@@ -279,3 +279,8 @@ test('linker_error3',
        ignore_output ],
      run_command,
      ['$MAKE -s --no-print-directory linker_error3'])
+
+# ignore_output as RTS reports slightly different error messages
+# in 'epoll' and 'select' backends on reading from EBADF
+# mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
+test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, [''])
