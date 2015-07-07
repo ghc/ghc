@@ -1152,6 +1152,17 @@ test.hs:(5,4)-(6,7):
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term><option>-fwarn-type-errors</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-type-errors</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+            <para>Causes a warning to be reported when a type error is deferred
+            until runtime. See <xref linkend="defer-type-errors"/></para>
+            <para>This warning is on by default.</para>
+        </listitem>
+      </varlistentry>
 
       <varlistentry>
         <term><option>-fdefer-type-errors</option>:</term>

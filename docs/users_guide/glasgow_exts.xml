@@ -9182,7 +9182,8 @@ main = print "b"
   <para>
     The flag <literal>-fdefer-type-errors</literal> controls whether type
     errors are deferred to runtime. Type errors will still be emitted as
-    warnings, but will not prevent compilation.
+    warnings, but will not prevent compilation. You can use
+    <literal>-fno-warn-deferred-type-errors</literal> to suppress these warnings.
   </para>
   <para>
     This flag implies the <literal>-fdefer-typed-holes</literal> flag,

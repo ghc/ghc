@@ -524,6 +524,7 @@ data WarningFlag =
    | Opt_WarnMissingExportedSigs
    | Opt_WarnUntickedPromotedConstructors
    | Opt_WarnDerivingTypeable
+   | Opt_WarnDeferredTypeErrors
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2848,6 +2849,7 @@ fWarningFlags = [
   flagSpec' "warn-amp"                        Opt_WarnAMP
     (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
   flagSpec "warn-auto-orphans"                Opt_WarnAutoOrphans,
+  flagSpec "warn-deferred-type-errors"        Opt_WarnDeferredTypeErrors,
   flagSpec "warn-deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "warn-deprecated-flags"            Opt_WarnDeprecatedFlags,
   flagSpec "warn-deriving-typeable"           Opt_WarnDerivingTypeable,
@@ -3344,6 +3346,7 @@ standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
+        Opt_WarnDeferredTypeErrors,
         Opt_WarnTypedHoles,
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,

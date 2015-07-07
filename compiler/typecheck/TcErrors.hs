@@ -101,8 +101,12 @@ compilation. The errors are turned into warnings in `reportUnsolved`.
 -- deferred run-time errors if `-fdefer-type-errors` is on.
 reportUnsolved :: WantedConstraints -> TcM (Bag EvBind)
 reportUnsolved wanted
-  = do { binds_var  <- newTcEvBinds
-       ; defer_errs <- goptM Opt_DeferTypeErrors
+  = do { binds_var <- newTcEvBinds
+       ; defer_errors <- goptM Opt_DeferTypeErrors
+       ; warn_errors <- woptM Opt_WarnDeferredTypeErrors -- implement #10283
+       ; let type_errors | not defer_errors = TypeError
+                         | warn_errors      = TypeWarn
+                         | otherwise        = TypeDefer
 
        ; defer_holes <- goptM Opt_DeferTypedHoles
        ; warn_holes  <- woptM Opt_WarnTypedHoles
@@ -116,30 +120,30 @@ reportUnsolved wanted
                         | warn_partial_sigs = HoleWarn
                         | otherwise         = HoleDefer
 
-       ; report_unsolved (Just binds_var) False defer_errs expr_holes type_holes wanted
+       ; report_unsolved (Just binds_var) False type_errors expr_holes type_holes wanted
        ; getTcEvBinds binds_var }
 
 -- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- See Note [Deferring coercion errors to runtime]
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
-  = report_unsolved Nothing False False HoleError HoleError wanted
+  = report_unsolved Nothing False TypeError HoleError HoleError wanted
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
 -- run-time). See Note [Safe Haskell Overlapping Instances Implementation] in
 -- TcSimplify
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
-  = report_unsolved Nothing True False HoleWarn HoleWarn wanted
+  = report_unsolved Nothing True TypeWarn HoleWarn HoleWarn wanted
 
 -- | Report unsolved goals as errors or warnings.
 report_unsolved :: Maybe EvBindsVar  -- cec_binds
                 -> Bool              -- Errors as warnings
-                -> Bool              -- cec_defer_type_errors
+                -> TypeErrorChoice   -- Deferred type errors
                 -> HoleChoice        -- Expression holes
                 -> HoleChoice        -- Type holes
                 -> WantedConstraints -> TcM ()
-report_unsolved mb_binds_var err_as_warn defer_errs expr_holes type_holes wanted
+report_unsolved mb_binds_var err_as_warn type_errors expr_holes type_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
@@ -159,7 +163,7 @@ report_unsolved mb_binds_var err_as_warn defer_errs expr_holes type_holes wanted
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
        ; let err_ctxt = CEC { cec_encl  = []
                             , cec_tidy  = tidy_env
-                            , cec_defer_type_errors = defer_errs
+                            , cec_defer_type_errors = type_errors
                             , cec_errors_as_warns = err_as_warn
                             , cec_expr_holes = expr_holes
                             , cec_type_holes = type_holes
@@ -173,6 +177,11 @@ report_unsolved mb_binds_var err_as_warn defer_errs expr_holes type_holes wanted
 --------------------------------------------
 --      Internal functions
 --------------------------------------------
+
+data TypeErrorChoice   -- What to do for type errors found by the type checker
+  = TypeError     -- A type error aborts compilation with an error message
+  | TypeWarn      -- A type error is deferred to runtime, plus a compile-time warning
+  | TypeDefer     -- A type error is deferred to runtime; no error or warning at compile time
 
 data HoleChoice
   = HoleError     -- A hole is a compile-time error
@@ -194,9 +203,8 @@ data ReportErrCtxt
                                           -- (except for Holes, which are
                                           -- controlled by cec_type_holes and
                                           -- cec_expr_holes)
-          , cec_defer_type_errors :: Bool -- True <=> -fdefer-type-errors
-                                          -- Defer type errors until runtime
-                                          -- Irrelevant if cec_binds = Nothing
+          , cec_defer_type_errors :: TypeErrorChoice -- Defer type errors until runtime
+                                                     -- Irrelevant if cec_binds = Nothing
 
           , cec_expr_holes :: HoleChoice  -- Holes in expressions
           , cec_type_holes :: HoleChoice  -- Holes in types
@@ -472,13 +480,14 @@ maybeReportHoleError ctxt ct err
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
-  -- See Note [Always warn with -fdefer-type-errors]
-  | cec_defer_type_errors ctxt || cec_errors_as_warns ctxt
+  | cec_errors_as_warns ctxt
   = reportWarning err
-  | cec_suppress ctxt
-  = return ()
   | otherwise
-  = reportError err
+  = case cec_defer_type_errors ctxt of
+    TypeDefer -> return ()
+    TypeWarn -> reportWarning err
+    -- handle case when suppress is on like in the original code
+    TypeError -> if cec_suppress ctxt then return () else reportError err
 
 addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
@@ -509,11 +518,13 @@ maybeAddDeferredHoleBinding ctxt err ct
     = return ()
 
 maybeAddDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
-maybeAddDeferredBinding ctxt err ct
-    | cec_defer_type_errors ctxt
-    = addDeferredBinding ctxt err ct
-    | otherwise
-    = return ()
+maybeAddDeferredBinding ctxt err ct =
+  case cec_defer_type_errors ctxt of
+        TypeDefer -> deferred
+        TypeWarn -> deferred
+        TypeError -> return ()
+  where
+    deferred = addDeferredBinding ctxt err ct
 
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
@@ -610,6 +621,8 @@ first two equations for maybeReportError
 To be consistent, we should also report multiple warnings from a single
 location in mkGroupReporter, when -fdefer-type-errors is on.  But that
 is perhaps a bit *over*-consistent! Again, an easy choice to change.
+
+With #10283, you can now opt out of deferred type error warnings.
 
 
 Note [Do not report derived but soluble errors]

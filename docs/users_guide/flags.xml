@@ -1497,7 +1497,8 @@
             <entry>
                 Turn type errors into warnings, <link linkend="defer-type-errors">
                 deferring the error until runtime</link>. Implies
-                <option>-fdefer-typed-holes</option>.
+                <option>-fdefer-typed-holes</option>. See also
+                <option>-fwarn-deferred-type-errors</option>
             </entry>
             <entry>dynamic</entry>
             <entry><option>-fno-defer-type-errors</option></entry>
@@ -1801,6 +1802,16 @@
             <entry><emphasis>(deprecated)</emphasis> warn on definitions conflicting with the Applicative-Monad Proposal (AMP)</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-amp</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-deferred-type-errors</option></entry>
+            <entry>
+                Report warnings when <link linkend="defer-type-errors">deferred type errors</link>
+                are enabled. This option is enabled by default. See <option>-fdefer-type-errors</option>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-deferred-type-errors</option></entry>
           </row>
 
           <row>
