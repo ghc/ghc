@@ -13,7 +13,7 @@ module PPC.Ppr (
         pprSectionHeader,
         pprData,
         pprInstr,
-        pprSize,
+        pprFormat,
         pprImm,
         pprDataItem,
 )
@@ -25,7 +25,7 @@ import PPC.Instr
 import PPC.Cond
 import PprBase
 import Instruction
-import Size
+import Format
 import Reg
 import RegClass
 import TargetReg
@@ -236,8 +236,8 @@ pprReg r
 
 
 
-pprSize :: Size -> SDoc
-pprSize x 
+pprFormat :: Format -> SDoc
+pprFormat x
  = ptext (case x of
                 II8        -> sLit "b"
                 II16        -> sLit "h"
@@ -245,7 +245,7 @@ pprSize x
                 II64        -> sLit "d"
                 FF32        -> sLit "fs"
                 FF64        -> sLit "fd"
-                _        -> panic "PPC.Ppr.pprSize: no match")
+                _        -> panic "PPC.Ppr.pprFormat: no match")
                 
                 
 pprCond :: Cond -> SDoc
@@ -347,7 +347,7 @@ pprSectionHeader seg =
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
   = sdocWithDynFlags $ \dflags ->
-    vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit dflags)
+    vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit dflags)
     where
         imm = litToImm lit
         archPPC_64 dflags = not $ target32Bit $ targetPlatform dflags
@@ -418,10 +418,10 @@ pprInstr (RELOAD slot reg)
         pprReg reg]
 -}
 
-pprInstr (LD sz reg addr) = hcat [
+pprInstr (LD fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "l"),
-        ptext (case sz of
+        ptext (case fmt of
             II8  -> sLit "bz"
             II16 -> sLit "hz"
             II32 -> sLit "wz"
@@ -437,10 +437,10 @@ pprInstr (LD sz reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
-pprInstr (LA sz reg addr) = hcat [
+pprInstr (LA fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "l"),
-        ptext (case sz of
+        ptext (case fmt of
             II8  -> sLit "ba"
             II16 -> sLit "ha"
             II32 -> sLit "wa"
@@ -456,10 +456,10 @@ pprInstr (LA sz reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
-pprInstr (ST sz reg addr) = hcat [
+pprInstr (ST fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "st"),
-        pprSize sz,
+        pprFormat fmt,
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
         char '\t',
@@ -467,10 +467,10 @@ pprInstr (ST sz reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
-pprInstr (STU sz reg addr) = hcat [
+pprInstr (STU fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "st"),
-        pprSize sz,
+        pprFormat fmt,
         ptext (sLit "u\t"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
@@ -507,7 +507,7 @@ pprInstr (MR reg1 reg2)
         ptext (sLit ", "),
         pprReg reg2
     ]
-pprInstr (CMP sz reg ri) = hcat [
+pprInstr (CMP fmt reg ri) = hcat [
         char '\t',
         op,
         char '\t',
@@ -518,12 +518,12 @@ pprInstr (CMP sz reg ri) = hcat [
     where
         op = hcat [
                 ptext (sLit "cmp"),
-                pprSize sz,
+                pprFormat fmt,
                 case ri of
                     RIReg _ -> empty
                     RIImm _ -> char 'i'
             ]
-pprInstr (CMPL sz reg ri) = hcat [
+pprInstr (CMPL fmt reg ri) = hcat [
         char '\t',
         op,
         char '\t',
@@ -534,7 +534,7 @@ pprInstr (CMPL sz reg ri) = hcat [
     where
         op = hcat [
                 ptext (sLit "cmpl"),
-                pprSize sz,
+                pprFormat fmt,
                 case ri of
                     RIReg _ -> empty
                     RIImm _ -> char 'i'
@@ -680,10 +680,10 @@ pprInstr (XORIS reg1 reg2 imm) = hcat [
         pprImm imm
     ]
 
-pprInstr (EXTS sz reg1 reg2) = hcat [
+pprInstr (EXTS fmt reg1 reg2) = hcat [
         char '\t',
         ptext (sLit "exts"),
-        pprSize sz,
+        pprFormat fmt,
         char '\t',
         pprReg reg1,
         ptext (sLit ", "),
@@ -693,12 +693,12 @@ pprInstr (EXTS sz reg1 reg2) = hcat [
 pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
 pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
 
-pprInstr (SL sz reg1 reg2 ri) =
-         let op = case sz of
+pprInstr (SL fmt reg1 reg2 ri) =
+         let op = case fmt of
                        II32 -> "slw"
                        II64 -> "sld"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
-         in pprLogic (sLit op) reg1 reg2 (limitShiftRI sz ri)
+         in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
 pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
     -- Handle the case where we are asked to shift a 32 bit register by
@@ -706,19 +706,19 @@ pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
     -- of the destination register.
     -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
     pprInstr (XOR reg1 reg2 (RIReg reg2))
-pprInstr (SR sz reg1 reg2 ri) =
-         let op = case sz of
+pprInstr (SR fmt reg1 reg2 ri) =
+         let op = case fmt of
                        II32 -> "srw"
                        II64 -> "srd"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
-         in pprLogic (sLit op) reg1 reg2 (limitShiftRI sz ri)
+         in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
-pprInstr (SRA sz reg1 reg2 ri) =
-         let op = case sz of
+pprInstr (SRA fmt reg1 reg2 ri) =
+         let op = case fmt of
                        II32 -> "sraw"
                        II64 -> "srad"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
-         in pprLogic (sLit op) reg1 reg2 (limitShiftRI sz ri)
+         in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
 pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
         ptext (sLit "\trlwinm\t"),
@@ -733,10 +733,10 @@ pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
         int me
     ]
     
-pprInstr (FADD sz reg1 reg2 reg3) = pprBinaryF (sLit "fadd") sz reg1 reg2 reg3
-pprInstr (FSUB sz reg1 reg2 reg3) = pprBinaryF (sLit "fsub") sz reg1 reg2 reg3
-pprInstr (FMUL sz reg1 reg2 reg3) = pprBinaryF (sLit "fmul") sz reg1 reg2 reg3
-pprInstr (FDIV sz reg1 reg2 reg3) = pprBinaryF (sLit "fdiv") sz reg1 reg2 reg3
+pprInstr (FADD fmt reg1 reg2 reg3) = pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
+pprInstr (FSUB fmt reg1 reg2 reg3) = pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
+pprInstr (FMUL fmt reg1 reg2 reg3) = pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
+pprInstr (FDIV fmt reg1 reg2 reg3) = pprBinaryF (sLit "fdiv") fmt reg1 reg2 reg3
 pprInstr (FNEG reg1 reg2) = pprUnary (sLit "fneg") reg1 reg2
 
 pprInstr (FCMP reg1 reg2) = hcat [
@@ -829,11 +829,11 @@ pprUnary op reg1 reg2 = hcat [
     ]
 
 
-pprBinaryF :: LitString -> Size -> Reg -> Reg -> Reg -> SDoc
-pprBinaryF op sz reg1 reg2 reg3 = hcat [
+pprBinaryF :: LitString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprBinaryF op fmt reg1 reg2 reg3 = hcat [
         char '\t',
         ptext op,
-        pprFSize sz,
+        pprFFormat fmt,
         char '\t',
         pprReg reg1,
         ptext (sLit ", "),
@@ -847,14 +847,14 @@ pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
 
-pprFSize :: Size -> SDoc
-pprFSize FF64     = empty
-pprFSize FF32     = char 's'
-pprFSize _        = panic "PPC.Ppr.pprFSize: no match"
+pprFFormat :: Format -> SDoc
+pprFFormat FF64     = empty
+pprFFormat FF32     = char 's'
+pprFFormat _        = panic "PPC.Ppr.pprFFormat: no match"
 
     -- limit immediate argument for shift instruction to range 0..63
     -- for 64 bit size and 0..32 otherwise
-limitShiftRI :: Size -> RI -> RI
+limitShiftRI :: Format -> RI -> RI
 limitShiftRI II64 (RIImm (ImmInt i)) | i > 63 || i < 0 =
   panic $ "PPC.Ppr: Shift by " ++ show i ++ " bits is not allowed."
 limitShiftRI II32 (RIImm (ImmInt i)) | i > 31 || i < 0 =

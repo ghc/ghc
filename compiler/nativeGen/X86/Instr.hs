@@ -11,7 +11,7 @@
 module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,
-                  maxSpillSlots, archWordSize)
+                  maxSpillSlots, archWordFormat)
 where
 
 #include "HsVersions.h"
@@ -20,7 +20,7 @@ where
 import X86.Cond
 import X86.Regs
 import Instruction
-import Size
+import Format
 import RegClass
 import Reg
 import TargetReg
@@ -43,10 +43,10 @@ import UniqSupply
 import Control.Monad
 import Data.Maybe       (fromMaybe)
 
--- Size of an x86/x86_64 memory address, in bytes.
+-- Format of an x86/x86_64 memory address, in bytes.
 --
-archWordSize :: Bool -> Size
-archWordSize is32Bit
+archWordFormat :: Bool -> Format
+archWordFormat is32Bit
  | is32Bit   = II32
  | otherwise = II64
 
@@ -184,52 +184,52 @@ data Instr
         | DELTA   Int
 
         -- Moves.
-        | MOV         Size Operand Operand
-        | CMOV   Cond Size Operand Reg
-        | MOVZxL      Size Operand Operand -- size is the size of operand 1
-        | MOVSxL      Size Operand Operand -- size is the size of operand 1
+        | MOV         Format Operand Operand
+        | CMOV   Cond Format Operand Reg
+        | MOVZxL      Format Operand Operand -- format is the size of operand 1
+        | MOVSxL      Format Operand Operand -- format is the size of operand 1
         -- x86_64 note: plain mov into a 32-bit register always zero-extends
         -- into the 64-bit reg, in contrast to the 8 and 16-bit movs which
         -- don't affect the high bits of the register.
 
         -- Load effective address (also a very useful three-operand add instruction :-)
-        | LEA         Size Operand Operand
+        | LEA         Format Operand Operand
 
         -- Int Arithmetic.
-        | ADD         Size Operand Operand
-        | ADC         Size Operand Operand
-        | SUB         Size Operand Operand
-        | SBB         Size Operand Operand
+        | ADD         Format Operand Operand
+        | ADC         Format Operand Operand
+        | SUB         Format Operand Operand
+        | SBB         Format Operand Operand
 
-        | MUL         Size Operand Operand
-        | MUL2        Size Operand              -- %edx:%eax = operand * %rax
-        | IMUL        Size Operand Operand      -- signed int mul
-        | IMUL2       Size Operand              -- %edx:%eax = operand * %eax
+        | MUL         Format Operand Operand
+        | MUL2        Format Operand         -- %edx:%eax = operand * %rax
+        | IMUL        Format Operand Operand -- signed int mul
+        | IMUL2       Format Operand         -- %edx:%eax = operand * %eax
 
-        | DIV         Size Operand              -- eax := eax:edx/op, edx := eax:edx%op
-        | IDIV        Size Operand              -- ditto, but signed
+        | DIV         Format Operand         -- eax := eax:edx/op, edx := eax:edx%op
+        | IDIV        Format Operand         -- ditto, but signed
 
         -- Int Arithmetic, where the effects on the condition register
         -- are important. Used in specialized sequences such as MO_Add2.
         -- Do not rewrite these instructions to "equivalent" ones that
         -- have different effect on the condition register! (See #9013.)
-        | ADD_CC      Size Operand Operand
-        | SUB_CC      Size Operand Operand
+        | ADD_CC      Format Operand Operand
+        | SUB_CC      Format Operand Operand
 
         -- Simple bit-twiddling.
-        | AND         Size Operand Operand
-        | OR          Size Operand Operand
-        | XOR         Size Operand Operand
-        | NOT         Size Operand
-        | NEGI        Size Operand              -- NEG instruction (name clash with Cond)
-        | BSWAP       Size Reg
+        | AND         Format Operand Operand
+        | OR          Format Operand Operand
+        | XOR         Format Operand Operand
+        | NOT         Format Operand
+        | NEGI        Format Operand         -- NEG instruction (name clash with Cond)
+        | BSWAP       Format Reg
 
         -- Shifts (amount may be immediate or %cl only)
-        | SHL         Size Operand{-amount-} Operand
-        | SAR         Size Operand{-amount-} Operand
-        | SHR         Size Operand{-amount-} Operand
+        | SHL         Format Operand{-amount-} Operand
+        | SAR         Format Operand{-amount-} Operand
+        | SHR         Format Operand{-amount-} Operand
 
-        | BT          Size Imm Operand
+        | BT          Format Imm Operand
         | NOP
 
         -- x86 Float Arithmetic.
@@ -239,8 +239,8 @@ data Instr
         -- and furthermore are constrained to be fp regs only.
         -- IMPORTANT: keep is_G_insn up to date with any changes here
         | GMOV        Reg Reg -- src(fpreg), dst(fpreg)
-        | GLD         Size AddrMode Reg -- src, dst(fpreg)
-        | GST         Size Reg AddrMode -- src(fpreg), dst
+        | GLD         Format AddrMode Reg -- src, dst(fpreg)
+        | GST         Format Reg AddrMode -- src(fpreg), dst
 
         | GLDZ        Reg -- dst(fpreg)
         | GLD1        Reg -- dst(fpreg)
@@ -253,10 +253,10 @@ data Instr
 
         | GDTOF       Reg Reg -- src(fpreg), dst(fpreg)
 
-        | GADD        Size Reg Reg Reg -- src1, src2, dst
-        | GDIV        Size Reg Reg Reg -- src1, src2, dst
-        | GSUB        Size Reg Reg Reg -- src1, src2, dst
-        | GMUL        Size Reg Reg Reg -- src1, src2, dst
+        | GADD        Format Reg Reg Reg -- src1, src2, dst
+        | GDIV        Format Reg Reg Reg -- src1, src2, dst
+        | GSUB        Format Reg Reg Reg -- src1, src2, dst
+        | GMUL        Format Reg Reg Reg -- src1, src2, dst
 
                 -- FP compare.  Cond must be `elem` [EQQ, NE, LE, LTT, GE, GTT]
                 -- Compare src1 with src2; set the Zero flag iff the numbers are
@@ -264,12 +264,12 @@ data Instr
                 -- test the %eflags zero flag regardless of the supplied Cond.
         | GCMP        Cond Reg Reg -- src1, src2
 
-        | GABS        Size Reg Reg -- src, dst
-        | GNEG        Size Reg Reg -- src, dst
-        | GSQRT       Size Reg Reg -- src, dst
-        | GSIN        Size CLabel CLabel Reg Reg -- src, dst
-        | GCOS        Size CLabel CLabel Reg Reg -- src, dst
-        | GTAN        Size CLabel CLabel Reg Reg -- src, dst
+        | GABS        Format Reg Reg -- src, dst
+        | GNEG        Format Reg Reg -- src, dst
+        | GSQRT       Format Reg Reg -- src, dst
+        | GSIN        Format CLabel CLabel Reg Reg -- src, dst
+        | GCOS        Format CLabel CLabel Reg Reg -- src, dst
+        | GTAN        Format CLabel CLabel Reg Reg -- src, dst
 
         | GFREE         -- do ffree on all x86 regs; an ugly hack
 
@@ -277,33 +277,33 @@ data Instr
         -- SSE2 floating point: we use a restricted set of the available SSE2
         -- instructions for floating-point.
         -- use MOV for moving (either movss or movsd (movlpd better?))
-        | CVTSS2SD      Reg Reg         -- F32 to F64
-        | CVTSD2SS      Reg Reg         -- F64 to F32
-        | CVTTSS2SIQ    Size Operand Reg -- F32 to I32/I64 (with truncation)
-        | CVTTSD2SIQ    Size Operand Reg -- F64 to I32/I64 (with truncation)
-        | CVTSI2SS      Size Operand Reg -- I32/I64 to F32
-        | CVTSI2SD      Size Operand Reg -- I32/I64 to F64
+        | CVTSS2SD      Reg Reg            -- F32 to F64
+        | CVTSD2SS      Reg Reg            -- F64 to F32
+        | CVTTSS2SIQ    Format Operand Reg -- F32 to I32/I64 (with truncation)
+        | CVTTSD2SIQ    Format Operand Reg -- F64 to I32/I64 (with truncation)
+        | CVTSI2SS      Format Operand Reg -- I32/I64 to F32
+        | CVTSI2SD      Format Operand Reg -- I32/I64 to F64
 
         -- use ADD & SUB for arithmetic.  In both cases, operands
         -- are  Operand Reg.
 
         -- SSE2 floating-point division:
-        | FDIV          Size Operand Operand   -- divisor, dividend(dst)
+        | FDIV          Format Operand Operand   -- divisor, dividend(dst)
 
         -- use CMP for comparisons.  ucomiss and ucomisd instructions
         -- compare single/double prec floating point respectively.
 
-        | SQRT          Size Operand Reg        -- src, dst
+        | SQRT          Format Operand Reg      -- src, dst
 
 
         -- Comparison
-        | TEST          Size Operand Operand
-        | CMP           Size Operand Operand
+        | TEST          Format Operand Operand
+        | CMP           Format Operand Operand
         | SETCC         Cond Operand
 
         -- Stack Operations.
-        | PUSH          Size Operand
-        | POP           Size Operand
+        | PUSH          Format Operand
+        | POP           Format Operand
         -- both unused (SDM):
         --  | PUSHA
         --  | POPA
@@ -320,7 +320,7 @@ data Instr
         | CALL        (Either Imm Reg) [Reg]
 
         -- Other things.
-        | CLTD Size              -- sign extend %eax into %edx:%eax
+        | CLTD Format            -- sign extend %eax into %edx:%eax
 
         | FETCHGOT    Reg        -- pseudo-insn for ELF position-independent code
                                  -- pretty-prints as
@@ -333,17 +333,17 @@ data Instr
                                  -- 1:    popl %reg
 
     -- bit counting instructions
-        | POPCNT      Size Operand Reg -- [SSE4.2] count number of bits set to 1
-        | BSF         Size Operand Reg -- bit scan forward
-        | BSR         Size Operand Reg -- bit scan reverse
+        | POPCNT      Format Operand Reg -- [SSE4.2] count number of bits set to 1
+        | BSF         Format Operand Reg -- bit scan forward
+        | BSR         Format Operand Reg -- bit scan reverse
 
     -- prefetch
-        | PREFETCH  PrefetchVariant Size Operand -- prefetch Variant, addr size, address to prefetch
+        | PREFETCH  PrefetchVariant Format Operand -- prefetch Variant, addr size, address to prefetch
                                         -- variant can be NTA, Lvl0, Lvl1, or Lvl2
 
         | LOCK        Instr -- lock prefix
-        | XADD        Size Operand Operand  -- src (r), dst (r/m)
-        | CMPXCHG     Size Operand Operand  -- src (r), dst (r/m), eax implicit
+        | XADD        Format Operand Operand -- src (r), dst (r/m)
+        | CMPXCHG     Format Operand Operand -- src (r), dst (r/m), eax implicit
         | MFENCE
 
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
@@ -541,44 +541,44 @@ interesting _        (RegReal (RealRegPair{}))   = panic "X86.interesting: no re
 x86_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 x86_patchRegsOfInstr instr env
  = case instr of
-    MOV  sz src dst     -> patch2 (MOV  sz) src dst
-    CMOV cc sz src dst  -> CMOV cc sz (patchOp src) (env dst)
-    MOVZxL sz src dst   -> patch2 (MOVZxL sz) src dst
-    MOVSxL sz src dst   -> patch2 (MOVSxL sz) src dst
-    LEA  sz src dst     -> patch2 (LEA  sz) src dst
-    ADD  sz src dst     -> patch2 (ADD  sz) src dst
-    ADC  sz src dst     -> patch2 (ADC  sz) src dst
-    SUB  sz src dst     -> patch2 (SUB  sz) src dst
-    SBB  sz src dst     -> patch2 (SBB  sz) src dst
-    IMUL sz src dst     -> patch2 (IMUL sz) src dst
-    IMUL2 sz src        -> patch1 (IMUL2 sz) src
-    MUL sz src dst      -> patch2 (MUL sz) src dst
-    MUL2 sz src         -> patch1 (MUL2 sz) src
-    IDIV sz op          -> patch1 (IDIV sz) op
-    DIV sz op           -> patch1 (DIV sz) op
-    ADD_CC sz src dst   -> patch2 (ADD_CC sz) src dst
-    SUB_CC sz src dst   -> patch2 (SUB_CC sz) src dst
-    AND  sz src dst     -> patch2 (AND  sz) src dst
-    OR   sz src dst     -> patch2 (OR   sz) src dst
-    XOR  sz src dst     -> patch2 (XOR  sz) src dst
-    NOT  sz op          -> patch1 (NOT  sz) op
-    BSWAP sz reg        -> BSWAP sz (env reg)
-    NEGI sz op          -> patch1 (NEGI sz) op
-    SHL  sz imm dst     -> patch1 (SHL sz imm) dst
-    SAR  sz imm dst     -> patch1 (SAR sz imm) dst
-    SHR  sz imm dst     -> patch1 (SHR sz imm) dst
-    BT   sz imm src     -> patch1 (BT  sz imm) src
-    TEST sz src dst     -> patch2 (TEST sz) src dst
-    CMP  sz src dst     -> patch2 (CMP  sz) src dst
-    PUSH sz op          -> patch1 (PUSH sz) op
-    POP  sz op          -> patch1 (POP  sz) op
-    SETCC cond op       -> patch1 (SETCC cond) op
-    JMP op regs         -> JMP (patchOp op) regs
-    JMP_TBL op ids s lbl-> JMP_TBL (patchOp op) ids s lbl
+    MOV  fmt src dst     -> patch2 (MOV  fmt) src dst
+    CMOV cc fmt src dst  -> CMOV cc fmt (patchOp src) (env dst)
+    MOVZxL fmt src dst   -> patch2 (MOVZxL fmt) src dst
+    MOVSxL fmt src dst   -> patch2 (MOVSxL fmt) src dst
+    LEA  fmt src dst     -> patch2 (LEA  fmt) src dst
+    ADD  fmt src dst     -> patch2 (ADD  fmt) src dst
+    ADC  fmt src dst     -> patch2 (ADC  fmt) src dst
+    SUB  fmt src dst     -> patch2 (SUB  fmt) src dst
+    SBB  fmt src dst     -> patch2 (SBB  fmt) src dst
+    IMUL fmt src dst     -> patch2 (IMUL fmt) src dst
+    IMUL2 fmt src        -> patch1 (IMUL2 fmt) src
+    MUL fmt src dst      -> patch2 (MUL fmt) src dst
+    MUL2 fmt src         -> patch1 (MUL2 fmt) src
+    IDIV fmt op          -> patch1 (IDIV fmt) op
+    DIV fmt op           -> patch1 (DIV fmt) op
+    ADD_CC fmt src dst   -> patch2 (ADD_CC fmt) src dst
+    SUB_CC fmt src dst   -> patch2 (SUB_CC fmt) src dst
+    AND  fmt src dst     -> patch2 (AND  fmt) src dst
+    OR   fmt src dst     -> patch2 (OR   fmt) src dst
+    XOR  fmt src dst     -> patch2 (XOR  fmt) src dst
+    NOT  fmt op          -> patch1 (NOT  fmt) op
+    BSWAP fmt reg        -> BSWAP fmt (env reg)
+    NEGI fmt op          -> patch1 (NEGI fmt) op
+    SHL  fmt imm dst     -> patch1 (SHL fmt imm) dst
+    SAR  fmt imm dst     -> patch1 (SAR fmt imm) dst
+    SHR  fmt imm dst     -> patch1 (SHR fmt imm) dst
+    BT   fmt imm src     -> patch1 (BT  fmt imm) src
+    TEST fmt src dst     -> patch2 (TEST fmt) src dst
+    CMP  fmt src dst     -> patch2 (CMP  fmt) src dst
+    PUSH fmt op          -> patch1 (PUSH fmt) op
+    POP  fmt op          -> patch1 (POP  fmt) op
+    SETCC cond op        -> patch1 (SETCC cond) op
+    JMP op regs          -> JMP (patchOp op) regs
+    JMP_TBL op ids s lbl -> JMP_TBL (patchOp op) ids s lbl
 
-    GMOV src dst        -> GMOV (env src) (env dst)
-    GLD  sz src dst     -> GLD sz (lookupAddr src) (env dst)
-    GST  sz src dst     -> GST sz (env src) (lookupAddr dst)
+    GMOV src dst         -> GMOV (env src) (env dst)
+    GLD  fmt src dst     -> GLD fmt (lookupAddr src) (env dst)
+    GST  fmt src dst     -> GST fmt (env src) (lookupAddr dst)
 
     GLDZ dst            -> GLDZ (env dst)
     GLD1 dst            -> GLD1 (env dst)
@@ -591,26 +591,26 @@ x86_patchRegsOfInstr instr env
 
     GDTOF src dst       -> GDTOF (env src) (env dst)
 
-    GADD sz s1 s2 dst   -> GADD sz (env s1) (env s2) (env dst)
-    GSUB sz s1 s2 dst   -> GSUB sz (env s1) (env s2) (env dst)
-    GMUL sz s1 s2 dst   -> GMUL sz (env s1) (env s2) (env dst)
-    GDIV sz s1 s2 dst   -> GDIV sz (env s1) (env s2) (env dst)
+    GADD fmt s1 s2 dst   -> GADD fmt (env s1) (env s2) (env dst)
+    GSUB fmt s1 s2 dst   -> GSUB fmt (env s1) (env s2) (env dst)
+    GMUL fmt s1 s2 dst   -> GMUL fmt (env s1) (env s2) (env dst)
+    GDIV fmt s1 s2 dst   -> GDIV fmt (env s1) (env s2) (env dst)
 
-    GCMP sz src1 src2   -> GCMP sz (env src1) (env src2)
-    GABS sz src dst     -> GABS sz (env src) (env dst)
-    GNEG sz src dst     -> GNEG sz (env src) (env dst)
-    GSQRT sz src dst    -> GSQRT sz (env src) (env dst)
-    GSIN sz l1 l2 src dst       -> GSIN sz l1 l2 (env src) (env dst)
-    GCOS sz l1 l2 src dst       -> GCOS sz l1 l2 (env src) (env dst)
-    GTAN sz l1 l2 src dst       -> GTAN sz l1 l2 (env src) (env dst)
+    GCMP fmt src1 src2   -> GCMP fmt (env src1) (env src2)
+    GABS fmt src dst     -> GABS fmt (env src) (env dst)
+    GNEG fmt src dst     -> GNEG fmt (env src) (env dst)
+    GSQRT fmt src dst    -> GSQRT fmt (env src) (env dst)
+    GSIN fmt l1 l2 src dst       -> GSIN fmt l1 l2 (env src) (env dst)
+    GCOS fmt l1 l2 src dst       -> GCOS fmt l1 l2 (env src) (env dst)
+    GTAN fmt l1 l2 src dst       -> GTAN fmt l1 l2 (env src) (env dst)
 
     CVTSS2SD src dst    -> CVTSS2SD (env src) (env dst)
     CVTSD2SS src dst    -> CVTSD2SS (env src) (env dst)
-    CVTTSS2SIQ sz src dst -> CVTTSS2SIQ sz (patchOp src) (env dst)
-    CVTTSD2SIQ sz src dst -> CVTTSD2SIQ sz (patchOp src) (env dst)
-    CVTSI2SS sz src dst -> CVTSI2SS sz (patchOp src) (env dst)
-    CVTSI2SD sz src dst -> CVTSI2SD sz (patchOp src) (env dst)
-    FDIV sz src dst     -> FDIV sz (patchOp src) (patchOp dst)
+    CVTTSS2SIQ fmt src dst -> CVTTSS2SIQ fmt (patchOp src) (env dst)
+    CVTTSD2SIQ fmt src dst -> CVTTSD2SIQ fmt (patchOp src) (env dst)
+    CVTSI2SS fmt src dst -> CVTSI2SS fmt (patchOp src) (env dst)
+    CVTSI2SD fmt src dst -> CVTSI2SD fmt (patchOp src) (env dst)
+    FDIV fmt src dst     -> FDIV fmt (patchOp src) (patchOp dst)
 
     CALL (Left _)  _    -> instr
     CALL (Right reg) p  -> CALL (Right (env reg)) p
@@ -627,16 +627,16 @@ x86_patchRegsOfInstr instr env
     JXX_GBL _ _         -> instr
     CLTD _              -> instr
 
-    POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
-    BSF    sz src dst -> BSF    sz (patchOp src) (env dst)
-    BSR    sz src dst -> BSR    sz (patchOp src) (env dst)
+    POPCNT fmt src dst -> POPCNT fmt (patchOp src) (env dst)
+    BSF    fmt src dst -> BSF    fmt (patchOp src) (env dst)
+    BSR    fmt src dst -> BSR    fmt (patchOp src) (env dst)
 
-    PREFETCH lvl size src -> PREFETCH lvl size (patchOp src)
+    PREFETCH lvl format src -> PREFETCH lvl format (patchOp src)
 
-    LOCK i              -> LOCK (x86_patchRegsOfInstr i env)
-    XADD sz src dst     -> patch2 (XADD sz) src dst
-    CMPXCHG sz src dst  -> patch2 (CMPXCHG sz) src dst
-    MFENCE              -> instr
+    LOCK i               -> LOCK (x86_patchRegsOfInstr i env)
+    XADD fmt src dst     -> patch2 (XADD fmt) src dst
+    CMPXCHG fmt src dst  -> patch2 (CMPXCHG fmt) src dst
+    MFENCE               -> instr
 
     _other              -> panic "patchRegs: unrecognised instr"
 
@@ -713,7 +713,7 @@ x86_mkSpillInstr dflags reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
     case targetClassOfReg platform reg of
-           RcInteger   -> MOV (archWordSize is32Bit)
+           RcInteger   -> MOV (archWordFormat is32Bit)
                               (OpReg reg) (OpAddr (spRel dflags off))
            RcDouble    -> GST FF80 reg (spRel dflags off) {- RcFloat/RcDouble -}
            RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
@@ -733,7 +733,7 @@ x86_mkLoadInstr dflags reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
         case targetClassOfReg platform reg of
-              RcInteger -> MOV (archWordSize is32Bit)
+              RcInteger -> MOV (archWordFormat is32Bit)
                                (OpAddr (spRel dflags off)) (OpReg reg)
               RcDouble  -> GLD FF80 (spRel dflags off) reg {- RcFloat/RcDouble -}
               RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)

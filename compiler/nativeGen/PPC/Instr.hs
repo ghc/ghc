@@ -12,7 +12,7 @@
 #include "nativeGen/NCG.h"
 
 module PPC.Instr (
-    archWordSize,
+    archWordFormat,
     RI(..),
     Instr(..),
     maxSpillSlots,
@@ -25,7 +25,7 @@ where
 import PPC.Regs
 import PPC.Cond
 import Instruction
-import Size
+import Format
 import TargetReg
 import RegClass
 import Reg
@@ -47,10 +47,10 @@ import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
 --------------------------------------------------------------------------------
--- Size of a PPC memory address, in bytes.
+-- Format of a PPC memory address.
 --
-archWordSize :: Bool -> Size
-archWordSize is32Bit
+archWordFormat :: Bool -> Format
+archWordFormat is32Bit
  | is32Bit   = II32
  | otherwise = II64
 
@@ -186,16 +186,16 @@ data Instr
     | DELTA   Int
 
     -- Loads and stores.
-    | LD      Size Reg AddrMode     -- Load size, dst, src
-    | LA      Size Reg AddrMode     -- Load arithmetic size, dst, src
-    | ST      Size Reg AddrMode     -- Store size, src, dst
-    | STU     Size Reg AddrMode     -- Store with Update size, src, dst
+    | LD      Format Reg AddrMode   -- Load format, dst, src
+    | LA      Format Reg AddrMode   -- Load arithmetic format, dst, src
+    | ST      Format Reg AddrMode   -- Store format, src, dst
+    | STU     Format Reg AddrMode   -- Store with Update format, src, dst
     | LIS     Reg Imm               -- Load Immediate Shifted dst, src
     | LI      Reg Imm               -- Load Immediate dst, src
     | MR      Reg Reg               -- Move Register dst, src -- also for fmr
 
-    | CMP     Size Reg RI           -- size, src1, src2
-    | CMPL    Size Reg RI           -- size, src1, src2
+    | CMP     Format Reg RI         -- format, src1, src2
+    | CMPL    Format Reg RI         -- format, src1, src2
 
     | BCC     Cond BlockId
     | BCCFAR  Cond BlockId
@@ -240,22 +240,22 @@ data Instr
     | XOR     Reg Reg RI            -- dst, src1, src2
     | XORIS   Reg Reg Imm           -- XOR Immediate Shifted dst, src1, src2
 
-    | EXTS    Size Reg Reg
+    | EXTS    Format Reg Reg
 
     | NEG     Reg Reg
     | NOT     Reg Reg
 
-    | SL      Size Reg Reg RI            -- shift left
-    | SR      Size Reg Reg RI            -- shift right
-    | SRA     Size Reg Reg RI            -- shift right arithmetic
+    | SL      Format Reg Reg RI            -- shift left
+    | SR      Format Reg Reg RI            -- shift right
+    | SRA     Format Reg Reg RI            -- shift right arithmetic
 
     | RLWINM  Reg Reg Int Int Int   -- Rotate Left Word Immediate then AND with Mask
 
-    | FADD    Size Reg Reg Reg
-    | FSUB    Size Reg Reg Reg
-    | FMUL    Size Reg Reg Reg
-    | FDIV    Size Reg Reg Reg
-    | FNEG    Reg Reg           -- negate is the same for single and double prec.
+    | FADD    Format Reg Reg Reg
+    | FSUB    Format Reg Reg Reg
+    | FMUL    Format Reg Reg Reg
+    | FDIV    Format Reg Reg Reg
+    | FNEG    Reg Reg               -- negate is the same for single and double prec.
 
     | FCMP    Reg Reg
 
@@ -375,15 +375,15 @@ interesting _        (RegReal (RealRegPair{}))
 ppc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 ppc_patchRegsOfInstr instr env
  = case instr of
-    LD      sz reg addr     -> LD sz (env reg) (fixAddr addr)
-    LA      sz reg addr     -> LA sz (env reg) (fixAddr addr)
-    ST      sz reg addr     -> ST sz (env reg) (fixAddr addr)
-    STU     sz reg addr     -> STU sz (env reg) (fixAddr addr)
+    LD      fmt reg addr    -> LD fmt (env reg) (fixAddr addr)
+    LA      fmt reg addr    -> LA fmt (env reg) (fixAddr addr)
+    ST      fmt reg addr    -> ST fmt (env reg) (fixAddr addr)
+    STU     fmt reg addr    -> STU fmt (env reg) (fixAddr addr)
     LIS     reg imm         -> LIS (env reg) imm
     LI      reg imm         -> LI (env reg) imm
     MR      reg1 reg2       -> MR (env reg1) (env reg2)
-    CMP     sz reg ri       -> CMP sz (env reg) (fixRI ri)
-    CMPL    sz reg ri       -> CMPL sz (env reg) (fixRI ri)
+    CMP     fmt reg ri      -> CMP fmt (env reg) (fixRI ri)
+    CMPL    fmt reg ri      -> CMPL fmt (env reg) (fixRI ri)
     BCC     cond lbl        -> BCC cond lbl
     BCCFAR  cond lbl        -> BCCFAR cond lbl
     MTCTR   reg             -> MTCTR (env reg)
@@ -413,18 +413,21 @@ ppc_patchRegsOfInstr instr env
     ORIS    reg1 reg2 imm   -> ORIS (env reg1) (env reg2) imm
     XOR     reg1 reg2 ri    -> XOR (env reg1) (env reg2) (fixRI ri)
     XORIS   reg1 reg2 imm   -> XORIS (env reg1) (env reg2) imm
-    EXTS    sz reg1 reg2    -> EXTS sz (env reg1) (env reg2)
+    EXTS    fmt reg1 reg2   -> EXTS fmt (env reg1) (env reg2)
     NEG     reg1 reg2       -> NEG (env reg1) (env reg2)
     NOT     reg1 reg2       -> NOT (env reg1) (env reg2)
-    SL      sz reg1 reg2 ri -> SL sz (env reg1) (env reg2) (fixRI ri)
-    SR      sz reg1 reg2 ri -> SR sz (env reg1) (env reg2) (fixRI ri)
-    SRA     sz reg1 reg2 ri -> SRA sz (env reg1) (env reg2) (fixRI ri)
+    SL      fmt reg1 reg2 ri
+                            -> SL fmt (env reg1) (env reg2) (fixRI ri)
+    SR      fmt reg1 reg2 ri
+                            -> SR fmt (env reg1) (env reg2) (fixRI ri)
+    SRA     fmt reg1 reg2 ri
+                            -> SRA fmt (env reg1) (env reg2) (fixRI ri)
     RLWINM  reg1 reg2 sh mb me
                             -> RLWINM (env reg1) (env reg2) sh mb me
-    FADD    sz r1 r2 r3     -> FADD sz (env r1) (env r2) (env r3)
-    FSUB    sz r1 r2 r3     -> FSUB sz (env r1) (env r2) (env r3)
-    FMUL    sz r1 r2 r3     -> FMUL sz (env r1) (env r2) (env r3)
-    FDIV    sz r1 r2 r3     -> FDIV sz (env r1) (env r2) (env r3)
+    FADD    fmt r1 r2 r3    -> FADD fmt (env r1) (env r2) (env r3)
+    FSUB    fmt r1 r2 r3    -> FSUB fmt (env r1) (env r2) (env r3)
+    FMUL    fmt r1 r2 r3    -> FMUL fmt (env r1) (env r2) (env r3)
+    FDIV    fmt r1 r2 r3    -> FDIV fmt (env r1) (env r2) (env r3)
     FNEG    r1 r2           -> FNEG (env r1) (env r2)
     FCMP    r1 r2           -> FCMP (env r1) (env r2)
     FCTIWZ  r1 r2           -> FCTIWZ (env r1) (env r2)
@@ -499,13 +502,13 @@ ppc_mkSpillInstr dflags reg delta slot
         off      = spillSlotToOffset slot
         arch     = platformArch platform
     in
-    let sz = case targetClassOfReg platform reg of
+    let fmt = case targetClassOfReg platform reg of
                 RcInteger -> case arch of
                                 ArchPPC -> II32
                                 _       -> II64
                 RcDouble  -> FF64
                 _         -> panic "PPC.Instr.mkSpillInstr: no match"
-    in ST sz reg (AddrRegImm sp (ImmInt (off-delta)))
+    in ST fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 ppc_mkLoadInstr
@@ -520,13 +523,13 @@ ppc_mkLoadInstr dflags reg delta slot
         off     = spillSlotToOffset slot
         arch     = platformArch platform
     in
-    let sz = case targetClassOfReg platform reg of
+    let fmt = case targetClassOfReg platform reg of
                 RcInteger ->  case arch of
                                  ArchPPC -> II32
                                  _       -> II64
                 RcDouble  -> FF64
                 _         -> panic "PPC.Instr.mkLoadInstr: no match"
-    in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
+    in LD fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 -- | The maximum number of bytes required to spill a register. PPC32

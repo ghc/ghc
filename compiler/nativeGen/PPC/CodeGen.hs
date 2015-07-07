@@ -34,7 +34,7 @@ import CPrim
 import NCGMonad
 import Instruction
 import PIC
-import Size
+import Format
 import RegClass
 import Reg
 import TargetReg
@@ -141,20 +141,20 @@ stmtToInstrs stmt = do
     CmmUnwind {}   -> return nilOL
 
     CmmAssign reg src
-      | isFloatType ty -> assignReg_FltCode size reg src
+      | isFloatType ty -> assignReg_FltCode format reg src
       | target32Bit (targetPlatform dflags) &&
         isWord64 ty    -> assignReg_I64Code      reg src
-      | otherwise        -> assignReg_IntCode size reg src
+      | otherwise        -> assignReg_IntCode format reg src
         where ty = cmmRegType dflags reg
-              size = cmmTypeSize ty
+              format = cmmTypeFormat ty
 
     CmmStore addr src
-      | isFloatType ty -> assignMem_FltCode size addr src
+      | isFloatType ty -> assignMem_FltCode format addr src
       | target32Bit (targetPlatform dflags) &&
         isWord64 ty      -> assignMem_I64Code      addr src
-      | otherwise        -> assignMem_IntCode size addr src
+      | otherwise        -> assignMem_IntCode format addr src
         where ty = cmmExprType dflags src
-              size = cmmTypeSize ty
+              format = cmmTypeFormat ty
 
     CmmUnsafeForeignCall target result_regs args
        -> genCCall target result_regs args
@@ -185,20 +185,20 @@ type InstrBlock
 --      register to put it in.
 --
 data Register
-        = Fixed Size Reg InstrBlock
-        | Any   Size (Reg -> InstrBlock)
+        = Fixed Format Reg InstrBlock
+        | Any   Format (Reg -> InstrBlock)
 
 
-swizzleRegisterRep :: Register -> Size -> Register
-swizzleRegisterRep (Fixed _ reg code) size = Fixed size reg code
-swizzleRegisterRep (Any _ codefn)     size = Any   size codefn
+swizzleRegisterRep :: Register -> Format -> Register
+swizzleRegisterRep (Fixed _ reg code) format = Fixed format reg code
+swizzleRegisterRep (Any _ codefn)     format = Any   format codefn
 
 
 -- | Grab the Reg for a CmmReg
 getRegisterReg :: Platform -> CmmReg -> Reg
 
 getRegisterReg _ (CmmLocal (LocalReg u pk))
-  = RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
+  = RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
 
 getRegisterReg platform (CmmGlobal mid)
   = case globalRegMaybe platform mid of
@@ -382,13 +382,13 @@ getRegister' :: DynFlags -> CmmExpr -> NatM Register
 
 getRegister' dflags (CmmReg (CmmGlobal PicBaseReg))
   | target32Bit (targetPlatform dflags) = do
-      reg <- getPicBaseNat $ archWordSize (target32Bit (targetPlatform dflags))
-      return (Fixed (archWordSize (target32Bit (targetPlatform dflags)))
+      reg <- getPicBaseNat $ archWordFormat (target32Bit (targetPlatform dflags))
+      return (Fixed (archWordFormat (target32Bit (targetPlatform dflags)))
                     reg nilOL)
   | otherwise = return (Fixed II64 toc nilOL)
 
 getRegister' dflags (CmmReg reg)
-  = return (Fixed (cmmTypeSize (cmmRegType dflags reg))
+  = return (Fixed (cmmTypeFormat (cmmRegType dflags reg))
                   (getRegisterReg (targetPlatform dflags) reg) nilOL)
 
 getRegister' dflags tree@(CmmRegOff _ _)
@@ -424,14 +424,14 @@ getRegister' dflags (CmmLoad mem pk)
         let platform = targetPlatform dflags
         Amode addr addr_code <- getAmode D mem
         let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
-                       addr_code `snocOL` LD size dst addr
-        return (Any size code)
+                       addr_code `snocOL` LD format dst addr
+        return (Any format code)
  | not (target32Bit (targetPlatform dflags)) = do
         Amode addr addr_code <- getAmode DS mem
         let code dst = addr_code `snocOL` LD II64 dst addr
         return (Any II64 code)
 
-          where size = cmmTypeSize pk
+          where format = cmmTypeFormat pk
 
 -- catch simple cases of zero- or sign-extended load
 getRegister' _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
@@ -482,14 +482,14 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
       MO_SF_Conv from to -> coerceInt2FP from to x
 
       MO_SS_Conv from to
-        | from == to    -> conversionNop (intSize to) x
+        | from == to    -> conversionNop (intFormat to) x
 
         -- narrowing is a nop: we treat the high bits as undefined
       MO_SS_Conv W64 to
         | arch32    -> panic "PPC.CodeGen.getRegister no 64 bit int register"
-        | otherwise -> conversionNop (intSize to) x
+        | otherwise -> conversionNop (intFormat to) x
       MO_SS_Conv W32 to
-        | arch32    -> conversionNop (intSize to) x
+        | arch32    -> conversionNop (intFormat to) x
         | otherwise -> case to of
             W64 -> triv_ucode_int to (EXTS II32)
             W16 -> conversionNop II16 x
@@ -500,13 +500,13 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
       MO_SS_Conv W16 to -> triv_ucode_int to (EXTS II16)
 
       MO_UU_Conv from to
-        | from == to -> conversionNop (intSize to) x
+        | from == to -> conversionNop (intFormat to) x
         -- narrowing is a nop: we treat the high bits as undefined
       MO_UU_Conv W64 to
         | arch32    -> panic "PPC.CodeGen.getRegister no 64 bit target"
-        | otherwise -> conversionNop (intSize to) x
+        | otherwise -> conversionNop (intFormat to) x
       MO_UU_Conv W32 to
-        | arch32    -> conversionNop (intSize to) x
+        | arch32    -> conversionNop (intFormat to) x
         | otherwise ->
           case to of
            W64 -> trivialCode to False AND x (CmmLit (CmmInt 4294967295 W64))
@@ -519,12 +519,12 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
       _ -> panic "PPC.CodeGen.getRegister: no match"
 
     where
-        triv_ucode_int   width instr = trivialUCode (intSize   width) instr x
-        triv_ucode_float width instr = trivialUCode (floatSize width) instr x
+        triv_ucode_int   width instr = trivialUCode (intFormat    width) instr x
+        triv_ucode_float width instr = trivialUCode (floatFormat  width) instr x
 
-        conversionNop new_size expr
+        conversionNop new_format expr
             = do e_code <- getRegister' dflags expr
-                 return (swizzleRegisterRep e_code new_size)
+                 return (swizzleRegisterRep e_code new_format)
         arch32 = target32Bit $ targetPlatform dflags
 
 getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
@@ -586,7 +586,7 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
         case y of    -- subfi ('substract from' with immediate) doesn't exist
           CmmLit (CmmInt imm immrep) | Just _ <- makeImmediate rep True (-imm)
             -> trivialCode rep True ADD x (CmmLit $ CmmInt (-imm) immrep)
-          _ -> trivialCodeNoImm' (intSize rep) SUBF y x
+          _ -> trivialCodeNoImm' (intFormat rep) SUBF y x
 
       MO_Mul rep
        | arch32    -> trivialCode rep True MULLW x y
@@ -599,14 +599,14 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_U_MulMayOflo _ -> panic "U_MulMayOflo: not implemented"
 
       MO_S_Quot rep
-       | arch32     -> trivialCodeNoImm' (intSize rep) DIVW
+       | arch32     -> trivialCodeNoImm' (intFormat rep) DIVW
                 (extendSExpr dflags rep x) (extendSExpr dflags rep y)
-       | otherwise  -> trivialCodeNoImm' (intSize rep) DIVD
+       | otherwise  -> trivialCodeNoImm' (intFormat rep) DIVD
                 (extendSExpr dflags rep x) (extendSExpr dflags rep y)
       MO_U_Quot rep
-       | arch32     -> trivialCodeNoImm' (intSize rep) DIVWU
+       | arch32     -> trivialCodeNoImm' (intFormat rep) DIVWU
                 (extendUExpr dflags rep x) (extendUExpr dflags rep y)
-       | otherwise  -> trivialCodeNoImm' (intSize rep) DIVDU
+       | otherwise  -> trivialCodeNoImm' (intFormat rep) DIVDU
                 (extendUExpr dflags rep x) (extendUExpr dflags rep y)
 
       MO_S_Rem rep
@@ -630,8 +630,8 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
       _         -> panic "PPC.CodeGen.getRegister: no match"
 
   where
-    triv_float :: Width -> (Size -> Reg -> Reg -> Reg -> Instr) -> NatM Register
-    triv_float width instr = trivialCodeNoImm (floatSize width) instr x y
+    triv_float :: Width -> (Format -> Reg -> Reg -> Reg -> Instr) -> NatM Register
+    triv_float width instr = trivialCodeNoImm (floatFormat width) instr x y
 
     arch32 = target32Bit $ targetPlatform dflags
 
@@ -640,19 +640,19 @@ getRegister' _ (CmmLit (CmmInt i rep))
   = let
         code dst = unitOL (LI dst imm)
     in
-        return (Any (intSize rep) code)
+        return (Any (intFormat rep) code)
 
 getRegister' _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
     dflags <- getDynFlags
     dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode D dynRef
-    let size = floatSize frep
+    let format = floatFormat frep
         code dst =
             LDATA ReadOnlyData (Statics lbl
                                    [CmmStaticLit (CmmFloat f frep)])
-            `consOL` (addr_code `snocOL` LD size dst addr)
-    return (Any size code)
+            `consOL` (addr_code `snocOL` LD format dst addr)
+    return (Any format code)
 
 getRegister' dflags (CmmLit lit)
   | target32Bit (targetPlatform dflags)
@@ -662,19 +662,19 @@ getRegister' dflags (CmmLit lit)
               LIS dst (HA imm),
               ADD dst dst (RIImm (LO imm))
           ]
-    in return (Any (cmmTypeSize rep) code)
+    in return (Any (cmmTypeFormat rep) code)
   | otherwise
   = do lbl <- getNewLabelNat
        dflags <- getDynFlags
        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
        Amode addr addr_code <- getAmode D dynRef
        let rep = cmmLitType dflags lit
-           size = cmmTypeSize rep
+           format = cmmTypeFormat rep
            code dst =
             LDATA ReadOnlyData (Statics lbl
                                    [CmmStaticLit lit])
-            `consOL` (addr_code `snocOL` LD size dst addr)
-       return (Any size code)
+            `consOL` (addr_code `snocOL` LD format dst addr)
+       return (Any format code)
 
 getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
 
@@ -908,18 +908,18 @@ condIntCode cond x (CmmLit (CmmInt y rep))
   = do
         (src1, code) <- getSomeReg x
         dflags <- getDynFlags
-        let size = archWordSize $ target32Bit $ targetPlatform dflags
+        let format = archWordFormat $ target32Bit $ targetPlatform dflags
             code' = code `snocOL`
-              (if condUnsigned cond then CMPL else CMP) size src1 (RIImm src2)
+              (if condUnsigned cond then CMPL else CMP) format src1 (RIImm src2)
         return (CondCode False cond code')
 
 condIntCode cond x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     dflags <- getDynFlags
-    let size = archWordSize $ target32Bit $ targetPlatform dflags
+    let format = archWordFormat $ target32Bit $ targetPlatform dflags
         code' = code1 `appOL` code2 `snocOL`
-          (if condUnsigned cond then CMPL else CMP) size src1 (RIReg src2)
+          (if condUnsigned cond then CMPL else CMP) format src1 (RIReg src2)
     return (CondCode False cond code')
 
 condFltCode cond x y = do
@@ -949,11 +949,11 @@ condFltCode cond x y = do
 -- fails when the right hand side is forced into a fixed register
 -- (e.g. the result of a call).
 
-assignMem_IntCode :: Size -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_IntCode :: Size -> CmmReg  -> CmmExpr -> NatM InstrBlock
+assignMem_IntCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
+assignReg_IntCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 
-assignMem_FltCode :: Size -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_FltCode :: Size -> CmmReg  -> CmmExpr -> NatM InstrBlock
+assignMem_FltCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
+assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 
 assignMem_IntCode pk addr src = do
     (srcReg, code) <- getSomeReg src
@@ -1142,7 +1142,7 @@ genCCall' _ _ (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
 genCCall' dflags gcp target dest_regs args
-  = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
+  = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeFormat argReps)
         -- we rely on argument promotion in the codeGen
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
@@ -1200,7 +1200,7 @@ genCCall' dflags gcp target dest_regs args
             -- See Note [implicit register in PPC PIC code]
             -- on why we claim to use PIC register here
             when (gopt Opt_PIC dflags && target32Bit platform) $ do
-                _ <- getPicBaseNat $ archWordSize True
+                _ <- getPicBaseNat $ archWordFormat True
                 return ()
 
         initialStackOffset = case gcp of
@@ -1228,28 +1228,28 @@ genCCall' dflags gcp target dest_regs args
         roundTo a x | x `mod` a == 0 = x
                     | otherwise = x + a - (x `mod` a)
 
-        spSize = if target32Bit platform then II32 else II64
+        spFormat = if target32Bit platform then II32 else II64
 
         move_sp_down finalStack
                | delta > 64 =
-                        toOL [STU spSize sp (AddrRegImm sp (ImmInt (-delta))),
+                        toOL [STU spFormat sp (AddrRegImm sp (ImmInt (-delta))),
                               DELTA (-delta)]
                | otherwise = nilOL
                where delta = stackDelta finalStack
         toc_before = case gcp of
-           GCPLinux64ELF 1 -> unitOL $ ST spSize toc (AddrRegImm sp (ImmInt 40))
-           GCPLinux64ELF 2 -> unitOL $ ST spSize toc (AddrRegImm sp (ImmInt 24))
+           GCPLinux64ELF 1 -> unitOL $ ST spFormat toc (AddrRegImm sp (ImmInt 40))
+           GCPLinux64ELF 2 -> unitOL $ ST spFormat toc (AddrRegImm sp (ImmInt 24))
            _               -> nilOL
         toc_after labelOrExpr = case gcp of
            GCPLinux64ELF 1 -> case labelOrExpr of
                                 Left _  -> toOL [ NOP ]
-                                Right _ -> toOL [ LD spSize toc
+                                Right _ -> toOL [ LD spFormat toc
                                                      (AddrRegImm sp
                                                       (ImmInt 40))
                                                 ]
            GCPLinux64ELF 2 -> case labelOrExpr of
                                 Left _  -> toOL [ NOP ]
-                                Right _ -> toOL [ LD spSize toc
+                                Right _ -> toOL [ LD spFormat toc
                                                      (AddrRegImm sp
                                                       (ImmInt 24))
                                                 ]
@@ -1331,7 +1331,7 @@ genCCall' dflags gcp target dest_regs args
                               (drop nGprs gprs)
                               (drop nFprs fprs)
                               (stackOffset' + stackBytes)
-                              (accumCode `appOL` code `snocOL` ST (cmmTypeSize rep) vr stackSlot)
+                              (accumCode `appOL` code `snocOL` ST (cmmTypeFormat rep) vr stackSlot)
                               accumUsed
             where
                 stackOffset' = case gcp of
@@ -1355,7 +1355,7 @@ genCCall' dflags gcp target dest_regs args
                 (nGprs, nFprs, stackBytes, regs)
                     = case gcp of
                       GCPDarwin ->
-                          case cmmTypeSize rep of
+                          case cmmTypeFormat rep of
                           II8  -> (1, 0, 4, gprs)
                           II16 -> (1, 0, 4, gprs)
                           II32 -> (1, 0, 4, gprs)
@@ -1367,7 +1367,7 @@ genCCall' dflags gcp target dest_regs args
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
                       GCPLinux ->
-                          case cmmTypeSize rep of
+                          case cmmTypeFormat rep of
                           II8  -> (1, 0, 4, gprs)
                           II16 -> (1, 0, 4, gprs)
                           II32 -> (1, 0, 4, gprs)
@@ -1377,7 +1377,7 @@ genCCall' dflags gcp target dest_regs args
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
                       GCPLinux64ELF _ ->
-                          case cmmTypeSize rep of
+                          case cmmTypeFormat rep of
                           II8  -> (1, 0, 8, gprs)
                           II16 -> (1, 0, 8, gprs)
                           II32 -> (1, 0, 8, gprs)
@@ -1484,15 +1484,15 @@ genSwitch dflags expr targets
   | (gopt Opt_PIC dflags) || (not $ target32Bit $ targetPlatform dflags)
   = do
         (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
-        let sz = archWordSize $ target32Bit $ targetPlatform dflags
+        let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
             sha = if target32Bit $ targetPlatform dflags then 2 else 3
-        tmp <- getNewRegNat sz
+        tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let code = e_code `appOL` t_code `appOL` toOL [
-                            SL sz tmp reg (RIImm (ImmInt sha)),
-                            LD sz tmp (AddrRegReg tableReg tmp),
+                            SL fmt tmp reg (RIImm (ImmInt sha)),
+                            LD fmt tmp (AddrRegReg tableReg tmp),
                             ADD tmp tmp (RIReg tableReg),
                             MTCTR tmp,
                             BCTR ids (Just lbl)
@@ -1501,14 +1501,14 @@ genSwitch dflags expr targets
   | otherwise
   = do
         (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
-        let sz = archWordSize $ target32Bit $ targetPlatform dflags
+        let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
             sha = if target32Bit $ targetPlatform dflags then 2 else 3
-        tmp <- getNewRegNat sz
+        tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         let code = e_code `appOL` toOL [
-                            SL sz tmp reg (RIImm (ImmInt sha)),
+                            SL fmt tmp reg (RIImm (ImmInt sha)),
                             ADDIS tmp tmp (HA (ImmCLbl lbl)),
-                            LD sz tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
+                            LD fmt tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
                             MTCTR tmp,
                             BCTR ids (Just lbl)
                     ]
@@ -1569,8 +1569,8 @@ condReg getCond = do
             GU  -> (1, False)
             _   -> panic "PPC.CodeGen.codeReg: no match"
 
-        size = archWordSize $ target32Bit $ targetPlatform dflags
-    return (Any size code)
+        format = archWordFormat $ target32Bit $ targetPlatform dflags
+    return (Any format code)
 
 condIntReg cond x y = condReg (condIntCode cond x y)
 condFltReg cond x y = condReg (condFltCode cond x y)
@@ -1631,17 +1631,17 @@ trivialCode rep signed instr x (CmmLit (CmmInt y _))
     = do
         (src1, code1) <- getSomeReg x
         let code dst = code1 `snocOL` instr dst src1 (RIImm imm)
-        return (Any (intSize rep) code)
+        return (Any (intFormat rep) code)
 
 trivialCode rep _ instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let code dst = code1 `appOL` code2 `snocOL` instr dst src1 (RIReg src2)
-    return (Any (intSize rep) code)
+    return (Any (intFormat rep) code)
 
 shiftCode
         :: Width
-        -> (Size-> Reg -> Reg -> RI -> Instr)
+        -> (Format-> Reg -> Reg -> RI -> Instr)
         -> CmmExpr
         -> CmmExpr
         -> NatM Register
@@ -1649,32 +1649,32 @@ shiftCode width instr x (CmmLit (CmmInt y _))
     | Just imm <- makeImmediate width False y
     = do
         (src1, code1) <- getSomeReg x
-        let size = intSize width
-        let code dst = code1 `snocOL` instr size dst src1 (RIImm imm)
-        return (Any size code)
+        let format = intFormat width
+        let code dst = code1 `snocOL` instr format dst src1 (RIImm imm)
+        return (Any format code)
 
 shiftCode width instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
-    let size = intSize width
-    let code dst = code1 `appOL` code2 `snocOL` instr size dst src1 (RIReg src2)
-    return (Any size code)
+    let format = intFormat width
+    let code dst = code1 `appOL` code2 `snocOL` instr format dst src1 (RIReg src2)
+    return (Any format code)
 
-trivialCodeNoImm' :: Size -> (Reg -> Reg -> Reg -> Instr)
+trivialCodeNoImm' :: Format -> (Reg -> Reg -> Reg -> Instr)
                  -> CmmExpr -> CmmExpr -> NatM Register
-trivialCodeNoImm' size instr x y = do
+trivialCodeNoImm' format instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let code dst = code1 `appOL` code2 `snocOL` instr dst src1 src2
-    return (Any size code)
+    return (Any format code)
 
-trivialCodeNoImm :: Size -> (Size -> Reg -> Reg -> Reg -> Instr)
+trivialCodeNoImm :: Format -> (Format -> Reg -> Reg -> Reg -> Instr)
                  -> CmmExpr -> CmmExpr -> NatM Register
-trivialCodeNoImm size instr x y = trivialCodeNoImm' size (instr size) x y
+trivialCodeNoImm format instr x y = trivialCodeNoImm' format (instr format) x y
 
 
 trivialUCode
-        :: Size
+        :: Format
         -> (Reg -> Reg -> Instr)
         -> CmmExpr
         -> NatM Register
@@ -1700,7 +1700,7 @@ remainderCode rep div x y = do
                 mull_instr dst dst (RIReg src2),
                 SUBF dst dst src1
             ]
-    return (Any (intSize rep) code)
+    return (Any (intFormat rep) code)
 
 coerceInt2FP :: Width -> Width -> CmmExpr -> NatM Register
 coerceInt2FP fromRep toRep x = do
@@ -1744,7 +1744,7 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
                         W64 -> nilOL
                         _       -> panic "PPC.CodeGen.coerceInt2FP: no match"
 
-    return (Any (floatSize toRep) code')
+    return (Any (floatFormat toRep) code')
 
 -- On an ELF v1 Linux we use the compiler doubleword in the stack frame
 -- this is the TOC pointer doubleword on ELF v2 Linux. The latter is only
@@ -1773,7 +1773,7 @@ coerceInt2FP' (ArchPPC_64 _) fromRep toRep x = do
                         W64 -> nilOL
                         _       -> panic "PPC.CodeGen.coerceInt2FP: no match"
 
-    return (Any (floatSize toRep) code')
+    return (Any (floatFormat toRep) code')
 
 coerceInt2FP' _ _ _ _ = panic "PPC.CodeGen.coerceInt2FP: unknown arch"
 
@@ -1798,7 +1798,7 @@ coerceFP2Int' ArchPPC _ toRep x = do
             ST FF64 tmp (spRel dflags 2),
                 -- read low word of value (high word is undefined)
             LD II32 dst (spRel dflags 3)]
-    return (Any (intSize toRep) code')
+    return (Any (intFormat toRep) code')
 
 coerceFP2Int' (ArchPPC_64 _) _ toRep x = do
     dflags <- getDynFlags
@@ -1812,7 +1812,7 @@ coerceFP2Int' (ArchPPC_64 _) _ toRep x = do
                 -- store value (64bit) from FP to compiler word on stack
             ST FF64 tmp (spRel dflags 3),
             LD II64 dst (spRel dflags 3)]
-    return (Any (intSize toRep) code')
+    return (Any (intFormat toRep) code')
 
 coerceFP2Int' _ _ _ _ = panic "PPC.CodeGen.coerceFP2Int: unknown arch"
 

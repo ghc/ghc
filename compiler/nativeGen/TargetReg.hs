@@ -23,7 +23,7 @@ where
 
 import Reg
 import RegClass
-import Size
+import Format
 
 import Outputable
 import Unique
@@ -86,7 +86,7 @@ targetClassOfRealReg platform
       ArchJavaScript-> panic "targetClassOfRealReg ArchJavaScript"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
 
-targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
+targetMkVirtualReg :: Platform -> Unique -> Format -> VirtualReg
 targetMkVirtualReg platform
     = case platformArch platform of
       ArchX86       -> X86.mkVirtualReg

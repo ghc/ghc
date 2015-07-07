@@ -51,7 +51,7 @@ where
 
 import Reg
 import RegClass
-import Size
+import Format
 
 import Cmm
 import CLabel           ( CLabel )
@@ -115,11 +115,11 @@ realRegSqueeze cls rr
 
         _other -> _ILIT(0)
 
-mkVirtualReg :: Unique -> Size -> VirtualReg
-mkVirtualReg u size
-   | not (isFloatSize size) = VirtualRegI u
+mkVirtualReg :: Unique -> Format -> VirtualReg
+mkVirtualReg u format
+   | not (isFloatFormat format) = VirtualRegI u
    | otherwise
-   = case size of
+   = case format of
         FF32    -> VirtualRegD u
         FF64    -> VirtualRegD u
         _       -> panic "mkVirtualReg"

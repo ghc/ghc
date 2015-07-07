@@ -1,8 +1,5 @@
--- | Sizes on this architecture
---      A Size is a combination of width and class
---
---      TODO:   Rename this to "Format" instead of "Size" to reflect
---              the fact that it represents floating point vs integer.
+-- | Formats on this architecture
+--      A Format is a combination of width and class
 --
 --      TODO:   Signed vs unsigned?
 --
@@ -11,14 +8,14 @@
 --              to have architecture specific formats, and do the overloading
 --              properly. eg SPARC doesn't care about FF80.
 --
-module Size (
-    Size(..),
-    intSize,
-    floatSize,
-    isFloatSize,
-    cmmTypeSize,
-    sizeToWidth,
-    sizeInBytes
+module Format (
+    Format(..),
+    intFormat,
+    floatFormat,
+    isFloatFormat,
+    cmmTypeFormat,
+    formatToWidth,
+    formatInBytes
 )
 
 where
@@ -34,14 +31,14 @@ import Outputable
 --      mov.l a b
 -- might be encoded
 --      MOV II32 a b
--- where the Size field encodes the ".l" part.
+-- where the Format field encodes the ".l" part.
 
--- ToDo: it's not clear to me that we need separate signed-vs-unsigned sizes
+-- ToDo: it's not clear to me that we need separate signed-vs-unsigned formats
 --        here.  I've removed them from the x86 version, we'll see what happens --SDM
 
--- ToDo: quite a few occurrences of Size could usefully be replaced by Width
+-- ToDo: quite a few occurrences of Format could usefully be replaced by Width
 
-data Size
+data Format
         = II8
         | II16
         | II32
@@ -52,47 +49,47 @@ data Size
         deriving (Show, Eq)
 
 
--- | Get the integer size of this width.
-intSize :: Width -> Size
-intSize width
+-- | Get the integer format of this width.
+intFormat :: Width -> Format
+intFormat width
  = case width of
         W8      -> II8
         W16     -> II16
         W32     -> II32
         W64     -> II64
-        other   -> pprPanic "Size.intSize" (ppr other)
+        other   -> pprPanic "Format.intFormat" (ppr other)
 
 
--- | Get the float size of this width.
-floatSize :: Width -> Size
-floatSize width
+-- | Get the float format of this width.
+floatFormat :: Width -> Format
+floatFormat width
  = case width of
         W32     -> FF32
         W64     -> FF64
-        other   -> pprPanic "Size.floatSize" (ppr other)
+        other   -> pprPanic "Format.floatFormat" (ppr other)
 
 
--- | Check if a size represents a floating point value.
-isFloatSize :: Size -> Bool
-isFloatSize size
- = case size of
+-- | Check if a format represents a floating point value.
+isFloatFormat :: Format -> Bool
+isFloatFormat format
+ = case format of
         FF32    -> True
         FF64    -> True
         FF80    -> True
         _       -> False
 
 
--- | Convert a Cmm type to a Size.
-cmmTypeSize :: CmmType -> Size
-cmmTypeSize ty
-        | isFloatType ty        = floatSize (typeWidth ty)
-        | otherwise             = intSize (typeWidth ty)
+-- | Convert a Cmm type to a Format.
+cmmTypeFormat :: CmmType -> Format
+cmmTypeFormat ty
+        | isFloatType ty        = floatFormat (typeWidth ty)
+        | otherwise             = intFormat (typeWidth ty)
 
 
--- | Get the Width of a Size.
-sizeToWidth :: Size -> Width
-sizeToWidth size
- = case size of
+-- | Get the Width of a Format.
+formatToWidth :: Format -> Width
+formatToWidth format
+ = case format of
         II8             -> W8
         II16            -> W16
         II32            -> W32
@@ -101,5 +98,5 @@ sizeToWidth size
         FF64            -> W64
         FF80            -> W80
 
-sizeInBytes :: Size -> Int
-sizeInBytes = widthInBytes . sizeToWidth
+formatInBytes :: Format -> Int
+formatInBytes = widthInBytes . formatToWidth
