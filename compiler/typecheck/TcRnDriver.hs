@@ -1299,7 +1299,7 @@ check_main dflags tcg_env
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; main_expr
                 <- addErrCtxt mainCtxt    $
-                   tcPolyExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
+                   tcMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -1809,7 +1809,7 @@ tcRnExpr hsc_env rdr_expr
     -- Ignore the dictionary bindings
     _ <- simplifyInteractive (andWC stWC lie_top) ;
 
-    let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_tau) } ;
+    let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
     ty <- zonkTcType all_expr_ty ;
 
     -- We normalise type families, so that the type of an expression is the

@@ -123,12 +123,11 @@ tcInferRho, tcInferRhoNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
 -- Infer a *rho*-type. The return type is always (shallowly) instantiated.
 tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
 
-tcInferRhoNC (L loc expr)
-  = setSrcSpan loc $
-    do { (expr', sigma) <- tcInferSigmaNC expr
+tcInferRhoNC expr
+  = do { (expr', sigma) <- tcInferSigmaNC expr
                     -- TODO (RAE): Fix origin stuff
        ; (wrap, rho) <- topInstantiate AppOrigin sigma
-       ; return (L loc (mkHsWrap wrap expr'), rho) }
+       ; return (mkLHsWrap wrap expr', rho) }
 
 
 {-
@@ -343,7 +342,7 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
                op' fix
                (mkLHsWrapCo co_a arg2') }
 
-tcExpr (OpApp arg1 op fix arg2) res_ty
+  | otherwise
   = do { traceTc "Non Application rule" (ppr op)
        ; (wrap, op', [arg1', arg2']) <- tcApp (Just $ mk_op_msg op) AppOrigin
                                         op [arg1, arg2] res_ty
@@ -412,14 +411,14 @@ tcExpr (ExplicitList _ witness exprs) res_ty
                      ; (coi, elt_ty) <- matchExpectedListTy list_ty
                      ; exprs' <- mapM (tc_elt elt_ty) exprs
                      ; return $ mkHsWrapCo coi (ExplicitList elt_ty (Just fln') exprs') }
-     where tc_elt elt_ty expr = tcMonoExpr expr elt_ty
+     where tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
 tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
         ; exprs' <- mapM (tc_elt elt_ty) exprs
         ; return $ mkHsWrapCo coi (ExplicitPArr elt_ty exprs') }
   where
-    tc_elt elt_ty expr = tcMonoExpr expr elt_ty
+    tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
 {-
 ************************************************************************
@@ -486,7 +485,7 @@ tcExpr (HsStatic expr) res_ty
             addErrCtxt (hang (ptext (sLit "In the body of a static form:"))
                              2 (ppr expr)
                        ) $
-            tcMonoExprNC expr expr_ty
+            tcPolyExprNC expr expr_ty
         -- Require the type of the argument to be Typeable.
         -- The evidence is not used, but asking the constraint ensures that
         -- the current implementation is as restrictive as future versions
@@ -788,8 +787,8 @@ tcExpr (ArithSeq _ witness seq) res_ty
 
 tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
-        ; expr1' <- tcMonoExpr expr1 elt_ty
-        ; expr2' <- tcMonoExpr expr2 elt_ty
+        ; expr1' <- tcPolyExpr expr1 elt_ty
+        ; expr2' <- tcPolyExpr expr2 elt_ty
         ; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
         ; enum_from_to <- newMethodFromName (PArrSeqOrigin seq)
                                  (idName enumFromToP) elt_ty
@@ -797,10 +796,10 @@ tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
                      (PArrSeq enum_from_to (FromTo expr1' expr2')) }
 
 tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = do  { (coi, elt_ty) <- matchExpectedPArrTy Expected res_ty
-        ; expr1' <- tcMonoExpr expr1 elt_ty
-        ; expr2' <- tcMonoExpr expr2 elt_ty
-        ; expr3' <- tcMonoExpr expr3 elt_ty
+  = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
+        ; expr1' <- tcPolyExpr expr1 elt_ty
+        ; expr2' <- tcPolyExpr expr2 elt_ty
+        ; expr3' <- tcPolyExpr expr3 elt_ty
         ; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
         ; eft <- newMethodFromName (PArrSeqOrigin seq)
                       (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
@@ -849,32 +848,32 @@ tcArithSeq :: Maybe (SyntaxExpr Name) -> ArithSeqInfo Name -> TcRhoType
 
 tcArithSeq witness seq@(From expr) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-       ; expr' <- tcMonoExpr expr elt_ty
+       ; expr' <- tcPolyExpr expr elt_ty
        ; enum_from <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from wit' (From expr')) }
 
 tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-       ; expr1' <- tcMonoExpr expr1 elt_ty
-       ; expr2' <- tcMonoExpr expr2 elt_ty
+       ; expr1' <- tcPolyExpr expr1 elt_ty
+       ; expr2' <- tcPolyExpr expr2 elt_ty
        ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromThenName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from_then wit' (FromThen expr1' expr2')) }
 
 tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-       ; expr1' <- tcMonoExpr expr1 elt_ty
-       ; expr2' <- tcMonoExpr expr2 elt_ty
+       ; expr1' <- tcPolyExpr expr1 elt_ty
+       ; expr2' <- tcPolyExpr expr2 elt_ty
        ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromToName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from_to wit' (FromTo expr1' expr2')) }
 
 tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-        ; expr1' <- tcMonoExpr expr1 elt_ty
-        ; expr2' <- tcMonoExpr expr2 elt_ty
-        ; expr3' <- tcMonoExpr expr3 elt_ty
+        ; expr1' <- tcPolyExpr expr1 elt_ty
+        ; expr2' <- tcPolyExpr expr2 elt_ty
+        ; expr3' <- tcPolyExpr expr3 elt_ty
         ; eft <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromThenToName elt_ty
         ; return $ mkHsWrapCo coi (ArithSeq eft wit' (FromThenTo expr1' expr2' expr3')) }
@@ -883,7 +882,7 @@ tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
 arithSeqEltType :: Maybe (SyntaxExpr Name) -> TcRhoType
                 -> TcM (TcCoercionN, TcType, Maybe (SyntaxExpr Id))
 arithSeqEltType Nothing res_ty
-  = do { (coi, elt_ty) <- matchExpectedListTy Expected res_ty
+  = do { (coi, elt_ty) <- matchExpectedListTy res_ty
        ; return (coi, elt_ty, Nothing) }
 arithSeqEltType (Just fl) res_ty
   = do { list_ty <- newFlexiTyVarTy liftedTypeKind
@@ -964,7 +963,7 @@ tcInferFun (L loc (HsVar name))
        ; return (L loc fun, ty) }
 
 tcInferFun fun
-  = do { (fun, fun_ty) <- tcInfer (tcMonoExpr fun)
+  = do { (fun, fun_ty) <- tcInferSigma fun
 
          -- Zonk the function type carefully, to expose any polymorphism
          -- E.g. (( \(x::forall a. a->a). blah ) e)
@@ -1006,17 +1005,17 @@ tcTupArgs args tys
   = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
   where
     go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
-    go (L l (Present expr), arg_ty) = do { expr' <- tcMonoExpr expr arg_ty
+    go (L l (Present expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
                                          ; return (L l (Present expr')) }
 
 ---------------------------
-tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcSigmaType -> TcM (HsExpr TcId)
+tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
 -- Typecheck a syntax operator, checking that it has the specified type
 -- The operator is always a variable at this stage (i.e. renamer output)
 -- This version assumes res_ty is a monotype
-tcSyntaxOp orig (HsVar op) res_ty = do { (expr, ty) <- tcInferIdWithOrig orig op
-                                       ; wrap <- tcSubType GenSigCtxt ty res_ty
-                                       ; return (mkHsWrap wrap expr) }
+tcSyntaxOp orig (HsVar op) res_ty = do { (expr, rho) <- tcInferIdWithOrig orig op
+                                       ; tcWrapResult expr rho res_ty }
+
 tcSyntaxOp _ other         _      = pprPanic "tcSyntaxOp" (ppr other)
 
 {-
@@ -1207,7 +1206,7 @@ srcSpanPrimLit dflags span
     = HsLit (HsStringPrim "" (unsafeMkByteString
                              (showSDocOneLine dflags (ppr span))))
 
-tcUnboundId :: OccName -> TcM (HsExpr TcId, TcSigmaType)
+tcUnboundId :: OccName -> TcRhoType -> TcM (HsExpr TcId)
 -- Typechedk an occurrence of an unbound Id
 --
 -- Some of these started life as a true hole "_".  Others might simply
@@ -1216,7 +1215,7 @@ tcUnboundId :: OccName -> TcM (HsExpr TcId, TcSigmaType)
 -- We turn all of them into HsVar, since HsUnboundVar can't contain an
 -- Id; and indeed the evidence for the CHoleCan does bind it, so it's
 -- not unbound any more!
-tcUnboundId occ
+tcUnboundId occ res_ty
  = do { ty <- newFlexiTyVarTy liftedTypeKind
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
@@ -1224,7 +1223,7 @@ tcUnboundId occ
       ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
                            , cc_hole = ExprHole }
       ; emitInsoluble can
-      ; return (HsVar ev, ty) }
+      ; tcWrapResult (HsVar ev) ty res_ty }
 
 {-
 Note [Adding the implicit parameter to 'assert']

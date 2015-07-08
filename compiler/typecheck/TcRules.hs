@@ -18,7 +18,6 @@ import TcExpr
 import TcEnv
 import TcEvidence( TcEvBinds(..) )
 import Type
-import Inst   ( topInstantiate )
 import Id
 import Var              ( EvVar )
 import Name
@@ -32,8 +31,6 @@ import Data.List( partition )
 {-
 Note [Typechecking rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO (RAE): Update note.
-
 We *infer* the typ of the LHS, and use that type to *check* the type of
 the RHS.  That means that higher-rank rules work reasonably well. Here's
 an example (test simplCore/should_compile/rule2.hs) produced by Roman:
@@ -75,10 +72,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
             <- tcExtendTyVarEnv tv_bndrs $
                tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
-                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints $
-                                                     tcInferRho lhs
-
-                  ; (rhs', rhs_wanted) <- captureConstraints (tcPolyExpr rhs rule_ty)
+                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
+                  ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
        ; (lhs_evs, other_lhs_wanted) <- simplifyRule (snd $ unLoc name)
@@ -335,3 +330,4 @@ simplifyRule name lhs_wanted rhs_wanted
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_simple = non_q_cts }) }
+

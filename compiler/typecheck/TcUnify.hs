@@ -628,9 +628,20 @@ tcSubTypeDS_NC ctxt ty_actual ty_expected
 ---------------
 tc_sub_type :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 tc_sub_type origin ctxt ty_actual ty_expected
-  | isTyVarTy ty_actual  -- See Note [Higher rank types]
-  = do { cow <- uType origin ty_actual ty_expected
-       ; return (coToHsWrapper cow) }
+  | Just tv_actual <- tcGetTyVar_maybe ty_actual -- See Note [Higher rank types]
+  = do { lookup_res <- lookupTcTyVar tv_actual
+       ; case lookup_res of
+           Filled ty_actual' -> tc_sub_type origin ctxt ty_actual' ty_expected
+
+             -- It's tempting to see if tv_actual can unify with a polytype
+             -- and, if so, call uType; otherwise, skolemise first. But this
+             -- is wrong, because skolemising will bump the TcLevel and the
+             -- unification will fail anyway.
+             -- It's also tempting to call uUnfilledVar directly, but calling
+             -- uType seems safer in the presence of possible refactoring
+             -- later.
+           Unfilled _        -> coToHsWrapper <$>
+                                uType origin ty_actual ty_expected }
 
   | otherwise  -- See Note [Deep skolemisation]
   = do { (sk_wrap, inner_wrap) <- tcSkolemise SkolemiseDeeply ctxt ty_expected $
@@ -642,49 +653,53 @@ tc_sub_type origin ctxt ty_actual ty_expected
 tc_sub_type_ds :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcRhoType -> TcM HsWrapper
 -- Just like tcSubType, but with the additional precondition that
 -- ty_expected is deeply skolemised
-tc_sub_type_ds origin ctxt ty_actual ty_expected
-  | Just tv_expected <- tcGetTyVar_maybe ty_expected
-  , isMetaTyVar tv_expected
-  = do { traceTc "RAE1" (ppr ty_actual $$ ppr ty_expected $$
-                         pprTcTyVarDetails (tcTyVarDetails tv_expected))
-       ; dflags <- getDynFlags
-       ; let details = tcTyVarDetails tv_expected
-             kind    = tyVarKind tv_expected
-       ; (in_wrap, in_rho) <- if canUnifyWithPolyType dflags details kind
-                              then traceTc "RAE3" empty >>
-                                   return (idHsWrapper, ty_actual)
-                              else traceTc "RAE2" empty >>
-                                   deeplyInstantiate origin ty_actual
+tc_sub_type_ds origin ctxt ty_actual ty_expected = go ty_actual ty_expected
+  where
+    go ty_a ty_e | Just ty_a' <- tcView ty_a = go ty_a' ty_e
+                 | Just ty_e' <- tcView ty_e = go ty_a  ty_e'
+
+    go ty_a@(TyVarTy tv_a) ty_e
+      = do { lookup_res <- lookupTcTyVar tv_a
+           ; case lookup_res of
+               Filled ty_a' -> tc_sub_type_ds origin ctxt ty_a' ty_e
+               Unfilled _   -> coToHsWrapper <$> uType origin ty_a ty_e }
+
+    go ty_a ty_e@(TyVarTy tv_e)
+      = do { dflags <- getDynFlags
+           ; lookup_res <- lookupTcTyVar tv_e
+           ; case lookup_res of
+               Filled ty_e'     -> tc_sub_type origin ctxt ty_a ty_e'
+               Unfilled details
+                 |  canUnifyWithPolyType dflags details (tyVarKind tv_e)
+                 -> coToHsWrapper <$> uType origin ty_a ty_e
+
      -- We've avoided instantiating ty_actual just in case ty_expected is
      -- polymorphic. But we've now assiduously determined that it is *not*
      -- polymorphic. So instantiate away. This is needed for e.g. test
      -- typecheck/should_compile/T4284.
+                 |  otherwise
+                 -> do { (wrap, rho_a) <- deeplyInstantiate origin ty_a
+                       ; cow <- uType origin rho_a ty_e
+                       ; return (coToHsWrapper cow <.> wrap) } }
 
-         -- Even if it's not a TauTv, we want to go straight to
-         -- uType, so that a ReturnTv can unify with a polytype
-       ; traceTc "RAE4" (ppr in_wrap $$ ppr in_rho)
-       ; cow <- uType origin in_rho ty_expected
-       ; traceTc "RAE5" (ppr cow)
-       ; return (coToHsWrapper cow <.> in_wrap) }
+    go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
+      = -- See Note [Co/contra-variance of subsumption checking]
+        do { res_wrap <- tc_sub_type_ds origin ctxt act_res exp_res
+           ; arg_wrap <- tc_sub_type    origin ctxt exp_arg act_arg
+           ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res) }
+               -- arg_wrap :: exp_arg ~ act_arg
+               -- res_wrap :: act-res ~ exp_res
 
-  | Just (act_arg, act_res) <- tcSplitFunTy_maybe ty_actual
-  , Just (exp_arg, exp_res) <- tcSplitFunTy_maybe ty_expected
-  = -- See Note [Co/contra-variance of subsumption checking]
-    do { res_wrap <- tc_sub_type_ds origin ctxt act_res exp_res
-       ; arg_wrap <- tc_sub_type    origin ctxt exp_arg act_arg
-       ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res) }
-           -- arg_wrap :: exp_arg ~ act_arg
-           -- res_wrap :: act-res ~ exp_res
+    go ty_a ty_e
+      | let (tvs, theta, _) = tcSplitSigmaTy ty_a
+      , not (null tvs && null theta)
+      = do { (in_wrap, in_rho) <- topInstantiate origin ty_a
+           ; body_wrap <- tcSubTypeDS_NC ctxt in_rho ty_e
+           ; return (body_wrap <.> in_wrap) }
 
-  | (tvs, theta, _) <- tcSplitSigmaTy ty_actual
-  , not (null tvs && null theta)
-  = do { (in_wrap, in_rho) <- topInstantiate origin ty_actual
-       ; body_wrap <- tcSubTypeDS_NC ctxt in_rho ty_expected
-       ; return (body_wrap <.> in_wrap) }
-
-  | otherwise   -- Revert to unification
-  = do { cow <- uType origin ty_actual ty_expected
-       ; return (coToHsWrapper cow) }
+      | otherwise   -- Revert to unification
+      = do { cow <- uType origin ty_a ty_e
+           ; return (coToHsWrapper cow) }
 
 -----------------
 tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType -> TcM (HsExpr TcId)

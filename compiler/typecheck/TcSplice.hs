@@ -41,7 +41,6 @@ import FastString
 import THNames
 import TcUnify
 import TcEnv
-import Inst
 
 #ifdef GHCI
 import HscMain
@@ -186,7 +185,7 @@ tcBrackTy (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
 tcPendingSplice (PendingRnSplice flavour splice_name expr)
   = do { res_ty <- tcMetaTy meta_ty_name
-       ; expr' <- tcPolyExpr expr res_ty
+       ; expr' <- tcMonoExpr expr res_ty
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
@@ -431,7 +430,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
   = do { meta_exp_ty <- tcTExpTy res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
-                  tcPolyExpr expr meta_exp_ty
+                  tcMonoExpr expr meta_exp_ty
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
        ; ps <- readMutVar ps_var
@@ -449,7 +448,7 @@ tcTopSplice expr res_ty
          -- making sure it has type Q (T res_ty)
          meta_exp_ty <- tcTExpTy res_ty
        ; zonked_q_expr <- tcTopSpliceExpr True $
-                          tcPolyExpr expr meta_exp_ty
+                          tcMonoExpr expr meta_exp_ty
 
          -- Run the expression
        ; expr2 <- runMetaE zonked_q_expr
@@ -463,7 +462,7 @@ tcTopSplice expr res_ty
          -- These steps should never fail; this is a *typed* splice
        ; addErrCtxt (spliceResultDoc expr) $ do
        { (exp3, _fvs) <- rnLExpr expr2
-       ; exp4 <- tcPolyExpr exp3 res_ty
+       ; exp4 <- tcMonoExpr exp3 res_ty
        ; return (unLoc exp4) } }
 
 {-
@@ -541,8 +540,7 @@ runAnnotation target expr = do
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
               ; let specialised_to_annotation_wrapper_expr
                       = L loc (HsWrap wrapper (HsVar to_annotation_wrapper_id))
-              ; return (L loc (HsApp specialised_to_annotation_wrapper_expr
-                                     expr')) }
+              ; return (L loc (HsApp specialised_to_annotation_wrapper_expr expr')) }
 
     -- Run the appropriately wrapped expression to get the value of
     -- the annotation and its dictionaries. The return value is of

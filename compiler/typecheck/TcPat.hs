@@ -18,7 +18,7 @@ module TcPat ( tcLetPat, TcSigFun, TcPragFun
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigma )
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRho )
 
 import HsSyn
 import TcHsSyn
@@ -541,11 +541,6 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
         ; (expr',expr'_inferred) <- tcInferRho expr
 
          -- next, we check that expr is coercible to `overall_pat_ty -> pat_ty`
-         -- NOTE: this forces pat_ty to be a monotype (because we use a unification
-         -- variable to find it).  this means that in an example like
-         -- (view -> f)    where view :: _ -> forall b. b
-         -- we will only be able to use view at one instantation in the
-         -- rest of the view
         ; (expr_wrap, pat_ty) <- tcInfer $ \ pat_ty ->
                 tcSubTypeDS GenSigCtxt expr'_inferred
                             (mkFunTy overall_pat_ty pat_ty)
@@ -911,7 +906,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
 ----------------------------
 -- | Convenient wrapper for calling a matchExpectedXXX function
-matchExpectedPatTy :: (TcRhoType -> TcM (HsWrapper, a))
+matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionN, a))
                     -> TcSigmaType -> TcM (HsWrapper, a)
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~R inner_ty
@@ -955,7 +950,7 @@ matchExpectedConTy data_tc pat_ty
 
   | otherwise
   = do { (wrap, pat_rho) <- topInstantiate PatOrigin pat_ty
-       ; (coi, tys) <- matchExpectedTyConApp (Actual PatOrigin) data_tc pat_rho
+       ; (coi, tys) <- matchExpectedTyConApp data_tc pat_rho
        ; return (coToHsWrapper (mkTcSymCo coi) <.> wrap, tys) }
 
 {-
