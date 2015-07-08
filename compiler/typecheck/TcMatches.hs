@@ -8,8 +8,7 @@ TcMatches: Typecheck some @Matches@
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
-module TcMatches ( tcMatchesFun, tcMatchFun,
-                   tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
+module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
                    tcStmts, tcStmtsAndThen, tcDoStmts, tcBody,
                    tcDoStmt, tcGuardStmt
@@ -92,20 +91,6 @@ tcMatchesFun fun_name inf matches exp_ty
              <+> quotes (ppr fun_name) <+> ptext (sLit "have")
     match_ctxt = MC { mc_what = FunRhs fun_name inf, mc_body = tcBody }
 
--- | Like 'tcMatchesFun', but handles the case where there is only one
--- clause, and we want the ability to infer a polytype
-tcMatchFun :: Name -> Bool
-           -> LMatch Name (LHsExpr Name)
-           -> Origin       -- from the MatchGroup
-           -> TcRhoType     -- Expected type of function (just a TauTv)
-           -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
-tcMatchFun fun_name inf match origin exp_ty
-  = tcMatch1 match_ctxt herald match origin exp_ty
-  where
-    herald = ptext (sLit "The equation(s) for")
-             <+> quotes (ppr fun_name) <+> ptext (sLit "have")
-    match_ctxt = MC { mc_what = FunRhs fun_name inf, mc_body = tcBody }
-
 {-
 @tcMatchesCase@ doesn't do the argument-count check because the
 parser guarantees that each equation has exactly one argument.
@@ -132,36 +117,18 @@ tcMatchesCase ctxt scrut_ty matches res_ty
 
 tcMatchLambda :: MatchGroup Name (LHsExpr Name) -> TcRhoType
               -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
-tcMatchLambda (MG { mg_alts = [match], mg_origin = origin }) res_ty
-  = tcMatch1 match_ctxt herald match origin res_ty
+tcMatchLambda match res_ty
+  = matchFunTys herald n_pats res_ty  $ \ pat_tys rhs_ty ->
+    tcMatches match_ctxt pat_tys rhs_ty match
   where
+    n_pats = matchGroupArity match
     herald = sep [ ptext (sLit "The lambda expression")
                          <+> quotes (pprSetDepth (PartWay 1) $
-                             pprMatch (LambdaExpr :: HsMatchContext Name)
-                                      (unLoc match)),
+                             pprMatches (LambdaExpr :: HsMatchContext Name) match),
                         -- The pprSetDepth makes the abstraction print briefly
                 ptext (sLit "has")]
     match_ctxt = MC { mc_what = LambdaExpr,
                       mc_body = tcBody }
-tcMatchLambda group _ = pprPanic "tcMatchLambda" $
-                        pprMatches (LambdaExpr :: HsMatchContext Name) group
-
--- | Convenient wrapper for case with only one match
-tcMatch1 :: TcMatchCtxt HsExpr
-         -> SDoc                 -- ^ herald for 'matchFunTys'
-         -> LMatch Name (LHsExpr Name)
-         -> Origin               -- ^ from the 'MatchGroup'
-         -> TcRhoType
-         -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
-tcMatch1 match_ctxt herald match origin res_ty
-  = matchFunTys herald arity res_ty $ \ pat_tys rhs_ty ->
-    do { match' <- tcMatch match_ctxt pat_tys rhs_ty match
-       ; return (MG { mg_alts    = [match']
-                    , mg_arg_tys = pat_tys
-                    , mg_res_ty  = rhs_ty
-                    , mg_origin  = origin }) }
-  where
-    arity = length (hsLMatchPats match)
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
