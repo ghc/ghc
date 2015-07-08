@@ -242,8 +242,9 @@ top_instantiate inst_all orig ty
                                              mkFunTys leave_theta rho)
 
        ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
-       ; traceTc "Instantiating (inferred only)"
-                 (vcat [ text "origin" <+> pprCtOrigin orig
+       ; traceTc "Instantiating"
+                 (vcat [ text "all tyvars?" <+> ppr inst_all
+                       , text "origin" <+> pprCtOrigin orig
                        , text "type" <+> ppr ty
                        , text "with" <+> ppr inst_tvs'
                        , text "theta:" <+>  ppr inst_theta' ])

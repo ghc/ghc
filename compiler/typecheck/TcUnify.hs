@@ -11,7 +11,7 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcSkolemise, SkolemiseMode(..),
-  tcSubTypeHR, tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
+  tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
   checkConstraints,
 
   -- Various unifications
@@ -216,7 +216,6 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
       | Just (Just hs_ty_arg) <- fmap isLHsTypeExpr_maybe arg
       = do { let origin = case ea of Expected    -> panic "match_fun_tys"
                                      Actual orig -> orig
-           ; traceTc "RAE1" (ppr arg $$ ppr args $$ ppr ty)
            ; (wrap1, upsilon_ty) <- topInstantiateInferred origin ty
                -- wrap1 :: ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -225,7 +224,6 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                  do { let kind = tyVarKind tv
                     ; ty_arg <- tcCheckLHsType hs_ty_arg kind
                     ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
-                    ; traceTc "RAE3" (ppr upsilon_ty $$ ppr tv $$ ppr inner_ty $$ ppr insted_ty $$ ppr ty_arg)
                     ; (inner_wrap, arg_tys, res_ty) <- go args insted_ty
                         -- inner_wrap :: insted_ty "->" arg_tys -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
@@ -236,8 +234,7 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
 
     go args ty
       | not (null tvs && null theta)
-      = do { traceTc "RAE2" (ppr args $$ ppr ty)
-           ; (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
+      = do { (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
              do { (inner_wrap, arg_tys, res_ty) <- go args rho
                 ; return (inner_wrap, (arg_tys, res_ty)) }
            ; return (wrap, arg_tys, res_ty) }
@@ -601,10 +598,6 @@ So it's important that we unify beta := forall a. a->a, rather than
 skolemising the type.
 -}
 
--- | Use this wrapper for 'tcSubType' in higher-rank situations.
-tcSubTypeHR :: TcSigmaType -> TcSigmaType -> TcM HsWrapper
-tcSubTypeHR = tcSubType GenSigCtxt
-
 tcSubType :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
@@ -675,21 +668,26 @@ tc_sub_type_ds :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcRhoType -> TcM Hs
 tc_sub_type_ds origin ctxt ty_actual ty_expected
   | Just tv_expected <- tcGetTyVar_maybe ty_expected
   , isMetaTyVar tv_expected
-  = do { dflags <- getDynFlags
-       ; (in_wrap, in_rho) <- case metaTyVarInfo tv_expected of
-                                TauTv _
-                                  | not (xopt Opt_ImpredicativeTypes dflags)
-                                  -> deeplyInstantiate origin ty_actual
+  = do { traceTc "RAE1" (ppr ty_actual $$ ppr ty_expected $$
+                         pprTcTyVarDetails (tcTyVarDetails tv_expected))
+       ; dflags <- getDynFlags
+       ; let details = tcTyVarDetails tv_expected
+             kind    = tyVarKind tv_expected
+       ; (in_wrap, in_rho) <- if canUnifyWithPolyType dflags details kind
+                              then traceTc "RAE3" empty >>
+                                   return (idHsWrapper, ty_actual)
+                              else traceTc "RAE2" empty >>
+                                   deeplyInstantiate origin ty_actual
      -- We've avoided instantiating ty_actual just in case ty_expected is
      -- polymorphic. But we've now assiduously determined that it is *not*
      -- polymorphic. So instantiate away. This is needed for e.g. test
      -- typecheck/should_compile/T4284.
 
-                                _ -> return (idHsWrapper, ty_actual)
-
          -- Even if it's not a TauTv, we want to go straight to
          -- uType, so that a ReturnTv can unify with a polytype
+       ; traceTc "RAE4" (ppr in_wrap $$ ppr in_rho)
        ; cow <- uType origin in_rho ty_expected
+       ; traceTc "RAE5" (ppr cow)
        ; return (coToHsWrapper cow <.> in_wrap) }
 
   | Just (act_arg, act_res) <- tcSplitFunTy_maybe ty_actual

@@ -41,6 +41,7 @@ import FastString
 import THNames
 import TcUnify
 import TcEnv
+import Inst
 
 #ifdef GHCI
 import HscMain
@@ -73,7 +74,6 @@ import Var
 import Module
 import LoadIface
 import Class
-import Inst
 import TyCon
 import CoAxiom
 import PatSyn ( patSynName )

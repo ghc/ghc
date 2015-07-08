@@ -93,14 +93,7 @@ tcPolyExprNC (L loc expr) res_ty
 
 ---------------
 tcInferSigma, tcInferSigmaNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
--- Infer an *sigma*-type.  This is, in effect, a special case
--- for ids and partial applications, so that if
---     f :: Int -> forall b. (forall a. a -> a -> b) -> b
--- then we can infer
---     f 3 :: forall b. (forall a. a -> a -> b) -> b
--- And that in turn is useful
---  (a) for the function part of any application (see tcApp)
---  (b) for the special rule for '$'
+-- Infer a *sigma*-type.
 tcInferSigma expr = addErrCtxt (exprCtxt expr) (tcInferSigmaNC expr)
 
 tcInferSigmaNC (L loc expr)
@@ -108,24 +101,17 @@ tcInferSigmaNC (L loc expr)
     do { (expr', sigma) <- tcInfer (tcExpr Up expr)
        ; return (L loc expr', sigma) }
 
-tcUnboundId :: OccName -> TcSigmaType -> TcM (HsExpr TcId)
--- Typechedk an occurrence of an unbound Id
---
--- Some of these started life as a true hole "_".  Others might simply
--- be variables that accidentally have no binding site
---
--- We turn all of them into HsVar, since HsUnboundVar can't contain an
--- Id; and indeed the evidence for the CHoleCan does bind it, so it's
--- not unbound any more!
-tcUnboundId occ res_ty
- = do { ty <- newFlexiTyVarTy liftedTypeKind
-      ; name <- newSysName occ
-      ; let ev = mkLocalId name ty
-      ; loc <- getCtLocM HoleOrigin
-      ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
-                           , cc_hole = ExprHole }
-      ; emitInsoluble can
-      ; tcWrapResult (HsVar ev) ty res_ty }
+tcInferRho, tcInferRhoNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
+-- Infer a *rho*-type. The return type is always (shallowly) instantiated.
+tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
+
+tcInferRhoNC (L loc expr)
+  = setSrcSpan loc $
+    do { (expr', sigma) <- tcInferSigmaNC expr
+                    -- TODO (RAE): Fix origin stuff
+       ; (wrap, rho) <- topInstantiate AppOrigin sigma
+       ; return (L loc (mkHsWrap wrap expr'), rho) }
+
 
 {-
 ************************************************************************
@@ -1220,6 +1206,25 @@ srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr TcId
 srcSpanPrimLit dflags span
     = HsLit (HsStringPrim "" (unsafeMkByteString
                              (showSDocOneLine dflags (ppr span))))
+
+tcUnboundId :: OccName -> TcM (HsExpr TcId, TcSigmaType)
+-- Typechedk an occurrence of an unbound Id
+--
+-- Some of these started life as a true hole "_".  Others might simply
+-- be variables that accidentally have no binding site
+--
+-- We turn all of them into HsVar, since HsUnboundVar can't contain an
+-- Id; and indeed the evidence for the CHoleCan does bind it, so it's
+-- not unbound any more!
+tcUnboundId occ
+ = do { ty <- newFlexiTyVarTy liftedTypeKind
+      ; name <- newSysName occ
+      ; let ev = mkLocalId name ty
+      ; loc <- getCtLocM HoleOrigin
+      ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
+                           , cc_hole = ExprHole }
+      ; emitInsoluble can
+      ; return (HsVar ev, ty) }
 
 {-
 Note [Adding the implicit parameter to 'assert']

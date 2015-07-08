@@ -175,18 +175,22 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
-    do  { (wrap, group) <-
-             -- we skolemise the result type
+    do  { (wrap, (group, tau_co)) <-
+             -- we skolemise the result type and unify it with a TauTv
              -- so that no one branch takes precedence over others in
              -- higher-rank situations
              -- (this is also needed for e.g. typecheck/should_compile/T700)
              tcSkolemise SkolemiseDeeply GenSigCtxt rhs_ty $ \_ rhs_rho ->
-             do { matches' <- mapM (tcMatch ctxt pat_tys rhs_rho) matches
+             do { tau_ty <- newFlexiTyVarTy openTypeKind
+                ; tau_co <- unifyType tau_ty rhs_rho
+                ; tau_ty <- zonkTcType tau_ty
+                ; matches' <- mapM (tcMatch ctxt pat_tys tau_ty) matches
                 ; return (MG { mg_alts    = matches'
                              , mg_arg_tys = pat_tys
-                             , mg_res_ty  = rhs_ty
-                             , mg_origin  = origin }) }
-        ; return (wrap_group wrap group) }
+                             , mg_res_ty  = rhs_ty -- applying the wrapper
+                                                   -- will make this right
+                             , mg_origin  = origin }, tau_co) }
+        ; return (wrap_group (wrap <.> coToHsWrapper tau_co) group) }
 
   where
     wrap_group wrap mg

@@ -18,6 +18,7 @@ import TcExpr
 import TcEnv
 import TcEvidence( TcEvBinds(..) )
 import Type
+import Inst   ( topInstantiate )
 import Id
 import Var              ( EvVar )
 import Name
@@ -31,6 +32,8 @@ import Data.List( partition )
 {-
 Note [Typechecking rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO (RAE): Update note.
+
 We *infer* the typ of the LHS, and use that type to *check* the type of
 the RHS.  That means that higher-rank rules work reasonably well. Here's
 an example (test simplCore/should_compile/rule2.hs) produced by Roman:
@@ -72,7 +75,14 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
             <- tcExtendTyVarEnv tv_bndrs $
                tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
-                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferSigma lhs)
+                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints $
+                      do { (lhs', lhs_sigma) <- tcInferSigma lhs
+                         ; (lhs_wrap, lhs_rho) <- topInstantiate AppOrigin lhs_sigma  -- TODO (RAE): Fix origin
+                                -- could theoretically do deeplyInstantiate,
+                                -- but the resulting wrapper would be too complex
+                                -- for a RULE LHS.
+                         ; return (mkLHsWrap lhs_wrap lhs', lhs_rho) }
+
                   ; (rhs', rhs_wanted) <- captureConstraints (tcPolyExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
