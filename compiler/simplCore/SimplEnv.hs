@@ -23,7 +23,7 @@ module SimplEnv (
 
         SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
 
-        substExprS,
+        substExpr,
         simplNonRecBndr, simplRecBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getTvSubst,
@@ -46,6 +46,7 @@ import VarEnv
 import VarSet
 import OrdList
 import Id
+import qualified CoreSubst
 import MkCore                   ( mkWildValBinder )
 import TysWiredIn
 import qualified Type
@@ -538,72 +539,6 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         Just _ -> pprPanic "lookupRecBndr" (ppr v)
         Nothing -> refineFromInScope in_scope v
 
-
-substExprS :: SimplEnv -> CoreExpr -> CoreExpr
--- This entire substExprS thing is called in just one place
--- but we can't use substExpr because it uses a different shape
--- of substitution  Better solution coming in HEAD.
-substExprS env expr
-  = go expr
-  where
-    go (Var v) = case substId env v of
-                   DoneId v'            -> Var v'
-                   DoneEx e             -> e
-                   ContEx tvs cvs ids e -> substExprS (setSubstEnv env tvs cvs ids) e
-
-    go (Type ty)       = Type (substTy env ty)
-    go (Coercion co)   = Coercion (substCo env co)
-    go (Lit lit)       = Lit lit
-    go (App fun arg)   = App (go fun) (go arg)
-    go (Tick tickish e) = mkTick (substTickishS env tickish) (go e)
-    go (Cast e co)     = Cast (go e) (substCo env co)
-       -- Do not optimise even identity coercions
-       -- Reason: substitution applies to the LHS of RULES, and
-       --         if you "optimise" an identity coercion, you may
-       --         lose a binder. We optimise the LHS of rules at
-       --         construction time
-
-    go (Lam bndr body) = Lam bndr' (substExprS env' body)
-                       where
-                         (env', bndr') = substBndr env bndr
-
-    go (Let bind body) = Let bind' (substExprS env' body)
-                       where
-                         (env', bind') = substBindS env bind
-
-    go (Case scrut bndr ty alts)
-      = Case (go scrut) bndr' (substTy env ty)
-                              (map (go_alt env') alts)
-      where
-       (env', bndr') = substBndr env bndr
-
-    go_alt env (con, bndrs, rhs) = (con, bndrs', substExprS env' rhs)
-                                 where
-                                   (env', bndrs') = substBndrs env bndrs
-
-substTickishS :: SimplEnv -> Tickish Id -> Tickish Id
-substTickishS env (Breakpoint n ids) = Breakpoint n (map do_one ids)
- where
-   do_one = getIdFromTrivialExpr . substExprS env . Var  -- Ugh
-substTickishS _subst other = other
-
--- | Apply a substitution to an entire 'CoreBind', additionally returning an updated 'Subst'
--- that should be used by subsequent substitutions.
-substBindS :: SimplEnv -> CoreBind -> (SimplEnv, CoreBind)
-
-substBindS env (NonRec bndr rhs) = (env', NonRec bndr' (substExprS env rhs))
-                                 where
-                                   (env', bndr') = substBndr env bndr
-
-substBindS env (Rec pairs)
-  = (env', Rec (bndrs' `zip` rhss'))
-  where
-    (bndrs, rhss)  = unzip pairs
-    (env', bndrs') = substBndrs env bndrs
-    rhss'          = map (substExprS env') rhss
-    -- No need for the complexity of CoreSubst.substRecBndrs, because
-    -- we zap all IdInfo that depends on free variables
-
 {-
 ************************************************************************
 *                                                                      *
@@ -611,8 +546,6 @@ substBindS env (Rec pairs)
 *                                                                      *
 ************************************************************************
 
-
-* substBndr, substBndrs: non-monadic version
 
 * sinplBndr, simplBndrs: monadic version, only so that they
                          can be made strict via seq.
@@ -646,15 +579,6 @@ simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 simplRecBndrs env@(SimplEnv {}) ids
   = do  { let (env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
-
----------------
-substBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
-substBndr env bndr
-  | isTyVar bndr  = substTyVarBndr env bndr
-  | otherwise     = substIdBndr env bndr
-
-substBndrs :: SimplEnv -> [InBndr] -> (SimplEnv, [OutBndr])
-substBndrs  env bndrs = mapAccumL substBndr env bndrs
 
 substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
@@ -804,3 +728,40 @@ substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env }) id
                 -- in a Note in the id's type itself
   where
     old_ty = idType id
+
+substExpr :: SimplEnv -> CoreExpr -> CoreExpr
+-- See Note [Substitution in the simplifier]
+substExpr (SimplEnv { seInScope = in_scope
+                    , seTvSubst = tv_env
+                    , seCvSubst = cv_env
+                    , seIdSubst = id_env })
+  = subst_expr in_scope tv_env cv_env id_env
+  where
+    subst_expr :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst
+               -> CoreExpr -> CoreExpr
+    subst_expr is tvs cvs id_env
+      = CoreSubst.substExpr (text "SimplEnv.substExpr")
+                            (CoreSubst.mkGblSubst is tvs cvs lookup_id)
+      where
+        lookup_id in_scope v
+          = case lookupVarEnv id_env v of
+              Nothing                  -> Nothing
+              Just (DoneEx e)          -> Just e
+              Just (DoneId v)          -> Just (Var v)
+              Just (ContEx tv cv id e) -> Just (subst_expr in_scope tv cv id e)
+
+{- Note [Substitution in the simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In just one place (sigh) we need to lazily substitute over a CoreExpr.
+For that we need CoreSubst.substExpr.  But there is a difficulty: SimplEnv
+has a SimplIdSubst, whose range is SimplSR, not just CoreExpr.
+
+So SimplEnv.substExpr has to perform impedence-matching, via the ambient
+substitution provided by mkGblSubst.  It seems like a lot of work for
+a small thing.  Previously we attempted to construct a (VarEnv CoreExpr)
+from the SimplIdSubst, but that had absolutely terrible performance
+(Trac #10370 comment:12).  Then I tried to write a complete new substExpr
+that used SimplIdSubst insead of (VarEnv CoreExpr), but that got out of
+hand because we need to substitute over rules and unfoldings too
+(Trac #5113, comment:7 and following).
+-}
