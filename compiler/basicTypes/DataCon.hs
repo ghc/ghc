@@ -698,17 +698,6 @@ mkDataCon name declared_infix
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
 
-{-
-Note [Unpack equality predicates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have a GADT with a contructor C :: (a~[b]) => b -> T a
-we definitely want that equality predicate *unboxed* so that it
-takes no space at all.  This is easily done: just give it
-an UNPACK pragma. The rest of the unpack/repack code does the
-heavy lifting.  This one line makes every GADT take a word less
-space for each equality predicate, so it's pretty important!
--}
-
 -- | The 'Name' of the 'DataCon', giving it a unique, rooted identification
 dataConName :: DataCon -> Name
 dataConName = dcName
