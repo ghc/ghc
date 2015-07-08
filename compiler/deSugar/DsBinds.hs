@@ -822,10 +822,14 @@ dsEvBinds :: Bag EvBind -> DsM [CoreBind]
 dsEvBinds bs = mapM ds_scc (sccEvBinds bs)
   where
     ds_scc (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = r }))
-                          = liftM (NonRec v) (dsEvTerm r)
+                          = liftM (NonRec (ds_set_inst v r)) (dsEvTerm r)
     ds_scc (CyclicSCC bs) = liftM Rec (mapM ds_pair bs)
 
-    ds_pair (EvBind { eb_lhs = v, eb_rhs = r }) = liftM ((,) v) (dsEvTerm r)
+    ds_pair (EvBind { eb_lhs = v, eb_rhs = r })
+      = liftM ((,) (ds_set_inst v r)) (dsEvTerm r)
+
+    ds_set_inst v (EvInstanceOf _ _) = setIdIsInstantiationFn v True
+    ds_set_inst v _ = v
 
 sccEvBinds :: Bag EvBind -> [SCC EvBind]
 sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
@@ -1171,8 +1175,7 @@ dsEvInstanceOf ty ev e
 
 dsEvInstanceOf' :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
 dsEvInstanceOf' (EvInstanceOfVar v) e
-  = let v' = setIdIsInstantiationFn v True
-    in return (mkCoreApp (Var v') e)
+  = return (mkCoreApp (Var v) e)
 dsEvInstanceOf' (EvInstanceOfEq co) e
   = do { dsTcCoercion co $ \c ->
            case coercionKind c of
@@ -1180,18 +1183,16 @@ dsEvInstanceOf' (EvInstanceOfEq co) e
             _ ->  mkCast e (mkSubCo c) }
 dsEvInstanceOf' (EvInstanceOfInst qvars co qs) e
   = do { qs'  <- mapM dsEvTerm qs
-       ; let co' = setIdIsInstantiationFn co True
        ; let exprTy = mkCoreApps e (map Type qvars)
              exprEv = mkCoreApps exprTy qs'
-       ; return $ case splitFunTy_maybe (exprType (Var co')) of
+       ; return $ case splitFunTy_maybe (exprType (Var co)) of
                          Just (ty1, ty2) | ty1 == ty2 -> exprEv
-                         _ -> mkCoreApp (Var co') exprEv }
+                         _ -> mkCoreApp (Var co) exprEv }
 dsEvInstanceOf' (EvInstanceOfLet tyvars qvars qs rest) e
   = do { q_binds <- dsTcEvBinds qs
-       ; let rest' = setIdIsInstantiationFn rest True
-       ; let inner = case splitFunTy_maybe (exprType (Var rest')) of
+       ; let inner = case splitFunTy_maybe (exprType (Var rest)) of
                        Just (ty1, ty2) | ty1 == ty2 -> e
-                       _ -> mkCoreApp (Var rest') e
+                       _ -> mkCoreApp (Var rest) e
        ; return $ mkCoreLams (tyvars ++ qvars) (mkCoreLets q_binds inner) }
 
 dsEvInstanceOfBndr :: Type -> EvInstanceOf -> DsM CoreExpr

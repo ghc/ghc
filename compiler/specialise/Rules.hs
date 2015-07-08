@@ -528,7 +528,7 @@ matchN (in_scope, id_unf) tmpl_vars tmpl_es target_es
     lookup_tmpl :: RuleSubst -> Var -> CoreExpr
     lookup_tmpl (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst }) tmpl_var'
         | isId tmpl_var' = case lookupVarEnv id_subst tmpl_var' of
-                             Just e -> e
+                             Just (e, _) -> e
                              _      -> unbound tmpl_var'
         | otherwise      = case lookupVarEnv tv_subst tmpl_var' of
                              Just ty -> Type ty
@@ -833,7 +833,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
   = Nothing     -- Occurs check failure
                 -- e.g. match forall a. (\x-> a x) against (\y. y y)
 
-  | Just e1' <- lookupVarEnv id_subst v1'
+  | Just (e1', _) <- lookupVarEnv id_subst v1'
   = if eqExpr (rnInScopeSet rn_env) e1' e2'
     then Just subst
     else Nothing
@@ -856,7 +856,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
     e2' | isEmptyVarSet let_bndrs = e2
         | otherwise = substExpr (text "match_tmpl_var") flt_env e2
 
-    id_subst' = extendVarEnv (rs_id_subst subst) v1' e2'
+    id_subst' = extendVarEnv (rs_id_subst subst) v1' (e2', False)
          -- No further renaming to do on e2',
          -- because no free var of e2' is in the rnEnvR of the envt
 

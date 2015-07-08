@@ -378,6 +378,7 @@ ppIdInfo id info
     , (has_caf_info,     ptext (sLit "Caf=") <> ppr caf_info)
     , (True,             ptext (sLit "Str=") <> pprStrictness str_info)
     , (has_unf,          ptext (sLit "Unf=") <> ppr unf_info)
+    , (is_inst_fn,       ptext (sLit "Inst"))
     , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
         -- printed out with all binders (when debug is on);
@@ -402,6 +403,8 @@ ppIdInfo id info
     has_unf = hasSomeUnfolding unf_info
 
     rules = specInfoRules (specInfo info)
+
+    is_inst_fn = isInstantiationFn info
 
 showAttributes :: [(Bool,SDoc)] -> SDoc
 showAttributes stuff

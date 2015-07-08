@@ -16,7 +16,7 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
-import TcEvidence( TcEvBinds(..) )
+import TcEvidence( TcEvBinds(..), mkWpInstanceOf )
 import Type
 import Id
 import Var              ( EvVar )
@@ -27,6 +27,7 @@ import Outputable
 import FastString
 import Bag
 import Data.List( partition )
+import Inst( newWanted )
 
 {-
 Note [Typechecking rules]
@@ -73,9 +74,14 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
             <- tcExtendTyVarEnv tv_bndrs  $
                tcExtendIdEnv    id_bndrs' $
                do { -- See Note [Solve order for RULES]
-                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
+                  ; lhs_ty <- newFlexiTyVarTy openTypeKind
+                  ; (lhs', lhs_wanted) <- captureConstraints (tcPolyMonoExpr lhs lhs_ty)
+                  ; rule_ty <- newFlexiTyVarTy openTypeKind
                   ; (rhs', rhs_wanted) <- captureConstraints (tcPolyMonoExpr rhs rule_ty)
-                  ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
+                    -- Add the constraint that InstanceOf lhs_ty rule_ty
+                  ; inst_w <- newWanted AnnOrigin (mkTcInstanceOfPred lhs_ty rule_ty)
+                  ; let rhs_wanted' = mkSimpleWC [inst_w] `andWC` rhs_wanted
+                  ; return (lhs', lhs_wanted, rhs', rhs_wanted', rule_ty) }
 
        ; (lhs_evs, other_lhs_wanted) <- simplifyRule (snd $ unLoc name)
                                                      (bndr_wanted `andWC` lhs_wanted)
