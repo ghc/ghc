@@ -49,6 +49,8 @@ import ListSetOps( assocDefault )
 import FastString
 import Data.List
 
+import Control.Arrow ( first )
+
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
     }
@@ -504,7 +506,7 @@ case bodies, containing the following fields:
 -}
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdCase exp (MG { mg_alts = matches, mg_arg_tys = arg_tys, mg_origin = origin }))
+      (HsCmdCase exp (MG { mg_alts = matches, mg_arg_tys = arg_tys, mg_origin = origin }) wrap)
       env_ids = do
     stack_id <- newSysLocalDs stack_ty
 
@@ -512,7 +514,8 @@ dsCmd ids local_vars stack_ty res_ty
     -- expressions that will (after tagging) replace these leaves
 
     let
-        leaves = concatMap leavesMatch matches
+        leaves = map (first $ mkLHsCmdWrap wrap) $
+                 concatMap leavesMatch matches
         make_branch (leaf, bound_vars) = do
             (core_leaf, _fvs, leaf_ids) <-
                   dsfixCmd ids (bound_vars `unionVarSet` local_vars) stack_ty res_ty leaf
@@ -611,9 +614,9 @@ dsCmd _ids local_vars _stack_ty _res_ty (HsCmdArrForm op _ args) env_ids = do
     return (mkApps (App core_op (Type env_ty)) core_args,
             unionVarSets fv_sets)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdCast coercion cmd) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdWrap wrap cmd) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
-    wrapped_cmd <- dsHsWrapper (mkWpCast coercion) core_cmd
+    wrapped_cmd <- dsHsWrapper wrap core_cmd
     return (wrapped_cmd, env_ids')
 
 dsCmd _ _ _ _ _ c = pprPanic "dsCmd" (ppr c)

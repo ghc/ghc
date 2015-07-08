@@ -8,7 +8,8 @@ TcMatches: Typecheck some @Matches@
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
-module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
+module TcMatches ( tcMatchesFun, tcMatchFun,
+                   tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
                    tcStmts, tcStmtsAndThen, tcDoStmts, tcBody,
                    tcDoStmt, tcGuardStmt
@@ -78,15 +79,29 @@ tcMatchesFun fun_name inf matches exp_ty
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
         ; checkArgs fun_name matches
 
-        ; (wrap_gen, (wrap_fun, group))
+        ; (wrap_gen, (wrap_fun, (wrap_tau, group)))
             <- tcSkolemise SkolemiseDeeply (FunSigCtxt fun_name True) exp_ty $
                \ _ exp_rho ->
                   -- Note [Polymorphic expected type for tcMatchesFun]
                matchFunTys herald arity exp_rho $ \ pat_tys rhs_ty ->
                tcMatches match_ctxt pat_tys rhs_ty matches
-        ; return (wrap_gen <.> wrap_fun, group) }
+        ; return (wrap_gen <.> wrap_fun <.> wrap_tau, group) }
   where
     arity = matchGroupArity matches
+    herald = ptext (sLit "The equation(s) for")
+             <+> quotes (ppr fun_name) <+> ptext (sLit "have")
+    match_ctxt = MC { mc_what = FunRhs fun_name inf, mc_body = tcBody }
+
+-- | Like 'tcMatchesFun', but handles the case where there is only one
+-- clause, and we want the ability to infer a polytype
+tcMatchFun :: Name -> Bool
+           -> LMatch Name (LHsExpr Name)
+           -> Origin       -- from the MatchGroup
+           -> TcRhoType     -- Expected type of function (just a TauTv)
+           -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
+tcMatchFun fun_name inf match origin exp_ty
+  = tcMatch1 match_ctxt herald match origin exp_ty
+  where
     herald = ptext (sLit "The equation(s) for")
              <+> quotes (ppr fun_name) <+> ptext (sLit "have")
     match_ctxt = MC { mc_what = FunRhs fun_name inf, mc_body = tcBody }
@@ -101,29 +116,52 @@ tcMatchesCase :: (Outputable (body Name)) =>
               -> TcSigmaType                                  -- Type of scrutinee
               -> MatchGroup Name (Located (body Name))        -- The case alternatives
               -> TcRhoType                                    -- Type of whole case expressions
-              -> TcM (MatchGroup TcId (Located (body TcId)))  -- Translated alternatives
+              -> TcM (HsWrapper, MatchGroup TcId (Located (body TcId)))
+                 -- Translated alternatives
+                 -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt scrut_ty matches res_ty
   | isEmptyMatchGroup matches   -- Allow empty case expressions
-  = return (MG { mg_alts = [], mg_arg_tys = [scrut_ty], mg_res_ty = res_ty, mg_origin = mg_origin matches })
+  = return (idHsWrapper, MG { mg_alts = []
+                            , mg_arg_tys = [scrut_ty]
+                            , mg_res_ty = res_ty
+                            , mg_origin = mg_origin matches })
 
   | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
 
 tcMatchLambda :: MatchGroup Name (LHsExpr Name) -> TcRhoType
               -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
-tcMatchLambda match res_ty
-  = matchFunTys herald n_pats res_ty  $ \ pat_tys rhs_ty ->
-    tcMatches match_ctxt pat_tys rhs_ty match
+tcMatchLambda (MG { mg_alts = [match], mg_origin = origin }) res_ty
+  = tcMatch1 match_ctxt herald match origin res_ty
   where
-    n_pats = matchGroupArity match
     herald = sep [ ptext (sLit "The lambda expression")
                          <+> quotes (pprSetDepth (PartWay 1) $
-                             pprMatches (LambdaExpr :: HsMatchContext Name) match),
+                             pprMatch (LambdaExpr :: HsMatchContext Name)
+                                      (unLoc match)),
                         -- The pprSetDepth makes the abstraction print briefly
                 ptext (sLit "has")]
     match_ctxt = MC { mc_what = LambdaExpr,
                       mc_body = tcBody }
+tcMatchLambda group _ = pprPanic "tcMatchLambda" $
+                        pprMatches (LambdaExpr :: HsMatchContext Name) group
+
+-- | Convenient wrapper for case with only one match
+tcMatch1 :: TcMatchCtxt HsExpr
+         -> SDoc                 -- ^ herald for 'matchFunTys'
+         -> LMatch Name (LHsExpr Name)
+         -> Origin               -- ^ from the 'MatchGroup'
+         -> TcRhoType
+         -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
+tcMatch1 match_ctxt herald match origin res_ty
+  = matchFunTys herald arity res_ty $ \ pat_tys rhs_ty ->
+    do { match' <- tcMatch match_ctxt pat_tys rhs_ty match
+       ; return (MG { mg_alts    = [match']
+                    , mg_arg_tys = pat_tys
+                    , mg_res_ty  = rhs_ty
+                    , mg_origin  = origin }) }
+  where
+    arity = length (hsLMatchPats match)
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
@@ -159,11 +197,14 @@ matchFunTys herald arity res_ty thing_inside
 ************************************************************************
 -}
 
+-- | Type-check a MatchGroup. This deeply instantiates the return
+-- type: it cannot be used to infer a polytype.
 tcMatches :: (Outputable (body Name)) => TcMatchCtxt body
           -> [TcSigmaType]      -- Expected pattern types
           -> TcRhoType          -- Expected result-type of the Match.
           -> MatchGroup Name (Located (body Name))
-          -> TcM (MatchGroup TcId (Located (body TcId)))
+          -> TcM (HsWrapper, MatchGroup TcId (Located (body TcId)))
+               -- wrapper goes from MatchGroup's ty to the expected ty
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
   = MC { mc_what :: HsMatchContext Name,        -- What kind of thing this is
@@ -174,8 +215,14 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
-    do  { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
-        ; return (MG { mg_alts = matches', mg_arg_tys = pat_tys, mg_res_ty = rhs_ty, mg_origin = origin }) }
+    do  { tau_ty <- newFlexiMonoTyVarTy openTypeKind
+        ; wrap   <- tcSubTypeDS GenSigCtxt tau_ty rhs_ty
+        ; tau_ty <- zonkTcType tau_ty   -- seems more efficient to zonk just once
+        ; matches' <- mapM (tcMatch ctxt pat_tys tau_ty) matches
+        ; return (wrap, MG { mg_alts = matches'
+                           , mg_arg_tys = pat_tys
+                           , mg_res_ty = tau_ty
+                           , mg_origin = origin }) }
 
 -------------
 tcMatch :: (Outputable (body Name)) => TcMatchCtxt body

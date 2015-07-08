@@ -15,7 +15,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  instTcTySig, instTcTySigFromId, findScopedTyVars,
                  badBootDeclErr, mkExport ) where
 
-import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
+import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun, tcMatchFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
@@ -1270,9 +1270,10 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
                                 fun_matches = matches, bind_fvs = fvs })]
-                             -- Single function binding,
-  | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
-  , Nothing <- sig_fn name   -- ...with no type signature
+                               -- Single function binding,
+  | NonRecursive <- is_rec     -- ...binder isn't mentioned in RHS
+  , Nothing <- sig_fn name     -- ...with no type signature
+  , [match] <- mg_alts matches -- ...and only one clause
   =     -- In this very special case we infer the type of the
         -- right hand side first (it may have a higher-rank type)
         -- and *then* make the monomorphic Id for the LHS
@@ -1281,11 +1282,12 @@ tcMonoBinds is_rec sig_fn no_gen
     setSrcSpan b_loc    $
     do  { rhs_ty  <- newFlexiTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name rhs_ty
-        ; (co_fn, matches') <- tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
-                                 -- We extend the error context even for a non-recursive
-                                 -- function so that in type error messages we show the
-                                 -- type of the thing whose rhs we are type checking
-                               tcMatchesFun name inf matches rhs_ty
+        ; (co_fn, matches') <-
+              tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
+                -- We extend the error context even for a non-recursive
+                -- function so that in type error messages we show the
+                -- type of the thing whose rhs we are type checking
+              tcMatchFun name inf match (mg_origin matches) rhs_ty
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,

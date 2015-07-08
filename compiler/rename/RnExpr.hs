@@ -499,10 +499,10 @@ rnCmd (HsCmdPar e)
   = do  { (e', fvs_e) <- rnLCmd e
         ; return (HsCmdPar e', fvs_e) }
 
-rnCmd (HsCmdCase expr matches)
+rnCmd (HsCmdCase expr matches ph)
   = do { (new_expr, e_fvs) <- rnLExpr expr
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
-       ; return (HsCmdCase new_expr new_matches, e_fvs `plusFV` ms_fvs) }
+       ; return (HsCmdCase new_expr new_matches ph, e_fvs `plusFV` ms_fvs) }
 
 rnCmd (HsCmdIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -520,7 +520,7 @@ rnCmd (HsCmdDo stmts _)
   = do  { ((stmts', _), fvs) <- rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
         ; return ( HsCmdDo stmts' placeHolderType, fvs ) }
 
-rnCmd cmd@(HsCmdCast {}) = pprPanic "rnCmd" (ppr cmd)
+rnCmd cmd@(HsCmdWrap {}) = pprPanic "rnCmd" (ppr cmd)
 
 ---------------------------------------------------
 type CmdNeeds = FreeVars        -- Only inhabitants are
@@ -537,7 +537,7 @@ methodNamesCmd (HsCmdArrApp _arrow _arg _ HsFirstOrderApp _rtl)
 methodNamesCmd (HsCmdArrApp _arrow _arg _ HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
-methodNamesCmd (HsCmdCast _ cmd) = methodNamesCmd cmd
+methodNamesCmd (HsCmdWrap _ cmd) = methodNamesCmd cmd
 
 methodNamesCmd (HsCmdPar c) = methodNamesLCmd c
 
@@ -549,7 +549,7 @@ methodNamesCmd (HsCmdDo stmts _) = methodNamesStmts stmts
 methodNamesCmd (HsCmdApp c _)      = methodNamesLCmd c
 methodNamesCmd (HsCmdLam match)    = methodNamesMatch match
 
-methodNamesCmd (HsCmdCase _ matches)
+methodNamesCmd (HsCmdCase _ matches _)
   = methodNamesMatch matches `addOneFV` choiceAName
 
 --methodNamesCmd _ = emptyFVs

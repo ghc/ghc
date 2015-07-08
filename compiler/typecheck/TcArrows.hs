@@ -142,11 +142,11 @@ tc_cmd env (HsCmdLet binds (L body_loc body)) res_ty
                              tc_cmd env body res_ty
         ; return (HsCmdLet binds' (L body_loc body')) }
 
-tc_cmd env in_cmd@(HsCmdCase scrut matches) (stk, res_ty)
+tc_cmd env in_cmd@(HsCmdCase scrut matches _) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferSigma scrut
-      matches' <- tcMatchesCase match_ctxt scrut_ty matches res_ty
-      return (HsCmdCase scrut' matches')
+      (wrap, matches') <- tcMatchesCase match_ctxt scrut_ty matches res_ty
+      return (HsCmdCase scrut' matches' wrap)
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
@@ -250,7 +250,7 @@ tc_cmd env
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam (MG { mg_alts = [match'], mg_arg_tys = arg_tys
                                   , mg_res_ty = res_ty, mg_origin = origin })
-        ; return (mkHsCmdCast co cmd') }
+        ; return (mkHsCmdWrap (coToHsWrapper co) cmd') }
   where
     n_pats     = length pats
     match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
@@ -272,7 +272,7 @@ tc_cmd env
 tc_cmd env (HsCmdDo stmts _) (cmd_stk, res_ty)
   = do  { co <- unifyType unitTy cmd_stk  -- Expecting empty argument stack
         ; stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
-        ; return (mkHsCmdCast co (HsCmdDo stmts' res_ty)) }
+        ; return (mkHsCmdWrap (coToHsWrapper co) (HsCmdDo stmts' res_ty)) }
 
 
 -----------------------------------------------------------------
@@ -317,7 +317,7 @@ tc_cmd _ cmd _
                       ptext (sLit "was found where an arrow command was expected")])
 
 
-matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercion, [TcType], TcType)
+matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcType], TcType)
 matchExpectedCmdArgs 0 ty
   = return (mkTcNomReflCo ty, [], ty)
 matchExpectedCmdArgs n ty

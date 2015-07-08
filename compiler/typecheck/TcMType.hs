@@ -19,6 +19,7 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
+  newFlexiMonoTyVarTy,
   newReturnTyVar, newReturnTyVarTy,
   newMetaKindVar, newMetaKindVars,
   mkTcTyVarName, cloneMetaTyVar,
@@ -104,7 +105,7 @@ kind_var_occ = mkOccName tvName "k"
 
 newMetaKindVar :: TcM TcKind
 newMetaKindVar = do { uniq <- newUnique
-                    ; details <- newMetaDetails (TauTv False)
+                    ; details <- newMetaDetails (TauTv VanillaTau)
                     ; let kv = mkTcTyVar (mkKindName uniq) superKind details
                     ; return (mkTyVarTy kv) }
 
@@ -288,8 +289,9 @@ newMetaTyVar meta_info kind
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
                         ReturnTv    -> fsLit "r"
-                        TauTv True  -> fsLit "w"
-                        TauTv False -> fsLit "t"
+                        TauTv WildcardTau   -> fsLit "w"
+                        TauTv VanillaTau    -> fsLit "t"
+                        TauTv AlwaysMonoTau -> fsLit "m"
                         FlatMetaTv  -> fsLit "fmv"
                         SigTv       -> fsLit "a"
         ; details <- newMetaDetails meta_info
@@ -418,7 +420,7 @@ writeMetaTyVarRef tyvar ref ty
 -}
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
-newFlexiTyVar kind = newMetaTyVar (TauTv False) kind
+newFlexiTyVar kind = newMetaTyVar (TauTv VanillaTau) kind
 
 newFlexiTyVarTy  :: Kind -> TcM TcType
 newFlexiTyVarTy kind = do
@@ -427,6 +429,11 @@ newFlexiTyVarTy kind = do
 
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
+
+-- | Creates a TyVarTy that absolutely cannot unify with polytypes
+newFlexiMonoTyVarTy :: Kind -> TcM TcType
+newFlexiMonoTyVarTy kind
+  = TyVarTy <$> newMetaTyVar (TauTv AlwaysMonoTau) kind
 
 newReturnTyVar :: Kind -> TcM TcTyVar
 newReturnTyVar kind = newMetaTyVar ReturnTv kind
@@ -449,7 +456,7 @@ tcInstTyVarX :: TvSubst -> TKVar -> TcM (TvSubst, TcTyVar)
 -- an existing TyVar. We substitute kind variables in the kind.
 tcInstTyVarX subst tyvar
   = do  { uniq <- newUnique
-        ; details <- newMetaDetails (TauTv False)
+        ; details <- newMetaDetails (TauTv VanillaTau)
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]
               kind   = substTy subst (tyVarKind tyvar)
@@ -984,7 +991,7 @@ tidySkolemInfo env info = (env, info)
 -- to replace a wildcard in a type. Such a wildcard meta var can be
 -- distinguished from other meta vars with the 'isWildcardVar' function.
 newWildcardVar :: Name -> Kind -> TcM TcTyVar
-newWildcardVar name kind = newNamedMetaTyVar name (TauTv True) kind
+newWildcardVar name kind = newNamedMetaTyVar name (TauTv WildcardTau) kind
 
 -- | Create a new meta var (which can unify with a type of any kind). This
 -- meta var should be used to replace a wildcard in a type. Such a wildcard
@@ -997,5 +1004,5 @@ newWildcardVarMetaKind name = do kind <- newMetaKindVar
 -- | Return 'True' if the argument is a meta var created for a wildcard (by
 -- 'newWildcardVar' or 'newWildcardVarMetaKind').
 isWildcardVar :: TcTyVar -> Bool
-isWildcardVar tv | isTcTyVar tv, MetaTv (TauTv True) _ _ <- tcTyVarDetails tv = True
+isWildcardVar tv | isTcTyVar tv, MetaTv (TauTv WildcardTau) _ _ <- tcTyVarDetails tv = True
 isWildcardVar _ = False

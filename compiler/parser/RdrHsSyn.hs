@@ -1095,7 +1095,7 @@ checkCmd _ (HsLam mg) =
 checkCmd _ (HsPar e) =
     checkCommand e >>= (\c -> return $ HsCmdPar c)
 checkCmd _ (HsCase e mg) =
-    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase e mg')
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase e mg' placeHolderHsWrapper)
 checkCmd _ (HsIf cf ep et ee) = do
     pt <- checkCommand et
     pe <- checkCommand ee

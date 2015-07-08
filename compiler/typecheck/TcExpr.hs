@@ -197,10 +197,10 @@ tcExpr (HsLam match) res_ty
         ; return (mkHsWrap co_fn (HsLam match')) }
 
 tcExpr e@(HsLamCase _ matches) res_ty
-  = do {(wrap, [arg_ty], body_ty) <-
+  = do {(wrap1, [arg_ty], body_ty) <-
             matchExpectedFunTys Expected msg 1 res_ty
-       ; matches' <- tcMatchesCase match_ctxt arg_ty matches body_ty
-       ; return $ mkHsWrap wrap $ HsLamCase arg_ty matches' }
+       ; (wrap2, matches') <- tcMatchesCase match_ctxt arg_ty matches body_ty
+       ; return $ mkHsWrap (wrap1 <.> wrap2) $ HsLamCase arg_ty matches' }
   where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
@@ -446,17 +446,22 @@ tcExpr (HsCase scrut matches) exp_ty
           (scrut', scrut_ty) <- tcInferSigma scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; matches' <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
-        ; return (HsCase scrut' matches') }
+        ; (wrap, matches') <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
+        ; return $ mkHsWrap wrap $ HsCase scrut' matches' }
  where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = tcBody }
 
 tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
   = do { pred' <- tcMonoExpr pred boolTy
-       ; b1' <- tcMonoExpr b1 res_ty
-       ; b2' <- tcMonoExpr b2 res_ty
-       ; return (HsIf Nothing pred' b1' b2') }
+            -- this forces the branches to be fully instantiated
+            -- (See #10619)
+       ; tau_ty <- newFlexiMonoTyVarTy openTypeKind
+       ; wrap   <- tcSubTypeHR tau_ty res_ty
+       ; tau_ty <- zonkTcType tau_ty
+       ; b1' <- tcMonoExpr b1 tau_ty
+       ; b2' <- tcMonoExpr b2 tau_ty
+       ; return $ mkHsWrap wrap $ HsIf Nothing pred' b1' b2' }
 
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty
   -- Note [Rebindable syntax for if]

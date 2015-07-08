@@ -780,10 +780,10 @@ zonkCmd   :: ZonkEnv -> HsCmd TcId    -> TcM (HsCmd Id)
 
 zonkLCmd  env cmd  = wrapLocM (zonkCmd env) cmd
 
-zonkCmd env (HsCmdCast co cmd)
-  = do { co' <- zonkTcCoToCo env co
-       ; cmd' <- zonkCmd env cmd
-       ; return (HsCmdCast co' cmd') }
+zonkCmd env (HsCmdWrap w cmd)
+  = do { (env1, w') <- zonkCoFn env w
+       ; cmd' <- zonkCmd env1 cmd
+       ; return (HsCmdWrap w' cmd') }
 zonkCmd env (HsCmdArrApp e1 e2 ty ho rl)
   = do new_e1 <- zonkLExpr env e1
        new_e2 <- zonkLExpr env e2
@@ -808,10 +808,11 @@ zonkCmd env (HsCmdPar c)
   = do new_c <- zonkLCmd env c
        return (HsCmdPar new_c)
 
-zonkCmd env (HsCmdCase expr ms)
-  = do new_expr <- zonkLExpr env expr
-       new_ms <- zonkMatchGroup env zonkLCmd ms
-       return (HsCmdCase new_expr new_ms)
+zonkCmd env (HsCmdCase expr ms wrap)
+  = do (env1, wrap') <- zonkCoFn env wrap
+       new_expr <- zonkLExpr env expr
+       new_ms <- zonkMatchGroup env1 zonkLCmd ms
+       return (HsCmdCase new_expr new_ms wrap')
 
 zonkCmd env (HsCmdIf eCond ePred cThen cElse)
   = do { new_eCond <- fmapMaybeM (zonkExpr env) eCond

@@ -671,6 +671,7 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected = go ty_actual ty_expected
                Filled ty_e'     -> tc_sub_type origin ctxt ty_a ty_e'
                Unfilled details
                  |  canUnifyWithPolyType dflags details (tyVarKind tv_e)
+                    && isMetaTyVar tv_e  -- don't want skolems here
                  -> coToHsWrapper <$> uType origin ty_a ty_e
 
      -- We've avoided instantiating ty_actual just in case ty_expected is

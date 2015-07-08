@@ -786,10 +786,11 @@ addTickHsCmd (OpApp e1 c2 fix c3) =
                 (addTickLHsCmd c3)
 -}
 addTickHsCmd (HsCmdPar e) = liftM HsCmdPar (addTickLHsCmd e)
-addTickHsCmd (HsCmdCase e mgs) =
-        liftM2 HsCmdCase
+addTickHsCmd (HsCmdCase e mgs w) =
+        liftM3 HsCmdCase
                 (addTickLHsExpr e)
                 (addTickCmdMatchGroup mgs)
+                (return w)
 addTickHsCmd (HsCmdIf cnd e1 c2 c3) =
         liftM3 (HsCmdIf cnd)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
@@ -817,8 +818,8 @@ addTickHsCmd (HsCmdArrForm e fix cmdtop) =
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdCast co cmd)
-  = liftM2 HsCmdCast (return co) (addTickHsCmd cmd)
+addTickHsCmd (HsCmdWrap w cmd)
+  = liftM2 HsCmdWrap (return w) (addTickHsCmd cmd)
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)

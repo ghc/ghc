@@ -31,7 +31,7 @@ module TcType (
   -- MetaDetails
   UserTypeCtxt(..), pprUserTypeCtxt, pprSigCtxt,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
-  MetaDetails(Flexi, Indirect), MetaInfo(..),
+  MetaDetails(Flexi, Indirect), MetaInfo(..), TauTvFlavour(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isFskTyVar, isFmvTyVar, isFlattenTyVar, isReturnTyVar,
@@ -347,12 +347,17 @@ instance Outputable MetaDetails where
   ppr Flexi         = ptext (sLit "Flexi")
   ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
 
+data TauTvFlavour
+  = VanillaTau     -- ^ This generally avoids unifying with polytypes, but
+                   -- if its kind is OpenKind, it will unify with a polytype.
+                   -- This is the most common flavour of TauTv
+                   -- See Note [OpenTypeKind accepts foralls]
+  | WildcardTau    -- ^ A tyvar that originates from a type wildcard.
+  | AlwaysMonoTau  -- ^ A tyvar that really can only unify with a monotype.
+
 data MetaInfo
-   = TauTv Bool    -- This MetaTv is an ordinary unification variable
-                   -- A TauTv is always filled in with a tau-type, which
-                   -- never contains any ForAlls.
-                   -- The boolean is true when the meta var originates
-                   -- from a wildcard.
+   = TauTv TauTvFlavour
+                   -- This MetaTv is an ordinary unification variable
 
    | ReturnTv      -- Can unify with *anything*. Used to convert a
                    -- type "checking" algorithm into a type inference algorithm.
@@ -533,8 +538,9 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   where
     pp_info = case info of
                 ReturnTv    -> ptext (sLit "ret")
-                TauTv True  -> ptext (sLit "twc")
-                TauTv False -> ptext (sLit "tau")
+                TauTv WildcardTau   -> ptext (sLit "twc")
+                TauTv VanillaTau    -> ptext (sLit "tau")
+                TauTv AlwaysMonoTau -> ptext (sLit "mono")
                 SigTv       -> ptext (sLit "sig")
                 FlatMetaTv  -> ptext (sLit "fuv")
 
@@ -1298,8 +1304,9 @@ occurCheckExpand dflags tv ty
 canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> TcKind -> Bool
 canUnifyWithPolyType dflags details kind
   = case details of
-      MetaTv { mtv_info = ReturnTv } -> True      -- See Note [ReturnTv]
-      MetaTv { mtv_info = SigTv }    -> False
+      MetaTv { mtv_info = ReturnTv }            -> True   -- See Note [ReturnTv]
+      MetaTv { mtv_info = SigTv }               -> False
+      MetaTv { mtv_info = TauTv AlwaysMonoTau } -> False
       MetaTv { mtv_info = TauTv _ }  -> xopt Opt_ImpredicativeTypes dflags
                                      || isOpenTypeKind kind
                                           -- Note [OpenTypeKind accepts foralls]

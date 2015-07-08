@@ -894,6 +894,7 @@ data HsCmd id
 
   | HsCmdCase   (LHsExpr id)
                 (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
+                (PostTc id HsWrapper)
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
     --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
     --       'ApiAnnotation.AnnClose' @'}'@
@@ -928,10 +929,10 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdCast   TcCoercion     -- A simpler version of HsWrap in HsExpr
+  | HsCmdWrap   HsWrapper
                 (HsCmd id)     -- If   cmd :: arg1 --> res
-                               --       co :: arg1 ~ arg2
-                               -- Then (HsCmdCast co cmd) :: arg2 --> res
+                               --      wrap :: arg1 "->" arg2
+                               -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsCmd id)
 
@@ -994,7 +995,7 @@ ppr_cmd (HsCmdApp c e)
 ppr_cmd (HsCmdLam matches)
   = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
-ppr_cmd (HsCmdCase expr matches)
+ppr_cmd (HsCmdCase expr matches _wrap)
   = sep [ sep [ptext (sLit "case"), nest 4 (ppr expr), ptext (sLit "of {")],
           nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches <+> char '}') ]
 
@@ -1014,8 +1015,7 @@ ppr_cmd (HsCmdLet binds cmd)
          hang (ptext (sLit "in"))  2 (ppr cmd)]
 
 ppr_cmd (HsCmdDo stmts _)  = pprDo ArrowExpr stmts
-ppr_cmd (HsCmdCast co cmd) = sep [ ppr_cmd cmd
-                                 , ptext (sLit "|>") <+> ppr co ]
+ppr_cmd (HsCmdWrap w cmd)  = pprHsWrapper (ppr_cmd cmd) w
 
 ppr_cmd (HsCmdArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]

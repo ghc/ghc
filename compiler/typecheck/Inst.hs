@@ -193,22 +193,26 @@ deeplySkolemise
   -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
 
 deeplySkolemise ty
-  | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-  = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
-       ; (subst, tvs1) <- tcInstSkolTyVars tvs
-       ; ev_vars1 <- newEvVars (substTheta subst theta)
-       ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise (substTy subst ty')
-       ; return ( mkWpLams ids1
-                   <.> mkWpTyLams tvs1
-                   <.> mkWpLams ev_vars1
-                   <.> wrap
-                   <.> mkWpEvVarApps ids1
-                , tvs1     ++ tvs2
-                , ev_vars1 ++ ev_vars2
-                , mkFunTys arg_tys rho ) }
+  = do { ty <- zonkTcType ty
+       ; go ty }
+  where
+    go ty
+      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
+      = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
+           ; (subst, tvs1) <- tcInstSkolTyVars tvs
+           ; ev_vars1 <- newEvVars (substTheta subst theta)
+           ; (wrap, tvs2, ev_vars2, rho) <- go (substTy subst ty')
+           ; return ( mkWpLams ids1
+                       <.> mkWpTyLams tvs1
+                       <.> mkWpLams ev_vars1
+                       <.> wrap
+                       <.> mkWpEvVarApps ids1
+                    , tvs1     ++ tvs2
+                    , ev_vars1 ++ ev_vars2
+                    , mkFunTys arg_tys rho ) }
 
-  | otherwise
-  = return (idHsWrapper, [], [], ty)
+      | otherwise
+      = return (idHsWrapper, [], [], ty)
 
 -- | Instantiate all outer type variables
 -- and any context. Never looks through arrows.

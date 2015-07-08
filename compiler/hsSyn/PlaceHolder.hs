@@ -12,6 +12,7 @@ import NameSet
 import RdrName
 import Var
 import Coercion
+import TcEvidence ( HsWrapper )
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -59,6 +60,9 @@ placeHolderNames = PlaceHolder
 placeHolderNamesTc :: NameSet
 placeHolderNamesTc = emptyNameSet
 
+placeHolderHsWrapper :: PlaceHolder
+placeHolderHsWrapper = PlaceHolder
+
 {-
 
 Note [Pass sensitive types]
@@ -102,4 +106,5 @@ type DataId id =
 
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
+  , Data (PostTc id HsWrapper)
   )

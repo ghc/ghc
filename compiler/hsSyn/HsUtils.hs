@@ -25,7 +25,7 @@ module HsUtils(
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   coToHsWrapper, coToHsWrapperR, mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
-  mkLHsPar, mkHsCmdCast, isLHsTypeExpr_maybe, isLHsTypeExpr,
+  mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap, isLHsTypeExpr_maybe, isLHsTypeExpr,
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -502,9 +502,12 @@ mkHsWrapCoR co e = mkHsWrap (coToHsWrapperR co) e
 mkLHsWrapCo :: TcCoercion -> LHsExpr id -> LHsExpr id
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
 
-mkHsCmdCast :: TcCoercion -> HsCmd id -> HsCmd id
-mkHsCmdCast co cmd | isTcReflCo co = cmd
-                   | otherwise     = HsCmdCast co cmd
+mkHsCmdWrap :: HsWrapper -> HsCmd id -> HsCmd id
+mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
+                  | otherwise       = HsCmdWrap w cmd
+
+mkLHsCmdWrap :: HsWrapper -> LHsCmd id -> LHsCmd id
+mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
 coToHsWrapper :: TcCoercion -> HsWrapper   -- A Nominal coercion
 coToHsWrapper co | isTcReflCo co = idHsWrapper
