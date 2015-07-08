@@ -966,29 +966,6 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
 
 
 /* ----------------------------------------------------------------------------
- * Send pending messages (PARALLEL_HASKELL only)
- * ------------------------------------------------------------------------- */
-
-#if defined(PARALLEL_HASKELL)
-static void
-scheduleSendPendingMessages(void)
-{
-
-# if defined(PAR) // global Mem.Mgmt., omit for now
-    if (PendingFetches != END_BF_QUEUE) {
-        processFetches();
-    }
-# endif
-
-    if (RtsFlags.ParFlags.BufferTime) {
-        // if we use message buffering, we must send away all message
-        // packets which have become too old...
-        sendOldBuffers();
-    }
-}
-#endif
-
-/* ----------------------------------------------------------------------------
  * Process message in the current Capability's inbox
  * ------------------------------------------------------------------------- */
 
@@ -1035,7 +1012,7 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
 }
 
 /* ----------------------------------------------------------------------------
- * Activate spark threads (PARALLEL_HASKELL and THREADED_RTS)
+ * Activate spark threads (THREADED_RTS)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
@@ -1048,7 +1025,7 @@ scheduleActivateSpark(Capability *cap)
         debugTrace(DEBUG_sched, "creating a spark thread");
     }
 }
-#endif // PARALLEL_HASKELL || THREADED_RTS
+#endif // THREADED_RTS
 
 /* ----------------------------------------------------------------------------
  * After running a thread...

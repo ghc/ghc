@@ -514,13 +514,6 @@ getCallMethod dflags _ id _ n_args _cg_loc (Just (self_loop_id, block_id, args))
   -- See Note [Self-recursive tail calls] in StgCmmExpr for more details
   = JumpToIt block_id args
 
-getCallMethod dflags _name _ lf_info _n_args _cg_loc _self_loop_info
-  | nodeMustPointToIt dflags lf_info && gopt Opt_Parallel dflags
-  =     -- If we're parallel, then we must always enter via node.
-        -- The reason is that the closure may have been
-        -- fetched since we allocated it.
-    EnterIt
-
 getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _cg_loc
               _self_loop_info
   | n_args == 0    = ASSERT( arity /= 0 )
