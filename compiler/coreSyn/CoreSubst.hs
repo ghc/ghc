@@ -20,7 +20,7 @@ module CoreSubst (
         substTickish, substVarSet,
 
         -- ** Operations on substitutions
-        emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst,
+        emptySubst, mkEmptySubst, mkGblSubst, mkOpenSubst, substInScope, isEmptySubst,
         extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
         extendCvSubst, extendCvSubstList,
         extendSubst, extendSubstList, extendSubstWithVar, zapSubstEnv,
@@ -178,24 +178,106 @@ TvSubstEnv and CvSubstEnv?
 
 * For TyVars, only coercion variables can possibly change, and they are
   easy to spot
+
+Note [IdSubstEnv]
+~~~~~~~~~~~~~~~~~
+An IdSubstEnv has a "local environment" of type (IdEnv CoreExpr);
+this is extended when we meet a binder, in the usual way.  But it also
+has a "global environment" of type GblIdSubst.  This global envt is
+never modified during substitution.  Rather:
+
+ * The GblIdSubst is used when initialising the substitution via
+   mkGblSubst, to give an "ambient substitution" for the enclosing
+   context.
+
+ * On lookup, we look first in the local envt and then in the global envt
+   (see lookupIdSubst)
+
+ * The GblIdSubst is just a function; but since we need to delete things
+   from the substitution when passing a binder, we have to record a set
+   of Ids gis_del that must *not* be looked up in the gbl envt.
+
+All this is needed to support SimplEnv.substExpr, which starts off
+with a SimplIdSubst, which provides the ambient subsitution.
 -}
 
 -- | An environment for substituting for 'Id's
-type IdSubstEnv = IdEnv CoreExpr
+-- See Note [IdSubstEnv]
+data IdSubstEnv = ISE { ise_env  :: !(IdEnv CoreExpr)
+                      , ise_gbl  :: !GblIdSubst }
+
+data GblIdSubst = NoGIS
+                | GIS { gis_env :: !(InScopeSet -> Id -> Maybe CoreExpr)
+                      , gis_del :: !IdSet }  -- Deletions from gis_env
+
+instance Outputable IdSubstEnv where
+  ppr (ISE { ise_env = lcl, ise_gbl = gbl })
+    = ppr gbl $$ ppr lcl
+
+instance Outputable GblIdSubst where
+  ppr NoGIS = empty
+  ppr (GIS { gis_del = dels }) = ptext (sLit "GIS") <+> ppr dels
+
+lookupGIS :: GblIdSubst -> InScopeSet -> Id -> Maybe CoreExpr
+lookupGIS NoGIS _ _ = Nothing
+lookupGIS (GIS { gis_env = gbl_fn, gis_del = dels }) in_scope v
+  | v `elemVarSet` dels = Nothing
+  | otherwise           = gbl_fn in_scope v
+
+isEmptyIdSubst :: IdSubstEnv -> Bool
+isEmptyIdSubst (ISE { ise_env = lcl, ise_gbl = NoGIS }) = isEmptyVarEnv lcl
+isEmptyIdSubst _ = False
+
+emptyIdSubst :: IdSubstEnv
+emptyIdSubst = ISE { ise_env = emptyVarEnv, ise_gbl = NoGIS }
+
+extendIdSubstEnv :: IdSubstEnv -> Id -> CoreExpr -> IdSubstEnv
+extendIdSubstEnv ise v e = ise { ise_env = extendVarEnv (ise_env ise) v e }
+
+extendIdSubstEnvList :: IdSubstEnv -> [(Id,CoreExpr)] -> IdSubstEnv
+extendIdSubstEnvList ise prs = ise { ise_env = extendVarEnvList (ise_env ise) prs }
+
+delIdSubst :: IdSubstEnv -> Id -> IdSubstEnv
+delIdSubst (ISE { ise_env = lcl, ise_gbl = gbl }) v
+  = ISE { ise_env = delVarEnv lcl v, ise_gbl = delGIS gbl v }
+
+delIdSubstList :: IdSubstEnv -> [Id] -> IdSubstEnv
+delIdSubstList (ISE { ise_env = lcl, ise_gbl = gbl }) vs
+  = ISE { ise_env = delVarEnvList lcl vs, ise_gbl = delGISList gbl vs }
+
+delGIS :: GblIdSubst -> Id -> GblIdSubst
+delGIS NoGIS _ = NoGIS
+delGIS (GIS { gis_env = gbl, gis_del = dels }) v
+  = GIS { gis_env = gbl, gis_del = if isJust (gbl emptyInScopeSet v)
+                                   then extendVarSet dels v
+                                   else dels }
+
+delGISList :: GblIdSubst -> [Id] -> GblIdSubst
+delGISList NoGIS _ = NoGIS
+delGISList (GIS { gis_env = gbl, gis_del = dels }) vs
+  = GIS { gis_env = gbl, gis_del = extendVarSetList dels del_vs }
+  where
+    del_vs = [ v | v <- vs, isJust (gbl emptyInScopeSet v)]
 
 ----------------------------
 isEmptySubst :: Subst -> Bool
 isEmptySubst (Subst _ id_env tv_env cv_env)
-  = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
+  = isEmptyIdSubst id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
 
 emptySubst :: Subst
-emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
+emptySubst = Subst emptyInScopeSet emptyIdSubst emptyVarEnv emptyVarEnv
 
 mkEmptySubst :: InScopeSet -> Subst
-mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
+mkEmptySubst in_scope = Subst in_scope emptyIdSubst emptyVarEnv emptyVarEnv
 
-mkSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> IdSubstEnv -> Subst
-mkSubst in_scope tvs cvs ids = Subst in_scope ids tvs cvs
+mkGblSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv
+           -> (InScopeSet -> Id -> Maybe CoreExpr)
+           -> Subst
+mkGblSubst in_scope tvs cvs lookup_id
+ = Subst in_scope id_subst tvs cvs
+ where
+    id_subst = ISE { ise_env = emptyVarEnv
+                   , ise_gbl = GIS { gis_env = lookup_id, gis_del = emptyVarSet } }
 
 -- | Find the in-scope set: see "CoreSubst#in_scope_invariant"
 substInScope :: Subst -> InScopeSet
@@ -204,17 +286,17 @@ substInScope (Subst in_scope _ _ _) = in_scope
 -- | Remove all substitutions for 'Id's and 'Var's that might have been built up
 -- while preserving the in-scope set
 zapSubstEnv :: Subst -> Subst
-zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
+zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyIdSubst emptyVarEnv emptyVarEnv
 
 -- | Add a substitution for an 'Id' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
-extendIdSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope (extendVarEnv ids v r) tvs cvs
+extendIdSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope (extendIdSubstEnv ids v r) tvs cvs
 
 -- | Adds multiple 'Id' substitutions to the 'Subst': see also 'extendIdSubst'
 extendIdSubstList :: Subst -> [(Id, CoreExpr)] -> Subst
-extendIdSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope (extendVarEnvList ids prs) tvs cvs
+extendIdSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope (extendIdSubstEnvList ids prs) tvs cvs
 
 -- | Add a substitution for a 'TyVar' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
@@ -260,9 +342,10 @@ extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var r
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst :: SDoc -> Subst -> Id -> CoreExpr
-lookupIdSubst doc (Subst in_scope ids _ _) v
+lookupIdSubst doc (Subst in_scope (ISE { ise_env = lcl, ise_gbl = gbl }) _ _) v
   | not (isLocalId v) = Var v
-  | Just e  <- lookupVarEnv ids       v = e
+  | Just e <- lookupVarEnv lcl        v = e
+  | Just e <- lookupGIS gbl in_scope  v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
   | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v
@@ -278,14 +361,15 @@ lookupCvSubst :: Subst -> CoVar -> Coercion
 lookupCvSubst (Subst _ _ _ cvs) v = ASSERT( isCoVar v ) lookupVarEnv cvs v `orElse` mkCoVarCo v
 
 delBndr :: Subst -> Var -> Subst
+-- Doesn't work for gbl_ids
 delBndr (Subst in_scope ids tvs cvs) v
   | isCoVar v = Subst in_scope ids tvs (delVarEnv cvs v)
   | isTyVar v = Subst in_scope ids (delVarEnv tvs v) cvs
-  | otherwise = Subst in_scope (delVarEnv ids v) tvs cvs
+  | otherwise = Subst in_scope (delIdSubst ids v) tvs cvs
 
 delBndrs :: Subst -> [Var] -> Subst
 delBndrs (Subst in_scope ids tvs cvs) vs
-  = Subst in_scope (delVarEnvList ids vs) (delVarEnvList tvs vs) (delVarEnvList cvs vs)
+  = Subst in_scope (delIdSubstList ids vs) (delVarEnvList tvs vs) (delVarEnvList cvs vs)
       -- Easiest thing is just delete all from all!
 
 -- | Simultaneously substitute for a bunch of variables
@@ -293,10 +377,11 @@ delBndrs (Subst in_scope ids tvs cvs) vs
 --   ie the substitution for   (\x \y. e) a1 a2
 --      so neither x nor y scope over a1 a2
 mkOpenSubst :: InScopeSet -> [(Var,CoreArg)] -> Subst
-mkOpenSubst in_scope pairs = Subst in_scope
-                                   (mkVarEnv [(id,e)  | (id, e) <- pairs, isId id])
-                                   (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
-                                   (mkVarEnv [(v,co)  | (v, Coercion co) <- pairs])
+mkOpenSubst in_scope pairs
+  = Subst in_scope
+          (ISE { ise_env = mkVarEnv [(id,e)  | (id, e) <- pairs, isId id], ise_gbl = NoGIS})
+          (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
+          (mkVarEnv [(v,co)  | (v, Coercion co) <- pairs])
 
 ------------------------------
 isInScope :: Var -> Subst -> Bool
@@ -313,20 +398,20 @@ addInScopeSet (Subst in_scope ids tvs cvs) vs
 extendInScope :: Subst -> Var -> Subst
 extendInScope (Subst in_scope ids tvs cvs) v
   = Subst (in_scope `extendInScopeSet` v)
-          (ids `delVarEnv` v) (tvs `delVarEnv` v) (cvs `delVarEnv` v)
+          (ids `delIdSubst` v) (tvs `delVarEnv` v) (cvs `delVarEnv` v)
 
 -- | Add the 'Var's to the in-scope set: see also 'extendInScope'
 extendInScopeList :: Subst -> [Var] -> Subst
 extendInScopeList (Subst in_scope ids tvs cvs) vs
   = Subst (in_scope `extendInScopeSetList` vs)
-          (ids `delVarEnvList` vs) (tvs `delVarEnvList` vs) (cvs `delVarEnvList` vs)
+          (ids `delIdSubstList` vs) (tvs `delVarEnvList` vs) (cvs `delVarEnvList` vs)
 
 -- | Optimized version of 'extendInScopeList' that can be used if you are certain
 -- all the things being added are 'Id's and hence none are 'TyVar's or 'CoVar's
 extendInScopeIds :: Subst -> [Id] -> Subst
 extendInScopeIds (Subst in_scope ids tvs cvs) vs
   = Subst (in_scope `extendInScopeSetList` vs)
-          (ids `delVarEnvList` vs) tvs cvs
+          (ids `delIdSubstList` vs) tvs cvs
 
 setInScope :: Subst -> InScopeSet -> Subst
 setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
@@ -497,8 +582,8 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
 
         -- Extend the substitution if the unique has changed
         -- See the notes with substTyVarBndr for the delVarEnv
-    new_env | no_change = delVarEnv env old_id
-            | otherwise = extendVarEnv env old_id (Var new_id)
+    new_env | no_change = delIdSubst env old_id
+            | otherwise = extendIdSubstEnv env old_id (Var new_id)
 
     no_change = id1 == old_id
         -- See Note [Extending the Subst]
@@ -553,7 +638,7 @@ clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
     id2     = substIdType subst id1
     new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
     (new_idvs, new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
-                        | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
+                        | otherwise      = (extendIdSubstEnv idvs old_id (Var new_id), cvs)
 
 {-
 ************************************************************************
@@ -1066,9 +1151,9 @@ subst_opt_id_bndr subst@(Subst in_scope id_subst tv_subst cv_subst) old_id
         -- or there's some useful occurrence information
         -- See the notes with substTyVarBndr for the delSubstEnv
     new_id_subst | new_id /= old_id
-                 = extendVarEnv id_subst old_id (Var new_id)
+                 = extendIdSubstEnv id_subst old_id (Var new_id)
                  | otherwise
-                 = delVarEnv id_subst old_id
+                 = delIdSubst id_subst old_id
 
 ----------------------
 subst_opt_bndrs :: Subst -> [InVar] -> (Subst, [OutVar])

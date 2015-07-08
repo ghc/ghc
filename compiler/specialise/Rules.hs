@@ -591,10 +591,10 @@ data RuleMatchEnv
 rvInScopeEnv :: RuleMatchEnv -> InScopeEnv
 rvInScopeEnv renv = (rnInScopeSet (rv_lcl renv), rv_unf renv)
 
-data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
-                    , rs_id_subst :: IdSubstEnv   --   template variables
-                    , rs_binds    :: BindWrapper  -- Floated bindings
-                    , rs_bndrs    :: VarSet       -- Variables bound by floated lets
+data RuleSubst = RS { rs_tv_subst :: TvSubstEnv      -- Range is the
+                    , rs_id_subst :: IdEnv CoreExpr  --   template variables
+                    , rs_binds    :: BindWrapper     -- Floated bindings
+                    , rs_bndrs    :: VarSet          -- Variables bound by floated lets
                     }
 
 type BindWrapper = CoreExpr -> CoreExpr

@@ -1179,7 +1179,7 @@ simplCast env body co0 cont0
                 -- But it isn't a common case.
                 --
                 -- Example of use: Trac #995
-         = do { let arg' = substExprS arg_se arg
+         = do { let arg' = substExpr arg_se arg
                            -- It's important that this is lazy, because this argument
                            -- may be disarded if turns out to be the argument of
                            -- (\_ -> e)     This can make a huge difference;
