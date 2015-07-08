@@ -269,12 +269,12 @@ synifyDataCon use_gadt_syntax dc =
   linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
                 src_bang = case bang of
-                             HsUnpack {} -> HsSrcBang Nothing (Just True) (Just True)
-                             HsStrict    -> HsSrcBang Nothing (Just False) (Just True)
-                             HsLazy      -> HsSrcBang Nothing Nothing Nothing
+                             HsUnpack {} -> HsSrcBang Nothing SrcUnpack SrcStrict
+                             HsStrict    -> HsSrcBang Nothing SrcNoUnpack SrcStrict
+                             HsLazy      -> HsSrcBang Nothing NoSrcUnpack NoSrcStrictness
                              _           -> bang
             in case src_bang of
-                 (HsSrcBang _ Nothing Nothing) -> tySyn
+                 (HsSrcBang _ NoSrcUnpack NoSrcStrictness) -> tySyn
                  _        -> noLoc $ HsBangTy bang tySyn
           )
           arg_tys (dataConSrcBangs dc)
