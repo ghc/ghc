@@ -11,7 +11,7 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcSkolemise, SkolemiseMode(..),
-  tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
+  tcSubTypeHR, tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
   checkConstraints,
 
   -- Various unifications
@@ -25,7 +25,7 @@ module TcUnify (
   matchExpectedListTy,
   matchExpectedPArrTy,
   matchExpectedTyConApp,
-  matchExpectedAppTys,
+  matchExpectedAppTy,
   matchExpectedFunTys, matchExpectedFunTys_Args,
   matchExpectedFunKind,
   newOverloadedLit,
@@ -339,53 +339,42 @@ of (->) to have openTypeKind, and this also permits foralls, so
 we are ok.
 -}
 
+
 ----------------------
-matchExpectedListTy :: ExpOrAct -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
 -- Special case for lists
-matchExpectedListTy ea exp_ty
- = do { (co, [elt_ty]) <- matchExpectedTyConApp ea listTyCon exp_ty
+matchExpectedListTy exp_ty
+ = do { (co, [elt_ty]) <- matchExpectedTyConApp listTyCon exp_ty
       ; return (co, elt_ty) }
 
 ----------------------
-matchExpectedPArrTy :: ExpOrAct -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+matchExpectedPArrTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
 -- Special case for parrs
-matchExpectedPArrTy ea exp_ty
-  = do { (co, [elt_ty]) <- matchExpectedTyConApp ea parrTyCon exp_ty
+matchExpectedPArrTy exp_ty
+  = do { (co, [elt_ty]) <- matchExpectedTyConApp parrTyCon exp_ty
        ; return (co, elt_ty) }
 
 ---------------------
-matchExpectedTyConApp :: ExpOrAct
-                      -> TyCon
-                         -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
-
-                      -> TcSigmaType          -- orig_ty
-                      -> TcM (HsWrapper,
+matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
+                      -> TcRhoType            -- orig_ty
+                      -> TcM (TcCoercionN,    -- T k1 k2 k3 a b c ~N orig_ty
                               [TcSigmaType])  -- Element types, k1 k2 k3 a b c
-
--- Expected: wrapper : T k1 k2 k3 a b c "->" orig_ty
--- Actual:   wrapper : orig_ty "->" T k1 k2 k3 a b c
 
 -- It's used for wired-in tycons, so we call checkWiredInTyCon
 -- Precondition: never called with FunTyCon
 -- Precondition: input type :: *
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
-matchExpectedTyConApp ea tc orig_ty
+matchExpectedTyConApp tc orig_ty
   = go orig_ty
   where
-    go ty
-       | not (null tvs && null theta)
-       = exposeRhoType ea ty go
-      where
-        (tvs, theta, _) = tcSplitSigmaTy ty
-
     go ty
        | Just ty' <- tcView ty
        = go ty'
 
-    go (TyConApp tycon args)
+    go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
-       = return (idHsWrapper, args)
+       = return (mkTcNomReflCo ty, args)
 
     go (TyVarTy tv)
        | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -410,63 +399,46 @@ matchExpectedTyConApp ea tc orig_ty
             do { kappa_tys <- mapM (const newMetaKindVar) kvs
                ; let arg_kinds' = map (substKiWith kvs kappa_tys) arg_kinds
                ; tau_tys <- mapM newFlexiTyVarTy arg_kinds'
-               ; let arg_tys = kappa_tys ++ tau_tys
-                     unif_ty = mkTyConApp tc arg_tys
-               ; wrap <- matchUnificationType ea unif_ty orig_ty
-               ; return (wrap, arg_tys) }
+               ; co <- unifyType (mkTyConApp tc (kappa_tys ++ tau_tys)) orig_ty
+               ; return (co, kappa_tys ++ tau_tys) }
 
     (kvs, body)           = splitForAllTys (tyConKind tc)
     (arg_kinds, res_kind) = splitKindFunTys body
 
 ----------------------
-matchExpectedAppTys :: Arity
-                    -> TcSigmaType                      -- orig_ty
-                    -> TcM ( HsWrapper                  -- m a1 a2 "->" orig_ty
-                           , TcTauType                  -- m
-                           , [TcTauType])               -- [a1, a2]
+matchExpectedAppTy :: TcRhoType                         -- orig_ty
+                   -> TcM (TcCoercion,                   -- m a ~ orig_ty
+                           (TcSigmaType, TcSigmaType))  -- Returns m, a
 -- If the incoming type is a mutable type variable of kind k, then
--- matchExpectedAppTys returns a new type variable (m: *^n -> k); note the *.
--- Only runs in "Expected" mode, with skolemisation, never instantiation.
+-- matchExpectedAppTy returns a new type variable (m: * -> k); note the *.
 
-matchExpectedAppTys n orig_ty
-  = do { (wrap, mb_stuff) <- tcSkolemise SkolemiseTop GenSigCtxt orig_ty $
-                             \ _ rho -> go n rho
-       ; case mb_stuff of
-            Just (co, fun_ty, arg_tys) ->
-              return (wrap <.> coToHsWrapper co, fun_ty, reverse arg_tys)
-            Nothing -> defer }
+matchExpectedAppTy orig_ty
+  = go orig_ty
   where
-    go 0 ty = return (Just (mkTcNomReflCo ty, ty, []))
-
-    go n ty
-      | Just ty' <- tcView ty = go n ty'
+    go ty
+      | Just ty' <- tcView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = do { mb_stuff <- go (n-1) fun_ty
-           ; return $ case mb_stuff of
-               Just (inner_co, inner_fun_ty, arg_tys)
-                 -> Just ( mkTcAppCo inner_co (mkTcNomReflCo arg_ty)
-                         , inner_fun_ty, arg_ty : arg_tys )
-               Nothing -> Nothing }
+      = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
 
-    go n (TyVarTy tv)
+    go (TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty -> go n ty
-               Flexi       -> return Nothing }
+               Indirect ty -> go ty
+               Flexi       -> defer }
 
-    go _ _ = return Nothing
+    go _ = defer
 
     -- Defer splitting by generating an equality constraint
-    defer = do { fun_ty  <- newFlexiTyVarTy fun_kind
-               ; arg_tys <- newFlexiTyVarTys n liftedTypeKind
-               ; wrap <- tcSubTypeHR (mkAppTys fun_ty arg_tys) orig_ty
-               ; return (wrap, fun_ty, arg_tys) }
+    defer = do { ty1 <- newFlexiTyVarTy kind1
+               ; ty2 <- newFlexiTyVarTy kind2
+               ; co <- unifyType (mkAppTy ty1 ty2) orig_ty
+               ; return (co, (ty1, ty2)) }
 
     orig_kind = typeKind orig_ty
-    fun_kind  = mkArrowKinds (nOfThem n liftedTypeKind) (defaultKind orig_kind)
-                              -- m :: * -> k
+    kind1 = mkArrowKind liftedTypeKind (defaultKind orig_kind)
+    kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
         -- The defaultKind is a bit smelly.  If you remove it,
         -- try compiling        f x = do { x }
@@ -597,6 +569,11 @@ The following happens:
 So it's important that we unify beta := forall a. a->a, rather than
 skolemising the type.
 -}
+
+-- | Call this variant when you are in a higher-rank situation and
+-- you know the right-hand type is deeply skolemised.
+tcSubTypeHR :: TcSigmaType -> TcRhoType -> TcM HsWrapper
+tcSubTypeHR = tcSubTypeDS GenSigCtxt
 
 tcSubType :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected

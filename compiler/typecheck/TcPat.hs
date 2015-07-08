@@ -538,7 +538,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
          -- Here, we infer a rho type for it,
          -- which replaces the leading foralls and constraints
          -- with fresh unification variables.
-        ; (expr',expr'_inferred) <- tcInferSigma expr
+        ; (expr',expr'_inferred) <- tcInferRho expr
 
          -- next, we check that expr is coercible to `overall_pat_ty -> pat_ty`
          -- NOTE: this forces pat_ty to be a monotype (because we use a unification
@@ -591,7 +591,7 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
 
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
   = do  { let tc = tupleTyCon boxity (length pats)
-        ; (coi, arg_tys) <- matchExpectedPatTy (flip matchExpectedTyConApp tc)
+        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                               pat_ty
         ; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
@@ -910,15 +910,16 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
 ----------------------------
--- | Convenient wrapper for calling a matchExpctedXXX function
-matchExpectedPatTy :: (ExpOrAct -> TcRhoType -> TcM (HsWrapper, a))
+-- | Convenient wrapper for calling a matchExpectedXXX function
+matchExpectedPatTy :: (TcRhoType -> TcM (HsWrapper, a))
                     -> TcSigmaType -> TcM (HsWrapper, a)
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~R inner_ty
 matchExpectedPatTy inner_match pat_ty
-  = do { (wrap, res) <- inner_match (Actual PatOrigin) pat_ty
+  = do { (wrap, pat_rho) <- topInstantiate PatOrigin pat_ty
+       ; (co, res) <- inner_match pat_rho
        ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr wrap)
-       ; return (wrap, res) }
+       ; return (coToHsWrapper (mkTcSymCo co) <.> wrap, res) }
 
 ----------------------------
 matchExpectedConTy :: TyCon      -- The TyCon that this data
@@ -953,7 +954,9 @@ matchExpectedConTy data_tc pat_ty
                 , tys') }
 
   | otherwise
-  = matchExpectedTyConApp (Actual PatOrigin) data_tc pat_ty
+  = do { (wrap, pat_rho) <- topInstantiate PatOrigin pat_ty
+       ; (coi, tys) <- matchExpectedTyConApp (Actual PatOrigin) data_tc pat_rho
+       ; return (coToHsWrapper (mkTcSymCo coi) <.> wrap, tys) }
 
 {-
 Note [Matching constructor patterns]

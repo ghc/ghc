@@ -1796,13 +1796,12 @@ tcRnExpr hsc_env rdr_expr
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     ((_tc_expr, res_ty), tclvl, lie) <- pushLevelAndCaptureConstraints $
-                                        tcInferSigma rn_expr ;
-    (_wrap, res_tau) <- topInstantiate GeneraliseOrigin res_ty ;
+                                        tcInferRho rn_expr ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $
                                       {-# SCC "simplifyInfer" #-}
                                       simplifyInfer tclvl
                                                     False {- No MR for now -}
-                                                    [(fresh_it, res_tau)]
+                                                    [(fresh_it, res_ty)]
                                                     lie ;
     -- Wanted constraints from static forms
     stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;

@@ -373,7 +373,6 @@ instStupidTheta orig theta
 
 -}
 
-
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in TcUnify
 newNonTrivialOverloadedLit :: CtOrigin

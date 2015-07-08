@@ -2226,8 +2226,6 @@ data CtOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
-  | GeneraliseOrigin    -- trying to generalise an expression
-  | ThBrackOrigin       -- trying to resolve a TH bracket to a tau-type
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2314,8 +2312,6 @@ pprCtO AnnOrigin             = ptext (sLit "an annotation")
 pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
 pprCtO ListOrigin            = ptext (sLit "an overloaded list")
 pprCtO StaticOrigin          = ptext (sLit "a static form")
-pprCtO GeneraliseOrigin      = ptext (sLit "generalising an expression")
-pprCtO ThBrackOrigin         = ptext (sLit "a TH bracket")
 pprCtO _                     = panic "pprCtOrigin"
 
 {-

@@ -273,16 +273,16 @@ tcDoStmts :: HsStmtContext Name
           -> TcRhoType
           -> TcM (HsExpr TcId)          -- Returns a HsDo
 tcDoStmts ListComp stmts res_ty
-  = do  { (co, elt_ty) <- matchExpectedListTy Expected res_ty
+  = do  { (co, elt_ty) <- matchExpectedListTy res_ty
         ; let list_ty = mkListTy elt_ty
         ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts elt_ty
-        ; return $ mkHsWrap co (HsDo ListComp stmts' list_ty) }
+        ; return $ mkHsWrapCo co (HsDo ListComp stmts' list_ty) }
 
 tcDoStmts PArrComp stmts res_ty
-  = do  { (co, elt_ty) <- matchExpectedPArrTy Expected res_ty
+  = do  { (co, elt_ty) <- matchExpectedPArrTy res_ty
         ; let parr_ty = mkPArrTy elt_ty
         ; stmts' <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts elt_ty
-        ; return $ mkHsWrap co (HsDo PArrComp stmts' parr_ty) }
+        ; return $ mkHsWrapCo co (HsDo PArrComp stmts' parr_ty) }
 
 tcDoStmts DoExpr stmts res_ty
   = do  { stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty

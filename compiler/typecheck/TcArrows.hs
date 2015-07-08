@@ -79,16 +79,18 @@ Note that
 -}
 
 tcProc :: InPat Name -> LHsCmdTop Name          -- proc pat -> expr
-       -> TcSigmaType                             -- Expected type of whole proc expression
+       -> TcRhoType                             -- Expected type of whole proc expression
        -> TcM (OutPat TcId, LHsCmdTop TcId, HsWrapper)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
-    do  { (wrap, arr_ty, [arg_ty, res_ty]) <- matchExpectedAppTys 2 exp_ty
+    do  { (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
+        ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
                           tcCmdTop cmd_env cmd (unitTy, res_ty)
-        ; return (pat', cmd', wrap) }
+        ; let res_co = mkTcTransCo co (mkTcAppCo co1 (mkTcNomReflCo res_ty))
+        ; return (pat', cmd', res_co) }
 
 {-
 ************************************************************************
@@ -319,14 +321,9 @@ matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercion, [TcType], TcType)
 matchExpectedCmdArgs 0 ty
   = return (mkTcNomReflCo ty, [], ty)
 matchExpectedCmdArgs n ty
-  = do { (wrap1, [ty1, ty2]) <- matchExpectedTyConApp Expected pairTyCon ty
-       ; let co1 = unwrap_co wrap1 ty
+  = do { (co1, [ty1, ty2]) <- matchExpectedTyConApp pairTyCon ty
        ; (co2, tys, res_ty) <- matchExpectedCmdArgs (n-1) ty2
        ; return (mkTcTyConAppCo Nominal pairTyCon [co1, co2], ty1:tys, res_ty) }
-  where
-    unwrap_co WpHole      t = mkTcNomReflCo t
-    unwrap_co (WpCast co) _ = co
-    unwrap_co wrap        _ = pprPanic "matchExpectedCmdArgs" (ppr wrap)
 
 {-
 ************************************************************************

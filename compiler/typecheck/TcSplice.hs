@@ -152,10 +152,9 @@ tcTypedBracket brack@(TExpBr expr) res_ty
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
        ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
-                                tcInferSigmaNC expr
+                                tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
 
-       ; (_, expr_ty) <- topInstantiate ThBrackOrigin expr_ty
        ; meta_ty <- tcTExpTy expr_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
@@ -534,8 +533,7 @@ runAnnotation target expr = do
     -- and check identifiers live in other modules using TH stage checks. tcSimplifyStagedExpr
     -- also resolves the LIE constraints to detect e.g. instance ambiguity
     zonked_wrapped_expr' <- tcTopSpliceExpr False $
-           do { (expr', expr_sigma) <- tcInferSigmaNC expr
-              ; (expr'_wrapper, expr_ty) <- topInstantiate AnnOrigin expr_sigma
+           do { (expr', expr_ty) <- tcInferRhoNC expr
                 -- We manually wrap the typechecked expression in a call to toAnnotationWrapper
                 -- By instantiating the call >here< it gets registered in the
                 -- LIE consulted by tcTopSpliceExpr
@@ -543,8 +541,8 @@ runAnnotation target expr = do
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
               ; let specialised_to_annotation_wrapper_expr
                       = L loc (HsWrap wrapper (HsVar to_annotation_wrapper_id))
-              ; return (L loc (HsApp specialised_to_annotation_wrapper_expr $
-                                     mkLHsWrap expr'_wrapper expr')) }
+              ; return (L loc (HsApp specialised_to_annotation_wrapper_expr
+                                     expr')) }
 
     -- Run the appropriately wrapped expression to get the value of
     -- the annotation and its dictionaries. The return value is of

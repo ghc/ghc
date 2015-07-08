@@ -76,12 +76,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
                     ((lhs', rule_ty), lhs_wanted) <- captureConstraints $
-                      do { (lhs', lhs_sigma) <- tcInferSigma lhs
-                         ; (lhs_wrap, lhs_rho) <- topInstantiate AppOrigin lhs_sigma  -- TODO (RAE): Fix origin
-                                -- could theoretically do deeplyInstantiate,
-                                -- but the resulting wrapper would be too complex
-                                -- for a RULE LHS.
-                         ; return (mkLHsWrap lhs_wrap lhs', lhs_rho) }
+                                                     tcInferRho lhs
 
                   ; (rhs', rhs_wanted) <- captureConstraints (tcPolyExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
