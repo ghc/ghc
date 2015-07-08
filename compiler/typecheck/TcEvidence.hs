@@ -18,7 +18,7 @@ module TcEvidence (
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
-  EvInstanceOf(..), mkInstanceOfEq, mkInstanceOfInst, mkInstanceOfLet,
+  EvInstanceOf(..), mkInstanceOfEq, mkInstanceOfInst, mkInstanceOfGen,
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -568,15 +568,16 @@ data HsWrapper
                               -- Guaranteed not the identity coercion
                               -- At role Representational
 
-        -- Evidence abstraction and application
+        -- Evidence abstraction
         -- (both dictionaries and coercions)
-  | WpEvLam  EvVar               -- \d. []       the 'd' is an evidence variable
-  | WpEvApp  EvTerm              -- [] d         the 'd' is evidence for a constraint
-  | WpEvRevApp EvTerm            -- d []         the 'd' is evidence for a instantiation
-
-        -- Kind and Type abstraction and application
   | WpTyLam TyVar       -- \a. []  the 'a' is a type/kind variable (not coercion var)
-  | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
+  | WpEvLam  EvVar      -- \d. []       the 'd' is an evidence variable
+
+        -- Evidence application (occurrence site of a function)
+  | WpTyApp KindOrType    -- [] t    the 't' is a type (not coercion)
+  | WpEvApp    EvTerm     -- [] d         the 'd' is evidence for a constraint
+                          --              Always EvId or EvCoercion
+  | WpEvInstOf EvId       -- d []         the 'd' is evidence for a instantiation
 
 
   | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
@@ -603,7 +604,7 @@ mkWpCast co
                     WpCast co
 
 mkWpInstanceOf :: Type -> EvVar -> HsWrapper
-mkWpInstanceOf ty v = WpEvRevApp (EvInstanceOf ty (EvInstanceOfVar v))
+mkWpInstanceOf ty v = WpEvInstOf v
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
@@ -732,7 +733,7 @@ data EvTerm
 
   | EvTypeable EvTypeable   -- Dictionary for `Typeable`
 
-  | EvInstanceOf Type EvInstanceOf  -- Instantiation of a type
+  | EvInstanceOf Type EvInstanceOf  -- Evidence for  s1 <= s2
 
   deriving( Data.Data, Data.Typeable )
 
@@ -768,17 +769,35 @@ data EvCallStack
     -- @?name@, occurring at @loc@, in a calling context @stk@.
   deriving( Data.Data, Data.Typeable )
 
--- Evidence for instantiation / InstanceOf constraints
+
+{- Note [Evidence for InstanceOf constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+             g : s ~N t
+    --------------------------
+    EvInstanceOfEq g : s <= t
+
+                 g : (s[tys/as] <= t),   vi : ci[tys/as]
+    -------------------------------------------------------------------------
+    EvInstanceOfInst [t1..tm] g [v1..vn] : (forall a1..am., c1..ck => s) <= t
+
+                 forall [a1..an]. [v1:c1,..vn:cn] <binds>. g : s <= t
+    -------------------------------------------------------------------------
+    EvInstanceOfGen [a1..an] [v1..vn] <binds> g : s <= (forall a1..am., c1..ck => t)
+-}
+
 data EvInstanceOf
-  = EvInstanceOfVar  EvId
-  | EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
+  = EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
+
   | EvInstanceOfInst [Type]      -- ^ type variables to apply
                      EvId        -- ^ witness for inner instantiation
                      [EvTerm]    -- ^ witness for inner constraints
-  | EvInstanceOfLet  [TyVar]     -- ^ type variables
+
+  | EvInstanceOfGen  [TyVar]     -- ^ type variables
                      [EvId]      -- ^ constraint variables
                      TcEvBinds   -- ^ inner bindings
                      EvId        -- ^ inner instantiation constraint
+
     deriving ( Data.Data, Data.Typeable )
 
 mkInstanceOfEq :: Type -> TcCoercion -> EvTerm
@@ -789,9 +808,9 @@ mkInstanceOfInst :: Type -> [Type] -> EvId -> [EvVar] -> EvTerm
 mkInstanceOfInst ty vars co q
   = EvInstanceOf ty (EvInstanceOfInst vars co (map EvId q))
 
-mkInstanceOfLet :: Type -> [TyVar] -> [EvId] -> TcEvBinds -> EvId -> EvTerm
-mkInstanceOfLet ty tyvars qvars bnds co
-  = EvInstanceOf ty (EvInstanceOfLet tyvars qvars bnds co)
+mkInstanceOfGen :: Type -> [TyVar] -> [EvId] -> TcEvBinds -> EvId -> EvTerm
+mkInstanceOfGen ty tyvars qvars bnds co
+  = EvInstanceOf ty (EvInstanceOfGen tyvars qvars bnds co)
 
 {-
 Note [Coercion evidence terms]
@@ -1056,13 +1075,12 @@ evVarsOfTypeable ev =
 evVarsOfInstanceOf :: EvInstanceOf -> VarSet
 evVarsOfInstanceOf ev =
   case ev of
-    EvInstanceOfVar  v      -> unitVarSet v
     EvInstanceOfEq   co     -> coVarsOfTcCo co
     EvInstanceOfInst _ co q -> unitVarSet co `unionVarSet` evVarsOfTerms q
-    EvInstanceOfLet  _ qvars (EvBinds bs) co ->
+    EvInstanceOfGen  _ qvars (EvBinds bs) co ->
       (foldrBag (unionVarSet . go_bind) (unitVarSet co) bs
        `minusVarSet` get_bndrs bs) `minusVarSet` mkVarSet qvars
-    EvInstanceOfLet  _ _ _ _ -> emptyVarSet
+    EvInstanceOfGen  _ _ _ _ -> emptyVarSet
   where
     -- Similar to `coVarsOfTcCo`
     go_bind :: EvBind -> VarSet
@@ -1101,7 +1119,7 @@ pprHsWrapper doc wrap
     help it (WpEvLam id)    = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
     help it (WpTyLam tv)    = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
     help it (WpLet binds)   = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
-    help it (WpEvRevApp id) = no_parens  $ sep [it False, ptext (sLit "<|"), nest 2 (ppr id)]
+    help it (WpEvInstOf id) = no_parens  $ sep [it False, ptext (sLit "<|"), nest 2 (ppr id)]
 
     pp_bndr v = pprBndr LambdaBind v <> dot
 
@@ -1160,11 +1178,10 @@ instance Outputable EvTypeable where
 instance Outputable EvInstanceOf where
   ppr ev =
     case ev of
-      EvInstanceOfVar  id  -> ptext (sLit "VAR")  <+> ppr id
       EvInstanceOfEq   co  -> ptext (sLit "EQ")   <+> ppr co
       EvInstanceOfInst vars co q
         -> ptext (sLit "INST") <+> ppr vars <+> ppr q <+> ppr co
-      EvInstanceOfLet  vars qvars b i
+      EvInstanceOfGen  vars qvars b i
         -> ptext (sLit "LET") <+> ppr vars <+> ppr qvars
                               <+> ppr b <+> ppr i
 
