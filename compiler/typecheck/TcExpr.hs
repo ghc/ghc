@@ -8,8 +8,8 @@ c%
 
 {-# LANGUAGE CPP #-}
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC,
-                tcInferSigma, tcInferSigmaNC,
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
+                tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcCheckId,
                 addExprErrCtxt, tcSkolemiseExpr ) where
 
@@ -90,6 +90,21 @@ tcPolyExprNC (L loc expr) res_ty
     do { traceTc "tcPolyExprNC" (ppr res_ty)
        ; expr' <- tcSkolemiseExpr SkolemiseDeeply res_ty $ \ res_ty ->
                   tcExpr expr res_ty
+       ; return (L loc expr') }
+
+tcMonoExpr, tcMonoExprNC
+         :: LHsExpr Name        -- Expression to type check
+         -> TcRhoType           -- Expected type (must not be a polytype)
+         -> TcM (LHsExpr TcId)  -- Generalised expr with expected type
+
+tcMonoExpr expr res_ty
+  = addExprErrCtxt expr $
+    do { traceTc "tcMonoExpr" (ppr res_ty); tcMonoExprNC expr res_ty }
+
+tcMonoExprNC (L loc expr) res_ty
+  = setSrcSpan loc $
+    do { traceTc "tcPolyExprNC" (ppr res_ty)
+       ; expr' <- tcExpr expr res_ty
        ; return (L loc expr') }
 
 ---------------
@@ -460,7 +475,7 @@ tcExpr (HsDo do_or_lc stmts _) res_ty
 
 tcExpr (HsProc pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
-        ; return $ mkHsWrap coi (HsProc pat' cmd') }
+        ; return $ mkHsWrapCo coi (HsProc pat' cmd') }
 
 tcExpr (HsStatic expr) res_ty
   = do  { staticPtrTyCon  <- tcLookupTyCon staticPtrTyConName

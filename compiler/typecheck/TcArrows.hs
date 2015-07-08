@@ -9,7 +9,7 @@ Typecheck arrow notation
 
 module TcArrows ( tcProc ) where
 
-import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcInferSigma, tcSyntaxOp, tcCheckId, tcPolyExpr )
+import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferSigma, tcSyntaxOp, tcCheckId, tcPolyExpr )
 
 import HsSyn
 import TcMatches
@@ -80,7 +80,7 @@ Note that
 
 tcProc :: InPat Name -> LHsCmdTop Name          -- proc pat -> expr
        -> TcRhoType                             -- Expected type of whole proc expression
-       -> TcM (OutPat TcId, LHsCmdTop TcId, HsWrapper)
+       -> TcM (OutPat TcId, LHsCmdTop TcId, TcCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
@@ -153,7 +153,7 @@ tc_cmd env in_cmd@(HsCmdCase scrut matches) (stk, res_ty)
     mc_body body res_ty' = tcCmd env body (stk, res_ty')
 
 tc_cmd env (HsCmdIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
-  = do  { pred' <- tcPolyExpr pred boolTy
+  = do  { pred' <- tcMonoExpr pred boolTy
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
         ; return (HsCmdIf Nothing pred' b1' b2')
@@ -170,7 +170,7 @@ tc_cmd env (HsCmdIf (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
         ; checkTc (not (r_tv `elemVarSet` tyVarsOfType pred_ty))
                   (ptext (sLit "Predicate type of `ifThenElse' depends on result type"))
         ; fun'  <- tcSyntaxOp IfOrigin fun if_ty
-        ; pred' <- tcPolyExpr pred pred_ty
+        ; pred' <- tcMonoExpr pred pred_ty
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
         ; return (HsCmdIf (Just fun') pred' b1' b2')
@@ -196,9 +196,9 @@ tc_cmd env cmd@(HsCmdArrApp fun arg _ ho_app lr) (_, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newFlexiTyVarTy openTypeKind
         ; let fun_ty = mkCmdArrTy env arg_ty res_ty
-        ; fun' <- select_arrow_scope (tcPolyExpr fun fun_ty)
+        ; fun' <- select_arrow_scope (tcMonoExpr fun fun_ty)
 
-        ; arg' <- tcPolyExpr arg arg_ty
+        ; arg' <- tcMonoExpr arg arg_ty
 
         ; return (HsCmdArrApp fun' arg' fun_ty ho_app lr) }
   where
@@ -223,7 +223,7 @@ tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newFlexiTyVarTy openTypeKind
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
-        ; arg'   <- tcPolyExpr arg arg_ty
+        ; arg'   <- tcMonoExpr arg arg_ty
         ; return (HsCmdApp fun' arg') }
 
 -------------------------------------------

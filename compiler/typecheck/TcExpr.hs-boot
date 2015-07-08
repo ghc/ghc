@@ -1,12 +1,12 @@
 module TcExpr where
 import HsSyn    ( HsExpr, LHsExpr )
 import Name     ( Name )
-import TcType   ( TcType, TcSigmaType )
+import TcType   ( TcType, TcRhoType )
 import TcRnTypes( TcM, TcId, CtOrigin )
 
-tcPolyExpr, tcPolyExprNC ::
+tcMonoExpr, tcMonoExprNC ::
           LHsExpr Name
-       -> TcSigmaType
+       -> TcRhoType
        -> TcM (LHsExpr TcId)
 
 tcInferSigma, tcInferSigmaNC ::
