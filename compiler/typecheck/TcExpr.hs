@@ -51,7 +51,7 @@ import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
 import SrcLoc
-import Util hiding ( Direction )   -- TODO (RAE): Remove "hiding"
+import Util
 import ListSetOps
 import Maybes
 import ErrUtils
@@ -92,20 +92,22 @@ tcPolyExprNC (L loc expr) res_ty
                   tcExpr expr res_ty
        ; return (L loc expr') }
 
+---------------
 tcMonoExpr, tcMonoExprNC
-         :: LHsExpr Name        -- Expression to type check
-         -> TcRhoType           -- Expected type (must not be a polytype)
-         -> TcM (LHsExpr TcId)  -- Generalised expr with expected type
+    :: LHsExpr Name      -- Expression to type check
+    -> TcRhoType         -- Expected type (could be a type variable)
+                         -- Definitely no foralls at the top
+    -> TcM (LHsExpr TcId)
 
 tcMonoExpr expr res_ty
-  = addExprErrCtxt expr $
-    do { traceTc "tcMonoExpr" (ppr res_ty); tcMonoExprNC expr res_ty }
+  = addErrCtxt (exprCtxt expr) $
+    tcMonoExprNC expr res_ty
 
 tcMonoExprNC (L loc expr) res_ty
-  = setSrcSpan loc $
-    do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; expr' <- tcExpr expr res_ty
-       ; return (L loc expr') }
+  = ASSERT( not (isSigmaTy res_ty) )
+    setSrcSpan loc $
+    do  { expr' <- tcExpr expr res_ty
+        ; return (L loc expr') }
 
 ---------------
 tcInferSigma, tcInferSigmaNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
@@ -150,29 +152,29 @@ tcExpr (HsApp e1 e2) res_ty
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
                                     ; tcWrapResult (HsLit lit) lit_ty res_ty }
 
-tcExpr (HsPar expr)   res_ty = do { expr' <- tcPolyExprNC expr res_ty
+tcExpr (HsPar expr)   res_ty = do { expr' <- tcMonoExprNC expr res_ty
                                     ; return (HsPar expr') }
 
 tcExpr (HsSCC src lbl expr) res_ty
-  = do { expr' <- tcPolyExpr expr res_ty
+  = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsSCC src lbl expr') }
 
 tcExpr (HsTickPragma src info expr) res_ty
-  = do { expr' <- tcPolyExpr expr res_ty
+  = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsTickPragma src info expr') }
 
 tcExpr (HsCoreAnn src lbl expr) res_ty
-  = do  { expr' <- tcPolyExpr expr res_ty
+  = do  { expr' <- tcMonoExpr expr res_ty
         ; return (HsCoreAnn src lbl expr') }
 
 tcExpr (HsOverLit lit) res_ty
-  = do  { (wrap,  lit') <- newOverloadedLit lit res_ty
+  = do  { (wrap,  lit') <- newOverloadedLit Expected lit res_ty
         ; return (mkHsWrap wrap $ HsOverLit lit') }
 
 tcExpr (NegApp expr neg_expr) res_ty
   = do  { neg_expr' <- tcSyntaxOp NegateOrigin neg_expr
                                   (mkFunTy res_ty res_ty)
-        ; expr' <- tcPolyExpr expr res_ty
+        ; expr' <- tcMonoExpr expr res_ty
         ; return (NegApp expr' neg_expr') }
 
 tcExpr (HsIPVar x) res_ty
@@ -410,14 +412,14 @@ tcExpr (ExplicitList _ witness exprs) res_ty
                      ; (coi, elt_ty) <- matchExpectedListTy list_ty
                      ; exprs' <- mapM (tc_elt elt_ty) exprs
                      ; return $ mkHsWrapCo coi (ExplicitList elt_ty (Just fln') exprs') }
-     where tc_elt elt_ty expr = tcPolyExpr expr elt_ty
+     where tc_elt elt_ty expr = tcMonoExpr expr elt_ty
 
 tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
         ; exprs' <- mapM (tc_elt elt_ty) exprs
         ; return $ mkHsWrapCo coi (ExplicitPArr elt_ty exprs') }
   where
-    tc_elt elt_ty expr = tcPolyExpr expr elt_ty
+    tc_elt elt_ty expr = tcMonoExpr expr elt_ty
 
 {-
 ************************************************************************
@@ -429,7 +431,7 @@ tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
 
 tcExpr (HsLet binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
-                             tcPolyExpr expr res_ty
+                             tcMonoExpr expr res_ty
         ; return (HsLet binds' expr') }
 
 tcExpr (HsCase scrut matches) exp_ty
@@ -452,9 +454,9 @@ tcExpr (HsCase scrut matches) exp_ty
                       mc_body = tcBody }
 
 tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
-  = do { pred' <- tcPolyExpr pred boolTy
-       ; b1' <- tcPolyExpr b1 res_ty
-       ; b2' <- tcPolyExpr b2 res_ty
+  = do { pred' <- tcMonoExpr pred boolTy
+       ; b1' <- tcMonoExpr b1 res_ty
+       ; b2' <- tcMonoExpr b2 res_ty
        ; return (HsIf Nothing pred' b1' b2') }
 
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty
@@ -484,7 +486,7 @@ tcExpr (HsStatic expr) res_ty
             addErrCtxt (hang (ptext (sLit "In the body of a static form:"))
                              2 (ppr expr)
                        ) $
-            tcPolyExprNC expr expr_ty
+            tcMonoExprNC expr expr_ty
         -- Require the type of the argument to be Typeable.
         -- The evidence is not used, but asking the constraint ensures that
         -- the current implementation is as restrictive as future versions
@@ -733,7 +735,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
         -- STEP 5
         -- Typecheck the thing to be updated, and the bindings
-        ; record_expr' <- tcPolyExpr record_expr scrut_ty
+        ; record_expr' <- tcMonoExpr record_expr scrut_ty
         ; rbinds'      <- tcRecordBinds con1 con1_arg_tys' rbinds
 
         -- STEP 6: Deal with the stupid theta
@@ -786,8 +788,8 @@ tcExpr (ArithSeq _ witness seq) res_ty
 
 tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
-        ; expr1' <- tcPolyExpr expr1 elt_ty
-        ; expr2' <- tcPolyExpr expr2 elt_ty
+        ; expr1' <- tcMonoExpr expr1 elt_ty
+        ; expr2' <- tcMonoExpr expr2 elt_ty
         ; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
         ; enum_from_to <- newMethodFromName (PArrSeqOrigin seq)
                                  (idName enumFromToP) elt_ty
@@ -796,9 +798,9 @@ tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
 
 tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy Expected res_ty
-        ; expr1' <- tcPolyExpr expr1 elt_ty
-        ; expr2' <- tcPolyExpr expr2 elt_ty
-        ; expr3' <- tcPolyExpr expr3 elt_ty
+        ; expr1' <- tcMonoExpr expr1 elt_ty
+        ; expr2' <- tcMonoExpr expr2 elt_ty
+        ; expr3' <- tcMonoExpr expr3 elt_ty
         ; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
         ; eft <- newMethodFromName (PArrSeqOrigin seq)
                       (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
@@ -830,7 +832,7 @@ tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
 ************************************************************************
 -}
 
-tcExpr other _ = pprPanic "tcPolyExpr" (ppr other)
+tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
   -- Also HsTcBracketOut, HsQuasiQuoteE
 
@@ -847,32 +849,32 @@ tcArithSeq :: Maybe (SyntaxExpr Name) -> ArithSeqInfo Name -> TcRhoType
 
 tcArithSeq witness seq@(From expr) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-       ; expr' <- tcPolyExpr expr elt_ty
+       ; expr' <- tcMonoExpr expr elt_ty
        ; enum_from <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from wit' (From expr')) }
 
 tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-       ; expr1' <- tcPolyExpr expr1 elt_ty
-       ; expr2' <- tcPolyExpr expr2 elt_ty
+       ; expr1' <- tcMonoExpr expr1 elt_ty
+       ; expr2' <- tcMonoExpr expr2 elt_ty
        ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromThenName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from_then wit' (FromThen expr1' expr2')) }
 
 tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-       ; expr1' <- tcPolyExpr expr1 elt_ty
-       ; expr2' <- tcPolyExpr expr2 elt_ty
+       ; expr1' <- tcMonoExpr expr1 elt_ty
+       ; expr2' <- tcMonoExpr expr2 elt_ty
        ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromToName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from_to wit' (FromTo expr1' expr2')) }
 
 tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
-        ; expr1' <- tcPolyExpr expr1 elt_ty
-        ; expr2' <- tcPolyExpr expr2 elt_ty
-        ; expr3' <- tcPolyExpr expr3 elt_ty
+        ; expr1' <- tcMonoExpr expr1 elt_ty
+        ; expr2' <- tcMonoExpr expr2 elt_ty
+        ; expr3' <- tcMonoExpr expr3 elt_ty
         ; eft <- newMethodFromName (ArithSeqOrigin seq)
                               enumFromThenToName elt_ty
         ; return $ mkHsWrapCo coi (ArithSeq eft wit' (FromThenTo expr1' expr2' expr3')) }
@@ -962,7 +964,7 @@ tcInferFun (L loc (HsVar name))
        ; return (L loc fun, ty) }
 
 tcInferFun fun
-  = do { (fun, fun_ty) <- tcInfer (tcPolyExpr fun)
+  = do { (fun, fun_ty) <- tcInfer (tcMonoExpr fun)
 
          -- Zonk the function type carefully, to expose any polymorphism
          -- E.g. (( \(x::forall a. a->a). blah ) e)
@@ -1004,7 +1006,7 @@ tcTupArgs args tys
   = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
   where
     go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
-    go (L l (Present expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
+    go (L l (Present expr), arg_ty) = do { expr' <- tcMonoExpr expr arg_ty
                                          ; return (L l (Present expr')) }
 
 ---------------------------
@@ -1298,10 +1300,10 @@ tcSeq loc fun_name args res_ty
             [term_arg1, term_arg2] -> return (term_arg1, term_arg2)
             _ -> too_many_args
 
-        ; arg1' <- tcPolyExpr arg1 arg1_ty
+        ; arg1' <- tcMonoExpr arg1 arg1_ty
         ; res_ty <- zonkTcType res_ty   -- just in case we learned something
                                         -- interesting about it
-        ; arg2' <- tcPolyExpr arg2 res_ty
+        ; arg2' <- tcMonoExpr arg2 res_ty
         ; let fun'    = L loc (HsWrap ty_args (HsVar fun))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
         ; return (idHsWrapper, fun', [arg1', arg2']) }
@@ -1349,7 +1351,7 @@ tcTagToEnum loc fun_name args res_ty
        ; checkTc (isEnumerationTyCon rep_tc)
                  (mk_error ty' doc2)
 
-       ; arg' <- tcPolyExpr arg intPrimTy
+       ; arg' <- tcMonoExpr arg intPrimTy
        ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
              rep_ty = mkTyConApp rep_tc rep_args
 

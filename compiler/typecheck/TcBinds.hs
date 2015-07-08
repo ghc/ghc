@@ -16,7 +16,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  badBootDeclErr, mkExport ) where
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
-import {-# SOURCE #-} TcExpr  ( tcPolyExpr )
+import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
@@ -245,7 +245,7 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
        = do { ty <- newFlexiTyVarTy openTypeKind
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcPolyExpr expr ty
+            ; expr' <- tcMonoExpr expr ty
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind (Right ip_id) d)) }
     tc_ip_bind _ (IPBind (Right {}) _) = panic "tc_ip_bind"
