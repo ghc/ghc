@@ -749,17 +749,12 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
 -- need.  We have a patch for this from Andy Cheadle, but not
 -- incorporated yet. --SDM [6/2004]
 --
---
 -- Previously, eager blackholing was enabled when ticky-ticky
 -- was on. But it didn't work, and it wasn't strictly necessary
 -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING
 -- is unconditionally disabled. -- krc 1/2007
 --
---
 -- Static closures are never themselves black-holed.
---
--- We also never black-hole non-updatable thunks.
--- See Note [Black-holing non-updatable thunks]
 
 blackHoleOnEntry :: ClosureInfo -> Bool
 blackHoleOnEntry cl_info
@@ -768,28 +763,39 @@ blackHoleOnEntry cl_info
 
   | otherwise
   = case closureLFInfo cl_info of
-        LFReEntrant _ _ _ _          -> False
-        LFLetNoEscape                   -> False
-        LFThunk _ _no_fvs updatable _ _ -> updatable
-        _other -> panic "blackHoleOnEntry"      -- Should never happen
+      LFReEntrant _ _ _ _       -> False
+      LFLetNoEscape             -> False
+      LFThunk _ _no_fvs upd _ _ -> upd   -- See Note [Black-holing non-updatable thunks]
+      _other -> panic "blackHoleOnEntry"
 
-{-
-Note [Black-holing non-updatable thunks]
-=========================================
+{- Note [Black-holing non-updatable thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must not black-hole non-updatable (single-entry) thunks otherwise
+we run into issues like Trac #10414. Specifically:
 
-We cannot black-hole non-updatable thunks otherwise we run into issues like
-Trac #10414. A single-entry (non-updatable) thunk can actually be entered more
-than once in a parallel program, if work is duplicated by two threads both
-entering the same updatable thunk before the other has blackholed it. So, we
-must not eagerly blackhole non-updatable thunks, or the second thread to enter
-one will become blocked indefinitely. (They are not blackholed by lazy
-blackholing either, since they have no associated update frame.)
+  * There is no reason to black-hole a non-updatable thunk: it should
+    not be competed for by multiple threads
 
-For instance, let's consider the following value (in pseudo-Core, example due to
-Reid Barton),
+  * It could, conceivably, cause a space leak if we don't black-hole
+    it, if there was a live but never-followed pointer pointing to it.
+    Let's hope that doesn't happen.
 
+  * It is dangerous to black-hole a non-updatable thunk because
+     - is not updated (of course)
+     - hence, if it is black-holed and another thread tries to evalute
+       it, that thread will block forever
+    This actually happened in Trac #10414.  So we do not black-hole
+    non-updatable thunks.
+
+  * How could two threads evaluate the same non-updatable (single-entry)
+    thunk?  See Reid Barton's example below.
+
+  * Only eager blackholing could possibly black-hole a non-updatable
+    thunk, because lazy black-holing only affects thunks with an
+    update frame on the stack.
+
+Here is and example due to Reid Barton (Trac #10414):
     x = \u []  concat [[1], []]
-
 with the following definitions,
 
     concat x = case x of
