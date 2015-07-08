@@ -1977,11 +1977,6 @@ installSignalHandlers = do
   return ()
 #endif
 
-#if mingw32_HOST_OS || mingw32_TARGET_OS
-throwIOIO :: Exception.IOException -> IO a
-throwIOIO = Exception.throwIO
-#endif
-
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
 catchIO = Exception.catch
 
