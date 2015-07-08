@@ -825,11 +825,11 @@ pp_hs_context cxt unicode = parenList (map (ppType unicode) cxt)
 
 
 ppBang :: HsBang -> LaTeX
-ppBang HsStrict                     = char '!'
-ppBang (HsUnpack {})                = char '!'
-ppBang (HsSrcBang _ _ (Just True))  = char '!'
-ppBang (HsSrcBang _ _ (Just False)) = char '~'
-ppBang _                            = empty
+ppBang HsStrict                  = char '!'
+ppBang (HsUnpack {})             = char '!'
+ppBang (HsSrcBang _ _ SrcStrict) = char '!'
+ppBang (HsSrcBang _ _ SrcLazy)   = char '~'
+ppBang _                         = empty
 
 
 tupleParens :: HsTupleSort -> [LaTeX] -> LaTeX
