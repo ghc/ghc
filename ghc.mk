@@ -48,6 +48,8 @@
 #           o Build utils/ghc-cabal
 #           o Build utils/ghc-pkg
 #           o Build utils/hsc2hs
+#           o Build utils/genprimopcode
+#           o Build utils/deriveConstants
 #     * For each package:
 #	    o configure, generate package-data.mk and inplace-pkg-config
 #           o register each package into inplace/lib/package.conf
@@ -369,7 +371,7 @@ PACKAGES_STAGE1 += $1
 endef
 $(eval $(call foreachLibrary,addLibraryForCleaning))
 
-else
+else # CLEANING
 
 # Packages that are built by stage0. These packages are dependencies of
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
@@ -475,7 +477,7 @@ else
 INSTALL_PACKAGES := $(SUPERSIZE_INSTALL_PACKAGES)
 endif
 
-endif
+endif # CLEANING
 
 # -------------------------------------------
 # Dependencies between package-data.mk files
@@ -622,6 +624,10 @@ BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
 endif
 
+# When cleaning, don't add any library packages to BUILD_DIRS. We include
+# ghc.mk files for all BUILD_DIRS, but they don't exist until after running
+# `./boot`. Running `make clean` before anything else, as well as running
+# `make maintainer-clean` twice, should work.
 ifneq "$(CLEANING)" "YES"
 # These are deliberately in reverse order, so as to ensure that
 # there is no need to have them in dependency order. That's important
@@ -632,6 +638,10 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 ifeq "$(BUILD_DPH)" "YES"
+# Note: `$(eval $(call foreachLibrary,addExtraPackage))` above adds the
+# packages listed in `libraries/dph/ghc-packages` (e.g. dph-base) to
+# PACKAGES_STAGE2. But not 'libraries/dph' itself (it doesn't have a cabal
+# file). Since it does have a ghc.mk file, we add it to BUILD_DIRS here.
 BUILD_DIRS += $(wildcard libraries/dph)
 endif
 endif
@@ -1350,6 +1360,7 @@ maintainer-clean : distclean
 .PHONY: all_libraries
 
 .PHONY: bootstrapping-files
+# See https://ghc.haskell.org/trac/ghc/wiki/Building/Porting
 bootstrapping-files: $(includes_H_CONFIG)
 bootstrapping-files: $(includes_DERIVEDCONSTANTS)
 bootstrapping-files: $(includes_GHCCONSTANTS)
