@@ -1131,6 +1131,13 @@ Example infix function definition requiring individual API Annotations
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
 
+-- | Is there only one RHS in this group?
+isSingletonMatchGroup :: MatchGroup id body -> Bool
+isSingletonMatchGroup (MG { mg_alts = [match] })
+  | L _ (Match { m_grhss = GRHSs { grhssGRHSs = [_] } }) <- match
+  = True
+isSingletonMatchGroup _ = False
+
 matchGroupArity :: MatchGroup id body -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set

@@ -78,13 +78,13 @@ tcMatchesFun fun_name inf matches exp_ty
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
         ; checkArgs fun_name matches
 
-        ; (wrap_gen, (wrap_fun, (wrap_tau, group)))
+        ; (wrap_gen, (wrap_fun, group))
             <- tcSkolemise SkolemiseDeeply (FunSigCtxt fun_name True) exp_ty $
                \ _ exp_rho ->
                   -- Note [Polymorphic expected type for tcMatchesFun]
                matchFunTys herald arity exp_rho $ \ pat_tys rhs_ty ->
                tcMatches match_ctxt pat_tys rhs_ty matches
-        ; return (wrap_gen <.> wrap_fun <.> wrap_tau, group) }
+        ; return (wrap_gen <.> wrap_fun, group) }
   where
     arity = matchGroupArity matches
     herald = ptext (sLit "The equation(s) for")
@@ -144,17 +144,21 @@ matchFunTys
   :: SDoc       -- See Note [Herald for matchExpecteFunTys] in TcUnify
   -> Arity
   -> TcRhoType
-  -> ([TcSigmaType] -> TcRhoType -> TcM a)
+  -> ([TcSigmaType] -> TcRhoType -> TcM (HsWrapper, a))
+     -- "a" is always a MatchGroup. wrapper :: a's res_ty "->" TcRhoType
   -> TcM (HsWrapper, a)
+     -- wrapper :: (pat_tys -> a's res_ty) "->" res_ty passed in
 
 -- Written in CPS style for historical reasons;
 -- could probably be un-CPSd, like matchExpectedTyConApp
 
 matchFunTys herald arity res_ty thing_inside
-  = do  { (wrap, pat_tys, res_ty)
+  = do  { (wrap_fun, pat_tys, res_ty')
             <- matchExpectedFunTys Expected herald arity res_ty
-        ; res <- thing_inside pat_tys res_ty
-        ; return (wrap, res) }
+            -- wrap_fun :: pat_tys -> res_ty' "->" res_ty
+        ; (wrap_inner, res) <- thing_inside pat_tys res_ty'
+        ; let wrap_inner_with_args = mkWpFuns pat_tys wrap_inner
+        ; return (wrap_fun <.> wrap_inner_with_args, res) }
 
 {-
 ************************************************************************
@@ -180,15 +184,21 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcRhoType
                  -> TcM (Located (body TcId)) }
 
-tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
+tcMatches ctxt pat_tys rhs_ty group@(MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
-    do  { tau_ty <- newFlexiMonoTyVarTy openTypeKind
-        ; wrap   <- tcSubTypeDS GenSigCtxt tau_ty rhs_ty
-        ; tau_ty <- zonkTcType tau_ty   -- seems more efficient to zonk just once
-        ; matches' <- mapM (tcMatch ctxt pat_tys tau_ty) matches
+    do  { (wrap, rhs_ty') <-
+             if isSingletonMatchGroup group
+                  -- no need to monomorphise the RHS if there's only one
+             then return (idHsWrapper, rhs_ty)
+             else do { tau_ty <- newFlexiMonoTyVarTy openTypeKind
+                     ; wrap   <- tcSubTypeDS GenSigCtxt tau_ty rhs_ty
+                     ; tau_ty <- zonkTcType tau_ty
+                         -- seems more efficient to zonk just once
+                     ; return (wrap, tau_ty) }
+        ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty') matches
         ; return (wrap, MG { mg_alts = matches'
                            , mg_arg_tys = pat_tys
-                           , mg_res_ty = tau_ty
+                           , mg_res_ty = rhs_ty'
                            , mg_origin = origin }) }
 
 -------------

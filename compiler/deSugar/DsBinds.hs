@@ -793,10 +793,10 @@ dsHsWrapper (WpLet ev_binds)  e = do bs <- dsTcEvBinds ev_binds
                                      return (mkCoreLets bs e)
 dsHsWrapper (WpCompose c1 c2) e = do { e1 <- dsHsWrapper c2 e
                                      ; dsHsWrapper c1 e1 }
-dsHsWrapper (WpFun c1 c2 t1 _) e = do { x <- newSysLocalDs t1
-                                      ; e1 <- dsHsWrapper c1 (Var x)
-                                      ; e2 <- dsHsWrapper c2 (e `mkCoreAppDs` e1)
-                                      ; return (Lam x e2) }
+dsHsWrapper (WpFun c1 c2 t1)  e = do { x <- newSysLocalDs t1
+                                     ; e1 <- dsHsWrapper c1 (Var x)
+                                     ; e2 <- dsHsWrapper c2 (e `mkCoreAppDs` e1)
+                                     ; return (Lam x e2) }
 dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
                                   dsTcCoercion co (mkCast e)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e

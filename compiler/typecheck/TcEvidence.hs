@@ -7,7 +7,7 @@ module TcEvidence (
   -- HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpLams, mkWpLet, mkWpCast,
-  mkWpFun, idHsWrapper, isIdHsWrapper, pprHsWrapper,
+  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -562,13 +562,14 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper TcType TcType
-       -- (WpFun wrap1 wrap2 t1 t2)[e] = \(x:t1). wrap2[ e wrap1[x] ] :: t2
+  | WpFun HsWrapper HsWrapper TcType
+       -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
        -- This isn't the same as for mkTcFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
+       -- The TcType is the "from" type of the first wrapper
 
   | WpCast TcCoercion         -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
@@ -599,7 +600,14 @@ mkWpFun WpHole       WpHole       _  _  = WpHole
 mkWpFun WpHole       (WpCast co2) t1 _  = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
 mkWpFun (WpCast co1) WpHole       _  t2 = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
 mkWpFun (WpCast co1) (WpCast co2) _  _  = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
-mkWpFun co1          co2          t1 t2 = WpFun co1 co2 t1 t2
+mkWpFun co1          co2          t1 _  = WpFun co1 co2 t1
+
+-- | @mkWpFuns arg_tys wrap@, where @wrap :: a "->" b@, gives a wrapper from
+-- @arg_tys -> a@ to @arg_tys -> b@.
+mkWpFuns :: [TcType] -> HsWrapper -> HsWrapper
+mkWpFuns []                 res_wrap = res_wrap
+mkWpFuns (arg_ty : arg_tys) res_wrap
+  = WpFun idHsWrapper (mkWpFuns arg_tys res_wrap) arg_ty
 
 mkWpCast :: TcCoercion -> HsWrapper
 mkWpCast co
@@ -1049,7 +1057,7 @@ pprHsWrapper doc wrap
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1 _) = add_parens $ ptext (sLit "\\(x") <> dcolon <> ppr t1 <> ptext (sLit ").") <+>
+    help it (WpFun f1 f2 t1)   = add_parens $ ptext (sLit "\\(x") <> dcolon <> ppr t1 <> ptext (sLit ").") <+>
                                               help (\_ -> it True <+> help (\_ -> ptext (sLit "x")) f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>")
                                               <+> pprParendTcCo co)]
