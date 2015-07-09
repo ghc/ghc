@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, BangPatterns #-}
 
 --
 -- (c) The University of Glasgow 2003-2006
@@ -45,31 +45,75 @@ chunkToBitmap dflags chunk =
 -- eg. @[0,1,3], size 4 ==> 0xb@.
 --
 -- The list of @Int@s /must/ be already sorted.
-intsToBitmap :: DynFlags -> Int -> [Int] -> Bitmap
-intsToBitmap dflags size slots{- must be sorted -}
-  | size <= 0 = []
-  | otherwise =
-    (foldr (.|.) (toStgWord dflags 0) (map (toStgWord dflags 1 `shiftL`) these)) :
-        intsToBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
-             (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
-   where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
+intsToBitmap :: DynFlags
+             -> Int        -- ^ size in bits
+             -> [Int]      -- ^ sorted indices of ones
+             -> Bitmap
+intsToBitmap dflags size = go 0
+  where
+    word_sz = wORD_SIZE_IN_BITS dflags
+    oneAt :: Int -> StgWord
+    oneAt i = toStgWord dflags 1 `shiftL` i
+
+    -- It is important that we maintain strictness here.
+    -- See Note [Strictness when building Bitmaps].
+    go :: Int -> [Int] -> Bitmap
+    go !pos slots
+      | size <= pos = []
+      | otherwise =
+        (foldr (.|.) (toStgWord dflags 0) (map (\i->oneAt (i - pos)) these)) :
+          go (pos + word_sz) rest
+      where
+        (these,rest) = span (< (pos + word_sz)) slots
 
 -- | Make a bitmap where the slots specified are the /zeros/ in the bitmap.
 -- eg. @[0,1,3], size 4 ==> 0x4@  (we leave any bits outside the size as zero,
 -- just to make the bitmap easier to read).
 --
 -- The list of @Int@s /must/ be already sorted and duplicate-free.
-intsToReverseBitmap :: DynFlags -> Int -> [Int] -> Bitmap
-intsToReverseBitmap dflags size slots{- must be sorted -}
-  | size <= 0 = []
-  | otherwise =
-    (foldr xor (toStgWord dflags init) (map (toStgWord dflags 1 `shiftL`) these)) :
-        intsToReverseBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
-             (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
-   where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
-         init
-           | size >= wORD_SIZE_IN_BITS dflags = -1
-           | otherwise                        = (1 `shiftL` size) - 1
+intsToReverseBitmap :: DynFlags
+                    -> Int      -- ^ size in bits
+                    -> [Int]    -- ^ sorted indices of zeros free of duplicates
+                    -> Bitmap
+intsToReverseBitmap dflags size = go 0
+  where
+    word_sz = wORD_SIZE_IN_BITS dflags
+    oneAt :: Int -> StgWord
+    oneAt i = toStgWord dflags 1 `shiftL` i
+
+    -- It is important that we maintain strictness here.
+    -- See Note [Strictness when building Bitmaps].
+    go :: Int -> [Int] -> Bitmap
+    go !pos slots
+      | size <= pos = []
+      | otherwise =
+        (foldr xor (toStgWord dflags init) (map (\i->oneAt (i - pos)) these)) :
+          go (pos + word_sz) rest
+      where
+        (these,rest) = span (< (pos + word_sz)) slots
+        remain = size - pos
+        init
+          | remain >= word_sz = -1
+          | otherwise         = (1 `shiftL` remain) - 1
+
+{-
+
+Note [Strictness when building Bitmaps]
+========================================
+
+One of the places where @Bitmap@ is used is in in building Static Reference
+Tables (SRTs) (in @CmmBuildInfoTables.procpointSRT@). In #7450 it was noticed
+that some test cases (particularly those whose C-- have large numbers of CAFs)
+produced large quantities of allocations from this function.
+
+The source traced back to 'intsToBitmap', which was lazily subtracting the word
+size from the elements of the tail of the @slots@ list and recursively invoking
+itself with the result. This resulted in large numbers of subtraction thunks
+being built up. Here we take care to avoid passing new thunks to the recursive
+call. Instead we pass the unmodified tail along with an explicit position
+accumulator, which get subtracted in the fold when we compute the Word.
+
+-}
 
 {- |
 Magic number, must agree with @BITMAP_BITS_SHIFT@ in InfoTables.h.
