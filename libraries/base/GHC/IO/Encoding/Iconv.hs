@@ -99,6 +99,8 @@ char_shift | charSize == 2 = 1
 iconvEncoding :: String -> IO TextEncoding
 iconvEncoding = mkIconvEncoding ErrorOnCodingFailure
 
+-- | Construct an iconv-based 'TextEncoding' for the given character set and
+-- 'CodingFailureMode'.
 mkIconvEncoding :: CodingFailureMode -> String -> IO TextEncoding
 mkIconvEncoding cfm charset = do
   return (TextEncoding {

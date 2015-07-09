@@ -551,7 +551,7 @@ T7563:
 	-"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -C T7563.hs
 
 # Below we set LC_ALL=C to request standard ASCII output in the resulting error
-# messagse. Unfortunately, Mac OS X still uses a Unicode encoding even with
+# messages. Unfortunately, Mac OS X still uses a Unicode encoding even with
 # LC_ALL=C, so we expect these tests to fail there.
 
 .PHONY: T6037
