@@ -442,6 +442,8 @@ data GeneralFlag
    | Opt_SuppressIdInfo
    -- Suppress separate type signatures in core, but leave types on
    -- lambda bound vars
+   | Opt_SuppressUnfoldings
+   -- Suppress the details of even stable unfoldings
    | Opt_SuppressTypeSignatures
    -- Suppress unique ids on variables.
    -- Except for uniques, as some simplifier phases introduce new
@@ -2905,6 +2907,7 @@ dFlags = [
   flagSpec "ppr-ticks"                  Opt_PprShowTicks,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
+  flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
   flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,

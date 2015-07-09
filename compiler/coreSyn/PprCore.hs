@@ -120,6 +120,12 @@ pprCoreExpr   expr = ppr_expr noParens expr
 noParens :: SDoc -> SDoc
 noParens pp = pp
 
+pprOptCo :: Coercion -> SDoc
+pprOptCo co = sdocWithDynFlags $ \dflags ->
+              if gopt Opt_SuppressCoercions dflags
+              then ptext (sLit "...")
+              else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
+
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
@@ -130,16 +136,7 @@ ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO") <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co)
-  = add_par $
-    sep [pprParendExpr expr,
-         ptext (sLit "`cast`") <+> pprCo co]
-  where
-    pprCo co = sdocWithDynFlags $ \dflags ->
-               if gopt Opt_SuppressCoercions dflags
-               then ptext (sLit "...")
-               else parens $
-                        sep [ppr co, dcolon <+> ppr (coercionType co)]
-
+  = add_par $ sep [pprParendExpr expr, ptext (sLit "`cast`") <+> pprOptCo co]
 
 ppr_expr add_par expr@(Lam _ _)
   = let
@@ -271,7 +268,7 @@ pprArg (Type ty)
    if gopt Opt_SuppressTypeApplications dflags
    then empty
    else ptext (sLit "@") <+> pprParendType ty
-pprArg (Coercion co) = ptext (sLit "@~") <+> pprParendCo co
+pprArg (Coercion co) = ptext (sLit "@~") <+> pprOptCo co
 pprArg expr          = pprParendExpr expr
 
 {-
@@ -361,9 +358,8 @@ pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressIdInfo dflags
-    then empty
-    else info `seq` doc -- The seq is useful for poking on black holes
+    ppUnless (gopt Opt_SuppressIdInfo dflags) $
+    info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
@@ -391,9 +387,7 @@ pprIdBndrInfo info
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo id info
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressIdInfo dflags
-    then empty
-    else
+    ppUnless (gopt Opt_SuppressIdInfo dflags) $
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,        ptext (sLit "Arity=") <> int arity)
@@ -478,7 +472,9 @@ instance Outputable Unfolding where
                 , ptext (sLit "WorkFree=")   <> ppr wf
                 , ptext (sLit "Expandable=") <> ppr exp
                 , ptext (sLit "Guidance=")   <> ppr g ]
-      pp_tmpl = ptext (sLit "Tmpl=") <+> ppr rhs
+      pp_tmpl = sdocWithDynFlags $ \dflags ->
+                ppUnless (gopt Opt_SuppressUnfoldings dflags) $
+                ptext (sLit "Tmpl=") <+> ppr rhs
       pp_rhs | isStableSource src = pp_tmpl
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
