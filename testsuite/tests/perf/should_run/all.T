@@ -16,10 +16,11 @@ test('T3586',
 
 test('T4830',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 98248, 1),
+          [(wordsize(64), 98784, 1),
            #             127000 (amd64/Linux)
            # 2013-02-07:  99264 (amd64/Linux)
            # 2014-01-13:  98248 (amd64/Linux) due to #8647
+           # 2015-07-09:  98784 (amd64/Linux)
            (wordsize(32), 70646, 3)]),
            # 2013-02-10:  69744 (x86/Windows)
            # 2013-02-10:  71548 (x86/OSX)
@@ -276,12 +277,13 @@ test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 
 test('T7436',
      [stats_num_field('max_bytes_used',
-          [(wordsize(64), 60360, 1),
+          [(wordsize(64), 60296, 1),
            #             127000 (amd64/Linux)
            # 2013-02-07:  60360 (amd64/Linux)
+           # 2015-07-09:  60296 (amd64/Linux)
            (wordsize(32), 58434, 1)]),
-            # 2013-02-10: 58032 (x86/Windows)
-            # 2013-02-10: 58836 (x86/OSX)
+           # 2013-02-10: 58032 (x86/Windows)
+           # 2013-02-10: 58836 (x86/OSX)
       only_ways(['normal'])
       ],
      compile_and_run,

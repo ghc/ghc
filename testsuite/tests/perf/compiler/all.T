@@ -607,10 +607,11 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 663978160, 5),
+          [(wordsize(64), 617926624, 5),
           # 2015-01-12    807117816   Initally created
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
+          # 2015-07-09    617926624   Fix for #10527 improves it even more
            (wordsize(32), 375647160, 5)
           ]),
       ],
