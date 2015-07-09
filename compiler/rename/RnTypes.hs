@@ -691,19 +691,27 @@ checkValidPartialType doc lty
 
 {-
 *********************************************************
-*                                                      *
-\subsection{Contexts and predicates}
-*                                                      *
+*                                                       *
+        ConDeclField
+*                                                       *
 *********************************************************
+
+When renaming a ConDeclField, we have to find the FieldLabel
+associated with each field.  But we already have all the FieldLabels
+available (since they were brought into scope by
+RnNames.getLocalNonValBinders), so we just take the list as an
+argument, build a map and look them up.
 -}
 
 rnConDeclFields :: [FieldLabel] -> HsDocContext -> [LConDeclField RdrName]
                 -> RnM ([LConDeclField Name], FreeVars)
-rnConDeclFields fls doc fields = mapFvRn (rnField fls doc) fields
+rnConDeclFields fls doc fields = mapFvRn (rnField fl_env doc) fields
+  where
+    fl_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
 
-rnField :: [FieldLabel] -> HsDocContext -> LConDeclField RdrName
+rnField :: FastStringEnv FieldLabel -> HsDocContext -> LConDeclField RdrName
         -> RnM (LConDeclField Name, FreeVars)
-rnField fls doc (L l (ConDeclField names ty haddock_doc))
+rnField fl_env doc (L l (ConDeclField names ty haddock_doc))
   = do { let new_names = map (fmap lookupField) names
        ; (new_ty, fvs) <- rnLHsType doc ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
@@ -713,7 +721,16 @@ rnField fls doc (L l (ConDeclField names ty haddock_doc))
     lookupField (FieldOcc rdr _) = FieldOcc rdr fl
       where
         lbl = occNameFS $ rdrNameOcc rdr
-        fl  = expectJust "rnField" $ find ((== lbl) . flLabel) fls
+        fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl
+
+
+{-
+*********************************************************
+*                                                       *
+        Contexts
+*                                                       *
+*********************************************************
+-}
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnContext doc (L loc cxt)
