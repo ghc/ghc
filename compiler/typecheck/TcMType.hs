@@ -19,7 +19,6 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
-  newFlexiMonoTyVarTy,
   newReturnTyVar, newReturnTyVarTy,
   newMetaKindVar, newMetaKindVars,
   mkTcTyVarName, cloneMetaTyVar,
@@ -288,12 +287,11 @@ newMetaTyVar meta_info kind
   = do  { uniq <- newUnique
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
-                        ReturnTv    -> fsLit "r"
-                        TauTv WildcardTau   -> fsLit "w"
-                        TauTv VanillaTau    -> fsLit "t"
-                        TauTv AlwaysMonoTau -> fsLit "m"
-                        FlatMetaTv  -> fsLit "fmv"
-                        SigTv       -> fsLit "a"
+                        ReturnTv          -> fsLit "r"
+                        TauTv WildcardTau -> fsLit "w"
+                        TauTv VanillaTau  -> fsLit "t"
+                        FlatMetaTv        -> fsLit "fmv"
+                        SigTv             -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }
 
@@ -430,11 +428,6 @@ newFlexiTyVarTy kind = do
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
--- | Creates a TyVarTy that absolutely cannot unify with polytypes
-newFlexiMonoTyVarTy :: Kind -> TcM TcType
-newFlexiMonoTyVarTy kind
-  = TyVarTy <$> newMetaTyVar (TauTv AlwaysMonoTau) kind
-
 newReturnTyVar :: Kind -> TcM TcTyVar
 newReturnTyVar kind = newMetaTyVar ReturnTv kind
 
@@ -456,6 +449,9 @@ tcInstTyVarX :: TvSubst -> TKVar -> TcM (TvSubst, TcTyVar)
 -- an existing TyVar. We substitute kind variables in the kind.
 tcInstTyVarX subst tyvar
   = do  { uniq <- newUnique
+        ; let info | isOpenTypeKind (tyVarKind tyvar) = ReturnTv
+                         -- See Note [OpenTypeKind accepts foralls]
+                   | otherwise                        = TauTv VanillaTau
         ; details <- newMetaDetails (TauTv VanillaTau)
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]
@@ -467,6 +463,24 @@ tcInstTyVarX subst tyvar
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment we give a unification variable a System Name, which
 influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+
+Note [OpenTypeKind accepts foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is a common paradigm:
+   foo :: (forall a. a -> a) -> Int
+   foo = error "urk"
+To make this work we need to instantiate 'error' with a polytype.
+A similar case is
+   bar :: Bool -> (forall a. a->a) -> Int
+   bar True = \x. (x 3)
+   bar False = error "urk"
+Here we need to instantiate 'error' with a polytype.
+
+But 'error' has an OpenTypeKind type variable, precisely so that
+we can instantiate it with Int#.  So we also allow such type variables
+to be instantiated with a ReturnTv, which can unify with foralls.
+It's a bit of a hack, but seems straightforward.
+
 
 ************************************************************************
 *                                                                      *

@@ -348,12 +348,8 @@ instance Outputable MetaDetails where
   ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
 
 data TauTvFlavour
-  = VanillaTau     -- ^ This generally avoids unifying with polytypes, but
-                   -- if its kind is OpenKind, it will unify with a polytype.
-                   -- This is the most common flavour of TauTv
-                   -- See Note [OpenTypeKind accepts foralls]
+  = VanillaTau
   | WildcardTau    -- ^ A tyvar that originates from a type wildcard.
-  | AlwaysMonoTau  -- ^ A tyvar that really can only unify with a monotype.
 
 data MetaInfo
    = TauTv TauTvFlavour
@@ -537,12 +533,11 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = pp_info <> colon <> ppr tclvl
   where
     pp_info = case info of
-                ReturnTv    -> ptext (sLit "ret")
-                TauTv WildcardTau   -> ptext (sLit "twc")
-                TauTv VanillaTau    -> ptext (sLit "tau")
-                TauTv AlwaysMonoTau -> ptext (sLit "mono")
-                SigTv       -> ptext (sLit "sig")
-                FlatMetaTv  -> ptext (sLit "fuv")
+                ReturnTv          -> ptext (sLit "ret")
+                TauTv WildcardTau -> ptext (sLit "twc")
+                TauTv VanillaTau  -> ptext (sLit "tau")
+                SigTv             -> ptext (sLit "sig")
+                FlatMetaTv        -> ptext (sLit "fuv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
@@ -1304,33 +1299,13 @@ occurCheckExpand dflags tv ty
 canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> TcKind -> Bool
 canUnifyWithPolyType dflags details kind
   = case details of
-      MetaTv { mtv_info = ReturnTv }            -> True   -- See Note [ReturnTv]
-      MetaTv { mtv_info = SigTv }               -> False
-      MetaTv { mtv_info = TauTv AlwaysMonoTau } -> False
+      MetaTv { mtv_info = ReturnTv } -> True   -- See Note [ReturnTv]
+      MetaTv { mtv_info = SigTv }    -> False
       MetaTv { mtv_info = TauTv _ }  -> xopt Opt_ImpredicativeTypes dflags
-                                     || isOpenTypeKind kind
-                                          -- Note [OpenTypeKind accepts foralls]
       _other                         -> True
           -- We can have non-meta tyvars in given constraints
 
 {-
-Note [OpenTypeKind accepts foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is a common paradigm:
-   foo :: (forall a. a -> a) -> Int
-   foo = error "urk"
-To make this work we need to instantiate 'error' with a polytype.
-A similar case is
-   bar :: Bool -> (forall a. a->a) -> Int
-   bar True = \x. (x 3)
-   bar False = error "urk"
-Here we need to instantiate 'error' with a polytype.
-
-But 'error' has an OpenTypeKind type variable, precisely so that
-we can instantiate it with Int#.  So we also allow such type variables
-to be instantiated with foralls.  It's a bit of a hack, but seems
-straightforward.
-
 ************************************************************************
 *                                                                      *
 \subsection{Predicate types}
