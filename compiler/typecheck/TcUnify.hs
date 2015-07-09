@@ -324,9 +324,10 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                     else ptext (sLit "has only") <+> speakN n_args]
 
     ty_app_err ty arg
-      = failWith $
-        text "Cannot not apply expression of type" <+> quotes (ppr ty) $$
-        text "to a visible type argument" <+> quotes (ppr arg)
+      = do { (_, ty) <- zonkTidyTcType emptyTidyEnv ty
+           ; failWith $
+               text "Cannot not apply expression of type" <+> quotes (ppr ty) $$
+               text "to a visible type argument" <+> quotes (ppr arg) }
 
 {-
 Note [Foralls to left of arrow]

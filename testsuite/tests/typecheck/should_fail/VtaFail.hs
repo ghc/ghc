@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, RankNTypes, PolyKinds #-}
 
 module VtaFail1 where
 
