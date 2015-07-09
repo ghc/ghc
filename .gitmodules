@@ -1,117 +1,117 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = ../packages/binary.git
+	url = git://git.haskell.org/packages/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = ../packages/bytestring.git
+	url = git://git.haskell.org/packages/bytestring.git
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = ../packages/Cabal.git
+	url = git://git.haskell.org/packages/Cabal.git
 	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
-	url = ../packages/containers.git
+	url = git://git.haskell.org/packages/containers.git
 	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = ../packages/haskeline.git
+	url = git://git.haskell.org/packages/haskeline.git
 	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
-	url = ../packages/pretty.git
+	url = git://git.haskell.org/packages/pretty.git
 	ignore = untracked
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
-	url = ../packages/terminfo.git
+	url = git://git.haskell.org/packages/terminfo.git
 	ignore = untracked
 [submodule "libraries/transformers"]
 	path = libraries/transformers
-	url = ../packages/transformers.git
+	url = git://git.haskell.org/packages/transformers.git
 	ignore = untracked
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
-	url = ../packages/xhtml.git
+	url = git://git.haskell.org/packages/xhtml.git
 	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = ../packages/Win32.git
+	url = git://git.haskell.org/packages/Win32.git
 	ignore = untracked
 [submodule "libraries/primitive"]
 	path = libraries/primitive
-	url = ../packages/primitive.git
+	url = git://git.haskell.org/packages/primitive.git
 	ignore = untracked
 [submodule "libraries/vector"]
 	path = libraries/vector
-	url = ../packages/vector.git
+	url = git://git.haskell.org/packages/vector.git
 	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
-	url = ../packages/time.git
+	url = git://git.haskell.org/packages/time.git
 	ignore = untracked
 [submodule "libraries/random"]
 	path = libraries/random
-	url = ../packages/random.git
+	url = git://git.haskell.org/packages/random.git
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
-	url = ../packages/array.git
+	url = git://git.haskell.org/packages/array.git
 	ignore = none
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
-	url = ../packages/deepseq.git
+	url = git://git.haskell.org/packages/deepseq.git
 	ignore = none
 [submodule "libraries/directory"]
 	path = libraries/directory
-	url = ../packages/directory.git
+	url = git://git.haskell.org/packages/directory.git
 	ignore = none
 [submodule "libraries/filepath"]
 	path = libraries/filepath
-	url = ../packages/filepath.git
+	url = git://git.haskell.org/packages/filepath.git
 	ignore = none
 [submodule "libraries/hoopl"]
 	path = libraries/hoopl
-	url = ../packages/hoopl.git
+	url = git://git.haskell.org/packages/hoopl.git
 	ignore = none
 [submodule "libraries/hpc"]
 	path = libraries/hpc
-	url = ../packages/hpc.git
+	url = git://git.haskell.org/packages/hpc.git
 	ignore = none
 [submodule "libraries/process"]
 	path = libraries/process
-	url = ../packages/process.git
+	url = git://git.haskell.org/packages/process.git
 	ignore = none
 [submodule "libraries/unix"]
 	path = libraries/unix
-	url = ../packages/unix.git
+	url = git://git.haskell.org/packages/unix.git
 	ignore = none
 [submodule "libraries/parallel"]
 	path = libraries/parallel
-	url = ../packages/parallel.git
+	url = git://git.haskell.org/packages/parallel.git
 	ignore = none
 [submodule "libraries/stm"]
 	path = libraries/stm
-	url = ../packages/stm.git
+	url = git://git.haskell.org/packages/stm.git
 	ignore = none
 [submodule "libraries/dph"]
 	path = libraries/dph
-	url = ../packages/dph.git
+	url = git://git.haskell.org/packages/dph.git
 	ignore = none
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = ../haddock.git
+	url = git://git.haskell.org/haddock.git
 	ignore = none
 	branch = ghc-head
 [submodule "nofib"]
 	path = nofib
-	url = ../nofib.git
+	url = git://git.haskell.org/nofib.git
 	ignore = none
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
-	url = ../hsc2hs.git
+	url = git://git.haskell.org/hsc2hs.git
 	ignore = none
 [submodule "libffi-tarballs"]
 	path = libffi-tarballs
-	url = ../libffi-tarballs.git
+	url = git://git.haskell.org/libffi-tarballs.git
 	ignore = none
