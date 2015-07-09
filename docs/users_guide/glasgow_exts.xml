@@ -12084,7 +12084,7 @@ not going to be inlined before the rule has a chance to fire.
 </para>
 </sect2>
 
-a<sect2 id="rules-class-methods">
+<sect2 id="rules-class-methods">
 <title>How rules interact with class methods</title>
 
 <para>
