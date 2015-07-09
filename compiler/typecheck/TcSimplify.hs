@@ -17,8 +17,7 @@ module TcSimplify(
 import Bag
 import Class         ( classKey )
 import Class         ( Class )
-import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes
-                                    , Opt_FlexibleContexts )
+import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes )
                      , DynFlags( solverIterations ) )
 import Inst
 import Id            ( idType )
@@ -603,7 +602,9 @@ pickQuantifiablePreds :: TyVarSet         -- Quantifying over these
 -- This function decides whether a particular constraint shoudl be
 -- quantified over, given the type variables that are being quantified
 pickQuantifiablePreds qtvs theta
-  = do { flex_ctxt <- xoptM Opt_FlexibleContexts
+  = do { let flex_ctxt = True   -- Quantify over non-tyvar constraints, even without
+                                -- -XFlexibleContexts: see Trac #10608, #10351
+         -- flex_ctxt <- xoptM Opt_FlexibleContexts
        ; return (filter (pick_me flex_ctxt) theta) }
   where
     pick_me flex_ctxt pred

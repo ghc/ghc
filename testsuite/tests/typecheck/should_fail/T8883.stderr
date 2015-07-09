@@ -1,10 +1,8 @@
 
-T8883.hs:20:14: error:
-    Could not deduce (Functor (PF a)) arising from a use of ‘fmap’
-    from the context: Regular a
-      bound by the inferred type of
-               fold :: Regular a => (PF a b -> b) -> a -> b
-      at T8883.hs:20:1-33
-    In the first argument of ‘(.)’, namely ‘fmap (fold f)’
-    In the second argument of ‘(.)’, namely ‘fmap (fold f) . from’
-    In the expression: f . fmap (fold f) . from
+T8883.hs:20:1: error:
+    Non type-variable argument in the constraint: Functor (PF a)
+    (Use FlexibleContexts to permit this)
+    When checking that ‘fold’ has the inferred type
+      fold :: forall b a.
+              (Functor (PF a), Regular a) =>
+              (PF a b -> b) -> a -> b
