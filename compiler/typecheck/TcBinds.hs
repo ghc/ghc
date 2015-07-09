@@ -311,7 +311,7 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- declared with complete type signatures
                 -- Do not extend the TcIdBinderStack; instead
                 -- we extend it on a per-rhs basis in tcExtendForRhs
-        ; tcExtendLetEnvIds top_lvl [(idName id, id, choose_tc_id_flavour id) | id <- poly_ids] $ do
+        ; tcExtendLetEnvIds top_lvl [(idName id, id, choose_tc_id_flavor id) | id <- poly_ids] $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
@@ -387,7 +387,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
 
     go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                        ; let uids1 = map (\x -> (x, choose_tc_id_flavour x)) ids1
+                        ; let uids1 = map (\x -> (x, choose_tc_id_flavor x)) ids1
                         ; (binds2, thing) <- tcExtendLetEnv top_lvl uids1 $
                                              go sccs
                         ; return (binds1 `unionBags` binds2, thing) }
@@ -428,12 +428,12 @@ tc_single top_lvl sig_fn prag_fn lbind thing_inside
   = do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
                                       NonRecursive NonRecursive
                                       [lbind]
-       ; let uids = map (\x -> (x, choose_tc_id_flavour x)) ids
+       ; let uids = map (\x -> (x, choose_tc_id_flavor x)) ids
        ; thing <- tcExtendLetEnv top_lvl uids thing_inside
        ; return (binds1, thing) }
 
-
-choose_tc_id_flavour v
+choose_tc_id_flavor :: Id -> TcIdFlavor
+choose_tc_id_flavor v
   | Just _ <- tcGetTyVar_maybe (idType v) = TcIdMonomorphic
   | otherwise = TcIdUnrestricted
 
@@ -1303,7 +1303,7 @@ tcMonoBinds _ sig_fn no_gen binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_info  = getMonoBindInfo tc_binds
-              rhs_id_env = [(name, mono_id, choose_tc_id_flavour mono_id)
+              rhs_id_env = [(name, mono_id, choose_tc_id_flavor mono_id)
                            | (name, mb_sig, mono_id) <- mono_info
                            , noCompleteSig mb_sig ]
                     -- A monomorphic binding for each term variable that lacks

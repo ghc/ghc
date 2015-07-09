@@ -2912,7 +2912,7 @@ deferTcSForAllInstanceOf loc sigma1 sigma2
                           , ic_env      = env
                           , ic_info     = skol_info }
        ; updWorkListTcS (extendWorkListImplic imp)
-       ; return (mkInstanceOfLet sigma1 skol_tvs qs_ev_vars
+       ; return (mkInstanceOfGen sigma1 skol_tvs qs_ev_vars
                                  ev_binds (ctEvId ctev)) }
 
 -- Split a sigma type and instantiate its variables

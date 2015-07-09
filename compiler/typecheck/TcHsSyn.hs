@@ -866,8 +866,7 @@ zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToType env ty
                                  ; return (env, WpTyApp ty') }
 zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
                                  ; return (env1, WpLet bs') }
-zonkCoFn env (WpEvRevApp i) = do { i' <- zonkEvTerm env i
-                                 ; return (env, WpEvRevApp i') }
+zonkCoFn env (WpEvInstOf i) = return (env, WpEvInstOf (zonkIdOcc env i))
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit TcId -> TcM (HsOverLit Id)
@@ -1329,8 +1328,6 @@ zonkEvBind env (EvBind { eb_lhs = var, eb_rhs = term, eb_is_given = is_given })
       ; return (EvBind { eb_lhs = var', eb_rhs = term', eb_is_given = is_given }) }
 
 zonkEvInstanceOf :: ZonkEnv -> EvInstanceOf -> TcM EvInstanceOf
-zonkEvInstanceOf env (EvInstanceOfVar v)
-  = return (EvInstanceOfVar (zonkIdOcc env v))
 zonkEvInstanceOf env (EvInstanceOfEq co)
   = do { co' <- zonkTcCoToCo env co
        ; return (EvInstanceOfEq co') }
@@ -1339,12 +1336,12 @@ zonkEvInstanceOf env (EvInstanceOfInst tys co q)
        ; let co' = zonkIdOcc env co
        ; q' <- mapM (zonkEvTerm env) q
        ; return (EvInstanceOfInst tys' co' q') }
-zonkEvInstanceOf env (EvInstanceOfLet tys qvars bnds i)
+zonkEvInstanceOf env (EvInstanceOfGen tys qvars bnds i)
   = do { (env', tys') <- zonkTyBndrsX env tys
        ; let qvars' = map (zonkIdOcc env') qvars
        ; (env'', bnds') <- zonkTcEvBinds env' bnds
        ; let i' = zonkIdOcc env'' i
-       ; return (EvInstanceOfLet tys' qvars' bnds' i') }
+       ; return (EvInstanceOfGen tys' qvars' bnds' i') }
 
 {-
 ************************************************************************

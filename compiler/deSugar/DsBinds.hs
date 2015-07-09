@@ -804,9 +804,8 @@ dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
                                   dsTcCoercion co (mkCast e)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
-dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
-dsHsWrapper (WpEvRevApp (EvInstanceOf ty ev)) e = dsEvInstanceOf ty ev e
-dsHsWrapper (WpEvRevApp tm)   e = liftM (flip mkCoreApp e) (dsEvTerm tm)
+dsHsWrapper (WpEvApp   tm)    e = liftM (App e) (dsEvTerm tm)
+dsHsWrapper (WpEvInstOf v)    e = return (mkCoreApp (Var v) e)
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
@@ -1174,8 +1173,6 @@ dsEvInstanceOf ty ev e
                   else e' }
 
 dsEvInstanceOf' :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
-dsEvInstanceOf' (EvInstanceOfVar v) e
-  = return (mkCoreApp (Var v) e)
 dsEvInstanceOf' (EvInstanceOfEq co) e
   = do { dsTcCoercion co $ \c ->
            case coercionKind c of
@@ -1188,7 +1185,7 @@ dsEvInstanceOf' (EvInstanceOfInst qvars co qs) e
        ; return $ case splitFunTy_maybe (exprType (Var co)) of
                          Just (ty1, ty2) | ty1 == ty2 -> exprEv
                          _ -> mkCoreApp (Var co) exprEv }
-dsEvInstanceOf' (EvInstanceOfLet tyvars qvars qs rest) e
+dsEvInstanceOf' (EvInstanceOfGen tyvars qvars qs rest) e
   = do { q_binds <- dsTcEvBinds qs
        ; let inner = case splitFunTy_maybe (exprType (Var rest)) of
                        Just (ty1, ty2) | ty1 == ty2 -> e

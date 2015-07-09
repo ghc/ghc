@@ -16,7 +16,7 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
-import TcEvidence( TcEvBinds(..), mkWpInstanceOf )
+import TcEvidence( TcEvBinds(..) )
 import Type
 import Id
 import Var              ( EvVar )
