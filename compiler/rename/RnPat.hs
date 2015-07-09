@@ -675,7 +675,7 @@ rnHsRecUpdFields flds
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record updates] in TcExpr
                       if overload_ok
-                          then do { mb <- lookupOccRn_overloaded overload_ok lbl
+                          then do { mb <- lookupGlobalOccRn_overloaded overload_ok lbl
                                   ; case mb of
                                       Nothing -> do { addErr (unknownSubordinateErr doc lbl)
                                                     ; return (Right []) }
