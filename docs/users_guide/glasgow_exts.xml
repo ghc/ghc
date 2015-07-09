@@ -12084,6 +12084,61 @@ not going to be inlined before the rule has a chance to fire.
 </para>
 </sect2>
 
+a<sect2 id="rules-class-methods">
+<title>How rules interact with class methods</title>
+
+<para>
+Giving a RULE for a class method is a bad idea:
+<programlisting>
+class C a where
+  op :: a -> a -> a
+
+instance C Bool where
+  op x y = ...rhs for op at Bool...
+
+{-# RULES "f" op True y = False #-}
+</programlisting>
+In this
+example, <literal>op</literal> is not an ordinary top-level function;
+it is a class method.  GHC rapidly rewrites any occurrences of
+<literal>op</literal>-used-at-type-Bool
+to a specialised function, say <literal>opBool</literal>, where
+<programlisting>
+opBool :: Bool -> Bool -> Bool
+opBool x y = ..rhs for op at Bool...
+</programlisting>
+So the RULE never has a chance to fire, for just the same reasons as in <xref linkend="rules-inline"/>.
+</para>
+<para>
+The solution is to define the instance-specific function yourself, with a pragma to prevent
+it being inlined too early, and give a RULE for it:
+<programlisting>
+instance C Bool where
+  op x y = opBool
+
+opBool :: Bool -> Bool -> Bool
+{-# NOINLINE [1] opBool #-}
+opBool x y = ..rhs for op at Bool...
+
+{-# RULES "f" opBool True y = False #-}
+</programlisting>
+If you want a RULE that truly applies to the overloaded class method, the only way to
+do it is like this:
+<programlisting>
+class C a where
+  op_c :: a -> a -> a
+
+op :: C a => a -> a -> a
+{-# NOINLINE [1] op #-}
+op = op_c
+
+{-# RULES "reassociate" op (op x y) z = op x (op y z) #-}
+</programlisting>
+Now the inlining of <literal>op</literal> is delayed until the rule has a chance to fire.
+The down-side is that instance declarations must define <literal>op_c</literal>, but
+all other uses should go via <literal>op</literal>.
+</para>
+</sect2>
 <sect2>
 <title>List fusion</title>
 
