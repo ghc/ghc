@@ -175,7 +175,7 @@ expr_fvs (Type ty)       = someVars (tyVarsOfType ty)
 expr_fvs (Coercion co)   = someVars (tyCoVarsOfCo co)
 expr_fvs (Var var)       = oneVar var
 expr_fvs (Lit _)         = noVars
-expr_fvs (Tick t expr) = tickish_fvs t `union` expr_fvs expr
+expr_fvs (Tick t expr)   = tickish_fvs t `union` expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
 expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyCoVarsOfCo co)
@@ -279,9 +279,11 @@ ruleRhsFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs })
 -- | Those variables free in the both the left right hand sides of a rule
 ruleFreeVars :: CoreRule -> VarSet
 ruleFreeVars (BuiltinRule {}) = noFVs
-ruleFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
+ruleFreeVars (Rule { ru_fn = _do_not_include  -- See Note [Rule free var hack]
+                   , ru_bndrs = bndrs
+                   , ru_rhs = rhs, ru_args = args })
   = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
-      -- See Note [Rule free var hack]
+
 
 idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
 -- Just the variables free on the *rhs* of a rule
