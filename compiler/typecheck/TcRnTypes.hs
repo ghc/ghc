@@ -2223,9 +2223,10 @@ data CtOrigin
         -- is pinned on the entire error message
 
   | HoleOrigin
-  | UnboundOccurrenceOf RdrName
+  | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
+  | Shouldn'tHappenOrigin   -- the user should never see this one
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2278,6 +2279,11 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
   = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
+
+pprCtO Shouldn'tHappenOrigin
+  = vcat [ text "<< This should not appear in error messages. If you see this"
+         , text "in an error message, please report a bug at"
+         , text "https://ghc.haskell.org/trac/ghc/wiki/ReportABug >>" ]
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin

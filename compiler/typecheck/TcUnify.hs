@@ -573,8 +573,9 @@ skolemising the type.
 
 -- | Call this variant when you are in a higher-rank situation and
 -- you know the right-hand type is deeply skolemised.
-tcSubTypeHR :: TcSigmaType -> TcRhoType -> TcM HsWrapper
-tcSubTypeHR = tcSubTypeDS GenSigCtxt
+tcSubTypeHR :: CtOrigin    -- ^ of the actual type
+            -> TcSigmaType -> TcRhoType -> TcM HsWrapper
+tcSubTypeHR orig = tc_sub_type_ds orig GenSigCtxt
 
 tcSubType :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
@@ -713,10 +714,12 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected = go ty_actual ty_expected
            ; return (coToHsWrapper cow) }
 
 -----------------
-tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType -> TcM (HsExpr TcId)
-tcWrapResult expr actual_ty res_ty
+tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType -> CtOrigin
+             -> TcM (HsExpr TcId, CtOrigin)
+     -- the CtOrigin stuff is just for convenience in tcExpr
+tcWrapResult expr actual_ty res_ty orig
   = do { cow <- tcSubTypeDS GenSigCtxt actual_ty res_ty
-       ; return (mkHsWrap cow expr) }
+       ; return (mkHsWrap cow expr, orig) }
 
 -----------------------------------
 wrapFunResCoercion

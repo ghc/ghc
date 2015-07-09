@@ -11,7 +11,7 @@ c%
 module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
                 tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcCheckId,
-                addExprErrCtxt, tcSkolemiseExpr ) where
+                addExprErrCtxt ) where
 
 #include "HsVersions.h"
 
@@ -88,9 +88,9 @@ tcPolyExpr expr res_ty
 tcPolyExprNC (L loc expr) res_ty
   = setSrcSpan loc $
     do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; expr' <- tcSkolemiseExpr res_ty $ \ res_ty ->
-                  tcExpr expr res_ty
-       ; return (L loc expr') }
+       ; (wrap, (expr', _)) <- tcSkolemise GenSigCtxt res_ty $ \ _ res_ty ->
+                               tcExpr expr res_ty
+       ; return (L loc (mkHsWrap wrap expr')) }
 
 ---------------
 tcMonoExpr, tcMonoExprNC
@@ -103,30 +103,42 @@ tcMonoExpr expr res_ty
   = addErrCtxt (exprCtxt expr) $
     tcMonoExprNC expr res_ty
 
-tcMonoExprNC (L loc expr) res_ty
+tcMonoExprNC expr res_ty
+  = fst <$> tcMonoExprNC_O expr res_ty
+
+-- variant that also returns the CtOrigin
+tcMonoExpr_O, tcMonoExprNC_O
+  :: LHsExpr Name -> TcRhoType -> TcM (LHsExpr TcId, CtOrigin)
+
+tcMonoExpr_O expr res_ty
+  = addErrCtxt (exprCtxt expr) $
+    tcMonoExprNC_O expr res_ty
+
+tcMonoExprNC_O (L loc expr) res_ty
   = ASSERT( not (isSigmaTy res_ty) )
     setSrcSpan loc $
-    do  { expr' <- tcExpr expr res_ty
-        ; return (L loc expr') }
+    do  { (expr', orig) <- tcExpr expr res_ty
+        ; return (L loc expr', orig) }
 
 ---------------
-tcInferSigma, tcInferSigmaNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
+tcInferSigma, tcInferSigmaNC :: LHsExpr Name -> TcM ( LHsExpr TcId
+                                                    , TcSigmaType
+                                                    , CtOrigin )
 -- Infer a *sigma*-type.
 tcInferSigma expr = addErrCtxt (exprCtxt expr) (tcInferSigmaNC expr)
 
 tcInferSigmaNC (L loc expr)
   = setSrcSpan loc $
-    do { (expr', sigma) <- tcInfer (tcExpr expr)
-       ; return (L loc expr', sigma) }
+    do { ((expr', orig), sigma) <- tcInfer (tcExpr expr)
+       ; return (L loc expr', sigma, orig) }
 
 tcInferRho, tcInferRhoNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
 -- Infer a *rho*-type. The return type is always (shallowly) instantiated.
 tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
 
 tcInferRhoNC expr
-  = do { (expr', sigma) <- tcInferSigmaNC expr
-                    -- TODO (RAE): Fix origin stuff
-       ; (wrap, rho) <- topInstantiate AppOrigin sigma
+  = do { (expr', sigma, orig) <- tcInferSigmaNC expr
+       ; (wrap, rho) <- topInstantiate orig sigma
        ; return (mkLHsWrap wrap expr', rho) }
 
 
@@ -140,41 +152,44 @@ tcInferRhoNC expr
 NB: The res_ty is always deeply skolemised.
 -}
 
-tcExpr :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId)
-tcExpr (HsVar name)     res_ty = tcCheckId name res_ty
-tcExpr (HsUnboundVar v) res_ty = tcUnboundId v res_ty
+tcExpr :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId, CtOrigin)
+tcExpr (HsVar name)     res_ty = do { expr <- tcCheckId name res_ty
+                                    ; return (expr, OccurrenceOf name) }
+tcExpr (HsUnboundVar v) res_ty = do { expr <- tcUnboundId v res_ty
+                                    ; return (expr, UnboundOccurrenceOf v) }
 
 tcExpr (HsApp e1 e2) res_ty
-  = do { (wrap, fun, args) <- tcApp Nothing AppOrigin e1 [e2] res_ty
-       ; return (mkHsWrap wrap $ unLoc $ foldl mkHsApp fun args) }
+  = do { (wrap, fun, args, orig) <- tcApp Nothing e1 [e2] res_ty
+       ; return (mkHsWrap wrap $ unLoc $ foldl mkHsApp fun args, orig) }
 
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
-                                    ; tcWrapResult (HsLit lit) lit_ty res_ty }
+                                 ; tcWrapResult (HsLit lit) lit_ty res_ty
+                                                Shouldn'tHappenOrigin }
 
-tcExpr (HsPar expr)   res_ty = do { expr' <- tcMonoExprNC expr res_ty
-                                    ; return (HsPar expr') }
+tcExpr (HsPar expr)   res_ty = do { (expr', orig) <- tcMonoExprNC_O expr res_ty
+                                  ; return (HsPar expr', orig) }
 
 tcExpr (HsSCC src lbl expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsSCC src lbl expr') }
+  = do { (expr', orig) <- tcMonoExpr_O expr res_ty
+       ; return (HsSCC src lbl expr', orig) }
 
 tcExpr (HsTickPragma src info expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsTickPragma src info expr') }
+  = do { (expr', orig) <- tcMonoExpr_O expr res_ty
+       ; return (HsTickPragma src info expr', orig) }
 
 tcExpr (HsCoreAnn src lbl expr) res_ty
-  = do  { expr' <- tcMonoExpr expr res_ty
-        ; return (HsCoreAnn src lbl expr') }
+  = do  { (expr', orig) <- tcMonoExpr_O expr res_ty
+        ; return (HsCoreAnn src lbl expr', orig) }
 
 tcExpr (HsOverLit lit) res_ty
   = do  { (wrap,  lit') <- newOverloadedLit Expected lit res_ty
-        ; return (mkHsWrap wrap $ HsOverLit lit') }
+        ; return (mkHsWrap wrap $ HsOverLit lit', LiteralOrigin lit) }
 
 tcExpr (NegApp expr neg_expr) res_ty
   = do  { neg_expr' <- tcSyntaxOp NegateOrigin neg_expr
                                   (mkFunTy res_ty res_ty)
-        ; expr' <- tcMonoExpr expr res_ty
-        ; return (NegApp expr' neg_expr') }
+        ; (expr', orig) <- tcMonoExpr_O expr res_ty
+        ; return (NegApp expr' neg_expr', orig) }
 
 tcExpr (HsIPVar x) res_ty
   = do { let origin = IPOccOrigin x
@@ -186,7 +201,7 @@ tcExpr (HsIPVar x) res_ty
        ; ip_ty <- newFlexiTyVarTy openTypeKind
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
        ; ip_var <- emitWanted origin (mkClassPred ipClass [ip_name, ip_ty])
-       ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
+       ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty origin }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
   fromDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
@@ -194,7 +209,7 @@ tcExpr (HsIPVar x) res_ty
 
 tcExpr (HsLam match) res_ty
   = do  { (co_fn, match') <- tcMatchLambda match res_ty
-        ; return (mkHsWrap co_fn (HsLam match')) }
+        ; return (mkHsWrap co_fn (HsLam match'), ) }
 
 tcExpr e@(HsLamCase _ matches) res_ty
   = do {(wrap1, [arg_ty], body_ty) <-
@@ -904,15 +919,14 @@ arithSeqEltType (Just fl) res_ty
 
 tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
                      -- or leave out to get exactly that message
-      -> CtOrigin
       -> LHsExpr Name -> [LHsExpr Name] -- Function and args
-      -> TcRhoType -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
+      -> TcRhoType -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId], CtOrigin)
            -- (wrap, fun, args). For an ordinary function application,
            -- these should be assembled as (wrap (fun args)).
            -- But OpApp is slightly different, so that's why the caller
            -- must assemble
 
-tcApp m_herald orig orig_fun orig_args res_ty
+tcApp m_herald orig_fun orig_args res_ty
   = go orig_fun orig_args
   where
     go (L _ (HsPar e))     args = go e  args
@@ -921,15 +935,17 @@ tcApp m_herald orig orig_fun orig_args res_ty
     go (L loc (HsVar fun)) args
       | fun `hasKey` tagToEnumKey
       , count (not . isLHsTypeExpr) args == 1
-      = tcTagToEnum loc fun args res_ty
+      = do { (wrap, expr, args) <- tcTagToEnum loc fun args res_ty
+           ; return (wrap, expr, args, Shouldn'tHappenOrigin) }
 
       | fun `hasKey` seqIdKey
       , count (not . isLHsTypeExpr) args == 2
-      = tcSeq loc fun args res_ty
+      = do { (wrap, expr, args) <- tcSeq loc fun args res_ty
+           ; return (wrap, expr, args, Shouldn'tHappenOrigin) }
 
     go fun args
       = do {   -- Type-check the function
-           ; (fun1, fun_sigma) <- tcInferFun fun
+           ; (fun1, fun_sigma, orig) <- tcInferFun fun
 
                -- Extract its argument types
            ; (wrap_fun, expected_arg_tys, actual_res_ty)
@@ -949,7 +965,7 @@ tcApp m_herald orig orig_fun orig_args res_ty
            ; args1 <- tcArgs fun args expected_arg_tys
 
            -- Assemble the result
-           ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
+           ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1, orig) }
 
 mk_app_msg :: LHsExpr Name -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
@@ -1559,24 +1575,6 @@ checkMissingFields data_con rbinds
                           field_strs
 
     field_strs = dataConSrcBangs data_con
-
-{-
-************************************************************************
-*                                                                      *
-    Skolemisation
-*                                                                      *
-************************************************************************
--}
-
--- | Convenient wrapper for skolemising a type during typechecking an expression.
--- Always does uses a 'GenSigCtxt'.
-tcSkolemiseExpr :: TcSigmaType
-                -> (TcRhoType -> TcM (HsExpr TcId))
-                -> (TcM (HsExpr TcId))
-tcSkolemiseExpr res_ty thing_inside
-  = do { (wrap, expr) <- tcSkolemise GenSigCtxt res_ty $
-                         \_ rho -> thing_inside rho
-       ; return (mkHsWrap wrap expr) }
 
 {-
 ************************************************************************
