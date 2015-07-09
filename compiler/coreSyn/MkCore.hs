@@ -735,7 +735,7 @@ Notice the 'OpenKind' (manifested as openAlphaTyVar in the code). This ensures t
   * unboxed as well as boxed types
   * polymorphic types
 This is OK because it never returns, so the return type is irrelevant.
-See Note [OpenTypeKind accepts foralls] in TcUnify.
+See Note [OpenTypeKind accepts foralls] in TcType.
 
 
 ************************************************************************
