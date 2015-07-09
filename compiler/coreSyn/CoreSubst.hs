@@ -181,8 +181,7 @@ TvSubstEnv and CvSubstEnv?
 -}
 
 -- | An environment for substituting for 'Id's
-type IdSubstEnv = IdEnv ( CoreExpr
-                        , Bool )  -- is it an instantiation function?
+type IdSubstEnv = IdEnv CoreExpr
 
 ----------------------------
 isEmptySubst :: Subst -> Bool
@@ -212,12 +211,12 @@ zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv empt
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
 extendIdSubst (Subst in_scope ids tvs cvs) v r
-  = Subst in_scope (extendVarEnv ids v (r, idIsInstantiationFn v)) tvs cvs
+  = Subst in_scope (extendVarEnv ids v r) tvs cvs
 
 -- | Adds multiple 'Id' substitutions to the 'Subst': see also 'extendIdSubst'
 extendIdSubstList :: Subst -> [(Id, CoreExpr)] -> Subst
 extendIdSubstList (Subst in_scope ids tvs cvs) prs
-  = Subst in_scope (extendVarEnvList ids [(id, (v, idIsInstantiationFn id)) | (id,v) <- prs]) tvs cvs
+  = Subst in_scope (extendVarEnvList ids prs) tvs cvs
 
 -- | Add a substitution for a 'TyVar' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
@@ -265,17 +264,12 @@ extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var r
 lookupIdSubst :: SDoc -> Subst -> Id -> CoreExpr
 lookupIdSubst doc (Subst in_scope ids _ _) v
   | not (isLocalId v) = Var v
-  | Just (e, _) <- lookupVarEnv ids   v = e
+  | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
   | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v
                             $$ ppr in_scope)
                 Var v
-
-lookupIdIsInstantiationFn :: Subst -> Id -> Bool
-lookupIdIsInstantiationFn (Subst _ ids _ _) v
-  | Just (_, inst) <- lookupVarEnv ids v = inst
-  | otherwise = False
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
 lookupTvSubst :: Subst -> TyVar -> Type
@@ -302,7 +296,7 @@ delBndrs (Subst in_scope ids tvs cvs) vs
 --      so neither x nor y scope over a1 a2
 mkOpenSubst :: InScopeSet -> [(Var,CoreArg)] -> Subst
 mkOpenSubst in_scope pairs = Subst in_scope
-                                   (mkVarEnv [(id,(e, idIsInstantiationFn id)) | (id, e) <- pairs, isId id])
+                                   (mkVarEnv [(id,e)  | (id, e) <- pairs, isId id])
                                    (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
                                    (mkVarEnv [(v,co)  | (v, Coercion co) <- pairs])
 
@@ -506,7 +500,7 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
         -- Extend the substitution if the unique has changed
         -- See the notes with substTyVarBndr for the delVarEnv
     new_env | no_change = delVarEnv env old_id
-            | otherwise = extendVarEnv env old_id (Var new_id, idIsInstantiationFn new_id)
+            | otherwise = extendVarEnv env old_id (Var new_id)
 
     no_change = id1 == old_id
         -- See Note [Extending the Subst]
@@ -561,7 +555,7 @@ clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
     id2     = substIdType subst id1
     new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
     (new_idvs, new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
-                        | otherwise      = (extendVarEnv idvs old_id (Var new_id, idIsInstantiationFn new_id), cvs)
+                        | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
 
 {-
 ************************************************************************
@@ -960,17 +954,19 @@ simple_app subst (Lam b e) (a:as)
   where
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
-simple_app subst e@(Var v) as
+simple_app subst (Var v) as
   | isCompulsoryUnfolding (idUnfolding v)
   , isAlwaysActive (idInlineActivation v)
   -- See Note [Unfold compulsory unfoldings in LHSs]
   =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
   -- Instantiation functions are always inlined
+  {-
   | lookupIdIsInstantiationFn subst v, isLocalId v, c:cs <- as
   = case lookupIdSubst (text "simpleOptExpr") subst v of
       Lam b e -> simple_app (extendIdSubst subst b c) e cs
       Var v' | v == v' -> foldl App (simple_opt_expr subst e) as
       e' -> simple_app subst e' as
+  -}
 simple_app subst (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
   | t `tickishScopesLike` SoftScope
@@ -1080,7 +1076,7 @@ subst_opt_id_bndr subst@(Subst in_scope id_subst tv_subst cv_subst) old_id
         -- or there's some useful occurrence information
         -- See the notes with substTyVarBndr for the delSubstEnv
     new_id_subst | new_id /= old_id
-                 = extendVarEnv id_subst old_id (Var new_id, idIsInstantiationFn new_id)
+                 = extendVarEnv id_subst old_id (Var new_id)
                  | otherwise
                  = delVarEnv id_subst old_id
 

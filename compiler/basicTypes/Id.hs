@@ -95,11 +95,9 @@ module Id (
 
         setIdDemandInfo,
         setIdStrictness,
-        setIdIsInstantiationFn,
 
         idDemandInfo,
-        idStrictness,
-        idIsInstantiationFn
+        idStrictness
 
     ) where
 
@@ -149,8 +147,7 @@ infixl  1 `setIdUnfoldingLazily`,
           `idCafInfo`,
 
           `setIdDemandInfo`,
-          `setIdStrictness`,
-          `setIdIsInstantiationFn`
+          `setIdStrictness`
 
 {-
 ************************************************************************
@@ -545,12 +542,6 @@ isStrictId id
            (isStrictType (idType id)) ||
            -- Take the best of both strictnesses - old and new
            (isStrictDmd (idDemandInfo id))
-
-idIsInstantiationFn :: Id -> Bool
-idIsInstantiationFn id = isInstantiationFn (idInfo id)
-
-setIdIsInstantiationFn :: Id -> Bool -> Id
-setIdIsInstantiationFn id ifn = modifyIdInfo (`setIsInstantiationFn` ifn) id
 
         ---------------------------------
         -- UNFOLDING

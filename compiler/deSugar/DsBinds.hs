@@ -821,14 +821,11 @@ dsEvBinds :: Bag EvBind -> DsM [CoreBind]
 dsEvBinds bs = mapM ds_scc (sccEvBinds bs)
   where
     ds_scc (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = r }))
-                          = liftM (NonRec (ds_set_inst v r)) (dsEvTerm r)
+                          = liftM (NonRec v) (dsEvTerm r)
     ds_scc (CyclicSCC bs) = liftM Rec (mapM ds_pair bs)
 
     ds_pair (EvBind { eb_lhs = v, eb_rhs = r })
-      = liftM ((,) (ds_set_inst v r)) (dsEvTerm r)
-
-    ds_set_inst v (EvInstanceOf _ _) = setIdIsInstantiationFn v True
-    ds_set_inst v _ = v
+      = liftM ((,) v) (dsEvTerm r)
 
 sccEvBinds :: Bag EvBind -> [SCC EvBind]
 sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
