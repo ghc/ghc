@@ -9,7 +9,7 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP #-}
 
 module Inst (
-       skolemise, SkolemiseMode(..),
+       deeplySkolemise,
        topInstantiate, topInstantiateInferred, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
@@ -145,48 +145,6 @@ ToDo: this eta-abstraction plays fast and loose with termination,
       because it can introduce extra lambdas.  Maybe add a `seq` to
       fix this
 -}
-
--- | How should we skolemise a type?
-data SkolemiseMode
-  = SkolemiseDeeply
-    -- ^ Skolemise all inferred and specified variables, and all
-    -- constraints, from the top type and to the right of arrows.
-    -- See also 'deeplySkolemise'
-
-  | SkolemiseTop
-    -- ^ Skolemise all variables and all constraints, at the top level only.
-    -- Does not look past non-constraint arrows.
-
--- | Skolemise a type according to the provided 'SkolemiseMode'.
--- The caller will likely want to bind the returns variables and
--- givens. The 'HsWrapper' returned has type @skol_ty -> sigma@.
-skolemise :: SkolemiseMode -> TcSigmaType
-          -> TcM (HsWrapper, [TyVar], [EvVar], TcType)
-skolemise SkolemiseDeeply   = deeplySkolemise
-skolemise SkolemiseTop      = topSkolemise
-
--- | Skolemise top-level quantified variables and constraints.
-topSkolemise :: TcSigmaType
-             -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
-topSkolemise sigma
-  | null tvs && null theta
-  = return (idHsWrapper, [], [], rho)
-
-  | otherwise
-  = do { (subst, tvs') <- tcInstSkolTyVars tvs
-       ; let theta' = substTheta subst theta
-             rho'   = substTy    subst rho
-       ; ev_vars <- newEvVars theta'
-       ; (wrap, inner_tvs', inner_ev_vars, inner_rho) <- topSkolemise rho'
-               -- This handles types like
-               -- forall a. Num a => forall b. Ord b => ...
-
-       ; return ( mkWpTyLams tvs' <.> mkWpLams ev_vars <.> wrap
-                , tvs' ++ inner_tvs'
-                , ev_vars ++ inner_ev_vars
-                , inner_rho ) }
-  where
-    (tvs, theta, rho) = tcSplitSigmaTy sigma
 
 deeplySkolemise
   :: TcSigmaType

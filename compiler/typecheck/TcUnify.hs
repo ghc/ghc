@@ -10,7 +10,7 @@ Type subsumption and unification
 
 module TcUnify (
   -- Full-blown subsumption
-  tcWrapResult, tcSkolemise, SkolemiseMode(..),
+  tcWrapResult, tcSkolemise,
   tcSubTypeHR, tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
   checkConstraints,
 
@@ -87,7 +87,7 @@ exposeRhoType :: ExpOrAct -> TcSigmaType
               -> TcM (HsWrapper, a)
 exposeRhoType Expected ty thing_inside
   = do { (wrap1, (wrap2, result)) <-
-            tcSkolemise SkolemiseTop GenSigCtxt ty $ \_ -> thing_inside
+            tcSkolemise GenSigCtxt ty $ \_ -> thing_inside
        ; return (wrap1 <.> wrap2, result) }
 exposeRhoType (Actual orig) ty thing_inside
   = do { (wrap1, rho) <- topInstantiate orig ty
@@ -645,7 +645,7 @@ tc_sub_type origin ctxt ty_actual ty_expected
                                 uType origin ty_actual ty_expected }
 
   | otherwise  -- See Note [Deep skolemisation]
-  = do { (sk_wrap, inner_wrap) <- tcSkolemise SkolemiseDeeply ctxt ty_expected $
+  = do { (sk_wrap, inner_wrap) <- tcSkolemise ctxt ty_expected $
                                   \ _ sk_rho ->
                                   tc_sub_type_ds origin ctxt ty_actual sk_rho
        ; return (sk_wrap <.> inner_wrap) }
@@ -759,20 +759,17 @@ tcInfer tc_check
 
 -- | Take an "expected type" and strip off quantifiers to expose the
 -- type underneath, binding the new skolems for the @thing_inside@.
--- The 'SkolemiseMode' parameter tells 'tcSkolemise' which quantifiers
--- to skolemise. The returned 'HsWrapper' has type
--- @specific_ty -> expected_ty@.
-tcSkolemise :: SkolemiseMode
-            -> UserTypeCtxt -> TcSigmaType
+-- The returned 'HsWrapper' has type @specific_ty -> expected_ty@.
+tcSkolemise :: UserTypeCtxt -> TcSigmaType
             -> ([TcTyVar] -> TcType -> TcM result)
             -> TcM (HsWrapper, result)
         -- The expression has type: spec_ty -> expected_ty
 
-tcSkolemise mode ctxt expected_ty thing_inside
+tcSkolemise ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
   = do  { traceTc "tcSkolemise" Outputable.empty
-        ; (wrap, tvs', given, rho') <- skolemise mode expected_ty
+        ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
 
         ; when debugIsOn $
               traceTc "tcSkolemise" $ vcat [

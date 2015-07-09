@@ -88,7 +88,7 @@ tcPolyExpr expr res_ty
 tcPolyExprNC (L loc expr) res_ty
   = setSrcSpan loc $
     do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; expr' <- tcSkolemiseExpr SkolemiseDeeply res_ty $ \ res_ty ->
+       ; expr' <- tcSkolemiseExpr res_ty $ \ res_ty ->
                   tcExpr expr res_ty
        ; return (L loc expr') }
 
@@ -210,7 +210,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
       ; tcExtendTyVarEnv nwc_tvs $ do {
         sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
       ; (gen_fn, expr')
-            <- tcSkolemise SkolemiseTop ExprSigCtxt sig_tc_ty $
+            <- tcSkolemise ExprSigCtxt sig_tc_ty $
                \ skol_tvs res_ty ->
 
                   -- Remember to extend the lexical type-variable environment;
@@ -1571,12 +1571,11 @@ checkMissingFields data_con rbinds
 
 -- | Convenient wrapper for skolemising a type during typechecking an expression.
 -- Always does uses a 'GenSigCtxt'.
-tcSkolemiseExpr :: SkolemiseMode
-                -> TcSigmaType
+tcSkolemiseExpr :: TcSigmaType
                 -> (TcRhoType -> TcM (HsExpr TcId))
                 -> (TcM (HsExpr TcId))
-tcSkolemiseExpr mode res_ty thing_inside
-  = do { (wrap, expr) <- tcSkolemise mode GenSigCtxt res_ty $
+tcSkolemiseExpr res_ty thing_inside
+  = do { (wrap, expr) <- tcSkolemise GenSigCtxt res_ty $
                          \_ rho -> thing_inside rho
        ; return (mkHsWrap wrap expr) }
 

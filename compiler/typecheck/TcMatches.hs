@@ -79,7 +79,7 @@ tcMatchesFun fun_name inf matches exp_ty
         ; checkArgs fun_name matches
 
         ; (wrap_gen, (wrap_fun, group))
-            <- tcSkolemise SkolemiseDeeply (FunSigCtxt fun_name True) exp_ty $
+            <- tcSkolemise (FunSigCtxt fun_name True) exp_ty $
                \ _ exp_rho ->
                   -- Note [Polymorphic expected type for tcMatchesFun]
                matchFunTys herald arity exp_rho $ \ pat_tys rhs_ty ->
