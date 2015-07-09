@@ -23,7 +23,7 @@ module HsUtils(
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatchGroupName, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
-  coToHsWrapper, mkHsDictLet, mkHsLams,
+  coToHsWrapper, coToHsWrapperR, mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdCast,
 

@@ -286,23 +286,31 @@ tcExpr app@(OpApp _ _ _ _) res_ty = tcApp app res_ty
                (mkLHsWrapCo co_a arg2') }
 -}
 
+tcExpr (SectionL arg1 op) res_ty
+  = do { dflags <- getDynFlags      -- Note [Left sections]
+       ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
+                         | otherwise                        = 2
+       ; (co_fun, args_tys@(arg1_ty : _), rest_ty) <-
+           matchExpectedFunTys (mk_app_msg op) n_reqd_args res_ty
+       ; let op_ty = mkFunTys args_tys rest_ty
+          -- typecheck op and arg1
+       ; op'   <- tcPolyMonoExprNC op op_ty
+       ; arg1' <- tcArg op' (arg1, arg1_ty, 1)
+       ; return $ SectionL arg1' (mkLHsWrapCo co_fun op') }
+
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --      \ x -> op x expr
-
-tcExpr app@(SectionL _ _) res_ty = tcApp app res_ty
-tcExpr app@(SectionR _ _) res_ty = tcApp app res_ty
-{-
+tcExpr (SectionR op arg2) res_ty
   = do { -- res_ty = arg1_ty -> rest_ty
          (co_fun, [arg1_ty], rest_ty) <-
            matchExpectedFunTys (mk_app_msg op) 1 res_ty
        ; arg2_ty <- newFlexiTyVarTy openTypeKind
          -- op_ty = arg1_ty -> arg2_ty -> rest_ty
-       ; let op_ty = mkFunTys [arg1_ty,arg2_ty] rest_ty
+       ; let op_ty = mkFunTys [arg1_ty, arg2_ty] rest_ty
          -- typecheck op and arg2
-       ; op'   <- tcCheckFun op op_ty
-       ; arg2' <- tcArg op (arg2, arg2_ty, 2)
+       ; op'   <- tcPolyMonoExprNC op op_ty
+       ; arg2' <- tcArg op' (arg2, arg2_ty, 2)
        ; return $ SectionR (mkLHsWrapCo co_fun op') arg2' }
--}
 
 tcExpr (ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
@@ -1010,7 +1018,7 @@ tc_app fun_expr args fun_ty res_ty
                        args1                          -- Arguments
                        (coToHsWrapper co_res) } } }   -- Coercion to expected result type
 
-mk_app_msg :: LHsExpr TcId -> SDoc
+mk_app_msg :: Outputable a => a -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
                      , ptext (sLit "is applied to")]
 
@@ -1286,7 +1294,7 @@ tcTagToEnum loc fun_name arg res_ty
         ; arg' <- tcPolyMonoExpr arg intPrimTy
         ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
               rep_ty = mkTyConApp rep_tc rep_args
-              wrapper = coToHsWrapper (mkTcSymCo $ TcCoercion coi)
+              wrapper = coToHsWrapperR (mkTcSymCo $ TcCoercion coi)
 
         ; return (TcAppResult fun' [arg'] wrapper) }
                   -- coi is a Representational coercion
