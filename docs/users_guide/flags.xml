@@ -3380,6 +3380,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-dsuppress-unfoldings</option></entry>
+            <entry>Suppress the printing of the stable unfolding of a variable at its binding site</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-dsuppress-module-prefixes</option></entry>
             <entry>Suppress the printing of module qualification prefixes</entry>
             <entry>dynamic</entry>
