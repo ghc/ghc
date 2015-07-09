@@ -456,7 +456,7 @@ tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
   = do { pred' <- tcMonoExpr pred boolTy
             -- this forces the branches to be fully instantiated
             -- (See #10619)
-       ; tau_ty <- newFlexiMonoTyVarTy openTypeKind
+       ; tau_ty <- newFlexiTyVarTy openTypeKind
        ; wrap   <- tcSubTypeHR tau_ty res_ty
        ; tau_ty <- zonkTcType tau_ty
        ; b1' <- tcMonoExpr b1 tau_ty

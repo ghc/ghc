@@ -190,7 +190,8 @@ tcMatches ctxt pat_tys rhs_ty group@(MG { mg_alts = matches, mg_origin = origin 
              if isSingletonMatchGroup group
                   -- no need to monomorphise the RHS if there's only one
              then return (idHsWrapper, rhs_ty)
-             else do { tau_ty <- newFlexiMonoTyVarTy openTypeKind
+                  -- TODO (RAE): Document this behavior.
+             else do { tau_ty <- newFlexiTyVarTy openTypeKind
                      ; wrap   <- tcSubTypeDS GenSigCtxt tau_ty rhs_ty
                      ; tau_ty <- zonkTcType tau_ty
                          -- seems more efficient to zonk just once

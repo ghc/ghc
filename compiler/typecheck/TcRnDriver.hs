@@ -39,7 +39,6 @@ import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 import DynamicLoading ( loadPlugins )
 import Plugins ( tcPlugin )
-import Inst   ( topInstantiate )
 #endif
 
 import DynFlags

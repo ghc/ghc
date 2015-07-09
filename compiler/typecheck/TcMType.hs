@@ -67,6 +67,7 @@ module TcMType (
 import TypeRep
 import TcType
 import Type
+import Kind   ( isOpenTypeKind )
 import Class
 import Var
 import VarEnv
@@ -452,7 +453,7 @@ tcInstTyVarX subst tyvar
         ; let info | isOpenTypeKind (tyVarKind tyvar) = ReturnTv
                          -- See Note [OpenTypeKind accepts foralls]
                    | otherwise                        = TauTv VanillaTau
-        ; details <- newMetaDetails (TauTv VanillaTau)
+        ; details <- newMetaDetails info
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]
               kind   = substTy subst (tyVarKind tyvar)

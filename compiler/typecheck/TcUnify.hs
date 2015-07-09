@@ -677,7 +677,7 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected = go ty_actual ty_expected
                         (ppr tv_e <+> text "-->" <+> ppr ty_e')
                     ; tc_sub_type origin ctxt ty_a ty_e' }
                Unfilled details
-                 |  canUnifyWithPolyType dflags details (tyVarKind tv_e)
+                 |  canUnifyWithPolyType dflags details
                     && isTouchableMetaTyVar tclvl tv_e  -- don't want skolems here
                  -> coToHsWrapper <$> uType origin ty_a ty_e
 
@@ -1205,9 +1205,11 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
     ty2 = mkTyVarTy tv2
 
 nicer_to_update_tv1 :: TcTyVar -> MetaInfo -> MetaInfo -> Bool
-nicer_to_update_tv1 _   _                     SigTv                 = True
-nicer_to_update_tv1 _   SigTv                 _                     = False
-nicer_to_update_tv1 tv1 _                     _ = isSystemName (Var.varName tv1)
+nicer_to_update_tv1 _   ReturnTv _        = True
+nicer_to_update_tv1 _   _        ReturnTv = False
+nicer_to_update_tv1 _   _        SigTv    = True
+nicer_to_update_tv1 _   SigTv    _        = False
+nicer_to_update_tv1 tv1 _        _        = isSystemName (Var.varName tv1)
         -- Try not to update SigTvs or AlwaysMonoTaus; and try to update sys-y type
         -- variables in preference to ones gotten (say) by
         -- instantiating a polymorphic function with a user-written
@@ -1265,7 +1267,7 @@ checkTauTvUpdate dflags tv ty
     details = ASSERT2( isMetaTyVar tv, ppr tv ) tcTyVarDetails tv
     info         = mtv_info details
     is_return_tv = isReturnTyVar tv
-    impredicative = canUnifyWithPolyType dflags details (tyVarKind tv)
+    impredicative = canUnifyWithPolyType dflags details
 
     defer_me :: TcType -> Bool
     -- Checks for (a) occurrence of tv

@@ -65,6 +65,7 @@ import TypeRep
 import FamInst
 import FamInstEnv
 import InstEnv
+import Inst
 import NameEnv
 import PrelNames
 import OccName

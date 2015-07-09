@@ -1243,7 +1243,7 @@ occurCheckExpand dflags tv ty
   where
     details = ASSERT2( isTcTyVar tv, ppr tv ) tcTyVarDetails tv
 
-    impredicative = canUnifyWithPolyType dflags details (tyVarKind tv)
+    impredicative = canUnifyWithPolyType dflags details
 
     -- Check 'ty' is a tyvar, or can be expanded into one
     go_sig_tv ty@(TyVarTy {})            = OC_OK ty
@@ -1296,8 +1296,8 @@ occurCheckExpand dflags tv ty
               | otherwise             -> bad
                       -- Failing that, try to expand a synonym
 
-canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> TcKind -> Bool
-canUnifyWithPolyType dflags details kind
+canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
+canUnifyWithPolyType dflags details
   = case details of
       MetaTv { mtv_info = ReturnTv } -> True   -- See Note [ReturnTv]
       MetaTv { mtv_info = SigTv }    -> False
