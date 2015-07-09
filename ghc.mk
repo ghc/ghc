@@ -430,14 +430,6 @@ REGULAR_INSTALL_PACKAGES += compiler
 endif
 REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
-# If we have built the programs with dynamic libraries, then
-# ghc will be dynamically linked against haskeline.so etc, so
-# we need the dynamic libraries of everything down to here
-REGULAR_INSTALL_DYNLIBS := $(addprefix libraries/,$(PACKAGES_STAGE1))
-REGULAR_INSTALL_DYNLIBS += $(addprefix libraries/,$(PACKAGES_STAGE2))
-REGULAR_INSTALL_DYNLIBS := $(filter-out $(REGULAR_INSTALL_PACKAGES),\
-                                        $(REGULAR_INSTALL_DYNLIBS))
-
 ifneq "$(CrossCompiling)" "YES"
 define addExtraPackage
 ifeq "$2" "-"
@@ -467,12 +459,8 @@ SUPERSIZE_INSTALL_PACKAGES += compiler
 endif
 SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
-INSTALL_DYNLIBS  :=
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALL_PACKAGES := $(REGULAR_INSTALL_PACKAGES)
-ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
-INSTALL_DYNLIBS := $(REGULAR_INSTALL_DYNLIBS)
-endif
 else
 INSTALL_PACKAGES := $(SUPERSIZE_INSTALL_PACKAGES)
 endif
@@ -917,8 +905,6 @@ install_packages: rts/dist/package.conf.install
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts")
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
-	$(foreach p, $(INSTALL_DYNLIBS), \
-	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_dist-install_LIB_NAME)"))
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \
