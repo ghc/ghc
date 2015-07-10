@@ -81,6 +81,7 @@ module TcType (
   orphNamesOfTypes, orphNamesOfCoCon,
   getDFunTyKey,
   evVarPred_maybe, evVarPred,
+  toInferredType,
 
   ---------------------------------
   -- Predicate types
@@ -162,6 +163,7 @@ import Kind
 import TypeRep
 import Class
 import Var
+import Id   ( HasSigFlag(..) )
 import ForeignCall
 import VarSet
 import Coercion
@@ -822,10 +824,12 @@ isRuntimeUnkSkol x
   | otherwise                                   = False
 
 -- | Is this TyVar inferred by GHC? (Used with visible type application)
+-- See Note [Visible type application] in TcExpr
 isInferredTyVar :: TyVar -> Bool
 isInferredTyVar = isSystemName . tyVarName
 
 -- | Is this TyVar specified by the user? (Used with visible type application)
+-- See Note [Visible type application] in TcExpr
 isSpecifiedTyVar :: TyVar -> Bool
 isSpecifiedTyVar = isInternalName . tyVarName
 
@@ -1509,6 +1513,18 @@ deNoteType :: Type -> Type
 -- Remove all *outermost* type synonyms and other notes
 deNoteType ty | Just ty' <- tcView ty = deNoteType ty'
 deNoteType ty = ty
+
+-- | If the flag says NoSigId, changes all binders in this type to
+-- be inferred, instead of specified. This is necessary after reading
+-- an iface file, where all type variables are Internal.
+-- See Note [Visible type application] in TcExpr
+toInferredType :: HasSigFlag -> Type -> Type
+toInferredType HasSigId ty = ty
+toInferredType NoSigId  ty = go [] ty
+  where
+    go tvs (ForAllTy tv inner_ty) = go (tv:tvs) inner_ty
+    go tvs other_ty               = mkForAllTys tvs' other_ty
+      where tvs' = map toInferredTyVar $ reverse tvs
 
 tcTyVarsOfType :: Type -> TcTyVarSet
 -- Just the *TcTyVars* free in the type

@@ -142,14 +142,14 @@ tcRuleBndrs []
 tcRuleBndrs (L _ (RuleBndr (L _ name)) : rule_bndrs)
   = do  { ty <- newFlexiTyVarTy openTypeKind
         ; vars <- tcRuleBndrs rule_bndrs
-        ; return (mkLocalId name ty : vars) }
+        ; return (mkLocalId name ty HasSigId : vars) }
 tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a
   = do  { let ctxt = RuleSigCtxt name
         ; (id_ty, tv_prs, _) <- tcHsPatSigType ctxt rn_ty
-        ; let id  = mkLocalId name id_ty
+        ; let id  = mkLocalId name id_ty HasSigId
               tvs = map snd tv_prs
                     -- tcHsPatSigType returns (Name,TyVar) pairs
                     -- for for RuleSigCtxt their Names are not
@@ -330,4 +330,3 @@ simplifyRule name lhs_wanted rhs_wanted
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_simple = non_q_cts }) }
-

@@ -1223,7 +1223,7 @@ tcUnboundId :: OccName -> TcRhoType -> TcM (HsExpr TcId)
 tcUnboundId occ res_ty
  = do { ty <- newFlexiTyVarTy liftedTypeKind
       ; name <- newSysName occ
-      ; let ev = mkLocalId name ty
+      ; let ev = mkLocalId name ty NoSigId
       ; loc <- getCtLocM HoleOrigin
       ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
                            , cc_hole = ExprHole }
@@ -1511,7 +1511,7 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
         do { rhs' <- tcPolyExprNC rhs field_ty
            ; let field_id = mkUserLocal (nameOccName field_lbl)
                                         (nameUnique field_lbl)
-                                        field_ty loc
+                                        field_ty HasSigId loc
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

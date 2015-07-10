@@ -577,7 +577,7 @@ makeTrivialWithInfo top_lvl env info expr
   | otherwise           -- See Note [Take care] below
   = do  { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq (fsLit "a")
-              var = mkLocalIdWithInfo name expr_ty info
+              var = mkLocalIdWithInfo name expr_ty NoSigId info
         ; env'  <- completeNonRecX top_lvl env False var var expr
         ; expr' <- simplVar env' var
         ; return (env', expr') }

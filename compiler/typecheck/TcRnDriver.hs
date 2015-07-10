@@ -813,7 +813,7 @@ checkHiBootIface'
                      ; addErrTc (instMisMatch True boot_inst); return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
                      where
-                        local_boot_dfun = Id.mkExportedLocalId VanillaId boot_dfun_name (idType dfun)
+                        local_boot_dfun = Id.mkExportedLocalId (VanillaId HasSigId) boot_dfun_name (idType dfun)
                            -- Name from the /boot-file/ ClsInst, but type from the dfun
                            -- defined in /this module/.  That ensures that the TyCon etc
                            -- inside the type are the ones defined in this module, not
@@ -1307,7 +1307,7 @@ check_main dflags tcg_env
         ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                    (mkVarOccFS (fsLit "main"))
                                    (getSrcSpan main_name)
-              ; root_main_id = Id.mkExportedLocalId VanillaId root_main_name
+              ; root_main_id = Id.mkExportedLocalId (VanillaId HasSigId) root_main_name
                                                     (mkTyConApp ioTyCon [res_ty])
               ; co  = mkWpTyApps [res_ty]
               ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr

@@ -107,7 +107,7 @@ coreExprToBCOs dflags this_mod expr
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
-          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
+          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type") NoSigId
 
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions

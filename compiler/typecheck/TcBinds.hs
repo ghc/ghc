@@ -696,7 +696,7 @@ mkInferredPolyId poly_name qtvs theta mono_ty
        ; addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $
          checkValidType (InfSigCtxt poly_name) inferred_poly_ty
 
-       ; return (mkLocalId poly_name inferred_poly_ty) }
+       ; return (mkLocalId poly_name inferred_poly_ty NoSigId) }
 
 mk_bind_msg :: Bool -> Bool -> Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
 mk_bind_msg inferred want_ambig poly_name poly_ty tidy_env
@@ -847,7 +847,7 @@ recoveryCode binder_names sig_fn
       | Just (TcSigInfo { sig_poly_id = Just poly_id }) <- sig_fn name
       = poly_id
       | otherwise
-      = mkLocalId name forall_a_a
+      = mkLocalId name forall_a_a NoSigId
 
 forall_a_a :: TcType
 forall_a_a = mkForAllTy openAlphaTyVar (mkTyVarTy openAlphaTyVar)
@@ -1343,7 +1343,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
        --               see Note [Partial type signatures and generalisation]
        -- Both InferGen and CheckGen gives rise to LetLclBndr
     do  { mono_name <- newLocalName name
-        ; let mono_id = mkLocalId mono_name (sig_tau sig)
+        ; let mono_id = mkLocalId mono_name (sig_tau sig) HasSigId
         ; addErrCtxt (typeSigCtxt sig) $
           emitWildcardHoleConstraints (sig_nwcs sig)
         ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
@@ -1595,7 +1595,7 @@ instTcTySig :: LHsType Name -> TcType    -- HsType and corresponding TcType
 instTcTySig hs_ty@(L loc _) sigma_ty extra_cts nwcs name
   = do { (inst_tvs, theta, tau) <- tcInstType tcInstSigTyVars sigma_ty
        ; let mb_poly_id | isNothing extra_cts && null nwcs
-                        = Just $ mkLocalId name sigma_ty  -- non-partial
+                        = Just $ mkLocalId name sigma_ty HasSigId  -- non-partial
                         | otherwise = Nothing  -- partial type signature
        ; return (TcSigInfo { sig_name = name
                            , sig_poly_id = mb_poly_id

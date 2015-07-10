@@ -442,7 +442,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
                  ]
     let tvars = varSetElems $ tyVarsOfType ty
         speTy = mkForAllTys tvars $ mkTyConApp staticPtrTyCon [ty]
-        speId = mkExportedLocalId VanillaId n' speTy
+        speId = mkExportedLocalId (VanillaId NoSigId) n' speTy
         fp@(Fingerprint w0 w1) = fingerprintName $ idName speId
         fp_core = mkConApp fingerprintDataCon
                     [ mkWord64LitWordRep dflags w0

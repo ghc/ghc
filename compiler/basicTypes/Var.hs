@@ -62,7 +62,7 @@ module Var (
 
         -- ** Modifying 'TyVar's
         setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
-        updateTyVarKindM, toInternalTyVar
+        updateTyVarKindM, toSpecifiedTyVar, toInferredTyVar
 
     ) where
 
@@ -292,8 +292,14 @@ updateTyVarKindM update tv
 
 -- | Change a tyvar's name to be Internal. Used in the final zonk.
 -- See also Note [Visible type application] in TcExpr
-toInternalTyVar :: TyVar -> TyVar
-toInternalTyVar tv = setTyVarName tv (toInternalName (getName tv))
+toSpecifiedTyVar :: TyVar -> TyVar
+toSpecifiedTyVar tv = setTyVarName tv (toInternalName (getName tv))
+
+-- | Change a tyvar's name to be System. Used when reading in interface
+-- files with some ids without type signatures.
+-- See also Note [Visible type application] in TcExpr
+toInferredTyVar :: TyVar -> TyVar
+toInferredTyVar tv = setTyVarName tv (toSystemName (getName tv))
 
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name

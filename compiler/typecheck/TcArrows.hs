@@ -22,7 +22,7 @@ import TcUnify
 import TcRnMonad
 import TcEnv
 import TcEvidence
-import Id( mkLocalId )
+import Id( mkLocalId, HasSigFlag(..) )
 import Inst
 import Name
 import Coercion ( Role(..) )
@@ -360,7 +360,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith mkLocalId tup_names tup_elt_tys
+        ; let tup_ids = zipWith3 mkLocalId tup_names tup_elt_tys (repeat NoSigId)
         ; tcExtendIdEnv tup_ids $ do
         { (stmts', tup_rets)
                 <- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty   $ \ _res_ty' ->

@@ -1250,7 +1250,7 @@ emitWildcardHoleConstraints wcs
                -- Wildcards are defined locally, and so have RealSrcSpans
              ctLoc' = setCtLocSpan ctLoc real_span
              ty     = mkTyVarTy tv
-             ev     = mkLocalId name ty
+             ev     = mkLocalId name ty NoSigId
              can    = CHoleCan { cc_ev   = CtWanted ty ev ctLoc'
                                , cc_occ  = occName name
                                , cc_hole = TypeHole }

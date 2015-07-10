@@ -1006,7 +1006,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_t
 
            ; sc_top_name <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; let sc_top_ty = mkForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
-                 sc_top_id = mkLocalId sc_top_name sc_top_ty
+                 sc_top_id = mkLocalId sc_top_name sc_top_ty HasSigId
                  export = ABE { abe_wrap = idHsWrapper, abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
                               , abe_prags = SpecPrags [] }
@@ -1425,8 +1425,8 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  poly_meth_ty
-              local_meth_id = mkLocalId local_meth_name local_meth_ty
+        ; let poly_meth_id  = mkLocalId poly_meth_name  poly_meth_ty HasSigId
+              local_meth_id = mkLocalId local_meth_name local_meth_ty HasSigId
 
         ; case lookupHsSig sig_fn sel_name of
             Just lhs_ty  -- There is a signature in the instance declaration

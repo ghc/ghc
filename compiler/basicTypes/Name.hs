@@ -49,7 +49,7 @@ module Name (
         nameUnique, setNameUnique,
         nameOccName, nameModule, nameModule_maybe,
         setNameLoc,
-        toInternalName,
+        toInternalName, toSystemName,
         tidyNameOcc,
         localiseName,
         mkLocalisedOccName,
@@ -370,6 +370,11 @@ setNameLoc name loc = name {n_loc = loc}
 -- See Note [Visible type application] in TcExpr
 toInternalName :: Name -> Name
 toInternalName name = name { n_sort = Internal }
+
+-- | Convert a name into a System name. Used when reading inferface files.
+-- See Note [Visible type application] in TcExpr
+toSystemName :: Name -> Name
+toSystemName name = name { n_sort = System }
 
 tidyNameOcc :: Name -> OccName -> Name
 -- We set the OccName of a Name when tidying

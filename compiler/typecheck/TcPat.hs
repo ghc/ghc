@@ -338,7 +338,9 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
        ; return (mkTcNomReflCo pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
-  = return (mkTcNomReflCo pat_ty, mkLocalId bndr_name pat_ty)
+  = return (mkTcNomReflCo pat_ty, mkLocalId bndr_name pat_ty NoSigId)
+               -- whether or not there is a sig is irrelevant, as this
+               -- is local
 
 ------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
@@ -349,9 +351,9 @@ newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
 --    use the original name directly
 newNoSigLetBndr LetLclBndr name ty
   =do  { mono_name <- newLocalName name
-       ; return (mkLocalId mono_name ty) }
+       ; return (mkLocalId mono_name ty NoSigId) }
 newNoSigLetBndr (LetGblBndr prags) name ty
-  = addInlinePrags (mkLocalId name ty) (prags name)
+  = addInlinePrags (mkLocalId name ty NoSigId) (prags name)
 
 ----------
 addInlinePrags :: TcId -> [LSig Name] -> TcM TcId

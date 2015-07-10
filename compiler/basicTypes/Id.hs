@@ -29,16 +29,17 @@ module Id (
         Var, Id, isId,
 
         -- ** Simple construction
+        HasSigFlag(..),
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
         mkLocalId, mkLocalIdWithInfo, mkExportedLocalId,
-        mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
+        mkSysLocal, mkSysLocalM, mkUserLocal,
         mkDerivedLocalM,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
         mkWorkerId, mkWiredInIdName,
 
         -- ** Taking an Id apart
         idName, idType, idUnique, idInfo, idDetails, idRepArity,
-        recordSelectorFieldLabel,
+        recordSelectorFieldLabel, idHasSig,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, Id.setIdType,
@@ -166,6 +167,9 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
+idHasSig :: Id -> HasSigFlag
+idHasSig  = idDetailsHasSig . idDetails
+
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
 
@@ -190,7 +194,7 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = mkLocalIdWithInfo (localiseName name) (idType id) (idInfo id)
+  = mkLocalIdWithInfo (localiseName name) (idType id) (idHasSig id) (idInfo id)
   where
     name = idName id
 
@@ -241,16 +245,17 @@ mkVanillaGlobal name ty = mkVanillaGlobalWithInfo name ty vanillaIdInfo
 
 -- | Make a global 'Id' with no global information but some generic 'IdInfo'
 mkVanillaGlobalWithInfo :: Name -> Type -> IdInfo -> Id
-mkVanillaGlobalWithInfo = mkGlobalId VanillaId
+mkVanillaGlobalWithInfo = mkGlobalId (VanillaId NoSigId)
 
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty
-                         (vanillaIdInfo `setOneShotInfo` typeOneShot ty)
+mkLocalId :: Name -> Type -> HasSigFlag -> Id
+mkLocalId name ty has_sig = mkLocalIdWithInfo name ty has_sig
+                            (vanillaIdInfo `setOneShotInfo` typeOneShot ty)
 
-mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
+mkLocalIdWithInfo :: Name -> Type -> HasSigFlag -> IdInfo -> Id
+mkLocalIdWithInfo name ty has_sig info
+  = Var.mkLocalVar (VanillaId has_sig) name ty info
         -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.
@@ -264,22 +269,20 @@ mkExportedLocalId details name ty = Var.mkExportedLocalVar details name ty vanil
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Type -> Id
-mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
+mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty NoSigId
 
 mkSysLocalM :: MonadUnique m => FastString -> Type -> m Id
 mkSysLocalM fs ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq ty))
 
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
-mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName uniq occ loc) ty
-
-mkUserLocalM :: MonadUnique m => OccName -> Type -> SrcSpan -> m Id
-mkUserLocalM occ ty loc = getUniqueM >>= (\uniq -> return (mkUserLocal occ uniq ty loc))
+mkUserLocal :: OccName -> Unique -> Type -> HasSigFlag -> SrcSpan -> Id
+mkUserLocal occ uniq ty has_sig loc
+  = mkLocalId (mkInternalName uniq occ loc) ty has_sig
 
 mkDerivedLocalM :: MonadUnique m => (OccName -> OccName) -> Id -> Type -> m Id
 mkDerivedLocalM deriv_name id ty
-    = getUniqueM >>= (\uniq -> return (mkLocalId (mkDerivedInternalName deriv_name uniq (getName id)) ty))
+    = getUniqueM >>= (\uniq -> return (mkLocalId (mkDerivedInternalName deriv_name uniq (getName id)) ty (idHasSig id)))
 
 mkWiredInIdName :: Module -> FastString -> Unique -> Id -> Name
 mkWiredInIdName mod fs uniq id
@@ -294,7 +297,7 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty HasSigId
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id

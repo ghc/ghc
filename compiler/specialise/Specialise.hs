@@ -879,12 +879,13 @@ specCase env scrut' case_bndr [(con, args, rhs)]
     sc_args' = filter is_flt_sc_arg args'
 
     clone_me bndr = do { uniq <- getUniqueM
-                       ; return (mkUserLocal occ uniq ty loc) }
+                       ; return (mkUserLocal occ uniq ty has_sig loc) }
        where
-         name = idName bndr
-         ty   = idType bndr
-         occ  = nameOccName name
-         loc  = getSrcSpan name
+         name    = idName bndr
+         ty      = idType bndr
+         has_sig = idHasSig bndr
+         occ     = nameOccName name
+         loc     = getSrcSpan name
 
     arg_set = mkVarSet args'
     is_flt_sc_arg var =  isId var
@@ -2058,7 +2059,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 newDictBndr env b = do { uniq <- getUniqueM
                        ; let n   = idName b
                              ty' = substTy env (idType b)
-                       ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
+                       ; return (mkUserLocal (nameOccName n) uniq ty' HasSigId (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
@@ -2066,7 +2067,7 @@ newSpecIdSM old_id new_ty
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq new_ty NoSigId (getSrcSpan name)
         ; return new_id }
 
 {-

@@ -50,11 +50,11 @@ mkLocalisedName mk_occ name
 
 mkDerivedName :: (OccName -> OccName) -> Name -> VM Name
 -- Similar to mkLocalisedName, but assumes the
--- incoming name is from this module.  
+-- incoming name is from this module.
 -- Works on External names only
-mkDerivedName mk_occ name 
+mkDerivedName mk_occ name
   = do { u   <- liftDs newUnique
-       ; return (mkExternalName u (nameModule name)  
+       ; return (mkExternalName u (nameModule name)
                                   (mk_occ (nameOccName name))
                                   (nameSrcSpan name)) }
 
@@ -68,8 +68,8 @@ mkVectId :: Id -> Type -> VM Id
 mkVectId id ty
   = do { name <- mkLocalisedName mkVectOcc (getName id)
        ; let id' | isDFunId id     = MkId.mkDictFunId name tvs theta cls tys
-                 | isExportedId id = Id.mkExportedLocalId VanillaId name ty
-                 | otherwise       = Id.mkLocalId         name ty
+                 | isExportedId id = Id.mkExportedLocalId (VanillaId NoSigId) name ty
+                 | otherwise       = Id.mkLocalId         name ty NoSigId
        ; return id'
        }
   where
@@ -87,13 +87,13 @@ cloneVar var = liftM (setIdUnique var) (liftDs newUnique)
 -- |Make a fresh exported variable with the given type.
 --
 newExportedVar :: OccName -> Type -> VM Var
-newExportedVar occ_name ty 
+newExportedVar occ_name ty
  = do mod <- liftDs getModule
       u   <- liftDs newUnique
 
       let name = mkExternalName u mod occ_name noSrcSpan
 
-      return $ Id.mkExportedLocalId VanillaId name ty
+      return $ Id.mkExportedLocalId (VanillaId NoSigId) name ty
 
 -- |Make a fresh local variable with the given type.
 -- The variable's name is formed using the given string as the prefix.

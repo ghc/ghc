@@ -10,7 +10,8 @@ Haskell. [WDP 94/11])
 
 module IdInfo (
         -- * The IdDetails type
-        IdDetails(..), pprIdDetails, coVarDetails,
+        IdDetails(..), pprIdDetails, coVarDetails, HasSigFlag(..),
+        idDetailsHasSig,
 
         -- * The IdInfo type
         IdInfo,         -- Abstract
@@ -81,6 +82,7 @@ import Outputable
 import Module
 import FastString
 import Demand
+import Binary
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setSpecInfo`,
@@ -104,7 +106,7 @@ infixl  1 `setSpecInfo`,
 -- | The 'IdDetails' of an 'Id' give stable, and necessary,
 -- information about the Id.
 data IdDetails
-  = VanillaId
+  = VanillaId HasSigFlag
 
   -- | The 'Id' for a record selector
   | RecSelId
@@ -134,24 +136,47 @@ data IdDetails
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
 
+data HasSigFlag = NoSigId    -- ^ This Id has an inferred type
+                | HasSigId   -- ^ This Id has a known type
+
 coVarDetails :: IdDetails
-coVarDetails = VanillaId
+coVarDetails = VanillaId NoSigId
+
+idDetailsHasSig :: IdDetails -> HasSigFlag
+idDetailsHasSig (VanillaId has_sig) = has_sig
+idDetailsHasSig _                   = HasSigId
 
 instance Outputable IdDetails where
     ppr = pprIdDetails
 
+instance Outputable HasSigFlag where
+  ppr NoSigId  = text "no signature"
+  ppr HasSigId = text "with signature"
+
+instance Binary HasSigFlag where
+  put_ bh NoSigId  = putByte bh 0
+  put_ bh HasSigId = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return NoSigId
+      _ -> return HasSigId
+
 pprIdDetails :: IdDetails -> SDoc
-pprIdDetails VanillaId = empty
-pprIdDetails other     = brackets (pp other)
+pprIdDetails (VanillaId NoSigId) = empty
+pprIdDetails other               = brackets (pp other)
  where
-   pp VanillaId         = panic "pprIdDetails"
-   pp (DataConWorkId _) = ptext (sLit "DataCon")
-   pp (DataConWrapId _) = ptext (sLit "DataConWrapper")
-   pp (ClassOpId {})    = ptext (sLit "ClassOp")
-   pp (PrimOpId _)      = ptext (sLit "PrimOp")
-   pp (FCallId _)       = ptext (sLit "ForeignCall")
-   pp (TickBoxOpId _)   = ptext (sLit "TickBoxOp")
-   pp (DFunId nt)       = ptext (sLit "DFunId") <> ppWhen nt (ptext (sLit "(nt)"))
+   pp (VanillaId NoSigId)  = panic "pprIdDetails"
+   pp (VanillaId HasSigId) = ptext (sLit "sig")
+   pp (DataConWorkId _)    = ptext (sLit "DataCon")
+   pp (DataConWrapId _)    = ptext (sLit "DataConWrapper")
+   pp (ClassOpId {})       = ptext (sLit "ClassOp")
+   pp (PrimOpId _)         = ptext (sLit "PrimOp")
+   pp (FCallId _)          = ptext (sLit "ForeignCall")
+   pp (TickBoxOpId _)      = ptext (sLit "TickBoxOp")
+   pp (DFunId nt)          = ptext (sLit "DFunId") <>
+                             ppWhen nt (ptext (sLit "(nt)"))
    pp (RecSelId { sel_naughty = is_naughty })
                          = brackets $ ptext (sLit "RecSel")
                             <> ppWhen is_naughty (ptext (sLit "(naughty)"))

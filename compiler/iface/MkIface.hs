@@ -1533,7 +1533,7 @@ dataConToIfaceDecl :: DataCon -> IfaceDecl
 dataConToIfaceDecl dataCon
   = IfaceId { ifName      = getOccName dataCon,
               ifType      = toIfaceType (dataConUserType dataCon),
-              ifIdDetails = IfVanillaId,
+              ifIdDetails = IfVanillaId HasSigId,
               ifIdInfo    = NoInfo }
 
 --------------------------
@@ -1850,18 +1850,20 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
 toIfaceLetBndr :: Id -> IfaceLetBndr
 toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceType (idType id))
+                               (idHasSig id)
                                (toIfaceIdInfo (idInfo id))
   -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
 
 --------------------------
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
-toIfaceIdDetails VanillaId                      = IfVanillaId
+toIfaceIdDetails (VanillaId has_sig)            = IfVanillaId has_sig
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
                            , sel_tycon = tc })  = IfRecSelId (toIfaceTyCon tc) n
 toIfaceIdDetails other                          = pprTrace "toIfaceIdDetails" (ppr other)
-                                                  IfVanillaId   -- Unexpected
+                                                  IfVanillaId NoSigId
+                                                     -- Unexpected
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info

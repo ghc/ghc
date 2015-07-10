@@ -243,7 +243,7 @@ tcFImport (L dloc fo@(ForeignImport (L nloc nm) hs_ty _ imp_decl))
            -- structure of the foreign type.
              (_, t_ty)         = tcSplitForAllTys norm_sig_ty
              (arg_tys, res_ty) = tcSplitFunTys t_ty
-             id                = mkLocalId nm sig_ty
+             id                = mkLocalId nm sig_ty HasSigId
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so TcHsSyn.zonkForeignExports ignores it).
