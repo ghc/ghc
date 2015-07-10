@@ -2,7 +2,7 @@
 
 
 module Haddock.Syb
-    ( everything
+    ( everything, everywhere
     , combine
     ) where
 
@@ -18,6 +18,12 @@ import Control.Applicative
 everything :: (r -> r -> r) -> (forall a. Data a => a -> r)
            -> (forall a. Data a => a -> r)
 everything k f x = foldl k (f x) (gmapQ (everything k f) x)
+
+-- | Apply transformation on each level of a tree.
+--
+-- Just like 'everything', this is stolen from SYB package.
+everywhere :: (forall a. Data a => a -> a) -> (forall a. Data a => a -> a)
+everywhere f = f . gmapT (everywhere f)
 
 -- | Combine two queries into one using alternative combinator.
 combine :: Alternative f => (forall a. Data a => a -> f r)
