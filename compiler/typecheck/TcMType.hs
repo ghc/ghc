@@ -22,6 +22,7 @@ module TcMType (
   newReturnTyVar, newReturnTyVarTy,
   newMetaKindVar, newMetaKindVars,
   mkTcTyVarName, cloneMetaTyVar,
+  tauTvsForReturnTvs,
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
@@ -434,6 +435,26 @@ newReturnTyVar kind = newMetaTyVar ReturnTv kind
 
 newReturnTyVarTy :: Kind -> TcM TcType
 newReturnTyVarTy kind = TyVarTy <$> newReturnTyVar kind
+
+-- | Replace all the ReturnTvs in a type with TauTvs. These types are
+-- *not* then unified. The caller may wish to do that. No variables
+-- are looked through here. Similarly, no synonyms are looked through,
+-- as doing so won't expose more ReturnTvs.
+tauTvsForReturnTvs :: TcType -> TcM TcType
+tauTvsForReturnTvs = go emptyTvSubst
+  where
+    go env ty@(TyVarTy tv)
+      | isReturnTyVar tv     = newFlexiTyVarTy (substTy env (tyVarKind tv))
+      | otherwise            = return $ substTy env ty
+    go env (AppTy ty1 ty2)   = AppTy <$> go env ty1 <*> go env ty2
+    go env (TyConApp tc tys) = TyConApp tc <$> mapM (go env) tys
+    go env (FunTy ty1 ty2)   = FunTy <$> go env ty1 <*> go env ty2
+    go env (ForAllTy tv ty)
+      = do { k <- go env (tyVarKind tv)
+           ; let tv'  = setTyVarKind tv k
+                 env' = extendTvSubst env tv (TyVarTy tv')
+           ; ForAllTy tv' <$> go env' ty }
+    go _   ty@(LitTy {})     = return ty
 
 tcInstTyVars :: [TKVar] -> TcM (TvSubst, [TcTyVar])
 -- Instantiate with META type variables
