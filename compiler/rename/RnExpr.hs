@@ -1352,7 +1352,8 @@ sectionErr expr
 
 patSynErr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 patSynErr e = do { addErr (sep [ptext (sLit "Pattern syntax in expression context:"),
-                                nest 4 (ppr e)])
+                                nest 4 (ppr e)] $$
+                           text "Did you mean to enable TypeApplications?")
                  ; return (EWildPat, emptyFVs) }
 
 badIpBinds :: Outputable a => SDoc -> a -> SDoc
