@@ -49,6 +49,7 @@ utils/ghc-pkg_dist_PROGNAME = ghc-pkg
 utils/ghc-pkg_dist_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist_INSTALL_INPLACE = YES
 
+# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifeq "$(Stage1Only)" "YES"
 # Install the copy of ghc-pkg from the dist directory when running 'make
 # install' (it's the only copy we have at this stage).
@@ -70,6 +71,7 @@ utils/ghc-pkg/dist/package-data.mk: \
 #
 # See Note [Why build certain utils twice?].
 
+# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifneq "$(Stage1Only)" "YES"
 utils/ghc-pkg_dist-install_USES_CABAL = YES
 utils/ghc-pkg_dist-install_PROGNAME = ghc-pkg

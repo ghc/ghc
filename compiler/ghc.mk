@@ -637,6 +637,7 @@ compiler_stage2_dll0_HS_OBJS = \
     $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))
 
 # if stage is set to something other than "1" or "", disable stage 1
+# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifneq "$(filter-out 1,$(stage))" ""
 compiler_stage1_NOT_NEEDED = YES
 endif
