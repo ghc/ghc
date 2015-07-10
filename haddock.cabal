@@ -116,6 +116,7 @@ executable haddock
       Haddock.InterfaceFile
       Haddock.Options
       Haddock.GhcUtils
+      Haddock.Syb
       Haddock.Convert
   else
     build-depends:  haddock-api == 2.16.*

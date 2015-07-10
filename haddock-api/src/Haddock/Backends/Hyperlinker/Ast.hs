@@ -6,6 +6,7 @@
 module Haddock.Backends.Hyperlinker.Ast (enrich) where
 
 
+import Haddock.Syb
 import Haddock.Backends.Hyperlinker.Types
 
 import qualified GHC
@@ -179,17 +180,3 @@ matches tspan (GHC.RealSrcSpan aspan)
     saspan = (GHC.srcSpanStartLine aspan, GHC.srcSpanStartCol aspan)
     easpan = (GHC.srcSpanEndLine aspan, GHC.srcSpanEndCol aspan)
 matches _ _ = False
-
--- | Perform a query on each level of a tree.
---
--- This is stolen directly from SYB package and copied here to not introduce
--- additional dependencies.
-everything :: (r -> r -> r) -> (forall a. Data a => a -> r)
-           -> (forall a. Data a => a -> r)
-everything k f x = foldl k (f x) (gmapQ (everything k f) x)
-
--- | Combine two queries into one using alternative combinator.
-combine :: Alternative f => (forall a. Data a => a -> f r)
-                         -> (forall a. Data a => a -> f r)
-                         -> (forall a. Data a => a -> f r)
-combine f g x = f x <|> g x

@@ -94,6 +94,7 @@ library
     Haddock.InterfaceFile
     Haddock.Options
     Haddock.GhcUtils
+    Haddock.Syb
     Haddock.Convert
     Paths_haddock_api
 
