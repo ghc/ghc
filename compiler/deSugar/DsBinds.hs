@@ -48,7 +48,7 @@ import Type
 import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
-                  , mkBoxedTupleTy, stringTy )
+                  , mkBoxedTupleTy, stringTy, instanceOfNewtypeAxiom )
 import Id
 import MkId(proxyHashId)
 import Class
@@ -805,7 +805,7 @@ dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp   tm)    e = liftM (App e) (dsEvTerm tm)
-dsHsWrapper (WpEvInstOf v)    e = return (mkCoreApp (Var v) e)
+dsHsWrapper (WpEvInstOf v)    e = return $ applyInstanceOf v e
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
@@ -1162,35 +1162,40 @@ to simply never generate the redundant box/unbox in the first place.
 -- In order to get a smaller term to simplify,
 -- we apply a direct simplification at this point,
 -- removing all identity coercions and instantiations.
-dsEvInstanceOf :: Type -> EvInstanceOf -> CoreExpr -> DsM CoreExpr
-dsEvInstanceOf ty ev e
-  = do { e' <- dsEvInstanceOf' ev e
-       ; return $ if ty == exprType e'
-                  then e  -- No conversion needed
-                  else e' }
-
-dsEvInstanceOf' :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
-dsEvInstanceOf' (EvInstanceOfEq co) e
-  = do { dsTcCoercion co $ \c ->
-           case coercionKind c of
-            Pair ty1 ty2 | ty1 == ty2 -> e  -- No conversion needed
-            _ ->  mkCast e (mkSubCo c) }
-dsEvInstanceOf' (EvInstanceOfInst qvars co qs) e
-  = do { qs'  <- mapM dsEvTerm qs
-       ; let exprTy = mkCoreApps e (map Type qvars)
-             exprEv = mkCoreApps exprTy qs'
-       ; return $ case splitFunTy_maybe (exprType (Var co)) of
-                         Just (ty1, ty2) | ty1 == ty2 -> exprEv
-                         _ -> mkCoreApp (Var co) exprEv }
-dsEvInstanceOf' (EvInstanceOfGen tyvars qvars qs rest) e
-  = do { q_binds <- dsTcEvBinds qs
-       ; let inner = case splitFunTy_maybe (exprType (Var rest)) of
-                       Just (ty1, ty2) | ty1 == ty2 -> e
-                       _ -> mkCoreApp (Var rest) e
-       ; return $ mkCoreLams (tyvars ++ qvars) (mkCoreLets q_binds inner) }
-
 dsEvInstanceOfBndr :: Type -> EvInstanceOf -> DsM CoreExpr
 dsEvInstanceOfBndr ty ev
   = do { bndr <- newSysLocalDs ty
-       ; expr <- dsEvInstanceOf ty ev (Var bndr)
-       ; return $ mkCoreLams [bndr] expr }
+       ; expr <- dsEvInstanceOf ev (Var bndr)
+       ; let ty2 = exprType expr
+             inner = if ty == ty2 then Var bndr else expr
+       ; return $ Cast (mkCoreLams [bndr] inner)
+                       (SymCo (coInstanceOfArrow ty (exprType expr))) }
+
+applyInstanceOf :: EvId -> CoreExpr -> CoreExpr
+applyInstanceOf id e
+  | (_, [ty1, ty2]) <- splitTyConApp (idType id)
+  = if ty1 == ty2
+       then e  -- Shortcut: we have the reflexive instantiation
+       else mkCoreApp (Cast (Var id) (coInstanceOfArrow ty1 ty2)) e
+  | otherwise
+  = pprPanic "The impossible happened" (ppr id)
+
+dsEvInstanceOf :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
+dsEvInstanceOf (EvInstanceOfEq co) e
+  = do { dsTcCoercion co $ \c ->
+           case coercionKind c of
+             Pair ty1 ty2 | ty1 == ty2 -> e  -- No conversion needed
+             _ ->  mkCast e (mkSubCo c) }
+dsEvInstanceOf (EvInstanceOfInst qvars co qs) e
+  = do { qs' <- mapM dsEvTerm qs
+       ; let exprTy = mkCoreApps e (map Type qvars)
+             exprEv = mkCoreApps exprTy qs'
+       ; return $ applyInstanceOf co exprEv }
+dsEvInstanceOf (EvInstanceOfGen tyvars qvars qs rest) e
+  = do { q_binds <- dsTcEvBinds qs
+       ; return $ mkCoreLams (tyvars ++ qvars)
+           (mkCoreLets q_binds (applyInstanceOf rest e)) }
+
+coInstanceOfArrow :: Type -> Type -> Coercion
+coInstanceOfArrow ty1 ty2
+  = mkUnbranchedAxInstCo Representational instanceOfNewtypeAxiom [ty1, ty2]

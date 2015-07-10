@@ -71,7 +71,7 @@ module TysWiredIn (
         -- * Equality and instance predicates
         eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
         coercibleTyCon, coercibleDataCon, coercibleClass,
-        instanceOfTyCon, instanceOfDataCon,
+        instanceOfTyCon, instanceOfDataCon, instanceOfNewtypeAxiom,
 
         mkWiredInTyConName -- This is used in TcTypeNats to define the
                            -- built-in functions for evaluation.
@@ -110,6 +110,8 @@ import FastString
 import Outputable
 import Util
 import BooleanFormula   ( mkAnd )
+import CoAxiom
+import Coercion         ( mkNewTypeCo )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -185,9 +187,11 @@ coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercib
 coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
 
 -- See Note [Kind-changing of (~). Coercible and InstanceOf]
-instanceOfTyConName, instanceOfDataConName :: Name
-instanceOfTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "InstanceOf")   instanceOfTyConKey   instanceOfTyCon
-instanceOfDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkInstanceOf") instanceOfDataConKey instanceOfDataCon
+instanceOfTyConName, instanceOfDataConName, instanceOfAxiomName :: Name
+instanceOfTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "<=")   instanceOfTyConKey   instanceOfTyCon
+instanceOfDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "InstOf") instanceOfDataConKey instanceOfDataCon
+instanceOfAxiomName   = mkWiredInName gHC_TYPES (mkDataOccFS (fsLit "InstOfArrow")) instanceOfAxiomKey
+                                      (ACoAxiom (toBranchedAxiom instanceOfNewtypeAxiom)) UserSyntax
 
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
@@ -598,7 +602,11 @@ instanceOfTyCon = mkAlgTyCon instanceOfTyConName
     [Nominal, Nominal]
     Nothing
     []      -- No stupid theta
-    (DataTyCon [instanceOfDataCon] False)
+    (NewTyCon { data_con = instanceOfDataCon
+              , nt_rhs = FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar)
+              , nt_etad_rhs = ( [alphaTyVar, betaTyVar]
+                              , FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar) )
+              , nt_co = instanceOfNewtypeAxiom })
     NoParentTyCon
     NonRecursive
     False
@@ -609,6 +617,11 @@ instanceOfDataCon = pcDataCon instanceOfDataConName
     [alphaTyVar, betaTyVar]
     [FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar)]
     instanceOfTyCon
+
+instanceOfNewtypeAxiom :: CoAxiom Unbranched
+instanceOfNewtypeAxiom = mkNewTypeCo instanceOfAxiomName
+    instanceOfTyCon [alphaTyVar, betaTyVar] [Nominal, Nominal]
+    (FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar))
 
 charTy :: Type
 charTy = mkTyConTy charTyCon

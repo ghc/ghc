@@ -1442,18 +1442,8 @@ zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
 zonkTcTypeToType env ty
   = go ty
   where
-    go (TyConApp tc tys)
-      | tc `hasKey` instanceOfTyConKey
-      = do tys' <- mapM go tys
-             -- Zonc instantiations to functions
-           return $ case tys' of
-             []    -> (mkTyConApp funTyCon [])
-             [_]   -> (mkTyConApp funTyCon tys')
-             [_,_] -> (mkTyConApp funTyCon tys')
-             _     -> pprPanic "zonkTcTypeToType/instanceOf" (ppr ty)
-
-      | otherwise = do tys' <- mapM go tys
-                       return (mkTyConApp tc tys')
+    go (TyConApp tc tys) = do tys' <- mapM go tys
+                              return (mkTyConApp tc tys')
                 -- Establish Type invariants
                 -- See Note [Zonking inside the knot] in TcHsType
 

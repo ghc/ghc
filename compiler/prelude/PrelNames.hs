@@ -1891,6 +1891,10 @@ typeLitTypeRepKey = mkPreludeMiscIdUnique 506
 toDynIdKey :: Unique
 toDynIdKey = mkPreludeMiscIdUnique 507
 
+-- InstanceOf
+instanceOfAxiomKey :: Unique
+instanceOfAxiomKey = mkPreludeMiscIdUnique 508
+
 {-
 ************************************************************************
 *                                                                      *
