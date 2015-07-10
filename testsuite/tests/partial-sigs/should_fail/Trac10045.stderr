@@ -1,6 +1,6 @@
 
 Trac10045.hs:6:17: error:
-    Found hole: _ :: t1 -> a -> t2
+    Found type wildcard ‘_’ standing for ‘t1 -> a -> t2’
     Where: ‘t1’ is a rigid type variable bound by
                 the inferred type of copy :: Num a => t1 -> a -> t2
                 at Trac10045.hs:7:9

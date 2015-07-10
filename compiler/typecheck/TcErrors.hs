@@ -697,9 +697,9 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
   | isOutOfScopeCt ct
   = do { dflags  <- getDynFlags
        ; rdr_env <- getGlobalRdrEnv
-       ; mkLongErrAt (RealSrcSpan (tcl_loc lcl_env)) var_msg
+       ; mkLongErrAt (RealSrcSpan (tcl_loc lcl_env)) out_of_scope_msg
                      (unknownNameSuggestions dflags rdr_env
-                                             (tcl_rdr lcl_env) (mkRdrUnqual occ)) }
+                               (tcl_rdr lcl_env) (mkRdrUnqual occ)) }
 
   | otherwise
   = do { (ctxt, binds_doc, ct) <- relevantBindings False ctxt ct
@@ -707,37 +707,41 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
        ; mkErrorMsgFromCt ctxt ct (hole_msg $$ binds_doc) }
 
   where
-    ct_loc  = ctLoc ct
-    lcl_env = ctLocEnv ct_loc
+    ct_loc      = ctLoc ct
+    lcl_env     = ctLocEnv ct_loc
+    hole_ty     = ctEvPred (ctEvidence ct)
+    tyvars      = varSetElems (tyVarsOfType hole_ty)
+    boring_type = isTyVarTy hole_ty
 
-    var_msg  = hang herald  -- Print v :: ty only if the type has structure
-                  2 (if boring_type
-                     then ppr occ
-                     else pp_with_type)
-
-    hole_msg = vcat [ hang (ptext (sLit "Found hole:"))
-                         2 pp_with_type
-                    , tyvars_msg, hint ]
+    out_of_scope_msg -- Print v :: ty only if the type has structure
+      | boring_type = hang herald 2 (ppr occ)
+      | otherwise   = hang herald 2 pp_with_type
 
     pp_with_type = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
     herald | isDataOcc occ = ptext (sLit "Data constructor not in scope:")
            | otherwise     = ptext (sLit "Variable not in scope:")
 
-    hole_ty    = ctEvPred (ctEvidence ct)
-    tyvars     = varSetElems (tyVarsOfType hole_ty)
+    hole_msg = case hole_sort of
+      ExprHole -> vcat [ hang (ptext (sLit "Found hole:"))
+                            2 pp_with_type
+                       , tyvars_msg, expr_hole_hint ]
+      TypeHole -> vcat [ hang (ptext (sLit "Found type wildcard") <+> quotes (ppr occ))
+                            2 (ptext (sLit "standing for") <+> quotes (pprType hole_ty))
+                       , tyvars_msg, type_hole_hint ]
+
     tyvars_msg = ppUnless (null tyvars) $
                  ptext (sLit "Where:") <+> vcat (map loc_msg tyvars)
-    boring_type = isTyVarTy hole_ty
 
-    hint | TypeHole  <- hole_sort
-         , HoleError <- cec_type_holes ctxt
+    type_hole_hint
+         | HoleError <- cec_type_holes ctxt
          = ptext (sLit "To use the inferred type, enable PartialTypeSignatures")
+         | otherwise
+         = empty
 
-         | ExprHole <- hole_sort         -- Give hint for, say,   f x = _x
-         , lengthFS (occNameFS occ) > 1  -- Don't give this hint for plain "_"
+    expr_hole_hint                       -- Give hint for, say,   f x = _x
+         | lengthFS (occNameFS occ) > 1  -- Don't give this hint for plain "_"
          = ptext (sLit "Or perhaps") <+> quotes (ppr occ)
            <+> ptext (sLit "is mis-spelled, or not in scope")
-
          | otherwise
          = empty
 

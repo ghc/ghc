@@ -8,7 +8,7 @@ Dependent packages: [base-4.8.2.0, ghc-prim-0.4.0.0,
                      integer-gmp-1.0.0.0]
 
 WarningWildcardInstantiations.hs:5:14: warning:
-    Found hole: _a :: w_a
+    Found type wildcard ‘_a’ standing for ‘w_a’
     Where: ‘w_a’ is a rigid type variable bound by
                  the inferred type of foo :: (Enum w_a, Show w_a) => w_a -> String
                  at WarningWildcardInstantiations.hs:6:1
@@ -19,18 +19,18 @@ WarningWildcardInstantiations.hs:5:18: warning:
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:5:30: warning:
-    Found hole: _ :: String
+    Found type wildcard ‘_’ standing for ‘String’
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:8:8: warning:
-    Found hole: _ :: w_
+    Found type wildcard ‘_’ standing for ‘w_’
     Where: ‘w_’ is a rigid type variable bound by
                 the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
                 at WarningWildcardInstantiations.hs:9:1
     In the type signature for ‘bar’: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:13: warning:
-    Found hole: _ :: w_ -> w_1
+    Found type wildcard ‘_’ standing for ‘w_ -> w_1’
     Where: ‘w_’ is a rigid type variable bound by
                 the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
                 at WarningWildcardInstantiations.hs:9:1
@@ -40,7 +40,7 @@ WarningWildcardInstantiations.hs:8:13: warning:
     In the type signature for ‘bar’: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:18: warning:
-    Found hole: _ :: w_1
+    Found type wildcard ‘_’ standing for ‘w_1’
     Where: ‘w_1’ is a rigid type variable bound by
                  the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
                  at WarningWildcardInstantiations.hs:9:1

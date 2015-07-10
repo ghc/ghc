@@ -1,6 +1,6 @@
 
 InstantiatedNamedWildcardsInConstraints.hs:4:14: error:
-    Found hole: _a :: b
+    Found type wildcard ‘_a’ standing for ‘b’
     Where: ‘b’ is a rigid type variable bound by
                the inferred type of foo :: (Enum b, Show b) => b -> (String, b)
                at InstantiatedNamedWildcardsInConstraints.hs:4:8
