@@ -2,14 +2,17 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 23, types: 11, coercions: 0}
 
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 lvl :: [Char]
 [GblId, Str=DmdType]
 lvl = unpackCString# "Too small"#
 
+-- RHS size: {terms: 2, types: 1, coercions: 0}
 T4930.foo1 :: Int
 [GblId, Str=DmdType b]
 T4930.foo1 = error @ Int lvl
 
+-- RHS size: {terms: 16, types: 5, coercions: 0}
 foo :: Int -> Int
 [GblId,
  Arity=1,

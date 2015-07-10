@@ -2,12 +2,14 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 162, types: 61, coercions: 0}
 
+-- RHS size: {terms: 2, types: 1, coercions: 0}
 Roman.foo3 :: Int
 [GblId, Str=DmdType b]
 Roman.foo3 =
   patError @ Int "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 Rec {
+-- RHS size: {terms: 55, types: 9, coercions: 0}
 Roman.foo_$s$wgo [Occ=LoopBreaker] :: Int# -> Int# -> Int#
 [GblId, Arity=2, Caf=NoCafRefs, Str=DmdType <L,U><L,U>]
 Roman.foo_$s$wgo =
@@ -30,6 +32,7 @@ Roman.foo_$s$wgo =
     }
 end Rec }
 
+-- RHS size: {terms: 74, types: 22, coercions: 0}
 Roman.$wgo [InlPrag=[0]] :: Maybe Int -> Maybe Int -> Int#
 [GblId,
  Arity=2,
@@ -67,6 +70,7 @@ Roman.$wgo =
         }
     }
 
+-- RHS size: {terms: 9, types: 5, coercions: 0}
 Roman.foo_go [InlPrag=INLINE[0]] :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
@@ -80,6 +84,7 @@ Roman.foo_go =
   \ (w :: Maybe Int) (w1 :: Maybe Int) ->
     case Roman.$wgo w w1 of ww { __DEFAULT -> I# ww }
 
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 Roman.foo2 :: Int
 [GblId,
  Caf=NoCafRefs,
@@ -88,6 +93,7 @@ Roman.foo2 :: Int
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo2 = I# 6#
 
+-- RHS size: {terms: 2, types: 1, coercions: 0}
 Roman.foo1 :: Maybe Int
 [GblId,
  Caf=NoCafRefs,
@@ -96,6 +102,7 @@ Roman.foo1 :: Maybe Int
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo1 = Just @ Int Roman.foo2
 
+-- RHS size: {terms: 11, types: 4, coercions: 0}
 foo :: Int -> Int
 [GblId,
  Arity=1,
