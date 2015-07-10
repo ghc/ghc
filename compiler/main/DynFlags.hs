@@ -3273,6 +3273,8 @@ impliedXFlags
 
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
+
+    , (Opt_TypeApplications, turnOn, Opt_AllowAmbiguousTypes)
   ]
 
 -- Note [Documenting optimisation flags]
