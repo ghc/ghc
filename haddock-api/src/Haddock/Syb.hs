@@ -3,6 +3,7 @@
 
 module Haddock.Syb
     ( everything, everywhere
+    , mkT
     , combine
     ) where
 
@@ -24,6 +25,14 @@ everything k f x = foldl k (f x) (gmapQ (everything k f) x)
 -- Just like 'everything', this is stolen from SYB package.
 everywhere :: (forall a. Data a => a -> a) -> (forall a. Data a => a -> a)
 everywhere f = f . gmapT (everywhere f)
+
+-- | Create generic transformation.
+--
+-- Another function stolen from SYB package.
+mkT :: (Typeable a, Typeable b) => (b -> b) -> (a -> a)
+mkT f = case cast f of
+    Just f' -> f'
+    Nothing -> id
 
 -- | Combine two queries into one using alternative combinator.
 combine :: Alternative f => (forall a. Data a => a -> f r)
