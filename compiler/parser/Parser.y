@@ -2260,7 +2260,7 @@ aexp    :: { LHsExpr RdrName }
 	    -- Note [Lexing type applications] in Lexer.x
 
         | '~' aexp              {% ams (sLL $1 $> $ ELazyPat $2) [mj AnnTilde $1] }
-        | TYPEAPP atype         {% ams (sLL $1 $> $ HsType $2) [mj AnnAt $1] }
+        | TYPEAPP atype         {% ams (sLL $1 $> $ HsType $2 PlaceHolder) [mj AnnAt $1] }
         | aexp1                 { $1 }
 
 aexp1   :: { LHsExpr RdrName }

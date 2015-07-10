@@ -226,7 +226,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
         emitWildcardHoleConstraints (zip wcs nwc_tvs)
       ; tcWrapResult inner_expr sig_tc_ty res_ty } }
 
-tcExpr (HsType ty) _
+tcExpr (HsType ty _) _
   = failWithTc (sep [ text "Type argument used outside of a function argument:"
                     , ppr ty ])
 
@@ -986,7 +986,7 @@ tcArgs fun orig_args orig_arg_tys = go 1 orig_args orig_arg_tys
   where
     go _ [] [] = return []
     go n (arg:args) all_arg_tys
-      | Just hs_ty <- isLHsTypeExpr_maybe arg
+      | Just (hs_ty, _) <- isLHsTypeExpr_maybe arg
       = do { args' <- go (n+1) args all_arg_tys
            ; return (L (getLoc arg) (HsTypeOut hs_ty) : args') }
 
@@ -1289,7 +1289,7 @@ tcSeq loc fun_name args res_ty
         ; (arg1_ty, args1) <- case args of
             (ty_arg_expr1 : args1)
               | Just hs_ty_arg1 <- isLHsTypeExpr_maybe ty_arg_expr1
-              -> do { ty_arg1 <- tcHsLiftedType hs_ty_arg1
+              -> do { ty_arg1 <- tcHsTypeApp hs_ty_arg1 liftedTypeKind
                     ; return (ty_arg1, args1) }
 
             _ -> do { arg_ty1 <- newReturnTyVarTy liftedTypeKind
@@ -1298,7 +1298,7 @@ tcSeq loc fun_name args res_ty
         ; (arg1, arg2) <- case args1 of
             [ty_arg_expr2, term_arg1, term_arg2]
               | Just hs_ty_arg2 <- isLHsTypeExpr_maybe ty_arg_expr2
-              -> do { ty_arg2 <- tcHsOpenType hs_ty_arg2
+              -> do { ty_arg2 <- tcHsTypeApp hs_ty_arg2 openTypeKind
                     ; _ <- unifyType ty_arg2 res_ty
                     ; return (term_arg1, term_arg2) }
             [term_arg1, term_arg2] -> return (term_arg1, term_arg2)
@@ -1329,7 +1329,7 @@ tcTagToEnum loc fun_name args res_ty
        ; arg <- case args of
            [ty_arg_expr, term_arg]
              | Just hs_ty_arg <- isLHsTypeExpr_maybe ty_arg_expr
-             -> do { ty_arg <- tcHsLiftedType hs_ty_arg
+             -> do { ty_arg <- tcHsTypeApp hs_ty_arg liftedTypeKind
                    ; _ <- unifyType ty_arg res_ty
                      -- other than influencing res_ty, we just
                      -- don't care about a type arg passed in.

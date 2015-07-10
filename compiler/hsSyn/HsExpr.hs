@@ -496,6 +496,11 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsType      (LHsType id) -- Explicit type argument; e.g  f @Int x y
+                (PostRn id [Name])      -- After renaming, the list of Names
+                                        -- contains the named and unnamed
+                                        -- wildcards brought in scope by the
+                                        -- signature
+
   | HsTypeOut   (LHsType Name)  -- just for pretty-printing
 
   ---------------------------------------
@@ -726,7 +731,7 @@ ppr_expr (HsSCC _ (_,lbl) expr)
           pprParendExpr expr ]
 
 ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
-ppr_expr (HsType ty)      = char '@' <> pprParendHsType (unLoc ty)
+ppr_expr (HsType ty _)    = char '@' <> pprParendHsType (unLoc ty)
 ppr_expr (HsTypeOut ty)   = char '@' <> pprParendHsType (unLoc ty)
 
 ppr_expr (HsSpliceE s)         = pprSplice s

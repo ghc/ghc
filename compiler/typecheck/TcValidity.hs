@@ -126,7 +126,7 @@ unless the instance is available *here*.
 
 Note [When to call checkAmbiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We call checkAmbiguity 
+We call checkAmbiguity
    (a) on user-specified type signatures
    (b) in checkValidType
 
@@ -283,6 +283,7 @@ checkValidType ctxt ty
                  TySynCtxt _    -> rank0
 
                  ExprSigCtxt    -> rank1
+                 TypeAppCtxt    -> rank0
                  FunSigCtxt _ _ -> rank1
                  InfSigCtxt _   -> ArbitraryRank        -- Inferred type
                  ConArgCtxt _   -> rank1 -- We are given the type of the entire
@@ -340,6 +341,7 @@ expectedKindInCtxt :: UserTypeCtxt -> Maybe Kind
 expectedKindInCtxt (TySynCtxt _)  = Nothing -- Any kind will do
 expectedKindInCtxt ThBrackCtxt    = Nothing
 expectedKindInCtxt GhciCtxt       = Nothing
+expectedKindInCtxt TypeAppCtxt    = Nothing
 expectedKindInCtxt (ForSigCtxt _) = Just liftedTypeKind
 expectedKindInCtxt InstDeclCtxt   = Just constraintKind
 expectedKindInCtxt SpecInstCtxt   = Just constraintKind
@@ -730,6 +732,7 @@ okIPCtxt :: UserTypeCtxt -> Bool
 okIPCtxt (FunSigCtxt {})    = True
 okIPCtxt (InfSigCtxt {})    = True
 okIPCtxt ExprSigCtxt        = True
+okIPCtxt TypeAppCtxt        = True
 okIPCtxt PatSigCtxt         = True
 okIPCtxt ResSigCtxt         = True
 okIPCtxt GenSigCtxt         = True
@@ -1340,4 +1343,3 @@ fv_type (ForAllTy tyvar ty) = filter (/= tyvar) (fv_type ty)
 
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys = concat (map fvType tys)
-

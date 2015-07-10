@@ -597,7 +597,7 @@ addTickHsExpr (HsWrap w e) =
                 (return w)
                 (addTickHsExpr e)       -- explicitly no tick on inside
 
-addTickHsExpr e@(HsType _) = return e
+addTickHsExpr e@(HsTypeOut _) = return e
 
 -- Others dhould never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)

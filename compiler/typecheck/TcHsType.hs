@@ -9,7 +9,7 @@
 
 module TcHsType (
         tcHsSigType, tcHsDeriv, tcHsVectInst,
-        tcHsInstHead,
+        tcHsInstHead, tcHsTypeApp,
         UserTypeCtxt(..),
 
                 -- Type checking type and class decls
@@ -228,6 +228,21 @@ tcHsVectInst ty
        ; return (cls, arg_tys) }
   | otherwise
   = failWithTc $ ptext (sLit "Malformed instance type")
+
+----------------------------------------------
+-- | Type-check a visible type application, passed in with the names
+-- of the wildcards in the type
+tcHsTypeApp :: (LHsType Name, [Name]) -> Kind -> TcM Type
+tcHsTypeApp (hs_ty, wcs) kind
+  = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
+       ; tcExtendTyVarEnv nwc_tvs $
+    do { ty <- tcCheckLHsType hs_ty kind
+
+       ; addErrCtxt (pprSigCtxt TypeAppCtxt empty (ppr hs_ty)) $
+         emitWildcardHoleConstraints (zip wcs nwc_tvs)
+
+       ; checkValidType TypeAppCtxt ty
+       ; return ty } }
 
 {-
         These functions are used during knot-tying in

@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeApplications, ScopedTypeVariables, PolyKinds,
-             TypeFamilies, RankNTypes #-}
-
+             TypeFamilies, RankNTypes, PartialTypeSignatures,
+             FlexibleContexts #-}
+{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 -- tests about visible type application
 
 module Vta1 where
@@ -8,8 +9,7 @@ module Vta1 where
 quad :: a -> b -> c -> d -> (a, b, c, d)
 quad = (,,,)
 
--- silly :: (a, Bool, Char, b)
--- silly = quad @_ @Bool @Char @_ 5 True 'a' "Hello"
+silly = quad @_ @Bool @Char @_ 5 True 'a' "Hello"
 
 pairup_nosig x y = (x, y)
 

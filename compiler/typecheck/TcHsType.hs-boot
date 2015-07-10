@@ -2,7 +2,7 @@ module TcHsType where
 
 import HsTypes   ( LHsType )
 import Name      ( Name )
-import TcType    ( TcKind, Type )
+import TcType    ( Kind, Type )
 import TcRnMonad ( TcM )
 
-tcCheckLHsType :: LHsType Name -> TcKind -> TcM Type
+tcHsTypeApp :: (LHsType Name, [Name]) -> Kind -> TcM Type

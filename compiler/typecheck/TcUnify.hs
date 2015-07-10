@@ -35,7 +35,7 @@ module TcUnify (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TcHsType ( tcCheckLHsType )
+import {-# SOURCE #-} TcHsType ( tcHsTypeApp )
 
 import HsSyn
 import TypeRep
@@ -222,7 +222,7 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                Just (tv, inner_ty) ->
                  ASSERT( isSpecifiedTyVar tv )
                  do { let kind = tyVarKind tv
-                    ; ty_arg <- tcCheckLHsType hs_ty_arg kind
+                    ; ty_arg <- tcHsTypeApp hs_ty_arg kind
                     ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
                     ; (inner_wrap, arg_tys, res_ty) <- go args insted_ty
                         -- inner_wrap :: insted_ty "->" arg_tys -> res_ty
@@ -230,7 +230,7 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                         -- inst_wrap :: upsilon_ty "->" insted_ty
                     ; return ( inner_wrap <.> inst_wrap <.> wrap1
                              , arg_tys, res_ty ) }
-               Nothing -> ty_app_err upsilon_ty hs_ty_arg }
+               Nothing -> ty_app_err upsilon_ty (fst hs_ty_arg) }
 
     go args ty
       | not (null tvs && null theta)
