@@ -57,7 +57,7 @@ import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substC
 import TyCon       ( tyConArity )
 import DataCon
 import PrelNames   ( eqBoxDataConKey, coercibleDataConKey, unpackCStringIdKey
-                   , unpackCStringUtf8IdKey )
+                   , unpackCStringUtf8IdKey, instanceOfTyConKey )
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
 import Module      ( Module )
@@ -959,14 +959,6 @@ simple_app subst (Var v) as
   , isAlwaysActive (idInlineActivation v)
   -- See Note [Unfold compulsory unfoldings in LHSs]
   =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
-  -- Instantiation functions are always inlined
-  {-
-  | lookupIdIsInstantiationFn subst v, isLocalId v, c:cs <- as
-  = case lookupIdSubst (text "simpleOptExpr") subst v of
-      Lam b e -> simple_app (extendIdSubst subst b c) e cs
-      Var v' | v == v' -> foldl App (simple_opt_expr subst e) as
-      e' -> simple_app subst e' as
-  -}
 simple_app subst (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
   | t `tickishScopesLike` SoftScope
@@ -1030,6 +1022,11 @@ maybe_substitute subst b r
   , not (isExportedId b)
   , not (isUnLiftedType (idType b)) || exprOkForSpeculation r
   = Just (extendIdSubst subst b r)
+
+  | isId b
+  , Just (tc, _) <- splitTyConApp_maybe (idType b)
+  , tc `hasKey` instanceOfTyConKey
+  = Just (extendIdSubst subst b r)  -- Aggresively inline (<=) coercions
 
   | otherwise
   = Nothing

@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             MultiParamTypeClasses, RoleAnnotations #-}
+             MultiParamTypeClasses, RoleAnnotations, TypeOperators #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -24,7 +24,7 @@ module GHC.Types (
         SPEC(..),
         Nat, Symbol,
         Coercible,
-        InstanceOf
+        type (<~)
     ) where
 
 import GHC.Prim
@@ -177,7 +177,7 @@ data Coercible a b = MkCoercible ((~#) a b)
 -- Also see Note [Kind-changing of (~) and Coercible]
 
 -- | A constraint inhabited only if type `a` is an instance of type `b`.
-newtype (<=) b a = InstOf (b -> a)
+newtype (<~) b a = InstOf (b -> a)
 
 -- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False
 --   if it is 0#.

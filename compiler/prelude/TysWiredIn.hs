@@ -188,7 +188,7 @@ coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoerc
 
 -- See Note [Kind-changing of (~). Coercible and InstanceOf]
 instanceOfTyConName, instanceOfDataConName, instanceOfAxiomName :: Name
-instanceOfTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "<=")   instanceOfTyConKey   instanceOfTyCon
+instanceOfTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "<~")   instanceOfTyConKey   instanceOfTyCon
 instanceOfDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "InstOf") instanceOfDataConKey instanceOfDataCon
 instanceOfAxiomName   = mkWiredInName gHC_TYPES (mkDataOccFS (fsLit "InstOfArrow")) instanceOfAxiomKey
                                       (ACoAxiom (toBranchedAxiom instanceOfNewtypeAxiom)) UserSyntax
@@ -597,15 +597,17 @@ coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) 
 
 instanceOfTyCon :: TyCon
 instanceOfTyCon = mkAlgTyCon instanceOfTyConName
-    (mkArrowKinds [liftedTypeKind, liftedTypeKind] constraintKind)
-    [alphaTyVar, betaTyVar]
+    (mkArrowKinds [openTypeKind, openTypeKind] constraintKind)
+    [openAlphaTyVar, openBetaTyVar]
     [Nominal, Nominal]
     Nothing
     []      -- No stupid theta
     (NewTyCon { data_con = instanceOfDataCon
-              , nt_rhs = FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar)
-              , nt_etad_rhs = ( [alphaTyVar, betaTyVar]
-                              , FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar) )
+              , nt_rhs = FunTy (mkTyVarTy openAlphaTyVar)
+                               (mkTyVarTy openBetaTyVar)
+              , nt_etad_rhs = ( [openAlphaTyVar, betaTyVar]
+                              , FunTy (mkTyVarTy openAlphaTyVar)
+                                      (mkTyVarTy openBetaTyVar) )
               , nt_co = instanceOfNewtypeAxiom })
     NoParentTyCon
     NonRecursive
@@ -614,14 +616,14 @@ instanceOfTyCon = mkAlgTyCon instanceOfTyConName
 
 instanceOfDataCon :: DataCon
 instanceOfDataCon = pcDataCon instanceOfDataConName
-    [alphaTyVar, betaTyVar]
-    [FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar)]
+    [openAlphaTyVar, openBetaTyVar]
+    [FunTy (mkTyVarTy openAlphaTyVar) (mkTyVarTy openBetaTyVar)]
     instanceOfTyCon
 
 instanceOfNewtypeAxiom :: CoAxiom Unbranched
 instanceOfNewtypeAxiom = mkNewTypeCo instanceOfAxiomName
-    instanceOfTyCon [alphaTyVar, betaTyVar] [Nominal, Nominal]
-    (FunTy (mkTyVarTy alphaTyVar) (mkTyVarTy betaTyVar))
+    instanceOfTyCon [openAlphaTyVar, openBetaTyVar] [Nominal, Nominal]
+    (FunTy (mkTyVarTy openAlphaTyVar) (mkTyVarTy openBetaTyVar))
 
 charTy :: Type
 charTy = mkTyConTy charTyCon
