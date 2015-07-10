@@ -435,16 +435,14 @@ define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
 else ifeq "$2" "dph"
-## DPH-specific clause
-ifeq "$$(GhcProfiled)" "YES"
-# Ignore package: The DPH packages need TH, which is incompatible with
-# a profiled GHC
-else ifneq "$$(BUILD_DPH)" "YES"
-# Ignore package: DPH was disabled
-else
+ifeq "$$(BUILD_DPH) $$(GhcProfiled)" "YES NO"
+# The DPH packages need TH, which is incompatible with a profiled GHC.
 PACKAGES_STAGE2 += $1
 endif
-## end of DPH-specific clause
+else ifeq "$2" "extra"
+ifeq "$$(BUILD_EXTRA_PKGS)" "YES"
+PACKAGES_STAGE2 += $1
+endif
 else
 PACKAGES_STAGE2 += $1
 endif

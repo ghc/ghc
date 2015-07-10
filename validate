@@ -171,6 +171,11 @@ echo "ValidateSpeed=$speed" >> mk/are-validating.mk
 echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 echo "V=0"                  >> mk/are-validating.mk # Less gunk
 
+if [ $speed != "FAST" ]; then
+    # Build the "extra" packages (see ./packages), to enable more tests.
+    echo "BUILD_EXTRA_PKGS=YES" >> mk/are-validating.mk
+fi
+
 if [ $use_dph -eq 1 ]; then
     echo "BUILD_DPH=YES"    >> mk/are-validating.mk
 else

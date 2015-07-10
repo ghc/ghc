@@ -773,6 +773,8 @@ endif
 
 # Build DPH?
 BUILD_DPH = NO
+# Build the "extra" packages (see ./packages)?
+BUILD_EXTRA_PKGS = NO
 
 ################################################################################
 #
