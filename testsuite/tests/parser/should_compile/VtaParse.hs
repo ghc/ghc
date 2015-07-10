@@ -30,10 +30,6 @@ n = MkN show
 foo :: Bool -> String
 foo = unMkN n @Bool   -- Fails without parens! Not anymore!
 
-boo = unMkN @Bool n
--- boo :: Bool -> String --(compiler doesn't infer this type! It infers a -> String!)
--- boo = unMkN (n @Bool)
-
 (&&) :: Bool -> Bool -> Bool
 (b@True) && True = True
 _ && _ = False
