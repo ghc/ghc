@@ -1,0 +1,525 @@
+\documentclass[12pt]{article}
+
+% \usepackage{mathpazo}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{bussproofs}
+\usepackage{multicol}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{tikz-qtree}
+\usepackage{stmaryrd}
+\usepackage{vwcol}
+\usepackage{fullpage}
+% \usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{colonequals}
+\usepackage{mdframed}
+
+\begin{document}
+
+\newcommand{\QQ}{\mathcal{Q}}
+\newcommand{\alt}{\; | \;}
+\newcommand{\highlighttree}[1]{\begin{center}\colorbox{black!15}{\parbox{0.45\textwidth}{#1}}\end{center}}
+\newcommand{\highlight}[1]{\colorbox{black!15}{$\displaystyle #1$}}
+
+\title{Impredicativity in GHC, plan 2015}
+\author{Alejandro Serrano, Jurriaan Hage, Dimitrios Vytiniotis, and Simon PJ}
+\date{ }
+\maketitle
+
+\noindent The \emph{goal} is to build a better story for impredicative and higher-rank polymorphism in GHC. For that aim we introduce a new type of constraint, $\sigma_1 \leq \sigma_2$, which expresses that type $\sigma_2$ is an instance of $\sigma_1$. This new type of constraint is inspired on ideas from MLF and HML.
+
+\paragraph{Notation:} the grammar for types and constraints can be found in Figure \ref{types}.
+
+\paragraph{Basic facts about $\leq$:}
+\begin{itemize}
+\item The kind of $\leq$ is $* \to * \to Constraint$.
+\item The evidence for $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
+\item The canonical forms are $\sigma_1 \leq \alpha_1$ and $\alpha_2 \leq \sigma_2$, where $\sigma_2$ is not a type variable.
+% \item In Haskell code, $\sigma_1 \leq \sigma_2$ is written as $\textit{InstanceOf} \; \sigma_1 \; \sigma_2$.
+\end{itemize}
+
+\begin{figure}[h]
+\begin{mdframed}
+\noindent \begin{tabular}{ll}
+Type variables & $\alpha$, $\beta$, $\gamma$ \\
+Type constuctors & $\mathsf{T}$ \\
+Type families & $\mathsf{F}$ \\
+Type classes & $\mathtt{C}$
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent \begin{tabular}{lrcl}
+Monomorphic types & $\mu$ & $\coloncolonequals$ & $\alpha \alt a \alt \mu_1 \to \mu_2 \alt \mathsf{T} \; \overline{\mu} \alt \mathsf{F} \; \overline{\mu}$ \\
+Types without top-level $\forall$ & $\tau$ & $\coloncolonequals$ & $\alpha \alt a \alt \sigma_1 \to \sigma_2 \alt \mathsf{T} \; \overline{\sigma} \alt \mathsf{F} \; \overline{\mu}$ \\
+Polymorphic types & $\sigma$ & $\coloncolonequals$ & $\forall \overline{a}. Q \Rightarrow \sigma \alt \tau$ \\
+Constraints & $Q$ & $\coloncolonequals$ & $\epsilon \alt Q_1 \wedge Q_2 \alt \sigma_1 \sim \sigma_2 \alt \sigma_1 \leq \sigma_2 \alt \mathtt{C} \; \overline{\mu}$ \\
+Implications & $I$ & $\coloncolonequals$ & $\epsilon \alt I_1 \wedge I_2 \alt Q \alt \forall \overline{a}. \, (Q \supset I)$ \\
+Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \mathsf{F} \; \overline{\mu} \sim \sigma \alt \alpha \leq \sigma \alt \sigma \leq \alpha \alt \mathtt{C} \; \overline{\mu}$
+\end{tabular}
+\end{mdframed}
+\caption{Grammar}
+\label{types}
+\end{figure}
+
+\section*{Changes to constraint solving}
+
+\subsection*{New rules for $\sim$}
+
+$$
+\begin{array}{rcl}
+canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\mathsf{T} \; \overline{\sigma_2})\right] & = & \overline{\sigma_1 \sim \sigma_2} \\
+canon\left[\sigma \sim a\right] & = & a \sim \sigma \\
+canon\left[(\forall \overline{a}. Q \Rightarrow \sigma_1) \sim (\forall \overline{a}. Q \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q \supset \sigma_1 \sim \sigma_2) \\
+canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\mathsf{S} \; \overline{\sigma_2})\right] & = & \bot \\
+canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \bot \\
+canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \sim (\mathsf{T} \; \overline{\sigma_2})\right] & = & \bot \\
+\end{array}
+$$
+
+\subsection*{Rules for $\leq$}
+
+$$
+\begin{array}{lrcl}
+\textsc{[$\leq$can1]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \leq \sigma_2\right] & = & (\mathsf{T} \; \overline{\sigma_1}) \sim \sigma_2 \\
+\textsc{[$\leq$can2]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq (\mathsf{T} \; \overline{\sigma_2})\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq (\mathsf{T} \; \overline{\sigma_2}) \wedge [\overline{a \mapsto \alpha}]Q_1 \\
+\textsc{[$\leq$can2']} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow a) \leq \sigma_2\right] & = & \alpha \sim \sigma_2 \wedge [\overline{a \mapsto \alpha}]Q_1 \\
+\textsc{[$\leq$can3]} & canon\left[\sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2) \\
+\end{array}
+$$
+Note that rule {\sc [$\leq$can2]} can only be applied when the right-hand side is not a variable nor a quantified type:
+\begin{itemize}
+\item If we did so in the case of a variable, and later that variable was substituted by some other type, we would need to remember the instantiation done by this rule and apply it to the substituted value. Instead, we prefer to defer the instantiation of the constraint until the variable is changed to another type.
+\item In the case of a quantified type, we want to apply always {\sc [$\leq$can3]} first, which may in turn lead to an application of {\sc [$\leq$can2]} inside the implication.
+\end{itemize}
+However, when the left-hand is of the form $\forall a. Q => a$, we can always safely instantiate it. For example, if we have $(\forall a. \mathtt{Monoid} \; a \Rightarrow a) \leq \tau$, this is equivalent to $\mathtt{Monoid} \; \tau$ (note that the rule will actually produce another equivalent version $\mathtt{Monoid} \; \alpha \wedge \alpha \sim \tau$). This is the duty of rule {\sc [$\leq$can2']}.
+
+\subsubsection*{Design choice: rules for $\to$}
+
+\noindent Additionally, we may have these special rules for $\to$, based on the covariance and contravariance of each of the argument positions:
+$$
+\begin{array}{lrcl}
+\textsc{[$\leq$can$\to$alt1]} & canon\left[(\sigma_1 \to \sigma_2) \leq (\sigma_3 \to \sigma_4)\right] & = & \sigma_1 \leq \sigma_3 \wedge \sigma_2 \leq \sigma_4 \\
+\textsc{[$\leq$can$\to$alt2]} & canon\left[(\sigma_1 \to \sigma_2) \leq (\sigma_3 \to \sigma_4)\right] & = & \sigma_1 \sim \sigma_3 \wedge \sigma_2 \leq \sigma_4
+\end{array}
+$$
+But it seems that we lose the ability to infer the type for {\tt runST \$ e}.
+
+\subsection*{Evidence generation for $\leq$}
+
+In the constraint solving process we do not only need to find a solution for the constraints, but also generate evidence of the solving. Remember that the evidence for a constraint $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
+
+\paragraph{Rule {\sc [$\leq$can1]}.} We need to build $W_1 :: \mathsf{T} \; \overline{\sigma_1} \to \sigma_2$. For this, we can use the evidence $W_2 :: \mathsf{T} \; \overline{\sigma_1} \sim \sigma_2$ generated by later solving steps. In this case the solution is to make:
+$$W_1 = \lambda (x :: \mathsf{T} \; \overline{\sigma_1}). \; x \rhd W_2$$
+where $\rhd$ is the cast operator which applies a coercion $\rho_1 \to \rho_2$ to a value of type $\rho_1$ to produce the same value, but typed as $\rho_2$.
+
+\paragraph{Rule {\sc [$\leq$can2]}.} We need to build $W_1 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to \mathsf{T} \; \overline{\sigma_2}$ given $W_2 :: [\overline{a \mapsto \alpha}]\sigma_1 \to (\mathsf{T} \; \overline{\sigma_2})$ and $W_3 :: [\overline{a \mapsto \alpha}]Q_1$. The first step is to get $[\overline{a \mapsto \alpha}]\sigma_1$ from $\forall \overline{a}. Q_1 \Rightarrow \sigma_1$, to do that we need to make a type application and afterwards apply the witness for $Q_1 \Rightarrow \sigma_1$:
+$$\lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; x \; \alpha \; W_3 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to [\overline{a \mapsto \alpha}]\sigma_1$$
+The last step is then applying $W_2$ to convert it to our desired type:
+$$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; W_2 \; (x \; \alpha \; W_3)$$
+
+\paragraph{Rule {\sc [$\leq$can2']}.} This is very similar to the previous case, but $W_2$ now is an evidence for $\alpha \sim \sigma_2$. The evidence for the original constraint is:
+$$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow a). \; (x \; \alpha \; W_3) \rhd W_2$$
+
+\paragraph{Rule {\sc [$\leq$can3']}.} This is the most complicated rule for which to generate evidence. As usual, we want to generate evidence $W_1 :: \sigma_1 \to (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)$. In order to do so, we can use the evidence generated by solving $\forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2)$. In GHC, this implication generates two pieces of information: evidence $W_2 :: \sigma_1 \to \sigma_2$, and a series of bindings which might use the data in $Q_2$ and which make $W_2$ correct. We shall denote those bindings by $\square$.
+
+In this case, we need to generate something whose type is $\forall \overline{a}. Q_2 \Rightarrow \dots$. Thus, we need first a series of type abstractions and evidence abstractions. Then, we can just apply $W_2$ remembering to bring the bindings into scope.
+$$W_1 = \lambda (x :: \sigma_1). \; \overline{\Lambda a}. \; \lambda (d :: Q_2). \; \textsf{let} \; \square \; \textsf{in} \; W_2 \; x$$
+
+\subsection*{Type families and type classes}
+
+Suppose we want to typecheck the following piece of code:
+\begin{verbatim}
+p = [] == []
+\end{verbatim}
+The canonical constraints for this case are:
+$$\mathtt{Eq} \; \alpha \; \wedge \; \forall a. \mathrm{[}a\mathrm{]} \leq \alpha$$
+A similar scenario comes along when working with type families:
+\begin{verbatim}
+type family    F  a
+type instance  F  [a] = Bool
+
+f :: a -> F a
+
+g :: Bool
+g = f []
+\end{verbatim}
+In this case these are the constraints to be solved:
+$$\mathsf{F} \; \alpha \sim \mathsf{Bool} \; \wedge \; \forall a. \mathrm{[}a\mathrm{]} \leq \alpha$$
+In both cases we are stuck, since we cannot substitute $\alpha$ by the polymorphic type.\footnote{The grammar mandates for arguments of type classes and families to be monomorphic types $\mu$.} The only way to go further is to \emph{instantiate} some variables.
+
+\vspace{0.3cm}
+
+\noindent We have with two ways to deal with the problem, which are the two extremes of a solution:
+\begin{enumerate}
+\item Force all unification variables appearing in type families or type classes to be monomorphic. This monomorphism restriction needs to ``infect'' other variables. However, this poses its own problems, which we can realize by considering the following type family:
+\begin{verbatim}
+type family    F  a    b
+type instance  F  [a]  b = b -> b
+\end{verbatim}
+Using the rule of always instantiating, the result of $\gamma \sim \mathsf{F} \; [Int] \; \beta$, $(\forall a. a \to a) \leq b$ is $\gamma \sim (\delta \to \delta) \to (\delta \to \delta)$. We have lost polymorphism in a way which was not expected. What we hoped is to get $\gamma \sim (\forall a. a \to a) \to (\forall a. a \to a)$.
+\item Thus, we need to have a way to instantiate variables appearing in type classes and families, but only as necessary. We do this by temporarily instantiating variables when checking for axiom application, and returning extra constraints which make this instantiation possible if the match is successful.
+
+For example, in the previous case we want to apply the axiom $\forall e. \mathtt{Eq} \; e \Rightarrow \mathtt{Eq} \; [e]$, and thus we need to instantiate $a$. We return as residual constraints $\mathtt{Eq} \; \xi \wedge \mathtt{Eq} \; \alpha \sim \mathtt{Eq} \; \mathrm{[}\xi\mathrm{]}$, and the solver takes care of the rest, that is, $\forall a. \mathrm{[}a\mathrm{]} \leq \mathrm{[}\xi\mathrm{]}$. 
+\end{enumerate}
+
+\subsection*{Generalization}
+
+One nasty side-effect of this approach to impredicativity is that the solver may produce non-Haskell 2010 types. For example, when type checking {\tt singleton id}, where $singleton :: \forall a. \, a \to [a]$ and $id :: \forall a. \, a \to a$, the result would be $\forall a. (forall b. b -> b) \leq a \Rightarrow [a]$. In short, we want to get rid of the $\leq$ constraints once a binding has been found to type check. This process is part of a larger one which in GHC is known as approximation.
+
+\vspace{0.2cm}
+
+\noindent There are two main procedures to move to types without $\leq$ constraints:
+\begin{itemize}
+\item \emph{Convert all $\leq$ constraints into type equality}. In the previous case, the type of {\tt singleton id} is $\forall a. \, a \sim (\forall b. \, b \to b) \Rightarrow [a]$, or equivalently, $[\forall b. \, b \to b]$.
+\item \emph{Generate a type with the less possible polymorphism}, by moving quantifiers out of the $\leq$ constraints to top-level. In this case, the type given to {\tt singleton id} is $\forall b. \, [b \to b]$. 
+\end{itemize}
+We prefer the second option, since it leads to types which are more similar to those already inferred by GHC. Note that this approximation only applies to unannotated top-level bindings: the user can always ask to give $[\forall a. \, a \to a]$ as a type for {\tt singleton id} via an annotation.
+
+\vspace{0.2cm}
+
+\noindent The conversion works by applying repeatedly the following rules to the residual constraints:
+$$
+\begin{array}{lrcl}
+\textsc{[$\leq$gen1]} & (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \sigma_2 & \leadsto & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \wedge [\overline{a \mapsto \alpha}]Q_1 \\
+\textsc{[$\leq$gen2]} & \sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2) & \leadsto & \sigma_1 \sim (\forall \overline{a}. Q_2 \Rightarrow \sigma_2) \\
+\end{array}
+$$
+Note that the first rule is a variation of {\sc [$\leq$gen2]} without any restriction on the shape of the left-hand side. This corresponds to generating the less amount of polymorphism.
+
+\section*{Constraint generation}
+
+\subsection*{Without propagation}
+
+In the $\Gamma \vdash e : \sigma \leadsto C$ judgement, $\Gamma$ and $e$ are inputs, whereas $\sigma$ and $C$ are outputs. The highlighted parts are changes with respect to the constraint generation judgement in the original {\sc OutsideIn(X)} system.
+
+\highlighttree{
+\begin{prooftree}
+\AxiomC{$x :_\lambda \tau \in \Gamma$}
+\RightLabel{\sc VarCon${}_\lambda$}
+\UnaryInfC{$\Gamma \vdash x : \tau \leadsto \epsilon$}
+\end{prooftree}}
+
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$x : \sigma \in \Gamma$}
+\RightLabel{\sc VarCon}
+\BinaryInfC{$\Gamma \vdash x : \alpha \leadsto \highlight{\sigma \leq \alpha}$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$\Gamma, \highlight{x :_\lambda \alpha} \vdash e : \tau \leadsto C$}
+\RightLabel{\sc Abs}
+\BinaryInfC{$\Gamma \vdash \lambda x. e : \alpha \to \tau \leadsto C$}
+\end{prooftree}
+
+\highlighttree{
+\begin{prooftree}
+\AxiomC{$\Gamma, x : \sigma_1 \vdash e : \tau_2 \leadsto C$}
+\RightLabel{\sc AbsA}
+\UnaryInfC{$\Gamma \vdash \lambda (x :: \sigma_1).e : \sigma_1 \to \tau_2 \leadsto C$}
+\end{prooftree}}
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash e_1 : \tau_1 \leadsto C_1$}
+\AxiomC{$\Gamma \vdash e_2 : \tau_2 \leadsto C_2$}
+\AxiomC{$\alpha \text{ fresh}$}
+\RightLabel{\sc App}
+\TrinaryInfC{$\Gamma \vdash e_1 \, e_2 : \alpha \leadsto C_1 \wedge C_2 \wedge \tau_1 \sim \tau_2 \to \alpha$}
+\end{prooftree}
+
+\highlighttree{
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash e : \tau_2 \leadsto C$}
+\RightLabel{\sc Annot}
+\UnaryInfC{$\Gamma \vdash (e :: \sigma_1) : \sigma_1 \leadsto C \wedge \tau_2 \leq \sigma_1$}
+\end{prooftree}}
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash e_1 : \tau_1 \leadsto C_1$}
+\AxiomC{$\Gamma, \highlight{x :_\lambda \tau_1} \vdash e_2 : \tau_2 \leadsto C_2$}
+\RightLabel{\sc Let}
+\BinaryInfC{$\Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \tau_2 \leadsto C_1 \wedge C_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma, x : \sigma_1 \vdash e_1 : \sigma_1 \leadsto C_1$}
+\AxiomC{$\Gamma, x : \sigma_1 \vdash e_2 : \tau_2 \leadsto C_2$}
+\RightLabel{\sc LetA}
+\BinaryInfC{$\Gamma \vdash \textsf{let } x :: \sigma_1 = e_1 \textsf{ in } e_2 : \tau_2 \leadsto C_1 \wedge C_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash e : \tau \leadsto C$}
+\noLine
+\UnaryInfC{$
+\begin{array}{l}
+\text{for each branch } K_i \, \overline{x_i} \to u_i \text{ do} \\
+\quad K_i : \forall \overline{a} \overline{b_i}. Q_i \Rightarrow \overline{v_i} \to \textsf{T} \, \overline{a} \in \Gamma \qquad \overline{b_i} \text{ fresh} \\
+\quad \Gamma, \overline{x_i : [\overline{a \mapsto \gamma}]v_i} \vdash u_i : \tau_i \leadsto C_i \\
+\quad \overline{\delta_i} = fuv(\tau_i,C_i) - fuv(\Gamma,\overline{\gamma}) \\
+\quad C'_i = 
+\begin{cases}
+C_i \wedge \tau_i \sim \beta \qquad \text{if } \overline{b_i} \text{ and } Q_i \text{ empty} \\
+\forall \overline{\delta_i}. \, ([\overline{a \mapsto \gamma}])Q_i \supset C_i \wedge \tau_i \sim \beta
+\end{cases}
+\end{array}
+$}
+\RightLabel{\sc Case}
+\UnaryInfC{$\Gamma \vdash \textsf{case } e \textsf{ of } \{ \overline{K_i \, \overline{x_i} \to u_i} \} : \beta \leadsto C \wedge \textsf{T} \, \overline{\gamma} \sim \tau \wedge \bigwedge C'_i$}
+\end{prooftree}
+
+\subsection*{Why $:_\lambda$?}
+
+In principle, the only rule that wuld need to change is that of variables in the term level, which is the point in which instantiation may happen:
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$x : \sigma \in \Gamma$}
+\RightLabel{\sc VarCon}
+\BinaryInfC{$\Gamma \vdash x : \alpha \leadsto \highlight{\sigma \leq \alpha}$}
+\end{prooftree}
+Unfortunately, this is not enough. Suppose we have the following piece of code:
+\begin{verbatim}
+(\f -> (f 1, f True)) (if ... then id else not)
+\end{verbatim}
+We want to typecheck it, and we give the argument $f$ a type variable $\alpha$, and each of its appearances the types variables $\beta$ and $\gamma$. The constraints that are generated are:
+\begin{itemize}
+\item $\alpha \leq \beta$ (from the usage in {\tt f 1})
+\item $\alpha \leq \gamma$ (from the usage in {\tt f True})
+\item $(\forall a. \, a \to a) \leq \alpha$ (from {\tt id})
+\item $(Bool \to Bool) \leq \alpha$ (from {\tt not})
+\end{itemize}
+At this point we are stuck, since we have no rule that could be applied. One might think about applying transitivity of InstanceOf, but this is just calling trouble, because it is not clear how to do this without losing information.
+
+\
+
+Our solution is to make this situation impossible by generating $\alpha \sim \beta$ and $\alpha \sim \gamma$ instead of their $\leq$ counterparts. We do this by splitting the {\sc [VarCon]} rule in such a way that $\sim$ is generated when the variable comes from an unannotated abstraction or unannotated $\mathsf{let}$. The environment is responsible for keeping track of this fact for each binding, by a small tag, which we denote by $:_\lambda$ in the type rules.
+
+With this change, our initial example leads to an error ({\tt f cannot be applied to both Bool and Int}), from which one can recover by adding an extra annotation. This is a better situation, though, that getting stuck in the middle of the solving process.
+
+\subsection*{With propagation}
+
+\noindent We use propagation to cover two main scenarios:
+\begin{itemize}
+\item Propagating information from signatures to $\lambda$-bound variables. For example:
+\begin{verbatim}
+f :: (forall a. a -> a) -> (Int, Bool)
+f = \x. -> (x 1, x True)
+\end{verbatim}
+\item Propagating information from known types of functions to arguments. Without this propagation, given the previous definition of {\tt f}, then {\tt f (\\x -> x)} would not typecheck, but {\tt f id} would.
+\end{itemize}
+
+\
+
+\noindent In the $\Gamma \vdash_\Downarrow e : \sigma \leadsto C$ judgement, $\Gamma$, $e$ and $\sigma$ are inputs, and only $C$ is an output.
+
+\begin{prooftree}
+\AxiomC{$x :_\lambda \tau \in \Gamma$}
+\RightLabel{\sc VarCon${}_\lambda$}
+\UnaryInfC{$\Gamma \vdash_\Downarrow x : \sigma \leadsto \tau \sim \sigma$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$x : \sigma_1 \in \Gamma$}
+\RightLabel{\sc VarCon}
+\UnaryInfC{$\Gamma \vdash_\Downarrow x : \sigma_2 \leadsto \sigma_1 \leq \sigma_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash_\Downarrow e : \tau \leadsto C$}
+\RightLabel{\sc Prop$\forall$}
+\UnaryInfC{$\Gamma \vdash_\Downarrow e : (\forall \overline{a}. \, Q \Rightarrow \tau) \leadsto \forall \overline{a}. (Q \supset C)$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\alpha$, $\beta$ fresh}
+\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e : \beta \leadsto C$}
+\RightLabel{\sc AbsVar}
+\BinaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \gamma \leadsto C \, \wedge \, \gamma \sim \alpha \to \beta$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e : \sigma_2 \leadsto C$}
+\RightLabel{\sc AbsArrowVar}
+\UnaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \alpha \to \sigma_2 \leadsto C$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma, x : \forall a. \sigma_1 \vdash_\Downarrow e : \sigma_2 \leadsto C$}
+\RightLabel{\sc AbsArrow$\forall$}
+\UnaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : (\forall a. \sigma_1) \to \sigma_2 \leadsto C$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\sigma_1 \not\equiv \alpha$}
+\AxiomC{$\sigma_1 \not\equiv \forall a. Q \Rightarrow \sigma$}
+\AxiomC{$\Gamma, x :_{\{\lambda,\_\}} \sigma_1 \vdash_\Downarrow e : \sigma_2 \leadsto C$}
+\RightLabel{\sc AbsArrowRest}
+\TrinaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \sigma_1 \to \sigma_2 \leadsto C$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$\Gamma, x : \sigma_1 \vdash_\Downarrow e : \alpha \leadsto C$}
+\RightLabel{\sc AbsAVar}
+\BinaryInfC{$\Gamma \vdash_\Downarrow \lambda (x :: \sigma_1).e : \gamma \leadsto C \, \wedge \, \gamma \sim \sigma_1 \to \alpha$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma, x : \sigma_1 \vdash_\Downarrow e : \sigma_3 \leadsto C$}
+\RightLabel{\sc AbsAArrow}
+\UnaryInfC{$\Gamma \vdash_\Downarrow \lambda (x :: \sigma_1).e : \sigma_2 \to \sigma_3 \leadsto C \, \wedge \, \sigma_2 \sim \sigma_1$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$f \in \Gamma$}
+\AxiomC{$f : \forall \overline{a}. \, \sigma_1 \to \dots \to \sigma_n \to \sigma_r \in \Gamma$}
+\noLine
+\BinaryInfC{
+$\theta = [\overline{a \to \alpha}] \qquad
+\Gamma \vdash_\Downarrow e_i : \theta(\sigma_i) \leadsto C_i \qquad
+\theta(\sigma_r) \equiv \beta$}
+\RightLabel{\sc AppFunVar}
+\UnaryInfC{$\Gamma \vdash_\Downarrow f \, e_1 \, \dots \, e_n : \sigma \leadsto \bigwedge_i C_i \, \wedge \, \theta(Q) \, \wedge \, \theta(\sigma_r) \sim \sigma$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$f \in \Gamma$}
+\AxiomC{$f : \forall \overline{a}. \, \sigma_1 \to \dots \to \sigma_n \to \sigma_r \in \Gamma$}
+\noLine
+\BinaryInfC{
+$\theta = [\overline{a \to \alpha}] \qquad
+\Gamma \vdash_\Downarrow e_i : \theta(\sigma_i) \leadsto C_i \qquad
+\theta(\sigma_r) \not\equiv \beta$}
+\RightLabel{\sc AppFunNonVar}
+\UnaryInfC{$\Gamma \vdash_\Downarrow f \, e_1 \, \dots \, e_n : \sigma \leadsto \bigwedge_i C_i \, \wedge \, \theta(Q) \, \wedge \, \theta(\sigma_r) \leq \sigma$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash_\Downarrow e_1 : \alpha \to \sigma \leadsto C_1$}
+\AxiomC{$\Gamma \vdash_\Downarrow e_2 : \alpha \leadsto C_2$}
+\AxiomC{$\alpha \text{ fresh}$}
+\RightLabel{\sc App}
+\TrinaryInfC{$\Gamma \vdash_\Downarrow e_1 \, e_2 : \sigma \leadsto C_1 \, \wedge \, C_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash_\Downarrow e : \sigma_1 \leadsto C$}
+\RightLabel{\sc Annot}
+\UnaryInfC{$\Gamma \vdash_\Downarrow (e :: \sigma_1) : \sigma_2 \leadsto C \, \wedge \, \sigma_1 \leq \sigma_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e_1 : \alpha \leadsto C_1$}
+\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e_2 : \sigma \leadsto C_2$}
+\RightLabel{\sc Let}
+\TrinaryInfC{$\Gamma \vdash_\Downarrow \textsf{let } x = e_1 \textsf{ in } e_2 : \sigma \leadsto C_1 \, \wedge \, C_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\Gamma, x:\sigma_1 \vdash_\Downarrow e_1 : \sigma_1 \leadsto C_1$}
+\AxiomC{$\Gamma, x:\sigma_1 \vdash_\Downarrow e_2 : \sigma_2 \leadsto C_2$}
+\RightLabel{\sc LetA}
+\BinaryInfC{$\Gamma \vdash_\Downarrow \textsf{let } x :: \sigma_1 = e_1 \textsf{ in } e_2 : \sigma_2 \leadsto C_1 \, \wedge \, C_2$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$\overline{\gamma}$ fresh}
+\AxiomC{$\Gamma \vdash_\Downarrow e : \mathsf{T} \, \overline{\gamma} \leadsto C$}
+\noLine
+\BinaryInfC{$
+\begin{array}{l}
+\text{for each branch } K_i \, \overline{x_i} \to u_i \text{ do} \\
+\quad K_i : \forall \overline{a} \overline{b_i}. Q_i \Rightarrow \overline{v_i} \to \textsf{T} \, \overline{a} \in \Gamma \qquad \overline{b_i} \text{ fresh} \\
+\quad \Gamma, \overline{x_i : [\overline{a \mapsto \gamma}]v_i} \vdash_\Downarrow u_i : \sigma \leadsto C_i \\
+\quad \overline{\delta_i} = fuv(\sigma,C_i) - fuv(\Gamma,\overline{\gamma}) \\
+\quad C'_i = 
+\begin{cases}
+C_i \qquad \text{if } \overline{b_i} \text{ and } Q_i \text{ empty} \\
+\forall \overline{\delta_i}. \, ([\overline{a \mapsto \gamma}])Q_i \supset C_i)
+\end{cases}
+\end{array}
+$}
+\RightLabel{\sc Case}
+\UnaryInfC{$\Gamma \vdash_\Downarrow \textsf{case } e \textsf{ of } \{ \overline{K_i \, \overline{x_i} \to u_i} \} : \sigma \leadsto C \, \wedge \, \bigwedge C'_i$}
+\end{prooftree}
+
+\
+
+\noindent The most surprising rules are {\sc [AppFunVar]} and {\sc [AppFunNonVar]}, which apply when we have a known expression $f$ whose type can be recovered from the environment followed by some other freely-shaped expressions. For example, the case of {\tt f (\\x -> x)} above, where {\tt f} is in the environment. In that case, we compute the type that the first block ought to have, and propagate it to the rest of arguments.
+
+% The reason for including a block of $f_i$s is to cover cases such as {\tt runST $ do ...}, or more clearly {\tt ($) runST (do ...)}, where some combinators are used between functions. Should the rules only include the case $f \, e_1 \, \dots \, f_m$, the fairly common {\tt runST $ do ...} could not be typed without an annotation.
+
+Of course, there is a reason for distinguishing between the cases of the return type being a variable or not, and generating equalities or instantiation constraints. In short, there is a reason for having both {\sc [AppFunVar]} and {\sc [AppFunNonVar]}. Consider the following:
+\begin{verbatim}
+data S a = S a
+
+f :: [Char] -> S a
+f x = S (error x)
+\end{verbatim}
+If we apply {\sc [AppFunNonVar]} directly, we instantiate the type of $error :: \forall b. [Char] \to b$ to $[Char] \to \beta$. 
+Since we are pushing down a unification variable $\alpha$ because of the previous application of {\sc [AppFunNonVar]} to $S :: \forall a. \, a \to S \; a$, we obtain a constraint $\beta \leq \alpha$. Since there are no more restrictions to either $\alpha$ or $\beta$, we are not stuck in solving.
+
+\section*{Examples}
+\subsection*{\tt runST e}
+$$(\$)^{\alpha \to \beta \to \gamma} \; runST^\alpha \; \left( e \; :: \; \forall s. ST \; s \; Int \right)^\beta$$
+$$\begin{array}{rcl}
+\forall a, b. (a \to b) \to a \to b & \leq & \alpha \to \beta \to \gamma \\
+\forall a. \left( \forall s. ST \; s \; a \right) \to a & \leq & \alpha \\
+\forall s. ST \; s \; Int & \leq & \beta \\
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\left( \forall s. ST \; s \; \epsilon \right) \to \epsilon & \leq & \beta \to \gamma \\
+\forall s. ST \; s \; Int & \leq & \beta
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\forall s. ST \; s \; \gamma & \sim & \beta \\
+\forall s. ST \; s \; Int & \leq & \beta
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\forall s. ST \; s \; Int & \leq & \forall s. ST \; s \; \gamma
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\forall s. \, \left( \epsilon \supset \forall s. ST \; s \; Int \, \leq \, ST \; s \; \gamma \right)
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\forall s. \, \left( \epsilon \supset ST \; \pi \; Int \sim ST \; s \; \gamma \right)
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\forall s. \, \left( \epsilon \supset \pi \sim s \wedge Int \sim \gamma  \right)
+\end{array}$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\gamma & \sim & Int
+\end{array}$$
+
+\subsection*{$\eta$-expansion}
+
+$$\begin{array}{l}
+f :: \left( \forall a. a \to a \right) \to Int \\
+g_1 = f^\alpha \\
+g_2 = \left( \lambda x. f^\beta \; x^\gamma \right)^\delta :: \forall \gamma \, \delta. \, \left( \tau_f \leq \gamma \to \delta \right) \Rightarrow \gamma \to \delta
+\end{array}$$
+$$\left( \forall a. a \to a \right) \to Int \leq \gamma \to \delta$$
+$$\downarrow$$
+$$\left( \forall a. a \to a \right) \to Int \sim \gamma \to \delta$$
+$$\downarrow$$
+$$\begin{array}{rcl}
+\gamma & \sim & \forall a. a \to a \\
+\delta & \sim & Int
+\end{array}$$
+\begin{center} So we lose nothing by $\eta$-expanding! \end{center}
+
+\end{document}
