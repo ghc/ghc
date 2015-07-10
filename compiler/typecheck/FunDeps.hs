@@ -377,18 +377,21 @@ checkInstCoverage be_liberal clas theta inst_taus
   where
     (tyvars, fds) = classTvsFds clas
     fundep_ok fd
-       | if be_liberal then liberal_ok else conservative_ok
-       = IsValid
-       | otherwise
-       = NotValid msg
+       | isEmptyVarSet undetermined_tvs = IsValid
+       | otherwise                      = NotValid msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = tyVarsOfTypes ls
          rs_tvs = tyVarsOfTypes rs
 
-         conservative_ok = rs_tvs `subVarSet` closeOverKinds ls_tvs
-         liberal_ok      = rs_tvs `subVarSet` oclose theta (closeOverKinds ls_tvs)
+         undetermined_tvs | be_liberal = liberal_undet_tvs
+                          | otherwise  = conserv_undet_tvs
+
+         liberal_undet_tvs = rs_tvs `minusVarSet`oclose theta (closeOverKinds ls_tvs)
+         conserv_undet_tvs = rs_tvs `minusVarSet` closeOverKinds ls_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
+
+         undet_list = varSetElemsKvsFirst undetermined_tvs
 
          msg = vcat [ -- text "ls_tvs" <+> ppr ls_tvs
                       -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
@@ -408,7 +411,11 @@ checkInstCoverage be_liberal clas theta inst_taus
                              else ptext (sLit "do not jointly"))
                             <+> ptext (sLit "determine rhs type")<>plural rs
                             <+> pprQuotedList rs ]
-                    , ppWhen (not be_liberal && liberal_ok) $
+                    , ptext (sLit "Un-determined variable") <> plural undet_list <> colon
+                            <+> pprWithCommas ppr undet_list
+                    , ppWhen (all isKindVar undet_list) $
+                      ptext (sLit "(Use -fprint-explicit-kinds to see the kind variables in the types)")
+                    , ppWhen (not be_liberal && isEmptyVarSet liberal_undet_tvs) $
                       ptext (sLit "Using UndecidableInstances might help") ]
 
 {- Note [Closing over kinds in coverage]
