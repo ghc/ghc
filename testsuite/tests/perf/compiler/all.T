@@ -659,7 +659,9 @@ test('T9872d',
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
-           (wordsize(32), 328810212, 5)
+           (wordsize(32), 350369584, 5)
+          # some date     328810212
+          # 2015-07-11    350369584
           ]),
       ],
      compile,
