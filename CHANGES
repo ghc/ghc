@@ -23,6 +23,8 @@ Changes in version 2.16.1
 
  * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
 
+ * Fix expansion icon for user-collapsible sections (#412)
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
