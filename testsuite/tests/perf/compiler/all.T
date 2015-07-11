@@ -29,13 +29,14 @@ setTestOpts(no_lint)
 
 test('T1969',
      [compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(32), 17, 15),
+          [(wordsize(32), 21, 15),
              # 2010-05-17 14 (x86/Windows)
              #            15 (x86/OS X)
              #            19 (x86/OS X)
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
              # 2013-11-13 17 (x86/Windows, 64bit machine)
+             # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
            (wordsize(64), 41, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
@@ -54,11 +55,12 @@ test('T1969',
                                  # 2013-02-10 5030080 (x86/Windows)
                                  # 2013-11-13 7295012 (x86/Windows, 64bit machine)
                                  # 2014-04-24 5719436 (x86/Windows, 64bit machine)
-           (wordsize(32), 5949188, 1),
+           (wordsize(32), 6241108, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
+             # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
            (wordsize(64), 11000000, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
@@ -76,13 +78,14 @@ test('T1969',
                                  # 2013-02-10 310633884 (x86/Windows)
                                  # 2013-11-13 317975916 (x86/Windows, 64bit machine)
                                  # 2014-04-04 301784492 (x86/Windows, 64bit machine)
-           (wordsize(32), 303300692, 1),
+           (wordsize(32), 288699104, 1),
              #            221667908 (x86/OS X)
              #            274932264 (x86/Linux)
              # 2012-10-08 303930948 (x86/Linux, new codegen)
              # 2013-02-10 322937684 (x86/OSX)
              # 2014-01-22 316103268 (x86/Linux)
              # 2014-06-29 303300692 (x86/Linux)
+             # 2015-07-11 288699104 (x86/Linux, 64-bit machine) use +RTS -G1
            (wordsize(64), 581460896, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
@@ -109,8 +112,7 @@ test('T1969',
           # that will catch a regression in -dcore-lint performance.
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      # Only 64-bit as we don't have a good 32-bit test environment at the moment
-      when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
+      extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -130,7 +132,7 @@ else:
 test('T3294',
      [
       compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(32), 26525384, 15),
+          [(wordsize(32), 43196344, 15),
              #            17725476 (x86/OS X)
              #            14593500 (Windows)
              # 2013-02-10 20651576 (x86/Windows)
@@ -138,6 +140,7 @@ test('T3294',
              # 2013-11-13 24009436 (x86/Windows, 64bit machine)
              # 2014-04-24 19882188 (x86/Windows, 64bit machine)
              # 2014-12-22 26525384 (x86/Windows) Increase due to silent superclasses?
+             # 2015-07-11 43196344 (x86/Linux, 64-bit machine) use +RTS -G1
 
            (wordsize(64), 45000000, 20)]),
              # prev:           25753192 (amd64/Linux)
@@ -176,8 +179,7 @@ test('T3294',
       conf_3294,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      # Only 64-bit as we don't have a good 32-bit test environment at the moment
-      when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
+      extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -248,19 +250,19 @@ test('T4801',
        extra_hc_opts('-static'),
 
        # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-       # Only 64-bit as we don't have a good 32-bit test environment at the moment
-       when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
+       extra_hc_opts('+RTS -G1 -RTS')
        ],
      compile,
      [''])
 
 test('T3064',
      [compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
-          [(wordsize(32), 16, 20),
+          [(wordsize(32), 28, 20),
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
             # 2014-12-22:     23 (x86/Linux) death to silent superclasses
+            # 2015-07-11      28 (x86/Linux, 64-bit machine) use +RTS -G1
            (wordsize(64), 54, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
@@ -331,8 +333,7 @@ test('T3064',
        only_ways(['normal']),
 
        # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-       # Only 64-bit as we don't have a good 32-bit test environment at the moment
-       when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
+       extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -344,12 +345,13 @@ test('T4007',
 
 test('T5030',
      [compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 227205560, 10),
+          [(wordsize(32), 201882912, 10),
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
            # 2014-12-10:  227205560 constraint solver got worse again; more aggressive solving
            #                        of family-applications leads to less sharing, I think
+           # 2015-07-11:  201882912 reason unknown
 
            (wordsize(64), 403932600, 10)]),
              # Previously 530000000 (+/- 10%)
@@ -585,7 +587,8 @@ test('T9675',
           # 2014-10-13    18582472   different machines giving different results..
           # 2014-10-13    22220552   use the mean
           # 2015-06-21    28056344   switch to `+RTS -G1`, tighten bound to 15%
-           (wordsize(32), 11220552, 15)
+           (wordsize(32), 15341228, 15)
+ 	  # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
           [(wordsize(64), 105, 15),
@@ -595,17 +598,18 @@ test('T9675',
           # 2014-10-13    53         use the mean
           # 2015-06-15    44         reduced for some reason
           # 2015-06-21    105        switch to `+RTS -G1`
-            (wordsize(32), 25, 15)
+            (wordsize(32), 56, 15)
+ 	  # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 544489040, 10)
           # 2014-10-13    544489040
-          ,(wordsize(32), 250000000, 10)
+          ,(wordsize(32), 279480696, 10)
+ 	  # 2015-07-11    279480696  (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
 
        # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-       # Only 64-bit as we don't have a good 32-bit test environment at the moment
-       when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
+       extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
