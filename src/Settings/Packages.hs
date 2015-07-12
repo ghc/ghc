@@ -1,8 +1,9 @@
 module Settings.Packages (
-    packages
+    packages, knownPackages
     ) where
 
 import Base
+import Package
 import Targets
 import Switches
 import Expression
@@ -31,3 +32,18 @@ packagesStage1 = mconcat
     , windowsHost    ? append [win32]
     , notWindowsHost ? append [unix]
     , buildHaddock   ? append [xhtml] ]
+
+-- These are all packages we know about. Build rules will be generated for
+-- all of them. However, not all of these packages will be built. For example,
+-- package 'win32' is built only on Windows.
+-- Settings/Packages.hs defines default conditions for building each package,
+-- which can be overridden in UserSettings.hs.
+knownPackages :: [Package]
+knownPackages = defaultKnownPackages ++ userKnownPackages
+
+defaultKnownPackages :: [Package]
+defaultKnownPackages =
+    [ array, base, binPackageDb, binary, bytestring, cabal, compiler
+    , containers, deepseq, directory, filepath, ghcPrim, haskeline
+    , hoopl, hpc, integerLibrary, parallel, pretty, primitive, process
+    , stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]

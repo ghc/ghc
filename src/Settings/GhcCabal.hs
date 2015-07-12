@@ -1,5 +1,5 @@
 module Settings.GhcCabal (
-    cabalSettings, bootPackageDbSettings
+    cabalSettings, bootPackageDbSettings, customPackageSettings
     ) where
 
 import Base hiding (arg, args)
@@ -14,6 +14,7 @@ import Expression hiding (when, liftIO)
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
+import Settings.TargetDirectory
 import UserSettings
 
 cabalSettings :: Settings
@@ -40,7 +41,7 @@ cabalSettings = builder GhcCabal ? do
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 librarySettings :: Settings
 librarySettings = do
-    ways            <- fromDiff Settings.Ways.ways
+    ways            <- fromDiffExpr Settings.Ways.ways
     ghcInterpreter  <- ghcWithInterpreter
     dynamicPrograms <- dynamicGhcPrograms
     append [ if vanilla `elem` ways
@@ -95,7 +96,7 @@ with' builder = appendM $ with builder
 
 packageConstraints :: Settings
 packageConstraints = do
-    pkgs <- fromDiff packages
+    pkgs <- fromDiffExpr packages
     constraints <- lift $ forM pkgs $ \pkg -> do
         let cabal  = pkgPath pkg </> pkgCabal pkg
             prefix = dropExtension (pkgCabal pkg) ++ " == "
@@ -124,3 +125,16 @@ ldSettings = mempty
 
 cppSettings :: Settings
 cppSettings = mempty
+
+customPackageSettings :: Settings
+customPackageSettings = mconcat
+    [ package integerGmp2 ?
+      mconcat [ windowsHost ? builder GhcCabal ?
+                arg "--configure-option=--with-intree-gmp"
+              , ccArgs ["-Ilibraries/integer-gmp2/gmp"] ]
+
+    , package base ?
+      builder GhcCabal ? arg ("--flags=" ++ pkgName integerLibrary)
+
+    , package ghcPrim ?
+      builder GhcCabal ? arg "--flag=include-ghc-prim" ]

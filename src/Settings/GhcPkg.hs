@@ -4,12 +4,12 @@ module Settings.GhcPkg (
 
 import Base hiding (arg, args)
 import Package
-import Targets
 import Switches
 import Expression hiding (when, liftIO)
 import Settings.Util
 import Oracles.Builder
 import Settings.GhcCabal
+import Settings.TargetDirectory
 
 ghcPkgSettings :: Settings
 ghcPkgSettings = do

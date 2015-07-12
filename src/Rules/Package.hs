@@ -6,5 +6,5 @@ import Base
 import Rules.Data
 import Expression
 
-buildPackage :: Environment -> Rules ()
+buildPackage :: Target -> Rules ()
 buildPackage = buildPackageData

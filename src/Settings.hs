@@ -2,7 +2,6 @@ module Settings (
     settings
     ) where
 
-import Targets
 import Base hiding (arg, args)
 import Settings.GhcPkg
 import Settings.GhcCabal

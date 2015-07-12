@@ -49,12 +49,11 @@ argStagedConfigList key = do
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 ccArgs :: [String] -> Settings
-ccArgs args = do
+ccArgs xs = do
     stage <- asks getStage
-    mconcat [ builder (Gcc stage) ? append args
-            , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" args
-            , builder GhcCabal    ? appendSub "--gcc-options" args ]
-
+    mconcat [ builder (Gcc stage) ? args xs
+            , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" xs
+            , builder GhcCabal    ? appendSub "--gcc-options" xs ]
 
 
 

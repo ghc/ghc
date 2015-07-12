@@ -10,12 +10,16 @@ UserSettings.hs, but will clutter it (what is the good balance of
 what we expose to users?). Can be made into a conditional expression
 similar to userWays, userPackages and userSettings, but is it worth it?
 
+=> DONE: make this configurable.
+
 * knownPackages (Targets.hs) -- fix by adding knownUserPackages? A nasty
 import cycle is then created between Targets.hs and UserSettings.hs. Possible
 solution: add file Settings/Targets.hs which will actually put two things
 together similar to how it's done with userWays, userPackages and userSettings.
 
-* integerLibraryImpl (Switches.hs) -- fix by having three integer library
+=> DONE: keep duplication
+
+* integerLibraryImpl (Switches.hs) -- DONE: fix by having three integer library
 packages in Targets.hs and choosing which one to build in userPackages, e.g.:
 
 userPackages = remove [integerGmp2] <> append [integerSimple]
@@ -25,7 +29,11 @@ userPackages = remove [integerGmp2] <> append [integerSimple]
 * In general, should Targets.hs (or any other file) be editable by users?
 Ideally, there should only be one place for users to look: UserSettings.hs.
 
+=> Only UserSettings.hs is touched by users.
+
 * Any other parameters I missed which should be user configurable?
+
+=> Look up config.mk
 
 ================================================
 
@@ -39,6 +47,8 @@ UserSettings.hs through oracles? Another alternative which was discussed
 previously: pass the final lists of arguments through oracles. Care must
 be taken though as final command lines can be as large as 5Mb and may bloat
 the Shake database!
+
+=> hash command lines and channel them through oracles
 
 ================================================
 
@@ -139,4 +149,14 @@ GetStage env, (GetStage env, GetPackage env), etc.
 
 ==============================================
 
+stageEnvironment :: Environment
+stageEnvironment stage = Environment
+    {
+        getStage   = stage
+        getPackage = error "stageEnvironment: Package not set in the environment",
+        getBuilder = error "Builder not set in the environment",
+        getFile    = error "File not set in the environment",
+        getWay     = error "Way not set in the environment"
+    }
 
+...

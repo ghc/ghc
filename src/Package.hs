@@ -20,6 +20,7 @@ instance Eq Package where
 instance Ord Package where
     compare = compare `on` pkgName
 
+-- TODO: check if unifyPath is actually needed
 library :: String -> Package
 library name =
     Package name (unifyPath $ "libraries" </> name) (name <.> "cabal")

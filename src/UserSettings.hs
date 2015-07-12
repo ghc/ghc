@@ -1,28 +1,38 @@
 module UserSettings (
-    userSettings, userPackages, userWays,
+    userSettings, userPackages, userWays, userTargetDirectory,
+    userKnownPackages, integerLibrary,
     buildHaddock, validating
     ) where
 
 import Base hiding (arg, args, Args)
-import Oracles.Builder
-import Ways
+import Package
 import Targets
-import Switches
 import Expression
-import Settings.Util
 
 -- No user-specific settings by default
+-- TODO: rename to userArgs
 userSettings :: Settings
 userSettings = mempty
 
--- Control conditions of which packages get to be built
--- TODO: adding *new* packages is not possible (see knownPackages in Targets.hs)
+-- Control which packages get to be built
 userPackages :: Packages
 userPackages = mempty
+
+-- Add new user-defined packages
+userKnownPackages :: [Package]
+userKnownPackages = []
 
 -- Control which ways are built
 userWays :: Ways
 userWays = mempty
+
+-- Control where build results go
+userTargetDirectory :: Stage -> Package -> FilePath
+userTargetDirectory = defaultTargetDirectory
+
+-- Choose integer library: integerGmp, integerGmp2 or integerSimple
+integerLibrary :: Package
+integerLibrary = integerGmp2
 
 -- User-defined predicates
 -- TODO: migrate more predicates here from configuration files
@@ -31,33 +41,3 @@ buildHaddock = return True
 
 validating :: Predicate
 validating = return False
-
--- Examples:
-userSettings' :: Settings
-userSettings' = mconcat
-    [ package base           ?
-      builder GhcCabal       ? arg ("--flags=" ++ integerLibraryName)
-
-    , package integerLibrary ? ccArgs ["-Ilibraries/integer-gmp2/gmp"]
-
-    , windowsHost            ?
-      package integerLibrary ?
-      builder GhcCabal       ? arg "--configure-option=--with-intree-gmp"
-
-    , package compiler       ?
-      stage0                 ?
-      way profiling          ?
-      file "pattern.*"       ? args ["foo", "bar"]
-
-    , builder (Ghc Stage0)   ? remove ["-O2"]
-
-    , builder GhcCabal       ? removeSub "--configure-option=CFLAGS" ["-Werror"]
-    ]
-
-userPackages' :: Packages
-userPackages' = mconcat
-    [ stage1 ? remove [cabal]
-    ,          remove [compiler] ]
-
-userWays' :: Ways
-userWays' = remove [profiling]

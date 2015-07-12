@@ -2,10 +2,10 @@
 module Expression (
     module Control.Monad.Reader,
     module Data.Monoid,
-    Expr, DiffExpr, fromDiff,
+    Expr, DiffExpr, fromDiffExpr,
     Predicate,
     Settings, Ways, Packages,
-    Environment (..), defaultEnvironment,
+    Target (..), stageTarget, stagePackageTarget,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
     applyPredicate, (?), (??), stage, package, builder, file, way,
@@ -19,7 +19,7 @@ import Package
 import Data.Monoid
 import Control.Monad.Reader
 
-data Environment = Environment
+data Target = Target
      {
         getStage   :: Stage,
         getPackage :: Package,
@@ -28,26 +28,40 @@ data Environment = Environment
         getWay     :: Way
      }
 
--- TODO: all readers are currently partial functions. Can use type classes to
--- guarantee these errors never occur.
-defaultEnvironment :: Environment
-defaultEnvironment = Environment
+stageTarget :: Stage -> Target
+stageTarget stage = Target
     {
-        getStage   = error "Stage not set in the environment",
-        getPackage = error "Package not set in the environment",
-        getBuilder = error "Builder not set in the environment",
-        getFile    = error "File not set in the environment",
-        getWay     = error "Way not set in the environment"
+        getStage   = stage,
+        getPackage = error "stageTarget: Package not set",
+        getBuilder = error "stageTarget: Builder not set",
+        getFile    = error "stageTarget: File not set",
+        getWay     = error "stageTarget: Way not set"
     }
 
-type Expr a = ReaderT Environment Action a
-type DiffExpr a = Expr (Dual (Endo a))
+stagePackageTarget :: Stage -> Package -> Target
+stagePackageTarget stage package = Target
+    {
+        getStage   = stage,
+        getPackage = package,
+        getBuilder = error "stagePackageTarget: Builder not set",
+        getFile    = error "stagePackageTarget: File not set",
+        getWay     = error "stagePackageTarget: Way not set"
+    }
 
-type Predicate = Expr Bool
+-- We could use Dual (Endo a) instead of Diff a, but the former may look scary.
+newtype Diff a = Diff { fromDiff :: a -> a }
 
-type Settings = DiffExpr [String]
-type Ways     = DiffExpr [Way]
-type Packages = DiffExpr [Package]
+instance Monoid (Diff a) where
+    mempty = Diff id
+    Diff x `mappend` Diff y = Diff $ y . x
+
+type Expr a = ReaderT Target Action a
+type DiffExpr a = Expr (Diff a)
+
+type Predicate       = Expr Bool
+type Settings        = DiffExpr [String] -- TODO: rename to Args
+type Ways            = DiffExpr [Way]
+type Packages        = DiffExpr [Package]
 
 instance Monoid a => Monoid (Expr a) where
     mempty  = return mempty
@@ -56,11 +70,11 @@ instance Monoid a => Monoid (Expr a) where
 -- Basic operations on expressions:
 -- 1) append something to an expression
 append :: Monoid a => a -> DiffExpr a
-append x = return . Dual . Endo $ (<> x)
+append x = return . Diff $ (<> x)
 
 -- 2) remove given elements from a list expression
 remove :: Eq a => [a] -> DiffExpr [a]
-remove xs = return . Dual . Endo $ filter (`notElem` xs)
+remove xs = return . Diff $ filter (`notElem` xs)
 
 -- 3) apply a predicate to an expression
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
@@ -85,7 +99,7 @@ appendM mx = lift mx >>= append
 appendSub :: String -> [String] -> Settings
 appendSub prefix xs
     | xs' == [] = mempty
-    | otherwise = return . Dual . Endo $ go False
+    | otherwise = return . Diff $ go False
   where
     xs' = filter (/= "") xs
     go True  []     = []
@@ -97,31 +111,31 @@ appendSub prefix xs
 -- appendSubD is similar to appendSub but it extracts the list of sub-arguments
 -- from the given DiffExpr.
 appendSubD :: String -> Settings -> Settings
-appendSubD prefix diffExpr = fromDiff diffExpr >>= appendSub prefix
+appendSubD prefix diffExpr = fromDiffExpr diffExpr >>= appendSub prefix
 
 filterSub :: String -> (String -> Bool) -> Settings
-filterSub prefix p = return . Dual . Endo $ map filterSubstr
+filterSub prefix p = return . Diff $ map filterSubstr
   where
     filterSubstr s
         | prefix `isPrefixOf` s = unwords . filter p . words $ s
         | otherwise             = s
 
--- remove given elements from a list of sub-arguments with a given prefix
+-- Remove given elements from a list of sub-arguments with a given prefix
 -- Example: removeSub "--configure-option=CFLAGS" ["-Werror"]
 removeSub :: String -> [String] -> Settings
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
 -- Interpret a given expression in a given environment
-interpret :: Environment -> Expr a -> Action a
+interpret :: Target -> Expr a -> Action a
 interpret = flip runReaderT
 
 -- Extract an expression from a difference expression
-fromDiff :: Monoid a => DiffExpr a -> Expr a
-fromDiff = fmap (($ mempty) . appEndo . getDual)
+fromDiffExpr :: Monoid a => DiffExpr a -> Expr a
+fromDiffExpr = fmap (($ mempty) . fromDiff)
 
 -- Interpret a given difference expression in a given environment
-interpretDiff :: Monoid a => Environment -> DiffExpr a -> Action a
-interpretDiff env = interpret env . fromDiff
+interpretDiff :: Monoid a => Target -> DiffExpr a -> Action a
+interpretDiff target = interpret target . fromDiffExpr
 
 -- An equivalent of if-then-else for predicates
 (??) :: Monoid a => Predicate -> (Expr a, Expr a) -> Expr a

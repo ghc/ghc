@@ -7,17 +7,17 @@ import Package
 import Expression hiding (when, liftIO)
 import Oracles.Flag (when)
 import Oracles.Builder
-import Targets
 import Settings
 import Settings.GhcPkg
 import Settings.GhcCabal
+import Settings.TargetDirectory
 import Util
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Environment -> Rules ()
-buildPackageData env =
-    let stage = getStage env
-        pkg   = getPackage env
+buildPackageData :: Target -> Rules ()
+buildPackageData target =
+    let stage = getStage target
+        pkg   = getPackage target
         dir   = pkgPath pkg </> targetDirectory stage pkg
     in
     (dir </>) <$>
@@ -31,20 +31,20 @@ buildPackageData env =
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
             -- TODO: 1) how to automate this? 2) handle multiple files?
-            newEnv    = env { getFile = dir </> "package-data.mk" }
+            newEnv    = target { getFile = dir </> "package-data.mk" }
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        run' env GhcCabal
+        run' newEnv GhcCabal
         -- TODO: when (registerPackage settings) $
-        run' env (GhcPkg stage)
+        run' newEnv (GhcPkg stage)
         postProcessPackageData $ dir </> "package-data.mk"
 
 -- TODO: This should probably go to Oracles.Builder
-run' :: Environment -> Builder -> Action ()
-run' env builder = do
-    args <- interpret (env {getBuilder = builder}) $ fromDiff settings
+run' :: Target -> Builder -> Action ()
+run' target builder = do
+    args <- interpret (target {getBuilder = builder}) $ fromDiffExpr settings
     putColoured Green (show args)
     run builder args
 
