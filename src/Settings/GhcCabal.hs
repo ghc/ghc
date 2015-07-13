@@ -10,7 +10,7 @@ import Util
 import Package
 import Targets
 import Switches
-import Expression hiding (when, liftIO)
+import Expression hiding (liftIO)
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
@@ -29,14 +29,14 @@ cabalSettings = builder GhcCabal ? do
             , argWith $ GhcPkg stage
             , stage0 ? bootPackageDbSettings
             , librarySettings
-            , configKeyNonEmpty "hscolour" ? argWith HsColour -- TODO: generalise?
+            , configKeyNonEmpty "hscolour" ? argWith HsColour
             , configureSettings
             , stage0 ? packageConstraints
             , argWith $ Gcc stage
             , notStage Stage0 ? argWith Ld
             , argWith Ar
             , argWith Alex
-            , argWith Happy ] -- TODO: reorder argWiths
+            , argWith Happy ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 librarySettings :: Settings
@@ -84,9 +84,9 @@ bootPackageDbSettings = do
     sourcePath <- lift $ askConfig "ghc-source-path"
     arg $ "--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"
 
--- this is a positional argument, hence:
--- * if it is empty, we need to emit one empty string argument
--- * otherwise, we must collapse it into one space-separated string
+-- This is a positional argument, hence:
+-- * if it is empty, we need to emit one empty string argument;
+-- * otherwise, we must collapse it into one space-separated string.
 dllSettings :: Settings
 dllSettings = arg ""
 
