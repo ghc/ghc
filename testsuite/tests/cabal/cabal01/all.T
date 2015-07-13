@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 if config.have_vanilla:
     vanilla = '--enable-library-vanilla'
 else:

@@ -204,21 +204,9 @@ def _extra_ways( name, opts, ways ):
 
 # -----
 
-def omit_compiler_types( compiler_types ):
-   return lambda name, opts, c=compiler_types: _omit_compiler_types(name, opts, c)
-
-def _omit_compiler_types( name, opts, compiler_types ):
-    if config.compiler_type in compiler_types:
-        opts.skip = 1
-
-# -----
-
-def only_compiler_types( compiler_types ):
-   return lambda name, opts, c=compiler_types: _only_compiler_types(name, opts, c)
-
-def _only_compiler_types( name, opts, compiler_types ):
-    if config.compiler_type not in compiler_types:
-        opts.skip = 1
+def only_compiler_types( _compiler_types ):
+   # Don't delete yet. The libraries unix, stm and hpc still call this function.
+   return lambda _name, _opts: None 
 
 # -----
 
@@ -377,24 +365,21 @@ def have_profiling( ):
 def in_tree_compiler( ):
     return config.in_tree_compiler
 
-def compiler_type( compiler ):
-    return config.compiler_type == compiler
-
 def compiler_lt( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_lt(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_lt(config.compiler_version, version)
 
 def compiler_le( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_le(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_le(config.compiler_version, version)
 
 def compiler_gt( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_gt(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_gt(config.compiler_version, version)
 
 def compiler_ge( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_ge(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_ge(config.compiler_version, version)
 
 def unregisterised( ):
     return config.unregisterised
@@ -2119,11 +2104,11 @@ def qualify( name, suff ):
 
 # Finding the sample output.  The filename is of the form
 #
-#   <test>.stdout[-<compiler>][-<version>][-ws-<wordsize>][-<platform>]
+#   <test>.stdout[-ghc][-<version>][-ws-<wordsize>][-<platform>]
 #
 # and we pick the most specific version available.  The <version> is
 # the major version of the compiler (e.g. 6.8.2 would be "6.8").  For
-# more fine-grained control use if_compiler_lt().
+# more fine-grained control use compiler_lt().
 #
 def platform_wordsize_qualify( name, suff ):
 
@@ -2134,7 +2119,7 @@ def platform_wordsize_qualify( name, suff ):
                                               (1, '-' + config.os),
                                               (0, '')]
              for ws   in ['-ws-' + config.wordsize, '']
-             for comp in ['-' + config.compiler_type, '']
+             for comp in ['-ghc', '']
              for vers in ['-' + config.compiler_maj_version, '']]
 
     dir = glob.glob(basepath + '*')

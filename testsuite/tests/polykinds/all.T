@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 test('PolyKinds09', normal, compile_and_run, [''])
 test('PolyKinds10', normal, compile_and_run, [''])
 

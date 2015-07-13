@@ -59,9 +59,6 @@ class TestConfig:
 
         self.list_broken = False
 
-        # Compiler type (ghc, hugs, nhc, etc.)
-        self.compiler_type = ''
-
         # Path to the compiler
         self.compiler = ''
         # and ghc-pkg

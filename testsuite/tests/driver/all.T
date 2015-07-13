@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 test('driver011',
      extra_clean(['A011.hi', 'A011.o']),
      run_command,

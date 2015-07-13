@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 hide_all = '-hide-all-packages -XNoImplicitPrelude '
 incr_containers = '-package "containers (Data.Map as Map, Data.Set)" '
 inc_containers = '-package containers '

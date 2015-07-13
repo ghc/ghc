@@ -1,4 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
 # Keep optimised tests, so we test coercion optimisation
 setTestOpts(omit_ways(['optasm', 'optllvm', 'hpc']))
 
