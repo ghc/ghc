@@ -1148,7 +1148,7 @@ stupidly constructed a rule like
      f (x |> c1 |> c2) = ....
 
 But simplExpr collapses those coercions into one.  (Indeed in
-#10602, it collapsed to the identity and was removed altogether.)
+Trac #10602, it collapsed to the identity and was removed altogether.)
 
 We don't have a great story for what to do here, but at least
 this check will nail it.
