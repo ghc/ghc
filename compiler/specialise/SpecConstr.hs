@@ -1144,7 +1144,9 @@ scExpr' _   e@(Lit {})   = return (nullUsage, e)
 scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
                               return (usg, Tick t e')
 scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
-                              return (usg, Cast e' (scSubstCo env co))
+                              return (usg, mkCast e' (scSubstCo env co))
+                              -- Important to use mkCast here
+                              -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
 scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
                               (usg, e') <- scExpr env' e
@@ -1727,9 +1729,27 @@ BUT phantom type synonyms can mess this reasoning up,
   eg   x::T b   with  type T b = Int
 So we apply expandTypeSynonyms to the bound Ids.
 See Trac # 5458.  Yuk.
+
+Note [SpecConstr call patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "call patterns" that we collect is going to become the LHS of a RULE.
+It's important that it doesn't have
+     e |> Refl
+or
+    e |> g1 |> g2
+because both of these will be optimised by Simplify.simplRule. In the
+former case such optimisation benign, because the rule will match more
+terms; but in the latter we may lose a binding of 'g1' or 'g2', and
+end up with a rule LHS that doesn't bind the template variables (Trac
+#10602).
+
+The simplifier eliminates such things, but SpecConstr itself constructs
+new terms by substituting.  So the 'mkCast' in the Cast case of scExpr
+is very important!
 -}
 
 type CallPat = ([Var], [CoreExpr])      -- Quantified variables and arguments
+                                        -- See Note [SpecConstr call patterns]
 
 callsToPats :: ScEnv -> [OneSpec] -> [ArgOcc] -> [Call] -> UniqSM (Bool, [CallPat])
         -- Result has no duplicate patterns,
@@ -1849,9 +1869,6 @@ argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
 -}
 
 argToPat env in_scope val_env (Cast arg co) arg_occ
-  | isReflCo co     -- Substitution in the SpecConstr itself
-                    -- can lead to identity coercions
-  = argToPat env in_scope val_env arg arg_occ
   | not (ignoreType env ty2)
   = do  { (interesting, arg') <- argToPat env in_scope val_env arg arg_occ
         ; if not interesting then
