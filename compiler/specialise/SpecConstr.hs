@@ -1777,8 +1777,8 @@ or
 because both of these will be optimised by Simplify.simplRule. In the
 former case such optimisation benign, because the rule will match more
 terms; but in the latter we may lose a binding of 'g1' or 'g2', and
-end up with a rule LHS that doesn't bind the template variables (Trac
-#10602).
+end up with a rule LHS that doesn't bind the template variables
+(Trac #10602).
 
 The simplifier eliminates such things, but SpecConstr itself constructs
 new terms by substituting.  So the 'mkCast' in the Cast case of scExpr
