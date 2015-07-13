@@ -106,6 +106,7 @@ packageConstraints = do
     args $ concatMap (\c -> ["--constraint", c]) $ constraints
 
 -- TODO: should be in a different file
+-- TODO: put all validating options together in one file
 ccSettings :: Settings
 ccSettings = validating ? do
     let gccGe46 = liftM not gccLt46

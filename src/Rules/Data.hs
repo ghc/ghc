@@ -18,9 +18,9 @@ buildPackageData :: Target -> Rules ()
 buildPackageData target =
     let stage = getStage target
         pkg   = getPackage target
-        dir   = pkgPath pkg </> targetDirectory stage pkg
+        path  = targetPath stage pkg
     in
-    (dir </>) <$>
+    (path </>) <$>
     [ "package-data.mk"
     , "haddock-prologue.txt"
     , "inplace-pkg-config"
@@ -31,7 +31,7 @@ buildPackageData target =
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
             -- TODO: 1) how to automate this? 2) handle multiple files?
-            newEnv    = target { getFile = dir </> "package-data.mk" }
+            newEnv    = target { getFile = path </> "package-data.mk" }
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
@@ -39,7 +39,7 @@ buildPackageData target =
         run' newEnv GhcCabal
         -- TODO: when (registerPackage settings) $
         run' newEnv (GhcPkg stage)
-        postProcessPackageData $ dir </> "package-data.mk"
+        postProcessPackageData $ path </> "package-data.mk"
 
 -- TODO: This should probably go to Oracles.Builder
 run' :: Target -> Builder -> Action ()

@@ -6,7 +6,6 @@ module Rules (
 
 import Base hiding (arg, args, Args)
 import Control.Monad
-import Package
 import Expression
 import Rules.Package
 import Settings.Packages
@@ -19,8 +18,7 @@ generateTargets = action $
     forM_ [Stage0 ..] $ \stage -> do
         pkgs <- interpret (stageTarget stage) packages
         forM_ pkgs $ \pkg -> do
-            let dir = targetDirectory stage pkg
-            need [pkgPath pkg </> dir </> "package-data.mk"]
+            need [targetPath stage pkg </> "package-data.mk"]
 
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()
