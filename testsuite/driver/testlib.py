@@ -410,14 +410,6 @@ def tag( t ):
 
 # ---
 
-def namebase( nb ):
-   return lambda opts, nb=nb: _namebase(opts, nb)
-
-def _namebase( opts, nb ):
-    opts.with_namebase = nb
-
-# ---
-
 def high_memory_usage(name, opts):
     opts.alone = True
 
@@ -1049,12 +1041,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    if getTestOpts().with_namebase == None:
-        namebase = name
-    else:
-        namebase = getTestOpts().with_namebase
-
-    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
+    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
     if not compare_outputs(way, 'stderr',
@@ -1079,12 +1066,7 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    if getTestOpts().with_namebase == None:
-        namebase = name
-    else:
-        namebase = getTestOpts().with_namebase
-
-    (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
+    (platform_specific, expected_asm_file) = platform_wordsize_qualify(name, 'asm')
     actual_asm_file = qualify(name, 's')
 
     if not compare_outputs(way, 'asm',
@@ -1530,13 +1512,8 @@ def get_compiler_flags(override_flags, noforce):
     return flags
 
 def check_stdout_ok(name, way):
-   if getTestOpts().with_namebase == None:
-       namebase = name
-   else:
-       namebase = getTestOpts().with_namebase
-
    actual_stdout_file   = qualify(name, 'run.stdout')
-   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(namebase, 'stdout')
+   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(name, 'stdout')
 
    def norm(str):
       if platform_specific:
@@ -1558,13 +1535,8 @@ def dump_stdout( name ):
    print(read_no_crs(qualify(name, 'run.stdout')))
 
 def check_stderr_ok(name, way):
-   if getTestOpts().with_namebase == None:
-       namebase = name
-   else:
-       namebase = getTestOpts().with_namebase
-
    actual_stderr_file   = qualify(name, 'run.stderr')
-   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
+   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
 
    def norm(str):
       if platform_specific:
@@ -1634,13 +1606,8 @@ def check_prof_ok(name, way):
         print(prof_file + " is empty")
         return(False)
 
-    if getTestOpts().with_namebase == None:
-        namebase = name
-    else:
-        namebase = getTestOpts().with_namebase
-
     (platform_specific, expected_prof_file) = \
-        platform_wordsize_qualify(namebase, 'prof.sample')
+        platform_wordsize_qualify(name, 'prof.sample')
 
     # sample prof file is not required
     if not os.path.exists(expected_prof_file):
