@@ -17,7 +17,7 @@ import Settings.TargetDirectory
 generateTargets :: Rules ()
 generateTargets = action $
     forM_ [Stage0 ..] $ \stage -> do
-        pkgs <- interpretDiff (stageTarget stage) packages
+        pkgs <- interpret (stageTarget stage) packages
         forM_ pkgs $ \pkg -> do
             let dir = targetDirectory stage pkg
             need [pkgPath pkg </> dir </> "package-data.mk"]

@@ -44,7 +44,7 @@ buildPackageData target =
 -- TODO: This should probably go to Oracles.Builder
 run' :: Target -> Builder -> Action ()
 run' target builder = do
-    args <- interpret (target {getBuilder = builder}) $ fromDiffExpr settings
+    args <- interpret (target {getBuilder = builder}) settings
     putColoured Green (show args)
     run builder args
 

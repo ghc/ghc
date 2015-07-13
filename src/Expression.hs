@@ -7,7 +7,7 @@ module Expression (
     Settings, Ways, Packages,
     Target (..), stageTarget, stagePackageTarget,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
-    interpret, interpretDiff,
+    interpret, interpretExpr,
     applyPredicate, (?), (??), stage, package, builder, file, way,
     configKeyValue, configKeyValues
     ) where
@@ -19,6 +19,9 @@ import Package
 import Data.Monoid
 import Control.Monad.Reader
 
+-- Target captures parameters relevant to the current build target: Stage and
+-- Package being built, Builder that is to be invoked, file(s) that are to
+-- be built and the Way they are to be built.
 data Target = Target
      {
         getStage   :: Stage,
@@ -48,24 +51,40 @@ stagePackageTarget stage package = Target
         getWay     = error "stagePackageTarget: Way not set"
     }
 
+-- Expr a is a computation that produces a value of type Action a and can read
+-- parameters of the current build Target.
+type Expr a = ReaderT Target Action a
+
+-- If values of type a form a Monoid then so do computations of type Expr a:
+-- * the empty computation returns the identity element of the underlying type
+-- * two computations can be combined by combining their results
+instance Monoid a => Monoid (Expr a) where
+    mempty  = return mempty
+    mappend = liftM2 mappend
+
+-- Diff a holds functions of type a -> a and is equipped with a Monoid instance.
 -- We could use Dual (Endo a) instead of Diff a, but the former may look scary.
+-- The name comes from "difference lists".
 newtype Diff a = Diff { fromDiff :: a -> a }
 
+-- DiffExpr a is a computation that builds a difference list (i.e., a function
+-- of type Action (a -> a)) and can read parameters of the current build Target.
+type DiffExpr a = Expr (Diff a)
+
+-- Note the reverse order of function composition (y . x), which ensures that
+-- when two DiffExpr computations c1 and c2 are combined (c1 <> c2), then c1 is
+-- applied first, and c2 is applied second.
 instance Monoid (Diff a) where
     mempty = Diff id
     Diff x `mappend` Diff y = Diff $ y . x
 
-type Expr a = ReaderT Target Action a
-type DiffExpr a = Expr (Diff a)
-
-type Predicate       = Expr Bool
-type Settings        = DiffExpr [String] -- TODO: rename to Args
-type Ways            = DiffExpr [Way]
-type Packages        = DiffExpr [Package]
-
-instance Monoid a => Monoid (Expr a) where
-    mempty  = return mempty
-    mappend = liftM2 mappend
+-- The following expressions are used throughout the build system for
+-- specifying conditions (Predicate), lists of arguments (Settings), Ways and
+-- Packages.
+type Predicate = Expr Bool
+type Settings  = DiffExpr [String] -- TODO: rename to Args
+type Ways      = DiffExpr [Way]
+type Packages  = DiffExpr [Package]
 
 -- Basic operations on expressions:
 -- 1) append something to an expression
@@ -126,16 +145,16 @@ removeSub :: String -> [String] -> Settings
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
 -- Interpret a given expression in a given environment
-interpret :: Target -> Expr a -> Action a
-interpret = flip runReaderT
+interpretExpr :: Target -> Expr a -> Action a
+interpretExpr = flip runReaderT
 
 -- Extract an expression from a difference expression
 fromDiffExpr :: Monoid a => DiffExpr a -> Expr a
 fromDiffExpr = fmap (($ mempty) . fromDiff)
 
 -- Interpret a given difference expression in a given environment
-interpretDiff :: Monoid a => Target -> DiffExpr a -> Action a
-interpretDiff target = interpret target . fromDiffExpr
+interpret :: Monoid a => Target -> DiffExpr a -> Action a
+interpret target = interpretExpr target . fromDiffExpr
 
 -- An equivalent of if-then-else for predicates
 (??) :: Monoid a => Predicate -> (Expr a, Expr a) -> Expr a
