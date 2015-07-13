@@ -2,7 +2,7 @@
 
 module Settings.Util (
     -- Primitive settings elements
-    arg, argM, args,
+    arg, argM, args, argWith,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
     ccArgs,
     -- argBuilderPath, argStagedBuilderPath,
@@ -27,6 +27,9 @@ argM = appendM . fmap return
 -- A list of arguments
 args :: [String] -> Settings
 args = append
+
+argWith :: Builder -> Settings
+argWith = argM . with
 
 argConfig :: String -> Settings
 argConfig = appendM . fmap return . askConfig

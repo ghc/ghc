@@ -25,18 +25,18 @@ cabalSettings = builder GhcCabal ? do
             , arg $ pkgPath pkg
             , arg $ targetDirectory stage pkg
             , dllSettings
-            , with' $ Ghc stage
-            , with' $ GhcPkg stage
+            , argWith $ Ghc stage
+            , argWith $ GhcPkg stage
             , stage0 ? bootPackageDbSettings
             , librarySettings
-            , configKeyNonEmpty "hscolour" ? with' HsColour -- TODO: generalise?
+            , configKeyNonEmpty "hscolour" ? argWith HsColour -- TODO: generalise?
             , configureSettings
             , stage0 ? packageConstraints
-            , with' $ Gcc stage
-            , notStage Stage0 ? with' Ld
-            , with' Ar
-            , with' Alex
-            , with' Happy ] -- TODO: reorder with's
+            , argWith $ Gcc stage
+            , notStage Stage0 ? argWith Ld
+            , argWith Ar
+            , argWith Alex
+            , argWith Happy ] -- TODO: reorder argWiths
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 librarySettings :: Settings
@@ -89,10 +89,6 @@ bootPackageDbSettings = do
 -- * otherwise, we must collapse it into one space-separated string
 dllSettings :: Settings
 dllSettings = arg ""
-
--- TODO: remove
-with' :: Builder -> Settings
-with' builder = appendM $ with builder
 
 packageConstraints :: Settings
 packageConstraints = do

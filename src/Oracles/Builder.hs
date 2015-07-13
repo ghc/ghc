@@ -12,8 +12,7 @@ import Oracles.Base
 import Oracles.Flag
 import Oracles.Option
 
--- A Builder is an external command invoked in separate process
--- by calling Shake.cmd
+-- A Builder is an external command invoked in separate process using Shake.cmd
 --
 -- Ghc Stage0 is the bootstrapping compiler
 -- Ghc StageN, N > 0, is the one built on stage (N - 1)
@@ -82,11 +81,11 @@ needBuilder builder = do
     need [exe]
 
 -- Action 'with Gcc' returns '--with-gcc=/path/to/gcc' and needs Gcc
-with :: Builder -> Args
+with :: Builder -> Action String
 with builder = do
     exe <- showArg builder
     needBuilder builder
-    return [withBuilderKey builder ++ exe]
+    return $ withBuilderKey builder ++ exe
 
 withBuilderKey :: Builder -> String
 withBuilderKey builder = case builder of
