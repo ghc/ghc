@@ -780,15 +780,16 @@ substRule _ _ rule@(BuiltinRule {}) = rule
 substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
                                        , ru_fn = fn_name, ru_rhs = rhs
                                        , ru_local = is_local })
-  = rule { ru_bndrs = bndrs',
-           ru_fn    = if is_local
+  = rule { ru_bndrs = bndrs'
+         , ru_fn    = if is_local
                         then subst_ru_fn fn_name
-                        else fn_name,
-           ru_args  = map (substExpr (text "subst-rule" <+> ppr fn_name) subst') args,
-           ru_rhs   = simpleOptExprWith subst' rhs }
-           -- Do simple optimisation on RHS, in case substitution lets
-           -- you improve it.  The real simplifier never gets to look at it.
+                        else fn_name
+         , ru_args  = map (substExpr doc subst') args
+         , ru_rhs   = substExpr (text "foo") subst' rhs }
+           -- Do NOT optimise the RHS (previously we did simplOptExpr here)
+           -- See Note [Substitute lazily]
   where
+    doc = ptext (sLit "subst-rule") <+> ppr fn_name
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
@@ -818,8 +819,22 @@ substTickish subst (Breakpoint n ids) = Breakpoint n (map do_one ids)
  where do_one = getIdFromTrivialExpr . lookupIdSubst (text "subst_tickish") subst
 substTickish _subst other = other
 
-{- Note [substTickish]
+{- Note [Substitute lazily]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The functions that substitute over IdInfo must be pretty lazy, becuause
+they are knot-tied by substRecBndrs.
 
+One case in point was Trac #10627 in which a rule for a function 'f'
+referred to 'f' (at a differnet type) on the RHS.  But instead of just
+substituting in the rhs of the rule, we were calling simpleOptExpr, which
+looked at the idInfo for 'f'; result <<loop>>.
+
+In any case we don't need to optimise the RHS of rules, or unfoldings,
+because the simplifier will do that.
+
+
+Note [substTickish]
+~~~~~~~~~~~~~~~~~~~~~~
 A Breakpoint contains a list of Ids.  What happens if we ever want to
 substitute an expression for one of these Ids?
 
