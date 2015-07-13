@@ -447,7 +447,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
          -- Check the rhs
     do { ty <- lintCoreExpr rhs
        ; lintBinder binder -- Check match to RHS type
-       ; binder_ty <- applySubstTy binder_ty
+       ; binder_ty <- applySubstTy (idType binder)
        ; checkTys binder_ty ty (mkRhsMsg binder (ptext (sLit "RHS")) ty)
 
         -- Check the let/app invariant
@@ -468,9 +468,6 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
         -- Check that if the binder is local, it does not have an external name
        ; checkL (not (isExternalName (Var.varName binder)) || isTopLevel top_lvl_flag)
            (mkNonTopExternalNameMsg binder)
-
-        -- Check whether binder's specialisations contain any out-of-scope variables
-       ; mapM_ (checkBndrIdInScope binder) bndr_vars
 
        ; flags <- getLintFlags
        ; when (lf_check_inline_loop_breakers flags
@@ -507,14 +504,12 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
                ppr binder)
            _ -> return ()
 
+       ; mapM_ (lintCoreRule binder_ty) (idCoreRules binder)
        ; lintIdUnfolding binder binder_ty (idUnfolding binder) }
 
         -- We should check the unfolding, if any, but this is tricky because
         -- the unfolding is a SimplifiableCoreExpr. Give up for now.
    where
-    binder_ty                  = idType binder
-    bndr_vars                  = varSetElems (idFreeVars binder)
-
     -- If you edit this function, you may need to update the GHC formalism
     -- See Note [GHC Formalism]
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
@@ -526,7 +521,8 @@ lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
   = do { ty <- lintCoreExpr rhs
        ; checkTys bndr_ty ty (mkRhsMsg bndr (ptext (sLit "unfolding")) ty) }
 lintIdUnfolding  _ _ _
-  = return ()       -- We could check more
+  = return ()       -- Do not Lint unstable unfoldings, becuase that leads
+                    -- to exponential behaviour; c.f. CoreFVs.idUnfoldingVars
 
 {-
 Note [Checking for INLINE loop breakers]
@@ -690,7 +686,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
 -- This case can't happen; linting types in expressions gets routed through
 -- lintCoreArgs
 lintCoreExpr (Type ty)
-  = pprPanic "lintCoreExpr" (ppr ty)
+  = failWithL (ptext (sLit "Type found as expression") <+> ppr ty)
 
 lintCoreExpr (Coercion co)
   = do { (_kind, ty1, ty2, role) <- lintInCo co
@@ -1114,6 +1110,49 @@ lint_app doc kfn kas
            ; return (substKiWith [kv] [ta] kfn) }
 
     go_app _ _ = failWithL fail_msg
+
+{- *********************************************************************
+*                                                                      *
+        Linting rules
+*                                                                      *
+********************************************************************* -}
+
+lintCoreRule :: OutType -> CoreRule -> LintM ()
+lintCoreRule _ (BuiltinRule {})
+  = return ()  -- Don't bother
+
+lintCoreRule fun_ty (Rule { ru_name = name, ru_bndrs = bndrs
+                          , ru_args = args, ru_rhs = rhs })
+  = lintBinders bndrs $ \ _ ->
+    do { lhs_ty <- foldM lintCoreArg fun_ty args
+       ; rhs_ty <- lintCoreExpr rhs
+       ; checkTys lhs_ty rhs_ty $
+         (rule_doc <+> vcat [ ptext (sLit "lhs type:") <+> ppr lhs_ty
+                            , ptext (sLit "rhs type:") <+> ppr rhs_ty ])
+       ; let bad_bndrs = filterOut (`elemVarSet` exprsFreeVars args) bndrs
+       ; checkL (null bad_bndrs)
+                (rule_doc <+> ptext (sLit "unbound") <+> ppr bad_bndrs)
+            -- See Note [Linting rules]
+    }
+  where
+    rule_doc = ptext (sLit "Rule") <+> doubleQuotes (ftext name) <> colon
+
+{- Note [Linting rules]
+~~~~~~~~~~~~~~~~~~~~~~~
+It's very bad if simplifying a rule means that one of the template
+variables (ru_bndrs) becomes not-mentioned in the template argumments
+(ru_args).  How can that happen?  Well, in Trac #10602, SpecConstr
+stupidly constructed a rule like
+
+  forall x,c1,c2.
+     f (x |> c1 |> c2) = ....
+
+But simplExpr collapses those coercions into one.  (Indeed in
+#10602, it collapsed to the identity and was removed altogether.)
+
+We don't have a great story for what to do here, but at least
+this check will nail it.
+-}
 
 {-
 ************************************************************************
@@ -1571,13 +1610,6 @@ lookupIdInScope id
 
 oneTupleDataConId :: Id -- Should not happen
 oneTupleDataConId = dataConWorkId (tupleDataCon Boxed 1)
-
-checkBndrIdInScope :: Var -> Var -> LintM ()
-checkBndrIdInScope binder id
-  = checkInScope msg id
-    where
-     msg = ptext (sLit "is out of scope inside info for") <+>
-           ppr binder
 
 checkTyCoVarInScope :: Var -> LintM ()
 checkTyCoVarInScope v = checkInScope (ptext (sLit "is out of scope")) v
