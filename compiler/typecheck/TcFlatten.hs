@@ -23,6 +23,7 @@ import NameEnv
 import Outputable
 import TcSMonad as TcS
 import DynFlags( DynFlags )
+import Unify( noLazyEqs )
 
 import Util
 import Bag
@@ -1135,9 +1136,9 @@ flatten_exact_fam_app_fully tc tys
                   -> FlatM (Xi, TcCoercion)
     try_to_reduce tc tys cache update_co k
       = do { checkStackDepth (mkTyConApp tc tys)
-           ; mb_match <- liftTcS $ matchFam tc tys
+           ; mb_match <- liftTcS $ matchFam tc tys noLazyEqs
            ; case mb_match of
-               Just (norm_co, norm_ty)
+               Just (norm_co, norm_ty, _)
                  -> do { traceFlat "Eager T.F. reduction success" $
                          vcat [ppr tc, ppr tys, ppr norm_ty, ppr cache]
                        ; (xi, final_co) <- bumpDepth $ flatten_one norm_ty
@@ -1500,4 +1501,3 @@ unsolved constraints.  The flat form will be
 
 Flatten using the fun-eqs first.
 -}
-

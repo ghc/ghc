@@ -2813,15 +2813,17 @@ checkReductionDepth loc ty
          wrapErrTcS $
          solverDepthErrorTcS loc ty }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
-matchFam tycon args = wrapTcS $ matchFamTcM tycon args
+matchFam :: TyCon -> [Type] -> LazyEqs l
+         -> TcS (Maybe (TcCoercion, TcType, LazyEqs l))
+matchFam tycon args leqs = wrapTcS $ matchFamTcM tycon args leqs
 
-matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (TcCoercion, TcType))
+matchFamTcM :: TyCon -> [Type] -> LazyEqs l
+            -> TcM (Maybe (TcCoercion, TcType, LazyEqs l))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
-matchFamTcM tycon args
+matchFamTcM tycon args leqs
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
-       ; return $ fmap (\(x,y,_) -> (TcCoercion x, y)) $
-         reduceTyFamApp_maybe fam_envs Nominal tycon args noLazyEqs }
+       ; return $ fmap (\(x,y,z) -> (TcCoercion x, y, z)) $
+         reduceTyFamApp_maybe fam_envs Nominal tycon args leqs }
 
 {-
 Note [Residual implications]

@@ -1280,53 +1280,60 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
   = ASSERT(isTypeFamilyTyCon fam_tc) -- No associated data families
                                      -- have reached this far
     -- Look up in top-level instances, or built-in axiom
-    do { match_res <- matchFam fam_tc args   -- See Note [MATCHING-SYNONYMS]
+    do { inertCans <- getInertCans
+       ; lazyEqs <- inerts_to_lazy_eqs (inert_irreds inertCans)
+       ; match_res <- matchFam fam_tc args lazyEqs   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
            Nothing -> do { try_improve
                          ; continueWith work_item } ;
-           Just (ax_co, rhs_ty)
+           Just (ax_co, rhs_ty, extra_eqs)
+                   -> do { let qs = extract_lazy_eqs extra_eqs
+                         ; qs_evs <- mapM (newWantedEvVarNC loc) qs
+                         ; emitWorkNC qs_evs
+                         ; emitFam ax_co rhs_ty } } }
 
     -- Found a top-level instance
-
-    | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
-    , isTypeFamilyTyCon tc
-    , tc_args `lengthIs` tyConArity tc    -- Short-cut
-    -> shortCutReduction old_ev fsk ax_co tc tc_args
-         -- Try shortcut; see Note [Short cut for top-level reaction]
-
-    | isGiven old_ev  -- Not shortcut
-    -> do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
-                -- final_co :: fsk ~ rhs_ty
-          ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
-                                                EvCoercion final_co)
-          ; emitWorkNC [new_ev]   -- Non-canonical; that will mean we flatten rhs_ty
-          ; stopWith old_ev "Fun/Top (given)" }
-
-    | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
-    -> do { dischargeFmv old_ev fsk ax_co rhs_ty
-          ; traceTcS "doTopReactFunEq" $
-            vcat [ text "old_ev:" <+> ppr old_ev
-                 , nest 2 (text ":=") <+> ppr ax_co ]
-          ; stopWith old_ev "Fun/Top (wanted)" }
-
-    | otherwise -- We must not assign ufsk := ...ufsk...!
-    -> do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
-          ; new_ev <- newWantedEvVarNC loc (mkTcEqPred alpha_ty rhs_ty)
-          ; emitWorkNC [new_ev]
-              -- By emitting this as non-canonical, we deal with all
-              -- flattening, occurs-check, and ufsk := ufsk issues
-          ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
-              --    ax_co :: fam_tc args ~ rhs_ty
-              --   new_ev :: alpha ~ rhs_ty
-              --     ufsk := alpha
-              -- final_co :: fam_tc args ~ alpha
-          ; dischargeFmv old_ev fsk final_co alpha_ty
-          ; traceTcS "doTopReactFunEq (occurs)" $
-            vcat [ text "old_ev:" <+> ppr old_ev
-                 , nest 2 (text ":=") <+> ppr final_co
-                 , text "new_ev:" <+> ppr new_ev ]
-          ; stopWith old_ev "Fun/Top (wanted)" } } }
   where
+    emitFam ax_co rhs_ty
+      | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
+      , isTypeFamilyTyCon tc
+      , tc_args `lengthIs` tyConArity tc    -- Short-cut
+      = shortCutReduction old_ev fsk ax_co tc tc_args
+           -- Try shortcut; see Note [Short cut for top-level reaction]
+
+      | isGiven old_ev  -- Not shortcut
+      = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
+                 -- final_co :: fsk ~ rhs_ty
+           ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
+                                                 EvCoercion final_co)
+           ; emitWorkNC [new_ev]   -- Non-canonical; that will mean we flatten rhs_ty
+           ; stopWith old_ev "Fun/Top (given)" }
+
+      | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
+      = do { dischargeFmv old_ev fsk ax_co rhs_ty
+           ; traceTcS "doTopReactFunEq" $
+             vcat [ text "old_ev:" <+> ppr old_ev
+                  , nest 2 (text ":=") <+> ppr ax_co ]
+           ; stopWith old_ev "Fun/Top (wanted)" }
+
+      | otherwise -- We must not assign ufsk := ...ufsk...!
+      = do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
+           ; new_ev <- newWantedEvVarNC loc (mkTcEqPred alpha_ty rhs_ty)
+           ; emitWorkNC [new_ev]
+               -- By emitting this as non-canonical, we deal with all
+               -- flattening, occurs-check, and ufsk := ufsk issues
+           ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
+               --    ax_co :: fam_tc args ~ rhs_ty
+               --   new_ev :: alpha ~ rhs_ty
+               --     ufsk := alpha
+               -- final_co :: fam_tc args ~ alpha
+           ; dischargeFmv old_ev fsk final_co alpha_ty
+           ; traceTcS "doTopReactFunEq (occurs)" $
+             vcat [ text "old_ev:" <+> ppr old_ev
+                  , nest 2 (text ":=") <+> ppr final_co
+                  , text "new_ev:" <+> ppr new_ev ]
+           ; stopWith old_ev "Fun/Top (wanted)" }
+
     loc = ctEvLoc old_ev
     deeper_loc = bumpCtLocDepth loc
 
@@ -1735,9 +1742,6 @@ matchClassInst dflags _ clas tys loc
             ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
             ; return $ GenInst theta (EvDFunApp dfun_id tys) so eqs }
 
-     extract_lazy_eqs :: LazyEqs [TcPredType] -> [TcPredType]
-     extract_lazy_eqs leqs = concatMap (\(_,_,qs) -> qs) (bagToList leqs)
-
 inerts_to_lazy_eqs :: Cts -> TcS (LazyEqs [TcPredType])
 inerts_to_lazy_eqs = flatMapBagM $ \ct ->
   case (ctEvidence ct, classifyPredType (ctPred ct)) of
@@ -1752,6 +1756,9 @@ inerts_to_lazy_eqs = flatMapBagM $ \ct ->
       | otherwise
       -> pprPanic "malformed irred InstanceOf" (ppr (ctPred ct))
     _ -> return noLazyEqs
+
+extract_lazy_eqs :: LazyEqs [TcPredType] -> [TcPredType]
+extract_lazy_eqs leqs = concatMap (\(_,_,qs) -> qs) (bagToList leqs)
 
 
 {- Note [Instance and Given overlap]
