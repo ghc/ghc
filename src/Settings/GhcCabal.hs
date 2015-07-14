@@ -3,11 +3,11 @@ module Settings.GhcCabal (
     ) where
 
 import Base
-import Oracles.Base
-import Oracles.Builder
+import Builder
+import Package
 import Ways
 import Util
-import Package
+import Oracles.Base
 import Switches
 import Expression
 import Settings.User
@@ -24,18 +24,18 @@ cabalArgs = builder GhcCabal ? do
             , arg $ pkgPath pkg
             , arg $ targetDirectory stage pkg
             , dllArgs
-            , argWith $ Ghc stage
-            , argWith $ GhcPkg stage
+            , with $ Ghc stage
+            , with $ GhcPkg stage
             , stage0 ? bootPackageDbArgs
             , libraryArgs
-            , configKeyNonEmpty "hscolour" ? argWith HsColour
+            , configKeyNonEmpty "hscolour" ? with HsColour
             , configureArgs
             , stage0 ? packageConstraints
-            , argWith $ Gcc stage
-            , notStage Stage0 ? argWith Ld
-            , argWith Ar
-            , argWith Alex
-            , argWith Happy ]
+            , with $ Gcc stage
+            , notStage Stage0 ? with Ld
+            , with Ar
+            , with Alex
+            , with Happy ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 libraryArgs :: Args
@@ -76,7 +76,7 @@ configureArgs = do
         , conf "--with-gmp-libraries"   $ argConfig "gmp-lib-dirs"
         -- TODO: why TargetPlatformFull and not host?
         , crossCompiling ? (conf "--host" $ argConfig "target-platform-full")
-        , conf "--with-cc" . argM . showArg $ Gcc stage ]
+        , conf "--with-cc" . argM . builderPath $ Gcc stage ]
 
 bootPackageDbArgs :: Args
 bootPackageDbArgs = do
@@ -134,3 +134,22 @@ customPackageArgs = mconcat
 
     , package ghcPrim ?
       builder GhcCabal ? arg "--flag=include-ghc-prim" ]
+
+withBuilderKey :: Builder -> String
+withBuilderKey builder = case builder of
+    Ar       -> "--with-ar="
+    Ld       -> "--with-ld="
+    Gcc _    -> "--with-gcc="
+    Ghc _    -> "--with-ghc="
+    Alex     -> "--with-alex="
+    Happy    -> "--with-happy="
+    GhcPkg _ -> "--with-ghc-pkg="
+    HsColour -> "--with-hscolour="
+    _        -> error "withBuilderKey: not supported builder"
+
+-- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
+with :: Builder -> Args
+with builder = do
+    path <- lift $ builderPath builder
+    lift $ needBuilder builder
+    append [withBuilderKey builder ++ path]

@@ -7,7 +7,7 @@ module Target (
 import Base
 import Ways
 import Package
-import Oracles.Builder
+import Builder
 import GHC.Generics
 import Development.Shake.Classes
 

@@ -13,10 +13,10 @@ module Expression (
 
 import Base
 import Ways
+import Builder
+import Package
 import Target
 import Oracles.Base
-import Oracles.Builder
-import Package
 import Data.Monoid
 import Control.Monad.Reader hiding (liftIO)
 

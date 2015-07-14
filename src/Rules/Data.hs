@@ -6,13 +6,13 @@ module Rules.Data (
 
 import Base
 import Package
+import Builder
 import Expression
 import Control.Monad.Extra
-import Oracles.Builder
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.TargetDirectory
-import Rules.Util
+import Rules.Actions
 import Util
 import Ways
 

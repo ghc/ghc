@@ -1,6 +1,6 @@
 module Settings.Util (
     -- Primitive settings elements
-    arg, argM, argWith,
+    arg, argM,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
     appendCcArgs,
     -- argBuilderPath, argStagedBuilderPath,
@@ -12,8 +12,8 @@ module Settings.Util (
     ) where
 
 import Base
+import Builder
 import Oracles.Base
-import Oracles.Builder
 import Expression
 
 -- A single argument
@@ -22,9 +22,6 @@ arg = append . return
 
 argM :: Action String -> Args
 argM = appendM . fmap return
-
-argWith :: Builder -> Args
-argWith = argM . with
 
 argConfig :: String -> Args
 argConfig = appendM . fmap return . askConfig

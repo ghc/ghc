@@ -3,10 +3,10 @@ module Settings.GhcPkg (
     ) where
 
 import Base
+import Builder
 import Switches
 import Expression
 import Settings.Util
-import Oracles.Builder
 import Settings.GhcCabal
 import Settings.TargetDirectory
 
