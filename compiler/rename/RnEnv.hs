@@ -833,10 +833,10 @@ lookupGlobalOccRn_maybe rdr_name
 --   * Nothing         -> name not in scope (no error reported)
 --   * Just (Left x)   -> name uniquely refers to x,
 --                        or there is a name clash (reported)
---   * Just (Right xs) -> name refers to one or more (parent, record selector)
---                        pairs; if overload_ok was False, this list will be
+--   * Just (Right xs) -> name refers to one or more record selectors;
+--                        if overload_ok was False, this list will be
 --                        a singleton.
-lookupOccRn_overloaded  :: Bool -> RdrName -> RnM (Maybe (Either Name [(Name, Name)]))
+lookupOccRn_overloaded  :: Bool -> RdrName -> RnM (Maybe (Either Name [FieldOcc Name]))
 lookupOccRn_overloaded overload_ok rdr_name
   = do { local_env <- getLocalRdrEnv
        ; case lookupLocalRdrEnv local_env rdr_name of {
@@ -853,7 +853,7 @@ lookupOccRn_overloaded overload_ok rdr_name
            (n:_) -> return $ Just $ Left n  -- Unlikely to be more than one...?
            []    -> return Nothing  } } } } }
 
-lookupGlobalOccRn_overloaded :: Bool -> RdrName -> RnM (Maybe (Either Name [(Name, Name)]))
+lookupGlobalOccRn_overloaded :: Bool -> RdrName -> RnM (Maybe (Either Name [FieldOcc Name]))
 lookupGlobalOccRn_overloaded overload_ok rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
   = do { n' <- lookupExactOcc n; return (Just (Left n')) }
@@ -868,18 +868,22 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                 []    -> return Nothing
                 [gre] | isOverloadedRecFldGRE gre
                          -> do { addUsedRdrName True gre rdr_name
-                               ; return (Just (Right [greBits gre])) }
+                               ; return (Just (Right [greToFieldOcc gre])) }
                       | otherwise
                          -> do { addUsedRdrName True gre rdr_name
                                ; return (Just (Left (gre_name gre))) }
                 gres  | all isRecFldGRE gres && overload_ok
                          -> do { mapM_ (\ gre -> addUsedRdrName True gre rdr_name) gres
-                               ; return (Just (Right (map greBits gres))) }
+                               ; return (Just (Right (map greToFieldOcc gres))) }
                 gres     -> do { addNameClashErrRn rdr_name gres
                                ; return (Just (Left (gre_name (head gres)))) } }
   where
-    greBits (GRE{ gre_name = n, gre_par = FldParent { par_is = p }}) = (p, n)
-    greBits gre = pprPanic "lookupGlobalOccRn_overloaded/greBits" (ppr gre)
+    greToFieldOcc :: GlobalRdrElt -> FieldOcc Name
+    greToFieldOcc gre = FieldOcc rdr_name (FieldLabel lbl is_overloaded sel)
+      where
+        lbl           = occNameFS $ rdrNameOcc rdr_name
+        is_overloaded = isOverloadedRecFldGRE gre
+        sel           = gre_name gre
 
 
 --------------------------------------------------

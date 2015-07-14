@@ -55,7 +55,6 @@ import NameSet
 import RdrName
 import BasicTypes
 import Util
-import Maybes
 import ListSetOps          ( removeDups )
 import Outputable
 import SrcLoc
@@ -694,7 +693,7 @@ rnHsRecUpdFields flds
            ; return (L l (HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
                                         , hsRecUpdFieldSel = case sel of
                                                                Left sel_name -> [sel_name]
-                                                               Right xs      -> map snd xs
+                                                               Right xs      -> map (flSelector . labelFieldOcc) xs
                                         , hsRecUpdFieldArg = arg''
                                         , hsRecUpdPun      = pun }), fvs') }
 

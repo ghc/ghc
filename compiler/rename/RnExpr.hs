@@ -109,9 +109,8 @@ rnExpr (HsVar v)
 
               | otherwise
               -> finishHsVar name ;
-           Just (Right ((_, sel_name):ns)) -> ASSERT( null ns )
-                                              -- AMG TODO push up into lookupOccRn_overloaded? False is wrong!
-                                              return (HsSingleRecFld (FieldOcc v (FieldLabel (occNameFS $ rdrNameOcc v) False sel_name)), unitFV sel_name) ;
+           Just (Right (f:fs)) -> ASSERT( null fs )
+                                  return (HsSingleRecFld f, unitFV (flSelector (labelFieldOcc f))) ;
            Just (Right [])                 -> error "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)
