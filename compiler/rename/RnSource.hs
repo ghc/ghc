@@ -25,7 +25,6 @@ import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcAnnotations    ( annCtxt )
 import TcRnMonad
 
-import IfaceEnv
 import ForeignCall      ( CCallTarget(..) )
 import Module
 import HscTypes         ( Warnings(..), plusWarns )
@@ -35,7 +34,6 @@ import Name
 import NameSet
 import NameEnv
 import Avail
-import DataCon
 import Outputable
 import Bag
 import BasicTypes       ( RuleName )
@@ -46,11 +44,10 @@ import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 import Util             ( mapSnd )
-import State
 
 import Control.Monad
 import Data.List( partition, sortBy )
-import Maybes( orElse, mapMaybe, expectJust )
+import Maybes( orElse, mapMaybe )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
 #endif
@@ -217,12 +214,6 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    traceRn (text "finish Dus" <+> ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}
-
--- some utils because we do this a bunch above
--- compute and install the new env
-inNewEnv :: TcM TcGblEnv -> (TcGblEnv -> TcM a) -> TcM a
-inNewEnv env cont = do e <- env
-                       setGblEnv e $ cont e
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
 -- This function could be defined lower down in the module hierarchy,

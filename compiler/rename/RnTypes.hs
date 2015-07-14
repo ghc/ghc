@@ -48,7 +48,7 @@ import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
 import Outputable
 import FastString
 import Maybes
-import Data.List        ( nub, nubBy, find, deleteFirstsBy )
+import Data.List        ( nub, nubBy, deleteFirstsBy )
 import Control.Monad    ( unless, when )
 
 #if __GLASGOW_HASKELL__ < 709

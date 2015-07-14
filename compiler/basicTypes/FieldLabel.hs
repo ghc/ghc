@@ -100,7 +100,7 @@ data FieldLbl a = FieldLabel {
                                           --   in the defining module for this datatype?
       flSelector     :: a                 -- ^ Record selector function
     }
-  deriving (Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable, Typeable)
 deriving instance Data a => Data (FieldLbl a)
 
 instance Outputable a => Outputable (FieldLbl a) where

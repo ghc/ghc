@@ -28,7 +28,6 @@ import TcEvidence
 import CoreSyn
 import Var
 import Name
-import RdrName
 import BasicTypes
 import DataCon
 import SrcLoc

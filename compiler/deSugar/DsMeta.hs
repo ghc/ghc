@@ -50,7 +50,6 @@ import CoreUtils
 import SrcLoc
 import Unique
 import BasicTypes
-import FieldLabel
 import Outputable
 import Bag
 import DynFlags

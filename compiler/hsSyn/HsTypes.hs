@@ -73,7 +73,6 @@ import TysWiredIn
 import PrelNames( ipClassName )
 import HsDoc
 import BasicTypes
-import FieldLabel
 import SrcLoc
 import StaticFlags
 import Outputable
@@ -563,6 +562,7 @@ type LFieldOcc name = Located (FieldOcc name)
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
 data FieldOcc name = FieldOcc RdrName (PostRn name name)
+  deriving Typeable
 deriving instance (DataId name) => Data (FieldOcc name)
 
 instance Outputable (FieldOcc name) where

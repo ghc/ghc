@@ -61,7 +61,7 @@ import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
-import Maybes     ( isNothing, isJust, whenIsJust, catMaybes, expectJust )
+import Maybes     ( isNothing, isJust, whenIsJust, catMaybes )
 import Data.List  ( mapAccumL, partition )
 
 {-

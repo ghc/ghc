@@ -30,7 +30,6 @@ import RnPat
 import DynFlags
 import BasicTypes       ( FixityDirection(..), Fixity(..), minPrecedence )
 import PrelNames
-import FieldLabel
 
 import Name
 import NameSet

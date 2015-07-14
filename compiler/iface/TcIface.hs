@@ -46,7 +46,6 @@ import TyCon
 import CoAxiom
 import ConLike
 import DataCon
-import FieldLabel
 import PrelNames
 import TysWiredIn
 import TysPrim          ( superKindTyConName )

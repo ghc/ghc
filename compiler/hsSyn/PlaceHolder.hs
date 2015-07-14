@@ -12,7 +12,6 @@ import NameSet
 import RdrName
 import Var
 import Coercion
-import FieldLabel
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)

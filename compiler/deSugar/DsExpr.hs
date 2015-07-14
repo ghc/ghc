@@ -22,7 +22,6 @@ import DsArrows
 import DsMonad
 import Name
 import NameEnv
-import RdrName
 import FamInstEnv( topNormaliseType )
 import DsMeta
 import HsSyn
