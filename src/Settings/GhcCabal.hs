@@ -1,8 +1,8 @@
 module Settings.GhcCabal (
-    cabalSettings, bootPackageDbSettings, customPackageSettings
+    cabalArgs, bootPackageDbArgs, customPackageArgs
     ) where
 
-import Base hiding (arg, args)
+import Base
 import Oracles.Base
 import Oracles.Builder
 import Ways
@@ -16,20 +16,20 @@ import Settings.Util
 import Settings.Packages
 import Settings.TargetDirectory
 
-cabalSettings :: Settings
-cabalSettings = builder GhcCabal ? do
+cabalArgs :: Args
+cabalArgs = builder GhcCabal ? do
     stage <- asks getStage
     pkg   <- asks getPackage
     mconcat [ arg "configure"
             , arg $ pkgPath pkg
             , arg $ targetDirectory stage pkg
-            , dllSettings
+            , dllArgs
             , argWith $ Ghc stage
             , argWith $ GhcPkg stage
-            , stage0 ? bootPackageDbSettings
-            , librarySettings
+            , stage0 ? bootPackageDbArgs
+            , libraryArgs
             , configKeyNonEmpty "hscolour" ? argWith HsColour
-            , configureSettings
+            , configureArgs
             , stage0 ? packageConstraints
             , argWith $ Gcc stage
             , notStage Stage0 ? argWith Ld
@@ -38,8 +38,8 @@ cabalSettings = builder GhcCabal ? do
             , argWith Happy ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
-librarySettings :: Settings
-librarySettings = do
+libraryArgs :: Args
+libraryArgs = do
     ways            <- fromDiffExpr Settings.Ways.ways
     ghcInterpreter  <- ghcWithInterpreter
     dynamicPrograms <- dynamicGhcPrograms
@@ -56,15 +56,15 @@ librarySettings = do
              then  "--enable-shared"
              else "--disable-shared" ]
 
-configureSettings :: Settings
-configureSettings = do
+configureArgs :: Args
+configureArgs = do
     stage <- asks getStage
     let conf key = appendSubD $ "--configure-option=" ++ key
-        cFlags   = mconcat [ ccSettings
+        cFlags   = mconcat [ ccArgs
                            , remove ["-Werror"]
                            , argStagedConfig "conf-cc-args" ]
-        ldFlags  = ldSettings <> argStagedConfig "conf-gcc-linker-args"
-        cppFlags = cppSettings <> argStagedConfig "conf-cpp-args"
+        ldFlags  = ldArgs <> argStagedConfig "conf-gcc-linker-args"
+        cppFlags = cppArgs <> argStagedConfig "conf-cpp-args"
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
@@ -78,18 +78,18 @@ configureSettings = do
         , crossCompiling ? (conf "--host" $ argConfig "target-platform-full")
         , conf "--with-cc" . argM . showArg $ Gcc stage ]
 
-bootPackageDbSettings :: Settings
-bootPackageDbSettings = do
+bootPackageDbArgs :: Args
+bootPackageDbArgs = do
     sourcePath <- lift $ askConfig "ghc-source-path"
     arg $ "--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"
 
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;
 -- * otherwise, we must collapse it into one space-separated string.
-dllSettings :: Settings
-dllSettings = arg ""
+dllArgs :: Args
+dllArgs = arg ""
 
-packageConstraints :: Settings
+packageConstraints :: Args
 packageConstraints = do
     pkgs <- fromDiffExpr packages
     constraints <- lift $ forM pkgs $ \pkg -> do
@@ -102,12 +102,12 @@ packageConstraints = do
             [v] -> return $ prefix ++ dropWhile (not . isDigit) v
             _   -> redError $ "Cannot determine package version in '"
                             ++ cabal ++ "'."
-    args $ concatMap (\c -> ["--constraint", c]) $ constraints
+    append $ concatMap (\c -> ["--constraint", c]) $ constraints
 
 -- TODO: should be in a different file
 -- TODO: put all validating options together in one file
-ccSettings :: Settings
-ccSettings = validating ? do
+ccArgs :: Args
+ccArgs = validating ? do
     let gccGe46 = liftM not gccLt46
     mconcat [ arg "-Werror"
             , arg "-Wall"
@@ -116,18 +116,18 @@ ccSettings = validating ? do
                 gccGe46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
               , gccGe46 ? arg "-Wno-error=inline" )]
 
-ldSettings :: Settings
-ldSettings = mempty
+ldArgs :: Args
+ldArgs = mempty
 
-cppSettings :: Settings
-cppSettings = mempty
+cppArgs :: Args
+cppArgs = mempty
 
-customPackageSettings :: Settings
-customPackageSettings = mconcat
+customPackageArgs :: Args
+customPackageArgs = mconcat
     [ package integerGmp2 ?
       mconcat [ windowsHost ? builder GhcCabal ?
                 arg "--configure-option=--with-intree-gmp"
-              , ccArgs ["-Ilibraries/integer-gmp2/gmp"] ]
+              , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
 
     , package base ?
       builder GhcCabal ? arg ("--flags=" ++ pkgName integerLibrary)

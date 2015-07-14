@@ -1,10 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Rules.Data (
-    cabalSettings, ghcPkgSettings, buildPackageData
+    cabalArgs, ghcPkgArgs, buildPackageData
     ) where
 
-import Base hiding (arg, args, Args)
+import Base
 import Package
 import Expression hiding (when, liftIO)
 import Oracles.Flag (when)

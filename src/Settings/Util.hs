@@ -2,9 +2,9 @@
 
 module Settings.Util (
     -- Primitive settings elements
-    arg, argM, args, argWith,
+    arg, argM, argWith,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
-    ccArgs,
+    appendCcArgs,
     -- argBuilderPath, argStagedBuilderPath,
     -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     -- argIncludeDirs, argDepIncludeDirs,
@@ -18,95 +18,91 @@ import Oracles hiding (not)
 import Expression
 
 -- A single argument
-arg :: String -> Settings
+arg :: String -> Args
 arg = append . return
 
-argM :: Action String -> Settings
+argM :: Action String -> Args
 argM = appendM . fmap return
 
--- A list of arguments
-args :: [String] -> Settings
-args = append
-
-argWith :: Builder -> Settings
+argWith :: Builder -> Args
 argWith = argM . with
 
-argConfig :: String -> Settings
+argConfig :: String -> Args
 argConfig = appendM . fmap return . askConfig
 
-argConfigList :: String -> Settings
+argConfigList :: String -> Args
 argConfigList = appendM . fmap words . askConfig
 
 stagedKey :: Stage -> String -> String
 stagedKey stage key = key ++ "-stage" ++ show stage
 
-argStagedConfig :: String -> Settings
+argStagedConfig :: String -> Args
 argStagedConfig key = do
     stage <- asks getStage
     argConfig (stagedKey stage key)
 
-argStagedConfigList :: String -> Settings
+argStagedConfigList :: String -> Args
 argStagedConfigList key = do
     stage <- asks getStage
     argConfigList (stagedKey stage key)
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
-ccArgs :: [String] -> Settings
-ccArgs xs = do
+appendCcArgs :: [String] -> Args
+appendCcArgs xs = do
     stage <- asks getStage
-    mconcat [ builder (Gcc stage) ? args xs
+    mconcat [ builder (Gcc stage) ? append xs
             , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" xs
             , builder GhcCabal    ? appendSub "--gcc-options" xs ]
 
 
 
 
--- packageData :: Arity -> String -> Settings
+-- packageData :: Arity -> String -> Args
 -- packageData arity key =
 --     return $ EnvironmentParameter $ PackageData arity key Nothing Nothing
 
 -- -- Accessing key value pairs from package-data.mk files
--- argPackageKey :: Settings
+-- argPackageKey :: Args
 -- argPackageKey = packageData Single "PACKAGE_KEY"
 
--- argPackageDeps :: Settings
+-- argPackageDeps :: Args
 -- argPackageDeps = packageData Multiple "DEPS"
 
--- argPackageDepKeys :: Settings
+-- argPackageDepKeys :: Args
 -- argPackageDepKeys = packageData Multiple "DEP_KEYS"
 
--- argSrcDirs :: Settings
+-- argSrcDirs :: Args
 -- argSrcDirs = packageData Multiple "HS_SRC_DIRS"
 
--- argIncludeDirs :: Settings
+-- argIncludeDirs :: Args
 -- argIncludeDirs = packageData Multiple "INCLUDE_DIRS"
 
--- argDepIncludeDirs :: Settings
+-- argDepIncludeDirs :: Args
 -- argDepIncludeDirs = packageData Multiple "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
 
--- argPackageConstraints :: Packages -> Settings
+-- argPackageConstraints :: Packages -> Args
 -- argPackageConstraints = return . EnvironmentParameter . PackageConstraints
 
 -- -- Concatenate arguments: arg1 ++ arg2 ++ ...
--- argConcat :: Settings -> Settings
+-- argConcat :: Args -> Args
 -- argConcat = return . Fold Concat
 
 -- -- </>-concatenate arguments: arg1 </> arg2 </> ...
--- argConcatPath :: Settings -> Settings
+-- argConcatPath :: Args -> Args
 -- argConcatPath = return . Fold ConcatPath
 
 -- -- Concatene arguments (space separated): arg1 ++ " " ++ arg2 ++ ...
--- argConcatSpace :: Settings -> Settings
+-- argConcatSpace :: Args -> Args
 -- argConcatSpace = return . Fold ConcatSpace
 
 -- -- An ordered list of pairs of arguments: prefix |> arg1, prefix |> arg2, ...
--- argPairs :: String -> Settings -> Settings
+-- argPairs :: String -> Args -> Args
 -- argPairs prefix settings = settings >>= (arg prefix |>) . return
 
 -- -- An ordered list of prefixed arguments: prefix ++ arg1, prefix ++ arg2, ...
--- argPrefix :: String -> Settings -> Settings
+-- argPrefix :: String -> Args -> Args
 -- argPrefix prefix = fmap (Fold Concat . (arg prefix |>) . return)
 
 -- -- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
--- argPrefixPath :: String -> Settings -> Settings
+-- argPrefixPath :: String -> Args -> Args
 -- argPrefixPath prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)

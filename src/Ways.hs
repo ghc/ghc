@@ -4,7 +4,7 @@ module Ways ( -- TODO: rename to "Way"?
     WayUnit (..),
     Way, tag,
 
-    allWays, defaultWays,
+    allWays,
 
     vanilla, profiling, logging, parallel, granSim,
     threaded, threadedProfiling, threadedLogging,
@@ -13,7 +13,6 @@ module Ways ( -- TODO: rename to "Way"?
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic,
 
-    wayHcArgs,
     wayPrefix,
     hisuf, osuf, hcsuf, obootsuf, ssuf, libsuf,
     detectWay
@@ -87,27 +86,27 @@ allWays = [vanilla, profiling, logging, parallel, granSim,
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic]
 
-defaultWays :: Stage -> Action [Way]
-defaultWays stage = do
-    sharedLibs <- platformSupportsSharedLibs
-    return $ [vanilla]
-          ++ [profiling | stage /= Stage0]
-          ++ [dynamic   | sharedLibs     ]
+-- defaultWays :: Stage -> Action [Way]
+-- defaultWays stage = do
+--     sharedLibs <- platformSupportsSharedLibs
+--     return $ [vanilla]
+--           ++ [profiling | stage /= Stage0]
+--           ++ [dynamic   | sharedLibs     ]
 
 -- TODO: do '-ticky' in all debug ways?
-wayHcArgs :: Way -> Args
-wayHcArgs (Way _ units) = args
-    [ if (Dynamic    `elem` units)
-      then args ["-fPIC", "-dynamic"]
-      else arg "-static"
-    , when (Threaded   `elem` units) $ arg "-optc-DTHREADED_RTS"
-    , when (Debug      `elem` units) $ arg "-optc-DDEBUG"
-    , when (Profiling  `elem` units) $ arg "-prof"
-    , when (Logging    `elem` units) $ arg "-eventlog"
-    , when (Parallel   `elem` units) $ arg "-parallel"
-    , when (GranSim    `elem` units) $ arg "-gransim"
-    , when (units == [Debug] || units == [Debug, Dynamic]) $
-      args ["-ticky", "-DTICKY_TICKY"] ]
+-- wayHcArgs :: Way -> Args
+-- wayHcArgs (Way _ units) = args
+--     [ if (Dynamic    `elem` units)
+--       then args ["-fPIC", "-dynamic"]
+--       else arg "-static"
+--     , when (Threaded   `elem` units) $ arg "-optc-DTHREADED_RTS"
+--     , when (Debug      `elem` units) $ arg "-optc-DDEBUG"
+--     , when (Profiling  `elem` units) $ arg "-prof"
+--     , when (Logging    `elem` units) $ arg "-eventlog"
+--     , when (Parallel   `elem` units) $ arg "-parallel"
+--     , when (GranSim    `elem` units) $ arg "-gransim"
+--     , when (units == [Debug] || units == [Debug, Dynamic]) $
+--       args ["-ticky", "-DTICKY_TICKY"] ]
 
 wayPrefix :: Way -> String
 wayPrefix way | isVanilla way = ""

@@ -4,14 +4,14 @@ module Expression (
     module Data.Monoid,
     module Control.Monad.Reader,
     Expr, DiffExpr, fromDiffExpr,
-    Predicate, Settings, Ways, Packages,
+    Predicate, Args, Ways, Packages,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretExpr,
     applyPredicate, (?), (??), stage, package, builder, file, way,
     configKeyValue, configKeyValues
     ) where
 
-import Base hiding (arg, args, Args, TargetDir)
+import Base hiding (Args)
 import Ways
 import Target
 import Oracles
@@ -47,12 +47,12 @@ instance Monoid (Diff a) where
     Diff x `mappend` Diff y = Diff $ y . x
 
 -- The following expressions are used throughout the build system for
--- specifying conditions (Predicate), lists of arguments (Settings), Ways and
+-- specifying conditions (Predicate), lists of arguments (Args), Ways and
 -- Packages.
 type Predicate = Expr Bool
-type Settings  = DiffExpr [String] -- TODO: rename to Args
-type Ways      = DiffExpr [Way]
+type Args      = DiffExpr [String]
 type Packages  = DiffExpr [Package]
+type Ways      = DiffExpr [Way]
 
 -- Basic operations on expressions:
 -- 1) append something to an expression
@@ -83,7 +83,7 @@ appendM mx = lift mx >>= append
 -- given prefix. If there is no argument with such prefix then a new argument
 -- of the form 'prefix=listOfSubarguments' is appended to the expression.
 -- Note: nothing is done if the list of sub-arguments is empty.
-appendSub :: String -> [String] -> Settings
+appendSub :: String -> [String] -> Args
 appendSub prefix xs
     | xs' == [] = mempty
     | otherwise = return . Diff $ go False
@@ -97,10 +97,10 @@ appendSub prefix xs
 
 -- appendSubD is similar to appendSub but it extracts the list of sub-arguments
 -- from the given DiffExpr.
-appendSubD :: String -> Settings -> Settings
+appendSubD :: String -> Args -> Args
 appendSubD prefix diffExpr = fromDiffExpr diffExpr >>= appendSub prefix
 
-filterSub :: String -> (String -> Bool) -> Settings
+filterSub :: String -> (String -> Bool) -> Args
 filterSub prefix p = return . Diff $ map filterSubstr
   where
     filterSubstr s
@@ -109,7 +109,7 @@ filterSub prefix p = return . Diff $ map filterSubstr
 
 -- Remove given elements from a list of sub-arguments with a given prefix
 -- Example: removeSub "--configure-option=CFLAGS" ["-Werror"]
-removeSub :: String -> [String] -> Settings
+removeSub :: String -> [String] -> Args
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
 -- Interpret a given expression in a given environment

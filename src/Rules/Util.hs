@@ -11,9 +11,9 @@ import Oracles.ArgsHash
 
 build :: Target -> Action ()
 build target = do
-    args <- interpret target settings
+    argList <- interpret target args
     putColoured Green (show target)
-    putColoured Green (show args)
+    putColoured Green (show argList)
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target
-    run (getBuilder target) args
+    run (getBuilder target) argList

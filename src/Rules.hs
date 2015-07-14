@@ -4,7 +4,7 @@ module Rules (
     module Rules.Package,
     ) where
 
-import Base hiding (arg, args, Args)
+import Base
 import Control.Monad
 import Expression
 import Rules.Package

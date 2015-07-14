@@ -1,19 +1,19 @@
 module Settings.User (
     module Settings.Default,
-    userSettings, userPackages, userWays, userTargetDirectory,
+    userArgs, userPackages, userWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
     buildHaddock, validating
     ) where
 
-import Base hiding (arg, args, Args)
+import Base hiding (Args)
 import Package
 import Settings.Default
 import Expression
 
 -- No user-specific settings by default
 -- TODO: rename to userArgs
-userSettings :: Settings
-userSettings = mempty
+userArgs :: Args
+userArgs = mempty
 
 -- Control which packages get to be built
 userPackages :: Packages

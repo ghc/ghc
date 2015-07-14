@@ -1,19 +1,19 @@
 module Settings (
-    settings
+    args
     ) where
 
-import Base hiding (arg, args)
+import Base hiding (arg, args, Args)
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.User
 import Expression hiding (when, liftIO)
 
-settings :: Settings
-settings = defaultSettings <> userSettings
+args :: Args
+args = defaultArgs <> userArgs
 
 -- TODO: add all other settings
-defaultSettings :: Settings
-defaultSettings = mconcat
-    [ cabalSettings
-    , ghcPkgSettings
-    , customPackageSettings ]
+defaultArgs :: Args
+defaultArgs = mconcat
+    [ cabalArgs
+    , ghcPkgArgs
+    , customPackageArgs ]
