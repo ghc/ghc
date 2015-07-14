@@ -566,17 +566,14 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                      , hsRecPun      = pun })) }
 
     rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
-              -> Maybe Name     -- The constructor (Nothing for an update
-                                --    or out of scope constructor)
+              -> Maybe Name     -- The constructor (Nothing for an
+                                --    out of scope constructor)
               -> [LHsRecField Name (Located arg)] -- Explicit fields
               -> RnM [LHsRecField Name (Located arg)]   -- Filled in .. fields
     rn_dotdot Nothing _mb_con _flds     -- No ".." at all
       = return []
-    rn_dotdot (Just {}) Nothing _flds   -- ".." on record update
-      = do { case ctxt of
-                HsRecFieldUpd -> addErr badDotDotUpd
-                _             -> return ()
-           ; return [] }
+    rn_dotdot (Just {}) Nothing _flds   -- Constructor out of scope
+      = return []
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       = ASSERT( n == length flds )
         do { loc <- getSrcSpanM -- Rather approximate
@@ -722,9 +719,6 @@ badDotDotCon :: Name -> SDoc
 badDotDotCon con
   = vcat [ ptext (sLit "Illegal `..' notation for constructor") <+> quotes (ppr con)
          , nest 2 (ptext (sLit "The constructor has no labelled fields")) ]
-
-badDotDotUpd :: SDoc
-badDotDotUpd = ptext (sLit "You cannot use `..' in a record update")
 
 emptyUpdateErr :: SDoc
 emptyUpdateErr = ptext (sLit "Empty record update")

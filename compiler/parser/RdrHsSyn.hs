@@ -1179,8 +1179,9 @@ mkRecConstrOrUpdate
 mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
-mkRecConstrOrUpdate exp _ (fs,dd)
-  = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs) [] [] [])
+mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
+  | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
+  | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs) [] [] [])
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
