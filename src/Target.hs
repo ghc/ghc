@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, TypeSynonymInstances #-}
 module Target (
-    Target (..), stageTarget, stagePackageTarget
+    Target (..), StageTarget (..), StagePackageTarget (..), FullTarget (..),
+    stageTarget, stagePackageTarget, fullTarget
     ) where
 
 import Base
@@ -17,41 +18,59 @@ data Target = Target
      {
         getStage   :: Stage,
         getPackage :: Package,
-        getBuilder :: Builder,
         getFile    :: FilePath, -- TODO: handle multple files?
+        getBuilder :: Builder,
         getWay     :: Way
      }
      deriving (Eq, Generic)
 
--- Shows a target as "package:file@stage (builder, way)"
-instance Show Target where
-    show target = show (getPackage target)
-                  ++ ":" ++ show (getFile target)
-                  ++ "@" ++ show (getStage target)
-                  ++ " (" ++ show (getBuilder target)
-                  ++ ", " ++ show (getWay target) ++ ")"
+-- StageTarget is a Target whose field getStage is already assigned
+type StageTarget = Target
 
-stageTarget :: Stage -> Target
+stageTarget :: Stage -> StageTarget
 stageTarget stage = Target
     {
         getStage   = stage,
         getPackage = error "stageTarget: Package not set",
-        getBuilder = error "stageTarget: Builder not set",
         getFile    = error "stageTarget: File not set",
+        getBuilder = error "stageTarget: Builder not set",
         getWay     = error "stageTarget: Way not set"
     }
 
-stagePackageTarget :: Stage -> Package -> Target
+-- StagePackageTarget is a Target whose fields getStage and getPackage are
+-- already assigned
+type StagePackageTarget = Target
+
+stagePackageTarget :: Stage -> Package -> StagePackageTarget
 stagePackageTarget stage package = Target
     {
         getStage   = stage,
         getPackage = package,
-        getBuilder = error "stagePackageTarget: Builder not set",
         getFile    = error "stagePackageTarget: File not set",
+        getBuilder = error "stagePackageTarget: Builder not set",
         getWay     = error "stagePackageTarget: Way not set"
     }
 
--- Instances for storing Target in the Shake database
-instance Binary Target
-instance NFData Target
-instance Hashable Target
+-- FullTarget is a Target whose fields are all assigned
+type FullTarget = Target
+
+fullTarget :: StagePackageTarget -> FilePath -> Builder -> Way -> FullTarget
+fullTarget target file builder way = target
+    {
+        getFile    = file,
+        getBuilder = builder,
+        getWay     = way
+    }
+
+-- Shows a (full) target as "package:file@stage (builder, way)"
+instance Show FullTarget where
+    show target = show (getPackage target)
+                  ++ ":" ++ getFile target
+                  ++ "@" ++ show (getStage target)
+                  ++ " (" ++ show (getBuilder target)
+                  ++ ", " ++ show (getWay target) ++ ")"
+
+-- Instances for storing FullTarget in the Shake database
+instance Binary FullTarget
+instance NFData FullTarget
+instance Hashable FullTarget

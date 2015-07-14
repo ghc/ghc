@@ -1,4 +1,5 @@
 module Settings.Packages (
+    module Settings.Default,
     packages, knownPackages
     ) where
 
@@ -6,6 +7,7 @@ import Base
 import Package
 import Switches
 import Expression
+import Settings.Default
 import Settings.User
 
 -- Combining default list of packages with user modifications
@@ -25,7 +27,8 @@ packagesStage0 = mconcat
 
 packagesStage1 :: Packages
 packagesStage1 = mconcat
-    [ append [ array, base, bytestring, containers, deepseq, directory
+    [ packagesStage0
+    , append [ array, base, bytestring, containers, deepseq, directory
              , filepath, ghcPrim, haskeline, integerLibrary, parallel
              , pretty, primitive, process, stm, templateHaskell, time ]
     , windowsHost    ? append [win32]

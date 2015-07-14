@@ -9,7 +9,7 @@ import Expression
 import Oracles.Builder
 import Oracles.ArgsHash
 
-build :: Target -> Action ()
+build :: FullTarget -> Action ()
 build target = do
     argList <- interpret target args
     putColoured Green (show target)

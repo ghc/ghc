@@ -6,5 +6,5 @@ import Base
 import Rules.Data
 import Expression
 
-buildPackage :: Target -> Rules ()
+buildPackage :: StagePackageTarget -> Rules ()
 buildPackage = buildPackageData

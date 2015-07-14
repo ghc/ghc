@@ -17,7 +17,7 @@ import Util
 import Ways
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Target -> Rules ()
+buildPackageData :: StagePackageTarget -> Rules ()
 buildPackageData target =
     let stage = getStage target
         pkg   = getPackage target
@@ -33,16 +33,14 @@ buildPackageData target =
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
-            -- TODO: 1) how to automate this? 2) handle multiple files?
-            newTarget = target { getFile = path </> "package-data.mk"
-                               , getWay = vanilla } -- TODO: think
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
-        build $ newTarget { getBuilder = GhcCabal }
+        -- TODO: 1) automate? 2) mutliple files 3) vanilla?
+        build $ fullTarget target (path </> "package-data.mk") GhcCabal vanilla
         -- TODO: when (registerPackage settings) $
-        build $ newTarget { getBuilder = GhcPkg stage }
+        build $ fullTarget target (path </> "package-data.mk") (GhcPkg stage) vanilla
         postProcessPackageData $ path </> "package-data.mk"
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
