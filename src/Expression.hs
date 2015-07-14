@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Expression (
     module Target,
     module Data.Monoid,
@@ -11,13 +11,14 @@ module Expression (
     configKeyValue, configKeyValues
     ) where
 
-import Base hiding (Args)
+import Base
 import Ways
 import Target
-import Oracles
+import Oracles.Base
+import Oracles.Builder
 import Package
 import Data.Monoid
-import Control.Monad.Reader
+import Control.Monad.Reader hiding (liftIO)
 
 -- Expr a is a computation that produces a value of type Action a and can read
 -- parameters of the current build Target.

@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 
 module Oracles.Builder (
     Builder (..), builderKey, withBuilderKey,
@@ -9,8 +8,8 @@ module Oracles.Builder (
 import Data.Char
 import Base
 import Util
-import Oracles.Base
 import Oracles.Flag
+import Oracles.Base
 import Oracles.Option
 import GHC.Generics
 import Development.Shake.Classes
@@ -34,6 +33,7 @@ data Builder = Ar
              | GhcPkg Stage
              deriving (Show, Eq, Generic)
 
+-- Instances for storing Target in the Shake database
 instance Binary Builder
 instance Hashable Builder
 
@@ -148,6 +148,7 @@ interestingInfo builder ss = case builder of
              ++ " arguments ..."]
              ++ drop (length ss - m) ss
 
+-- TODO: remove?
 -- Check if the builder is specified in config files
-specified :: Builder -> Condition
+specified :: Builder -> Action Bool
 specified = fmap (not . null) . showArg

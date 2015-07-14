@@ -3,7 +3,7 @@ module Settings.Ways (
     ) where
 
 import Base
-import Ways hiding (defaultWays)
+import Ways
 import Switches
 import Expression
 import Settings.User

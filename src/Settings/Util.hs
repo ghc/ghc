@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module Settings.Util (
     -- Primitive settings elements
     arg, argM, argWith,
@@ -13,8 +11,9 @@ module Settings.Util (
     -- argPackageConstraints,
     ) where
 
-import Base hiding (Args, arg, args)
-import Oracles hiding (not)
+import Base
+import Oracles.Base
+import Oracles.Builder
 import Expression
 
 -- A single argument

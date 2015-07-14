@@ -5,8 +5,8 @@ module Target (
 
 import Base
 import Ways
-import Oracles
 import Package
+import Oracles.Builder
 import GHC.Generics
 import Development.Shake.Classes
 

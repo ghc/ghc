@@ -5,7 +5,7 @@ module Oracles.ArgsHash (
     ) where
 
 import Development.Shake.Classes
-import Base hiding (args)
+import Base
 import Settings
 import Expression
 

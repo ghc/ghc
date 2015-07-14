@@ -1,11 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 module Oracles.Option (
-    Option (..), MultiOption (..),
-    ghcWithInterpreter, platformSupportsSharedLibs, windowsHost, splitObjects
+    Option (..), MultiOption (..), windowsHost
     ) where
 
 import Base
-import Oracles.Flag
 import Oracles.Base
 
 -- For each Option the files {default.config, user.config} contain
@@ -58,40 +55,7 @@ instance ShowArgs MultiOption where
       where
         showStage = ("-stage" ++) . show
 
-ghcWithInterpreter :: Condition
-ghcWithInterpreter = do
-    os   <- showArg TargetOs
-    arch <- showArg TargetArch
-    return $
-        os `elem` ["mingw32", "cygwin32", "linux", "solaris2",
-                   "freebsd", "dragonfly", "netbsd", "openbsd",
-                   "darwin", "kfreebsdgnu"]
-        &&
-        arch `elem` ["i386", "x86_64", "powerpc", "sparc", "sparc64", "arm"]
-
-platformSupportsSharedLibs :: Condition
-platformSupportsSharedLibs = do
-    platform <- showArg TargetPlatformFull
-    solarisBrokenShld <- test SolarisBrokenShld
-    return $ notElem platform $
-        ["powerpc-unknown-linux",
-         "x86_64-unknown-mingw32",
-         "i386-unknown-mingw32"] ++
-        ["i386-unknown-solaris2" | solarisBrokenShld]
-
-windowsHost :: Condition
+windowsHost :: Action Bool
 windowsHost = do
     hostOsCpp <- showArg HostOsCpp
     return $ hostOsCpp `elem` ["mingw32", "cygwin32"]
-
--- TODO: refactor helper Condition functions into a separate file
-splitObjects :: Stage -> Condition
-splitObjects stage = do
-    arch <- showArg TargetArch
-    os   <- showArg TargetOs
-    not SplitObjectsBroken && not GhcUnregisterised
-        && stage == Stage1
-        && arch `elem` ["i386", "x86_64", "powerpc", "sparc"]
-        && os   `elem` ["mingw32", "cygwin32", "linux", "darwin",
-                       "solaris2", "freebsd", "dragonfly", "netbsd",
-                       "openbsd"]

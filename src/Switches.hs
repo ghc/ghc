@@ -90,3 +90,14 @@ windowsHost = configKeyValues "host-os-cpp" ["mingw32", "cygwin32"]
 
 notWindowsHost :: Predicate
 notWindowsHost = liftM not windowsHost
+
+-- splitObjects :: Stage -> Condition
+-- splitObjects stage = do
+--     arch <- showArg TargetArch
+--     os   <- showArg TargetOs
+--     not SplitObjectsBroken && not GhcUnregisterised
+--         && stage == Stage1
+--         && arch `elem` ["i386", "x86_64", "powerpc", "sparc"]
+--         && os   `elem` ["mingw32", "cygwin32", "linux", "darwin",
+--                        "solaris2", "freebsd", "dragonfly", "netbsd",
+--                        "openbsd"]

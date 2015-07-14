@@ -1,4 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 module Rules (
     generateTargets, packageRules, oracleRules,
     module Rules.Package,

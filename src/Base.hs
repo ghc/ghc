@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric, FlexibleInstances #-}
 
 module Base (
     module Development.Shake,
@@ -11,12 +10,11 @@ module Base (
     Stage (..),
     Arg, ArgList,
     ShowArg (..), ShowArgs (..),
-    Condition (..),
     filterOut,
     productArgs, concatArgs
     ) where
 
-import Development.Shake hiding ((*>), alternatives)
+import Development.Shake hiding ((*>))
 import Development.Shake.FilePath
 import Control.Applicative
 import Data.Function
@@ -38,8 +36,6 @@ instance Hashable Stage
 -- to be passed to a Builder
 type Arg     = Action String
 type ArgList = Action [String]
-
-type Condition = Action Bool
 
 instance Monoid a => Monoid (Action a) where
     mempty = return mempty

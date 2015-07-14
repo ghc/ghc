@@ -1,10 +1,5 @@
 module Oracles (
     module Oracles.Base,
-    module Oracles.Flag,
-    module Oracles.Option,
-    module Oracles.Builder,
-    module Oracles.PackageData,
-    module Oracles.DependencyList,
     configOracle, packageDataOracle, dependencyOracle
     ) where
 
@@ -17,10 +12,8 @@ import Base
 import Util
 import Config
 import Oracles.Base
-import Oracles.Flag
-import Oracles.Option
-import Oracles.Builder
 import Oracles.PackageData
+import Control.Monad.Extra
 import Oracles.DependencyList
 
 defaultConfig, userConfig :: FilePath
@@ -31,7 +24,7 @@ userConfig    = cfgPath </> "user.config"
 configOracle :: Rules ()
 configOracle = do
     cfg <- newCache $ \() -> do
-        unless (doesFileExist $ defaultConfig <.> "in") $
+        unlessM (doesFileExist $ defaultConfig <.> "in") $
             redError_ $ "\nDefault configuration file '"
                       ++ (defaultConfig <.> "in")
                       ++ "' is missing; unwilling to proceed."

@@ -9,7 +9,7 @@ import Ways
 import Util
 import Package
 import Switches
-import Expression hiding (liftIO)
+import Expression
 import Settings.User
 import Settings.Ways
 import Settings.Util

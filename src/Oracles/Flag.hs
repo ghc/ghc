@@ -1,15 +1,8 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, MultiParamTypeClasses #-}
-
 module Oracles.Flag (
-    module Control.Monad,
-    module Prelude,
     Flag (..),
-    test, when, unless, not, (&&), (||)
+    test
     ) where
 
-import qualified Prelude
-import Prelude hiding (not, (&&), (||))
-import Control.Monad hiding (when, unless)
 import Base
 import Util
 import Oracles.Base
@@ -49,66 +42,3 @@ test flag = do
                 ++ "'.\n"
            return defaultString
     return $ value == "YES"
-
-class ToCondition a where
-    toCondition :: a -> Condition
-
-instance ToCondition Condition where
-    toCondition = id
-
-instance ToCondition Bool where
-    toCondition = return
-
-instance ToCondition Flag where
-    toCondition = test
-
-when :: (ToCondition a, Monoid m) => a -> Action m -> Action m
-when x act = do
-    bool <- toCondition x
-    if bool then act else mempty
-
-unless :: (ToCondition a, Monoid m) => a -> Action m -> Action m
-unless x act = do
-    bool <- toCondition x
-    if bool then mempty else act
-
-class Not a where
-    type NotResult a
-    not :: a -> NotResult a
-
-instance Not Bool where
-    type NotResult Bool = Bool
-    not = Prelude.not
-
-instance Not Condition where
-    type NotResult Condition = Condition
-    not = fmap not
-
-instance Not Flag where
-    type NotResult Flag = Condition
-    not = not . toCondition
-
-class AndOr a b where
-    type AndOrResult a b
-    (&&) :: a -> b -> AndOrResult a b
-    (||) :: a -> b -> AndOrResult a b
-
-infixr 3 &&
-infixr 2 ||
-
-instance AndOr Bool Bool where
-    type AndOrResult Bool Bool = Bool
-    (&&) = (Prelude.&&)
-    (||) = (Prelude.||)
-
-instance ToCondition a => AndOr Condition a where
-    type AndOrResult Condition a = Condition
-    x && y = (&&) <$> x <*> toCondition y
-    x || y = (||) <$> x <*> toCondition y
-
-instance ToCondition a => AndOr Flag a where
-    type AndOrResult Flag a = Condition
-    x && y = toCondition x && y
-    x || y = toCondition x || y
-
--- TODO: need more instances to handle Bool as first argument of (&&), (||)

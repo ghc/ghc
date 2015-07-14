@@ -6,8 +6,8 @@ module Rules.Data (
 
 import Base
 import Package
-import Expression hiding (when, liftIO)
-import Oracles.Flag (when)
+import Expression
+import Control.Monad.Extra
 import Oracles.Builder
 import Settings.GhcPkg
 import Settings.GhcCabal
@@ -39,7 +39,7 @@ buildPackageData target =
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
-        when (doesFileExist $ configure <.> "ac") $ need [configure]
+        whenM (doesFileExist $ configure <.> "ac") $ need [configure]
         build $ newTarget { getBuilder = GhcCabal }
         -- TODO: when (registerPackage settings) $
         build $ newTarget { getBuilder = GhcPkg stage }

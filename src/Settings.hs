@@ -2,11 +2,11 @@ module Settings (
     args
     ) where
 
-import Base hiding (arg, args, Args)
+import Base
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.User
-import Expression hiding (when, liftIO)
+import Expression
 
 args :: Args
 args = defaultArgs <> userArgs

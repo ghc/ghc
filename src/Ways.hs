@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 module Ways ( -- TODO: rename to "Way"?
     WayUnit (..),
     Way, tag,
@@ -19,7 +18,7 @@ module Ways ( -- TODO: rename to "Way"?
     ) where
 
 import Base
-import Oracles
+import Oracles.Option
 import GHC.Generics
 import Development.Shake.Classes
 

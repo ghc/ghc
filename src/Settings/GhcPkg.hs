@@ -4,7 +4,7 @@ module Settings.GhcPkg (
 
 import Base
 import Switches
-import Expression hiding (when, liftIO)
+import Expression
 import Settings.Util
 import Oracles.Builder
 import Settings.GhcCabal

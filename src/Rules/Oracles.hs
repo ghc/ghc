@@ -2,7 +2,7 @@ module Rules.Oracles (
     oracleRules
     ) where
 
-import Base hiding (arg, args, Args)
+import Base
 import Oracles
 import Oracles.ArgsHash
 
