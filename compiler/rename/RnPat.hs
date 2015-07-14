@@ -552,7 +552,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
             Nothing  -> ptext (sLit "constructor field name")
             Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
 
-    rn_fld :: Bool -> Parent -> LHsRecField RdrName (Located arg) -> RnM (LHsRecField Name (Located arg))
+    rn_fld :: Bool -> Maybe Name -> LHsRecField RdrName (Located arg)
+           -> RnM (LHsRecField Name (Located arg))
     rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl _)
                                           , hsRecFieldArg = arg
                                           , hsRecPun      = pun }))
@@ -611,7 +612,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ]
 
-           ; addUsedRdrNames (map (\ (_, _, gre) -> greUsedRdrName gre) dot_dot_gres) -- AMG TODO wrong
+           ; addUsedRdrNames (map (\ (_, _, gre) -> greUsedRdrName gre) dot_dot_gres)
            ; return [ L loc (HsRecField
                         { hsRecFieldLbl = L loc (FieldOcc arg_rdr sel)
                         , hsRecFieldArg = L loc (mk_arg arg_rdr)
@@ -619,12 +620,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                     | (lbl, sel, _) <- dot_dot_gres
                     , let arg_rdr = mkVarUnqual lbl ] }
 
-    check_disambiguation :: Bool -> Maybe Name -> RnM Parent
-    -- When disambiguation is on,
+    check_disambiguation :: Bool -> Maybe Name -> RnM (Maybe Name)
+    -- When disambiguation is on, return name of parent tycon.
     check_disambiguation disambig_ok mb_con
       | disambig_ok, Just con <- mb_con
-      = do { env <- getGlobalRdrEnv; return (ParentIs (find_tycon env con)) }
-      | otherwise = return NoParent
+      = do { env <- getGlobalRdrEnv; return (Just (find_tycon env con)) }
+      | otherwise = return Nothing
 
     find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Name {- TyCon -}
     -- Return the parent *type constructor* of the data constructor
@@ -676,7 +677,7 @@ rnHsRecUpdFields flds
                                       Nothing -> do { addErr (unknownSubordinateErr doc lbl)
                                                     ; return (Right []) }
                                       Just r  -> return r }
-                          else fmap Left $ lookupSubBndrOcc True NoParent doc lbl
+                          else fmap Left $ lookupSubBndrOcc True Nothing doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                              ; return (L loc (HsVar lbl)) }

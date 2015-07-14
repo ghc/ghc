@@ -414,7 +414,7 @@ lookupInstDeclBndr cls what rdr
                                 -- warnings when a deprecated class
                                 -- method is defined. We only warn
                                 -- when it's used
-                          (ParentIs cls) doc rdr }
+                          (Just cls) doc rdr }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
 
@@ -461,8 +461,8 @@ lookupConstructorFields con_name
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 lookupSubBndrOcc :: Bool
-                 -> Parent  -- NoParent   => just look it up as usual
-                            -- ParentIs p => use p to disambiguate
+                 -> Maybe Name  -- Nothing => just look it up as usual
+                                -- Just p  => use parent p to disambiguate
                  -> SDoc -> RdrName
                  -> RnM Name
 lookupSubBndrOcc warnIfDeprec parent doc rdr_name
@@ -496,19 +496,16 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
       | isQual rdr_name = rdr_name
       | otherwise       = greUsedRdrName gre
 
-lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
--- If Parent = NoParent, just do a normal lookup
--- If Parent = Parent p then find all GREs that
+lookupSubBndrGREs :: GlobalRdrEnv -> Maybe Name -> RdrName -> [GlobalRdrElt]
+-- If parent = Nothing, just do a normal lookup
+-- If parent = Just p then find all GREs that
 --   (a) have parent p
 --   (b) for Unqual, are in scope qualified or unqualified
 --       for Qual, are in scope with that qualification
 lookupSubBndrGREs env parent rdr_name
   = case parent of
-      NoParent   -> pickGREs rdr_name gres
-      ParentIs p
-        | isUnqual rdr_name -> filter (parent_is p) gres
-        | otherwise         -> filter (parent_is p) (pickGREs rdr_name gres)
-      FldParent { par_is = p }
+      Nothing               -> pickGREs rdr_name gres
+      Just p
         | isUnqual rdr_name -> filter (parent_is p) gres
         | otherwise         -> filter (parent_is p) (pickGREs rdr_name gres)
 
@@ -1196,7 +1193,7 @@ lookupBindGroupOcc ctxt what rdr_name
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv
-           ; let gres = lookupSubBndrGREs env (ParentIs cls) rdr_name
+           ; let gres = lookupSubBndrGREs env (Just cls) rdr_name
            ; case gres of
                []      -> return (Left (unknownSubordinateErr doc rdr_name))
                (gre:_) -> return (Right (gre_name gre)) }
