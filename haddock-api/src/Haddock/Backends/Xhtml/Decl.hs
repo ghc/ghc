@@ -268,7 +268,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
-      = ppInstances links instances docname unicode qual
+      = ppInstances links instances Nothing docname unicode qual
 
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
@@ -439,6 +439,8 @@ ppClassDecl summary links instances fixities loc d subdocs
   | otherwise = classheader +++ docSection Nothing qual d
                   +++ minimalBit +++ atBit +++ methodBit +++ instancesBit
   where
+    sigs = map unLoc lsigs
+
     classheader
       | any isVanillaLSig lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
       | otherwise = topDeclElem links loc splice [nm] (hdr unicode qual <+> fixs)
@@ -458,7 +460,7 @@ ppClassDecl summary links instances fixities loc d subdocs
                             subfixs = [ f | f@(n',_) <- fixities, n == n' ] ]
 
     methodBit = subMethods [ ppFunSig summary links loc doc names typ subfixs splice unicode qual
-                           | L _ (TypeSig lnames (L _ typ) _) <- lsigs
+                           | TypeSig lnames (L _ typ) _ <- sigs
                            , let doc = lookupAnySubdoc (head names) subdocs
                                  subfixs = [ f | n <- names
                                                , f@(n',_) <- fixities
@@ -468,15 +470,15 @@ ppClassDecl summary links instances fixities loc d subdocs
                            -- there are different subdocs for different names in a single
                            -- type signature?
 
-    minimalBit = case [ s | L _ (MinimalSig _ s) <- lsigs ] of
+    minimalBit = case [ s | MinimalSig _ s <- sigs ] of
       -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
-                   sort [getName n | L _ (TypeSig ns _ _) <- lsigs, L _ n <- ns]
+                   sort [getName n | TypeSig ns _ _ <- sigs, L _ n <- ns]
         -> noHtml
 
       -- Minimal complete definition = the only shown method
       Var (L _ n) : _ | [getName n] ==
-                        [getName n' | L _ (TypeSig ns _ _) <- lsigs, L _ n' <- ns]
+                        [getName n' | TypeSig ns _ _ <- sigs, L _ n' <- ns]
         -> noHtml
 
       -- Minimal complete definition = nothing
@@ -490,13 +492,16 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instancesBit = ppInstances links instances nm unicode qual
+    instancesBit = ppInstances links instances (Just sigs) nm unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
-ppInstances :: LinksInfo -> [DocInstance DocName] -> DocName -> Unicode -> Qualification -> Html
-ppInstances links instances baseName unicode qual
+ppInstances :: LinksInfo
+            -> [DocInstance DocName] -> Maybe [Sig DocName] -> DocName
+            -> Unicode -> Qualification
+            -> Html
+ppInstances links instances _ baseName unicode qual
   = subInstances qual instName links True (map instDecl instances)
   -- force Splice = True to use line URLs
   where
@@ -581,7 +586,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
                                      (map unLoc (con_names (unLoc c)))) fixities
       ]
 
-    instancesBit = ppInstances links instances docname unicode qual
+    instancesBit = ppInstances links instances Nothing docname unicode qual
 
 
 
