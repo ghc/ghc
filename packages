@@ -1,7 +1,6 @@
 # Despite the name "package", this file contains the master list of
 # the *repositories* that make up GHC. It is parsed by
 # * boot
-# * sync-all
 # * rules/foreachLibrary.mk
 #
 # Some of this information is duplicated elsewhere in the build system:
@@ -30,17 +29,8 @@
 #     GitHub and GHC developers are granted push-rights for are denoted by
 #     being specified with the `ssh://` scheme. Thus, `https://`
 #     repo urls denote read-only access.
-#
-#   * The 'tag' determines when "sync-all get" will get the
-#     repo. If the tag is "-" then it will always get it, but if there
-#     is a tag then a corresponding flag must be given to "sync-all", e.g.
-#     if you want to get the packages with an "extralibs"
-#     tag then you need to use "sync-all --extra get".
-#     Support for new tags must be manually added to the "sync-all" script.
-#
-#     'tag' is also used to determine which packages the build system
-#     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra'
-#     both give this property
+#   * 'tag', in combination with the variables BUILD_DPH and BUILD_EXTRA_PKGS,
+#     determines which packages are build by default.
 #
 # Lines that start with a '#' are comments.
 #
