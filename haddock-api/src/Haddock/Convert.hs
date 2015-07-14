@@ -266,18 +266,14 @@ synifyDataCon use_gadt_syntax dc =
   -- skip any EqTheta, use 'orig'inal syntax
   ctx = synifyCtx theta
 
-  linear_tys = zipWith (\ty bang ->
-            let tySyn = synifyType WithinType ty
-                src_bang = case bang of
-                             HsUnpack {} -> HsSrcBang Nothing SrcUnpack SrcStrict
-                             HsStrict    -> HsSrcBang Nothing SrcNoUnpack SrcStrict
-                             HsLazy      -> HsSrcBang Nothing NoSrcUnpack NoSrcStrictness
-                             _           -> bang
-            in case src_bang of
-                 (HsSrcBang _ NoSrcUnpack NoSrcStrictness) -> tySyn
-                 _        -> noLoc $ HsBangTy bang tySyn
-          )
-          arg_tys (dataConSrcBangs dc)
+  linear_tys =
+    zipWith (\ty bang ->
+               let tySyn = synifyType WithinType ty
+               in case bang of
+                    (HsSrcBang _ NoSrcUnpack NoSrcStrict) -> tySyn
+                    bang' -> noLoc $ HsBangTy bang' tySyn)
+            arg_tys (dataConSrcBangs dc)
+
   field_tys = zipWith (\field synTy -> noLoc $ ConDeclField
                                                [synifyName field] synTy Nothing)
                 (dataConFieldLabels dc) linear_tys

@@ -822,9 +822,7 @@ pp_hs_context cxt unicode = parenList (map (ppType unicode) cxt)
 -------------------------------------------------------------------------------
 
 
-ppBang :: HsBang -> LaTeX
-ppBang HsStrict                  = char '!'
-ppBang (HsUnpack {})             = char '!'
+ppBang :: HsSrcBang -> LaTeX
 ppBang (HsSrcBang _ _ SrcStrict) = char '!'
 ppBang (HsSrcBang _ _ SrcLazy)   = char '~'
 ppBang _                         = empty
