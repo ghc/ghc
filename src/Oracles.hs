@@ -5,7 +5,7 @@ module Oracles (
     module Oracles.Builder,
     module Oracles.PackageData,
     module Oracles.DependencyList,
-    oracleRules
+    configOracle, packageDataOracle, dependencyOracle
     ) where
 
 import Development.Shake.Config
@@ -81,9 +81,6 @@ dependencyOracle = do
     addOracle $ \(DependencyListKey (file, obj)) ->
         M.lookup (unifyPath obj) <$> deps (unifyPath file)
     return ()
-
-oracleRules :: Rules ()
-oracleRules = configOracle <> packageDataOracle <> dependencyOracle
 
 -- Make oracle's output more distinguishable
 putOracle :: String -> Action ()

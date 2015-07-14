@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module Ways ( -- TODO: rename to "Way"?
     WayUnit (..),
@@ -20,6 +21,8 @@ module Ways ( -- TODO: rename to "Way"?
 
 import Base
 import Oracles
+import GHC.Generics
+import Development.Shake.Classes
 
 data WayUnit = Profiling
              | Logging
@@ -28,17 +31,23 @@ data WayUnit = Profiling
              | Threaded
              | Debug
              | Dynamic
-             deriving Eq
+             deriving (Eq, Generic)
 
 -- TODO: think about Booleans instead of a list of ways.
 data Way = Way
      {
          tag         :: String,    -- e.g., "thr_p"
          units       :: [WayUnit]  -- e.g., [Threaded, Profiling]
-     }
+     } deriving Generic
 
 instance Show Way where
     show = tag
+
+instance Binary WayUnit
+instance Binary Way
+
+instance Hashable Way where
+    hashWithSalt salt = hashWithSalt salt . show
 
 instance Eq Way where
     -- The tag is fully determined by the units

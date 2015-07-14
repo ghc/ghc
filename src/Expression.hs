@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 module Expression (
     module Control.Monad.Reader,
@@ -17,6 +18,8 @@ import Ways
 import Oracles
 import Package
 import Data.Monoid
+import Development.Shake.Classes
+import GHC.Generics
 import Control.Monad.Reader
 
 -- Target captures parameters relevant to the current build target: Stage and
@@ -30,6 +33,19 @@ data Target = Target
         getFile    :: FilePath, -- TODO: handle multple files?
         getWay     :: Way
      }
+     deriving (Eq, Generic)
+
+-- Shows a target as "package:file@stage (builder, way)"
+instance Show Target where
+    show target = show (getPackage target)
+                  ++ ":" ++ show (getFile target)
+                  ++ "@" ++ show (getStage target)
+                  ++ " (" ++ show (getBuilder target)
+                  ++ ", " ++ show (getWay target) ++ ")"
+
+instance Binary Target
+instance NFData Target
+instance Hashable Target
 
 stageTarget :: Stage -> Target
 stageTarget stage = Target

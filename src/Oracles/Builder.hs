@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Oracles.Builder (
@@ -11,6 +12,8 @@ import Util
 import Oracles.Base
 import Oracles.Flag
 import Oracles.Option
+import GHC.Generics
+import Development.Shake.Classes
 
 -- A Builder is an external command invoked in separate process using Shake.cmd
 --
@@ -29,7 +32,10 @@ data Builder = Ar
              | Gcc Stage
              | Ghc Stage
              | GhcPkg Stage
-             deriving (Show, Eq)
+             deriving (Show, Eq, Generic)
+
+instance Binary Builder
+instance Hashable Builder
 
 builderKey :: Builder -> String
 builderKey builder = case builder of

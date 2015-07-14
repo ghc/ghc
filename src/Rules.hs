@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Rules (
-    generateTargets, packageRules,
+    generateTargets, packageRules, oracleRules,
     module Rules.Package,
     ) where
 
@@ -8,6 +8,7 @@ import Base hiding (arg, args, Args)
 import Control.Monad
 import Expression
 import Rules.Package
+import Rules.Oracles
 import Settings.Packages
 import Settings.TargetDirectory
 

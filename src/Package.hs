@@ -1,7 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Package (Package (..), library, topLevel, setCabal) where
 
 import Base
 import Util
+import GHC.Generics
+import Development.Shake.Classes
 
 -- pkgPath is the path to the source code relative to the root
 data Package = Package
@@ -10,6 +14,7 @@ data Package = Package
          pkgPath  :: FilePath, -- "libraries/deepseq", "libraries/Cabal/Cabal"
          pkgCabal :: FilePath  -- "deepseq.cabal", "Cabal.cabal" (relative)
      }
+     deriving Generic
 
 instance Show Package where
     show = pkgName
@@ -19,6 +24,11 @@ instance Eq Package where
 
 instance Ord Package where
     compare = compare `on` pkgName
+
+instance Binary Package
+
+instance Hashable Package where
+    hashWithSalt salt = hashWithSalt salt . show
 
 -- TODO: check if unifyPath is actually needed
 library :: String -> Package

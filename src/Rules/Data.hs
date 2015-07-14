@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+
 module Rules.Data (
     cabalSettings, ghcPkgSettings, buildPackageData
     ) where
@@ -7,11 +9,13 @@ import Package
 import Expression hiding (when, liftIO)
 import Oracles.Flag (when)
 import Oracles.Builder
+import Oracles.ArgsHash
 import Settings
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.TargetDirectory
 import Util
+import Ways
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Target -> Rules ()
@@ -31,21 +35,25 @@ buildPackageData target =
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
             -- TODO: 1) how to automate this? 2) handle multiple files?
-            newEnv    = target { getFile = path </> "package-data.mk" }
+            newTarget = target { getFile = path </> "package-data.mk" }
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        run' newEnv GhcCabal
+        run' newTarget GhcCabal
         -- TODO: when (registerPackage settings) $
-        run' newEnv (GhcPkg stage)
+        run' newTarget (GhcPkg stage)
         postProcessPackageData $ path </> "package-data.mk"
 
 -- TODO: This should probably go to Oracles.Builder
 run' :: Target -> Builder -> Action ()
 run' target builder = do
-    args <- interpret (target {getBuilder = builder}) settings
+    let finalTarget = target {getBuilder = builder, getWay = vanilla }
+    args <- interpret finalTarget settings
     putColoured Green (show args)
+    -- The line below forces the rule to be rerun if the hash has changed
+    argsHash <- askArgsHash finalTarget
+    putColoured Yellow (show argsHash)
     run builder args
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:

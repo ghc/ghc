@@ -48,7 +48,7 @@ previously: pass the final lists of arguments through oracles. Care must
 be taken though as final command lines can be as large as 5Mb and may bloat
 the Shake database!
 
-=> hash command lines and channel them through oracles
+=> DONE: hash command lines and channel them through oracles
 
 ================================================
 
@@ -148,6 +148,7 @@ getPackage, getBuilder, getFile, getWay. Hence, it may be OK to have only
 GetStage env, (GetStage env, GetPackage env), etc.
 
 ==============================================
+DONE:
 
 stageEnvironment :: Environment
 stageEnvironment stage = Environment

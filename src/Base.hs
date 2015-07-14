@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Base (
@@ -22,11 +23,16 @@ import Control.Applicative
 import Data.Function
 import Data.Monoid
 import Data.List
+import GHC.Generics
+import Development.Shake.Classes
 
-data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum)
+data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum, Generic)
 
 instance Show Stage where
     show = show . fromEnum
+
+instance Binary Stage
+instance Hashable Stage
 
 -- The returned string or list of strings is a part of an argument list
 -- to be passed to a Builder
