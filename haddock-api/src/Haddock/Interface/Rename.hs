@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 ----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Rename
@@ -261,16 +262,20 @@ renameLContext (L loc context) = do
   return (L loc context')
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
-renameInstHead (className, k, types, rest) = do
-  className' <- rename className
-  k' <- mapM renameType k
-  types' <- mapM renameType types
-  rest' <- case rest of
+renameInstHead InstHead {..} = do
+  cname <- rename ihdClsName
+  kinds <- mapM renameType ihdKinds
+  types <- mapM renameType ihdTypes
+  itype <- case ihdInstType of
     ClassInst cs -> ClassInst <$> mapM renameType cs
     TypeInst  ts -> TypeInst  <$> traverse renameType ts
     DataInst  dd -> DataInst  <$> renameTyClD dd
-  return (className', k', types', rest')
-
+  return InstHead
+    { ihdClsName = cname
+    , ihdKinds = kinds
+    , ihdTypes = types
+    , ihdInstType = itype
+    }
 
 renameLDecl :: LHsDecl Name -> RnM (LHsDecl DocName)
 renameLDecl (L loc d) = return . L loc =<< renameDecl d

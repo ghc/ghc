@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# LANGUAGE RecordWildCards #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.LaTeX
@@ -560,12 +561,13 @@ ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
 
 
 ppInstHead :: Bool -> InstHead DocName -> LaTeX
-ppInstHead unicode (n, ks, ts, ClassInst ctx) = ppContextNoLocs ctx unicode <+> ppAppNameTypes n ks ts unicode
-ppInstHead unicode (n, ks, ts, TypeInst rhs) = keyword "type"
-  <+> ppAppNameTypes n ks ts unicode
-  <+> maybe empty (\t -> equals <+> ppType unicode t) rhs
-ppInstHead _unicode (_n, _ks, _ts, DataInst _dd) =
-  error "data instances not supported by --latex yet"
+ppInstHead unicode (InstHead {..}) = case ihdInstType of
+    ClassInst ctx -> ppContextNoLocs ctx unicode <+> typ
+    TypeInst rhs -> keyword "type" <+> typ <+> tibody rhs
+    DataInst _ -> error "data instances not supported by --latex yet"
+  where
+    typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode
+    tibody = maybe empty (\t -> equals <+> ppType unicode t)
 
 lookupAnySubdoc :: (Eq name1) =>
                    name1 -> [(name1, DocForDecl name2)] -> DocForDecl name2

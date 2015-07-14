@@ -1,4 +1,5 @@
 {-# LANGUAGE TransformListComp #-}
+{-# LANGUAGE RecordWildCards #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Html.Decl
@@ -507,15 +508,21 @@ ppInstances links instances _ baseName unicode qual
   where
     instName = getOccString $ getName baseName
     instDecl :: DocInstance DocName -> (SubDecl,Located DocName)
-    instDecl (inst, maybeDoc,l) = ((instHead inst, maybeDoc, []),l)
-    instHead (n, ks, ts, ClassInst cs) = ppContextNoLocs cs unicode qual
-        <+> ppAppNameTypes n ks ts unicode qual
-    instHead (n, ks, ts, TypeInst rhs) = keyword "type"
-        <+> ppAppNameTypes n ks ts unicode qual
+    instDecl (inst, maybeDoc,l) =
+        ((ppInstHead links unicode qual inst, maybeDoc, []),l)
+
+ppInstHead :: LinksInfo -> Unicode -> Qualification
+           -> InstHead DocName
+           -> Html
+ppInstHead _ unicode qual (InstHead {..}) = case ihdInstType of
+    ClassInst cs -> ppContextNoLocs cs unicode qual <+> typ
+    TypeInst rhs -> keyword "type" <+> typ
         <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
-    instHead (n, ks, ts, DataInst dd) = keyword "data"
-        <+> ppAppNameTypes n ks ts unicode qual
+    DataInst dd -> keyword "data" <+> typ
         <+> ppShortDataDecl False True dd unicode qual
+  where
+    typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
+
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n

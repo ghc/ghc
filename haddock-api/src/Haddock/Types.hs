@@ -308,7 +308,12 @@ type DocInstance name = (InstHead name, Maybe (MDoc name), Located name)
 
 -- | The head of an instance. Consists of a class name, a list of kind
 -- parameters, a list of type parameters and an instance type
-type InstHead name = (name, [HsType name], [HsType name], InstType name)
+data InstHead name = InstHead
+    { ihdClsName :: name
+    , ihdKinds :: [HsType name]
+    , ihdTypes :: [HsType name]
+    , ihdInstType :: InstType name
+    }
 
 -----------------------------------------------------------------------------
 -- * Documentation comments

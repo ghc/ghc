@@ -390,23 +390,29 @@ synifyKindSig :: Kind -> LHsKind Name
 synifyKindSig k = synifyType WithinType k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
-synifyInstHead (_, preds, cls, types) =
-  ( getName cls
-  , map (unLoc . synifyType WithinType) ks
-  , map (unLoc . synifyType WithinType) ts
-  , ClassInst $ map (unLoc . synifyType WithinType) preds
-  )
+synifyInstHead (_, preds, cls, types) = InstHead
+  { ihdClsName = getName cls
+  , ihdKinds = map (unLoc . synifyType WithinType) ks
+  , ihdTypes = map (unLoc . synifyType WithinType) ts
+  , ihdInstType = ClassInst $ map (unLoc . synifyType WithinType) preds
+  }
   where (ks,ts) = break (not . isKind) types
 
 -- Convert a family instance, this could be a type family or data family
 synifyFamInst :: FamInst -> Bool -> Either ErrMsg (InstHead Name)
-synifyFamInst fi opaque =
-  let fff = case fi_flavor fi of
-        SynFamilyInst | opaque -> return $ TypeInst Nothing
-        SynFamilyInst ->
-          return . TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
-        DataFamilyInst c ->
-          synifyTyCon (Just $ famInstAxiom fi) c >>= return . DataInst
-  in fff >>= \f' -> return (fi_fam fi , map (unLoc . synifyType WithinType) ks,
-                            map (unLoc . synifyType WithinType) ts , f')
-  where (ks,ts) = break (not . isKind) $ fi_tys fi
+synifyFamInst fi opaque = do
+    ityp' <- ityp $ fi_flavor fi
+    return InstHead
+        { ihdClsName = fi_fam fi
+        , ihdKinds = synifyTypes ks
+        , ihdTypes = synifyTypes ts
+        , ihdInstType = ityp'
+        }
+  where
+    ityp SynFamilyInst | opaque = return $ TypeInst Nothing
+    ityp SynFamilyInst =
+        return . TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
+    ityp (DataFamilyInst c) =
+        DataInst <$> synifyTyCon (Just $ famInstAxiom fi) c
+    (ks,ts) = break (not . isKind) $ fi_tys fi
+    synifyTypes = map (unLoc. synifyType WithinType)

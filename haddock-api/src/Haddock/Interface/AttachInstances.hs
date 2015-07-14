@@ -108,7 +108,7 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
 
     attachFixities e = e
     -- spanName: attach the location to the name that is the same file as the instance location
-    spanName s (clsn,_,_,_) (L instL instn) =
+    spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
         let s1 = getSrcSpan s
             sn = if srcSpanFileName_maybe s1 == srcSpanFileName_maybe instL
                     then instn
