@@ -640,7 +640,6 @@ data ExtensionFlag
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
    | Opt_AllowDuplicateRecordFields
-   | Opt_OverloadedRecordFields
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
@@ -3153,7 +3152,6 @@ xFlags = [
   flagSpec' "OverlappingInstances"            Opt_OverlappingInstances
                                               setOverlappingInsts,
   flagSpec "OverloadedLists"                  Opt_OverloadedLists,
-  flagSpec "OverloadedRecordFields"           Opt_OverloadedRecordFields,
   flagSpec "OverloadedStrings"                Opt_OverloadedStrings,
   flagSpec "PackageImports"                   Opt_PackageImports,
   flagSpec "ParallelArrays"                   Opt_ParallelArrays,
@@ -3278,8 +3276,7 @@ impliedXFlags
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
 
-    -- Overloaded record fields require field disambiguation
-    , (Opt_OverloadedRecordFields,     turnOn, Opt_AllowDuplicateRecordFields)
+    -- Duplicate record fields require field disambiguation
     , (Opt_AllowDuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
   ]
 

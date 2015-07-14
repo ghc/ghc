@@ -581,11 +581,10 @@ We gather three sorts of usage information
       is unnecessary.  This info isn't present in Names.
 
  * tcg_used_selectors
-      Records the Names of record selectors that are used during
-      typechecking (by the OverloadedRecordFields extension). These
-      may otherwise be missed from tcg_used_rdrnames as they need
-      not actually occur in the source text: they might be needed
-      only to satisfy a Has constraint, for example.
+      Records the Names of record selectors that are used
+      by the AllowDuplicateRecordFields extension. These
+      may otherwise be missed from tcg_used_rdrnames as a
+      single RdrName might refer to multiple fields.
 
 
 ************************************************************************
