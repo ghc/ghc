@@ -1,13 +1,13 @@
-module Targets (
-    defaultTargetDirectory,
+module Settings.Default (
+    defaultTargetDirectory, defaultKnownPackages,
+
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc,
-    integerGmp, integerGmp2, integerSimple,
-    parallel, pretty, primitive, process, stm, templateHaskell,
-    terminfo, time, transformers, unix, win32, xhtml
+    deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerGmp,
+    integerGmp2, integerSimple, parallel, pretty, primitive, process, stm,
+    templateHaskell, terminfo, time, transformers, unix, win32, xhtml
     ) where
 
-import Base hiding (arg, args)
+import Base
 import Package
 
 -- Build results will be placed into a target directory with the following
@@ -20,6 +20,19 @@ defaultTargetDirectory stage package
     | package == compiler = "stage" ++ show (fromEnum stage + 1)
     | stage   == Stage0   = "dist-boot"
     | otherwise           = "dist-install"
+
+-- These are all packages we know about. Build rules will be generated for
+-- all of them. However, not all of these packages will be built. For example,
+-- package 'win32' is built only on Windows.
+-- Settings/Packages.hs defines default conditions for building each package,
+-- which can be overridden in UserSettings.hs.
+defaultKnownPackages :: [Package]
+defaultKnownPackages =
+    [ array, base, binPackageDb, binary, bytestring, cabal, compiler
+    , containers, deepseq, directory, filepath, ghcPrim, haskeline
+    , hoopl, hpc, integerGmp, integerGmp2, integerSimple, parallel
+    , pretty, primitive, process, stm, templateHaskell, terminfo, time
+    , transformers, unix, win32, xhtml ]
 
 -- Package definitions
 array           = library  "array"

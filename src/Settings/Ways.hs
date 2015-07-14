@@ -6,7 +6,7 @@ import Base
 import Ways hiding (defaultWays)
 import Switches
 import Expression
-import UserSettings
+import Settings.User
 
 -- Combining default ways with user modifications
 ways :: Ways

@@ -8,14 +8,13 @@ import Oracles.Builder
 import Ways
 import Util
 import Package
-import Targets
 import Switches
 import Expression hiding (liftIO)
+import Settings.User
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
 import Settings.TargetDirectory
-import UserSettings
 
 cabalSettings :: Settings
 cabalSettings = builder GhcCabal ? do

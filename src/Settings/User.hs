@@ -1,4 +1,5 @@
-module UserSettings (
+module Settings.User (
+    module Settings.Default,
     userSettings, userPackages, userWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
     buildHaddock, validating
@@ -6,7 +7,7 @@ module UserSettings (
 
 import Base hiding (arg, args, Args)
 import Package
-import Targets
+import Settings.Default
 import Expression
 
 -- No user-specific settings by default
@@ -26,7 +27,7 @@ userKnownPackages = []
 userWays :: Ways
 userWays = mempty
 
--- Control where build results go
+-- Control where build results go (see Settings.Default for an example)
 userTargetDirectory :: Stage -> Package -> FilePath
 userTargetDirectory = defaultTargetDirectory
 

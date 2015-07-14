@@ -5,7 +5,7 @@ module Settings (
 import Base hiding (arg, args)
 import Settings.GhcPkg
 import Settings.GhcCabal
-import UserSettings
+import Settings.User
 import Expression hiding (when, liftIO)
 
 settings :: Settings
