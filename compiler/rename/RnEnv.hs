@@ -460,7 +460,6 @@ lookupConstructorFields con_name
 -- Arguably this should work, because the reference to 'fld' is
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
-
 lookupSubBndrOcc :: Bool
                  -> Parent  -- NoParent   => just look it up as usual
                             -- ParentIs p => use p to disambiguate
@@ -868,22 +867,15 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                 []    -> return Nothing
                 [gre] | isOverloadedRecFldGRE gre
                          -> do { addUsedRdrName True gre rdr_name
-                               ; return (Just (Right [greToFieldOcc gre])) }
+                               ; return (Just (Right [FieldOcc rdr_name $ gre_name gre])) }
                       | otherwise
                          -> do { addUsedRdrName True gre rdr_name
                                ; return (Just (Left (gre_name gre))) }
                 gres  | all isRecFldGRE gres && overload_ok
                          -> do { mapM_ (\ gre -> addUsedRdrName True gre rdr_name) gres
-                               ; return (Just (Right (map greToFieldOcc gres))) }
+                               ; return (Just (Right (map (FieldOcc rdr_name . gre_name) gres))) }
                 gres     -> do { addNameClashErrRn rdr_name gres
                                ; return (Just (Left (gre_name (head gres)))) } }
-  where
-    greToFieldOcc :: GlobalRdrElt -> FieldOcc Name
-    greToFieldOcc gre = FieldOcc rdr_name (FieldLabel lbl is_overloaded sel)
-      where
-        lbl           = occNameFS $ rdrNameOcc rdr_name
-        is_overloaded = isOverloadedRecFldGRE gre
-        sel           = gre_name gre
 
 
 --------------------------------------------------

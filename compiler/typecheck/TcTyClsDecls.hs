@@ -1970,7 +1970,7 @@ mkRecSelBind (tycon, fl)
                                  (L loc (HsVar field_var))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
-    rec_field  = noLoc (HsRecField { hsRecFieldLbl = L loc (FieldOcc (mkVarUnqual lbl) fl)
+    rec_field  = noLoc (HsRecField { hsRecFieldLbl = L loc (FieldOcc (mkVarUnqual lbl) sel_name)
                                    , hsRecFieldArg = L loc (VarPat field_var)
                                    , hsRecPun = False })
     sel_lname = L loc sel_name

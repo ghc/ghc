@@ -21,8 +21,7 @@ module HsPat (
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField(..), LHsRecField,
         HsRecUpdField(..), LHsRecUpdField,
-        hsRecFields, hsRecFieldId,
-        -- hsRecUpdFields,
+        hsRecFields, hsRecFieldSel, hsRecFieldId,
         hsRecUpdFieldsUnambiguous,
         hsRecUpdFieldId,
 
@@ -327,19 +326,15 @@ deriving instance (DataId id) => Data (HsRecUpdField id)
 -- the lookup in the typechecker, so that completely unambiguous
 -- updates can be represented by 'DsMeta.repUpdFields'.
 
-hsRecFields :: PostRn id (FieldLbl id) ~ FieldLbl id => HsRecFields id arg -> [id]
-hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
+hsRecFields :: HsRecFields id arg -> [PostRn id id]
+hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
 
-hsRecFieldId :: PostRn id (FieldLbl id) ~ FieldLbl id => HsRecField id arg -> Located id
-hsRecFieldId = fmap (flSelector . labelFieldOcc) . hsRecFieldLbl
+hsRecFieldSel :: HsRecField id arg -> Located (PostRn id id)
+hsRecFieldSel = fmap selectorFieldOcc . hsRecFieldLbl
 
-{-
-hsRecUpdFields :: [LHsRecUpdField id] -> [(FieldLabelString, Either id [(id, id)])]
-hsRecUpdFields = map (toFld . unLoc)
-  where
-    toFld x = ( occNameFS . rdrNameOcc . unLoc . hsRecUpdFieldLbl $ x
-              , hsRecUpdFieldSel x)
--}
+hsRecFieldId :: HsRecField Id arg -> Located Id
+hsRecFieldId = hsRecFieldSel
+
 
 hsRecUpdFieldsUnambiguous :: PostRn id [id] ~ [id] =>
                              [LHsRecUpdField id] -> [(FieldLabelString, id)]

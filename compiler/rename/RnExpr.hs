@@ -110,7 +110,7 @@ rnExpr (HsVar v)
               | otherwise
               -> finishHsVar name ;
            Just (Right (f:fs)) -> ASSERT( null fs )
-                                  return (HsSingleRecFld f, unitFV (flSelector (labelFieldOcc f))) ;
+                                  return (HsSingleRecFld f, unitFV (selectorFieldOcc f)) ;
            Just (Right [])                 -> error "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)

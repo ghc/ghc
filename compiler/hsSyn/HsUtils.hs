@@ -760,7 +760,7 @@ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
                         `mappend` foldMap hsLInstDeclBinders inst_decls)
   where
     getSelectorNames :: ([Located Name], [LFieldOcc Name]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (flSelector . labelFieldOcc . unLoc) fs
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (selectorFieldOcc.unLoc) fs
 
 -------------------
 hsLTyClDeclBinders :: Located (TyClDecl name) -> ([Located name], [LFieldOcc name])

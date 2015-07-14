@@ -1028,11 +1028,11 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   where
     tc_field :: Checker (LHsRecField Name (LPat Name))
                         (LHsRecField TcId (LPat TcId))
-    tc_field (L l (HsRecField (L loc (FieldOcc rdr fl)) pat pun)) penv thing_inside
-      = do { fl'    <- traverse tcLookupId fl
+    tc_field (L l (HsRecField (L loc (FieldOcc rdr sel)) pat pun)) penv thing_inside
+      = do { sel'   <- tcLookupId sel
            ; pat_ty <- setSrcSpan loc $ find_field_ty (occNameFS $ rdrNameOcc rdr)
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-           ; return (L l (HsRecField (L loc (FieldOcc rdr fl')) pat' pun), res) }
+           ; return (L l (HsRecField (L loc (FieldOcc rdr sel')) pat' pun), res) }
 
     find_field_ty :: FieldLabelString -> TcM TcType
     find_field_ty lbl

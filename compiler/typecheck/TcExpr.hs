@@ -1056,7 +1056,7 @@ tcInferId :: Name -> TcM (HsExpr TcId, TcRhoType)
 tcInferId n = tcInferIdWithOrig (OccurrenceOf n) (nameRdrName n) n
 
 tcInferRecSelId :: FieldOcc Name -> TcM (HsExpr TcId, TcRhoType)
-tcInferRecSelId (FieldOcc lbl fl) = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl (flSelector fl)
+tcInferRecSelId (FieldOcc lbl sel) = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl sel
 
 ------------------------
 tcInferIdWithOrig :: CtOrigin -> RdrName -> Name ->
@@ -1511,30 +1511,29 @@ tcRecordUpd data_con arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
     do_bind (L l fld@(HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
                                     , hsRecUpdFieldSel = [sel_name]
                                     , hsRecUpdFieldArg = rhs }))
-      = do { let f = L loc (FieldOcc lbl (FieldLabel (occNameFS $ rdrNameOcc lbl) False sel_name)) -- AMG TODO
+      = do { let f = L loc (FieldOcc lbl sel_name)
            ; mb <- tcRecordField data_con flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
                Just (f', rhs') -> return (Just (L l (fld { hsRecUpdFieldLbl = L loc lbl
-                                                         , hsRecUpdFieldSel = [flSelector (labelFieldOcc (unLoc f'))]
+                                                         , hsRecUpdFieldSel = [selectorFieldOcc (unLoc f')]
                                                          , hsRecUpdFieldArg = rhs' }))) }
     do_bind _ = panic "tcRecordUpd/do_bind: field with no selector or ambiguous selector"
 
 tcRecordField :: DataCon -> Assoc FieldLabelString Type -> LFieldOcc Name -> LHsExpr Name
               -> TcM (Maybe (LFieldOcc Id, LHsExpr Id))
-tcRecordField data_con flds_w_tys (L loc (FieldOcc lbl fl)) rhs
+tcRecordField data_con flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
   | Just field_ty <- assocMaybe flds_w_tys field_lbl
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcPolyExprNC rhs field_ty
-           ; let sel_name = flSelector fl
-                 field_id = mkUserLocal (nameOccName sel_name)
+           ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
                                         field_ty loc
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS
                 --          (so the desugarer knows the type of local binder to make)
-           ; return (Just (L loc (FieldOcc lbl fl { flSelector = field_id }), rhs')) }
+           ; return (Just (L loc (FieldOcc lbl field_id), rhs')) }
   | otherwise
       = do { addErrTc (badFieldCon (RealDataCon data_con) field_lbl)
            ; return Nothing }

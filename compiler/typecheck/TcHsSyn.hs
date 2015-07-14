@@ -260,7 +260,7 @@ zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = zonkIdBndrs emptyZonkEnv ids
 
 zonkFieldOcc :: ZonkEnv -> FieldOcc TcId -> TcM (FieldOcc Id)
-zonkFieldOcc env (FieldOcc lbl sel) = fmap (FieldOcc lbl) $ traverse (zonkIdBndr env) sel
+zonkFieldOcc env (FieldOcc lbl sel) = fmap (FieldOcc lbl) $ zonkIdBndr env sel
 
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
 zonkEvBndrsX = mapAccumLM zonkEvBndrX

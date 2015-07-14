@@ -561,7 +561,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                      then do { checkErr pun_ok (badPun (L loc lbl))
                              ; return (L loc (mk_arg lbl)) }
                      else return arg
-           ; return (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl (FieldLabel (occNameFS $ rdrNameOcc lbl) False sel)) -- AMG TODO is_overloaded
+           ; return (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl sel)
                                      , hsRecFieldArg = arg'
                                      , hsRecPun      = pun })) }
 
@@ -603,7 +603,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    where
                      rdr = mkVarUnqual lbl
 
-                 dot_dot_gres = [ (lbl, fl, head gres)
+                 dot_dot_gres = [ (lbl, sel, head gres)
                                 | fl <- con_fields
                                 , let lbl = flLabel fl
                                 , let sel = flSelector fl
@@ -616,10 +616,10 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
            ; addUsedRdrNames (map (\ (_, _, gre) -> greUsedRdrName gre) dot_dot_gres) -- AMG TODO wrong
            ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc arg_rdr fl)
+                        { hsRecFieldLbl = L loc (FieldOcc arg_rdr sel)
                         , hsRecFieldArg = L loc (mk_arg arg_rdr)
                         , hsRecPun      = False })
-                    | (lbl, fl, _) <- dot_dot_gres
+                    | (lbl, sel, _) <- dot_dot_gres
                     , let arg_rdr = mkVarUnqual lbl ] }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM Parent
@@ -693,7 +693,7 @@ rnHsRecUpdFields flds
            ; return (L l (HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
                                         , hsRecUpdFieldSel = case sel of
                                                                Left sel_name -> [sel_name]
-                                                               Right xs      -> map (flSelector . labelFieldOcc) xs
+                                                               Right xs      -> map selectorFieldOcc xs
                                         , hsRecUpdFieldArg = arg''
                                         , hsRecUpdPun      = pun }), fvs') }
 
@@ -706,7 +706,7 @@ rnHsRecUpdFields flds
 
 
 getFieldIds :: [LHsRecField Name arg] -> [Name]
-getFieldIds flds = map (unLoc . hsRecFieldId . unLoc) flds
+getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds = map (rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds

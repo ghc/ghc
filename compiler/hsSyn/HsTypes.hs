@@ -34,7 +34,7 @@ module HsTypes (
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
-        rdrNameFieldOcc, labelFieldOcc,
+        rdrNameFieldOcc, selectorFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
@@ -561,8 +561,8 @@ type LFieldOcc name = Located (FieldOcc name)
 
 -- | Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
--- renamer, the 'FieldLbl' including the selector function.
-data FieldOcc name = FieldOcc RdrName (PostRn name (FieldLbl name))
+-- renamer, the selector function.
+data FieldOcc name = FieldOcc RdrName (PostRn name name)
 deriving instance (DataId name) => Data (FieldOcc name)
 
 instance Outputable (FieldOcc name) where
@@ -574,8 +574,8 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 rdrNameFieldOcc :: FieldOcc name -> RdrName
 rdrNameFieldOcc (FieldOcc rdr _) = rdr
 
-labelFieldOcc :: FieldOcc name -> PostRn name (FieldLbl name)
-labelFieldOcc (FieldOcc _ fl) = fl
+selectorFieldOcc :: FieldOcc name -> PostRn name name
+selectorFieldOcc (FieldOcc _ sel) = sel
 
 
 {-

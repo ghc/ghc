@@ -1160,7 +1160,8 @@ repFields :: HsRecordBinds Name -> DsM (Core [TH.Q TH.FieldExp])
 repFields (HsRecFields { rec_flds = flds })
   = repList fieldExpQTyConName rep_fld flds
   where
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldId fld)
+    rep_fld :: LHsRecField Name (LHsExpr Name) -> DsM (Core (TH.Q TH.FieldExp))
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
 
@@ -1399,7 +1400,8 @@ repP (ConPatIn dc details)
                                 repPinfix p1' con_str p2' }
    }
  where
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldId fld)
+   rep_fld :: LHsRecField Name (LPat Name) -> DsM (Core (TH.Name,TH.PatQ))
+   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
@@ -1879,7 +1881,7 @@ repConstr con (RecCon (L _ ips))
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType Name -> LFieldOcc Name -> DsM (Core a)
-      rep_one_ip t n = do { MkC v  <- lookupOcc (flSelector $ labelFieldOcc $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (selectorFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varStrictTypeName [v,ty] }
 
