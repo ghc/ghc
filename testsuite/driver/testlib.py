@@ -2104,7 +2104,7 @@ def qualify( name, suff ):
 
 # Finding the sample output.  The filename is of the form
 #
-#   <test>.stdout[-ghc][-<version>][-ws-<wordsize>][-<platform>]
+#   <test>.stdout[-ghc-<version>][-ws-<wordsize>][-<platform>]
 #
 # and we pick the most specific version available.  The <version> is
 # the major version of the compiler (e.g. 6.8.2 would be "6.8").  For
@@ -2114,13 +2114,12 @@ def platform_wordsize_qualify( name, suff ):
 
     basepath = qualify(name, suff)
 
-    paths = [(platformSpecific, basepath + comp + vers + ws + plat)
+    paths = [(platformSpecific, basepath + ghcversion + ws + plat)
              for (platformSpecific, plat) in [(1, '-' + config.platform),
                                               (1, '-' + config.os),
                                               (0, '')]
              for ws   in ['-ws-' + config.wordsize, '']
-             for comp in ['-ghc', '']
-             for vers in ['-' + config.compiler_maj_version, '']]
+             for ghcversion in ['-ghc-' + config.compiler_maj_version, '']]
 
     dir = glob.glob(basepath + '*')
     dir = [normalise_slashes_(d) for d in dir]
