@@ -10,7 +10,6 @@ module Base (
     Stage (..),
     Arg, ArgList,
     ShowArg (..), ShowArgs (..),
-    filterOut,
     productArgs, concatArgs
     ) where
 
@@ -56,20 +55,8 @@ class ShowArgs a where
 instance ShowArgs [String] where
     showArgs = return
 
-instance ShowArgs [Arg] where
-    showArgs = sequence
-
-instance ShowArgs [ArgList] where
-    showArgs = mconcat
-
 instance ShowArgs a => ShowArgs (Action a) where
     showArgs = (showArgs =<<)
-
--- Filter out given arg(s) from a collection
-filterOut :: ShowArgs a => ArgList -> a -> ArgList
-filterOut as exclude = do
-    exclude' <- showArgs exclude
-    filter (`notElem` exclude') <$> as
 
 -- Generate a cross product collection of two argument collections
 -- Example: productArgs ["-a", "-b"] "c" = args ["-a", "c", "-b", "c"]
