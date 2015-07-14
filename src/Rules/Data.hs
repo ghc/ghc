@@ -9,11 +9,10 @@ import Package
 import Expression hiding (when, liftIO)
 import Oracles.Flag (when)
 import Oracles.Builder
-import Oracles.ArgsHash
-import Settings
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.TargetDirectory
+import Rules.Util
 import Util
 import Ways
 
@@ -35,26 +34,16 @@ buildPackageData target =
     ] &%> \_ -> do
         let configure = pkgPath pkg </> "configure"
             -- TODO: 1) how to automate this? 2) handle multiple files?
-            newTarget = target { getFile = path </> "package-data.mk" }
+            newTarget = target { getFile = path </> "package-data.mk"
+                               , getWay = vanilla } -- TODO: think
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
         when (doesFileExist $ configure <.> "ac") $ need [configure]
-        run' newTarget GhcCabal
+        build $ newTarget { getBuilder = GhcCabal }
         -- TODO: when (registerPackage settings) $
-        run' newTarget (GhcPkg stage)
+        build $ newTarget { getBuilder = GhcPkg stage }
         postProcessPackageData $ path </> "package-data.mk"
-
--- TODO: This should probably go to Oracles.Builder
-run' :: Target -> Builder -> Action ()
-run' target builder = do
-    let finalTarget = target {getBuilder = builder, getWay = vanilla }
-    args <- interpret finalTarget settings
-    putColoured Green (show args)
-    -- The line below forces the rule to be rerun if the hash has changed
-    argsHash <- askArgsHash finalTarget
-    putColoured Yellow (show argsHash)
-    run builder args
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
