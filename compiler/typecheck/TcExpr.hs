@@ -288,11 +288,12 @@ tcExpr app@(OpApp _ _ _ _) res_ty = tcApp app res_ty
 
 tcExpr (SectionL arg1 op) res_ty
   = do { dflags <- getDynFlags      -- Note [Left sections]
-       ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
-                         | otherwise                        = 2
-       ; (co_fun, args_tys@(arg1_ty : _), rest_ty) <-
+       ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 0
+                         | otherwise                        = 1
+       ; (co_fun, args_tys, rest_ty) <-
            matchExpectedFunTys (mk_app_msg op) n_reqd_args res_ty
-       ; let op_ty = mkFunTys args_tys rest_ty
+       ; arg1_ty <- newFlexiTyVarTy openTypeKind
+       ; let op_ty = mkFunTys (arg1_ty:args_tys) rest_ty
           -- typecheck op and arg1
        ; op'   <- tcPolyMonoExprNC op op_ty
        ; arg1' <- tcArg op' (arg1, arg1_ty, 1)
