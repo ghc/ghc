@@ -18,4 +18,4 @@ ghcPkgArgs = do
         [ arg "update"
         , arg "--force"
         , stage0 ? bootPackageDbArgs
-        , arg $ targetPath stage pkg </> "inplace-pkg-config" ]
+        , argPath $ targetPath stage pkg </> "inplace-pkg-config" ]

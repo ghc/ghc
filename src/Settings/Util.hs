@@ -1,6 +1,6 @@
 module Settings.Util (
     -- Primitive settings elements
-    arg, argM,
+    arg, argPath, argM,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
     appendCcArgs,
     -- argBuilderPath, argStagedBuilderPath,
@@ -12,13 +12,18 @@ module Settings.Util (
     ) where
 
 import Base
+import Util
 import Builder
 import Oracles.Base
 import Expression
 
--- A single argument
+-- A single argument.
 arg :: String -> Args
 arg = append . return
+
+-- A single path argument. The path gets unified.
+argPath :: String -> Args
+argPath = append . return . unifyPath
 
 argM :: Action String -> Args
 argM = appendM . fmap return
@@ -49,9 +54,6 @@ appendCcArgs xs = do
     mconcat [ builder (Gcc stage) ? append xs
             , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" xs
             , builder GhcCabal    ? appendSub "--gcc-options" xs ]
-
-
-
 
 -- packageData :: Arity -> String -> Args
 -- packageData arity key =

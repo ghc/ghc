@@ -21,8 +21,8 @@ cabalArgs = builder GhcCabal ? do
     stage <- asks getStage
     pkg   <- asks getPackage
     mconcat [ arg "configure"
-            , arg $ pkgPath pkg
-            , arg $ targetDirectory stage pkg
+            , argPath $ pkgPath pkg
+            , argPath $ targetDirectory stage pkg
             , dllArgs
             , with $ Ghc stage
             , with $ GhcPkg stage
