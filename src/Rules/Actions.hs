@@ -5,8 +5,8 @@ module Rules.Actions (
 import Base
 import Util
 import Builder
-import Settings
 import Expression
+import Settings.Args
 import Oracles.ArgsHash
 
 -- Build a given target using an appropriate builder. Force a rebuilt if the

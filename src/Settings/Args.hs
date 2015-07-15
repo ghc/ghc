@@ -1,4 +1,4 @@
-module Settings (
+module Settings.Args (
     args
     ) where
 
