@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, TypeSynonymInstances #-}
 module Target (
     Target (..), StageTarget (..), StagePackageTarget (..), FullTarget (..),
-    stageTarget, stagePackageTarget, fullTarget
+    stageTarget, stagePackageTarget, fullTarget, fullTargetWithWay
     ) where
 
 import Way
@@ -18,7 +18,7 @@ data Target = Target
      {
         getStage   :: Stage,
         getPackage :: Package,
-        getFile    :: FilePath, -- TODO: handle multple files?
+        getFiles   :: [FilePath],
         getBuilder :: Builder,
         getWay     :: Way
      }
@@ -32,9 +32,9 @@ stageTarget stage = Target
     {
         getStage   = stage,
         getPackage = error "stageTarget: Package not set",
-        getFile    = error "stageTarget: File not set",
+        getFiles   = error "stageTarget: Files not set",
         getBuilder = error "stageTarget: Builder not set",
-        getWay     = error "stageTarget: Way not set"
+        getWay     = vanilla -- most targets are built only one way (vanilla)
     }
 
 -- StagePackageTarget is a Target whose fields getStage and getPackage are
@@ -46,18 +46,28 @@ stagePackageTarget stage package = Target
     {
         getStage   = stage,
         getPackage = package,
-        getFile    = error "stagePackageTarget: File not set",
+        getFiles   = error "stagePackageTarget: Files not set",
         getBuilder = error "stagePackageTarget: Builder not set",
-        getWay     = error "stagePackageTarget: Way not set"
+        getWay     = vanilla
     }
 
 -- FullTarget is a Target whose fields are all assigned
 type FullTarget = Target
 
-fullTarget :: StagePackageTarget -> FilePath -> Builder -> Way -> FullTarget
-fullTarget target file builder way = target
+-- Most targets are built only one way, vanilla, hence we set it by default.
+fullTarget :: StagePackageTarget -> [FilePath] -> Builder -> FullTarget
+fullTarget target files builder = target
     {
-        getFile    = file,
+        getFiles   = files,
+        getBuilder = builder,
+        getWay     = vanilla
+    }
+
+-- Use this function to be explicit about build the way.
+fullTargetWithWay :: StagePackageTarget -> [FilePath] -> Builder -> Way -> FullTarget
+fullTargetWithWay target files builder way = target
+    {
+        getFiles   = files,
         getBuilder = builder,
         getWay     = way
     }
@@ -65,7 +75,7 @@ fullTarget target file builder way = target
 -- Shows a (full) target as "package:file@stage (builder, way)"
 instance Show FullTarget where
     show target = show (getPackage target)
-                  ++ ":" ++ getFile target
+                  ++ ":" ++ show (getFiles target)
                   ++ "@" ++ show (getStage target)
                   ++ " (" ++ show (getBuilder target)
                   ++ ", " ++ show (getWay target) ++ ")"

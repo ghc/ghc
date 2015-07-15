@@ -4,10 +4,10 @@ module Rules.Data (
     cabalArgs, ghcPkgArgs, buildPackageData
     ) where
 
-import Way
 import Base
 import Package
 import Builder
+import Switches
 import Expression
 import Control.Monad.Extra
 import Settings.GhcPkg
@@ -31,16 +31,14 @@ buildPackageData target =
     , "build" </> "autogen" </> "cabal_macros.h"
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
     -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
-    ] &%> \_ -> do
+    ] &%> \files -> do
         let configure = pkgPath pkg </> "configure"
         -- GhcCabal will run the configure script, so we depend on it
         need [pkgPath pkg </> pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
-        -- TODO: 1) automate? 2) mutliple files 3) vanilla?
-        build $ fullTarget target (path </> "package-data.mk") GhcCabal vanilla
-        -- TODO: when (registerPackage settings) $
-        build $ fullTarget target (path </> "package-data.mk") (GhcPkg stage) vanilla
+        build $ fullTarget target files GhcCabal
+        buildWhen registerPackage $ fullTarget target files (GhcPkg stage)
         postProcessPackageData $ path </> "package-data.mk"
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:

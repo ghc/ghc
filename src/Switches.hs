@@ -5,7 +5,8 @@ module Switches (
     targetOss, targetOs, notTargetOs,
     targetArchs, dynamicGhcPrograms, ghcWithInterpreter,
     platformSupportsSharedLibs, crossCompiling,
-    gccIsClang, gccLt46, windowsHost, notWindowsHost
+    gccIsClang, gccLt46, windowsHost, notWindowsHost,
+    registerPackage
     ) where
 
 import Base
@@ -90,6 +91,10 @@ windowsHost = configKeyValues "host-os-cpp" ["mingw32", "cygwin32"]
 
 notWindowsHost :: Predicate
 notWindowsHost = liftM not windowsHost
+
+-- TODO: Actually, we don't register compiler in some circumstances -- fix.
+registerPackage :: Predicate
+registerPackage = return True
 
 -- splitObjects :: Stage -> Condition
 -- splitObjects stage = do

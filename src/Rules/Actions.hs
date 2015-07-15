@@ -1,5 +1,5 @@
 module Rules.Actions (
-    build, run, verboseRun,
+    build, buildWhen, run, verboseRun,
     ) where
 
 import Base
@@ -20,6 +20,11 @@ build target = do
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target
     run (getBuilder target) argList
+
+buildWhen :: Predicate -> FullTarget -> Action ()
+buildWhen predicate target = do
+    bool <- interpretExpr target predicate
+    when bool $ build target
 
 -- Run the builder with a given collection of arguments
 verboseRun :: Builder -> [String] -> Action ()

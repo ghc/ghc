@@ -140,7 +140,7 @@ builder :: Builder -> Predicate
 builder b = liftM (b ==) (asks getBuilder)
 
 file :: FilePattern -> Predicate
-file f = liftM (f ?==) (asks getFile)
+file f = liftM (any (f ?==)) (asks getFiles)
 
 way :: Way -> Predicate
 way w = liftM (w ==) (asks getWay)
