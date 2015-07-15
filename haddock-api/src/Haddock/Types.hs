@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -27,11 +27,15 @@ import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
 import Data.Typeable
 import Data.Map (Map)
+import Data.Data (Data)
 import qualified Data.Map as Map
 import Documentation.Haddock.Types
 import BasicTypes (Fixity(..))
+
 import GHC hiding (NoLink)
 import DynFlags (ExtensionFlag, Language)
+import Coercion
+import NameSet
 import OccName
 import Outputable
 import Control.Monad (ap)
@@ -280,7 +284,16 @@ data DocName
   | Undocumented Name
      -- ^ This thing is not part of the (existing or resulting)
      -- documentation, as far as Haddock knows.
-  deriving Eq
+  deriving (Eq, Data)
+
+type instance PostRn DocName NameSet  = PlaceHolder
+type instance PostRn DocName Fixity   = PlaceHolder
+type instance PostRn DocName Bool     = PlaceHolder
+type instance PostRn DocName [Name]   = PlaceHolder
+
+type instance PostTc DocName Kind     = PlaceHolder
+type instance PostTc DocName Type     = PlaceHolder
+type instance PostTc DocName Coercion = PlaceHolder
 
 
 instance NamedThing DocName where
