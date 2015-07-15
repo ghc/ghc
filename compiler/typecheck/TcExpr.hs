@@ -200,7 +200,8 @@ tcExpr e@(HsLamCase _ matches) res_ty
   = do {(wrap1, [arg_ty], body_ty) <-
             matchExpectedFunTys Expected msg 1 res_ty
        ; (wrap2, matches') <- tcMatchesCase match_ctxt arg_ty matches body_ty
-       ; return $ mkHsWrap (wrap1 <.> wrap2) $ HsLamCase arg_ty matches' }
+       ; return $ mkHsWrap (wrap1 <.> mkWpFun idHsWrapper wrap2 arg_ty body_ty) $
+                  HsLamCase arg_ty matches' }
   where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }

@@ -595,7 +595,10 @@ WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-mkWpFun :: HsWrapper -> HsWrapper -> TcType -> TcType -> HsWrapper
+mkWpFun :: HsWrapper -> HsWrapper
+        -> TcType    -- the "from" type of the first wrapper
+        -> TcType    -- the "to" type of the second wrapper
+        -> HsWrapper
 mkWpFun WpHole       WpHole       _  _  = WpHole
 mkWpFun WpHole       (WpCast co2) t1 _  = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
 mkWpFun (WpCast co1) WpHole       _  t2 = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
