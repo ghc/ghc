@@ -269,7 +269,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
-      = ppInstances links instances Nothing docname unicode qual
+      = ppInstances links instances Nothing docname splice unicode qual
 
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
@@ -493,35 +493,52 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instancesBit = ppInstances links instances (Just sigs) nm unicode qual
+    instancesBit = ppInstances links instances (Just sigs) nm splice unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
 ppInstances :: LinksInfo
             -> [DocInstance DocName] -> Maybe [Sig DocName] -> DocName
-            -> Unicode -> Qualification
+            -> Splice -> Unicode -> Qualification
             -> Html
-ppInstances links instances _ baseName unicode qual
-  = subInstances qual instName links True (map instDecl instances)
+ppInstances links instances msigs baseName splice unicode qual
+  = subInstances qual instName links True (zipWith instDecl [1..] instances)
   -- force Splice = True to use line URLs
   where
     instName = getOccString $ getName baseName
-    instDecl :: DocInstance DocName -> (SubDecl,Located DocName)
-    instDecl (inst, maybeDoc,l) =
-        ((ppInstHead links unicode qual inst, maybeDoc, []),l)
+    instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
+    instDecl iid (inst, maybeDoc,l) =
+        ((ppInstHead links splice unicode qual msigs iid inst, maybeDoc, []),l)
 
-ppInstHead :: LinksInfo -> Unicode -> Qualification
-           -> InstHead DocName
+
+ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
+           -> Maybe [Sig DocName] -> Int -> InstHead DocName
            -> Html
-ppInstHead _ unicode qual (InstHead {..}) = case ihdInstType of
-    ClassInst cs -> ppContextNoLocs cs unicode qual <+> typ
-    TypeInst rhs -> keyword "type" <+> typ
-        <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
-    DataInst dd -> keyword "data" <+> typ
-        <+> ppShortDataDecl False True dd unicode qual
+ppInstHead links splice unicode qual msigs iid (InstHead {..}) =
+    case ihdInstType of
+        ClassInst cs | Just sigs <- msigs ->
+            subClsInstance (nameStr ++ "-" ++ show iid) hdr (mets sigs)
+          where
+            hdr = ppContextNoLocs cs unicode qual <+> typ
+            mets = ppInstanceSigs links splice unicode qual
+            nameStr = occNameString . nameOccName $ getName ihdClsName
+        ClassInst cs -> ppContextNoLocs cs unicode qual <+> typ
+        TypeInst rhs -> keyword "type" <+> typ
+            <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
+        DataInst dd -> keyword "data" <+> typ
+            <+> ppShortDataDecl False True dd unicode qual
   where
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
+
+
+ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
+              -> [Sig DocName]
+              -> [Html]
+ppInstanceSigs links splice unicode qual sigs = do
+    TypeSig lnames (L sspan typ) _ <- sigs
+    let names = map unLoc lnames
+    return $ ppFunSig False links sspan noDocForDecl names typ [] splice unicode qual
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
@@ -593,7 +610,8 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
                                      (map unLoc (con_names (unLoc c)))) fixities
       ]
 
-    instancesBit = ppInstances links instances Nothing docname unicode qual
+    instancesBit = ppInstances links instances Nothing docname
+        splice unicode qual
 
 
 
