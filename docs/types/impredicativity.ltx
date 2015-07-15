@@ -39,7 +39,7 @@
 \item The kind of $\leq$ is $* \to * \to Constraint$.
 \item The evidence for $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
 \item The canonical forms are $\sigma_1 \leq \alpha_1$ and $\alpha_2 \leq \sigma_2$, where $\sigma_2$ is not a type variable.
-% \item In Haskell code, $\sigma_1 \leq \sigma_2$ is written as $\textit{InstanceOf} \; \sigma_1 \; \sigma_2$.
+\item In Haskell code, $\sigma_1 \leq \sigma_2$ is written as {\tt sigma1 <$\sim$ sigma2}.
 \end{itemize}
 
 \begin{figure}[h]
@@ -48,6 +48,7 @@
 Type variables & $\alpha$, $\beta$, $\gamma$ \\
 Type constuctors & $\mathsf{T}$ \\
 Type families & $\mathsf{F}$ \\
+Type constructor or families & $\mathsf{D}$ \\
 Type classes & $\mathtt{C}$
 \end{tabular}
 
@@ -85,27 +86,35 @@ $$
 
 $$
 \begin{array}{lrcl}
-\textsc{[$\leq$can1]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \leq \sigma_2\right] & = & (\mathsf{T} \; \overline{\sigma_1}) \sim \sigma_2 \\
-\textsc{[$\leq$can2]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq (\mathsf{T} \; \overline{\sigma_2})\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq (\mathsf{T} \; \overline{\sigma_2}) \wedge [\overline{a \mapsto \alpha}]Q_1 \\
-\textsc{[$\leq$can2a]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow a) \leq \sigma_2\right] & = & \alpha \sim \sigma_2 \wedge [\overline{a \mapsto \alpha}]Q_1 \\
-\textsc{[$\leq$can2b]} & canon\left[(Q_1 \Rightarrow \sigma_1) \leq \sigma_2\right] & = & \sigma_1 \sim \sigma_2 \wedge Q_1 \\
-\textsc{[$\leq$can3]} & canon\left[\sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2) \\
+\textsc{[$\leq$refl]} & canon\left[\sigma \leq \sigma\right] & = & \sigma \sim \sigma \\
+\textsc{[$\leq$lcon]} & canon\left[(\mathsf{D} \; \overline{\sigma_1}) \leq \sigma_2\right] & = & (\mathsf{D} \; \overline{\sigma_1}) \sim \sigma_2 \\
+\textsc{[$\leq$l$\forall$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \sigma_2\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
+& & & \textrm{where } \sigma_2 \textrm{ is } \mathsf{D} \; \overline{\sigma} \textrm{ or a Skolem variable} \\
+\textsc{[$\leq$r$\forall$]} & canon\left[\sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2) \\
 \end{array}
 $$
-Note that rule {\sc [$\leq$can2]} can only be applied when the right-hand side is not a variable nor a quantified type:
+
+\subsubsection*{Notes on the {\sc [$\leq$l$\forall$]} rule}
 \begin{itemize}
-\item If we did so in the case of a variable, and later that variable was substituted by some other type, we would need to remember the instantiation done by this rule and apply it to the substituted value. Instead, we prefer to defer the instantiation of the constraint until the variable is changed to another type.
-\item In the case of a quantified type, we want to apply always {\sc [$\leq$can3]} first, which may in turn lead to an application of {\sc [$\leq$can2]} inside the implication.
+\item We disallow applying {\sc [$\leq$l$\forall$]} in the case of unification variables. If we did so, and later that variable was substituted by some other type, we would need to remember the instantiation done by this rule and apply it to the substituted value. Instead, we prefer to defer the instantiation of the constraint until the variable is changed to another type.
+
+Prior, we disallowed application of {\sc [$\leq$l$\forall$]} to any variable, unification or Skolem. However, when one tries to type check the following code:
+\begin{verbatim}
+g :: Monoid b => b
+g = mempty
+\end{verbatim}
+the only constraint being generated is $(\forall\, a.\, \textit{Monoid} \; a \Rightarrow a) \leq b$. To go further, we need to instantiate. In this case it is safe to do so, since $b$ is never going to be unified.
+
+\item We also disallow applying {\sc [$\leq$l$\forall$]} to quantified types. In that case, we want to apply {\sc [$\leq$r$\forall$]} first, which may in turn lead to an application of {\sc [$\leq$l$\forall$]} inside the implication.
 \end{itemize}
-However, when the left-hand is of the form $\forall a. Q \Rightarrow a$, we can always safely instantiate it. For example, if we have $(\forall a. \mathtt{Monoid} \; a \Rightarrow a) \leq \tau$, this is equivalent to $\mathtt{Monoid} \; \tau$ (note that the rule will actually produce another equivalent version $\mathtt{Monoid} \; \alpha \wedge \alpha \sim \tau$). This is the duty of rule {\sc [$\leq$can2a]}.
 
 \subsubsection*{Design choice: rules for $\to$}
 
 \noindent Additionally, we may have these special rules for $\to$, based on the covariance and contravariance of each of the argument positions:
 $$
 \begin{array}{lrcl}
-\textsc{[$\leq$can$\to$alt1]} & canon\left[(\sigma_1 \to \sigma_2) \leq (\sigma_3 \to \sigma_4)\right] & = & \sigma_1 \leq \sigma_3 \wedge \sigma_2 \leq \sigma_4 \\
-\textsc{[$\leq$can$\to$alt2]} & canon\left[(\sigma_1 \to \sigma_2) \leq (\sigma_3 \to \sigma_4)\right] & = & \sigma_1 \sim \sigma_3 \wedge \sigma_2 \leq \sigma_4
+\textsc{[$\leq\to$alt1]} & canon\left[(\sigma_1 \to \sigma_2) \leq (\sigma_3 \to \sigma_4)\right] & = & \sigma_1 \leq \sigma_3 \wedge \sigma_2 \leq \sigma_4 \\
+\textsc{[$\leq\to$alt2]} & canon\left[(\sigma_1 \to \sigma_2) \leq (\sigma_3 \to \sigma_4)\right] & = & \sigma_1 \sim \sigma_3 \wedge \sigma_2 \leq \sigma_4
 \end{array}
 $$
 But it seems that we lose the ability to infer the type for {\tt runST \$ e}.
@@ -114,19 +123,16 @@ But it seems that we lose the ability to infer the type for {\tt runST \$ e}.
 
 In the constraint solving process we do not only need to find a solution for the constraints, but also generate evidence of the solving. Remember that the evidence for a constraint $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
 
-\paragraph{Rule {\sc [$\leq$can1]}.} We need to build $W_1 :: \mathsf{T} \; \overline{\sigma_1} \to \sigma_2$. For this, we can use the evidence $W_2 :: \mathsf{T} \; \overline{\sigma_1} \sim \sigma_2$ generated by later solving steps. In this case the solution is to make:
-$$W_1 = \lambda (x :: \mathsf{T} \; \overline{\sigma_1}). \; x \rhd W_2$$
+\paragraph{Rules {\sc [$\leq$refl]} and {\sc [$\leq$lcon]}.} We need to build $W_1 :: \sigma_1 \to \sigma_2$ (what $\sigma_1$ and $\sigma_2$ are depends on the rule). For this, we can use the evidence $W_2 :: \sigma_1 \sim \sigma_2$ generated by later solving steps. In this case the solution is to make:
+$$W_1 = \lambda (x :: \sigma_1). \; x \rhd W_2$$
 where $\rhd$ is the cast operator which applies a coercion $\rho_1 \to \rho_2$ to a value of type $\rho_1$ to produce the same value, but typed as $\rho_2$.
 
-\paragraph{Rules {\sc [$\leq$can2]} and {\sc [$\leq$can2b]}.} We need to build $W_1 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to \mathsf{T} \; \overline{\sigma_2}$ given $W_2 :: [\overline{a \mapsto \alpha}]\sigma_1 \to (\mathsf{T} \; \overline{\sigma_2})$ and $W_3 :: [\overline{a \mapsto \alpha}]Q_1$. The first step is to get $[\overline{a \mapsto \alpha}]\sigma_1$ from $\forall \overline{a}. Q_1 \Rightarrow \sigma_1$, to do that we need to make a type application and afterwards apply the witness for $Q_1 \Rightarrow \sigma_1$:
+\paragraph{Rule and {\sc [$\leq$l$\forall$]}.} We need to build $W_1 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to \sigma_2$ given $W_2 :: [\overline{a \mapsto \alpha}]\sigma_1 \to \sigma_2$ and $W_3 :: [\overline{a \mapsto \alpha}]Q_1$. The first step is to get $[\overline{a \mapsto \alpha}]\sigma_1$ from $\forall \overline{a}. Q_1 \Rightarrow \sigma_1$, to do that we need to make a type application and afterwards apply the witness for $Q_1 \Rightarrow \sigma_1$:
 $$\lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; x \; \alpha \; W_3 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to [\overline{a \mapsto \alpha}]\sigma_1$$
 The last step is then applying $W_2$ to convert it to our desired type:
 $$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; W_2 \; (x \; \alpha \; W_3)$$
 
-\paragraph{Rule {\sc [$\leq$can2a]}.} This is very similar to the previous case, but $W_2$ now is an evidence for $\alpha \sim \sigma_2$. The evidence for the original constraint is:
-$$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow a). \; (x \; \alpha \; W_3) \rhd W_2$$
-
-\paragraph{Rule {\sc [$\leq$can3']}.} This is the most complicated rule for which to generate evidence. As usual, we want to generate evidence $W_1 :: \sigma_1 \to (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)$. In order to do so, we can use the evidence generated by solving $\forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2)$. In GHC, this implication generates two pieces of information: evidence $W_2 :: \sigma_1 \to \sigma_2$, and a series of bindings which might use the data in $Q_2$ and which make $W_2$ correct. We shall denote those bindings by $\square$.
+\paragraph{Rule {\sc [$\leq$r$\forall$]}.} This is the most complicated rule for which to generate evidence. As usual, we want to generate evidence $W_1 :: \sigma_1 \to (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)$. In order to do so, we can use the evidence generated by solving $\forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2)$. In GHC, this implication generates two pieces of information: evidence $W_2 :: \sigma_1 \to \sigma_2$, and a series of bindings which might use the data in $Q_2$ and which make $W_2$ correct. We shall denote those bindings by $\square$.
 
 In this case, we need to generate something whose type is $\forall \overline{a}. Q_2 \Rightarrow \dots$. Thus, we need first a series of type abstractions and evidence abstractions. Then, we can just apply $W_2$ remembering to bring the bindings into scope.
 $$W_1 = \lambda (x :: \sigma_1). \; \overline{\Lambda a}. \; \lambda (d :: Q_2). \; \textsf{let} \; \square \; \textsf{in} \; W_2 \; x$$
@@ -295,7 +301,7 @@ We want to typecheck it, and we give the argument $f$ a type variable $\alpha$, 
 \item $(\forall a. \, a \to a) \leq \alpha$ (from {\tt id})
 \item $(Bool \to Bool) \leq \alpha$ (from {\tt not})
 \end{itemize}
-At this point we are stuck, since we have no rule that could be applied. One might think about applying transitivity of InstanceOf, but this is just calling trouble, because it is not clear how to do this without losing information.
+At this point we are stuck, since we have no rule that could be applied. One might think about applying some kind transitivity of $\leq$, but this is just calling trouble, because it is not clear how to do this without losing information.
 
 \
 
