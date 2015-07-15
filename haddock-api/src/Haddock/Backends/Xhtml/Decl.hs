@@ -22,6 +22,7 @@ module Haddock.Backends.Xhtml.Decl (
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
+import Haddock.Backends.Xhtml.Specialize
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
@@ -493,32 +494,33 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instancesBit = ppInstances links instances (Just sigs) nm splice unicode qual
+    instSpec = Just $ InstSpec { ispecSigs = sigs, ispecTyVars = ltyvars }
+    instancesBit = ppInstances links instances instSpec nm splice unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
 ppInstances :: LinksInfo
-            -> [DocInstance DocName] -> Maybe [Sig DocName] -> DocName
+            -> [DocInstance DocName] -> Maybe (InstSpec DocName) -> DocName
             -> Splice -> Unicode -> Qualification
             -> Html
-ppInstances links instances msigs baseName splice unicode qual
+ppInstances links instances mspec baseName splice unicode qual
   = subInstances qual instName links True (zipWith instDecl [1..] instances)
   -- force Splice = True to use line URLs
   where
     instName = getOccString $ getName baseName
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
     instDecl iid (inst, maybeDoc,l) =
-        ((ppInstHead links splice unicode qual msigs iid inst, maybeDoc, []),l)
+        ((ppInstHead links splice unicode qual iid mspec inst, maybeDoc, []),l)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
-           -> Maybe [Sig DocName] -> Int -> InstHead DocName
+           -> Int -> Maybe (InstSpec DocName) -> InstHead DocName
            -> Html
-ppInstHead links splice unicode qual msigs iid (InstHead {..}) =
+ppInstHead links splice unicode qual iid mspec ihead@(InstHead {..}) =
     case ihdInstType of
-        ClassInst cs | Just sigs <- msigs ->
-            subClsInstance (nameStr ++ "-" ++ show iid) hdr (mets sigs)
+        ClassInst cs | Just spec <- mspec ->
+            subClsInstance (nameStr ++ "-" ++ show iid) hdr (mets spec ihead)
           where
             hdr = ppContextNoLocs cs unicode qual <+> typ
             mets = ppInstanceSigs links splice unicode qual
@@ -533,12 +535,14 @@ ppInstHead links splice unicode qual msigs iid (InstHead {..}) =
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
-              -> [Sig DocName]
+              -> InstSpec DocName -> InstHead DocName
               -> [Html]
-ppInstanceSigs links splice unicode qual sigs = do
-    TypeSig lnames (L sspan typ) _ <- sigs
+ppInstanceSigs links splice unicode qual (InstSpec {..}) (InstHead {..}) = do
+    TypeSig lnames (L sspan typ) _ <- ispecSigs
     let names = map unLoc lnames
-    return $ ppFunSig False links sspan noDocForDecl names typ [] splice unicode qual
+    let typ' = specializeTyVarBndrs ispecTyVars ihdTypes typ
+    return $ ppFunSig False links sspan noDocForDecl names typ' []
+        splice unicode qual
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
