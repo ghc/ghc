@@ -15,6 +15,7 @@ import Haddock.Syb
 import GHC
 import Name
 
+import Control.Monad
 import Data.Data
 
 
@@ -64,5 +65,36 @@ sugarListsStep (HsAppTy (L _ (HsTyVar name)) ltyp)
 sugarListsStep typ = typ
 
 
-sugarTuples :: HsType name -> HsType name
-sugarTuples = id
+sugarTuples :: forall name. (NamedThing name, DataId name)
+            => HsType name -> HsType name
+sugarTuples = everywhere $
+    mkT (sugarTuplesStep :: HsType name -> HsType name)
+
+
+sugarTuplesStep :: NamedThing name => HsType name -> HsType name
+sugarTuplesStep typ =
+    aux [] typ
+  where
+    aux apps (HsAppTy (L _ ftyp) atyp) = aux (atyp:apps) ftyp
+    aux apps (HsParTy (L _ typ')) = aux apps typ'
+    aux apps (HsTyVar name)
+        | isBuiltInSyntax name' && suitable = HsTupleTy HsBoxedTuple apps
+      where
+        name' = getName name
+        strName = occNameString . nameOccName $ name'
+        suitable = case parseTupleArity strName of
+            Just arity -> arity == length apps
+            Nothing -> False
+    aux _ _ = typ
+
+
+parseTupleArity :: String -> Maybe Int
+parseTupleArity ('(':commas) = do
+    n <- parseCommas commas
+    guard $ n /= 0
+    return $ n + 1
+  where
+    parseCommas (',':rest) = (+ 1) <$> parseCommas rest
+    parseCommas ")" = Just 0
+    parseCommas _ = Nothing
+parseTupleArity _ = Nothing
