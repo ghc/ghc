@@ -47,32 +47,26 @@ specializeTyVarBndrs bndrs typs =
     bname (KindedTyVar (L _ name) _) = name
 
 
-sugar :: (NamedThing name, DataId name) => HsType name -> HsType name
-sugar = sugarTuples . sugarLists
+sugar :: forall name. (NamedThing name, DataId name)
+      => HsType name -> HsType name
+sugar =
+    everywhere $ mkT step
+  where
+    step :: HsType name -> HsType name
+    step = sugarTuples . sugarLists
 
 
-sugarLists :: forall name. (NamedThing name, DataId name)
-           => HsType name -> HsType name
-sugarLists = everywhere $ mkT (sugarListsStep :: HsType name -> HsType name)
-
-
-sugarListsStep :: NamedThing name => HsType name -> HsType name
-sugarListsStep (HsAppTy (L _ (HsTyVar name)) ltyp)
+sugarLists :: NamedThing name => HsType name -> HsType name
+sugarLists (HsAppTy (L _ (HsTyVar name)) ltyp)
     | isBuiltInSyntax name' && strName == "[]" = HsListTy ltyp
   where
     name' = getName name
     strName = occNameString . nameOccName $ name'
-sugarListsStep typ = typ
+sugarLists typ = typ
 
 
-sugarTuples :: forall name. (NamedThing name, DataId name)
-            => HsType name -> HsType name
-sugarTuples = everywhere $
-    mkT (sugarTuplesStep :: HsType name -> HsType name)
-
-
-sugarTuplesStep :: NamedThing name => HsType name -> HsType name
-sugarTuplesStep typ =
+sugarTuples :: NamedThing name => HsType name -> HsType name
+sugarTuples typ =
     aux [] typ
   where
     aux apps (HsAppTy (L _ ftyp) atyp) = aux (atyp:apps) ftyp
