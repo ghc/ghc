@@ -540,7 +540,7 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
 ppInstanceSigs links splice unicode qual (InstSpec {..}) (InstHead {..}) = do
     TypeSig lnames (L sspan typ) _ <- ispecSigs
     let names = map unLoc lnames
-    let typ' = specializeTyVarBndrs ispecTyVars ihdTypes typ
+    let typ' = sugar $ specializeTyVarBndrs ispecTyVars ihdTypes typ
     return $ ppFunSig False links sspan noDocForDecl names typ' []
         splice unicode qual
 

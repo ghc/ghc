@@ -4,6 +4,7 @@
 module Haddock.Backends.Xhtml.Specialize
     ( specialize, specialize'
     , specializeTyVarBndrs
+    , sugar
     ) where
 
 
@@ -40,3 +41,15 @@ specializeTyVarBndrs bndrs typs =
     bndrs' = map (bname . unLoc) . hsq_tvs $ bndrs
     bname (UserTyVar name) = name
     bname (KindedTyVar (L _ name) _) = name
+
+
+sugar :: HsType name -> HsType name
+sugar = sugarTuples . sugarLists
+
+
+sugarLists :: HsType name -> HsType name
+sugarLists = id
+
+
+sugarTuples :: HsType name -> HsType name
+sugarTuples = id
