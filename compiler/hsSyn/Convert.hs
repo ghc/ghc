@@ -476,16 +476,22 @@ noExistentials = []
 
 cvtForD :: Foreign -> CvtM (ForeignDecl RdrName)
 cvtForD (ImportF callconv safety from nm ty)
+  | callconv == TH.Prim || callconv == TH.JavaScript
+  = mk_imp (CImport (noLoc (cvt_conv callconv)) (noLoc safety') Nothing
+                    (CFunction (StaticTarget (mkFastString from) Nothing True))
+                    (noLoc from))
   | Just impspec <- parseCImport (noLoc (cvt_conv callconv)) (noLoc safety')
                                  (mkFastString (TH.nameBase nm))
                                  from (noLoc from)
-  = do { nm' <- vNameL nm
-       ; ty' <- cvtType ty
-       ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
-       }
+  = mk_imp impspec
   | otherwise
   = failWith $ text (show from) <+> ptext (sLit "is not a valid ccall impent")
   where
+    mk_imp impspec
+      = do { nm' <- vNameL nm
+           ; ty' <- cvtType ty
+           ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
+           }
     safety' = case safety of
                      Unsafe     -> PlayRisky
                      Safe       -> PlaySafe
