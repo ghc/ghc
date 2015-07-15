@@ -820,11 +820,12 @@ lookupInstEnv' ie vis_mods cls tys leqs
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]
-        case tcUnifyTys instanceBindFun tpl_tys tys of
+        case tcUnifyTys instanceBindFun tpl_tys (substTys subst tys) of
             Just _   -> find ms (item:us) rest
             Nothing  -> find ms us        rest
       where
         tpl_tv_set = mkVarSet tpl_tvs
+        subst = lazyEqsToSubst leqs
 
     ----------------
     lookup_tv :: TvSubst -> TyVar -> DFunInstType

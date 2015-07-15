@@ -10,7 +10,7 @@ module Unify (
         ruleMatchTyX, tcMatchPreds,
         MatchResult, MatchResult'(..),
 
-        LazyEqs, noLazyEqs,
+        LazyEqs, noLazyEqs, lazyEqsToSubst,
         MatchEnv(..), matchList,
 
         typesCantMatch,
@@ -72,6 +72,12 @@ type LazyEqs l = Bag (Type, Type, l)
 
 noLazyEqs :: LazyEqs l
 noLazyEqs = emptyBag
+
+lazyEqsToSubst :: LazyEqs l -> TvSubst
+lazyEqsToSubst leqs = go (bagToList leqs)
+  where go [] = emptyTvSubst
+        go ((ty1,ty2,_):rs)
+          = extendTvSubst (go rs) (getTyVar "lazyEqsToSubst" ty1) ty2
 
 data MatchEnv l
   = ME  { me_tmpls :: VarSet    -- Template variables
