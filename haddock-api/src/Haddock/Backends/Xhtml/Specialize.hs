@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 
 module Haddock.Backends.Xhtml.Specialize
@@ -11,6 +13,7 @@ module Haddock.Backends.Xhtml.Specialize
 import Haddock.Syb
 
 import GHC
+import Name
 
 import Data.Data
 
@@ -43,12 +46,22 @@ specializeTyVarBndrs bndrs typs =
     bname (KindedTyVar (L _ name) _) = name
 
 
-sugar :: HsType name -> HsType name
+sugar :: (NamedThing name, DataId name) => HsType name -> HsType name
 sugar = sugarTuples . sugarLists
 
 
-sugarLists :: HsType name -> HsType name
-sugarLists = id
+sugarLists :: forall name. (NamedThing name, DataId name)
+           => HsType name -> HsType name
+sugarLists = everywhere $ mkT (sugarListsStep :: HsType name -> HsType name)
+
+
+sugarListsStep :: NamedThing name => HsType name -> HsType name
+sugarListsStep (HsAppTy (L _ (HsTyVar name)) ltyp)
+    | isBuiltInSyntax name' && strName == "[]" = HsListTy ltyp
+  where
+    name' = getName name
+    strName = occNameString . nameOccName $ name'
+sugarListsStep typ = typ
 
 
 sugarTuples :: HsType name -> HsType name
