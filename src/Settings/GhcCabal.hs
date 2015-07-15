@@ -2,10 +2,10 @@ module Settings.GhcCabal (
     cabalArgs, bootPackageDbArgs, customPackageArgs
     ) where
 
+import Way
 import Base
 import Builder
 import Package
-import Ways
 import Util
 import Oracles.Base
 import Switches

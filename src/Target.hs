@@ -4,8 +4,8 @@ module Target (
     stageTarget, stagePackageTarget, fullTarget
     ) where
 
+import Way
 import Base
-import Ways
 import Package
 import Builder
 import GHC.Generics
@@ -70,7 +70,7 @@ instance Show FullTarget where
                   ++ " (" ++ show (getBuilder target)
                   ++ ", " ++ show (getWay target) ++ ")"
 
--- Instances for storing FullTarget in the Shake database
+-- Instances for storing in the Shake database
 instance Binary FullTarget
 instance NFData FullTarget
 instance Hashable FullTarget

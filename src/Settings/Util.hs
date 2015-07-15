@@ -102,3 +102,18 @@ appendCcArgs xs = do
 -- -- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
 -- argPrefixPath :: String -> Args -> Args
 -- argPrefixPath prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
+
+-- TODO: do '-ticky' in all debug ways?
+-- wayHcArgs :: Way -> Args
+-- wayHcArgs (Way _ units) = args
+--     [ if (Dynamic    `elem` units)
+--       then args ["-fPIC", "-dynamic"]
+--       else arg "-static"
+--     , when (Threaded   `elem` units) $ arg "-optc-DTHREADED_RTS"
+--     , when (Debug      `elem` units) $ arg "-optc-DDEBUG"
+--     , when (Profiling  `elem` units) $ arg "-prof"
+--     , when (Logging    `elem` units) $ arg "-eventlog"
+--     , when (Parallel   `elem` units) $ arg "-parallel"
+--     , when (GranSim    `elem` units) $ arg "-gransim"
+--     , when (units == [Debug] || units == [Debug, Dynamic]) $
+--       args ["-ticky", "-DTICKY_TICKY"] ]

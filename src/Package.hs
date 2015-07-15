@@ -25,11 +25,6 @@ instance Eq Package where
 instance Ord Package where
     compare = compare `on` pkgName
 
-instance Binary Package
-
-instance Hashable Package where
-    hashWithSalt salt = hashWithSalt salt . show
-
 -- TODO: check if unifyPath is actually needed
 library :: String -> Package
 library name =
@@ -40,3 +35,8 @@ topLevel name = Package name name (name <.> "cabal")
 
 setCabal :: Package -> FilePath -> Package
 setCabal pkg cabalName = pkg { pkgCabal = cabalName }
+
+-- Instances for storing in the Shake database
+instance Binary Package
+instance Hashable Package where
+    hashWithSalt salt = hashWithSalt salt . show

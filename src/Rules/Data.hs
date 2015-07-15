@@ -4,6 +4,7 @@ module Rules.Data (
     cabalArgs, ghcPkgArgs, buildPackageData
     ) where
 
+import Way
 import Base
 import Package
 import Builder
@@ -14,7 +15,6 @@ import Settings.GhcCabal
 import Settings.TargetDirectory
 import Rules.Actions
 import Util
-import Ways
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: StagePackageTarget -> Rules ()

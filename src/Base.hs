@@ -27,10 +27,6 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum, Generic)
 instance Show Stage where
     show = show . fromEnum
 
--- Instances for storing Target in the Shake database
-instance Binary Stage
-instance Hashable Stage
-
 -- The returned string or list of strings is a part of an argument list
 -- to be passed to a Builder
 type Arg     = Action String
@@ -73,3 +69,7 @@ concatArgs as bs = do
     as' <- showArgs as
     bs' <- showArgs bs
     return $ map concat $ sequence [as', bs']
+
+-- Instances for storing in the Shake database
+instance Binary Stage
+instance Hashable Stage

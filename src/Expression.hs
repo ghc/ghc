@@ -11,8 +11,8 @@ module Expression (
     configKeyValue, configKeyValues
     ) where
 
+import Way
 import Base
-import Ways
 import Builder
 import Package
 import Target

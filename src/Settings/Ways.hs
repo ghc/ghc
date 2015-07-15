@@ -2,8 +2,8 @@ module Settings.Ways (
     ways
     ) where
 
+import Way
 import Base
-import Ways
 import Switches
 import Expression
 import Settings.User

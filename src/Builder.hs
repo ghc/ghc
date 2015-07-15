@@ -87,6 +87,6 @@ needBuilder builder = do
     path <- builderPath builder
     need [path]
 
--- Instances for storing Target in the Shake database
+-- Instances for storing in the Shake database
 instance Binary Builder
 instance Hashable Builder
