@@ -19,7 +19,7 @@ outofmem2::
 T2615-prep:
 	$(RM) libfoo_T2615.so
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fPIC -c libfoo_T2615.c -o libfoo_T2615.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -shared -no-auto-link-packages libfoo_T2615.o -o libfoo_T2615.so
+	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -shared -no-auto-link-packages libfoo_T2615.o -o libfoo_T2615.so
 
 .PHONY: T4059
 T4059:
