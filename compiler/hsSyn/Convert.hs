@@ -880,6 +880,7 @@ cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim (show w) w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar (show c) c }
+cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim (show c) c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
                             ; return $ HsString s s' }

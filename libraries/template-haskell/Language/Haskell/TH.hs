@@ -79,7 +79,7 @@ module Language.Haskell.TH(
     -- ** Constructors lifted to 'Q'
     -- *** Literals
         intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
-        charL, stringL, stringPrimL,
+        charL, stringL, stringPrimL, charPrimL,
     -- *** Patterns
         litP, varP, tupP, conP, uInfixP, parensP, infixP,
         tildeP, bangP, asP, wildP, recP,

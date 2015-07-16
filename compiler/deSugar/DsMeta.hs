@@ -58,6 +58,7 @@ import ForeignCall
 import Util
 import MonadUtils
 
+import Data.ByteString ( unpack )
 import Data.Maybe
 import Control.Monad
 import Data.List
@@ -1984,6 +1985,13 @@ repKConstraint = rep2 constraintKName []
 --              Literals
 
 repLiteral :: HsLit -> DsM (Core TH.Lit)
+repLiteral (HsStringPrim _ bs)
+  = do dflags   <- getDynFlags
+       word8_ty <- lookupType word8TyConName
+       let w8s = unpack bs
+           w8s_expr = map (\w8 -> mkCoreConApps word8DataCon
+                                  [mkWordLit dflags (toInteger w8)]) w8s
+       rep2 stringPrimLName [mkListExpr word8_ty w8s_expr]
 repLiteral lit
   = do lit' <- case lit of
                    HsIntPrim _ i    -> mk_integer i
@@ -1991,6 +1999,7 @@ repLiteral lit
                    HsInt _ i        -> mk_integer i
                    HsFloatPrim r    -> mk_rational r
                    HsDoublePrim r   -> mk_rational r
+                   HsCharPrim _ c   -> mk_char c
                    _ -> return lit
        lit_expr <- dsLit lit'
        case mb_lit_name of
@@ -2005,6 +2014,7 @@ repLiteral lit
                  HsFloatPrim _    -> Just floatPrimLName
                  HsDoublePrim _   -> Just doublePrimLName
                  HsChar _ _       -> Just charLName
+                 HsCharPrim _ _   -> Just charPrimLName
                  HsString _ _     -> Just stringLName
                  HsRat _ _        -> Just rationalLName
                  _                -> Nothing
@@ -2017,6 +2027,9 @@ mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit
 mk_string s = return $ HsString "" s
+
+mk_char :: Char -> DsM HsLit
+mk_char c = return $ HsChar "" c
 
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})

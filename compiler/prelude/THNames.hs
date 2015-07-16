@@ -33,7 +33,8 @@ templateHaskellNames = [
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
-    floatPrimLName, doublePrimLName, rationalLName,
+    floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
+    charPrimLName,
     -- Pat
     litPName, varPName, tupPName, unboxedTupPName,
     conPName, tildePName, bangPName, infixPName,
@@ -188,7 +189,8 @@ unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
 -------------------- TH.Lib -----------------------
 -- data Lit = ...
 charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
-    floatPrimLName, doublePrimLName, rationalLName :: Name
+    floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
+    charPrimLName :: Name
 charLName       = libFun (fsLit "charL")       charLIdKey
 stringLName     = libFun (fsLit "stringL")     stringLIdKey
 integerLName    = libFun (fsLit "integerL")    integerLIdKey
@@ -197,6 +199,8 @@ wordPrimLName   = libFun (fsLit "wordPrimL")   wordPrimLIdKey
 floatPrimLName  = libFun (fsLit "floatPrimL")  floatPrimLIdKey
 doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
 rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
+stringPrimLName = libFun (fsLit "stringPrimL") stringPrimLIdKey
+charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
 
 -- data Pat = ...
 litPName, varPName, tupPName, unboxedTupPName, conPName, infixPName, tildePName, bangPName,
@@ -556,7 +560,8 @@ unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 212
 
 -- data Lit = ...
 charLIdKey, stringLIdKey, integerLIdKey, intPrimLIdKey, wordPrimLIdKey,
-    floatPrimLIdKey, doublePrimLIdKey, rationalLIdKey :: Unique
+    floatPrimLIdKey, doublePrimLIdKey, rationalLIdKey, stringPrimLIdKey,
+    charPrimLIdKey:: Unique
 charLIdKey        = mkPreludeMiscIdUnique 220
 stringLIdKey      = mkPreludeMiscIdUnique 221
 integerLIdKey     = mkPreludeMiscIdUnique 222
@@ -565,9 +570,11 @@ wordPrimLIdKey    = mkPreludeMiscIdUnique 224
 floatPrimLIdKey   = mkPreludeMiscIdUnique 225
 doublePrimLIdKey  = mkPreludeMiscIdUnique 226
 rationalLIdKey    = mkPreludeMiscIdUnique 227
+stringPrimLIdKey  = mkPreludeMiscIdUnique 228
+charPrimLIdKey    = mkPreludeMiscIdUnique 229
 
 liftStringIdKey :: Unique
-liftStringIdKey     = mkPreludeMiscIdUnique 228
+liftStringIdKey     = mkPreludeMiscIdUnique 230
 
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,

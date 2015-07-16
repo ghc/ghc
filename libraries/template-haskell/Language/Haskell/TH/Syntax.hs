@@ -1230,6 +1230,7 @@ data Lit = CharL Char
          | FloatPrimL Rational
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
+         | CharPrimL Char
     deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,

@@ -57,6 +57,8 @@ integerL    :: Integer -> Lit
 integerL    = IntegerL
 charL       :: Char -> Lit
 charL       = CharL
+charPrimL   :: Char -> Lit
+charPrimL   = CharPrimL
 stringL     :: String -> Lit
 stringL     = StringL
 stringPrimL :: [Word8] -> Lit

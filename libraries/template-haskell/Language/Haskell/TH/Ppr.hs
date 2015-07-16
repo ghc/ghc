@@ -224,6 +224,7 @@ pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)
                                     (double (fromRational x) <> text "##")
 pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
+pprLit _ (CharPrimL c)   = text (show c) <> char '#'
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $
