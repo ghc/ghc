@@ -178,5 +178,16 @@ test('T9395', normal, compile_and_run, [''])
 test('T9532', omit_ways(['debug']), compile_and_run, [''])
 test('T9586', normal, compile, [''])
 test('T9681', normal, compile_fail, [''])
-test('T8089', normal, compile_and_run, [''])
+# Test no runtime crash. Report success and kill with `timeout` (exit code 99)
+# after a few seconds. From https://phabricator.haskell.org/D1075:
+#
+#   "I used a fairly conservative timeout. IF there is a regression it will
+#   crash as soon as the timeout's C call is done. The tricky bit is
+#   guesstimating how much time it needs to run to guarantee it's reached the
+#   C call.
+#   Probably something like 1s is already enough, but I don't know enough to
+#   make an educated guess how long it needs to be guaranteed to reach the C
+#   call."
+test('T8089', [exit_code(99), run_timeout_multiplier(0.01)],
+              compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
