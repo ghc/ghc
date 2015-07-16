@@ -820,7 +820,8 @@ mkEqErr1 ctxt ct
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; rdr_env <- getGlobalRdrEnv
        ; fam_envs <- tcGetFamInstEnvs
-       ; let (is_oriented, wanted_msg) = mk_wanted_extra (ctOrigin ct)
+       ; exp_syns <- goptM Opt_PrintExpandedSynonyms
+       ; let (is_oriented, wanted_msg) = mk_wanted_extra (ctOrigin ct) exp_syns
              coercible_msg = case ctEqRel ct of
                NomEq  -> empty
                ReprEq -> mkCoercibleExplanation rdr_env fam_envs ty1 ty2
@@ -841,20 +842,23 @@ mkEqErr1 ctxt ct
 
        -- If the types in the error message are the same as the types
        -- we are unifying, don't add the extra expected/actual message
-    mk_wanted_extra orig@(TypeEqOrigin {})
-      = mkExpectedActualMsg ty1 ty2 orig
+    mk_wanted_extra :: CtOrigin -> Bool -> (Maybe SwapFlag, SDoc)
+    mk_wanted_extra orig@(TypeEqOrigin {}) expandSyns
+      = mkExpectedActualMsg ty1 ty2 orig expandSyns
 
-    mk_wanted_extra (KindEqOrigin cty1 cty2 sub_o)
+    mk_wanted_extra (KindEqOrigin cty1 cty2 sub_o) expandSyns
       = (Nothing, msg1 $$ msg2)
       where
         msg1 = hang (ptext (sLit "When matching types"))
                   2 (vcat [ ppr cty1 <+> dcolon <+> ppr (typeKind cty1)
                           , ppr cty2 <+> dcolon <+> ppr (typeKind cty2) ])
         msg2 = case sub_o of
-                 TypeEqOrigin {} -> snd (mkExpectedActualMsg cty1 cty2 sub_o)
-                 _ -> empty
+                 TypeEqOrigin {} ->
+                   snd (mkExpectedActualMsg cty1 cty2 sub_o expandSyns)
+                 _ ->
+                   empty
 
-    mk_wanted_extra _ = (Nothing, empty)
+    mk_wanted_extra _ _ = (Nothing, empty)
 
 -- | This function tries to reconstruct why a "Coercible ty1 ty2" constraint
 -- is left over.
@@ -1197,17 +1201,169 @@ misMatchMsg ct oriented ty1 ty2
                     | null s2   = s1
                     | otherwise = s1 ++ (' ' : s2)
 
-mkExpectedActualMsg :: Type -> Type -> CtOrigin -> (Maybe SwapFlag, SDoc)
+mkExpectedActualMsg :: Type -> Type -> CtOrigin -> Bool
+                    -> (Maybe SwapFlag, SDoc)
 -- NotSwapped means (actual, expected), IsSwapped is the reverse
-mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act, uo_expected = exp })
+mkExpectedActualMsg ty1 ty2
+      (TypeEqOrigin { uo_actual = act, uo_expected = exp }) printExpanded
   | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (Just NotSwapped,  empty)
   | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (Just IsSwapped, empty)
   | otherwise                                    = (Nothing, msg)
   where
-    msg = vcat [ text "Expected type:" <+> ppr exp
-               , text "  Actual type:" <+> ppr act ]
+    msg = vcat
+      [ text "Expected type:" <+> ppr exp
+      , text "  Actual type:" <+> ppr act
+      , if printExpanded then expandedTys else empty
+      ]
 
-mkExpectedActualMsg _ _ _ = panic "mkExprectedAcutalMsg"
+    expandedTys =
+      ppUnless (expTy1 `pickyEqType` exp && expTy2 `pickyEqType` act) $ vcat
+        [ text "Type synonyms expanded:"
+        , text "Expected type:" <+> ppr expTy1
+        , text "  Actual type:" <+> ppr expTy2
+        ]
+
+    (expTy1, expTy2) = expandSynonymsToMatch exp act
+
+mkExpectedActualMsg _ _ _ _ = panic "mkExpectedAcutalMsg"
+
+pickyEqType :: TcType -> TcType -> Bool
+-- ^ Check when two types _look_ the same, _including_ synonyms.
+-- So (pickyEqType String [Char]) returns False
+pickyEqType ty1 ty2
+  = go init_env ty1 ty2
+  where
+    init_env =
+      mkRnEnv2 (mkInScopeSet (tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2))
+    go env (TyVarTy tv1) (TyVarTy tv2) =
+      rnOccL env tv1 == rnOccR env tv2
+    go _   (LitTy lit1) (LitTy lit2) =
+      lit1 == lit2
+    go env (ForAllTy tv1 t1) (ForAllTy tv2 t2) =
+      go env (tyVarKind tv1) (tyVarKind tv2) && go (rnBndr2 env tv1 tv2) t1 t2
+    go env (AppTy s1 t1) (AppTy s2 t2) =
+      go env s1 s2 && go env t1 t2
+    go env (FunTy s1 t1) (FunTy s2 t2) =
+      go env s1 s2 && go env t1 t2
+    go env (TyConApp tc1 ts1) (TyConApp tc2 ts2) =
+      (tc1 == tc2) && gos env ts1 ts2
+    go _ _ _ =
+      False
+
+    gos _   []       []       = True
+    gos env (t1:ts1) (t2:ts2) = go env t1 t2 && gos env ts1 ts2
+    gos _ _ _ = False
+
+{-
+Note [Expanding type synonyms to make types similar]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In type error messages, if -fprint-expanded-types is used, we want to expand
+type synonyms to make expected and found types as similar as possible, but we
+shouldn't expand types too much to make type messages even more verbose and
+harder to understand. The whole point here is to make the difference in expected
+and found types clearer.
+
+`expandSynonymsToMatch` does this, it takes two types, and expands type synonyms
+only as much as necessary. It should work like this:
+
+Given two types t1 and t2:
+
+  * If they're already same, it shouldn't expand any type synonyms and
+    just return.
+
+  * If they're in form `C1 t1_1 .. t1_n` and `C2 t2_1 .. t2_m` (C1 and C2 are
+    type constructors), it should expand C1 and C2 if they're different type
+    synonyms. Then it should continue doing same thing on expanded types. If C1
+    and C2 are same, then we should apply same procedure to arguments of C1
+    and argument of C2 to make them as similar as possible.
+
+    Most important thing here is to keep number of synonym expansions at
+    minimum. For example, if t1 is `T (T3, T5, Int)` and t2 is
+    `T (T5, T3, Bool)` where T5 = T4, T4 = T3, ..., T1 = X, we should return
+    `T (T3, T3, Int)` and `T (T3, T3, Bool)`.
+
+In the implementation, we just search in all possible solutions for a solution
+that does minimum amount of expansions. This leads to a complex algorithm: If
+we have two synonyms like X_m = X_{m-1} = .. X and Y_n = Y_{n-1} = .. Y, where
+X and Y are rigid types, we expand m * n times. But in practice it's not a
+problem because deeply nested synonyms with no intervening rigid type
+constructors are vanishingly rare.
+
+-}
+
+-- | Expand type synonyms in given types only enough to make them as equal as
+-- possible. Returned types are the same in terms of used type synonyms.
+--
+-- To expand all synonyms, see 'Type.expandTypeSynonyms'.
+expandSynonymsToMatch :: Type -> Type -> (Type, Type)
+expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
+  where
+    (_, ty1_ret, ty2_ret) = go 0 ty1 ty2
+
+    -- | Returns (number of synonym expansions done to make types similar,
+    --            type synonym expanded version of first type,
+    --            type synonym expanded version of second type)
+    --
+    -- Int argument is number of synonym expansions done so far.
+    go :: Int -> Type -> Type -> (Int, Type, Type)
+    go exps t1 t2
+      | t1 `pickyEqType` t2 =
+        -- Types are same, nothing to do
+        (exps, t1, t2)
+
+    go exps t1@(TyConApp tc1 tys1) t2@(TyConApp tc2 tys2)
+      | tc1 == tc2 =
+        -- Type constructors are same. They may be synonyms, but we don't
+        -- expand further.
+        let (exps', tys1', tys2') = unzip3 $ zipWith (go 0) tys1 tys2
+         in (exps + sum exps', TyConApp tc1 tys1', TyConApp tc2 tys2')
+      | otherwise =
+        -- Try to expand type constructors
+        case (tcView t1, tcView t2) of
+          -- When only one of the constructors is a synonym, we just
+          -- expand it and continue search
+          (Just t1', Nothing) ->
+            go (exps + 1) t1' t2
+          (Nothing, Just t2') ->
+            go (exps + 1) t1 t2'
+          (Just t1', Just t2') ->
+            -- Both constructors are synonyms, but they may be synonyms of
+            -- each other. We just search for minimally expanded solution.
+            -- See Note [Expanding type synonyms to make types similar].
+            let sol1@(exp1, _, _) = go (exps + 1) t1' t2
+                sol2@(exp2, _, _) = go (exps + 1) t1 t2'
+             in if exp1 < exp2 then sol1 else sol2
+          (Nothing, Nothing) ->
+            -- None of the constructors are synonyms, nothing to do
+            (exps, t1, t2)
+
+    go exps t1@TyConApp{} t2
+      | Just t1' <- tcView t1 = go (exps + 1) t1' t2
+      | otherwise             = (exps, t1, t2)
+
+    go exps t1 t2@TyConApp{}
+      | Just t2' <- tcView t2 = go (exps + 1) t1 t2'
+      | otherwise             = (exps, t1, t2)
+
+    go exps (AppTy t1_1 t1_2) (AppTy t2_1 t2_2) =
+      let (exps1, t1_1', t2_1') = go 0 t1_1 t2_1
+          (exps2, t1_2', t2_2') = go 0 t1_2 t2_2
+       in (exps + exps1 + exps2, mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
+
+    go exps (FunTy t1_1 t1_2) (FunTy t2_1 t2_2) =
+      let (exps1, t1_1', t2_1') = go 0 t1_1 t2_1
+          (exps2, t1_2', t2_2') = go 0 t1_2 t2_2
+       in (exps + exps1 + exps2, FunTy t1_1' t1_2', FunTy t2_1' t2_2')
+
+    go exps (ForAllTy tv1 t1) (ForAllTy tv2 t2) =
+      -- NOTE: We may have a bug here, but we just can't reproduce it easily.
+      -- See D1016 comments for details and our attempts at producing a test
+      -- case.
+      let (exps1, t1', t2') = go exps t1 t2
+       in (exps1, ForAllTy tv1 t1', ForAllTy tv2 t2')
+
+    go exps t1 t2 = (exps, t1, t2)
 
 sameOccExtra :: TcType -> TcType -> SDoc
 -- See Note [Disambiguating (X ~ X) errors]
@@ -1359,6 +1515,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     givens        = getUserGivens ctxt
     all_tyvars    = all isTyVarTy tys
 
+    cannot_resolve_msg :: Ct -> SDoc -> SDoc
     cannot_resolve_msg ct binds_msg
       = vcat [ addArising orig no_inst_msg
              , nest 2 extra_note

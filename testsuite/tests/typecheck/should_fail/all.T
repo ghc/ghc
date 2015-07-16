@@ -368,3 +368,8 @@ test('T10351', normal, compile_fail, [''])
 test('T10534', extra_clean(['T10534a.hi', 'T10534a.o']),
      multimod_compile_fail, ['T10534', '-v0'])
 test('T10495', normal, compile_fail, [''])
+
+test('ExpandSynsFail1', normal, compile_fail, ['-fprint-expanded-synonyms'])
+test('ExpandSynsFail2', normal, compile_fail, ['-fprint-expanded-synonyms'])
+test('ExpandSynsFail3', normal, compile_fail, ['-fprint-expanded-synonyms'])
+test('ExpandSynsFail4', normal, compile_fail, ['-fprint-expanded-synonyms'])

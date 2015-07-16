@@ -54,6 +54,12 @@
             <entry>-fno-print-unicode-syntax</entry>
           </row>
           <row>
+            <entry><option>-fprint-expanded-synonyms</option></entry>
+            <entry>In type errors, also print type-synonym-expanded types.</entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-expanded-synonyms</entry>
+          </row>
+          <row>
             <entry><option>-ferror-spans</option></entry>
             <entry>output full span in error messages</entry>
             <entry>dynamic</entry>

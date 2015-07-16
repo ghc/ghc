@@ -1,0 +1,11 @@
+ExpandSynsFail1.hs:4:31: error:
+    Couldn't match type ‘Bool’ with ‘Int’
+    Expected type: Foo
+      Actual type: Bar
+    Type synonyms expanded:
+    Expected type: Int
+      Actual type: Bool
+    In the second argument of ‘(==)’, namely ‘(False :: Bar)’
+    In the second argument of ‘($)’, namely
+      ‘(1 :: Foo) == (False :: Bar)’
+    In the expression: print $ (1 :: Foo) == (False :: Bar)
