@@ -587,9 +587,9 @@ include the field label as the user wrote it.  After the renamer, it
 will additionally contain the identity of the selector function in the
 second component.
 
-Due to AllowDuplicateRecordFields, the OccName of the selector function
+Due to DuplicateRecordFields, the OccName of the selector function
 may have been mangled, which is why we keep the original field label
-separately.  For example, when AllowDuplicateRecordFields is enabled
+separately.  For example, when DuplicateRecordFields is enabled
 
     data T = MkT { x :: Int }
 

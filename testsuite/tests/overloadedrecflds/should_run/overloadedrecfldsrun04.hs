@@ -1,6 +1,6 @@
--- Test that AllowDuplicateRecordFields works with TemplateHaskell
+-- Test that DuplicateRecordFields works with TemplateHaskell
 
-{-# LANGUAGE AllowDuplicateRecordFields, TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields, TemplateHaskell #-}
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax

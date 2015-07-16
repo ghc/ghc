@@ -5,9 +5,9 @@
 
 This module defines the representation of FieldLabels as stored in
 TyCons.  As well as a selector name, these have some extra structure
-to support the AllowDuplicateRecordFields extension.
+to support the DuplicateRecordFields extension.
 
-In the normal case (with NoAllowDuplicateRecordFields), a datatype like
+In the normal case (with NoDuplicateRecordFields), a datatype like
 
     data T = MkT { foo :: Int }
 
@@ -18,7 +18,7 @@ has
                , flSelector     = foo }.
 
 In particular, the Name of the selector has the same string
-representation as the label.  If AllowDuplicateRecordFields
+representation as the label.  If DuplicateRecordFields
 is enabled, however, the same declaration instead gives
 
     FieldLabel { flLabel        = "foo"
@@ -96,7 +96,7 @@ type FieldLabel = FieldLbl Name
 -- | Fields in an algebraic record type
 data FieldLbl a = FieldLabel {
       flLabel        :: FieldLabelString, -- ^ User-visible label of the field
-      flIsOverloaded :: Bool,             -- ^ Was AllowDuplicateRecordFields on
+      flIsOverloaded :: Bool,             -- ^ Was DuplicateRecordFields on
                                           --   in the defining module for this datatype?
       flSelector     :: a                 -- ^ Record selector function
     }

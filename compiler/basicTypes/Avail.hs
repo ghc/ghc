@@ -67,7 +67,7 @@ type AvailField     = AvailFld Name
 {-
 Note [Representing fields in AvailInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When -XAllowDuplicateRecordFields is disabled (the normal case), a
+When -XDuplicateRecordFields is disabled (the normal case), a
 datatype like
 
   data T = MkT { foo :: Int }
@@ -76,7 +76,7 @@ gives rise to the AvailInfo
 
   AvailTC T [T, MkT] [(foo, Nothing)],
 
-whereas if -XAllowDuplicateRecordFields is enabled it gives
+whereas if -XDuplicateRecordFields is enabled it gives
 
   AvailTC T [T, MkT] [($sel:foo:MkT, Just "foo")]
 

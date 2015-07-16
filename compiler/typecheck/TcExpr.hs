@@ -1350,7 +1350,7 @@ getFixedTyVars upd_fld_occs tvs1 cons
 {-
 Note [Disambiguating record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the -XAllowDuplicateRecordFields extension is used, the renamer may not
+If the -XDuplicateRecordFields extension is used, the renamer may not
 be able to determine exactly which fields are being updated. Consider:
 
         data S = MkS { foo :: Int }
@@ -1391,7 +1391,7 @@ signature to be omitted.
 disambiguateRecordBinds :: LHsExpr Name -> [LHsRecUpdField Name] -> Type
                                  -> TcM [LHsRecUpdField Name]
 disambiguateRecordBinds record_expr rbnds res_ty
-  | unambiguous = return rbnds -- Always the case if AllowDuplicateRecordFields is off
+  | unambiguous = return rbnds -- Always the case if DuplicateRecordFields is off
   | otherwise   = do
       { fam_inst_envs      <- tcGetFamInstEnvs
       ; rbnds_with_parents <- fmap (zip rbnds) $ mapM getParents rbnds

@@ -954,7 +954,7 @@ Note [Handling of deprecations]
 -}
 
 addUsedSelector :: Name -> RnM ()
--- Record usage of record selectors by AllowDuplicateRecordFields
+-- Record usage of record selectors by DuplicateRecordFields
 addUsedSelector n = do { env <- getGblEnv
                        ; updMutVar (tcg_used_selectors env)
                                    (\s -> extendNameSet s n) }

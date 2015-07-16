@@ -653,7 +653,7 @@ rnHsRecUpdFields
     -> RnM ([LHsRecUpdField Name], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM Opt_RecordPuns
-       ; overload_ok   <- xoptM Opt_AllowDuplicateRecordFields
+       ; overload_ok   <- xoptM Opt_DuplicateRecordFields
        ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 

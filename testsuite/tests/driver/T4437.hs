@@ -33,7 +33,7 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
-                             "AllowDuplicateRecordFields",
+                             "DuplicateRecordFields",
                              "StaticPointers"]
 
 expectedCabalOnlyExtensions :: [String]

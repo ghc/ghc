@@ -582,7 +582,7 @@ We gather three sorts of usage information
 
  * tcg_used_selectors
       Records the Names of record selectors that are used
-      by the AllowDuplicateRecordFields extension. These
+      by the DuplicateRecordFields extension. These
       may otherwise be missed from tcg_used_rdrnames as a
       single RdrName might refer to multiple fields.
 

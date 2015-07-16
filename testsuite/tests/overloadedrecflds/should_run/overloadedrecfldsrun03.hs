@@ -1,7 +1,7 @@
--- Test that AllowDuplicateRecordFields can be used along with
+-- Test that DuplicateRecordFields can be used along with
 -- TypeFamilies (with selectors only if unambiguous)
 
-{-# LANGUAGE AllowDuplicateRecordFields, TypeFamilies #-}
+{-# LANGUAGE DuplicateRecordFields, TypeFamilies #-}
 
 data family F a
 

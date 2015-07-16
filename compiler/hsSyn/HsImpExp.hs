@@ -184,8 +184,8 @@ A definition like
 
 gives rise to
 
-    IEThingWith T [MkT] [("x", Nothing)]           (without AllowDuplicateRecordFields)
-    IEThingWith T [MkT] [("x", Just $sel:x:MkT)]   (with    AllowDuplicateRecordFields)
+    IEThingWith T [MkT] [("x", Nothing)]           (without DuplicateRecordFields)
+    IEThingWith T [MkT] [("x", Just $sel:x:MkT)]   (with    DuplicateRecordFields)
 
 See Note [Representing fields in AvailInfo] in Avail for more details.
 -}

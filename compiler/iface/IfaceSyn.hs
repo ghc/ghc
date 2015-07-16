@@ -189,7 +189,7 @@ data IfaceConDecls
 
 -- For IfDataTyCon and IfNewTyCon we store:
 --  * the data constructor(s);
---  * a boolean indicating whether AllowDuplicateRecordFields was enabled
+--  * a boolean indicating whether DuplicateRecordFields was enabled
 --    at the definition site; and
 --  * a list of field labels.
 
@@ -849,7 +849,7 @@ pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls
       where
         -- IfaceConDecl contains the name of the selector function, so
         -- we have to look up the field label (in case
-        -- AllowDuplicateRecordFields was used for the definition)
+        -- DuplicateRecordFields was used for the definition)
         lbl = maybe sel (mkVarOccFS . flLabel) $ find (\ fl -> flSelector fl == sel) fls
 
     ppr_fields [ty1, ty2]

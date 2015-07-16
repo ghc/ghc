@@ -639,7 +639,7 @@ data ExtensionFlag
    | Opt_MultiWayIf
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
-   | Opt_AllowDuplicateRecordFields
+   | Opt_DuplicateRecordFields
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
@@ -3066,7 +3066,6 @@ xFlags = [
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "AllowAmbiguousTypes"              Opt_AllowAmbiguousTypes,
-  flagSpec "AllowDuplicateRecordFields"       Opt_AllowDuplicateRecordFields,
   flagSpec "AlternativeLayoutRule"            Opt_AlternativeLayoutRule,
   flagSpec "AlternativeLayoutRuleTransitional"
                                           Opt_AlternativeLayoutRuleTransitional,
@@ -3094,6 +3093,7 @@ xFlags = [
   flagSpec "DoAndIfThenElse"                  Opt_DoAndIfThenElse,
   flagSpec' "DoRec"                           Opt_RecursiveDo
     (deprecatedForExtension "RecursiveDo"),
+  flagSpec "DuplicateRecordFields"            Opt_DuplicateRecordFields,
   flagSpec "EmptyCase"                        Opt_EmptyCase,
   flagSpec "EmptyDataDecls"                   Opt_EmptyDataDecls,
   flagSpec "ExistentialQuantification"        Opt_ExistentialQuantification,
@@ -3271,7 +3271,7 @@ impliedXFlags
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
 
     -- Duplicate record fields require field disambiguation
-    , (Opt_AllowDuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
+    , (Opt_DuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
   ]
 
 -- Note [Documenting optimisation flags]

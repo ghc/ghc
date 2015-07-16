@@ -300,7 +300,7 @@ deriving instance (DataId id) => Data (HsRecUpdField id)
 
 -- A HsRecUpdField always contains a label (in hsRecUpdFieldLbl)
 -- giving the thing the user wrote, but thanks to
--- AllowDuplicateRecordFields this may not unambiguously correspond to
+-- DuplicateRecordFields this may not unambiguously correspond to
 -- a Name.  The hsRecUpdFieldSel is filled in by the renamer
 -- (RnPat.rnHsRecUpdFields) to contain a list of the candidate
 -- selector function names.  The typechecker (tcExpr) then

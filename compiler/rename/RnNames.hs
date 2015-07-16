@@ -532,7 +532,7 @@ getLocalNonValBinders fixity_env
                 hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
-        ; overload_ok <- xoptM Opt_AllowDuplicateRecordFields
+        ; overload_ok <- xoptM Opt_DuplicateRecordFields
         ; (tc_avails, tc_fldss) <- fmap unzip $ mapM (new_tc overload_ok)
                                                     (tyClGroupConcat tycl_decls)
         ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)
@@ -1007,7 +1007,7 @@ Note [ChildNames for overloaded record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the module
 
-    {-# LANGUAGE AllowDuplicateRecordFields #-}
+    {-# LANGUAGE DuplicateRecordFields #-}
     module M (F(foo, MkFInt, MkFBool)) where
       data family F a
       data instance F Int = MkFInt { foo :: Int }
@@ -1844,7 +1844,7 @@ Note [Overloaded field import]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 On the other hand, if we have
 
-    {-# LANGUAGE AllowDuplicateRecordFields #-}
+    {-# LANGUAGE DuplicateRecordFields #-}
     module A where
       data T = MkT { foo :: Int }
 
@@ -1854,7 +1854,7 @@ On the other hand, if we have
 
 then the minimal import for module B must be
     import A ( T(foo) )
-because when AllowDuplicateRecordFields is enabled, field selectors are
+because when DuplicateRecordFields is enabled, field selectors are
 not in scope without their enclosing datatype.
 
 
