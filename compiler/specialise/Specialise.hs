@@ -13,7 +13,7 @@ import Id
 import TcType hiding( substTy, extendTvSubstList )
 import Type   hiding( substTy, extendTvSubstList )
 import Coercion( Coercion )
-import Module( Module )
+import Module( Module, HasModule(..) )
 import CoreMonad
 import qualified CoreSubst
 import CoreUnfold
@@ -571,6 +571,7 @@ Hence, the invariant is this:
 ************************************************************************
 -}
 
+-- | Specialise calls to type-class overloaded functions occuring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
@@ -578,15 +579,23 @@ specProgram guts@(ModGuts { mg_module = this_mod
   = do { dflags <- getDynFlags
 
              -- Specialise the bindings of this module
-       ; (binds', uds) <- runSpecM dflags (go binds)
+       ; (binds', uds) <- runSpecM dflags this_mod (go binds)
 
              -- Specialise imported functions
        ; hpt_rules <- getRuleBase
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
-       ; (new_rules, spec_binds) <- specImports dflags this_mod emptyVarSet rule_base uds
 
-       ; let final_binds | null spec_binds = binds'
-                         | otherwise       = Rec (flattenBinds spec_binds) : binds'
+       ; (new_rules, spec_binds) <- specImports dflags this_mod emptyVarSet
+                                                rule_base (ud_calls uds)
+
+             -- Don't forget to wrap the specialized bindings with bindings
+             -- for the needed dictionaries.
+             -- See Note [Wrap bindings returned by specImports]
+       ; let spec_binds' = wrapDictBinds (ud_binds uds) spec_binds
+
+       ; let final_binds
+               | null spec_binds' = binds'
+               | otherwise        = Rec (flattenBinds spec_binds') : binds'
                    -- Note [Glom the bindings if imported functions are specialised]
 
        ; return (guts { mg_binds = final_binds
@@ -606,20 +615,49 @@ specProgram guts@(ModGuts { mg_module = this_mod
                          (bind', uds') <- specBind top_subst bind uds
                          return (bind' ++ binds', uds')
 
+{-
+Note [Wrap bindings returned by specImports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'specImports' returns a set of specialized bindings. However, these are lacking
+necessary floated dictionary bindings, which are returned by
+UsageDetails(ud_binds). These dictionaries need to be brought into scope with
+'wrapDictBinds' before the bindings returned by 'specImports' can be used. See,
+for instance, the 'specImports' call in 'specProgram'.
+
+
+Note [Disabling cross-module specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since GHC 7.10 we have performed specialisation of INLINEABLE bindings living
+in modules outside of the current module. This can sometimes uncover user code
+which explodes in size when aggressively optimized. The
+-fno-cross-module-specialise option was introduced to allow users to being
+bitten by such instances to revert to the pre-7.10 behavior.
+
+See Trac #10491
+-}
+
+-- | Specialise a set of calls to imported bindings
 specImports :: DynFlags
             -> Module
             -> VarSet           -- Don't specialise these ones
                                 -- See Note [Avoiding recursive specialisation]
             -> RuleBase         -- Rules from this module and the home package
                                 -- (but not external packages, which can change)
-            -> UsageDetails     -- Calls for imported things, and floating bindings
+            -> CallDetails      -- Calls for imported things, and floating bindings
             -> CoreM ( [CoreRule]   -- New rules
-                     , [CoreBind] ) -- Specialised bindings and floating bindings
-specImports dflags this_mod done rule_base uds
-  = do { let import_calls = varEnvElts (ud_calls uds)
+                     , [CoreBind] ) -- Specialised bindings
+                                    -- See Note [Wrapping bindings returned by specImports]
+specImports dflags this_mod done rule_base cds
+  -- See Note [Disabling cross-module specialisation]
+  | not $ gopt Opt_CrossModuleSpecialise dflags =
+    return ([], [])
+
+  | otherwise =
+    do { let import_calls = varEnvElts cds
        ; (rules, spec_binds) <- go rule_base import_calls
-       ; return (rules, wrapDictBinds (ud_binds uds) spec_binds) }
+       ; return (rules, spec_binds) }
   where
+    go :: RuleBase -> [CallInfoSet] -> CoreM ([CoreRule], [CoreBind])
     go _ [] = return ([], [])
     go rb (CIS fn calls_for_fn : other_calls)
       = do { (rules1, spec_binds1) <- specImport dflags this_mod done rb fn $
@@ -652,10 +690,11 @@ specImport dflags this_mod done rb fn calls_for_fn
              -- more rules as we go along
        ; hsc_env <- getHscEnv
        ; eps <- liftIO $ hscEPS hsc_env
+       ; vis_orphs <- getVisibleOrphanMods
        ; let full_rb = unionRuleBase rb (eps_rule_base eps)
-             rules_for_fn = getRules full_rb fn
+             rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
 
-       ; (rules1, spec_pairs, uds) <- runSpecM dflags $
+       ; (rules1, spec_pairs, uds) <- runSpecM dflags this_mod $
               specCalls (Just this_mod) emptySpecEnv rules_for_fn calls_for_fn fn rhs
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
@@ -666,9 +705,15 @@ specImport dflags this_mod done rb fn calls_for_fn
        ; (rules2, spec_binds2) <- -- pprTrace "specImport" (ppr fn $$ ppr uds $$ ppr rhs) $
                                   specImports dflags this_mod (extendVarSet done fn)
                                                      (extendRuleBaseList rb rules1)
-                                                     uds
+                                                     (ud_calls uds)
 
-       ; return (rules2 ++ rules1, spec_binds2 ++ spec_binds1) }
+             -- Don't forget to wrap the specialized bindings with bindings
+             -- for the needed dictionaries
+             -- See Note [Wrap bindings returned by specImports]
+       ; let final_binds = wrapDictBinds (ud_binds uds)
+                                         (spec_binds2 ++ spec_binds1)
+
+       ; return (rules2 ++ rules1, final_binds) }
 
   | otherwise
   = WARN( True, hang (ptext (sLit "specImport discarding:") <+> ppr fn <+> dcolon <+> ppr (idType fn))
@@ -970,8 +1015,10 @@ specBind rhs_env (NonRec fn rhs) body_uds
              (free_uds, dump_dbs, float_all) = dumpBindUDs [fn] combined_uds
                 -- See Note [From non-recursive to recursive]
 
-             final_binds | isEmptyBag dump_dbs = [NonRec b r | (b,r) <- pairs]
-                         | otherwise = [Rec (flattenDictBinds dump_dbs pairs)]
+             final_binds :: [DictBind]
+             final_binds
+               | isEmptyBag dump_dbs = [mkDB $ NonRec b r | (b,r) <- pairs]
+               | otherwise = [flattenDictBinds dump_dbs pairs]
 
          ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
@@ -980,7 +1027,7 @@ specBind rhs_env (NonRec fn rhs) body_uds
            else
              -- No call in final_uds mentions bound variables,
              -- so we can just leave the binding here
-              return (final_binds, free_uds) }
+              return (map fst final_binds, free_uds) }
 
 
 specBind rhs_env (Rec pairs) body_uds
@@ -1001,13 +1048,13 @@ specBind rhs_env (Rec pairs) body_uds
                         ; return (bndrs2, spec_defns2 ++ spec_defns1, uds2) }
 
        ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs bndrs uds3
-             bind = Rec (flattenDictBinds dumped_dbs $
-                         spec_defns3 ++ zip bndrs3 rhss')
+             bind = flattenDictBinds dumped_dbs
+                                     (spec_defns3 ++ zip bndrs3 rhss')
 
        ; if float_all then
               return ([], final_uds `snocDictBind` bind)
            else
-              return ([bind], final_uds) }
+              return ([fst bind], final_uds) }
 
 
 ---------------------------
@@ -1187,6 +1234,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
            ; spec_f <- newSpecIdSM fn spec_id_ty
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_args body)
+           ; this_mod <- getModule
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
@@ -1202,7 +1250,10 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                             -- otherwise uniques end up there, making builds
                             -- less deterministic (See #4012 comment:61 ff)
 
-                spec_env_rule = mkRule True {- Auto generated -} is_local
+                spec_env_rule = mkRule
+                                  this_mod
+                                  True {- Auto generated -}
+                                  is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
@@ -1245,7 +1296,7 @@ bindAuxiliaryDicts
         -> [DictId] -> [CoreExpr]   -- Original dict bndrs, and the witnessing expressions
         -> [DictId]                 -- A cloned dict-id for each dict arg
         -> (SpecEnv,                -- Substitute for all orig_dicts
-            [CoreBind],             -- Auxiliary dict bindings
+            [DictBind],             -- Auxiliary dict bindings
             [CoreExpr])             -- Witnessing expressions (all trivial)
 -- Bind any dictionary arguments to fresh names, to preserve sharing
 bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
@@ -1256,14 +1307,15 @@ bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
     env' = env { se_subst = CoreSubst.extendIdSubstList subst (orig_dict_ids `zip` spec_dict_args)
                , se_interesting = interesting `unionVarSet` interesting_dicts }
 
-    interesting_dicts = mkVarSet [ dx_id | NonRec dx_id dx <- dx_binds
+    interesting_dicts = mkVarSet [ dx_id | (NonRec dx_id dx, _) <- dx_binds
                                  , interestingDict env dx ]
                   -- See Note [Make the new dictionaries interesting]
 
+    go :: [CoreExpr] -> [CoreBndr] -> ([DictBind], [CoreExpr])
     go [] _  = ([], [])
     go (dx:dxs) (dx_id:dx_ids)
       | exprIsTrivial dx = (dx_binds, dx:args)
-      | otherwise        = (NonRec dx_id dx : dx_binds, Var dx_id : args)
+      | otherwise        = (mkDB (NonRec dx_id dx) : dx_binds, Var dx_id : args)
       where
         (dx_binds, args) = go dxs dx_ids
              -- In the first case extend the substitution but not bindings;
@@ -1593,9 +1645,9 @@ instance Outputable UsageDetails where
                 [ptext (sLit "binds") <+> equals <+> ppr dbs,
                  ptext (sLit "calls") <+> equals <+> ppr calls]))
 
+-- | A 'DictBind' is a binding along with a cached set containing its free
+-- variables (both type variables and dictionaries)
 type DictBind = (CoreBind, VarSet)
-        -- The set is the free vars of the binding
-        -- both tyvars and dicts
 
 type DictExpr = CoreExpr
 
@@ -1808,9 +1860,11 @@ plusUDList = foldr plusUDs emptyUDs
 _dictBindBndrs :: Bag DictBind -> [Id]
 _dictBindBndrs dbs = foldrBag ((++) . bindersOf . fst) [] dbs
 
+-- | Construct a 'DictBind' from a 'CoreBind'
 mkDB :: CoreBind -> DictBind
 mkDB bind = (bind, bind_fvs bind)
 
+-- | Identify the free variables of a 'CoreBind'
 bind_fvs :: CoreBind -> VarSet
 bind_fvs (NonRec bndr rhs) = pair_fvs (bndr,rhs)
 bind_fvs (Rec prs)         = foldl delVarSet rhs_fvs bndrs
@@ -1826,27 +1880,34 @@ pair_fvs (bndr, rhs) = exprFreeVars rhs `unionVarSet` idFreeVars bndr
         --      type T a = Int
         --      x :: T a = 3
 
-flattenDictBinds :: Bag DictBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
+-- | Flatten a set of 'DictBind's and some other binding pairs into a single
+-- recursive binding, including some additional bindings.
+flattenDictBinds :: Bag DictBind -> [(Id,CoreExpr)] -> DictBind
 flattenDictBinds dbs pairs
-  = foldrBag add pairs dbs
+  = (Rec bindings, fvs)
   where
-    add (NonRec b r,_) pairs = (b,r) : pairs
-    add (Rec prs1, _)  pairs = prs1 ++ pairs
+    (bindings, fvs) = foldrBag add
+                               ([], emptyVarSet)
+                               (dbs `snocBag` mkDB (Rec pairs))
+    add (NonRec b r, fvs') (pairs, fvs) =
+      ((b,r) : pairs, fvs `unionVarSet` fvs')
+    add (Rec prs1,   fvs') (pairs, fvs) =
+      (prs1 ++ pairs, fvs `unionVarSet` fvs')
 
-snocDictBinds :: UsageDetails -> [CoreBind] -> UsageDetails
+snocDictBinds :: UsageDetails -> [DictBind] -> UsageDetails
 -- Add ud_binds to the tail end of the bindings in uds
 snocDictBinds uds dbs
   = uds { ud_binds = ud_binds uds `unionBags`
-                     foldr (consBag . mkDB) emptyBag dbs }
+                     foldr consBag emptyBag dbs }
 
-consDictBind :: CoreBind -> UsageDetails -> UsageDetails
-consDictBind bind uds = uds { ud_binds = mkDB bind `consBag` ud_binds uds }
+consDictBind :: DictBind -> UsageDetails -> UsageDetails
+consDictBind bind uds = uds { ud_binds = bind `consBag` ud_binds uds }
 
 addDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
 addDictBinds binds uds = uds { ud_binds = listToBag binds `unionBags` ud_binds uds }
 
-snocDictBind :: UsageDetails -> CoreBind -> UsageDetails
-snocDictBind uds bind = uds { ud_binds = ud_binds uds `snocBag` mkDB bind }
+snocDictBind :: UsageDetails -> DictBind -> UsageDetails
+snocDictBind uds bind = uds { ud_binds = ud_binds uds `snocBag` bind }
 
 wrapDictBinds :: Bag DictBind -> [CoreBind] -> [CoreBind]
 wrapDictBinds dbs binds
@@ -1956,6 +2017,7 @@ newtype SpecM a = SpecM (State SpecState a)
 
 data SpecState = SpecState {
                      spec_uniq_supply :: UniqSupply,
+                     spec_module :: Module,
                      spec_dflags :: DynFlags
                  }
 
@@ -1990,11 +2052,15 @@ instance MonadUnique SpecM where
 instance HasDynFlags SpecM where
     getDynFlags = SpecM $ liftM spec_dflags get
 
-runSpecM :: DynFlags -> SpecM a -> CoreM a
-runSpecM dflags (SpecM spec)
+instance HasModule SpecM where
+    getModule = SpecM $ liftM spec_module get
+
+runSpecM :: DynFlags -> Module -> SpecM a -> CoreM a
+runSpecM dflags this_mod (SpecM spec)
     = do us <- getUniqueSupplyM
          let initialState = SpecState {
                                 spec_uniq_supply = us,
+                                spec_module = this_mod,
                                 spec_dflags = dflags
                             }
          return $ evalState spec initialState

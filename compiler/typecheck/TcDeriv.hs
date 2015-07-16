@@ -1029,7 +1029,7 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
   | cls `hasKey` gen1ClassKey   -- Gen1 needs Functor
   = ASSERT(length rep_tc_tvs > 0)   -- See Note [Getting base classes]
     do { functorClass <- tcLookupClass functorClassName
-       ; return (con_arg_constraints functorClass (get_gen1_constrained_tys last_tv)) }
+       ; return (con_arg_constraints (get_gen1_constraints functorClass)) }
 
   | otherwise  -- The others are a bit more complicated
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
@@ -1038,17 +1038,19 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
                  ++ sc_constraints
                  ++ arg_constraints) }
   where
-    arg_constraints = con_arg_constraints cls get_std_constrained_tys
+    arg_constraints = con_arg_constraints get_std_constrained_tys
 
        -- Constraints arising from the arguments of each constructor
-    con_arg_constraints cls' get_constrained_tys
-      = [ mkPredOrigin (DerivOriginDC data_con arg_n) (mkClassPred cls' [inner_ty])
+    con_arg_constraints :: (CtOrigin -> Type -> [PredOrigin]) -> [PredOrigin]
+    con_arg_constraints get_arg_constraints
+      = [ pred
         | data_con <- tyConDataCons rep_tc
         , (arg_n, arg_ty) <- ASSERT( isVanillaDataCon data_con )
                              zip [1..] $  -- ASSERT is precondition of dataConInstOrigArgTys
                              dataConInstOrigArgTys data_con all_rep_tc_args
         , not (isUnLiftedType arg_ty)
-        , inner_ty <- get_constrained_tys arg_ty ]
+        , let orig = DerivOriginDC data_con arg_n
+        , pred <- get_arg_constraints orig arg_ty ]
 
                 -- No constraints for unlifted types
                 -- See Note [Deriving and unboxed types]
@@ -1059,19 +1061,37 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
                 -- (b) The rep_tc_args will be one short
     is_functor_like =    getUnique cls `elem` functorLikeClassKeys
                       || onlyOneAndTypeConstr inst_tys
-    onlyOneAndTypeConstr [inst_ty] =
-      typeKind inst_ty `tcEqKind` mkArrowKind liftedTypeKind liftedTypeKind
+    onlyOneAndTypeConstr [inst_ty] = typeKind inst_ty `tcEqKind` a2a_kind
     onlyOneAndTypeConstr _         = False
 
-    get_std_constrained_tys :: Type -> [Type]
-    get_std_constrained_tys ty
-        | is_functor_like = deepSubtypesContaining last_tv ty
-        | otherwise       = [ty]
+    a2a_kind = mkArrowKind liftedTypeKind liftedTypeKind
+
+    get_gen1_constraints functor_cls orig ty
+       = mk_functor_like_constraints orig functor_cls $
+         get_gen1_constrained_tys last_tv ty
+
+    get_std_constrained_tys :: CtOrigin -> Type -> [PredOrigin]
+    get_std_constrained_tys orig ty
+        | is_functor_like = mk_functor_like_constraints orig cls $
+                            deepSubtypesContaining last_tv ty
+        | otherwise       = [mkPredOrigin orig (mkClassPred cls [ty])]
+
+    mk_functor_like_constraints :: CtOrigin -> Class -> [Type] -> [PredOrigin]
+    -- 'cls' is Functor or Traversable etc
+    -- For each type, generate two constraints: (cls ty, kind(ty) ~ (*->*))
+    -- The second constraint checks that the first is well-kinded.
+    -- Lacking that, as Trac #10561 showed, we can just generate an
+    -- ill-kinded instance.
+    mk_functor_like_constraints orig cls tys
+       = [ mkPredOrigin orig pred
+         | ty <- tys
+         , pred <- [ mkClassPred cls [ty]
+                   , mkEqPred (typeKind ty) a2a_kind] ]
 
     rep_tc_tvs = tyConTyVars rep_tc
     last_tv = last rep_tc_tvs
     all_rep_tc_args | cls `hasKey` gen1ClassKey || is_functor_like
-                      = rep_tc_args ++ [mkTyVarTy last_tv]
+                    = rep_tc_args ++ [mkTyVarTy last_tv]
                     | otherwise       = rep_tc_args
 
         -- Constraints arising from superclasses
@@ -1127,7 +1147,7 @@ The DeriveAnyClass extension adds a third way to derive instances, based on
 empty instance declarations.
 
 The canonical use case is in combination with GHC.Generics and default method
-signatures. These allow us have have instance declarations be empty, but still
+signatures. These allow us to have instance declarations being empty, but still
 useful, e.g.
 
   data T a = ...blah..blah... deriving( Generic )
@@ -1797,8 +1817,7 @@ simplifyDeriv pred tvs theta
                 -- We use *non-overlappable* (vanilla) skolems
                 -- See Note [Overlap and deriving]
 
-       ; let subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
-             skol_set   = mkVarSet tvs_skols
+       ; let skol_set = mkVarSet tvs_skols
              doc = ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- mapM (\(PredOrigin t o) -> newWanted o (substTy skol_subst t)) theta
@@ -1819,13 +1838,18 @@ simplifyDeriv pred tvs theta
                          | otherwise = Right ct
                          where p = ctPred ct
 
+       ; traceTc "simplifyDeriv 2" $
+         vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
+
        -- If we are deferring type errors, simply ignore any insoluble
        -- constraints.  They'll come up again when we typecheck the
        -- generated instance declaration
        ; defer <- goptM Opt_DeferTypeErrors
        ; unless defer (reportAllUnsolved (residual_wanted { wc_simple = bad }))
 
-       ; let min_theta = mkMinimalBySCs (bagToList good)
+       ; let min_theta  = mkMinimalBySCs (bagToList good)
+             subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+                          -- The reverse substitution (sigh)
        ; return (substTheta subst_skol min_theta) }
 
 {-

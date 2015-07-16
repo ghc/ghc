@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 def normaliseDynlibNames(str):
     return re.sub('-ghc[0-9.]+\.', '-ghc<VERSION>.', str)
 

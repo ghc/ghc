@@ -9,6 +9,17 @@ putStrLn "-- via stdin"
   }
 :}
 print (f 0,f 1,y)
+
+putStrLn "-- layout rule instead of explicit braces and semicolons works too"
+:{
+  let
+   g 0 = 1
+   g 1 = w
+    where w = 2
+   z = 3
+:}
+print (g 0,g 1,z)
+
 :{
 :browse
   Data.Maybe

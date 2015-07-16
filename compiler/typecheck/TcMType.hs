@@ -912,10 +912,6 @@ zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig)
        ; (env2, ty2') <- zonkTidyTcType env1 ty2
        ; (env3, orig') <- zonkTidyOrigin env2 orig
        ; return (env3, KindEqOrigin ty1' ty2' orig') }
-zonkTidyOrigin env (CoercibleOrigin ty1 ty2)
-  = do { (env1, ty1') <- zonkTidyTcType env  ty1
-       ; (env2, ty2') <- zonkTidyTcType env1 ty2
-       ; return (env2, CoercibleOrigin ty1' ty2') }
 zonkTidyOrigin env (FunDepOrigin1 p1 l1 p2 l2)
   = do { (env1, p1') <- zonkTidyTcType env  p1
        ; (env2, p2') <- zonkTidyTcType env1 p2

@@ -1,6 +1,6 @@
 
 T10438.hs:7:22: warning:
-    Found hole ‘_’ with type: w_1
+    Found type wildcard ‘_’ standing for ‘w_1’
     Where: ‘w_1’ is a rigid type variable bound by
                  the inferred type of g :: w_1 -> w_1 at T10438.hs:6:9
     Relevant bindings include

@@ -285,7 +285,9 @@ rnHsTyKi isType _doc (HsWildCardTy (AnonWildCard PlaceHolder))
     do { loc <- getSrcSpanM
        ; uniq <- newUnique
        ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
-       ; return (HsWildCardTy (AnonWildCard name), unitFV name) }
+       ; return (HsWildCardTy (AnonWildCard name), emptyFVs) }
+         -- emptyFVs: this occurrence does not refer to a
+         --           binding, so don't treat it as a free variable
 
 rnHsTyKi isType doc (HsWildCardTy (NamedWildCard rdr_name))
   = ASSERT( isType )
@@ -297,7 +299,9 @@ rnHsTyKi isType doc (HsWildCardTy (NamedWildCard rdr_name))
          failWith $ text "Unexpected wild card:" <+> quotes (ppr rdr_name) $$
                     docOfHsDocContext doc
        ; name <- rnTyVar isType rdr_name
-       ; return (HsWildCardTy (NamedWildCard name), unitFV name) }
+       ; return (HsWildCardTy (NamedWildCard name), emptyFVs) }
+         -- emptyFVs: this occurrence does not refer to a
+         --           binding, so don't treat it as a free variable
 
 --------------
 rnHsTyKiForAll :: Bool -> HsDocContext -> HsType RdrName
@@ -550,7 +554,7 @@ rnLHsTypeWithWildCards doc ty
   = do { -- When there is a wild card at the end of the context, remove it and
          -- add its location as the extra-constraints wild card in the
          -- HsForAllTy.
-         let ty' = extractExtraCtsWc `fmap` ty
+         let ty' = extractExtraCtsWc `fmap` flattenTopLevelLHsForAllTy ty
 
        ; checkValidPartialType doc ty'
 
@@ -825,8 +829,11 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 
 ----------------------------
 get_op :: LHsExpr Name -> Name
-get_op (L _ (HsVar n)) = n
-get_op other           = pprPanic "get_op" (ppr other)
+-- An unbound name could be either HsVar or HsUnboundVra
+-- See RnExpr.rnUnboundVar
+get_op (L _ (HsVar n))          = n
+get_op (L _ (HsUnboundVar occ)) = mkUnboundName (mkRdrUnqual occ)
+get_op other                    = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to

@@ -18,7 +18,7 @@ import SPARC.Imm
 import SPARC.Regs
 import SPARC.Base
 import NCGMonad
-import Size
+import Format
 import Reg
 
 import Cmm
@@ -49,7 +49,7 @@ getRegister :: CmmExpr -> NatM Register
 getRegister (CmmReg reg)
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
-       return (Fixed (cmmTypeSize (cmmRegType dflags reg))
+       return (Fixed (cmmTypeFormat (cmmRegType dflags reg))
                      (getRegisterReg platform reg) nilOL)
 
 getRegister tree@(CmmRegOff _ _)
@@ -115,8 +115,8 @@ getRegister (CmmMachOp mop [x])
 
 
         -- Integer negation --------------------------------
-        MO_S_Neg rep            -> trivialUCode (intSize rep) (SUB False False g0) x
-        MO_Not rep              -> trivialUCode (intSize rep) (XNOR False g0) x
+        MO_S_Neg rep            -> trivialUCode (intFormat rep) (SUB False False g0) x
+        MO_Not rep              -> trivialUCode (intFormat rep) (XNOR False g0) x
 
 
         -- Float word size conversion ----------------------
@@ -133,7 +133,7 @@ getRegister (CmmMachOp mop [x])
 
         -- If it's the same size, then nothing needs to be done.
         MO_UU_Conv from to
-         | from == to           -> conversionNop (intSize to)  x
+         | from == to           -> conversionNop (intFormat to)  x
 
         -- To narrow an unsigned word, mask out the high bits to simulate what would
         --      happen if we copied the value into a smaller register.
@@ -158,9 +158,9 @@ getRegister (CmmMachOp mop [x])
 
         -- To widen an unsigned word we don't have to do anything.
         --      Just leave it in the same register and mark the result as the new size.
-        MO_UU_Conv W8  W16      -> conversionNop (intSize W16)  x
-        MO_UU_Conv W8  W32      -> conversionNop (intSize W32)  x
-        MO_UU_Conv W16 W32      -> conversionNop (intSize W32)  x
+        MO_UU_Conv W8  W16      -> conversionNop (intFormat W16)  x
+        MO_UU_Conv W8  W32      -> conversionNop (intFormat W32)  x
+        MO_UU_Conv W16 W32      -> conversionNop (intFormat W32)  x
 
 
         -- Signed integer word size conversions ------------
@@ -240,8 +240,8 @@ getRegister (CmmMachOp mop [x, y])
 getRegister (CmmLoad mem pk) = do
     Amode src code <- getAmode mem
     let
-        code__2 dst     = code `snocOL` LD (cmmTypeSize pk) src dst
-    return (Any (cmmTypeSize pk) code__2)
+        code__2 dst     = code `snocOL` LD (cmmTypeFormat pk) src dst
+    return (Any (cmmTypeFormat pk) code__2)
 
 getRegister (CmmLit (CmmInt i _))
   | fits13Bits i
@@ -289,18 +289,18 @@ integerExtend from to expr
                 -- arithmetic shift right to sign extend
                 `snocOL`  SRA tmp (RIImm (ImmInt bitCount)) dst
 
-        return (Any (intSize to) code)
+        return (Any (intFormat to) code)
 
 
 -- | For nop word format conversions we set the resulting value to have the
 --      required size, but don't need to generate any actual code.
 --
 conversionNop
-        :: Size -> CmmExpr -> NatM Register
+        :: Format -> CmmExpr -> NatM Register
 
 conversionNop new_rep expr
  = do   e_code <- getRegister expr
-        return (setSizeOfRegister e_code new_rep)
+        return (setFormatOfRegister e_code new_rep)
 
 
 
@@ -477,7 +477,7 @@ trivialCode _ instr x y = do
 
 trivialFCode
         :: Width
-        -> (Size -> Reg -> Reg -> Reg -> Instr)
+        -> (Format -> Reg -> Reg -> Reg -> Instr)
         -> CmmExpr
         -> CmmExpr
         -> NatM Register
@@ -496,33 +496,33 @@ trivialFCode pk instr x y = do
         code__2 dst =
                 if pk1 `cmmEqType` pk2 then
                     code1 `appOL` code2 `snocOL`
-                    instr (floatSize pk) src1 src2 dst
+                    instr (floatFormat pk) src1 src2 dst
                 else if typeWidth pk1 == W32 then
                     code1 `snocOL` promote src1 `appOL` code2 `snocOL`
                     instr FF64 tmp src2 dst
                 else
                     code1 `appOL` code2 `snocOL` promote src2 `snocOL`
                     instr FF64 src1 tmp dst
-    return (Any (cmmTypeSize $ if pk1 `cmmEqType` pk2 then pk1 else cmmFloat W64)
+    return (Any (cmmTypeFormat $ if pk1 `cmmEqType` pk2 then pk1 else cmmFloat W64)
                 code__2)
 
 
 
 trivialUCode
-        :: Size
+        :: Format
         -> (RI -> Reg -> Instr)
         -> CmmExpr
         -> NatM Register
 
-trivialUCode size instr x = do
+trivialUCode format instr x = do
     (src, code) <- getSomeReg x
     let
         code__2 dst = code `snocOL` instr (RIReg src) dst
-    return (Any size code__2)
+    return (Any format code__2)
 
 
 trivialUFCode
-        :: Size
+        :: Format
         -> (Reg -> Reg -> Instr)
         -> CmmExpr
         -> NatM Register
@@ -544,10 +544,10 @@ coerceInt2FP width1 width2 x = do
     (src, code) <- getSomeReg x
     let
         code__2 dst = code `appOL` toOL [
-            ST (intSize width1) src (spRel (-2)),
-            LD (intSize width1) (spRel (-2)) dst,
-            FxTOy (intSize width1) (floatSize width2) dst dst]
-    return (Any (floatSize $ width2) code__2)
+            ST (intFormat width1) src (spRel (-2)),
+            LD (intFormat width1) (spRel (-2)) dst,
+            FxTOy (intFormat width1) (floatFormat width2) dst dst]
+    return (Any (floatFormat $ width2) code__2)
 
 
 
@@ -558,26 +558,26 @@ coerceInt2FP width1 width2 x = do
 --
 coerceFP2Int :: Width -> Width -> CmmExpr -> NatM Register
 coerceFP2Int width1 width2 x
- = do   let fsize1      = floatSize width1
-            fsize2      = floatSize width2
+ = do   let fformat1      = floatFormat width1
+            fformat2      = floatFormat width2
 
-            isize2      = intSize   width2
+            iformat2      = intFormat   width2
 
         (fsrc, code)    <- getSomeReg x
-        fdst            <- getNewRegNat fsize2
+        fdst            <- getNewRegNat fformat2
 
         let code2 dst
                 =       code
                 `appOL` toOL
                         -- convert float to int format, leaving it in a float reg.
-                        [ FxTOy fsize1 isize2 fsrc fdst
+                        [ FxTOy fformat1 iformat2 fsrc fdst
 
                         -- store the int into mem, then load it back to move
                         --      it into an actual int reg.
-                        , ST    fsize2 fdst (spRel (-2))
-                        , LD    isize2 (spRel (-2)) dst]
+                        , ST    fformat2 fdst (spRel (-2))
+                        , LD    iformat2 (spRel (-2)) dst]
 
-        return (Any isize2 code2)
+        return (Any iformat2 code2)
 
 
 -- | Coerce a double precision floating point value to single precision.

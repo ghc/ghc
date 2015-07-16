@@ -377,20 +377,28 @@ checkInstCoverage be_liberal clas theta inst_taus
   where
     (tyvars, fds) = classTvsFds clas
     fundep_ok fd
-       | if be_liberal then liberal_ok else conservative_ok
-       = IsValid
-       | otherwise
-       = NotValid msg
+       | isEmptyVarSet undetermined_tvs = IsValid
+       | otherwise                      = NotValid msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = tyVarsOfTypes ls
          rs_tvs = tyVarsOfTypes rs
 
-         conservative_ok = rs_tvs `subVarSet` closeOverKinds ls_tvs
-         liberal_ok      = rs_tvs `subVarSet` closeOverKinds (oclose theta ls_tvs)
-                           -- closeOverKinds: see Note [Closing over kinds in coverage]
+         undetermined_tvs | be_liberal = liberal_undet_tvs
+                          | otherwise  = conserv_undet_tvs
 
-         msg = vcat [ sep [ ptext (sLit "The")
+         liberal_undet_tvs = rs_tvs `minusVarSet`oclose theta (closeOverKinds ls_tvs)
+         conserv_undet_tvs = rs_tvs `minusVarSet` closeOverKinds ls_tvs
+            -- closeOverKinds: see Note [Closing over kinds in coverage]
+
+         undet_list = varSetElemsKvsFirst undetermined_tvs
+
+         msg = vcat [ -- text "ls_tvs" <+> ppr ls_tvs
+                      -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
+                      -- , text "theta" <+> ppr theta
+                      -- , text "oclose" <+> ppr (oclose theta (closeOverKinds ls_tvs))
+                      -- , text "rs_tvs" <+> ppr rs_tvs
+                      sep [ ptext (sLit "The")
                             <+> ppWhen be_liberal (ptext (sLit "liberal"))
                             <+> ptext (sLit "coverage condition fails in class")
                             <+> quotes (ppr clas)
@@ -403,25 +411,77 @@ checkInstCoverage be_liberal clas theta inst_taus
                              else ptext (sLit "do not jointly"))
                             <+> ptext (sLit "determine rhs type")<>plural rs
                             <+> pprQuotedList rs ]
-                    , ppWhen (not be_liberal && liberal_ok) $
+                    , ptext (sLit "Un-determined variable") <> plural undet_list <> colon
+                            <+> pprWithCommas ppr undet_list
+                    , ppWhen (all isKindVar undet_list) $
+                      ptext (sLit "(Use -fprint-explicit-kinds to see the kind variables in the types)")
+                    , ppWhen (not be_liberal && isEmptyVarSet liberal_undet_tvs) $
                       ptext (sLit "Using UndecidableInstances might help") ]
 
-{-
-Note [Closing over kinds in coverage]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Closing over kinds in coverage]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a fundep  (a::k) -> b
 Then if 'a' is instantiated to (x y), where x:k2->*, y:k2,
 then fixing x really fixes k2 as well, and so k2 should be added to
 the lhs tyvars in the fundep check.
 
 Example (Trac #8391), using liberal coverage
+      data Foo a = ...  -- Foo :: forall k. k -> *
+      class Bar a b | a -> b
+      instance Bar a (Foo a)
 
-    type Foo a = a  -- Foo :: forall k. k -> k
-    class Bar a b | a -> b
-    instance Bar a (Foo a)
+    In the instance decl, (a:k) does fix (Foo k a), but only if we notice
+    that (a:k) fixes k.  Trac #10109 is another example.
 
-In the instance decl, (a:k) does fix (Foo k a), but only if we notice
-that (a:k) fixes k.  Trac #10109 is another example.
+Here is a more subtle example, from HList-0.4.0.0 (Trac #10564)
+
+  class HasFieldM (l :: k) r (v :: Maybe *)
+        | l r -> v where ...
+  class HasFieldM1 (b :: Maybe [*]) (l :: k) r v
+        | b l r -> v where ...
+  class HMemberM (e1 :: k) (l :: [k]) (r :: Maybe [k])
+        | e1 l -> r
+
+  data Label :: k -> *
+  type family LabelsOf (a :: [*]) ::  *
+
+  instance (HMemberM (Label {k} (l::k)) (LabelsOf xs) b,
+            HasFieldM1 b l (r xs) v)
+         => HasFieldM l (r xs) v where
+
+Is the instance OK? Does {l,r,xs} determine v?  Well:
+
+  * From the instance constraint HMemberM (Label k l) (LabelsOf xs) b,
+    plus the fundep "| el l -> r" in class HMameberM,
+    we get {l,k,xs} -> b
+
+  * Note the 'k'!! We must call closeOverKinds on the seed set
+    ls_tvs = {l,r,xs}, BEFORE doing oclose, else the {l,k,xs}->b
+    fundep won't fire.  This was the reason for #10564.
+
+  * So starting from seeds {l,r,xs,k} we do oclose to get
+    first {l,r,xs,k,b}, via the HMemberM constraint, and then
+    {l,r,xs,k,b,v}, via the HasFieldM1 constraint.
+
+  * And that fixes v.
+
+However, we must closeOverKinds whenever augmenting the seed set
+in oclose!  Consider Trac #10109:
+
+  data Succ a   -- Succ :: forall k. k -> *
+  class Add (a :: k1) (b :: k2) (ab :: k3) | a b -> ab
+  instance (Add a b ab) => Add (Succ {k1} (a :: k1))
+                               b
+                               (Succ {k3} (ab :: k3})
+
+We start with seed set {a:k1,b:k2} and closeOverKinds to {a,k1,b,k2}.
+Now use the fundep to extend to {a,k1,b,k2,ab}.  But we need to
+closeOverKinds *again* now to {a,k1,b,k2,ab,k3}, so that we fix all
+the variables free in (Succ {k3} ab).
+
+Bottom line:
+  * closeOverKinds on initial seeds (in checkInstCoverage)
+  * and closeOverKinds whenever extending those seeds (in oclose)
 
 Note [The liberal coverage condition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -451,12 +511,14 @@ oclose preds fixed_tvs
     extend fixed_tvs = foldl add fixed_tvs tv_fds
        where
           add fixed_tvs (ls,rs)
-            | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
+            | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` closeOverKinds rs
             | otherwise                = fixed_tvs
+            -- closeOverKinds: see Note [Closing over kinds in coverage]
 
     tv_fds  :: [(TyVarSet,TyVarSet)]
-    tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-              | (xs, ys) <- concatMap determined preds ]
+    tv_fds  = [ (tyVarsOfTypes ls, tyVarsOfTypes rs)
+              | pred <- preds
+              , (ls, rs) <- determined pred ]
 
     determined :: PredType -> [([Type],[Type])]
     determined pred

@@ -1282,9 +1282,9 @@ type NormaliseStepper = RecTcChecker
 -- | The result of stepping in a normalisation function.
 -- See 'topNormaliseTypeX_maybe'.
 data NormaliseStepResult
-  = NS_Done   -- ^ nothing more to do
-  | NS_Abort  -- ^ utter failure. The outer function should fail too.
-  | NS_Step RecTcChecker Type Coercion  -- ^ we stepped, yielding new bits;
+  = NS_Done   -- ^ Nothing more to do
+  | NS_Abort  -- ^ Utter failure. The outer function should fail too.
+  | NS_Step RecTcChecker Type Coercion  -- ^ We stepped, yielding new bits;
                                         -- ^ co :: old type ~ new type
 
 modifyStepResultCo :: (Coercion -> Coercion)
@@ -1292,8 +1292,9 @@ modifyStepResultCo :: (Coercion -> Coercion)
 modifyStepResultCo f (NS_Step rec_nts ty co) = NS_Step rec_nts ty (f co)
 modifyStepResultCo _ result                  = result
 
--- | Try one stepper and then try the next, if the first doesn't make
--- progress.
+-- | Try one stepper and then try the next,
+-- if the first doesn't make progress.
+-- So if it returns NS_Done, it means that both steppers are satisfied
 composeSteppers :: NormaliseStepper -> NormaliseStepper
                 -> NormaliseStepper
 composeSteppers step1 step2 rec_nts tc tys

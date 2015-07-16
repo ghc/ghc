@@ -104,7 +104,7 @@ import qualified GHC.List as List ( foldr )
 -- >   instance Functor Identity where
 -- >     fmap f (Identity x) = Identity (f x)
 -- >
--- >   instance Applicative Indentity where
+-- >   instance Applicative Identity where
 -- >     pure x = Identity x
 -- >     Identity f <*> Identity x = Identity (f x)
 -- >

@@ -1,4 +1,4 @@
 
-T9433.hs:14:6:
-    Type family ‘Id’ should have 1 argument, but has been given none
+T9433.hs:14:6: error:
+    The type family ‘Id’ should have 1 argument, but has been given none
     In the type signature for ‘x’: x :: Map Id [Bool]

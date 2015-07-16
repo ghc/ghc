@@ -39,6 +39,7 @@ module Control.Exception.Base (
         RecSelError(..),
         RecUpdError(..),
         ErrorCall(..),
+        TypeError(..), -- #10284, custom error type for deferred type errors
 
         -- * Throwing exceptions
         throwIO,
@@ -92,7 +93,7 @@ module Control.Exception.Base (
         -- * Calls for GHC runtime
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
-        absentError,
+        absentError, typeError,
         nonTermination, nestedAtomically,
   ) where
 
@@ -357,6 +358,18 @@ instance Exception NoMethodError
 
 -----
 
+-- |An expression that didn't typecheck during compile time was called.
+-- This is only possible with -fdefer-type-errors. The @String@ gives
+-- details about the failed type check.
+data TypeError = TypeError String
+
+instance Show TypeError where
+    showsPrec _ (TypeError err) = showString err
+
+instance Exception TypeError
+
+-----
+
 -- |Thrown when the runtime system detects that the computation is
 -- guaranteed not to terminate. Note that there is no guarantee that
 -- the runtime system will notice whether any given computation is
@@ -383,7 +396,7 @@ instance Exception NestedAtomically
 
 recSelError, recConError, irrefutPatError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
-  absentError
+  absentError, typeError
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
 recSelError              s = throw (RecSelError ("No match in record selector "
@@ -396,6 +409,7 @@ irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pa
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
 noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
 patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
+typeError                s = throw (TypeError        (unpackCStringUtf8# s))
 
 -- GHC's RTS calls this
 nonTermination :: SomeException

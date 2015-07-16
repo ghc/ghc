@@ -2,8 +2,6 @@
 Test10399.hs:10:27: error:
     Not in scope: type constructor or class ‘MPISecret’
 
-Test10399.hs:12:10: error: Not in scope: ‘mkBila’
-
 Test10399.hs:12:39: error: Not in scope: ‘P.base’
 
 Test10399.hs:12:50: error: Not in scope: ‘P.pos’

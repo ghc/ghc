@@ -477,11 +477,11 @@ mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
                  | otherwise           = HsWrap co_fn e
 
-mkHsWrapCo :: TcCoercion   -- A Nominal coercion  a ~N b
+mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
            -> HsExpr id -> HsExpr id
 mkHsWrapCo co e = mkHsWrap (coToHsWrapper co) e
 
-mkHsWrapCoR :: TcCoercion   -- A Representational coercion  a ~R b
+mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
             -> HsExpr id -> HsExpr id
 mkHsWrapCoR co e = mkHsWrap (coToHsWrapperR co) e
 

@@ -1,12 +1,14 @@
 
 TcCoercibleFail.hs:11:8: error:
     Couldn't match representation of type ‘Int’ with that of ‘()’
+      arising from a use of ‘coerce’
     In the expression: coerce
     In the expression: coerce $ one :: ()
     In an equation for ‘foo1’: foo1 = coerce $ one :: ()
 
 TcCoercibleFail.hs:14:8: error:
     Couldn't match representation of type ‘m Int’ with that of ‘m Age’
+      arising from a use of ‘coerce’
     NB: We cannot know what roles the parameters to ‘m’ have;
       we must assume that the role is nominal
     Relevant bindings include
@@ -16,18 +18,14 @@ TcCoercibleFail.hs:14:8: error:
     In an equation for ‘foo2’: foo2 = coerce $ (return one :: m Int)
 
 TcCoercibleFail.hs:16:8: error:
-    Couldn't match type ‘Int’ with ‘Age’
-    arising from trying to show that the representations of
-      ‘Map Int ()’ and
-      ‘Map Age ()’ are the same
-    Relevant role signatures: type role Map nominal representational
+    Couldn't match type ‘Int’ with ‘Age’ arising from a use of ‘coerce’
     In the expression: coerce
     In the expression: coerce $ Map one () :: Map Age ()
     In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
 TcCoercibleFail.hs:18:8: error:
     Couldn't match representation of type ‘Int’ with that of ‘Down Int’
-    Relevant role signatures: type role Down representational
+      arising from a use of ‘coerce’
     The data constructor ‘Down’ of newtype ‘Down’ is not in scope
     In the expression: coerce
     In the expression: coerce $ one :: Down Int
@@ -35,13 +33,14 @@ TcCoercibleFail.hs:18:8: error:
 
 TcCoercibleFail.hs:21:8: error:
     Couldn't match representation of type ‘Void’ with that of ‘()’
+      arising from a use of ‘coerce’
     In the expression: coerce :: Void -> ()
     In an equation for ‘foo5’: foo5 = coerce :: Void -> ()
 
 TcCoercibleFail.hs:24:9: error:
     Couldn't match representation of type ‘VoidBad ()’
                              with that of ‘()’
-    Relevant role signatures: type role VoidBad phantom
+      arising from a use of ‘coerce’
     In the expression: coerce :: (VoidBad ()) -> ()
     In an equation for ‘foo5'’: foo5' = coerce :: (VoidBad ()) -> ()
 
@@ -60,11 +59,6 @@ TcCoercibleFail.hs:29:8: error:
     Couldn't match representation of type ‘Either
                                              Int (Fix (Either Int))’
                              with that of ‘()’
-    arising from trying to show that the representations of
-      ‘Fix (Either Int)’ and
-      ‘()’ are the same
-    Relevant role signatures:
-      type role Either representational representational
-      type role Fix nominal
+      arising from a use of ‘coerce’
     In the expression: coerce :: Fix (Either Int) -> ()
     In an equation for ‘foo7’: foo7 = coerce :: Fix (Either Int) -> ()

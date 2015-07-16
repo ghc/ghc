@@ -697,7 +697,7 @@ mkInferredPolyId poly_name qtvs theta mono_ty
 
        ; my_theta <- pickQuantifiablePreds my_tvs2 theta
 
-       ; let my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
+       ; let my_tvs = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
              inferred_poly_ty = mkSigmaTy my_tvs my_theta norm_mono_ty
 
        ; addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $

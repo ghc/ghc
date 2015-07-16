@@ -1,6 +1,6 @@
 
-T10072.hs:3:31:
-    Found hole ‘_’ with type: w_
+T10072.hs:3:31: error:
+    Found type wildcard ‘_’ standing for ‘w_’
     Where: ‘w_’ is a rigid type variable bound by
                 the RULE "map/empty" at T10072.hs:3:1
     To use the inferred type, enable PartialTypeSignatures

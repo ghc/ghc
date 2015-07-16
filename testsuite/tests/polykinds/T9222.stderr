@@ -1,5 +1,5 @@
 
-T9222.hs:13:3:
+T9222.hs:13:3: error:
     Couldn't match type ‘b0’ with ‘b’
       ‘b0’ is untouchable
         inside the constraints: a ~ '(b0, c0)
@@ -21,4 +21,4 @@ T9222.hs:13:3:
               ((a ~ '(b, c)) => Proxy b) -> Want a
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the definition of data constructor ‘Want’
-    In the data declaration for ‘Want’
+    In the data type declaration for ‘Want’

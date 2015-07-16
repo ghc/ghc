@@ -553,12 +553,17 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_implicit = False
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
 
-mkSingleCoAxiom :: Name -> [TyVar] -> TyCon -> [Type] -> Type -> CoAxiom Unbranched
-mkSingleCoAxiom ax_name tvs fam_tc lhs_tys rhs_ty
+mkSingleCoAxiom :: Role -> Name
+                -> [TyVar] -> TyCon -> [Type] -> Type
+                -> CoAxiom Unbranched
+-- Make a single-branch CoAxiom, incluidng making the branch itself
+-- Used for both type family (Nominal) and data family (Representational)
+-- axioms, hence passing in the Role
+mkSingleCoAxiom role ax_name tvs fam_tc lhs_tys rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
-            , co_ax_role     = Nominal
+            , co_ax_role     = role
             , co_ax_implicit = False
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
   where
@@ -895,27 +900,26 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
+--      * data family redex
 --      * newtypes
--- using appropriate coercions.  Specifically, if
+-- returning an appropriate Representaitonal coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Maybe (co, ty')
 -- then
---   (a) co :: ty ~ ty'
---   (b) ty' is not a newtype, and is not a type-family redex
+--   (a) co :: ty ~R ty'
+--   (b) ty' is not a newtype, and is not a type-family or data-family redex
 --
 -- However, ty' can be something like (Maybe (F ty)), where
 -- (F ty) is a redex.
 --
 -- Its a bit like Type.repType, but handles type families too
--- The coercion returned is always an R coercion
 
 topNormaliseType_maybe env ty
   = topNormaliseTypeX_maybe stepper ty
   where
-    stepper
-      = unwrapNewTypeStepper
-        `composeSteppers`
-        \ rec_nts tc tys ->
-        let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
+    stepper = unwrapNewTypeStepper `composeSteppers` tyFamStepper
+
+    tyFamStepper rec_nts tc tys  -- Try to step a type/data familiy
+      = let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
         case reduceTyFamApp_maybe env Representational tc ntys noLazyEqs of
           Just (co, rhs, _) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
           Nothing           -> NS_Done
@@ -962,7 +966,7 @@ normaliseType :: FamInstEnvs            -- environment with family instances
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- but *not* newtypes (which are visible to the programmer)
 -- Returns with Refl if nothing happens
--- Try to not to disturb type syonyms if possible
+-- Try to not to disturb type synonyms if possible
 
 normaliseType env role (TyConApp tc tys)
   = normaliseTcApp env role tc tys

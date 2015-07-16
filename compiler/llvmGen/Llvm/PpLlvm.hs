@@ -239,6 +239,7 @@ ppLlvmExpression expr
         Cast       op from to       -> ppCast op from to
         Compare    op left right    -> ppCmpOp op left right
         Extract    vec idx          -> ppExtract vec idx
+        ExtractV   struct idx       -> ppExtractV struct idx
         Insert     vec elt idx      -> ppInsert vec elt idx
         GetElemPtr inb ptr indexes  -> ppGetElementPtr inb ptr indexes
         Load       ptr              -> ppLoad ptr
@@ -428,6 +429,12 @@ ppExtract :: LlvmVar -> LlvmVar -> SDoc
 ppExtract vec idx =
     text "extractelement"
     <+> ppr (getVarType vec) <+> ppName vec <> comma
+    <+> ppr idx
+
+ppExtractV :: LlvmVar -> Int -> SDoc
+ppExtractV struct idx =
+    text "extractvalue"
+    <+> ppr (getVarType struct) <+> ppName struct <> comma
     <+> ppr idx
 
 ppInsert :: LlvmVar -> LlvmVar -> LlvmVar -> SDoc

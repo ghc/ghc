@@ -34,8 +34,9 @@ module TcSMonad (
     checkReductionDepth,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
-    getTopEnv, getGblEnv, getTcEvBinds, getTcLevel,
+    getTopEnv, getGblEnv, getLclEnv, getTcEvBinds, getTcLevel,
     getTcEvBindsMap,
+    tcLookupClass,
 
     -- Inerts
     InertSet(..), InertCans(..),
@@ -112,7 +113,7 @@ import FamInstEnv
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM
-       ( checkWellStaged, topIdLvl, tcGetDefaultTys )
+       ( checkWellStaged, topIdLvl, tcGetDefaultTys, tcLookupClass )
 import Kind
 import TcType
 import DynFlags
@@ -772,7 +773,7 @@ The idea is that
   have (a -fs-> a) in S, which contradicts (WF2).
 
 * The extended substitution satisfies (WF1) and (WF2)
-  - (K1) plus (L1) guarantee that the extended substiution satisfies (WF1).
+  - (K1) plus (L1) guarantee that the extended substitution satisfies (WF1).
   - (T3) guarantees (WF2).
 
 * (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
@@ -1431,7 +1432,7 @@ Note [Kick out insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have an insoluble alpha ~ [alpha], which is insoluble
 because an occurs check.  And then we unify alpha := [Int].
-Then we really want to rewrite the insouluble to [Int] ~ [[Int]].
+Then we really want to rewrite the insoluble to [Int] ~ [[Int]].
 Now it can be decomposed.  Otherwise we end up with a "Can't match
 [Int] ~ [[Int]]" which is true, but a bit confusing because the
 outer type constructors match.
@@ -2390,7 +2391,7 @@ emitWorkCt ct
 emitInsoluble :: Ct -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts.
 emitInsoluble ct
-  = do { traceTcS "Emit insoluble" (ppr ct)
+  = do { traceTcS "Emit insoluble" (ppr ct $$ pprCtLoc (ctLoc ct))
        ; updInertTcS add_insol }
   where
     this_pred = ctPred ct
@@ -2469,6 +2470,12 @@ getTopEnv = wrapTcS $ TcM.getTopEnv
 getGblEnv :: TcS TcGblEnv
 getGblEnv = wrapTcS $ TcM.getGblEnv
 
+getLclEnv :: TcS TcLclEnv
+getLclEnv = wrapTcS $ TcM.getLclEnv
+
+tcLookupClass :: Name -> TcS Class
+tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
+
 -- Setting names as used (used in the deriving of Coercible evidence)
 -- Too hackish to expose it to TcS? In that case somehow extract the used
 -- constructors from the result of solveInteract
@@ -2480,7 +2487,7 @@ addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
 
 checkWellStagedDFun :: PredType -> DFunId -> CtLoc -> TcS ()
 checkWellStagedDFun pred dfun_id loc
-  = wrapTcS $ TcM.setCtLoc loc $
+  = wrapTcS $ TcM.setCtLocM loc $
     do { use_stage <- TcM.getStage
        ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
   where
@@ -2760,6 +2767,8 @@ newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newWantedEvVarNC loc pty
   = do { -- checkReductionDepth loc pty
        ; new_ev <- newEvVar pty
+       ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
+                                         pprCtLoc loc)
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
@@ -2771,7 +2780,6 @@ newWantedEvVar loc pty
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                             ; return (ctev, Cached) }
             _ -> do { ctev <- newWantedEvVarNC loc pty
-                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (ctev, Fresh) } }
 
 emitNewDerived :: CtLoc -> TcPredType -> TcS ()
@@ -2794,7 +2802,7 @@ emitNewDerivedEq :: CtLoc -> TcPredType -> TcS ()
 -- There's no caching, no lookupInInerts
 emitNewDerivedEq loc pred
   = do { ev <- newDerivedNC loc pred
-       ; traceTcS "Emitting new derived equality" (ppr ev)
+       ; traceTcS "Emitting new derived equality" (ppr ev $$ pprCtLoc loc)
        ; updWorkListTcS (extendWorkListDerived loc ev) }
 
 newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
@@ -2861,7 +2869,7 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
         ; coe_inside <- case freshness of
             Cached -> return (ctEvCoercion ctev)
             Fresh  -> do { ev_binds_var <- newTcEvBinds
-                         ; env <- wrapTcS $ TcM.getLclEnv
+                         ; env <- getLclEnv
                          ; let ev_binds = TcEvBinds ev_binds_var
                                new_ct = mkNonCanonical ctev
                                new_co = ctEvCoercion ctev

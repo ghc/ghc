@@ -40,7 +40,25 @@ test('plugins06',
 
 test('plugins07',
      [pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.plugins07'),
-      clean_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin clean.plugins07'),
-      expect_broken(10420)],
+      clean_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin clean.plugins07')],
      run_command,
      ['$MAKE -s --no-print-directory plugins07'])
+
+test('T10420',
+     [pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T10420'),
+      clean_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin clean.T10420')],
+     run_command,
+     ['$MAKE -s --no-print-directory T10420'])
+
+test('T10294',
+     [pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294'),
+      clean_cmd('$MAKE -s --no-print-directory -C annotation-plugin clean.T10294'),
+      unless(have_dynamic(),expect_broken(10301))],
+     run_command,
+     ['$MAKE -s --no-print-directory T10294'])
+
+test('T10294a',
+     [pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294a'),
+      clean_cmd('$MAKE -s --no-print-directory -C annotation-plugin clean.T10294a')],
+     run_command,
+     ['$MAKE -s --no-print-directory T10294a'])

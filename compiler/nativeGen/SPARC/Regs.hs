@@ -35,7 +35,7 @@ where
 import CodeGen.Platform.SPARC
 import Reg
 import RegClass
-import Size
+import Format
 
 import Unique
 import Outputable
@@ -245,14 +245,14 @@ callClobberedRegs
 
 
 
--- | Make a virtual reg with this size.
-mkVirtualReg :: Unique -> Size -> VirtualReg
-mkVirtualReg u size
-        | not (isFloatSize size)
+-- | Make a virtual reg with this format.
+mkVirtualReg :: Unique -> Format -> VirtualReg
+mkVirtualReg u format
+        | not (isFloatFormat format)
         = VirtualRegI u
 
         | otherwise
-        = case size of
+        = case format of
                 FF32    -> VirtualRegF u
                 FF64    -> VirtualRegD u
                 _       -> panic "mkVReg"

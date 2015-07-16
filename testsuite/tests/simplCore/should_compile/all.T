@@ -1,7 +1,7 @@
 test('simpl001', normal, compile, [''])
 test('simpl002', normal, compile, [''])
 test('simpl003', normal, compile, [''])
-test('simpl004', only_compiler_types(['ghc']), compile, [''])
+test('simpl004', normal, compile, [''])
 test('simpl005', normal, compile, [''])
 
 # Missing:
@@ -212,3 +212,5 @@ test('T9565', only_ways(['optasm']), compile, [''])
 test('T5821', only_ways(['optasm']), compile, [''])
 test('T10176', only_ways(['optasm']), compile, [''])
 test('T10180', only_ways(['optasm']), compile, [''])
+test('T10602', only_ways(['optasm']), multimod_compile, ['T10602','-v0'])
+test('T10627', only_ways(['optasm']), compile, [''])

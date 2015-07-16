@@ -48,10 +48,6 @@ NO_INCLUDE_PKGDATA = NO
 # The compiler used to build GHC is $(GHC).  To change the actual compiler
 # used, re-configure with --with-ghc=<path-to-ghc>.
 
-# Extra ways in which to build the compiler (for example, you might want to
-# build a profiled compiler so you can see where it spends its time)
-GhcCompilerWays=
-
 # Extra option flags to pass to the compiler that compiles the compiler
 # (Ones that are essential are wired into compiler/Makefile)
 # Typical options to use here:
@@ -71,16 +67,6 @@ GhcHcOpts=-Rghc-timing
 GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
-
-# These options modify whether or not a built compiler for a bootstrap
-# stage defaults to using the new code generation path.  The new
-# code generation path is a bit slower, so for development just
-# GhcStage2DefaultNewCodegen=YES, but it's also a good idea to try
-# building all libraries and the stage2 compiler with the
-# new code generator, which involves GhcStage1DefaultNewCodegen=YES.
-GhcStage1DefaultNewCodegen=NO
-GhcStage2DefaultNewCodegen=NO
-GhcStage3DefaultNewCodegen=NO
 
 GhcDebugged=NO
 GhcDynamic=NO
@@ -159,9 +145,9 @@ GhcUnregisterised=@Unregisterised@
 # (as well as a C backend)
 #
 # Target platforms supported:
-#   i386, powerpc
+#   i386, powerpc, powerpc64, sparc
 #   IOS and AIX are not supported
-ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
+ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc)))
 OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(patsubst aix,,$(TargetOS_CPP)))))
 
 GhcWithNativeCodeGen := $(strip\
@@ -172,7 +158,7 @@ HaveLibDL = @HaveLibDL@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
-ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc arm aarch64)))
+ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le arm aarch64)))
 
 GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
@@ -180,7 +166,7 @@ GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised
 # has support for this OS/ARCH combination.
 
 OsSupportsGHCi=$(strip $(patsubst $(TargetOS_CPP), YES, $(findstring $(TargetOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
-ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc sparc64 arm aarch64)))
+ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc sparc64 arm aarch64)))
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
@@ -193,7 +179,7 @@ endif
 # (see TABLES_NEXT_TO_CODE in the RTS).  Whether we actually compile for
 # TABLES_NEXT_TO_CODE depends on whether we're building unregisterised
 # code or not, which may be decided by options to the compiler later.
-ifneq "$(findstring $(TargetArch_CPP)X, ia64X powerpc64X)" ""
+ifneq "$(findstring $(TargetArch_CPP)X, ia64X powerpc64X powerpc64leX)" ""
 GhcEnableTablesNextToCode=NO
 else
 GhcEnableTablesNextToCode=YES
@@ -233,15 +219,20 @@ ExtraMakefileSanityChecks = NO
 INTEGER_LIBRARY=integer-gmp
 
 # We build the libraries at least the "vanilla" way (way "v")
+# Technically we don't need the v way if DYNAMIC_GHC_PROGRAMS is YES,
+# but with -dynamic-too it's cheap, and makes life easier.
 GhcLibWays = v
 
 # In addition to the normal sequential way, the default is to also build
 # profiled prelude libraries
-GhcLibWays += p
+# $(if $(filter ...)) allows controlling this expression from build.mk.
+GhcLibWays += $(if $(filter $(BUILD_PROF_LIBS),NO),,p)
 
-ifeq "$(PlatformSupportsSharedLibs)" "YES"
-GhcLibWays += dyn
-endif
+# Backward compatibility: although it would be cleaner to test for
+# PlatformSupportsSharedLibs, or perhaps a new variable BUILD_SHARED_LIBS,
+# some users currently expect that DYNAMIC_GHC_PROGRAMS=NO in build.mk implies
+# that dyn is not added to GhcLibWays.
+GhcLibWays += $(if $(filter $(DYNAMIC_GHC_PROGRAMS),NO),,dyn)
 
 # Handy way to test whether we're building shared libs or not.
 BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
@@ -315,9 +306,6 @@ SplitObjs=$(SupportsSplitObjs)
 
 # Whether to install the extra packages
 InstallExtraPackages = NO
-
-# Run "ghc-pkg check" on each package
-CHECK_PACKAGES = NO
 
 # ----------------------------------------------------------------------------
 
@@ -731,7 +719,7 @@ BUILD_DOCBOOK_PS         = @BUILD_DOCBOOK_PS@
 BUILD_DOCBOOK_PDF        = @BUILD_DOCBOOK_PDF@
 DBLATEX                  = @DblatexCmd@
 # filename.as.url=0 is needed with dblatex 0.3.4 (#7486)
-DBLATEX_OPTS             = -P 'filename.as.url=0'
+DBLATEX_OPTS             = -P 'filename.as.url=0' -P 'latex.unicode.use=1'
 XSLTPROC                 = @XsltprocCmd@
 XMLLINT                  = @XmllintCmd@
 HAVE_DOCBOOK_XSL	 = @HAVE_DOCBOOK_XSL@
@@ -785,6 +773,8 @@ endif
 
 # Build DPH?
 BUILD_DPH = NO
+# Build the "extra" packages (see ./packages)?
+BUILD_EXTRA_PKGS = NO
 
 ################################################################################
 #

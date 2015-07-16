@@ -1152,6 +1152,17 @@ test.hs:(5,4)-(6,7):
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term><option>-fwarn-type-errors</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-type-errors</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+            <para>Causes a warning to be reported when a type error is deferred
+            until runtime. See <xref linkend="defer-type-errors"/></para>
+            <para>This warning is on by default.</para>
+        </listitem>
+      </varlistentry>
 
       <varlistentry>
         <term><option>-fdefer-type-errors</option>:</term>
@@ -2105,6 +2116,29 @@ _  = rhs3        -- No warning: lone wild-card pattern
     <emphasis>machine-specific</emphasis> optimisations to be turned
     on/off.</para>
 
+    <para>Most of these options are boolean and have options to turn them both
+    &ldquo;on&rdquo; and &ldquo;off&rdquo; (beginning with the prefix
+    <option>no-</option>). For instance, while <option>-fspecialise</option>
+    enables specialisation, <option>-fno-specialise</option> disables it. When
+    multiple flags for the same option appear in the command-line they are
+    evaluated from left to right. For instance <option>-fno-specialise
+    -fspecialise</option> will enable specialisation.
+    </para>
+
+    <para>It is important to note that the <option>-O*</option> flags are roughly
+    equivalent to combinations of <option>-f*</option> flags. For this reason,
+    the effect of the <option>-O*</option> and <option>-f*</option> flags is
+    dependent upon the order in which they occur on the command line.
+    </para>
+
+    <para>For instance, take the example of <option>-fno-specialise
+    -O1</option>. Despite the <option>-fno-specialise</option> appearing in the
+    command line, specialisation will still be enabled. This is the case
+    as <option>-O1</option> implies <option>-fspecialise</option>, overriding
+    the previous flag. By contrast, <option>-O1 -fno-specialise</option> will
+    compile without specialisation, as one would expect.
+    </para>
+
     <sect2 id="optimise-pkgs">
       <title><option>-O*</option>: convenient &ldquo;packages&rdquo; of optimisation flags.</title>
 
@@ -2936,10 +2970,25 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
           <listitem>
             <para><emphasis>On by default.</emphasis>
             Specialise each type-class-overloaded function defined in this
-            module for the types at which it is called in this module.  Also
-            specialise imported functions that have an INLINABLE pragma
-            (<xref linkend="inlinable-pragma"/>) for the types at which they
-            are called in this module.
+            module for the types at which it is called in this module. If
+            <literal>-fcross-module-specialise</literal> is set imported
+            functions that have an INLINABLE pragma
+            (<xref linkend="inlinable-pragma"/>) will be specialised as well.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fcross-module-specialise</option>
+            <indexterm><primary><option>-fcross-module-specialise</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Specialise <literal>INLINABLE</literal> (<xreg linked="inlinable-pragma"/>)
+            type-class-overloaded functions imported from other modules for the
+            types at which they are called in this module. Note that specialisation must
+            be enabled (by <literal>-fspecialise</literal>) for this to have any effect.
             </para>
           </listitem>
         </varlistentry>

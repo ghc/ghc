@@ -75,7 +75,7 @@ endif
 $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$($1_$2_$$(HADDOCK_WAY)_LIB)
 endif
 
-endif
+endif # $1_$2_DO_HADDOCK
 
 $(call profEnd, haddock($1,$2))
 endef

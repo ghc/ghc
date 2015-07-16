@@ -55,10 +55,10 @@ module TcRnTypes(
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt, isExprHoleCt, isTypeHoleCt,
-        ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel,
+        isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
+        ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvLoc, ctEvEqRel,
+        ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvTerm, ctEvCoercion, ctEvId,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
@@ -72,7 +72,7 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        CtOrigin(..), pprCtOrigin,
+        CtOrigin(..), pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
         SkolemInfo(..),
@@ -89,12 +89,11 @@ module TcRnTypes(
 
         CtFlavour(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeF,
+        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeFR,
 
         -- Pretty printing
         pprEvVarTheta,
         pprEvVars, pprEvVarWithType,
-        pprArising, pprArisingAt,
 
         -- Misc other types
         TcId, TcIdSet, HoleSort(..)
@@ -335,7 +334,7 @@ data TcGblEnv
   = TcGblEnv {
         tcg_mod     :: Module,         -- ^ Module being compiled
         tcg_src     :: HscSource,
-          -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
+          -- ^ What kind of module (regular Haskell, hs-boot, hsig)
         tcg_sig_of  :: Maybe Module,
           -- ^ Are we being compiled as a signature of an implementation?
         tcg_mod_name :: Maybe (Located ModuleName),
@@ -1285,6 +1284,12 @@ ctEvidence = cc_ev
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
 
+setCtLoc :: Ct -> CtLoc -> Ct
+setCtLoc ct loc = ct { cc_ev = (cc_ev ct) { ctev_loc = loc } }
+
+ctOrigin :: Ct -> CtOrigin
+ctOrigin = ctLocOrigin . ctLoc
+
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
@@ -1409,6 +1414,13 @@ isHoleCt:: Ct -> Bool
 isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
+isOutOfScopeCt :: Ct -> Bool
+-- A Hole that does not have a leading underscore is
+-- simply an out-of-scope variable, and we treat that
+-- a bit differently when it comes to error reporting
+isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
+isOutOfScopeCt _ = False
+
 isExprHoleCt :: Ct -> Bool
 isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
 isExprHoleCt _ = False
@@ -1525,22 +1537,20 @@ isInsolubleStatus _            = False
 insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
-insolubleWC :: WantedConstraints -> Bool
-insolubleWC (WC { wc_impl = implics, wc_insol = insols })
-  =  anyBag trulyInsoluble  insols
+insolubleWC :: TcLevel -> WantedConstraints -> Bool
+insolubleWC tc_lvl (WC { wc_impl = implics, wc_insol = insols })
+  =  anyBag (trulyInsoluble tc_lvl) insols
   || anyBag insolubleImplic implics
 
-trulyInsoluble :: Ct -> Bool
+trulyInsoluble :: TcLevel -> Ct -> Bool
 -- The constraint is in the wc_insol set,
 -- but we do not treat as truly isoluble
 --  a) type-holes, arising from PartialTypeSignatures,
---  b) superclass constraints, arising from the emitInsoluble
---     in TcInstDcls.tcSuperClasses. In fact only equalities
---     are truly-insoluble.
+--  b) an out-of-scope variable
 -- Yuk!
-trulyInsoluble insol
-  =  isEqPred (ctPred insol)
-  && not (isTypeHoleCt insol)
+trulyInsoluble tc_lvl insol
+  =  isOutOfScopeCt insol
+  || isRigidEqPred tc_lvl (classifyPredType (ctPred insol))
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
@@ -1770,6 +1780,9 @@ ctEvPred = ctev_pred
 ctEvLoc :: CtEvidence -> CtLoc
 ctEvLoc = ctev_loc
 
+ctEvOrigin :: CtEvidence -> CtOrigin
+ctEvOrigin = ctLocOrigin . ctEvLoc
+
 -- | Get the equality relation relevant for a 'CtEvidence'
 ctEvEqRel :: CtEvidence -> EqRel
 ctEvEqRel = predTypeEqRel . ctEvPred
@@ -1910,14 +1923,15 @@ eqCanRewriteFR _                 _                  = False
 
 canDischarge :: CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewriteOrSame]
-canDischarge ev1 ev2 = ctEvFlavour ev1 `canDischargeF` ctEvFlavour ev2
+canDischarge ev1 ev2 = ctEvFlavourRole ev1 `canDischargeFR` ctEvFlavourRole ev2
 
-canDischargeF :: CtFlavour -> CtFlavour -> Bool
-canDischargeF Given  _        = True
-canDischargeF Wanted Wanted   = True
-canDischargeF Wanted Derived  = True
-canDischargeF Derived Derived = True
-canDischargeF _       _       = False
+canDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
+canDischargeFR (_, ReprEq)  (_, NomEq)   = False
+canDischargeFR (Given, _)   _            = True
+canDischargeFR (Wanted, _)  (Wanted, _)  = True
+canDischargeFR (Wanted, _)  (Derived, _) = True
+canDischargeFR (Derived, _) (Derived, _) = True
+canDischargeFR _             _           = False
 
 
 {-
@@ -2054,17 +2068,6 @@ pushErrCtxtSameOrigin :: ErrCtxt -> CtLoc -> CtLoc
 pushErrCtxtSameOrigin err loc@(CtLoc { ctl_env = lcl })
   = loc { ctl_env = lcl { tcl_ctxt = err : tcl_ctxt lcl } }
 
-pprArising :: CtOrigin -> SDoc
--- Used for the main, top-level error message
--- We've done special processing for TypeEq and FunDep origins
-pprArising (TypeEqOrigin {}) = empty
-pprArising orig              = pprCtOrigin orig
-
-pprArisingAt :: CtLoc -> SDoc
-pprArisingAt (CtLoc { ctl_origin = o, ctl_env = lcl})
-  = sep [ pprCtOrigin o
-        , text "at" <+> ppr (tcl_loc lcl)]
-
 {-
 ************************************************************************
 *                                                                      *
@@ -2085,9 +2088,10 @@ data SkolemInfo
   | ClsSkol Class       -- Bound at a class decl
 
   | InstSkol            -- Bound at an instance decl
-  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection
-                        -- from an InstSkol, giving the largest class from
-                        -- which we made a superclass selection in the chain
+  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection.
+                        -- If (C ty1 .. tyn) is the largest class from
+                        --    which we made a superclass selection in the chain,
+                        --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
   | DataSkol            -- Bound at a data type declaration
@@ -2194,7 +2198,6 @@ data CtOrigin
   | KindEqOrigin
       TcType TcType             -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
-  | CoercibleOrigin TcType TcType  -- a Coercible constraint
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
 
@@ -2212,7 +2215,8 @@ data CtOrigin
   | ViewPatOrigin
 
   | ScOrigin TypeSize   -- Typechecking superclasses of an instance declaration
-                        -- whose head has the given size
+                        -- If the instance head is C ty1 .. tyn
+                        --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
   | DerivOrigin         -- Typechecking deriving
@@ -2247,8 +2251,16 @@ data CtOrigin
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
 
-pprCtOrigin :: CtOrigin -> SDoc
+pprCtLoc :: CtLoc -> SDoc
+-- "arising from ... at ..."
+-- Not an instance of Outputable because of the "arising from" prefix
+pprCtLoc (CtLoc { ctl_origin = o, ctl_env = lcl})
+  = sep [ pprCtOrigin o
+        , text "at" <+> ppr (tcl_loc lcl)]
 
+pprCtOrigin :: CtOrigin -> SDoc
+-- "arising from ..."
+-- Not an instance of Outputable because of the "arising from" prefix
 pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
 pprCtOrigin (SpecPragOrigin ctxt)
@@ -2259,13 +2271,13 @@ pprCtOrigin (SpecPragOrigin ctxt)
 
 pprCtOrigin (FunDepOrigin1 pred1 loc1 pred2 loc2)
   = hang (ctoHerald <+> ptext (sLit "a functional dependency between constraints:"))
-       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprArisingAt loc1)
-               , hang (quotes (ppr pred2)) 2 (pprArisingAt loc2) ])
+       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprCtLoc loc1)
+               , hang (quotes (ppr pred2)) 2 (pprCtLoc loc2) ])
 
 pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
   = hang (ctoHerald <+> ptext (sLit "a functional dependency between:"))
        2 (vcat [ hang (ptext (sLit "constraint") <+> quotes (ppr pred1))
-                    2 (pprArising orig1 )
+                    2 (pprCtOrigin orig1 )
                , hang (ptext (sLit "instance") <+> quotes (ppr pred2))
                     2 (ptext (sLit "at") <+> ppr loc2) ])
 
@@ -2287,11 +2299,6 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
   = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
-
-pprCtOrigin (CoercibleOrigin ty1 ty2)
-  = hang (ctoHerald <+> text "trying to show that the representations of")
-       2 (quotes (ppr ty1) <+> text "and" $$
-          quotes (ppr ty2) <+> text "are the same")
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin

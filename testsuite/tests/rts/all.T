@@ -33,6 +33,12 @@ test('divbyzero',
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
       when(opsys('linux'), ignore_output),
+      # PowerPC 64 bit and most likely PowerPC 32 bit processors
+      # do not generate an exception (interrupt) for integer
+      # division by zero but the result is undefined.
+      # C programs compiled with gcc exit normally, so do we.
+      when(platform('powerpc64-unknown-linux'), exit_code(0)),
+      when(platform('powerpc64le-unknown-linux'), exit_code(0)),
       when(opsys('mingw32'), exit_code(1)),
       # since these test are supposed to crash the
       # profile report will be empty always.
@@ -300,3 +306,20 @@ test('T9839_02', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_
 test('T9839_03', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -Px')],
                 compile_and_run,
                 [''])
+
+test('T9839_04', [ only_ways(prof_ways), ignore_output, exit_code(0), extra_run_opts('+RTS -xc')],
+                compile_and_run,
+                [''])
+
+test('T9839_05', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xcx')],
+                compile_and_run,
+                [''])
+
+test('T9839_06', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xtx')],
+                compile_and_run,
+                [''])
+
+# ignore_output as RTS reports slightly different error messages
+# in 'epoll' and 'select' backends on reading from EBADF
+# mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
+test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, [''])

@@ -1,20 +1,4 @@
 { 
-{-# LANGUAGE BangPatterns #-} -- required for versions of Happy before 1.18.6
-{-# OPTIONS -Wwarn -XNoMonomorphismRestriction #-}
--- The NoMonomorphismRestriction deals with a Happy infelicity
---    With OutsideIn's more conservativ monomorphism restriction
---    we aren't generalising
---        notHappyAtAll = error "urk"
---    which is terrible.  Switching off the restriction allows
---    the generalisation.  Better would be to make Happy generate
---    an appropriate signature.
---
--- The above warning suppression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HpcParser where
 
 import HpcLexer

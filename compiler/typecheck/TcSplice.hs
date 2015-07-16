@@ -6,7 +6,11 @@
 TcSplice: Template Haskell splices
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, MagicHash, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -106,7 +110,7 @@ import GHC.Desugar      ( AnnotationWrapper(..) )
 
 import qualified Data.Map as Map
 import Data.Dynamic  ( fromDynamic, toDyn )
-import Data.Typeable ( typeOf )
+import Data.Typeable ( typeOf, Typeable )
 import Data.Data (Data)
 import GHC.Exts         ( unsafeCoerce# )
 #endif
@@ -833,11 +837,14 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
       th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
       updTcRef th_modfinalizers_var (\fins -> fin:fins)
 
+  qGetQ :: forall a. Typeable a => IOEnv (Env TcGblEnv TcLclEnv) (Maybe a)
   qGetQ = do
       th_state_var <- fmap tcg_th_state getGblEnv
       th_state <- readTcRef th_state_var
-      let x = Map.lookup (typeOf x) th_state >>= fromDynamic
-      return x
+      -- See #10596 for why we use a scoped type variable here.
+      -- ToDo: convert @undefined :: a@ to @proxy :: Proxy a@ when
+      -- we drop support for GHC 7.6.
+      return (Map.lookup (typeOf (undefined :: a)) th_state >>= fromDynamic)
 
   qPutQ x = do
       th_state_var <- fmap tcg_th_state getGblEnv

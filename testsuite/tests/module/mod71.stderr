@@ -1,6 +1,6 @@
 
 mod71.hs:4:9: error:
-    Found hole ‘_’ with type: t1
+    Found hole: _ :: t1
     Where: ‘t1’ is a rigid type variable bound by
                 the inferred type of f :: Num a => (t1 -> a -> t) -> t
                 at mod71.hs:4:1

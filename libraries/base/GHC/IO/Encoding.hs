@@ -235,14 +235,9 @@ mkTextEncoding e = case mb_coding_failure_mode of
         _             -> Nothing
 
 mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
-mkTextEncoding' cfm enc
-  -- First, specifically match on ASCII encodings directly using
-  -- several possible aliases (specified by RFC 1345 & co), which
-  -- allows us to handle ASCII conversions without iconv at all (see
-  -- trac #10298).
-  | any (== enc) ansiEncNames = return (UTF8.mkUTF8 cfm)
-  -- Otherwise, handle other encoding needs via iconv.
-  | otherwise = case [toUpper c | c <- enc, c /= '-'] of
+mkTextEncoding' cfm enc =
+  case [toUpper c | c <- enc, c /= '-'] of
+  -- UTF-8 and friends we can handle ourselves
     "UTF8"    -> return $ UTF8.mkUTF8 cfm
     "UTF16"   -> return $ UTF16.mkUTF16 cfm
     "UTF16LE" -> return $ UTF16.mkUTF16le cfm
@@ -254,13 +249,31 @@ mkTextEncoding' cfm enc
     'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
     _ -> unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
 #else
-    _ -> Iconv.mkIconvEncoding cfm enc
-#endif
+    -- Otherwise, handle other encoding needs via iconv.
+
+    -- Unfortunately there is no good way to determine whether iconv is actually
+    -- functional without telling it to do something.
+    _ -> do res <- Iconv.mkIconvEncoding cfm enc
+            let isAscii = any (== enc) ansiEncNames
+            case res of
+              Just e -> return e
+              -- At this point we know that we can't count on iconv to work
+              -- (see, for instance, Trac #10298). However, we still want to do
+              --  what we can to work with what we have. For instance, ASCII is
+              -- easy. We match on ASCII encodings directly using several
+              -- possible aliases (specified by RFC 1345 & Co) and for this use
+              -- the 'char8' encoding
+              Nothing
+                | isAscii   -> return char8
+                | otherwise ->
+                    unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
   where
     ansiEncNames = -- ASCII aliases
       [ "ANSI_X3.4-1968", "iso-ir-6", "ANSI_X3.4-1986", "ISO_646.irv:1991"
       , "US-ASCII", "us", "IBM367", "cp367", "csASCII", "ASCII", "ISO646-US"
       ]
+#endif
+
 
 latin1_encode :: CharBuffer -> Buffer Word8 -> IO (CharBuffer, Buffer Word8)
 latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_encode input output -- unchecked, used for char8

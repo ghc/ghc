@@ -70,7 +70,7 @@ import Data.Maybe( isJust )
 
 newWanted :: CtOrigin -> PredType -> TcM CtEvidence
 newWanted orig pty
-  = do loc <- getCtLoc orig
+  = do loc <- getCtLocM orig
        v <- newEvVar pty
        return $ CtWanted { ctev_evar = v
                          , ctev_pred = pty
@@ -84,7 +84,7 @@ emitWanteds origin theta = mapM (emitWanted origin) theta
 
 emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred
-  = do { loc <- getCtLoc origin
+  = do { loc <- getCtLocM origin
        ; ev  <- newEvVar pred
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
@@ -232,21 +232,8 @@ instCallConstraints orig preds
      = do  { co <- unifyType ty1 ty2
            ; return (EvCoercion co) }
      | otherwise
-     = do { ev_var <- emitWanted modified_orig pred
+     = do { ev_var <- emitWanted orig pred
           ; return (EvId ev_var) }
-      where
-        -- Coercible constraints appear as normal class constraints, but
-        -- are aggressively canonicalized and manipulated during solving.
-        -- The final equality to solve may barely resemble the initial
-        -- constraint. Here, we remember the initial constraint in a
-        -- CtOrigin for better error messages. It's perhaps worthwhile
-        -- considering making this approach general, for other class
-        -- constraints, too.
-        modified_orig
-          | Just (Representational, ty1, ty2) <- getEqPredTys_maybe pred
-          = CoercibleOrigin ty1 ty2
-          | otherwise
-          = orig
 
 instDFunType :: DFunId -> [DFunInstType] -> TcM ([TcType], TcThetaType)
 -- See Note [DFunInstType: instantiating types] in InstEnv
@@ -403,12 +390,12 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
 syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty tidy_env
-  = do { inst_loc <- getCtLoc orig
+  = do { inst_loc <- getCtLocM orig
        ; let msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr name)
                           <+> ptext (sLit "(needed by a syntactic construct)")
                         , nest 2 (ptext (sLit "has the required type:")
                                   <+> ppr (tidyType tidy_env ty))
-                        , nest 2 (pprArisingAt inst_loc) ]
+                        , nest 2 (pprCtLoc inst_loc) ]
        ; return (tidy_env, msg) }
 
 {-

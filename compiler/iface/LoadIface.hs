@@ -458,11 +458,7 @@ loadInterface doc_str mod from
 
         ; updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) then eps else
-              case from of  -- See Note [Care with plugin imports]
-                ImportByPlugin -> eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
-                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls}
-                _              -> eps {
+                eps {
                   eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
@@ -525,27 +521,6 @@ badSourceImport mod
   = hang (ptext (sLit "You cannot {-# SOURCE #-} import a module from another package"))
        2 (ptext (sLit "but") <+> quotes (ppr mod) <+> ptext (sLit "is from package")
           <+> quotes (ppr (modulePackageKey mod)))
-
-{-
-Note [Care with plugin imports]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When dynamically loading a plugin (via loadPluginInterface) we
-populate the same External Package State (EPS), even though plugin
-modules are to link with the compiler itself, and not with the
-compiled program.  That's fine: mostly the EPS is just a cache for
-the interace files on disk.
-
-But it's NOT ok for the RULES or instance environment.  We do not want
-to fire a RULE from the plugin on the code we are compiling, otherwise
-the code we are compiling will have a reference to a RHS of the rule
-that exists only in the compiler!  This actually happened to Daniel,
-via a RULE arising from a specialisation of (^) in the plugin.
-
-Solution: when loading plugins, do not extend the rule and instance
-environments.  We are only interested in the type environment, so that
-we can check that the plugin exports a function with the type that the
-compiler expects.
--}
 
 -----------------------------------------------------
 --      Loading type/class/value decls

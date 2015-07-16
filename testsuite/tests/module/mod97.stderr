@@ -1,2 +1,3 @@
 
-mod97.hs:4:9: Not in scope: ‘==’
+mod97.hs:4:9: error:
+    Variable not in scope: (==) :: Char -> Char -> t

@@ -188,7 +188,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             test -z "[$]2" || eval "[$]2=ArchPPC"
             ;;
         powerpc64)
-            test -z "[$]2" || eval "[$]2=ArchPPC_64"
+            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 {ppc_64ABI = ELF_V1}\""
+            ;;
+        powerpc64le)
+            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 {ppc_64ABI = ELF_V2}\""
             ;;
         sparc)
             test -z "[$]2" || eval "[$]2=ArchSPARC"
@@ -209,7 +212,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         mipsel)
             test -z "[$]2" || eval "[$]2=ArchMipsel"
             ;;
-        hppa|hppa1_1|ia64|m68k|powerpc64le|rs6000|s390|s390x|sparc64|vax)
+        hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
@@ -869,9 +872,11 @@ AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
 
 
 dnl
-dnl Check for Happy and version.  If we're building GHC, then we need
-dnl at least Happy version 1.19.  If there's no installed Happy, we look
+dnl Check for Happy and version.
+dnl If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
+dnl If you increase the minimum version requirement, please also update:
+dnl https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Tools
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
 [FP_PATH_PROG(HappyCmd,happy,)
@@ -896,8 +901,9 @@ AC_SUBST(HappyVersion)
 ])
 
 dnl
-dnl Check for Alex and version.  If we're building GHC, then we need
-dnl at least Alex version 2.1.1.
+dnl Check for Alex and version.
+dnl If you increase the minimum version requirement, please also update:
+dnl https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Tools
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
@@ -1964,6 +1970,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
     $2="unknown"
     ;;
   softfloat) # like armv5tel-softfloat-linux-gnueabi
+    $2="unknown"
+    ;;
+  hardfloat) # like armv7a-hardfloat-linux-gnueabi
     $2="unknown"
     ;;
   *)

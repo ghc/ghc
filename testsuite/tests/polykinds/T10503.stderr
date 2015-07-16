@@ -1,0 +1,16 @@
+
+T10503.hs:8:6: error:
+    Couldn't match kind ‘k’ with ‘*’
+    ‘k’ is a rigid type variable bound by
+        the type signature for:
+        h :: ((Proxy 'KProxy ~ Proxy 'KProxy) => r) -> r
+        at T10503.hs:8:6
+    Expected type: Proxy 'KProxy
+      Actual type: Proxy 'KProxy
+    In the ambiguity check for the type signature for ‘h’:
+      h :: forall (k :: BOX) r.
+           ((Proxy 'KProxy ~ Proxy 'KProxy) => r) -> r
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‘h’:
+      h :: forall r.
+           (Proxy (KProxy :: KProxy k) ~ Proxy (KProxy :: KProxy *) => r) -> r

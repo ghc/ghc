@@ -68,6 +68,7 @@ module TyCon(
         tyConArity,
         tyConRoles,
         tyConParent,
+        tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe, famTyConFlav_maybe,
@@ -103,7 +104,7 @@ import BasicTypes
 import DynFlags
 import ForeignCall
 import Name
-import NameSet
+import NameEnv
 import CoAxiom
 import PrelNames
 import Maybes
@@ -176,8 +177,9 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
 
         data T a
         data R:TInt = T1 | T2 Bool
-        axiom ax_ti : T Int ~ R:TInt
+        axiom ax_ti : T Int ~R R:TInt
 
+  Note that this is a *representational* coercion
   The R:TInt is the "representation TyCons".
   It has an AlgTyConParent of
         FamInstTyCon T [Int] ax_ti
@@ -202,7 +204,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         data R:TPair a where
           X1 :: R:TPair Int Bool
           X2 :: a -> b -> R:TPair a b
-        axiom ax_pr :: T (a,b) ~ R:TPair a b
+        axiom ax_pr :: T (a,b)  ~R  R:TPair a b
 
         $WX1 :: forall a b. a -> b -> T (a,b)
         $WX1 a b (x::a) (y::b) = X2 a b x y `cast` sym (ax_pr a b)
@@ -651,7 +653,8 @@ data TyConParent
   --  type with the type instance family
   | FamInstTyCon          -- See Note [Data type families]
         (CoAxiom Unbranched)  -- The coercion axiom.
-               -- Generally of kind   T ty1 ty2 ~ R:T a b c
+               -- A *Representational* coercion,
+               -- of kind   T ty1 ty2   ~R   R:T a b c
                -- where T is the family TyCon,
                -- and R:T is the representation TyCon (ie this one)
                -- and a,b,c are the tyConTyVars of this TyCon
@@ -1763,6 +1766,24 @@ instance Outputable TyCon where
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
 
+tyConFlavour :: TyCon -> String
+tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+  | ClassTyCon _ <- parent = "class"
+  | otherwise = case rhs of
+                  TupleTyCon { tup_sort = sort }
+                     | isBoxed (tupleSortBoxity sort) -> "tuple"
+                     | otherwise                      -> "unboxed tuple"
+                  DataTyCon {}       -> "data type"
+                  NewTyCon {}        -> "newtype"
+                  DataFamilyTyCon {} -> "data family"
+                  AbstractTyCon {}   -> "abstract type"
+tyConFlavour (FamilyTyCon {})     = "type family"
+tyConFlavour (SynonymTyCon {})    = "type synonym"
+tyConFlavour (FunTyCon {})        = "built-in type"
+tyConFlavour (PrimTyCon {})       = "built-in type"
+tyConFlavour (PromotedDataCon {}) = "promoted data constructor"
+tyConFlavour (PromotedTyCon {})   = "promoted type constructor"
+
 pprPromotionQuote :: TyCon -> SDoc
 pprPromotionQuote (PromotedDataCon {}) = char '\''   -- Quote promoted DataCons
                                                      -- in types
@@ -1806,9 +1827,10 @@ the key examples:
   Id (Id Int)    Int
   Fix Id         NO NO NO
 
-Notice that we can expand T, even though it's recursive.
-And we can expand Id (Id Int), even though the Id shows up
-twice at the outer level.
+Notice that
+ * We can expand T, even though it's recursive.
+ * We can expand Id (Id Int), even though the Id shows up
+   twice at the outer level, because Id is non-recursive
 
 So, when expanding, we keep track of when we've seen a recursive
 newtype at outermost level; and bale out if we see it again.
@@ -1816,20 +1838,37 @@ newtype at outermost level; and bale out if we see it again.
 We sometimes want to do the same for product types, so that the
 strictness analyser doesn't unbox infinitely deeply.
 
-The function that manages this is checkRecTc.
+More precisely, we keep a *count* of how many times we've seen it.
+This is to account for
+   data instance T (a,b) = MkT (T a) (T b)
+Then (Trac #10482) if we have a type like
+        T (Int,(Int,(Int,(Int,Int))))
+we can still unbox deeply enough during strictness analysis.
+We have to treat T as potentially recursive, but it's still
+good to be able to unwrap multiple layers.
+
+The function that manages all this is checkRecTc.
 -}
 
-newtype RecTcChecker = RC NameSet
+data RecTcChecker = RC !Int (NameEnv Int)
+  -- The upper bound, and the number of times
+  -- we have encountered each TyCon
 
 initRecTc :: RecTcChecker
-initRecTc = RC emptyNameSet
+-- Intialise with a fixed max bound of 100
+-- We should probably have a flag for this
+initRecTc = RC 100 emptyNameEnv
 
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
-checkRecTc (RC rec_nts) tc
-  | not (isRecursiveTyCon tc)     = Just (RC rec_nts)
-  | tc_name `elemNameSet` rec_nts = Nothing
-  | otherwise                     = Just (RC (extendNameSet rec_nts tc_name))
+checkRecTc rc@(RC bound rec_nts) tc
+  | not (isRecursiveTyCon tc)
+  = Just rc  -- Tuples are a common example here
+  | otherwise
+  = case lookupNameEnv rec_nts tc_name of
+      Just n | n >= bound -> Nothing
+             | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
+      Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
   where
     tc_name = tyConName tc

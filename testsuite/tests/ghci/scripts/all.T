@@ -1,7 +1,7 @@
 # coding=utf8
 
 def normaliseTransformersPackageKey(str):
-    return re.sub('trans_[A-Za-z0-9]+', 'trans_<HASH>', str)
+    return re.sub('transformers-[^@]+@[A-Za-z0-9]+', 'transformers-<VERSION>@<HASH>', str)
 
 setTestOpts(when(compiler_profiled(), skip))
 
@@ -171,6 +171,7 @@ test('T8113', normal, ghci_script, ['T8113.script'])
 test('T8172', when(opsys('mingw32'), normalise_drive_letter),
      ghci_script, ['T8172.script'])
 test('T8215', normal, ghci_script, ['T8215.script'])
+test('T8353', normal, ghci_script, ['T8353.script'])
 test('T8357', normal, ghci_script, ['T8357.script'])
 test('T8383', normal, ghci_script, ['T8383.script'])
 test('T8469', normal, ghci_script, ['T8469.script'])
@@ -212,13 +213,12 @@ test('T10122', normal, ghci_script, ['T10122.script'])
 
 test('T10321', normal, ghci_script, ['T10321.script'])
 
-test('T10408A', normal, run_command,
-    ['$MAKE -s --no-print-directory T10408A'])
-test('T10408B', normal, run_command,
-    ['$MAKE -s --no-print-directory T10408B'])
+test('T10408', normal, run_command,
+    ['$MAKE -s --no-print-directory T10408'])
 test('T10248', normal, ghci_script, ['T10248.script'])
 test('T10110', normal, ghci_script, ['T10110.script'])
 test('T10322', normal, ghci_script, ['T10322.script'])
+test('T10439', normal, ghci_script, ['T10439.script'])
 test('T10466', normal, ghci_script, ['T10466.script'])
 test('T10501', normal, ghci_script, ['T10501.script'])
 test('T10508', normal, ghci_script, ['T10508.script'])

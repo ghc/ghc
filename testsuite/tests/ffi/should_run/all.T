@@ -50,8 +50,7 @@ test('ffi008', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
 maybe_skip = normal
 opts = ''
 if config.platform.startswith('i386-'):
-    if config.compiler_type == 'ghc' and \
-      version_ge(config.compiler_version, '6.13'):
+    if version_ge(config.compiler_version, '6.13'):
         opts = '-msse2'
     else:
         maybe_skip = only_ways(['ghci'])

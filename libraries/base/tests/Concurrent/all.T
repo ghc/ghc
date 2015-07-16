@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 test('Chan001',      reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
 
 test('Chan002',      extra_run_opts('100'), compile_and_run, [''])

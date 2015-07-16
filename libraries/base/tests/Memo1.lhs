@@ -5,17 +5,12 @@
 % Hashing memo tables.
 
 \begin{code}
-{-# LANGUAGE CPP #-}
 
 module Memo1
-#ifndef __PARALLEL_HASKELL__
 	( memo  	-- :: (a -> b) -> a -> b
 	, memoSized 	-- :: Int -> (a -> b) -> a -> b
  	) 
-#endif
 	where
-
-#ifndef __PARALLEL_HASKELL__
 
 import System.Mem.StableName	( StableName, makeStableName, hashStableName )
 import System.Mem.Weak		( Weak, mkWeakPtr, mkWeak, deRefWeak, finalize )
@@ -137,5 +132,4 @@ lookupSN sn (MemoEntry sn' weak : xs)
 						show (hashStableName sn))
 			Just v  -> return (Just v)
    | otherwise  = lookupSN sn xs
-#endif
 \end{code}

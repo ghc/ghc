@@ -881,6 +881,9 @@ freeReg 1 = fastBool False -- The Stack Pointer
 # if !MACHREGS_darwin
 -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
 freeReg 2 = fastBool False
+-- TODO: make this conditonal for ppc64 ELF
+freeReg 13 = fastBool False -- reserved for system thread ID
+-- TODO: do not reserve r30 in ppc64 ELF
 -- at least linux in -fPIC relies on r30 in PLT stubs
 freeReg 30 = fastBool False
 # endif

@@ -1242,7 +1242,7 @@ This is bad because throwing away the kind checked type throws away
 its splices.  But too bad for now.  [July 03]
 
 Historical note:
-    We no longer specify that these type variables must be univerally
+    We no longer specify that these type variables must be universally
     quantified (lots of email on the subject).  If you want to put that
     back in, you need to
         a) Do a checkSigTyVars after thing_inside

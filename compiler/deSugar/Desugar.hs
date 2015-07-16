@@ -356,6 +356,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 
         ; rhs' <- dsLExpr rhs
         ; dflags <- getDynFlags
+        ; this_mod <- getModule
 
         ; (bndrs'', lhs'', rhs'') <- unfold_coerce bndrs' lhs' rhs'
 
@@ -371,7 +372,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                 -- because they don't show up in the bindings until just before code gen
               fn_name   = idName fn_id
               final_rhs = simpleOptExpr rhs''    -- De-crap it
-              rule      = mkRule False {- Not auto -} is_local
+              rule      = mkRule this_mod False {- Not auto -} is_local
                                  (snd $ unLoc name) act fn_name final_bndrs args
                                  final_rhs
 

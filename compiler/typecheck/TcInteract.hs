@@ -14,7 +14,7 @@ import TcCanonical
 import TcFlatten
 import VarSet
 import Type
-import Kind ( isKind, isConstraintKind )
+import Kind ( isKind )
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId,
                 LazyEqs, noLazyEqs )
 import CoAxiom(sfInteractTop, sfInteractInert)
@@ -23,6 +23,7 @@ import Var
 import TcType
 import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
                    callStackTyConKey, typeableClassName )
+import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id( idType )
 import Class
 import TyCon
@@ -1641,12 +1642,19 @@ instance Outputable LookupInstResult where
     where ss = text $ if s then "[safe]" else "[unsafe]"
 
 
-matchClassInst :: DynFlags -> InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+matchClassInst, match_class_inst
+   :: DynFlags -> InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+
+matchClassInst dflags inerts clas tys loc
+ = do { traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr (mkClassPred clas tys) ]
+      ; res <- match_class_inst dflags inerts clas tys loc
+      ; traceTcS "matchClassInst result" $ ppr res
+      ; return res }
 
 -- First check whether there is an in-scope Given that could
 -- match this constraint.  In that case, do not use top-level
 -- instances.  See Note [Instance and Given overlap]
-matchClassInst dflags inerts clas tys loc
+match_class_inst dflags inerts clas tys loc
   | not (xopt Opt_IncoherentInstances dflags)
   , let matchable_givens = matchableGivens loc pred inerts
   , not (isEmptyBag matchable_givens)
@@ -1657,7 +1665,7 @@ matchClassInst dflags inerts clas tys loc
   where
      pred = mkClassPred clas tys
 
-matchClassInst _ _ clas [ ty ] _
+match_class_inst _ _ clas [ ty ] _
   | className clas == knownNatClassName
   , Just n <- isNumLitTy ty = makeDict (EvNum n)
 
@@ -1693,22 +1701,20 @@ matchClassInst _ _ clas [ ty ] _
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
 
-matchClassInst _ _ clas ts _
+match_class_inst _ _ clas ts _
   | isCTupleClass clas
   , let data_con = tyConSingleDataCon (classTyCon clas)
         tuple_ev = EvDFunApp (dataConWrapId data_con) ts
   = return (GenInst ts tuple_ev True [])
             -- The dfun is the data constructor!
 
-matchClassInst _ _ clas [k,t] _
+match_class_inst _ _ clas [k,t] _
   | className clas == typeableClassName
   = matchTypeableClass clas k t
 
-matchClassInst dflags inerts clas tys loc
+match_class_inst dflags inerts clas tys loc
    = do { instEnvs <- getInstEnvs
         ; lazyEqs <- inerts_to_lazy_eqs (inert_irreds (inert_cans inerts))
-        ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
-                                           , text "lazy_eqs =" <+> ppr lazyEqs ]
         ; let safeOverlapCheck = safeHaskell dflags `elem` [Sf_Safe, Sf_Trustworthy]
               (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys lazyEqs
               safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
@@ -1873,19 +1879,21 @@ isCallStackIP loc cls tys
 -- | Assumes that we've checked that this is the 'Typeable' class,
 -- and it was applied to the correct argument.
 matchTypeableClass :: Class -> Kind -> Type -> TcS LookupInstResult
-matchTypeableClass clas _k t
+matchTypeableClass clas k t
 
   -- See Note [No Typeable for qualified types]
   | isForAllTy t                               = return NoInstance
+
   -- Is the type of the form `C => t`?
-  | Just (t1,_) <- splitFunTy_maybe t,
-    isConstraintKind (typeKind t1)             = return NoInstance
+  | isJust (tcSplitPredFunTy_maybe t)          = return NoInstance
+
+  | eqType k typeNatKind                       = doTyLit knownNatClassName
+  | eqType k typeSymbolKind                    = doTyLit knownSymbolClassName
 
   | Just (tc, ks) <- splitTyConApp_maybe t
   , all isKind ks                              = doTyCon tc ks
+
   | Just (f,kt)       <- splitAppTy_maybe t    = doTyApp f kt
-  | Just _            <- isNumLitTy t          = mkSimpEv (EvTypeableTyLit t)
-  | Just _            <- isStrLitTy t          = mkSimpEv (EvTypeableTyLit t)
   | otherwise                                  = return NoInstance
 
   where
@@ -1893,7 +1901,8 @@ matchTypeableClass clas _k t
   doTyCon tc ks =
     case mapM kindRep ks of
       Nothing    -> return NoInstance
-      Just kReps -> mkSimpEv (EvTypeableTyCon tc kReps)
+      Just kReps ->
+        return $ GenInst [] (\_ -> EvTypeable (EvTypeableTyCon tc kReps) ) True []
 
   {- Representation for an application of a type to a type-or-kind.
   This may happen when the type expression starts with a type variable.
@@ -1921,7 +1930,12 @@ matchTypeableClass clas _k t
   -- Emit a `Typeable` constraint for the given type.
   mk_typeable_pred ty = mkClassPred clas [ typeKind ty, ty ]
 
-  mkSimpEv ev = return $ GenInst [] (\_ -> EvTypeable ev) True []
+  -- Given KnownNat / KnownSymbol, generate appropriate sub-goal
+  -- and make evidence for a type-level literal.
+  doTyLit c = do clas <- tcLookupClass c
+                 let p = mkClassPred clas [ t ]
+                 return $ GenInst [p] (\[i] -> EvTypeable
+                                             $ EvTypeableTyLit (EvId i,t)) True []
 
 {- Note [No Typeable for polytype or for constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

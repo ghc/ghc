@@ -17,7 +17,7 @@ import SPARC.Instr
 import SPARC.Ppr()
 import NCGMonad
 import Instruction
-import Size
+import Format
 import Reg
 
 import Cmm
@@ -68,7 +68,7 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree
  = do
      ChildCode64 vcode r_src_lo <- iselExpr64 valueTree    
      let 
-         r_dst_lo = RegVirtual $ mkVirtualReg u_dst (cmmTypeSize pk)
+         r_dst_lo = RegVirtual $ mkVirtualReg u_dst (cmmTypeFormat pk)
          r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo

@@ -1,3 +1,0 @@
-ERROR "tcfail112.hs":11 - Construction does not define strict field
-Expression : S {}
-Field      : y

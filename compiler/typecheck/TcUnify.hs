@@ -107,10 +107,10 @@ expected type, because it expects that to have been done already
 matchExpectedFunTys :: SDoc     -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> TcRhoType
-                    -> TcM (TcCoercion, [TcSigmaType], TcRhoType)
+                    -> TcM (TcCoercionN, [TcSigmaType], TcRhoType)
 
 -- If    matchExpectFunTys n ty = (co, [t1,..,tn], ty_r)
--- then  co : ty ~ (t1 -> ... -> tn -> ty_r)
+-- then  co : ty ~N (t1 -> ... -> tn -> ty_r)
 --
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
@@ -205,14 +205,14 @@ we are ok.
 -}
 
 ----------------------
-matchExpectedListTy :: TcRhoType -> TcM (TcCoercion, TcRhoType)
+matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
 -- Special case for lists
 matchExpectedListTy exp_ty
  = do { (co, [elt_ty]) <- matchExpectedTyConApp listTyCon exp_ty
       ; return (co, elt_ty) }
 
 ----------------------
-matchExpectedPArrTy :: TcRhoType -> TcM (TcCoercion, TcRhoType)
+matchExpectedPArrTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
 -- Special case for parrs
 matchExpectedPArrTy exp_ty
   = do { (co, [elt_ty]) <- matchExpectedTyConApp parrTyCon exp_ty
@@ -221,7 +221,7 @@ matchExpectedPArrTy exp_ty
 ---------------------
 matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
                       -> TcRhoType            -- orig_ty
-                      -> TcM (TcCoercion,     -- T k1 k2 k3 a b c ~ orig_ty
+                      -> TcM (TcCoercionN,    -- T k1 k2 k3 a b c ~N orig_ty
                               [TcSigmaType])  -- Element types, k1 k2 k3 a b c
 
 -- It's used for wired-in tycons, so we call checkWiredInTyCon
@@ -667,7 +667,7 @@ uType, uType_defer
 -- See Note [Deferred unification]
 uType_defer origin ty1 ty2
   = do { eqv <- newEq ty1 ty2
-       ; loc <- getCtLoc origin
+       ; loc <- getCtLocM origin
        ; emitSimple $ mkNonCanonical $
              CtWanted { ctev_evar = eqv
                       , ctev_pred = mkTcEqPred ty1 ty2

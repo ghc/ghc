@@ -8,7 +8,7 @@ module RnFail049 where
 
 import Data.List(inits, tails)
 
-functions :: [forall a. [a] -> [[a]]]
+functions :: [[a] -> [[a]]]
 functions = [inits, tails]
 
 output = [() | f <- functions, then group using f]

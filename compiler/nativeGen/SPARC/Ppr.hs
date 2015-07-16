@@ -16,7 +16,7 @@ module SPARC.Ppr (
         pprSectionHeader,
         pprData,
         pprInstr,
-        pprSize,
+        pprFormat,
         pprImm,
         pprDataItem
 )
@@ -34,7 +34,7 @@ import SPARC.AddrMode
 import SPARC.Base
 import Instruction
 import Reg
-import Size
+import Format
 import PprBase
 
 import Cmm hiding (topInfoTable)
@@ -208,9 +208,9 @@ pprReg_ofRegNo i
         _  -> sLit "very naughty sparc register" })
 
 
--- | Pretty print a size for an instruction suffix.
-pprSize :: Size -> SDoc
-pprSize x
+-- | Pretty print a format for an instruction suffix.
+pprFormat :: Format -> SDoc
+pprFormat x
  = ptext
     (case x of
         II8     -> sLit "ub"
@@ -219,13 +219,13 @@ pprSize x
         II64    -> sLit "d"
         FF32    -> sLit ""
         FF64    -> sLit "d"
-        _       -> panic "SPARC.Ppr.pprSize: no match")
+        _       -> panic "SPARC.Ppr.pprFormat: no match")
 
 
--- | Pretty print a size for an instruction suffix.
+-- | Pretty print a format for an instruction suffix.
 --      eg LD is 32bit on sparc, but LDD is 64 bit.
-pprStSize :: Size -> SDoc
-pprStSize x
+pprStFormat :: Format -> SDoc
+pprStFormat x
  = ptext
     (case x of
         II8   -> sLit "b"
@@ -234,7 +234,7 @@ pprStSize x
         II64  -> sLit "x"
         FF32  -> sLit ""
         FF64  -> sLit "d"
-        _       -> panic "SPARC.Ppr.pprSize: no match")
+        _       -> panic "SPARC.Ppr.pprFormat: no match")
 
 
 -- | Pretty print a condition code.
@@ -336,7 +336,7 @@ pprSectionHeader seg = case seg of
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
   = sdocWithDynFlags $ \dflags ->
-    vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit)
+    vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
     where
         imm = litToImm lit
 
@@ -378,10 +378,10 @@ pprInstr (LD FF64 _ reg)
         | RegReal (RealRegSingle{})     <- reg
         = panic "SPARC.Ppr: not emitting potentially misaligned LD FF64 instr"
 
-pprInstr (LD size addr reg)
+pprInstr (LD format addr reg)
         = hcat [
                ptext (sLit "\tld"),
-               pprSize size,
+               pprFormat format,
                char '\t',
                lbrack,
                pprAddr addr,
@@ -396,11 +396,11 @@ pprInstr (ST FF64 reg _)
 
 -- no distinction is made between signed and unsigned bytes on stores for the
 -- Sparc opcodes (at least I cannot see any, and gas is nagging me --SOF),
--- so we call a special-purpose pprSize for ST..
-pprInstr (ST size reg addr)
+-- so we call a special-purpose pprFormat for ST..
+pprInstr (ST format reg addr)
         = hcat [
                ptext (sLit "\tst"),
-               pprStSize size,
+               pprStFormat format,
                char '\t',
                pprReg reg,
                pp_comma_lbracket,
@@ -475,44 +475,45 @@ pprInstr (SETHI imm reg)
 pprInstr NOP
         = ptext (sLit "\tnop")
 
-pprInstr (FABS size reg1 reg2)
-        = pprSizeRegReg (sLit "fabs") size reg1 reg2
+pprInstr (FABS format reg1 reg2)
+        = pprFormatRegReg (sLit "fabs") format reg1 reg2
 
-pprInstr (FADD size reg1 reg2 reg3)
-        = pprSizeRegRegReg (sLit "fadd") size reg1 reg2 reg3
+pprInstr (FADD format reg1 reg2 reg3)
+        = pprFormatRegRegReg (sLit "fadd") format reg1 reg2 reg3
 
-pprInstr (FCMP e size reg1 reg2)
-        = pprSizeRegReg (if e then sLit "fcmpe" else sLit "fcmp") size reg1 reg2
+pprInstr (FCMP e format reg1 reg2)
+        = pprFormatRegReg (if e then sLit "fcmpe" else sLit "fcmp")
+                          format reg1 reg2
 
-pprInstr (FDIV size reg1 reg2 reg3)
-        = pprSizeRegRegReg (sLit "fdiv") size reg1 reg2 reg3
+pprInstr (FDIV format reg1 reg2 reg3)
+        = pprFormatRegRegReg (sLit "fdiv") format reg1 reg2 reg3
 
-pprInstr (FMOV size reg1 reg2)
-        = pprSizeRegReg (sLit "fmov") size reg1 reg2
+pprInstr (FMOV format reg1 reg2)
+        = pprFormatRegReg (sLit "fmov") format reg1 reg2
 
-pprInstr (FMUL size reg1 reg2 reg3)
-        = pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3
+pprInstr (FMUL format reg1 reg2 reg3)
+        = pprFormatRegRegReg (sLit "fmul") format reg1 reg2 reg3
 
-pprInstr (FNEG size reg1 reg2)
-        = pprSizeRegReg (sLit "fneg") size reg1 reg2
+pprInstr (FNEG format reg1 reg2)
+        = pprFormatRegReg (sLit "fneg") format reg1 reg2
 
-pprInstr (FSQRT size reg1 reg2)
-        = pprSizeRegReg (sLit "fsqrt") size reg1 reg2
+pprInstr (FSQRT format reg1 reg2)
+        = pprFormatRegReg (sLit "fsqrt") format reg1 reg2
 
-pprInstr (FSUB size reg1 reg2 reg3)
-        = pprSizeRegRegReg (sLit "fsub") size reg1 reg2 reg3
+pprInstr (FSUB format reg1 reg2 reg3)
+        = pprFormatRegRegReg (sLit "fsub") format reg1 reg2 reg3
 
-pprInstr (FxTOy size1 size2 reg1 reg2)
+pprInstr (FxTOy format1 format2 reg1 reg2)
   = hcat [
         ptext (sLit "\tf"),
         ptext
-        (case size1 of
+        (case format1 of
             II32  -> sLit "ito"
             FF32  -> sLit "sto"
             FF64  -> sLit "dto"
             _     -> panic "SPARC.Ppr.pprInstr.FxToY: no match"),
         ptext
-        (case size2 of
+        (case format2 of
             II32  -> sLit "i\t"
             II64  -> sLit "x\t"
             FF32  -> sLit "s\t"
@@ -555,15 +556,15 @@ pprRI (RIImm r) = pprImm r
 
 
 -- | Pretty print a two reg instruction.
-pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> SDoc
-pprSizeRegReg name size reg1 reg2
+pprFormatRegReg :: LitString -> Format -> Reg -> Reg -> SDoc
+pprFormatRegReg name format reg1 reg2
   = hcat [
         char '\t',
         ptext name,
-        (case size of
+        (case format of
             FF32 -> ptext (sLit "s\t")
             FF64 -> ptext (sLit "d\t")
-            _    -> panic "SPARC.Ppr.pprSizeRegReg: no match"),
+            _    -> panic "SPARC.Ppr.pprFormatRegReg: no match"),
 
         pprReg reg1,
         comma,
@@ -572,15 +573,15 @@ pprSizeRegReg name size reg1 reg2
 
 
 -- | Pretty print a three reg instruction.
-pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> SDoc
-pprSizeRegRegReg name size reg1 reg2 reg3
+pprFormatRegRegReg :: LitString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprFormatRegRegReg name format reg1 reg2 reg3
   = hcat [
         char '\t',
         ptext name,
-        (case size of
+        (case format of
             FF32  -> ptext (sLit "s\t")
             FF64  -> ptext (sLit "d\t")
-            _    -> panic "SPARC.Ppr.pprSizeRegReg: no match"),
+            _    -> panic "SPARC.Ppr.pprFormatRegReg: no match"),
         pprReg reg1,
         comma,
         pprReg reg2,

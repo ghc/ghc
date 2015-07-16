@@ -123,6 +123,7 @@ test('T9006',
      multimod_compile_fail, ['T9006', '-v0'])
 test('T9156', normal, compile_fail, [''])
 test('T9177', normal, compile_fail, [''])
+test('T9177a', normal, compile_fail, [''])
 test('T9436', normal, compile_fail, [''])
 test('T9437', normal, compile_fail, [''])
 test('T9077', normal, compile_fail, [''])
@@ -132,3 +133,4 @@ test('T9032',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T9032'])
+test('T10618', normal, compile_fail, [''])

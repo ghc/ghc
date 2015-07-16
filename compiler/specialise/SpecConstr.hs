@@ -58,6 +58,7 @@ import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
 import PrelNames        ( specTyConName )
+import Module
 
 -- See Note [Forcing specialisation]
 #ifndef GHCI
@@ -686,9 +687,11 @@ specConstrProgram guts
       dflags <- getDynFlags
       us     <- getUniqueSupplyM
       annos  <- getFirstAnnotations deserializeWithData guts
+      this_mod <- getModule
       let binds' = reverse $ fst $ initUs us $ do
                     -- Note [Top-level recursive groups]
-                    (env, binds) <- goEnv (initScEnv dflags annos) (mg_binds guts)
+                    (env, binds) <- goEnv (initScEnv dflags this_mod annos)
+                                          (mg_binds guts)
                         -- binds is identical to (mg_binds guts), except that the
                         -- binders on the LHS have been replaced by extendBndr
                         --   (SPJ this seems like overkill; I don't think the binders
@@ -760,6 +763,7 @@ leave it for now.
 -}
 
 data ScEnv = SCE { sc_dflags    :: DynFlags,
+                   sc_module    :: !Module,
                    sc_size      :: Maybe Int,   -- Size threshold
                    sc_count     :: Maybe Int,   -- Max # of specialisations for any one fn
                                                 -- See Note [Avoiding exponential blowup]
@@ -811,9 +815,10 @@ instance Outputable Value where
    ppr LambdaVal         = ptext (sLit "<Lambda>")
 
 ---------------------
-initScEnv :: DynFlags -> UniqFM SpecConstrAnnotation -> ScEnv
-initScEnv dflags anns
+initScEnv :: DynFlags -> Module -> UniqFM SpecConstrAnnotation -> ScEnv
+initScEnv dflags this_mod anns
   = SCE { sc_dflags      = dflags,
+          sc_module      = this_mod,
           sc_size        = specConstrThreshold dflags,
           sc_count       = specConstrCount     dflags,
           sc_recursive   = specConstrRecursive dflags,
@@ -1173,7 +1178,9 @@ scExpr' _   e@(Lit {})   = return (nullUsage, e)
 scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
                               return (usg, Tick t e')
 scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
-                              return (usg, Cast e' (scSubstCo env co))
+                              return (usg, mkCast e' (scSubstCo env co))
+                              -- Important to use mkCast here
+                              -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
 scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
                               (usg, e') <- scExpr env' e
@@ -1650,7 +1657,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
               body_ty    = exprType spec_body
               rule_rhs   = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
-              rule       = mkRule True {- Auto -} True {- Local -}
+              this_mod   = sc_module spec_env
+              rule       = mkRule this_mod True {- Auto -} True {- Local -}
                                   rule_name inline_act fn_name qvars pats rule_rhs
                            -- See Note [Transfer activation]
         ; return (spec_usg, OS call_pat rule spec_id spec_rhs) }
@@ -1758,9 +1766,27 @@ BUT phantom type synonyms can mess this reasoning up,
   eg   x::T b   with  type T b = Int
 So we apply expandTypeSynonyms to the bound Ids.
 See Trac # 5458.  Yuk.
+
+Note [SpecConstr call patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "call patterns" that we collect is going to become the LHS of a RULE.
+It's important that it doesn't have
+     e |> Refl
+or
+    e |> g1 |> g2
+because both of these will be optimised by Simplify.simplRule. In the
+former case such optimisation benign, because the rule will match more
+terms; but in the latter we may lose a binding of 'g1' or 'g2', and
+end up with a rule LHS that doesn't bind the template variables
+(Trac #10602).
+
+The simplifier eliminates such things, but SpecConstr itself constructs
+new terms by substituting.  So the 'mkCast' in the Cast case of scExpr
+is very important!
 -}
 
 type CallPat = ([Var], [CoreExpr])      -- Quantified variables and arguments
+                                        -- See Note [SpecConstr call patterns]
 
 callsToPats :: ScEnv -> [OneSpec] -> [ArgOcc] -> [Call] -> UniqSM (Bool, [CallPat])
         -- Result has no duplicate patterns,
@@ -1880,9 +1906,6 @@ argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
 -}
 
 argToPat env in_scope val_env (Cast arg co) arg_occ
-  | isReflCo co     -- Substitution in the SpecConstr itself
-                    -- can lead to identity coercions
-  = argToPat env in_scope val_env arg arg_occ
   | not (ignoreType env ty2)
   = do  { (interesting, arg') <- argToPat env in_scope val_env arg arg_occ
         ; if not interesting then

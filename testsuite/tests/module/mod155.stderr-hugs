@@ -1,2 +1,0 @@
-ERROR "mod155.hs" - Conflicting exports of entity "id"
-*** Could refer to Hugs.Prelude.id or M.id

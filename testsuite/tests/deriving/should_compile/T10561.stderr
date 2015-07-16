@@ -1,0 +1,5 @@
+
+T10561.hs:10:52: error:
+    Couldn't match kind ‘k’ with ‘*’
+      arising from the first field of ‘Compose’ (type ‘f (g a)’)
+    When deriving the instance for (Functor (Compose f g))

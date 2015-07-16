@@ -437,10 +437,10 @@ Prelude>
           <listitem>
             <para>The variable's type is not polymorphic, is not
               <literal>()</literal>, and is an instance of
-              <literal>Show</literal></para>
+              <literal>Show</literal>.</para>
           </listitem>
         </itemizedlist>
-      <indexterm><primary><option>-fprint-bind-result</option></primary></indexterm><indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm>.
+      <indexterm><primary><option>-fprint-bind-result</option></primary></indexterm><indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm>
       </para>
 
       <para>Of course, you can also bind normal non-IO expressions
@@ -477,9 +477,9 @@ Prelude>
         <para>However, this quickly gets tedious when defining functions
         with multiple clauses, or groups of mutually recursive functions,
         because the complete definition has to be given on a single line,
-        using explicit braces and semicolons instead of layout:</para>
+        using explicit semicolons instead of layout:</para>
 <screen>
-Prelude> let { f op n [] = n ; f op n (h:t) = h `op` f op n t }
+Prelude> let f op n [] = n ; f op n (h:t) = h `op` f op n t
 Prelude> f (+) 0 [1..3]
 6
 Prelude>
@@ -489,18 +489,14 @@ Prelude>
       <literal>:}</literal> (each on a single line of its own):</para>
 <screen>
 Prelude> :{
-Prelude| let { g op n [] = n
-Prelude|     ; g op n (h:t) = h `op` g op n t
-Prelude|     }
+Prelude| let g op n [] = n
+Prelude|     g op n (h:t) = h `op` g op n t
 Prelude| :}
 Prelude> g (*) 1 [1..3]
 6
 </screen>
       <para>Such multiline commands can be used with any GHCi command,
-      and the lines between <literal>:{</literal> and
-      <literal>:}</literal> are simply merged into a single line for
-      interpretation. That implies that each such group must form a single
-      valid command when merged, and that no layout rule is used.
+      and note that the layout rule is in effect.
       The main purpose of multiline commands is not to replace module
       loading but to make definitions in .ghci-files (see <xref
       linkend="ghci-dot-files"/>) more readable and maintainable.</para>
@@ -575,7 +571,7 @@ Prelude>
 </screen>
 
        <para>Explicit braces and semicolons can be used instead of
-         layout, as usual:</para>
+         layout:</para>
 
 <screen>
 Prelude> do {
@@ -678,13 +674,13 @@ Prelude>
       <title>What's really in scope at the prompt?</title>
 
       <para>When you type an expression at the prompt, what
-      identifiers and types are in scope?  
+      identifiers and types are in scope?
       GHCi provides a flexible
       way to control exactly how the context for an expression is
       constructed:
   <itemizedlist>
   <listitem><para>
-        The <literal>:load</literal>, <literal>:add</literal>, 
+        The <literal>:load</literal>, <literal>:add</literal>,
         and <literal>:reload</literal> commands (<xref linkend="ghci-load-scope"/>).
    </para></listitem>
   <listitem><para>
@@ -706,8 +702,8 @@ Prelude>
    <sect3 id="ghci-load-scope">
    <title>The effect of <literal>:load</literal> on what is in scope</title>
       <para>
-      The <literal>:load</literal>, <literal>:add</literal>, and <literal>:reload</literal> 
-       commands (<xref linkend="loading-source-files"/> 
+      The <literal>:load</literal>, <literal>:add</literal>, and <literal>:reload</literal>
+       commands (<xref linkend="loading-source-files"/>
       and <xref linkend="ghci-compiled"/>) affect the top-level scope.
       Let's start with the simple cases; when you start
       GHCi the prompt looks like this:
@@ -834,7 +830,7 @@ Prelude System.IO Map>
       <title>Controlling what is in scope with the <literal>:module</literal> command</title>
 
       <para>Another way to manipulate the scope is to use the
-      <literal>:module</literal> command, whose syntax is this: 
+      <literal>:module</literal> command, whose syntax is this:
 
 <screen>
 :module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable>
@@ -885,7 +881,7 @@ Prelude System.IO Map>
         <literal>:load</literal></title>
 
         <para>It might seem that <literal>:module</literal>/<literal>import</literal> and
-        <literal>:load</literal>/<literal>:add</literal>/<literal>:reload</literal> 
+        <literal>:load</literal>/<literal>:add</literal>/<literal>:reload</literal>
         do similar things: you can use both
         to bring a module into scope.  However, there is a very important
         difference.  GHCi is concerned with two sets of modules:</para>
@@ -911,7 +907,7 @@ Prelude System.IO Map>
           </listitem>
         </itemizedlist>
 
-        <para>You can add a module to the scope (via <literal>:module</literal> 
+        <para>You can add a module to the scope (via <literal>:module</literal>
            or <literal>import</literal>)
           only if either (a) it is loaded, or
           (b) it is a module from a package that GHCi knows about.
@@ -2631,7 +2627,7 @@ T Int :: * -> *
 
       <varlistentry>
         <term>
-          <literal>:load</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
+          <literal>:load</literal><optional><literal>!</literal></optional> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
           <indexterm><primary><literal>:load</literal></primary></indexterm>
         </term>
         <listitem>
@@ -2652,6 +2648,15 @@ T Int :: * -> *
           if available, or otherwise the module will be compiled to
           byte-code.  Using the <literal>*</literal> prefix forces a
           module to be loaded as byte-code.</para>
+
+          <para>Adding the optional "<literal>!</literal>" turns type
+          errors into warnings while loading. This allows to use the
+          portions of the module that are correct, even if there are
+          type errors in some definitions. Effectively, the
+          "-fdefer-type-errors" flag is set before loading and unset
+          after loading if the flag has not already been set
+          before. See <xref linkend="defer-type-errors" /> for further
+          motivation and details.</para>
 
           <para>After a <literal>:load</literal> command, the current
           context is set to:</para>
@@ -2789,7 +2794,7 @@ bar
 
       <varlistentry>
         <term>
-          <literal>:reload</literal>
+          <literal>:reload</literal><optional><literal>!</literal></optional>
           <indexterm><primary><literal>:reload</literal></primary></indexterm>
         </term>
         <listitem>
@@ -2798,6 +2803,15 @@ bar
           or any dependent module, has changed.  Note that this may
           entail loading new modules, or dropping modules which are no
           longer indirectly required by the target.</para>
+
+          <para>Adding the optional "<literal>!</literal>" turns type
+          errors into warnings while loading. This allows to use the
+          portions of the module that are correct, even if there are
+          type errors in some definitions. Effectively, the
+          "-fdefer-type-errors" flag is set before loading and unset
+          after loading if the flag has not already been set
+          before. See <xref linkend="defer-type-errors" /> for further
+          motivation and details.</para>
         </listitem>
       </varlistentry>
 
@@ -3306,7 +3320,7 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
       <title>Setting options for interactive evaluation only</title>
 
       <para>
-        GHCi actually maintains <emphasis>two</emphasis> sets of options: 
+        GHCi actually maintains <emphasis>two</emphasis> sets of options:
 <itemizedlist>
 <listitem><para>
   The <emphasis>loading options</emphasis> apply when loading modules
@@ -3321,7 +3335,7 @@ The <literal>:set</literal> command modifies both, but there is
       </para>
 
       <para>
-        It is often useful to change the interactive options, 
+        It is often useful to change the interactive options,
         without having that option apply to loaded modules
         too.  For example
 <screen>
@@ -3380,7 +3394,11 @@ Then the interactive options are modified as follows:
   </sect1>
 
   <sect1 id="ghci-dot-files">
-    <title>The <filename>.ghci</filename> file</title>
+  <title>The <filename>.ghci</filename> and <filename>.haskeline</filename> files</title>
+
+    <sect2 id="dot-ghci-files">
+    <title>The <filename>.ghci</filename> files</title>
+
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
     </indexterm>
     <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
@@ -3536,6 +3554,21 @@ Then the interactive options are modified as follows:
         </listitem>
       </orderedlist>
     </para>
+    </sect2>
+
+    <sect2 id="dot-haskeline-file">
+      <title>The <filename>.haskeline</filename> file</title>
+
+      <indexterm><primary><filename>.haskeline</filename></primary><secondary>file</secondary>
+      </indexterm>
+      <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
+      </indexterm>
+
+      GHCi uses <ulink url="https://hackage.haskell.org/package/haskeline">Haskeline</ulink>
+      under the hood. You can configure it to, among other things, prune
+      duplicates from ghci history. See:
+      <ulink url="http://trac.haskell.org/haskeline/wiki/UserPrefs">Haskeline user preferences</ulink>.
+    </sect2>
   </sect1>
 
   <sect1 id="ghci-obj">

@@ -12,7 +12,7 @@ import SPARC.Instr
 import SPARC.Regs
 import SPARC.Base
 import NCGMonad
-import Size
+import Format
 
 import Cmm
 

@@ -8779,15 +8779,39 @@ be suppressed entirely by <option>-fnowarn-typed-holes</option>).
 <para>
 The result is that a hole will behave
 like <literal>undefined</literal>, but with the added benefits that it shows a
-warning at compile time and will show another warning message if it gets
-evaluated at runtime.. This behaviour follows that of the
+warning at compile time, and will show the same message if it gets
+evaluated at runtime. This behaviour follows that of the
 <literal>-fdefer-type-errors</literal> option, which implies
 <literal>-fdefer-typed-holes</literal>. See <xref linkend="defer-type-errors"/>.
 </para>
 </listitem>
 
 <listitem><para>
-Unbound identifiers with the same name are never unified, even within the 
+All unbound identifiers are treated as typed holes, <emphasis>whether or not they
+start with an underscore</emphasis>.  The only difference is in the error message:
+<programlisting>
+cons z = z : True : _x : y
+</programlisting>
+yields the errors
+<programlisting>
+Foo.hs:5:15: error:
+    Found hole: _x :: Bool
+    Relevant bindings include
+      p :: Bool (bound at Foo.hs:3:6)
+      cons :: Bool -> [Bool] (bound at Foo.hs:3:1)
+
+Foo.hs:5:20: error:
+    Variable not in scope: y :: [Bool]
+</programlisting>
+More information is given for explicit holes (i.e. ones that start with an underscore),
+than for out-of-scope variables, because the latter are often
+unintended typos, so the extra information is distracting.
+If you the detailed information, use a leading underscore to
+make explicit your intent to use a hole.
+</para></listitem>
+
+<listitem><para>
+Unbound identifiers with the same name are never unified, even within the
 same function, but shown individually.
 For example:
 <programlisting>
@@ -8824,9 +8848,18 @@ is a perfectly legal variable, and its behaviour is unchanged when it is in scop
 <programlisting>
 f _x = _x + 1
 </programlisting>
-does not elict any errors.  Only a variable starting with an underscore <emphasis>that is not in scope</emphasis>
-is treated as an error (which it always was), albeit now with a more informative error message
+does not elict any errors.  Only a variable <emphasis>that is not in scope</emphasis>
+(whether or not it starts with an underscore)
+is treated as an error (which it always was), albeit now with a more informative error message.
 </para></listitem>
+
+<listitem><para>
+Unbound data constructors used in expressions behave exactly as above.
+However, unbound data constructors used in <emphasis>patterns</emphasis> cannot
+be deferred, and instead bring compilation to a halt.  (In implementation terms, they
+are reported by the renamer rather than the type checker.)
+</para></listitem>
+
 </itemizedlist>
 </para>
 
@@ -9149,7 +9182,8 @@ main = print "b"
   <para>
     The flag <literal>-fdefer-type-errors</literal> controls whether type
     errors are deferred to runtime. Type errors will still be emitted as
-    warnings, but will not prevent compilation.
+    warnings, but will not prevent compilation. You can use
+    <literal>-fno-warn-deferred-type-errors</literal> to suppress these warnings.
   </para>
   <para>
     This flag implies the <literal>-fdefer-typed-holes</literal> flag,
@@ -9162,11 +9196,11 @@ main = print "b"
   </para>
   <para>
     At runtime, whenever a term containing a type error would need to be
-    evaluated, the error is converted into a runtime exception.
-    Note that type errors are deferred as much as possible during runtime, but
-    invalid coercions are never performed, even when they would ultimately
-    result in a value of the correct type. For example, given the following
-    code:
+    evaluated, the error is converted into a runtime exception of type
+    <literal>TypeError</literal>. Note that type errors are deferred as much
+    as possible during runtime, but invalid coercions are never performed,
+    even when they would ultimately result in a value of the correct type.
+    For example, given the following code:
 <programlisting>
 x :: Int
 x = 0
@@ -9177,7 +9211,7 @@ y = x
 z :: Int
 z = y
 </programlisting>
-    evaluating <literal>z</literal> will result in a runtime type error.
+    evaluating <literal>z</literal> will result in a runtime <literal>TypeError</literal>.
   </para>
 </sect2>
 <sect2><title>Deferred type errors in GHCi</title>
@@ -12050,6 +12084,61 @@ not going to be inlined before the rule has a chance to fire.
 </para>
 </sect2>
 
+<sect2 id="rules-class-methods">
+<title>How rules interact with class methods</title>
+
+<para>
+Giving a RULE for a class method is a bad idea:
+<programlisting>
+class C a where
+  op :: a -> a -> a
+
+instance C Bool where
+  op x y = ...rhs for op at Bool...
+
+{-# RULES "f" op True y = False #-}
+</programlisting>
+In this
+example, <literal>op</literal> is not an ordinary top-level function;
+it is a class method.  GHC rapidly rewrites any occurrences of
+<literal>op</literal>-used-at-type-Bool
+to a specialised function, say <literal>opBool</literal>, where
+<programlisting>
+opBool :: Bool -> Bool -> Bool
+opBool x y = ..rhs for op at Bool...
+</programlisting>
+So the RULE never has a chance to fire, for just the same reasons as in <xref linkend="rules-inline"/>.
+</para>
+<para>
+The solution is to define the instance-specific function yourself, with a pragma to prevent
+it being inlined too early, and give a RULE for it:
+<programlisting>
+instance C Bool where
+  op x y = opBool
+
+opBool :: Bool -> Bool -> Bool
+{-# NOINLINE [1] opBool #-}
+opBool x y = ..rhs for op at Bool...
+
+{-# RULES "f" opBool True y = False #-}
+</programlisting>
+If you want a RULE that truly applies to the overloaded class method, the only way to
+do it is like this:
+<programlisting>
+class C a where
+  op_c :: a -> a -> a
+
+op :: C a => a -> a -> a
+{-# NOINLINE [1] op #-}
+op = op_c
+
+{-# RULES "reassociate" op (op x y) z = op x (op y z) #-}
+</programlisting>
+Now the inlining of <literal>op</literal> is delayed until the rule has a chance to fire.
+The down-side is that instance declarations must define <literal>op_c</literal>, but
+all other uses should go via <literal>op</literal>.
+</para>
+</sect2>
 <sect2>
 <title>List fusion</title>
 

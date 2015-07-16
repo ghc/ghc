@@ -662,9 +662,17 @@ StgRunIsImplementedInAssembler(void)
 }
 
 #else // linux_HOST_OS
-#error Only linux support for power64 right now.
+#error Only Linux support for power64 right now.
 #endif
 
+#endif
+
+#ifdef powerpc64le_HOST_ARCH
+/* -----------------------------------------------------------------------------
+   PowerPC 64 little endian architecture
+
+   Really everything is in assembler, so we don't have to deal with GCC...
+   -------------------------------------------------------------------------- */
 #endif
 
 /* -----------------------------------------------------------------------------

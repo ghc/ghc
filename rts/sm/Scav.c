@@ -1807,6 +1807,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     switch (info->i.type) {
 
     case UPDATE_FRAME:
+        // Note [upd-black-hole]
         // In SMP, we can get update frames that point to indirections
         // when two threads evaluate the same thunk.  We do attempt to
         // discover this situation in threadPaused(), but it's
@@ -1832,7 +1833,6 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         // compulsory (otherwise we would have to check for thunks
         // too).
         //
-        // Note [upd-black-hole]
         // One slight hiccup is that the THUNK_SELECTOR machinery can
         // overwrite the updatee with an IND.  In parallel GC, this
         // could even be happening concurrently, so we can't check for

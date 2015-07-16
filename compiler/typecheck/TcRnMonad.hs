@@ -956,16 +956,16 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
-getCtLoc :: CtOrigin -> TcM CtLoc
-getCtLoc origin
+getCtLocM :: CtOrigin -> TcM CtLoc
+getCtLocM origin
   = do { env <- getLclEnv
        ; return (CtLoc { ctl_origin = origin
                        , ctl_env = env
                        , ctl_depth = initialSubGoalDepth }) }
 
-setCtLoc :: CtLoc -> TcM a -> TcM a
+setCtLocM :: CtLoc -> TcM a -> TcM a
 -- Set the SrcSpan and error context from the CtLoc
-setCtLoc (CtLoc { ctl_env = lcl }) thing_inside
+setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
   = updLclEnv (\env -> env { tcl_loc   = tcl_loc lcl
                            , tcl_bndrs = tcl_bndrs lcl
                            , tcl_ctxt  = tcl_ctxt lcl })
@@ -1241,7 +1241,7 @@ traceTcConstraints msg
 
 emitWildcardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitWildcardHoleConstraints wcs
-  = do { ctLoc <- getCtLoc HoleOrigin
+  = do { ctLoc <- getCtLocM HoleOrigin
        ; forM_ wcs $ \(name, tv) -> do {
        ; let real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span

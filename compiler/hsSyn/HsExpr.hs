@@ -27,7 +27,6 @@ import HsBinds
 import TcEvidence
 import CoreSyn
 import Var
-import RdrName
 import Name
 import BasicTypes
 import DataCon
@@ -127,11 +126,18 @@ is Less Cool because
 
 -- | A Haskell expression.
 data HsExpr id
-  = HsVar     id                        -- ^ Variable
-  | HsIPVar   HsIPName                  -- ^ Implicit parameter
-  | HsOverLit (HsOverLit id)            -- ^ Overloaded literals
+  = HsVar     id             -- ^ Variable
 
-  | HsLit     HsLit                     -- ^ Simple (non-overloaded) literals
+  | HsUnboundVar OccName     -- ^ Unbound variable; also used for "holes" _, or _x.
+                             -- Turned from HsVar to HsUnboundVar by the renamer, when
+                             --   it finds an out-of-scope variable
+                             -- Turned into HsVar by type checker, to support deferred
+                             --   type errors.  (The HsUnboundVar only has an OccName.)
+
+  | HsIPVar   HsIPName       -- ^ Implicit parameter
+  | HsOverLit (HsOverLit id) -- ^ Overloaded literals
+
+  | HsLit     HsLit          -- ^ Simple (non-overloaded) literals
 
   | HsLam     (MatchGroup id (LHsExpr id)) -- ^ Lambda abstraction. Currently always a single match
        --
@@ -492,7 +498,7 @@ data HsExpr id
 
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
-  |  HsUnboundVar RdrName
+
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsExpr id)
 
@@ -582,11 +588,12 @@ ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
-ppr_expr (HsVar v)       = pprPrefixOcc v
-ppr_expr (HsIPVar v)     = ppr v
-ppr_expr (HsLit lit)     = ppr lit
-ppr_expr (HsOverLit lit) = ppr lit
-ppr_expr (HsPar e)       = parens (ppr_lexpr e)
+ppr_expr (HsVar v)        = pprPrefixOcc v
+ppr_expr (HsUnboundVar v) = pprPrefixOcc v
+ppr_expr (HsIPVar v)      = ppr v
+ppr_expr (HsLit lit)      = ppr lit
+ppr_expr (HsOverLit lit)  = ppr lit
+ppr_expr (HsPar e)        = parens (ppr_lexpr e)
 
 ppr_expr (HsCoreAnn _ (_,s) e)
   = vcat [ptext (sLit "HsCoreAnn") <+> ftext s, ppr_lexpr e]
@@ -762,8 +769,6 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
-ppr_expr (HsUnboundVar nm)
-  = ppr nm
 
 {-
 HsSyn records exactly where the user put parens, with HsPar.
@@ -816,14 +821,14 @@ hsExprNeedsParens _ = True
 
 isAtomicHsExpr :: HsExpr id -> Bool
 -- True of a single token
-isAtomicHsExpr (HsVar {})     = True
-isAtomicHsExpr (HsLit {})     = True
-isAtomicHsExpr (HsOverLit {}) = True
-isAtomicHsExpr (HsIPVar {})   = True
+isAtomicHsExpr (HsVar {})        = True
+isAtomicHsExpr (HsLit {})        = True
+isAtomicHsExpr (HsOverLit {})    = True
+isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsWrap _ e)   = isAtomicHsExpr e
-isAtomicHsExpr (HsPar e)      = isAtomicHsExpr (unLoc e)
-isAtomicHsExpr _              = False
+isAtomicHsExpr (HsWrap _ e)      = isAtomicHsExpr e
+isAtomicHsExpr (HsPar e)         = isAtomicHsExpr (unLoc e)
+isAtomicHsExpr _                 = False
 
 {-
 ************************************************************************

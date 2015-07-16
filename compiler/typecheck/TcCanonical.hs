@@ -322,8 +322,14 @@ newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { let size = sizePred (mkClassPred cls xis)
-             loc' = case ctLocOrigin loc of
+  = do { let size = sizeTypes xis
+             loc' | isCTupleClass cls
+                  = loc   -- For tuple predicates, just take them apart, without
+                          -- adding their (large) size into the chain.  When we
+                          -- get down to a base predicate, we'll include its size.
+                          -- Trac #10335
+                  | otherwise
+                  = case ctLocOrigin loc of
                        GivenOrigin InstSkol
                          -> loc { ctl_origin = GivenOrigin (InstSC size) }
                        GivenOrigin (InstSC n)
@@ -459,7 +465,8 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
                                mkTcReflCo (eqRelRole eq_rel) ty1)
        ; stopWith ev "Equal LitTy" }
 
--- Decomposable type constructor applications
+-- Try to decompose type constructor applications
+-- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
@@ -609,7 +616,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
 
 -- AppTys only decompose for nominal equality, so this case just leads
 -- to an irreducible constraint; see typecheck/should_compile/T10494
--- See Note [Decomposing equality]
+-- See Note [Decomposing equality], note {4}
 can_eq_app ev ReprEq _ _ _ _
   = do { traceTcS "failing to decompose representational AppTy equality" (ppr ev)
        ; continueWith (CIrredEvCan { cc_ev = ev }) }
@@ -705,66 +712,6 @@ For example, see typecheck/should_compile/T10493, repeated here:
 That should compile, but only because we use canEqFailure and not
 canEqHardFailure.
 
-Note [Decomposing newtypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Decomposing newtypes is a dangerous business. Here is a representative example
-of why:
-
-  newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
-  type role Nt representational  -- but the user gives it an R role anyway
-
-If we have [W] Nt alpha ~R Nt beta, we *don't* want to decompose to
-[W] alpha ~R beta, because it's possible that alpha and beta aren't
-representationally equal. So we really want to unwrap newtypes first,
-which is what is done in can_eq_nc'.
-It all comes from the fact that newtypes aren't necessarily injective w.r.t.
-representational equality.
-
-Furthermore, as explained in Note [NthCo and newtypes] in Coercion, we can't use
-NthCo on representational coercions over newtypes. NthCo comes into play
-only when decomposing givens. So we avoid decomposing representational given
-equalities over newtypes.
-
-But is it ever sensible to decompose *Wanted* constraints over newtypes? Yes --
-it's the only way we could ever prove (IO Int ~R IO Age), recalling that IO
-is a newtype. However, we must decompose wanteds only as
-long as there are no Givens that might (later) influence Coercible solving.
-(See Note [Instance and Given overlap] in TcInteract.) By the time we reach
-canDecomposableTyConApp, we know that any newtypes that can be unwrapped have
-been. So, without importing more constructors, say, we know there is no way
-forward other than decomposition. So we take the one route we have available.
-This *does* mean that importing a newtype's constructor might make code that
-previously compiled fail to do so. (If that newtype is perversely recursive,
-say.)
-
-Example of how a given might influence this decision-making:
-
-  [G] alpha ~R beta
-  [W] Nt Int ~R Nt gamma
-
-where Nt is a newtype whose constructor is not in scope, and its parameter
-is representational. Decomposing to [W] Int ~R gamma seems sensible, but it's
-just possible that the given above will become informative and that we shouldn't
-decompose. If we have `newtype Nt a = Mk Bool`, then there might be well-formed
-evidence that (Nt Int ~R Nt Char), even if we can't form that evidence in this
-module (because Mk is not in scope). Creating this scenario in source Haskell
-is challenging; there is no test case.
-
-Example of how decomposing a wanted newtype is wrong, if it's not the only
-possibility:
-
-  newtype Nt a = MkNt (Id a)
-  type family Id a where Id a = a
-
-  [W] Nt Int ~R Nt Age
-
-Because of its use of a type family, Nt's parameter will get inferred to have
-a nominal role. Thus, decomposing the wanted will yield [W] Int ~N Age, which
-is unsatisfiable. Unwrapping, though, leads to a solution.
-
-In summary, decomposing a wanted is always sound, but it might not be complete.
-So we do it when it's the only possible way forward.
-
 Note [Decomposing equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have a constraint (of any flavour and role) that looks like
@@ -804,7 +751,12 @@ of decomposition. The difference between Derived and Wanted is the handling of
 evidence. Since decomposition in these cases isn't a matter of soundness but of
 guessing, we want the same behavior regardless of evidence.
 
-Here is a table (discussion following) detailing where decomposition is allowed:
+Here is a table (discussion following) detailing where decomposition of
+   (T s1 ... sn) ~r (T t1 .. tn)
+is allowed.  The first four lines (Data types ... type family) refer
+to TyConApps with various TyCons T; the last line is for AppTy, where
+there is presumably a type variable at the head, so it's actually
+   (s s1 ... sn) ~r (t t1 .. tn)
 
 NOMINAL               GIVEN                       WANTED
 
@@ -832,10 +784,11 @@ writing, 13 June 2015, the implementation of injective type families has not
 been merged, but it should be soon. Please delete this parenthetical if the
 implementation is indeed merged.)
 
-{2}: See Note [Decomposing newtypes]
+{2}: See Note [Decomposing newtypes at representational role]
 
-{3}: Because of the possibility of newtype instances, we must treat data families
-like newtypes. See also Note [Decomposing newtypes]. See #10534 and test case
+{3}: Because of the possibility of newtype instances, we must treat
+data families like newtypes. See also Note [Decomposing newtypes at
+representational role]. See #10534 and test case
 typecheck/should_fail/T10534.
 
 {4}: Because type variables can stand in for newtypes, we conservatively do not
@@ -848,6 +801,66 @@ boiling the tables above down to rule (*). The exceptions to rule (*) are for
 injective type families, which are handled separately from other decompositions,
 and the MAYBE entries above.
 
+Note [Decomposing newtypes at representational role]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This note discusses the 'newtype' line in the REPRESENTATIONAL table
+in Note [Decomposing equality]. (At nominal role, newtypes are fully
+decomposable.)
+
+Here is a representative example of why representational equality over
+newtypes is tricky:
+
+  newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
+  type role Nt representational  -- but the user gives it an R role anyway
+
+If we have [W] Nt alpha ~R Nt beta, we *don't* want to decompose to
+[W] alpha ~R beta, because it's possible that alpha and beta aren't
+representationally equal. Here's another example.
+
+  newtype Nt a = MkNt (Id a)
+  type family Id a where Id a = a
+
+  [W] Nt Int ~R Nt Age
+
+Because of its use of a type family, Nt's parameter will get inferred to have
+a nominal role. Thus, decomposing the wanted will yield [W] Int ~N Age, which
+is unsatisfiable. Unwrapping, though, leads to a solution.
+
+Conclusion:
+ * Unwrap newtypes before attempting to decompose them.
+   This is done in can_eq_nc'.
+
+It all comes from the fact that newtypes aren't necessarily injective
+w.r.t. representational equality.
+
+Furthermore, as explained in Note [NthCo and newtypes] in Coercion, we can't use
+NthCo on representational coercions over newtypes. NthCo comes into play
+only when decomposing givens.
+
+Conclusion:
+ * Do not decompose [G] N s ~R N t
+
+Is it sensible to decompose *Wanted* constraints over newtypes?  Yes!
+It's the only way we could ever prove (IO Int ~R IO Age), recalling
+that IO is a newtype.
+
+However we must be careful.  Consider
+
+  type role Nt representational
+
+  [G] Nt a ~R Nt b       (1)
+  [W] NT alpha ~R Nt b   (2)
+  [W] alpha ~ a          (3)
+
+If we focus on (3) first, we'll substitute in (2), and now it's
+identical to the given (1), so we succeed.  But if we focus on (2)
+first, and decompose it, we'll get (alpha ~R b), which is not soluble.
+This is exactly like the question of overlapping Givens for class
+constraints: see Note [Instance and Given overlap] in TcInteract.
+
+Conclusion:
+  * Decompose [W] N s ~R N t  iff there no given constraint that could
+    later solve it.
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
@@ -880,15 +893,19 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
 -- Examples in Note [Use canEqFailure in canDecomposableTyConApp]
 canEqFailure :: CtEvidence -> EqRel
              -> TcType -> TcType -> TcS (StopOrContinue Ct)
+canEqFailure ev NomEq ty1 ty2
+  = canEqHardFailure ev NomEq ty1 ty2
 canEqFailure ev ReprEq ty1 ty2
   = do { (xi1, co1) <- flatten FM_FlattenAll ev ty1
        ; (xi2, co2) <- flatten FM_FlattenAll ev ty2
+            -- We must flatten the types before putting them in the
+            -- inert set, so that we are sure to kick them out when
+            -- new equalities become available
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
        ; rewriteEqEvidence ev ReprEq NotSwapped xi1 xi2 co1 co2
          `andWhenContinue` \ new_ev ->
          continueWith (CIrredEvCan { cc_ev = new_ev }) }
-canEqFailure ev NomEq ty1 ty2 = canEqHardFailure ev NomEq ty1 ty2
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
 canEqHardFailure :: CtEvidence -> EqRel
@@ -946,7 +963,7 @@ When an equality fails, we still want to rewrite the equality
 all the way down, so that it accurately reflects
  (a) the mutable reference substitution in force at start of solving
  (b) any ty-binds in force at this point in solving
-See Note [Kick out insolubles] in TcInteract.
+See Note [Kick out insolubles] in TcSMonad.
 And if we don't do this there is a bad danger that
 TcSimplify.applyTyVarDefaulting will find a variable
 that has in fact been substituted.

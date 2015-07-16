@@ -1257,7 +1257,7 @@ zonkEvTerm env (EvTypeable ev) =
     EvTypeableTyApp t1 t2    -> do e1 <- zonk t1
                                    e2 <- zonk t2
                                    return (EvTypeableTyApp e1 e2)
-    EvTypeableTyLit t        -> EvTypeableTyLit `fmap` zonkTcTypeToType env t
+    EvTypeableTyLit t        -> EvTypeableTyLit `fmap` zonk t
   where
   zonk (ev,t) = do ev' <- zonkEvTerm env ev
                    t'  <- zonkTcTypeToType env t

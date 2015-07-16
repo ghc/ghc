@@ -1,14 +1,14 @@
 
-TidyClash.hs:8:19:
-    Found hole ‘_’ with type: w_
+TidyClash.hs:8:19: error:
+    Found type wildcard ‘_’ standing for ‘w_’
     Where: ‘w_’ is a rigid type variable bound by
                 the inferred type of bar :: w_2 -> (w_2, w_ -> w_1)
                 at TidyClash.hs:9:1
     To use the inferred type, enable PartialTypeSignatures
     In the type signature for ‘bar’: w_ -> (w_, _ -> _)
 
-TidyClash.hs:8:24:
-    Found hole ‘_’ with type: w_1
+TidyClash.hs:8:24: error:
+    Found type wildcard ‘_’ standing for ‘w_1’
     Where: ‘w_1’ is a rigid type variable bound by
                  the inferred type of bar :: w_2 -> (w_2, w_ -> w_1)
                  at TidyClash.hs:9:1

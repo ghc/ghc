@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 # setTestOpts(only_ways(['normal']));
 # Not only-normal: want optimisation too, to check coercion optimiser
 

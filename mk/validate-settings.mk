@@ -14,24 +14,11 @@ GhcStage2HcOpts += -O -dcore-lint
 
 GhcLibHcOpts    += -O -dcore-lint
 
-# We define DefaultFastGhcLibWays in this style so that the value is
-# correct even if the user alters DYNAMIC_GHC_PROGRAMS.
-# Technically we don't need the v way if DYNAMIC_GHC_PROGRAMS is YES,
-# but with -dynamic-too it's cheap, and makes life easier.
-DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
-DefaultProfGhcLibWays = $(if $(filter $(GhcProfiled),YES),p,)
+BUILD_PROF_LIBS = NO
 
-ifeq "$(ValidateSpeed)" "FAST"
-GhcLibWays     = $(DefaultFastGhcLibWays)
-else
-GhcLibWays     := $(filter v dyn,$(GhcLibWays))
-endif
-GhcLibWays     += $(DefaultProfGhcLibWays)
 SplitObjs       = NO
 NoFibWays       =
 STRIP_CMD       = :
-
-CHECK_PACKAGES = YES
 
 # We want to install DPH when validating, so that we can test it
 InstallExtraPackages = YES

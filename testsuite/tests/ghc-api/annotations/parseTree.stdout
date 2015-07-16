@@ -8,8 +8,7 @@
  (AnnotationTuple.hs:16:20-22, [p], (6.5)),
  (AnnotationTuple.hs:16:24, [m], ()),
  (AnnotationTuple.hs:16:25, [m], ()),
- (AnnotationTuple.hs:16:26, [m], ()),
- (AnnotationTuple.hs:16:26, [m], ())]
+ (AnnotationTuple.hs:16:26, [m], ()), (<no location info>, [m], ())]
 [
 (AK AnnotationTuple.hs:1:1 AnnCloseC = [AnnotationTuple.hs:27:1])
 

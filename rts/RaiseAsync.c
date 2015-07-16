@@ -23,12 +23,6 @@
 #include "win32/IOManager.h"
 #endif
 
-static StgTSO* raiseAsync (Capability *cap,
-                           StgTSO *tso,
-                           StgClosure *exception,
-                           rtsBool stop_at_atomically,
-                           StgUpdateFrame *stop_here);
-
 static void removeFromQueues(Capability *cap, StgTSO *tso);
 
 static void removeFromMVarBlockedQueue (StgTSO *tso);
@@ -777,7 +771,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
  *
  * -------------------------------------------------------------------------- */
 
-static StgTSO *
+StgTSO *
 raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
            rtsBool stop_at_atomically, StgUpdateFrame *stop_here)
 {

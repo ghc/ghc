@@ -1,3 +1,0 @@
-ERROR "tcfail018.hs":5 - Unresolved top-level overloading
-*** Binding             : a
-*** Outstanding context : Num [b]

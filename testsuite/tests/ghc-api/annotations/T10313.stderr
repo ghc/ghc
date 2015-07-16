@@ -20,10 +20,6 @@ Test10313.hs:30:15: error:
 
 Test10313.hs:32:7: error: Not in scope: ‘S.concatMap’
 
-Test10313.hs:32:19: error: Not in scope: ‘stream’
-
 Test10313.hs:32:27: error: Not in scope: ‘GV.stream’
 
 Test10313.hs:33:7: error: Not in scope: ‘S.sized’
-
-Test10313.hs:34:7: error: Not in scope: data constructor ‘Exact’

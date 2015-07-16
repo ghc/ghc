@@ -581,7 +581,7 @@ newLocal ty = do { uniq <- getUniqueM
 dataConArgRep
    :: DynFlags
    -> FamInstEnvs
-   -> Type 
+   -> Type
    -> HsSrcBang     -- For DataCons defined in this module, this is the
                     --    bang/unpack annotation that the programmer wrote
                     -- For DataCons imported from an interface file, this

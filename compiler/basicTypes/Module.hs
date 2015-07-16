@@ -42,6 +42,7 @@ module Module
         dphParPackageKey,
         mainPackageKey,
         thisGhcPackageKey,
+        holePackageKey, isHoleModule,
         interactivePackageKey, isInteractiveModule,
         wiredInPackageKeys,
 
@@ -399,8 +400,16 @@ interactivePackageKey = fsToPackageKey (fsLit "interactive")
 -- to symbol names, since there can be only one main package per program.
 mainPackageKey      = fsToPackageKey (fsLit "main")
 
+-- | This is a fake package id used to provide identities to any un-implemented
+-- signatures.  The set of hole identities is global over an entire compilation.
+holePackageKey :: PackageKey
+holePackageKey      = fsToPackageKey (fsLit "hole")
+
 isInteractiveModule :: Module -> Bool
 isInteractiveModule mod = modulePackageKey mod == interactivePackageKey
+
+isHoleModule :: Module -> Bool
+isHoleModule mod = modulePackageKey mod == holePackageKey
 
 wiredInPackageKeys :: [PackageKey]
 wiredInPackageKeys = [ primPackageKey,
