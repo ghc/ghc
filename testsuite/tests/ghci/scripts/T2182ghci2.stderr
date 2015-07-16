@@ -1,8 +1,8 @@
 
-<interactive>:8:1:
+<interactive>:7:1:
     No instance for (Show Float) arising from a use of ‘print’
     In a stmt of an interactive GHCi command: print it
 
-<interactive>:16:1:
+<interactive>:15:1:
     No instance for (Show Float) arising from a use of ‘print’
     In a stmt of an interactive GHCi command: print it

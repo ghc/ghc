@@ -1,5 +1,5 @@
 
-<interactive>:4:9: Warning:
+<interactive>:3:9: Warning:
     Couldn't match type ‘[Dec]’ with ‘Exp’
     Expected type: Q Exp
       Actual type: DecsQ
@@ -8,7 +8,7 @@
 
 <interactive>:1:1:
     Exception when trying to run compile-time code:
-      <interactive>:4:9:
+      <interactive>:3:9:
     Couldn't match type ‘[Dec]’ with ‘Exp’
     Expected type: Q Exp
       Actual type: DecsQ
