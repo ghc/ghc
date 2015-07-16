@@ -212,8 +212,9 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
         -- collector will ignore it.
     static_link_value
         | mayHaveCafRefs caf_refs  = mkIntCLit dflags 0
-        | otherwise                = mkIntCLit dflags 1  -- No CAF refs
-
+        | otherwise                = mkIntCLit dflags 3  -- No CAF refs
+                                      -- See Note [STATIC_LINK fields]
+                                      -- in rts/sm/Storage.h
 
 mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]

@@ -175,9 +175,9 @@ initStorage (void)
 
   generations[0].max_blocks = 0;
 
-  dyn_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
-  debug_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
-  revertible_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
+  dyn_caf_list = (StgIndStatic*)END_OF_CAF_LIST;
+  debug_caf_list = (StgIndStatic*)END_OF_CAF_LIST;
+  revertible_caf_list = (StgIndStatic*)END_OF_CAF_LIST;
    
   /* initialise the allocate() interface */
   large_alloc_lim = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W;
@@ -427,7 +427,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
 
         ACQUIRE_SM_LOCK; // dyn_caf_list is global, locked by sm_mutex
         caf->static_link = (StgClosure*)dyn_caf_list;
-        dyn_caf_list = caf;
+        dyn_caf_list = (StgIndStatic*)((StgWord)caf | STATIC_FLAG_LIST);
         RELEASE_SM_LOCK;
     }
     else
@@ -484,7 +484,7 @@ StgInd* newRetainedCAF (StgRegTable *reg, StgIndStatic *caf)
     ACQUIRE_SM_LOCK;
 
     caf->static_link = (StgClosure*)revertible_caf_list;
-    revertible_caf_list = caf;
+    revertible_caf_list = (StgIndStatic*)((StgWord)caf | STATIC_FLAG_LIST);
 
     RELEASE_SM_LOCK;
 
