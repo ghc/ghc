@@ -127,6 +127,14 @@ xchg(StgPtr p, StgWord w)
         :"=&r" (result)
         :"r" (w), "r" (p)
     );
+#elif powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+    __asm__ __volatile__ (
+        "1:     ldarx     %0, 0, %2\n"
+        "       stdcx.    %1, 0, %2\n"
+        "       bne-      1b"
+        :"=&r" (result)
+        :"r" (w), "r" (p)
+    );
 #elif sparc_HOST_ARCH
     result = w;
     __asm__ __volatile__ (
@@ -201,6 +209,20 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         "       cmpw      %0, %1\n"
         "       bne       2f\n"
         "       stwcx.    %2, 0, %3\n"
+        "       bne-      1b\n"
+        "2:"
+        :"=&r" (result)
+        :"r" (o), "r" (n), "r" (p)
+        :"cc", "memory"
+    );
+    return result;
+#elif powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+    StgWord result;
+    __asm__ __volatile__ (
+        "1:     ldarx     %0, 0, %3\n"
+        "       cmpd      %0, %1\n"
+        "       bne       2f\n"
+        "       stdcx.    %2, 0, %3\n"
         "       bne-      1b\n"
         "2:"
         :"=&r" (result)
@@ -345,7 +367,7 @@ write_barrier(void) {
     return;
 #elif i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
-#elif powerpc_HOST_ARCH
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require store/store barriers. */
@@ -367,7 +389,7 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory");
 #elif x86_64_HOST_ARCH
     __asm__ __volatile__ ("lock; addq $0,0(%%rsp)" : : : "memory");
-#elif powerpc_HOST_ARCH
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
@@ -395,7 +417,7 @@ load_load_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
-#elif powerpc_HOST_ARCH
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require load/load barriers. */

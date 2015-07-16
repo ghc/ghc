@@ -12,7 +12,7 @@ import SPARC.Regs
 import SPARC.Ppr        ()
 import Instruction
 import Reg
-import Size
+import Format
 import Cmm
 
 

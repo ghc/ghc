@@ -42,7 +42,7 @@ endif
 .NOTPARALLEL:
 
 STD_TARGETS = all clean distclean maintainer_clean install html ps pdf
-DIRECTORY_INDEPENDENT_TARGETS = show
+DIRECTORY_INDEPENDENT_TARGETS = show show!
 
 # The + tells make that we're recursively invoking make, otherwise 'make -j2'
 # goes wrong.
@@ -52,7 +52,7 @@ $(STD_TARGETS):
 $(DIRECTORY_INDEPENDENT_TARGETS):
 	+$(TOPMAKE) $@ $(EXTRA_MAKE_OPTS)
 
-OTHERTARGETS=$(filter-out fast help show $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
+OTHERTARGETS=$(filter-out fast help $(DIRECTORY_INDEPENDENT_TARGETS) $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
 .PHONY: $(OTHERTARGETS)
 $(OTHERTARGETS):
 	+$(TOPMAKE) $(dir)/$@ $(EXTRA_MAKE_OPTS)

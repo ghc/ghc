@@ -5,7 +5,6 @@ test('T4491',
       # other ways, due to the TH use, so for now we only run it
       # the TH way
       only_ways([config.ghc_th_way]),
-      only_compiler_types(['ghc']),
       extra_clean(['A.hi', 'A.o'])
      ],
      compile_and_run, [''])

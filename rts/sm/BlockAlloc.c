@@ -183,23 +183,19 @@ void initBlockAllocator(void)
 STATIC_INLINE void
 initGroup(bdescr *head)
 {
-  bdescr *bd;
-  W_ i, n;
-
-  // If this block group fits in a single megablock, initialize
-  // all of the block descriptors.  Otherwise, initialize *only*
-  // the first block descriptor, since for large allocations we don't
-  // need to give the invariant that Bdescr(p) is valid for any p in the
-  // block group. (This is because it is impossible to do, as the
-  // block descriptor table for the second mblock will get overwritten
-  // by contiguous user data.)
-  n = head->blocks > BLOCKS_PER_MBLOCK ? 1 : head->blocks;
   head->free   = head->start;
   head->link   = NULL;
-  for (i=1, bd = head+1; i < n; i++, bd++) {
-      bd->free = 0;
-      bd->blocks = 0;
-      bd->link = head;
+
+  // If this is a block group (but not a megablock group), we
+  // make the last block of the group point to the head.  This is used
+  // when coalescing blocks in freeGroup().  We don't do this for
+  // megablock groups because blocks in the second and subsequent
+  // mblocks don't have bdescrs; freeing these is handled in a
+  // different way by free_mblock_group().
+  if (head->blocks > 1 && head->blocks <= BLOCKS_PER_MBLOCK) {
+      bdescr *last = head + head->blocks-1;
+      last->blocks = 0;
+      last->link = head;
   }
 }
 

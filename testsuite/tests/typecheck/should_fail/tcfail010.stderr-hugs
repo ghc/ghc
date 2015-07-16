@@ -1,3 +1,0 @@
-ERROR "tcfail010.hs":3 - Unresolved top-level overloading
-*** Binding             : q
-*** Outstanding context : Num [b]

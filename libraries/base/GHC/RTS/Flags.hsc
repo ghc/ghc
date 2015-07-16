@@ -9,13 +9,19 @@
 -- @since 4.8.0.0
 --
 module GHC.RTS.Flags
-  ( RTSFlags (..)
+  ( RtsTime
+  , RtsNat
+  , RTSFlags (..)
+  , GiveGCStats (..)
   , GCFlags (..)
   , ConcFlags (..)
   , MiscFlags (..)
   , DebugFlags (..)
+  , DoCostCentres (..)
   , CCFlags (..)
+  , DoHeapProfile (..)
   , ProfFlags (..)
+  , DoTrace (..)
   , TraceFlags (..)
   , TickyFlags (..)
   , getRTSFlags
@@ -48,7 +54,7 @@ import GHC.Show
 import GHC.Word
 
 -- | @'Time'@ is defined as a @'StgWord64'@ in @stg/Types.h@
-type Time = Word64
+type RtsTime = Word64
 
 -- | @'nat'@ defined in @rts/Types.h@
 type RtsNat = #{type unsigned int}
@@ -98,19 +104,19 @@ data GCFlags = GCFlags
       -- ^ use "mostly mark-sweep" instead of copying for the oldest generation
     , ringBell              :: Bool
     , frontpanel            :: Bool
-    , idleGCDelayTime       :: Time
+    , idleGCDelayTime       :: RtsTime
     , doIdleGC              :: Bool
     , heapBase              :: Word -- ^ address to ask the OS for memory
     , allocLimitGrace       :: Word
     } deriving (Show)
 
 data ConcFlags = ConcFlags
-    { ctxtSwitchTime  :: Time
+    { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
     } deriving (Show)
 
 data MiscFlags = MiscFlags
-    { tickInterval          :: Time
+    { tickInterval          :: RtsTime
     , installSignalHandlers :: Bool
     , machineReadable       :: Bool
     , linkerMemBase         :: Word
@@ -198,8 +204,8 @@ instance Enum DoHeapProfile where
 
 data ProfFlags = ProfFlags
     { doHeapProfile            :: DoHeapProfile
-    , heapProfileInterval      :: Time -- ^ time between samples
-    , heapProfileIntervalTicks :: Word -- ^ ticks between samples (derived)
+    , heapProfileInterval      :: RtsTime -- ^ time between samples
+    , heapProfileIntervalTicks :: Word    -- ^ ticks between samples (derived)
     , includeTSOs              :: Bool
     , showCCSOnException       :: Bool
     , maxRetainerSetSize       :: Word

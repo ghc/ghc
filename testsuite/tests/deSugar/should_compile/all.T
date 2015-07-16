@@ -39,7 +39,7 @@ test('ds031', normal, compile, [''])
 test('ds032', normal, compile, [''])
 test('ds033', normal, compile, [''])
 test('ds034', normal, compile, [''])
-test('ds035', only_compiler_types(['ghc']), compile, [''])
+test('ds035', normal, compile, [''])
 test('ds036', normal, compile, [''])
 test('ds037', normal, compile, [''])
 test('ds038', normal, compile, [''])
@@ -58,7 +58,7 @@ test('ds051', normal, compile, [''])
 test('ds052', normal, compile, [''])
 test('ds053', normal, compile, [''])
 test('ds054', normal, compile, [''])
-test('ds055', only_compiler_types(['ghc']), compile, [''])
+test('ds055', normal, compile, [''])
 test('ds056', normal, compile, ['-Wall -fno-warn-tabs'])
 test('ds057', normal, compile, [''])
 test('ds058', normal, compile, ['-W -fno-warn-tabs'])
@@ -78,7 +78,6 @@ test('T4439', normal, compile, [''])
 test('T4488', normal, compile, [''])
 test('T4870',
      [only_ways(['optasm']),
-      only_compiler_types(['ghc']),
       extra_clean(['T4870a.hi', 'T4870a.o'])],
      multimod_compile,
      ['T4870', '-v0'])
@@ -90,7 +89,6 @@ test('T5252',
 test('T5455', normal, compile, [''])
 test('T5001',
      [only_ways(['optasm']),
-      only_compiler_types(['ghc']),
       extra_clean(['T5001a.hi', 'T5001a.o'])],
      multimod_compile,
      ['T5001', '-v0'])

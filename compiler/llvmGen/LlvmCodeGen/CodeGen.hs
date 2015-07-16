@@ -30,6 +30,7 @@ import Platform
 import OrdList
 import UniqSupply
 import Unique
+import Util
 
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
@@ -255,6 +256,20 @@ genCall t@(PrimTarget op) [] args
                 `appOL` stmts4 `snocOL` call
     return (stmts, top1 ++ top2)
 
+-- Handle the MO_{Add,Sub}IntC separately. LLVM versions return a record from
+-- which we need to extract the actual values.
+genCall t@(PrimTarget (MO_AddIntC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+genCall t@(PrimTarget (MO_SubIntC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
+-- Similar to MO_{Add,Sub}IntC, but MO_Add2 expects the first element of the
+-- return tuple to be the overflow bit and the second element to contain the
+-- actual result of the addition. So we still use genCallWithOverflow but swap
+-- the return registers.
+genCall t@(PrimTarget (MO_Add2 w)) [dstO, dstV] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
 -- Handle all other foreign calls and prim ops.
 genCall target res args = do
 
@@ -359,6 +374,68 @@ genCall target res args = do
                     let s3 = Store v2 vreg
                     return (allStmts `snocOL` s2 `snocOL` s3
                                 `appOL` retStmt, top1 ++ top2)
+
+-- | Generate a call to an LLVM intrinsic that performs arithmetic operation
+-- with overflow bit (i.e., returns a struct containing the actual result of the
+-- operation and an overflow bit). This function will also extract the overflow
+-- bit and zero-extend it (all the corresponding Cmm PrimOps represent the
+-- overflow "bit" as a usual Int# or Word#).
+genCallWithOverflow
+  :: ForeignTarget -> Width -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
+genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
+    -- So far this was only tested for the following three CallishMachOps.
+    MASSERT( (op `elem` [MO_Add2 w, MO_AddIntC w, MO_SubIntC w]) )
+    let width = widthToLlvmInt w
+    -- This will do most of the work of generating the call to the intrinsic and
+    -- extracting the values from the struct.
+    (value, overflowBit, (stmts, top)) <-
+      genCallExtract t w (lhs, rhs) (width, i1)
+    -- value is i<width>, but overflowBit is i1, so we need to cast (Cmm expects
+    -- both to be i<width>)
+    (overflow, zext) <- doExpr width $ Cast LM_Zext overflowBit width
+    dstRegV <- getCmmReg (CmmLocal dstV)
+    dstRegO <- getCmmReg (CmmLocal dstO)
+    let storeV = Store value dstRegV
+        storeO = Store overflow dstRegO
+    return (stmts `snocOL` zext `snocOL` storeV `snocOL` storeO, top)
+genCallWithOverflow _ _ _ _ =
+    panic "genCallExtract: wrong ForeignTarget or number of arguments"
+
+-- | A helper function for genCallWithOverflow that handles generating the call
+-- to the LLVM intrinsic and extracting the result from the struct to LlvmVars.
+genCallExtract
+    :: ForeignTarget           -- ^ PrimOp
+    -> Width                   -- ^ Width of the operands.
+    -> (CmmActual, CmmActual)  -- ^ Actual arguments.
+    -> (LlvmType, LlvmType)    -- ^ LLLVM types of the returned sturct.
+    -> LlvmM (LlvmVar, LlvmVar, StmtData)
+genCallExtract target@(PrimTarget op) w (argA, argB) (llvmTypeA, llvmTypeB) = do
+    let width = widthToLlvmInt w
+        argTy = [width, width]
+        retTy = LMStructU [llvmTypeA, llvmTypeB]
+
+    -- Process the arguments.
+    let args_hints = zip [argA, argB] (snd $ foreignTargetHints target)
+    (argsV1, args1, top1) <- arg_vars args_hints ([], nilOL, [])
+    (argsV2, args2) <- castVars $ zip argsV1 argTy
+
+    -- Get the function and make the call.
+    fname <- cmmPrimOpFunctions op
+    (fptr, _, top2) <- getInstrinct fname retTy argTy
+    -- We use StdCall for primops. See also the last case of genCall.
+    (retV, call) <- doExpr retTy $ Call StdCall fptr argsV2 []
+
+    -- This will result in a two element struct, we need to use "extractvalue"
+    -- to get them out of it.
+    (res1, ext1) <- doExpr llvmTypeA (ExtractV retV 0)
+    (res2, ext2) <- doExpr llvmTypeB (ExtractV retV 1)
+
+    let stmts = args1 `appOL` args2 `snocOL` call `snocOL` ext1 `snocOL` ext2
+        tops = top1 ++ top2
+    return (res1, res2, (stmts, tops))
+
+genCallExtract _ _ _ _ =
+    panic "genCallExtract: unsupported ForeignTarget"
 
 -- Handle simple function call that only need simple type casting, of the form:
 --   truncate arg >>= \a -> call(a) >>= zext
@@ -534,12 +611,16 @@ cmmPrimOpFunctions mop = do
 
     (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
 
+    MO_AddIntC w    -> fsLit $ "llvm.sadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_SubIntC w    -> fsLit $ "llvm.ssub.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
-    MO_Add2 {}       -> unsupported
-    MO_AddIntC {}    -> unsupported
-    MO_SubIntC {}    -> unsupported
     MO_U_Mul2 {}     -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported

@@ -101,6 +101,11 @@
                     commands now take an optional count allowing the user to move forward or
                     backward in history several steps at a time.
                </para>
+               <para>
+                    Added commands <literal>:load!</literal> and <literal>:reload!</literal>,
+                    effectively setting "-fdefer-type-errors" before loading a module and
+                    unsetting it after loading if it has not been set before (#8353).
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>

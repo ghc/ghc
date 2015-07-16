@@ -1,6 +1,6 @@
 
 WildcardInstantiations.hs:5:14: error:
-    Found hole: _a :: w_a
+    Found type wildcard ‘_a’ standing for ‘w_a’
     Where: ‘w_a’ is a rigid type variable bound by
                  the inferred type of foo :: (Enum w_a, Show w_a) => w_a -> String
                  at WildcardInstantiations.hs:6:1
@@ -13,12 +13,12 @@ WildcardInstantiations.hs:5:18: error:
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WildcardInstantiations.hs:5:30: error:
-    Found hole: _ :: String
+    Found type wildcard ‘_’ standing for ‘String’
     To use the inferred type, enable PartialTypeSignatures
     In the type signature for ‘foo’: (Show _a, _) => _a -> _
 
 WildcardInstantiations.hs:8:8: error:
-    Found hole: _ :: w_
+    Found type wildcard ‘_’ standing for ‘w_’
     Where: ‘w_’ is a rigid type variable bound by
                 the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
                 at WildcardInstantiations.hs:9:1
@@ -26,7 +26,7 @@ WildcardInstantiations.hs:8:8: error:
     In the type signature for ‘bar’: _ -> _ -> _
 
 WildcardInstantiations.hs:8:13: error:
-    Found hole: _ :: w_ -> w_1
+    Found type wildcard ‘_’ standing for ‘w_ -> w_1’
     Where: ‘w_’ is a rigid type variable bound by
                 the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
                 at WildcardInstantiations.hs:9:1
@@ -37,7 +37,7 @@ WildcardInstantiations.hs:8:13: error:
     In the type signature for ‘bar’: _ -> _ -> _
 
 WildcardInstantiations.hs:8:18: error:
-    Found hole: _ :: w_1
+    Found type wildcard ‘_’ standing for ‘w_1’
     Where: ‘w_1’ is a rigid type variable bound by
                  the inferred type of bar :: w_ -> (w_ -> w_1) -> w_1
                  at WildcardInstantiations.hs:9:1

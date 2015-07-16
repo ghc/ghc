@@ -149,9 +149,9 @@ traceShowId :: (Show a) => a -> a
 traceShowId a = trace (show a) a
 
 {-|
-Like 'trace' but returning unit in an arbitrary monad. Allows for convenient
-use in do-notation. Note that the application of 'trace' is not an action in the
-monad, as 'traceIO' is in the 'IO' monad.
+Like 'trace' but returning unit in an arbitrary 'Applicative' context. Allows
+for convenient use in do-notation. Note that the application of 'trace' is not
+an action in the 'Applicative' context, as 'traceIO' is in the 'IO' type.
 
 > ... = do
 >   x <- ...
@@ -161,8 +161,8 @@ monad, as 'traceIO' is in the 'IO' monad.
 
 @since 4.7.0.0
 -}
-traceM :: (Monad m) => String -> m ()
-traceM string = trace string $ return ()
+traceM :: (Applicative f) => String -> f ()
+traceM string = trace string $ pure ()
 
 {-|
 Like 'traceM', but uses 'show' on the argument to convert it to a 'String'.
@@ -175,7 +175,7 @@ Like 'traceM', but uses 'show' on the argument to convert it to a 'String'.
 
 @since 4.7.0.0
 -}
-traceShowM :: (Show a, Monad m) => a -> m ()
+traceShowM :: (Show a, Applicative f) => a -> f ()
 traceShowM = traceM . show
 
 -- | like 'trace', but additionally prints a call stack if one is

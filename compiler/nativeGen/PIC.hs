@@ -158,7 +158,14 @@ cmmMakePicReference dflags lbl
         -- everything gets relocated at runtime
         | OSMinGW32 <- platformOS $ targetPlatform dflags
         = CmmLit $ CmmLabel lbl
-
+        -- both ABI versions default to medium code model
+        | ArchPPC_64 _ <- platformArch $ targetPlatform dflags
+        = CmmMachOp (MO_Add W32) -- code model medium
+                [ CmmReg (CmmGlobal PicBaseReg)
+                , CmmLit $ picRelative
+                                (platformArch   $ targetPlatform dflags)
+                                (platformOS     $ targetPlatform dflags)
+                                lbl ]
 
         | (gopt Opt_PIC dflags || not (gopt Opt_Static dflags)) && absoluteLabel lbl
         = CmmMachOp (MO_Add (wordWidth dflags))
@@ -293,13 +300,17 @@ howToAccessLabel dflags arch OSDarwin this_mod _ lbl
 -- from position independent code. It is also required from the main program
 -- when dynamic libraries containing Haskell code are used.
 
-howToAccessLabel _ ArchPPC_64 os _ kind _
+howToAccessLabel _ (ArchPPC_64 _) os _ kind _
         | osElfTarget os
-        = if kind == DataReference
-            -- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
-            then AccessViaSymbolPtr
-            -- actually, .label instead of label
-            else AccessDirectly
+        = case kind of
+          -- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
+          DataReference -> AccessViaSymbolPtr
+          -- RTLD does not generate stubs for function descriptors
+          -- in tail calls. Create a symbol pointer and generate
+          -- the code to load the function descriptor at the call site.
+          JumpReference -> AccessViaSymbolPtr
+          -- regular calls are handled by the runtime linker
+          _             -> AccessDirectly
 
 howToAccessLabel dflags _ os _ _ _
         -- no PIC -> the dynamic linker does everything for us;
@@ -430,9 +441,14 @@ needImportedSymbols dflags arch os
         , arch  == ArchPPC
         = gopt Opt_PIC dflags || not (gopt Opt_Static dflags)
 
+        -- PowerPC 64 Linux: always
+        | osElfTarget os
+        , arch == ArchPPC_64 ELF_V1 || arch == ArchPPC_64 ELF_V2
+        = True
+
         -- i386 (and others?): -dynamic but not -fPIC
         | osElfTarget os
-        , arch  /= ArchPPC_64
+        , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
         = not (gopt Opt_Static dflags) && not (gopt Opt_PIC dflags)
 
         | otherwise
@@ -467,16 +483,30 @@ pprGotDeclaration dflags ArchX86 OSDarwin
 pprGotDeclaration _ _ OSDarwin
         = empty
 
+-- PPC 64 ELF v1needs a Table Of Contents (TOC) on Linux
+pprGotDeclaration _ (ArchPPC_64 ELF_V1) OSLinux
+        = ptext (sLit ".section \".toc\",\"aw\"")
+-- In ELF v2 we also need to tell the assembler that we want ABI
+-- version 2. This would normally be done at the top of the file
+-- right after a file directive, but I could not figure out how
+-- to do that.
+pprGotDeclaration _ (ArchPPC_64 ELF_V2) OSLinux
+        = vcat [ ptext (sLit ".abiversion 2"),
+                 ptext (sLit ".section \".toc\",\"aw\"")
+               ]
+pprGotDeclaration _ (ArchPPC_64 _) _
+        = panic "pprGotDeclaration: ArchPPC_64 only Linux supported"
+
 -- Emit GOT declaration
 -- Output whatever needs to be output once per .s file.
 pprGotDeclaration dflags arch os
         | osElfTarget os
-        , arch  /= ArchPPC_64
+        , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
         , not (gopt Opt_PIC dflags)
         = empty
 
         | osElfTarget os
-        , arch  /= ArchPPC_64
+        , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
         = vcat [
                 -- See Note [.LCTOC1 in PPC PIC code]
                 ptext (sLit ".section \".got2\",\"aw\""),
@@ -635,9 +665,16 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 -- the NCG will keep track of all DynamicLinkerLabels it uses
 -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol _ platform@(Platform { platformArch = ArchPPC_64 }) _
+pprImportedSymbol _ platform@(Platform { platformArch = ArchPPC_64 _ })
+                  importedLbl
         | osElfTarget (platformOS platform)
-        = empty
+        = case dynamicLinkerLabelInfo importedLbl of
+            Just (SymbolPtr, lbl)
+              -> vcat [
+                   ptext (sLit ".section \".toc\", \"aw\""),
+                   ptext (sLit ".LC_") <> pprCLabel platform lbl <> char ':',
+                   ptext (sLit "\t.quad") <+> pprCLabel platform lbl ]
+            _ -> empty
 
 pprImportedSymbol dflags platform importedLbl
         | osElfTarget (platformOS platform)
@@ -735,6 +772,28 @@ initializePicBase_ppc ArchPPC OSDarwin picReg
         where   BasicBlock bID insns = entry
                 b' = BasicBlock bID (PPC.FETCHPC picReg : insns)
 
+-------------------------------------------------------------------------
+-- Load TOC into register 2
+-- PowerPC 64-bit ELF ABI 2.0 requires the address of the callee
+-- in register 12.
+-- We pass the label to FETCHTOC and create a .localentry too.
+-- TODO: Explain this better and refer to ABI spec!
+{-
+We would like to do approximately this, but spill slot allocation
+might be added before the first BasicBlock. That violates the ABI.
+
+For now we will emit the prologue code in the pretty printer,
+which is also what we do for ELF v1.
+initializePicBase_ppc (ArchPPC_64 ELF_V2) OSLinux picReg
+        (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
+        = do
+           bID <-getUniqueM
+           return (CmmProc info lab live (ListGraph (b':entry:blocks))
+                                         : statics)
+        where   BasicBlock entryID _ = entry
+                b' = BasicBlock bID [PPC.FETCHTOC picReg lab,
+                                     PPC.BCC PPC.ALWAYS entryID]
+-}
 
 initializePicBase_ppc _ _ _ _
         = panic "initializePicBase_ppc: not needed"

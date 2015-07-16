@@ -811,13 +811,16 @@ callishPrimOpSupported dflags op
       WordQuotRem2Op | ncg && x86ish  -> Left (MO_U_QuotRem2 (wordWidth dflags))
                      | otherwise      -> Right (genericWordQuotRem2Op dflags)
 
-      WordAdd2Op     | ncg && x86ish  -> Left (MO_Add2       (wordWidth dflags))
+      WordAdd2Op     | (ncg && x86ish)
+                         || llvm      -> Left (MO_Add2       (wordWidth dflags))
                      | otherwise      -> Right genericWordAdd2Op
 
-      IntAddCOp      | ncg && x86ish  -> Left (MO_AddIntC    (wordWidth dflags))
+      IntAddCOp      | (ncg && x86ish)
+                         || llvm      -> Left (MO_AddIntC    (wordWidth dflags))
                      | otherwise      -> Right genericIntAddCOp
 
-      IntSubCOp      | ncg && x86ish  -> Left (MO_SubIntC    (wordWidth dflags))
+      IntSubCOp      | (ncg && x86ish)
+                         || llvm      -> Left (MO_SubIntC    (wordWidth dflags))
                      | otherwise      -> Right genericIntSubCOp
 
       WordMul2Op     | ncg && x86ish  -> Left (MO_U_Mul2     (wordWidth dflags))
@@ -828,7 +831,9 @@ callishPrimOpSupported dflags op
   ncg = case hscTarget dflags of
            HscAsm -> True
            _      -> False
-
+  llvm = case hscTarget dflags of
+           HscLlvm -> True
+           _       -> False
   x86ish = case platformArch (targetPlatform dflags) of
              ArchX86    -> True
              ArchX86_64 -> True

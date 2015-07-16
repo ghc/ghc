@@ -4,28 +4,28 @@ test('rn003', normal, compile, [''])
 test('rn005', normal, compile, [''])
 test('rn006', normal, compile, [''])
 test('rn009',
-     [only_compiler_types(['ghc']),
+     [
       extra_clean(['Imp10Aux.hi',      'Imp10Aux.o',
                    'Imp10Aux.hi-boot', 'Imp10Aux.o-boot'])],
      multimod_compile,
      ['rn009', '-v0'])
 # rn10 tests the same things as 009,011,012
-#test('rn010', only_compiler_types(['ghc']), multimod_compile, ['rn010', '-v0'])
+#test('rn010', normal, multimod_compile, ['rn010', '-v0'])
 test('rn011',
-     [only_compiler_types(['ghc']),
+     [
       extra_clean(['Imp100Aux.hi',      'Imp100Aux.o',
                    'Imp100Aux.hi-boot', 'Imp100Aux.o-boot'])],
      multimod_compile,
      ['rn011', '-v0'])
 test('rn012',
-     [only_compiler_types(['ghc']),
+     [
       extra_clean(['Imp500Aux.hi',      'Imp500Aux.o',
                    'Imp500Aux.hi-boot', 'Imp500Aux.o-boot'])],
      multimod_compile,
      ['rn012', '-v0'])
 test('rn013', normal, compile, [''])
 test('rn017',
-     [only_compiler_types(['ghc']),
+     [
       extra_clean(['RnAux017.hi',      'RnAux017.o',
                    'RnAux017.hi-boot', 'RnAux017.o-boot'])],
      multimod_compile,
@@ -177,20 +177,20 @@ test('mc10', normal, compile, [''])
 test('mc11', normal, compile, [''])
 test('mc12', normal, compile, [''])
 test('T2436',
-     [ only_compiler_types(['ghc']),
+     [
        extra_clean(['T2436a.hi', 'T2436a.o']) ],
      multimod_compile,
      ['T2436', '-v0'])
 test('T5331', normal, compile, [''])   # Unused tyvar warnings
 test('T5334', normal, compile, [''])   # Unused tyvar warnings
 test('T5306',
-     [only_compiler_types(['ghc']),
+     [
       extra_clean(['T5306a.hi', 'T5306a.o',
                    'T5306b.hi', 'T5306b.o'])],
      multimod_compile,
      ['T5306', '-v0'])
 test('T5592',
-     [only_compiler_types(['ghc']),
+     [
       extra_clean(['T5592a.hi',      'T5592a.o'])],
      multimod_compile_and_run,
      ['T5592', '-v0'])

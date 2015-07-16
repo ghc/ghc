@@ -1,6 +1,11 @@
-{-# OPTIONS -cpp -fglasgow-exts #-}
-{-# OPTIONS -w #-}
--- The above warning suppression flag is a temporary kludge.
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+-- The above warning suppression flags are a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings

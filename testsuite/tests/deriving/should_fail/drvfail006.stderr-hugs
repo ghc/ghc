@@ -1,1 +1,0 @@
-ERROR "drvfail006.hs":9 - Cannot derive instances of class "MonadState"

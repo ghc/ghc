@@ -89,7 +89,7 @@ module TcRnTypes(
 
         CtFlavour(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeF,
+        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeFR,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -1906,14 +1906,15 @@ eqCanRewriteFR _                 _                  = False
 
 canDischarge :: CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewriteOrSame]
-canDischarge ev1 ev2 = ctEvFlavour ev1 `canDischargeF` ctEvFlavour ev2
+canDischarge ev1 ev2 = ctEvFlavourRole ev1 `canDischargeFR` ctEvFlavourRole ev2
 
-canDischargeF :: CtFlavour -> CtFlavour -> Bool
-canDischargeF Given  _        = True
-canDischargeF Wanted Wanted   = True
-canDischargeF Wanted Derived  = True
-canDischargeF Derived Derived = True
-canDischargeF _       _       = False
+canDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
+canDischargeFR (_, ReprEq)  (_, NomEq)   = False
+canDischargeFR (Given, _)   _            = True
+canDischargeFR (Wanted, _)  (Wanted, _)  = True
+canDischargeFR (Wanted, _)  (Derived, _) = True
+canDischargeFR (Derived, _) (Derived, _) = True
+canDischargeFR _             _           = False
 
 
 {-
@@ -2304,7 +2305,7 @@ pprCtO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"),
 pprCtO SectionOrigin         = ptext (sLit "an operator section")
 pprCtO TupleOrigin           = ptext (sLit "a tuple")
 pprCtO NegateOrigin          = ptext (sLit "a use of syntactic negation")
-pprCtO (ScOrigin n)          = ptext (sLit "the superclasses of an instance declaration") 
+pprCtO (ScOrigin n)          = ptext (sLit "the superclasses of an instance declaration")
                                <> ifPprDebug (parens (ppr n))
 pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
 pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")

@@ -966,29 +966,6 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
 
 
 /* ----------------------------------------------------------------------------
- * Send pending messages (PARALLEL_HASKELL only)
- * ------------------------------------------------------------------------- */
-
-#if defined(PARALLEL_HASKELL)
-static void
-scheduleSendPendingMessages(void)
-{
-
-# if defined(PAR) // global Mem.Mgmt., omit for now
-    if (PendingFetches != END_BF_QUEUE) {
-        processFetches();
-    }
-# endif
-
-    if (RtsFlags.ParFlags.BufferTime) {
-        // if we use message buffering, we must send away all message
-        // packets which have become too old...
-        sendOldBuffers();
-    }
-}
-#endif
-
-/* ----------------------------------------------------------------------------
  * Process message in the current Capability's inbox
  * ------------------------------------------------------------------------- */
 
@@ -1035,7 +1012,7 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
 }
 
 /* ----------------------------------------------------------------------------
- * Activate spark threads (PARALLEL_HASKELL and THREADED_RTS)
+ * Activate spark threads (THREADED_RTS)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
@@ -1048,7 +1025,7 @@ scheduleActivateSpark(Capability *cap)
         debugTrace(DEBUG_sched, "creating a spark thread");
     }
 }
-#endif // PARALLEL_HASKELL || THREADED_RTS
+#endif // THREADED_RTS
 
 /* ----------------------------------------------------------------------------
  * After running a thread...
@@ -1107,6 +1084,17 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
 static rtsBool
 scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 {
+    if (cap->r.rHpLim == NULL || cap->context_switch) {
+        // Sometimes we miss a context switch, e.g. when calling
+        // primitives in a tight loop, MAYBE_GC() doesn't check the
+        // context switch flag, and we end up waiting for a GC.
+        // See #1984, and concurrent/should_run/1984
+        cap->context_switch = 0;
+        appendToRunQueue(cap,t);
+    } else {
+        pushOnRunQueue(cap,t);
+    }
+
     // did the task ask for a large block?
     if (cap->r.rHpAlloc > BLOCK_SIZE) {
         // if so, get one and push it on the front of the nursery.
@@ -1164,27 +1152,23 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
             // run queue before us and steal the large block, but in that
             // case the thread will just end up requesting another large
             // block.
-            pushOnRunQueue(cap,t);
             return rtsFalse;  /* not actually GC'ing */
         }
     }
 
+    // if we got here because we exceeded large_alloc_lim, then
+    // proceed straight to GC.
+    if (g0->n_new_large_words >= large_alloc_lim) {
+        return rtsTrue;
+    }
+
+    // Otherwise, we just ran out of space in the current nursery.
+    // Grab another nursery if we can.
     if (getNewNursery(cap)) {
         debugTrace(DEBUG_sched, "thread %ld got a new nursery", t->id);
-        pushOnRunQueue(cap,t);
         return rtsFalse;
     }
 
-    if (cap->r.rHpLim == NULL || cap->context_switch) {
-        // Sometimes we miss a context switch, e.g. when calling
-        // primitives in a tight loop, MAYBE_GC() doesn't check the
-        // context switch flag, and we end up waiting for a GC.
-        // See #1984, and concurrent/should_run/1984
-        cap->context_switch = 0;
-        appendToRunQueue(cap,t);
-    } else {
-        pushOnRunQueue(cap,t);
-    }
     return rtsTrue;
     /* actual GC is done at the end of the while loop in schedule() */
 }

@@ -763,7 +763,7 @@ The idea is that
   have (a -fs-> a) in S, which contradicts (WF2).
 
 * The extended substitution satisfies (WF1) and (WF2)
-  - (K1) plus (L1) guarantee that the extended substiution satisfies (WF1).
+  - (K1) plus (L1) guarantee that the extended substitution satisfies (WF1).
   - (T3) guarantees (WF2).
 
 * (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
@@ -2755,7 +2755,8 @@ newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newWantedEvVarNC loc pty
   = do { -- checkReductionDepth loc pty
        ; new_ev <- newEvVar pty
-       ; traceTcS "Emitting new wanted" (ppr new_ev $$ pprCtLoc loc)
+       ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
+                                         pprCtLoc loc)
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)

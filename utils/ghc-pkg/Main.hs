@@ -22,7 +22,7 @@ import Distribution.ParseUtils
 import Distribution.Package hiding (installedPackageId)
 import Distribution.Text
 import Distribution.Version
-import Distribution.Simple.Utils (fromUTF8, toUTF8)
+import Distribution.Simple.Utils (fromUTF8, toUTF8, writeUTF8File, readUTF8File)
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
@@ -42,7 +42,7 @@ import Control.Applicative (Applicative(..))
 #endif
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
-                          doesFileExist, renameFile, removeFile,
+                          doesFileExist, removeFile,
                           getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
@@ -1056,7 +1056,7 @@ changeDBDir verbosity cmds db = do
   do_cmd (AddPackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
     when (verbosity > Normal) $ infoLn ("writing " ++ file)
-    writeFileUtf8Atomic file (showInstalledPackageInfo p)
+    writeUTF8File file (showInstalledPackageInfo p)
   do_cmd (ModifyPackage p) = 
     do_cmd (AddPackage p)
 
@@ -1977,68 +1977,11 @@ installSignalHandlers = do
   return ()
 #endif
 
-#if mingw32_HOST_OS || mingw32_TARGET_OS
-throwIOIO :: Exception.IOException -> IO a
-throwIOIO = Exception.throwIO
-#endif
-
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
 catchIO = Exception.catch
 
 tryIO :: IO a -> IO (Either Exception.IOException a)
 tryIO = Exception.try
-
-writeFileUtf8Atomic :: FilePath -> String -> IO ()
-writeFileUtf8Atomic targetFile content =
-  withFileAtomic targetFile $ \h -> do
-     hSetEncoding h utf8
-     hPutStr h content
-
--- copied from Cabal's Distribution.Simple.Utils, except that we want
--- to use text files here, rather than binary files.
-withFileAtomic :: FilePath -> (Handle -> IO ()) -> IO ()
-withFileAtomic targetFile write_content = do
-  (newFile, newHandle) <- openNewFile targetDir template
-  do  write_content newHandle
-      hClose newHandle
-#if mingw32_HOST_OS || mingw32_TARGET_OS
-      renameFile newFile targetFile
-        -- If the targetFile exists then renameFile will fail
-        `catchIO` \err -> do
-          exists <- doesFileExist targetFile
-          if exists
-            then do removeFileSafe targetFile
-                    -- Big fat hairy race condition
-                    renameFile newFile targetFile
-                    -- If the removeFile succeeds and the renameFile fails
-                    -- then we've lost the atomic property.
-            else throwIOIO err
-#else
-      renameFile newFile targetFile
-#endif
-   `Exception.onException` do hClose newHandle
-                              removeFileSafe newFile
-  where
-    template = targetName <.> "tmp"
-    targetDir | null targetDir_ = "."
-              | otherwise       = targetDir_
-    --TODO: remove this when takeDirectory/splitFileName is fixed
-    --      to always return a valid dir
-    (targetDir_,targetName) = splitFileName targetFile
-
-openNewFile :: FilePath -> String -> IO (FilePath, Handle)
-openNewFile dir template = do
-  -- this was added to System.IO in 6.12.1
-  -- we must use this version because the version below opens the file
-  -- in binary mode.
-  openTempFileWithDefaultPermissions dir template
-
-readUTF8File :: FilePath -> IO String
-readUTF8File file = do
-  h <- openFile file ReadMode
-  -- fix the encoding to UTF-8
-  hSetEncoding h utf8
-  hGetContents h
 
 -- removeFileSave doesn't throw an exceptions, if the file is already deleted
 removeFileSafe :: FilePath -> IO ()

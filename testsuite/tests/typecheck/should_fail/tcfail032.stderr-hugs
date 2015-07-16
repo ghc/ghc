@@ -1,4 +1,0 @@
-ERROR "tcfail032.hs":14 - Inferred type is not general enough
-*** Expression    : x
-*** Expected type : Eq a => a -> Int
-*** Inferred type : Eq _5 => _5 -> Int

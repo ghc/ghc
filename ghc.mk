@@ -48,6 +48,8 @@
 #           o Build utils/ghc-cabal
 #           o Build utils/ghc-pkg
 #           o Build utils/hsc2hs
+#           o Build utils/genprimopcode
+#           o Build utils/deriveConstants
 #     * For each package:
 #	    o configure, generate package-data.mk and inplace-pkg-config
 #           o register each package into inplace/lib/package.conf
@@ -369,7 +371,7 @@ PACKAGES_STAGE1 += $1
 endef
 $(eval $(call foreachLibrary,addLibraryForCleaning))
 
-else
+else # CLEANING
 
 # Packages that are built by stage0. These packages are dependencies of
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
@@ -428,29 +430,19 @@ REGULAR_INSTALL_PACKAGES += compiler
 endif
 REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
-# If we have built the programs with dynamic libraries, then
-# ghc will be dynamically linked against haskeline.so etc, so
-# we need the dynamic libraries of everything down to here
-REGULAR_INSTALL_DYNLIBS := $(addprefix libraries/,$(PACKAGES_STAGE1))
-REGULAR_INSTALL_DYNLIBS += $(addprefix libraries/,$(PACKAGES_STAGE2))
-REGULAR_INSTALL_DYNLIBS := $(filter-out $(REGULAR_INSTALL_PACKAGES),\
-                                        $(REGULAR_INSTALL_DYNLIBS))
-
 ifneq "$(CrossCompiling)" "YES"
 define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
 else ifeq "$2" "dph"
-## DPH-specific clause
-ifeq "$$(GhcProfiled)" "YES"
-# Ignore package: The DPH packages need TH, which is incompatible with
-# a profiled GHC
-else ifneq "$$(BUILD_DPH)" "YES"
-# Ignore package: DPH was disabled
-else
+ifeq "$$(BUILD_DPH) $$(GhcProfiled)" "YES NO"
+# The DPH packages need TH, which is incompatible with a profiled GHC.
 PACKAGES_STAGE2 += $1
 endif
-## end of DPH-specific clause
+else ifeq "$2" "extra"
+ifeq "$$(BUILD_EXTRA_PKGS)" "YES"
+PACKAGES_STAGE2 += $1
+endif
 else
 PACKAGES_STAGE2 += $1
 endif
@@ -465,17 +457,13 @@ SUPERSIZE_INSTALL_PACKAGES += compiler
 endif
 SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
-INSTALL_DYNLIBS  :=
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALL_PACKAGES := $(REGULAR_INSTALL_PACKAGES)
-ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
-INSTALL_DYNLIBS := $(REGULAR_INSTALL_DYNLIBS)
-endif
 else
 INSTALL_PACKAGES := $(SUPERSIZE_INSTALL_PACKAGES)
 endif
 
-endif
+endif # CLEANING
 
 # -------------------------------------------
 # Dependencies between package-data.mk files
@@ -622,6 +610,10 @@ BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
 endif
 
+# When cleaning, don't add any library packages to BUILD_DIRS. We include
+# ghc.mk files for all BUILD_DIRS, but they don't exist until after running
+# `./boot`. Running `make clean` before anything else, as well as running
+# `make maintainer-clean` twice, should work.
 ifneq "$(CLEANING)" "YES"
 # These are deliberately in reverse order, so as to ensure that
 # there is no need to have them in dependency order. That's important
@@ -632,6 +624,10 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 ifeq "$(BUILD_DPH)" "YES"
+# Note: `$(eval $(call foreachLibrary,addExtraPackage))` above adds the
+# packages listed in `libraries/dph/ghc-packages` (e.g. dph-base) to
+# PACKAGES_STAGE2. But not 'libraries/dph' itself (it doesn't have a cabal
+# file). Since it does have a ghc.mk file, we add it to BUILD_DIRS here.
 BUILD_DIRS += $(wildcard libraries/dph)
 endif
 endif
@@ -907,8 +903,6 @@ install_packages: rts/dist/package.conf.install
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts")
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
-	$(foreach p, $(INSTALL_DYNLIBS), \
-	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_dist-install_LIB_NAME)"))
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \
@@ -946,7 +940,7 @@ ifneq "$(CLEANING)" "YES"
 # This rule seems to hold some files open on Windows which prevents
 # cleaning, perhaps due to the $(wildcard).
 
-$(eval $(call bindist,.,\
+$(eval $(call bindist-list,.,\
     LICENSE \
     README \
     INSTALL \
@@ -1350,6 +1344,7 @@ maintainer-clean : distclean
 .PHONY: all_libraries
 
 .PHONY: bootstrapping-files
+# See https://ghc.haskell.org/trac/ghc/wiki/Building/Porting
 bootstrapping-files: $(includes_H_CONFIG)
 bootstrapping-files: $(includes_DERIVEDCONSTANTS)
 bootstrapping-files: $(includes_GHCCONSTANTS)

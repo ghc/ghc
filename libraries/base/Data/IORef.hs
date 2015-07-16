@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,10 +27,7 @@ module Data.IORef
         atomicModifyIORef,
         atomicModifyIORef',
         atomicWriteIORef,
-
-#if !defined(__PARALLEL_HASKELL__)
         mkWeakIORef,
-#endif
         -- ** Memory Model
 
         -- $memmodel
@@ -41,17 +38,13 @@ import GHC.Base
 import GHC.STRef
 import GHC.IORef hiding (atomicModifyIORef)
 import qualified GHC.IORef
-#if !defined(__PARALLEL_HASKELL__)
 import GHC.Weak
-#endif
 
-#if !defined(__PARALLEL_HASKELL__)
 -- |Make a 'Weak' pointer to an 'IORef', using the second argument as a finalizer
 -- to run when 'IORef' is garbage-collected
 mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
 mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
   case mkWeak# r# r f s of (# s1, w #) -> (# s1, Weak w #)
-#endif
 
 -- |Mutate the contents of an 'IORef'.
 --

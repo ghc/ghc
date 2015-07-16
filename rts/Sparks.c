@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 2000-2008
  *
- * Sparking support for PARALLEL_HASKELL and THREADED_RTS versions of the RTS.
+ * Sparking support for THREADED_RTS version of the RTS.
  *
  -------------------------------------------------------------------------*/
 

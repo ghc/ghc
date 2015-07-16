@@ -96,7 +96,7 @@ test('readwrite002',
 test('readwrite003', extra_clean(['readwrite003.txt']), compile_and_run, [''])
 
 test('hGetBuf001',
-     [only_compiler_types(['ghc']),
+     [
       when(fast(), skip),
       expect_fail_if_windows],
      compile_and_run, ['-package unix'])

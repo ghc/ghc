@@ -4,7 +4,7 @@ T10403.hs:15:7: warning:
     In the type signature for ‘h1’: _ => _
 
 T10403.hs:15:12: warning:
-    Found hole: _ :: (a -> b) -> f a -> H f
+    Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
     Where: ‘f’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
@@ -17,7 +17,7 @@ T10403.hs:15:12: warning:
     In the type signature for ‘h1’: _ => _
 
 T10403.hs:19:7: warning:
-    Found hole: _ :: (a -> b) -> f a -> H f
+    Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
     Where: ‘f’ is a rigid type variable bound by
                the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:21:1

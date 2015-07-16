@@ -2797,6 +2797,8 @@ Other choices:
      When x is inlined into its full context, we find that it was a bad
      idea to have pushed the outer case inside the (...) case.
 
+There is a cost to not doing case-of-case; see Trac #10626.
+
 Note [Single-alternative-unlifted]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here's another single-alternative where we really want to do case-of-case:

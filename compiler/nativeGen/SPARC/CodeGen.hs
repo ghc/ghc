@@ -36,7 +36,7 @@ import SPARC.AddrMode
 import SPARC.Regs
 import SPARC.Stack
 import Instruction
-import Size
+import Format
 import NCGMonad
 
 -- Our intermediate code:
@@ -131,18 +131,18 @@ stmtToInstrs stmt = do
     CmmUnwind {}   -> return nilOL
 
     CmmAssign reg src
-      | isFloatType ty  -> assignReg_FltCode size reg src
-      | isWord64 ty     -> assignReg_I64Code      reg src
-      | otherwise       -> assignReg_IntCode size reg src
+      | isFloatType ty  -> assignReg_FltCode format reg src
+      | isWord64 ty     -> assignReg_I64Code        reg src
+      | otherwise       -> assignReg_IntCode format reg src
         where ty = cmmRegType dflags reg
-              size = cmmTypeSize ty
+              format = cmmTypeFormat ty
 
     CmmStore addr src
-      | isFloatType ty  -> assignMem_FltCode size addr src
+      | isFloatType ty  -> assignMem_FltCode format addr src
       | isWord64 ty     -> assignMem_I64Code      addr src
-      | otherwise       -> assignMem_IntCode size addr src
+      | otherwise       -> assignMem_IntCode format addr src
         where ty = cmmExprType dflags src
-              size = cmmTypeSize ty
+              format = cmmTypeFormat ty
 
     CmmUnsafeForeignCall target result_regs args
        -> genCCall target result_regs args
@@ -199,14 +199,14 @@ jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
 -- fails when the right hand side is forced into a fixed register
 -- (e.g. the result of a call).
 
-assignMem_IntCode :: Size -> CmmExpr -> CmmExpr -> NatM InstrBlock
+assignMem_IntCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_IntCode pk addr src = do
     (srcReg, code) <- getSomeReg src
     Amode dstAddr addr_code <- getAmode addr
     return $ code `appOL` addr_code `snocOL` ST pk srcReg dstAddr
 
 
-assignReg_IntCode :: Size -> CmmReg  -> CmmExpr -> NatM InstrBlock
+assignReg_IntCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_IntCode _ reg src = do
     dflags <- getDynFlags
     r <- getRegister src
@@ -218,7 +218,7 @@ assignReg_IntCode _ reg src = do
 
 
 -- Floating point assignment to memory
-assignMem_FltCode :: Size -> CmmExpr -> CmmExpr -> NatM InstrBlock
+assignMem_FltCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_FltCode pk addr src = do
     dflags <- getDynFlags
     Amode dst__2 code1 <- getAmode addr
@@ -227,14 +227,14 @@ assignMem_FltCode pk addr src = do
     let
         pk__2   = cmmExprType dflags src
         code__2 = code1 `appOL` code2 `appOL`
-            if   sizeToWidth pk == typeWidth pk__2
+            if   formatToWidth pk == typeWidth pk__2
             then unitOL (ST pk src__2 dst__2)
-            else toOL   [ FxTOy (cmmTypeSize pk__2) pk src__2 tmp1
+            else toOL   [ FxTOy (cmmTypeFormat pk__2) pk src__2 tmp1
                         , ST    pk tmp1 dst__2]
     return code__2
 
 -- Floating point assignment to a register/temporary
-assignReg_FltCode :: Size -> CmmReg  -> CmmExpr -> NatM InstrBlock
+assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_FltCode pk dstCmmReg srcCmmExpr = do
     dflags <- getDynFlags
     let platform = targetPlatform dflags
@@ -477,7 +477,7 @@ arg_to_int_vregs' dflags arg
         = do    (src, code)     <- getSomeReg arg
                 let pk          = cmmExprType dflags arg
 
-                case cmmTypeSize pk of
+                case cmmTypeFormat pk of
 
                  -- Load a 64 bit float return value into two integer regs.
                  FF64 -> do

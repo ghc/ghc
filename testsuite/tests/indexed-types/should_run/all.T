@@ -1,4 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(omit_ways(['hpc', 'ghci', 'threaded1', 'threaded2']))
 
 test('T2985', normal, compile_and_run, [''])

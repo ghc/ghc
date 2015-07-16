@@ -555,7 +555,7 @@ rnLHsTypeWithWildCards doc ty
   = do { -- When there is a wild card at the end of the context, remove it and
          -- add its location as the extra-constraints wild card in the
          -- HsForAllTy.
-         let ty' = extractExtraCtsWc `fmap` ty
+         let ty' = extractExtraCtsWc `fmap` flattenTopLevelLHsForAllTy ty
 
        ; checkValidPartialType doc ty'
 
@@ -853,8 +853,11 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 
 ----------------------------
 get_op :: LHsExpr Name -> Name
-get_op (L _ (HsVar n)) = n
-get_op other           = pprPanic "get_op" (ppr other)
+-- An unbound name could be either HsVar or HsUnboundVra
+-- See RnExpr.rnUnboundVar
+get_op (L _ (HsVar n))          = n
+get_op (L _ (HsUnboundVar occ)) = mkUnboundName (mkRdrUnqual occ)
+get_op other                    = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to

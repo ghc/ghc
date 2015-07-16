@@ -508,7 +508,7 @@ Library
             TargetReg
             NCGMonad
             Instruction
-            Size
+            Format
             Reg
             RegClass
             PIC

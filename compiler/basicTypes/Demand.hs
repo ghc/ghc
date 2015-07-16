@@ -839,7 +839,7 @@ bothDmdResult r              _          = r
 -- defaultDmd (r1 `bothDmdResult` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
-instance Outputable DmdResult where
+instance Outputable r => Outputable (Termination r) where
   ppr Diverges      = char 'b'
   ppr (Dunno c)     = ppr c
 

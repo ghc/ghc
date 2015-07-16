@@ -12,7 +12,7 @@
 #include "nativeGen/NCG.h"
 
 module PPC.Instr (
-    archWordSize,
+    archWordFormat,
     RI(..),
     Instr(..),
     maxSpillSlots,
@@ -25,7 +25,7 @@ where
 import PPC.Regs
 import PPC.Cond
 import Instruction
-import Size
+import Format
 import TargetReg
 import RegClass
 import Reg
@@ -47,10 +47,12 @@ import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
 --------------------------------------------------------------------------------
--- Size of a PPC memory address, in bytes.
+-- Format of a PPC memory address.
 --
-archWordSize :: Size
-archWordSize = II32
+archWordFormat :: Bool -> Format
+archWordFormat is32Bit
+ | is32Bit   = II32
+ | otherwise = II64
 
 
 -- | Instruction instance for powerpc
@@ -74,16 +76,18 @@ instance Instruction Instr where
 ppc_mkStackAllocInstr :: Platform -> Int -> Instr
 ppc_mkStackAllocInstr platform amount
   = case platformArch platform of
-      ArchPPC -> -- SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
-                 ADD sp sp (RIImm (ImmInt (-amount)))
-      arch -> panic $ "ppc_mkStackAllocInstr " ++ show arch
+      ArchPPC    -> -- SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
+                    ADD sp sp (RIImm (ImmInt (-amount)))
+      ArchPPC_64 _ -> STU II64 sp (AddrRegImm sp (ImmInt (-amount)))
+      arch       -> panic $ "ppc_mkStackAllocInstr " ++ show arch
 
 ppc_mkStackDeallocInstr :: Platform -> Int -> Instr
 ppc_mkStackDeallocInstr platform amount
   = case platformArch platform of
-      ArchPPC -> -- ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
-                 ADD sp sp (RIImm (ImmInt amount))
-      arch -> panic $ "ppc_mkStackDeallocInstr " ++ show arch
+      ArchPPC    -> -- ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
+                    ADD sp sp (RIImm (ImmInt amount))
+      ArchPPC_64 _ -> ADD sp sp (RIImm (ImmInt amount))
+      arch       -> panic $ "ppc_mkStackDeallocInstr " ++ show arch
 
 --
 -- See note [extra spill slots] in X86/Instr.hs
@@ -182,16 +186,16 @@ data Instr
     | DELTA   Int
 
     -- Loads and stores.
-    | LD      Size Reg AddrMode     -- Load size, dst, src
-    | LA      Size Reg AddrMode     -- Load arithmetic size, dst, src
-    | ST      Size Reg AddrMode     -- Store size, src, dst
-    | STU     Size Reg AddrMode     -- Store with Update size, src, dst
+    | LD      Format Reg AddrMode   -- Load format, dst, src
+    | LA      Format Reg AddrMode   -- Load arithmetic format, dst, src
+    | ST      Format Reg AddrMode   -- Store format, src, dst
+    | STU     Format Reg AddrMode   -- Store with Update format, src, dst
     | LIS     Reg Imm               -- Load Immediate Shifted dst, src
     | LI      Reg Imm               -- Load Immediate dst, src
     | MR      Reg Reg               -- Move Register dst, src -- also for fmr
 
-    | CMP     Size Reg RI           -- size, src1, src2
-    | CMPL    Size Reg RI           -- size, src1, src2
+    | CMP     Format Reg RI         -- format, src1, src2
+    | CMPL    Format Reg RI         -- format, src1, src2
 
     | BCC     Cond BlockId
     | BCCFAR  Cond BlockId
@@ -210,9 +214,12 @@ data Instr
     | SUBF    Reg Reg Reg           -- dst, src1, src2 ; dst = src2 - src1
     | SUBFC   Reg Reg Reg           -- (carrying) dst, src1, src2 ; dst = src2 - src1
     | SUBFE   Reg Reg Reg           -- (extend) dst, src1, src2 ; dst = src2 - src1
+    | MULLD   Reg Reg RI
     | MULLW   Reg Reg RI
     | DIVW    Reg Reg Reg
+    | DIVD    Reg Reg Reg
     | DIVWU   Reg Reg Reg
+    | DIVDU   Reg Reg Reg
 
     | MULLW_MayOflo Reg Reg Reg
                                     -- dst = 1 if src1 * src2 overflows
@@ -220,32 +227,41 @@ data Instr
                                     -- mullwo. dst, src1, src2
                                     -- mfxer dst
                                     -- rlwinm dst, dst, 2, 31,31
+    | MULLD_MayOflo Reg Reg Reg
+                                    -- dst = 1 if src1 * src2 overflows
+                                    -- pseudo-instruction; pretty-printed as:
+                                    -- mulldo. dst, src1, src2
+                                    -- mfxer dst
+                                    -- rlwinm dst, dst, 2, 31,31
 
     | AND     Reg Reg RI            -- dst, src1, src2
     | OR      Reg Reg RI            -- dst, src1, src2
+    | ORIS    Reg Reg Imm           -- OR Immediate Shifted dst, src1, src2
     | XOR     Reg Reg RI            -- dst, src1, src2
     | XORIS   Reg Reg Imm           -- XOR Immediate Shifted dst, src1, src2
 
-    | EXTS    Size Reg Reg
+    | EXTS    Format Reg Reg
 
     | NEG     Reg Reg
     | NOT     Reg Reg
 
-    | SLW     Reg Reg RI            -- shift left word
-    | SRW     Reg Reg RI            -- shift right word
-    | SRAW    Reg Reg RI            -- shift right arithmetic word
+    | SL      Format Reg Reg RI            -- shift left
+    | SR      Format Reg Reg RI            -- shift right
+    | SRA     Format Reg Reg RI            -- shift right arithmetic
 
     | RLWINM  Reg Reg Int Int Int   -- Rotate Left Word Immediate then AND with Mask
 
-    | FADD    Size Reg Reg Reg
-    | FSUB    Size Reg Reg Reg
-    | FMUL    Size Reg Reg Reg
-    | FDIV    Size Reg Reg Reg
-    | FNEG    Reg Reg           -- negate is the same for single and double prec.
+    | FADD    Format Reg Reg Reg
+    | FSUB    Format Reg Reg Reg
+    | FMUL    Format Reg Reg Reg
+    | FDIV    Format Reg Reg Reg
+    | FNEG    Reg Reg               -- negate is the same for single and double prec.
 
     | FCMP    Reg Reg
 
     | FCTIWZ  Reg Reg           -- convert to integer word
+    | FCTIDZ  Reg Reg           -- convert to integer double word
+    | FCFID   Reg Reg           -- convert from integer double word
     | FRSP    Reg Reg           -- reduce to single precision
                                 -- (but destination is a FP register)
 
@@ -255,9 +271,13 @@ data Instr
     | MFLR    Reg               -- move from link register
     | FETCHPC Reg               -- pseudo-instruction:
                                 -- bcl to next insn, mflr reg
-
+    | FETCHTOC Reg CLabel       -- pseudo-instruction
+                                -- add TOC offset to address in r12
+                                -- print .localentry for label
     | LWSYNC                    -- memory barrier
-
+    | NOP                       -- no operation, PowerPC 64 bit
+                                -- needs this as place holder to
+                                -- reload TOC pointer
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
@@ -292,22 +312,28 @@ ppc_regUsageOfInstr platform instr
     SUBF    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     SUBFC   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     SUBFE   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    MULLD   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
     MULLW   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
     DIVW    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    DIVD    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     DIVWU   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    DIVDU   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
 
     MULLW_MayOflo reg1 reg2 reg3
                             -> usage ([reg2,reg3], [reg1])
+    MULLD_MayOflo reg1 reg2 reg3
+                            -> usage ([reg2,reg3], [reg1])
     AND     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
     OR      reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
+    ORIS    reg1 reg2 _     -> usage ([reg2], [reg1])
     XOR     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
     XORIS   reg1 reg2 _     -> usage ([reg2], [reg1])
     EXTS    _  reg1 reg2    -> usage ([reg2], [reg1])
     NEG     reg1 reg2       -> usage ([reg2], [reg1])
     NOT     reg1 reg2       -> usage ([reg2], [reg1])
-    SLW     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
-    SRW     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
-    SRAW    reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
+    SL      _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SR      _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SRA     _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     RLWINM  reg1 reg2 _ _ _ -> usage ([reg2], [reg1])
 
     FADD    _ r1 r2 r3      -> usage ([r2,r3], [r1])
@@ -317,10 +343,13 @@ ppc_regUsageOfInstr platform instr
     FNEG    r1 r2           -> usage ([r2], [r1])
     FCMP    r1 r2           -> usage ([r1,r2], [])
     FCTIWZ  r1 r2           -> usage ([r2], [r1])
+    FCTIDZ  r1 r2           -> usage ([r2], [r1])
+    FCFID   r1 r2           -> usage ([r2], [r1])
     FRSP    r1 r2           -> usage ([r2], [r1])
     MFCR    reg             -> usage ([], [reg])
     MFLR    reg             -> usage ([], [reg])
     FETCHPC reg             -> usage ([], [reg])
+    FETCHTOC reg _          -> usage ([], [reg])
     _                       -> noUsage
   where
     usage (src, dst) = RU (filter (interesting platform) src)
@@ -346,15 +375,15 @@ interesting _        (RegReal (RealRegPair{}))
 ppc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 ppc_patchRegsOfInstr instr env
  = case instr of
-    LD      sz reg addr     -> LD sz (env reg) (fixAddr addr)
-    LA      sz reg addr     -> LA sz (env reg) (fixAddr addr)
-    ST      sz reg addr     -> ST sz (env reg) (fixAddr addr)
-    STU     sz reg addr     -> STU sz (env reg) (fixAddr addr)
+    LD      fmt reg addr    -> LD fmt (env reg) (fixAddr addr)
+    LA      fmt reg addr    -> LA fmt (env reg) (fixAddr addr)
+    ST      fmt reg addr    -> ST fmt (env reg) (fixAddr addr)
+    STU     fmt reg addr    -> STU fmt (env reg) (fixAddr addr)
     LIS     reg imm         -> LIS (env reg) imm
     LI      reg imm         -> LI (env reg) imm
     MR      reg1 reg2       -> MR (env reg1) (env reg2)
-    CMP     sz reg ri       -> CMP sz (env reg) (fixRI ri)
-    CMPL    sz reg ri       -> CMPL sz (env reg) (fixRI ri)
+    CMP     fmt reg ri      -> CMP fmt (env reg) (fixRI ri)
+    CMPL    fmt reg ri      -> CMPL fmt (env reg) (fixRI ri)
     BCC     cond lbl        -> BCC cond lbl
     BCCFAR  cond lbl        -> BCCFAR cond lbl
     MTCTR   reg             -> MTCTR (env reg)
@@ -369,34 +398,46 @@ ppc_patchRegsOfInstr instr env
     SUBF    reg1 reg2 reg3  -> SUBF (env reg1) (env reg2) (env reg3)
     SUBFC   reg1 reg2 reg3  -> SUBFC (env reg1) (env reg2) (env reg3)
     SUBFE   reg1 reg2 reg3  -> SUBFE (env reg1) (env reg2) (env reg3)
+    MULLD   reg1 reg2 ri    -> MULLD (env reg1) (env reg2) (fixRI ri)
     MULLW   reg1 reg2 ri    -> MULLW (env reg1) (env reg2) (fixRI ri)
     DIVW    reg1 reg2 reg3  -> DIVW (env reg1) (env reg2) (env reg3)
+    DIVD    reg1 reg2 reg3  -> DIVD (env reg1) (env reg2) (env reg3)
     DIVWU   reg1 reg2 reg3  -> DIVWU (env reg1) (env reg2) (env reg3)
+    DIVDU   reg1 reg2 reg3  -> DIVDU (env reg1) (env reg2) (env reg3)
     MULLW_MayOflo reg1 reg2 reg3
                             -> MULLW_MayOflo (env reg1) (env reg2) (env reg3)
+    MULLD_MayOflo reg1 reg2 reg3
+                            -> MULLD_MayOflo (env reg1) (env reg2) (env reg3)
     AND     reg1 reg2 ri    -> AND (env reg1) (env reg2) (fixRI ri)
     OR      reg1 reg2 ri    -> OR  (env reg1) (env reg2) (fixRI ri)
+    ORIS    reg1 reg2 imm   -> ORIS (env reg1) (env reg2) imm
     XOR     reg1 reg2 ri    -> XOR (env reg1) (env reg2) (fixRI ri)
     XORIS   reg1 reg2 imm   -> XORIS (env reg1) (env reg2) imm
-    EXTS    sz reg1 reg2    -> EXTS sz (env reg1) (env reg2)
+    EXTS    fmt reg1 reg2   -> EXTS fmt (env reg1) (env reg2)
     NEG     reg1 reg2       -> NEG (env reg1) (env reg2)
     NOT     reg1 reg2       -> NOT (env reg1) (env reg2)
-    SLW     reg1 reg2 ri    -> SLW (env reg1) (env reg2) (fixRI ri)
-    SRW     reg1 reg2 ri    -> SRW (env reg1) (env reg2) (fixRI ri)
-    SRAW    reg1 reg2 ri    -> SRAW (env reg1) (env reg2) (fixRI ri)
+    SL      fmt reg1 reg2 ri
+                            -> SL fmt (env reg1) (env reg2) (fixRI ri)
+    SR      fmt reg1 reg2 ri
+                            -> SR fmt (env reg1) (env reg2) (fixRI ri)
+    SRA     fmt reg1 reg2 ri
+                            -> SRA fmt (env reg1) (env reg2) (fixRI ri)
     RLWINM  reg1 reg2 sh mb me
                             -> RLWINM (env reg1) (env reg2) sh mb me
-    FADD    sz r1 r2 r3     -> FADD sz (env r1) (env r2) (env r3)
-    FSUB    sz r1 r2 r3     -> FSUB sz (env r1) (env r2) (env r3)
-    FMUL    sz r1 r2 r3     -> FMUL sz (env r1) (env r2) (env r3)
-    FDIV    sz r1 r2 r3     -> FDIV sz (env r1) (env r2) (env r3)
+    FADD    fmt r1 r2 r3    -> FADD fmt (env r1) (env r2) (env r3)
+    FSUB    fmt r1 r2 r3    -> FSUB fmt (env r1) (env r2) (env r3)
+    FMUL    fmt r1 r2 r3    -> FMUL fmt (env r1) (env r2) (env r3)
+    FDIV    fmt r1 r2 r3    -> FDIV fmt (env r1) (env r2) (env r3)
     FNEG    r1 r2           -> FNEG (env r1) (env r2)
     FCMP    r1 r2           -> FCMP (env r1) (env r2)
     FCTIWZ  r1 r2           -> FCTIWZ (env r1) (env r2)
+    FCTIDZ  r1 r2           -> FCTIDZ (env r1) (env r2)
+    FCFID   r1 r2           -> FCFID (env r1) (env r2)
     FRSP    r1 r2           -> FRSP (env r1) (env r2)
     MFCR    reg             -> MFCR (env reg)
     MFLR    reg             -> MFLR (env reg)
     FETCHPC reg             -> FETCHPC (env reg)
+    FETCHTOC reg lab        -> FETCHTOC (env reg) lab
     _                       -> instr
   where
     fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)
@@ -459,12 +500,15 @@ ppc_mkSpillInstr
 ppc_mkSpillInstr dflags reg delta slot
   = let platform = targetPlatform dflags
         off      = spillSlotToOffset slot
+        arch     = platformArch platform
     in
-    let sz = case targetClassOfReg platform reg of
-                RcInteger -> II32
+    let fmt = case targetClassOfReg platform reg of
+                RcInteger -> case arch of
+                                ArchPPC -> II32
+                                _       -> II64
                 RcDouble  -> FF64
-                _      -> panic "PPC.Instr.mkSpillInstr: no match"
-    in ST sz reg (AddrRegImm sp (ImmInt (off-delta)))
+                _         -> panic "PPC.Instr.mkSpillInstr: no match"
+    in ST fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 ppc_mkLoadInstr
@@ -477,12 +521,15 @@ ppc_mkLoadInstr
 ppc_mkLoadInstr dflags reg delta slot
   = let platform = targetPlatform dflags
         off     = spillSlotToOffset slot
+        arch     = platformArch platform
     in
-    let sz = case targetClassOfReg platform reg of
-                RcInteger -> II32
+    let fmt = case targetClassOfReg platform reg of
+                RcInteger ->  case arch of
+                                 ArchPPC -> II32
+                                 _       -> II64
                 RcDouble  -> FF64
                 _         -> panic "PPC.Instr.mkLoadInstr: no match"
-    in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
+    in LD fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 -- | The maximum number of bytes required to spill a register. PPC32
@@ -500,8 +547,8 @@ maxSpillSlots dflags
 --     = 0 -- useful for testing allocMoreStack
 
 -- | The number of bytes that the stack pointer should be aligned
--- to. This is 16 both on PPC32 and PPC64 at least for Darwin, but I'm
--- not sure this is correct for other OSes.
+-- to. This is 16 both on PPC32 and PPC64 at least for Darwin, and
+-- Linux (see ELF processor specific supplements).
 stackAlign :: Int
 stackAlign = 16
 

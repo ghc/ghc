@@ -35,7 +35,7 @@ import TargetReg
 import Instruction
 import RegClass
 import Reg
-import Size
+import Format
 
 import CLabel
 import CodeGen.Platform
@@ -129,8 +129,8 @@ data Instr
 
         -- real instrs -----------------------------------------------
         -- Loads and stores.
-        | LD            Size AddrMode Reg               -- size, src, dst
-        | ST            Size Reg AddrMode               -- size, src, dst
+        | LD            Format AddrMode Reg             -- format, src, dst
+        | ST            Format Reg AddrMode             -- format, src, dst
 
         -- Int Arithmetic.
         --      x:   add/sub with carry bit.
@@ -180,16 +180,16 @@ data Instr
         -- Note that we cheat by treating F{ABS,MOV,NEG} of doubles as single
         -- instructions right up until we spit them out.
         --
-        | FABS          Size Reg Reg                    -- src dst
-        | FADD          Size Reg Reg Reg                -- src1, src2, dst
-        | FCMP          Bool Size Reg Reg               -- exception?, src1, src2, dst
-        | FDIV          Size Reg Reg Reg                -- src1, src2, dst
-        | FMOV          Size Reg Reg                    -- src, dst
-        | FMUL          Size Reg Reg Reg                -- src1, src2, dst
-        | FNEG          Size Reg Reg                    -- src, dst
-        | FSQRT         Size Reg Reg                    -- src, dst
-        | FSUB          Size Reg Reg Reg                -- src1, src2, dst
-        | FxTOy         Size Size Reg Reg               -- src, dst
+        | FABS          Format Reg Reg                  -- src dst
+        | FADD          Format Reg Reg Reg              -- src1, src2, dst
+        | FCMP          Bool Format Reg Reg             -- exception?, src1, src2, dst
+        | FDIV          Format Reg Reg Reg              -- src1, src2, dst
+        | FMOV          Format Reg Reg                  -- src, dst
+        | FMUL          Format Reg Reg Reg              -- src1, src2, dst
+        | FNEG          Format Reg Reg                  -- src, dst
+        | FSQRT         Format Reg Reg                  -- src, dst
+        | FSUB          Format Reg Reg Reg              -- src1, src2, dst
+        | FxTOy         Format Format Reg Reg           -- src, dst
 
         -- Jumping around.
         | BI            Cond Bool BlockId               -- cond, annul?, target
@@ -287,8 +287,8 @@ interesting platform reg
 -- | Apply a given mapping to tall the register references in this instruction.
 sparc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 sparc_patchRegsOfInstr instr env = case instr of
-    LD    sz addr reg           -> LD sz (fixAddr addr) (env reg)
-    ST    sz reg addr           -> ST sz (env reg) (fixAddr addr)
+    LD    fmt addr reg          -> LD fmt (fixAddr addr) (env reg)
+    ST    fmt reg addr          -> ST fmt (env reg) (fixAddr addr)
 
     ADD   x cc r1 ar r2         -> ADD   x cc  (env r1) (fixRI ar) (env r2)
     SUB   x cc r1 ar r2         -> SUB   x cc  (env r1) (fixRI ar) (env r2)
@@ -379,13 +379,13 @@ sparc_mkSpillInstr dflags reg _ slot
  = let  platform = targetPlatform dflags
         off      = spillSlotToOffset dflags slot
         off_w    = 1 + (off `div` 4)
-        sz      = case targetClassOfReg platform reg of
+        fmt      = case targetClassOfReg platform reg of
                         RcInteger -> II32
                         RcFloat   -> FF32
                         RcDouble  -> FF64
                         _         -> panic "sparc_mkSpillInstr"
 
-    in ST sz reg (fpRel (negate off_w))
+    in ST fmt reg (fpRel (negate off_w))
 
 
 -- | Make a spill reload instruction.
@@ -399,14 +399,14 @@ sparc_mkLoadInstr
 sparc_mkLoadInstr dflags reg _ slot
   = let platform = targetPlatform dflags
         off      = spillSlotToOffset dflags slot
-        off_w   = 1 + (off `div` 4)
-        sz      = case targetClassOfReg platform reg of
+        off_w    = 1 + (off `div` 4)
+        fmt      = case targetClassOfReg platform reg of
                         RcInteger -> II32
                         RcFloat   -> FF32
                         RcDouble  -> FF64
                         _         -> panic "sparc_mkLoadInstr"
 
-        in LD sz (fpRel (- off_w)) reg
+        in LD fmt (fpRel (- off_w)) reg
 
 
 --------------------------------------------------------------------------------

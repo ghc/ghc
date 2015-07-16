@@ -355,19 +355,21 @@ retry:
     }
 }
 
-INFO_TABLE(__stg_EAGER_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
+// CAF_BLACKHOLE is allocated when entering a CAF.  The reason it is
+// distinct from BLACKHOLE is so that we can tell the difference
+// between an update frame on the stack that points to a CAF under
+// evaluation, and one that points to a closure that is under
+// evaluation by another thread (a BLACKHOLE).  see Note [suspend
+// duplicate work] in ThreadPaused.c
+//
+INFO_TABLE(stg_CAF_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     (P_ node)
 {
     jump ENTRY_LBL(stg_BLACKHOLE) (node);
 }
 
-// CAF_BLACKHOLE is allocated when entering a CAF.  The reason it is
-// distinct from BLACKHOLE is so that we can tell the difference
-// between an update frame on the stack that points to a CAF under
-// evaluation, and one that points to a closure that is under
-// evaluation by another thread (a BLACKHOLE).  See threadPaused().
-//
-INFO_TABLE(stg_CAF_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
+// EAGER_BLACKHOLE exists for the same reason as CAF_BLACKHOLE (see above).
+INFO_TABLE(__stg_EAGER_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     (P_ node)
 {
     jump ENTRY_LBL(stg_BLACKHOLE) (node);

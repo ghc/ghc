@@ -568,6 +568,7 @@ wanteds = concat
           ,structField  C    "StgFunInfoExtraRev" "fun_type"
           ,structFieldH Both "StgFunInfoExtraRev" "arity"
           ,structField_ C    "StgFunInfoExtraRev_bitmap" "StgFunInfoExtraRev" "b.bitmap"
+          ,structField_ C    "StgFunInfoExtraRev_bitmap_offset" "StgFunInfoExtraRev" "b.bitmap_offset"
 
           ,structField C "StgLargeBitmap" "size"
           ,fieldOffset C "StgLargeBitmap" "bitmap"

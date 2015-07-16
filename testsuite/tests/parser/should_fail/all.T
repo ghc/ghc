@@ -88,3 +88,6 @@ test('T8431', compile_timeout_multiplier(0.05),
      compile_fail, ['-XAlternativeLayoutRule'])
 test('T8506', normal, compile_fail, [''])
 test('T9225', normal, compile_fail, [''])
+test('T10196Fail1', normal, compile_fail, [''])
+test('T10196Fail2', normal, compile_fail, [''])
+test('T10196Fail3', expect_broken(10196), compile_fail, [''])

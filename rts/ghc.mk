@@ -45,6 +45,9 @@ ifneq "$(PORTING_HOST)" "YES"
 ifneq "$(findstring $(TargetArch_CPP), i386 powerpc powerpc64)" ""
 rts_S_SRCS += rts/AdjustorAsm.S
 endif
+ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+rts_S_SRCS += rts/StgCRunAsm.S
+endif
 endif
 
 ifeq "$(GhcUnregisterised)" "YES"
