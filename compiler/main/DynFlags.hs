@@ -3208,7 +3208,8 @@ defaultFlags settings
 
     ++ (if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
         then wayGeneralFlags platform WayDyn
-        else [])
+        else [Opt_Static])
+        -- Opt_Static needs to be set if and only if WayDyn is not used (#7478)
 
     where platform = sTargetPlatform settings
 
