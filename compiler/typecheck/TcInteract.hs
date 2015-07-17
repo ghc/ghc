@@ -674,12 +674,7 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 -}
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
-interactDict inerts workItem
-  = do { lazyEqs <- inerts_to_lazy_eqs (inert_irreds inerts)
-       ; interactDict' inerts lazyEqs workItem }
-
-interactDict' :: InertCans -> LazyEqs [TcPredType] -> Ct -> TcS (StopOrContinue Ct)
-interactDict' inerts lazyEqs workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
+interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
   -- don't ever try to solve CallStack IPs directly from other dicts,
   -- we always build new dicts instead.
   -- See Note [Overview of implicit CallStacks]
@@ -699,12 +694,8 @@ interactDict' inerts lazyEqs workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, 
        setWantedEvBind (ctEvId ev_w) ev_tm
        stopWith ev_w "Wanted CallStack IP"
 
-  | Just (ctev_i, qs) <- over_lazy_eqs (lookupInertDict inerts cls) lazyEqs tys
-  = do { -- Apply obtained lazy equation
-         qs_evs <- mapM (newWantedEvVarNC (ctev_loc ev_w)) (extract_lazy_eqs qs)
-       ; emitWorkNC qs_evs
-         -- Perform interaction
-       ; (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
+  | Just ctev_i <- lookupInertDict inerts cls tys
+  = do { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
        ; case inert_effect of
            IRKeep    -> return ()
            IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
@@ -722,7 +713,7 @@ interactDict' inerts lazyEqs workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, 
   = do { addFunDepWork inerts ev_w cls
        ; continueWith workItem  }
 
-interactDict' _ _ wi = pprPanic "interactDict" (ppr wi)
+interactDict _ wi = pprPanic "interactDict" (ppr wi)
 
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
 -- Add derived constraints from type-class functional dependencies.
@@ -1773,25 +1764,6 @@ inerts_to_lazy_eqs = flatMapBagM $ \ct ->
 
 extract_lazy_eqs :: LazyEqs [TcPredType] -> [TcPredType]
 extract_lazy_eqs leqs = concatMap (\(_,_,qs) -> qs) (bagToList leqs)
-
-over_lazy_eqs :: ([Type] -> Maybe a) -> LazyEqs l -> [Type] -> Maybe (a, LazyEqs l)
-over_lazy_eqs f leqs tys
-  = go (subsets (bagToList leqs))
-  where
-    subsets :: [(Type, Type, l)] -> [(TvSubst, LazyEqs l)]
-    subsets [] = [(emptyTvSubst, emptyBag)]
-    subsets (elt@(ty1,ty2,_):xs)
-      | Just v <- getTyVar_maybe ty1
-      = let sxs = subsets xs
-        in sxs ++ flip map sxs (\(s, b) -> ( extendTvSubst s v ty2
-                                           , consBag elt b ))
-      | otherwise = pprPanic "Lazy eqs without var in the LHS" (ppr ty1)
-
-    go [] = Nothing
-    go ((subst, l):rest) = case f (substTys subst tys) of
-                             Just x  -> Just (x, l)
-                             Nothing -> go rest
-
 
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

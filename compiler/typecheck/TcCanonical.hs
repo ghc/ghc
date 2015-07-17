@@ -1677,24 +1677,6 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
     -- case InstanceOf sigma sigma, for the exact same sigma
   | lhs `eqType` rhs
   = can_instance_to_eq ev lhs rhs
-    -- case InstanceOf (forall a. a) sigma -> nothing
-  | (vs, [], ty) <- tcSplitSigmaTy lhs
-  , Just v <- getTyVar_maybe ty
-  , v `elem` vs
-  = can_instance_null ev lhs rhs
-    -- case InstanceOf (T ...) sigma --> T ... ~ sigma
-  | is_not_forall lhs, Nothing <- getTyVar_maybe lhs
-  = can_instance_to_eq ev lhs rhs
-    -- case InstanceOf (forall qvars. Q => ty) sigma
-    -- where sigma is T ..., F ... or a Skolem tyvar
-  | is_forall lhs
-  , is_not_forall rhs               -- RHS is not a forall
-  , Nothing <- getTyVar_maybe rhs   -- or a variabla
-  = can_instance_inst ev lhs rhs
-  | is_forall lhs
-  , Just v <- getTyVar_maybe rhs    -- RHS is an immutable var
-  , isImmutableTyVar v
-  = can_instance_inst ev lhs rhs
     -- case InstanceOf ty (forall qvars. Q => ty)
   | is_forall rhs
   = case ev of
@@ -1703,13 +1685,31 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
            ; setWantedEvBind evar ev_let
            ; stopWith ev "can_instance_of/LET" }
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
+    -- case InstanceOf (forall qvars. Q => ty) sigma
+    -- where sigma is T ... or a Skolem tyvar
+  | is_forall lhs, is_tyapp_or_skolem rhs
+  = can_instance_inst ev lhs rhs
+    -- case InstanceOf (T ...) sigma --> T ... ~ sigma
+    -- case InstanceOf var sigma --> var ~ sigma, var immutable
+  | is_tyapp_or_skolem lhs
+  = can_instance_to_eq ev lhs rhs
     -- already canonical
   | otherwise = continueWith (CIrredEvCan { cc_ev = ev })
   where
-    is_not_forall ty
-      | ([], [], _) <- tcSplitSigmaTy ty = True
-      | otherwise                        = False
-    is_forall = not . is_not_forall
+    is_forall ty
+      | ([], [], _) <- tcSplitSigmaTy ty = False
+      | otherwise                        = True
+
+    is_tyapp_or_skolem ty
+      | Just (tc, _) <- tcSplitTyConApp_maybe ty
+      = not (isTypeFamilyTyCon tc)
+      | (hd, _:_) <- tcSplitAppTys ty
+      , Just _ <- getTyVar_maybe hd
+      = True
+      | Just v <- getTyVar_maybe ty
+      = isImmutableTyVar v
+      | otherwise
+      = False
 
 can_instance_of _ = panic "can_instance_of in a non instanceOf constraint"
 
@@ -1733,33 +1733,21 @@ can_instance_inst ev lhs rhs
       do { (qvars, q, ty) <- splitInst lhs
            -- generate new constraints
          ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
-         ; let eq = mkInstanceOfPred ty rhs
-         ; new_ev_ty <- newWantedEvVarNC loc eq
+         ; let inst = mkInstanceOfPred ty rhs
+         ; new_ev_inst <- newWantedEvVarNC loc inst
            -- compute the evidence for the instantiation
          ; let qvars' = map mkTyVarTy qvars
-         ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvId new_ev_ty)
+         ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvId new_ev_inst)
                                                   (map ctev_evar new_ev_qs))
            -- emit new work
          ; emitWorkNC new_ev_qs
-         ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_ty, ppr new_ev_qs ])
-         ; canInstanceOfNC new_ev_ty }
-    _ -> stopWith ev "Given/Derived instanceOf instantiation"
-
-can_instance_null :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
-can_instance_null ev lhs rhs
-  = case ev of
-    CtWanted { ctev_evar = evar, ctev_loc = loc } ->
-      do { (qvars, _, ty) <- splitInst lhs
-           -- generate new constraints
-         ; let inst = mkInstanceOfPred ty rhs
-         ; new_ev_inst <- newWantedEvVarNC loc inst
-         ; let eq = mkTcEqPredRole Nominal ty rhs
-         ; new_ev_eq <- newWantedEvVarNC loc eq
-           -- set the evidence for the instantiation
-         ; let qvars' = map mkTyVarTy qvars
-         ; setWantedEvBind evar (mkInstanceOfInst lhs qvars' (ctEvId new_ev_inst) [])
-         ; setWantedEvBind (ctEvId new_ev_inst) (mkInstanceOfEq ty (ctEvCoercion new_ev_eq))
-           -- emit new work
-         ; traceTcS "can_instance_of/NULL" (vcat [ ppr new_ev_inst, ppr new_ev_eq ])
-         ; canEqNC new_ev_eq NomEq ty rhs }
+         ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_inst, ppr new_ev_qs ])
+         ; case getTyVar_maybe ty of
+             Just v | v `elem` qvars  -- case (forall a. Q => tyvar)
+               -> do { let eq = mkTcEqPredRole Nominal ty rhs
+                     ; new_ev_eq <- newWantedEvVarNC loc eq
+                     ; setWantedEvBind (ctEvId new_ev_inst)
+                                       (mkInstanceOfEq ty (ctEvCoercion new_ev_eq))
+                     ; canEqNC new_ev_eq NomEq ty rhs }
+             _ -> canInstanceOfNC new_ev_inst } -- general case
     _ -> stopWith ev "Given/Derived instanceOf instantiation"

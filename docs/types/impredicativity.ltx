@@ -17,6 +17,7 @@
 \usepackage{enumitem}
 \usepackage{colonequals}
 \usepackage{mdframed}
+\usepackage{microtype}
 
 \begin{document}
 
@@ -38,7 +39,7 @@
 \begin{itemize}
 \item The kind of $\leq$ is $* \to * \to Constraint$.
 \item The evidence for $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
-\item The canonical forms are $\sigma_1 \leq \alpha_1$ and $\alpha_2 \leq \sigma_2$, where $\sigma_2$ is not a type variable.
+\item The canonical forms are $\sigma \leq \alpha$, where $\alpha$ is not a Skolem.
 \item In Haskell code, $\sigma_1 \leq \sigma_2$ is written as {\tt sigma1 <$\sim$ sigma2}.
 \end{itemize}
 
@@ -60,7 +61,7 @@ Types without top-level $\forall$ & $\tau$ & $\coloncolonequals$ & $\alpha \alt 
 Polymorphic types & $\sigma$ & $\coloncolonequals$ & $\forall \overline{a}. Q \Rightarrow \sigma \alt \tau$ \\
 Constraints & $Q$ & $\coloncolonequals$ & $\epsilon \alt Q_1 \wedge Q_2 \alt \sigma_1 \sim \sigma_2 \alt \sigma_1 \leq \sigma_2 \alt \mathtt{C} \; \overline{\mu}$ \\
 Implications & $I$ & $\coloncolonequals$ & $\epsilon \alt I_1 \wedge I_2 \alt Q \alt \forall \overline{a}. \, (Q \supset I)$ \\
-Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \mathsf{F} \; \overline{\mu} \sim \sigma \alt \alpha \leq \sigma \alt \sigma \leq \alpha \alt \mathtt{C} \; \overline{\mu}$
+Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \mathsf{F} \; \overline{\mu} \sim \sigma \alt \sigma \leq \alpha \alt \mathtt{C} \; \overline{\mu}$
 \end{tabular}
 \end{mdframed}
 \caption{Grammar}
@@ -92,11 +93,12 @@ $$
 \begin{figure}
 $$
 \begin{array}{lrcl}
-\textsc{[$\leq$refl]} & canon\left[\sigma \leq \sigma\right] & = & \sigma \sim \sigma \\
-\textsc{[$\leq$trivial]} & canon\left[(\forall a. a) \leq \sigma_2 \right] & = & \epsilon \\
-\textsc{[$\leq$lcon]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \leq \sigma_2\right] & = & (\mathsf{T} \; \overline{\sigma_1}) \sim \sigma_2 \\
-\textsc{[$\leq$l$\forall$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \sigma_2\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
-& & & \textrm{where } \sigma_2 \textrm{ is } \mathsf{T} \; \overline{\sigma} \textrm{ or a Skolem variable} \\
+\textsc{[$\leq$refl]} & canon\left[\sigma \leq \sigma\right] & = & \epsilon \\
+\textsc{[$\leq$lcon]} & canon\left[\psi_1 \leq \sigma_2\right] & = & \psi_1 \sim \sigma_2 \\
+\textsc{[$\leq$l$\forall$var]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow v) \leq \psi_2 \right] & = & [\overline{a \mapsto \alpha}]v \sim \psi_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
+& & & \textrm{where } v \textrm{ is a unification variable and } v \in \overline{a} \\
+\textsc{[$\leq$l$\forall$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \psi_2\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
+& & & \textrm{where } v \textrm{ is not a unification variable or } v \not\in \overline{a} \\
 \textsc{[$\leq$r$\forall$]} & canon\left[\sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2) \\
 \end{array}
 $$
@@ -106,9 +108,30 @@ $$
 
 A subset of the canonicalization rules is given in Figures \ref{fig:sim} and \ref{fig:leq}. The only missing ones are those related to flattening of constraints.
 
-\subsubsection*{Notes on the {\sc [$\leq$trivial]} rule}
+\
 
-Consider the following code, taken from the {\tt GHC.List} module:
+\noindent We represent by $\psi$ a type with one of the following forms:
+\begin{itemize}
+\item Constructor applied to zero or more types, $\mathsf{T} \; \overline{\sigma}$
+\item An application headed by a type variable, $\alpha \; \overline{\sigma}$ or $a \; \overline{\sigma}$
+\item A Skolem variable, $a$
+\end{itemize}
+
+\subsubsection*{Notes on the {\sc [$\leq$l$\forall$var]} and {\sc [$\leq$l$\forall$]} rules}
+
+\begin{itemize}
+\item We disallow applying these rules in the case of unification variables in the right-hand side. If we did so, and later that variable was substituted by some other type, we would need to remember the instantiation done by this rule and apply it to the substituted value. Instead, we prefer to defer the instantiation of the constraint until the variable is changed to another type. The same reasoning applies to disallow application of the rule when the right-hand side is a type family.
+
+Prior, we disallowed application of the rules to any variable in the right-hand side, unification or Skolem. However, when one tries to type check the following code:
+\begin{verbatim}
+g :: Monoid b => b
+g = mempty
+\end{verbatim}
+the only constraint being generated is $(\forall\, a.\, \textit{Monoid} \; a \Rightarrow a) \leq b$. To go further, we need to instantiate. In this case it is safe to do so, since $b$ is never going to be unified.
+
+\item We also disallow applying the rules to quantified types. In that case, we want to apply {\sc [$\leq$r$\forall$]} first, which may in turn lead to an application of the other rules inside the implication.
+
+\item Consider the following code, taken from the {\tt GHC.List} module:
 \begin{verbatim}
 head :: [a] -> a
 head (x:xs) = x
@@ -117,20 +140,11 @@ head []     = badHead
 badHead :: b
 badHead = error "..."
 \end{verbatim}
-When type checking the second branch, we generate a constraint of the form $\forall b. b \leq a$. If we were to apply rule {\sc [$\leq$l$\forall$]}, we would get a constraint $\beta \leq a$, getting stuck. However, it is the case that \emph{any} type is an instance of $\forall a. a$, so we have included an extra rule for this case. It seems very specific, but this scenario is quite common when calling functions such as {\tt error} or {\tt raise}.
+When type checking the second branch, we generate a constraint of the form $\forall b. b \leq a$. If we were to apply rule {\sc [$\leq$l$\forall$]}, we would get a constraint $\beta \leq a$, getting stuck. Instead, the have the rule {\sc [$\leq$l$\forall$var]}, which ensures that the generated constraint is $\beta \sim a$.
 
-\subsubsection*{Notes on the {\sc [$\leq$l$\forall$]} rule}
-\begin{itemize}
-\item We disallow applying {\sc [$\leq$l$\forall$]} in the case of unification variables. If we did so, and later that variable was substituted by some other type, we would need to remember the instantiation done by this rule and apply it to the substituted value. Instead, we prefer to defer the instantiation of the constraint until the variable is changed to another type.
+The rule {\sc [$\leq$l$\forall$var]} is also key in being able to type check the {\tt g = mempty} example above. Without it, we would rewrite $(\forall\, a.\, \textit{Monoid} \; a \Rightarrow a) \leq b$ to $\textit{Monoid} \; \alpha \wedge \alpha \leq b$. But this disallows progress, we want $\alpha \sim b$ instead.
 
-Prior, we disallowed application of {\sc [$\leq$l$\forall$]} to any variable, unification or Skolem. However, when one tries to type check the following code:
-\begin{verbatim}
-g :: Monoid b => b
-g = mempty
-\end{verbatim}
-the only constraint being generated is $(\forall\, a.\, \textit{Monoid} \; a \Rightarrow a) \leq b$. To go further, we need to instantiate. In this case it is safe to do so, since $b$ is never going to be unified.
-
-\item We also disallow applying {\sc [$\leq$l$\forall$]} to quantified types. In that case, we want to apply {\sc [$\leq$r$\forall$]} first, which may in turn lead to an application of {\sc [$\leq$l$\forall$]} inside the implication.
+\item Note that these rules along with the generation and propagation ones ensure that no constraint of the form $\alpha \leq \sigma$, with $\alpha$ a unification variable, is even produced.
 \end{itemize}
 
 \subsubsection*{Design choice: rules for $\to$}
@@ -148,17 +162,20 @@ But it seems that we lose the ability to infer the type for {\tt runST \$ e}.
 
 In the constraint solving process we do not only need to find a solution for the constraints, but also generate evidence of the solving. Remember that the evidence for a constraint $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
 
-\paragraph{Rules {\sc [$\leq$refl]} and {\sc [$\leq$lcon]}.} We need to build $W_1 :: \sigma_1 \to \sigma_2$ (what $\sigma_1$ and $\sigma_2$ are depends on the rule). For this, we can use the evidence $W_2 :: \sigma_1 \sim \sigma_2$ generated by later solving steps. In this case the solution is to make:
+\paragraph{Rule {\sc [$\leq$refl]}.} We need to build $W :: \sigma \to \sigma$. This is easy:
+$$W = \lambda x. \; x$$
+
+\paragraph{Rule {\sc [$\leq$lcon]}.} We need to build $W_1 :: \psi_1 \to \sigma_2$. For this, we can use the evidence $W_2 :: \psi_1 \sim \sigma_2$ generated by later solving steps. In this case the solution is to make:
 $$W_1 = \lambda (x :: \sigma_1). \; x \rhd W_2$$
-where $\rhd$ is the cast operator which applies a coercion $\rho_1 \to \rho_2$ to a value of type $\rho_1$ to produce the same value, but typed as $\rho_2$.
+where $\rhd$ is the cast operator which applies a coercion $\sigma_a \sim \sigma_b$ to a value of type $\sigma_a$ to produce the same value, but typed as $\sigma_b$.
 
-\paragraph{Rule {\sc [$\leq$trivial]}.} We need to build $W_1 :: (\forall a. a) \to \sigma_2$. This is simple type application:
-$$W_1 = \lambda (x :: \forall a. a). \; x \; \sigma_2$$
-
-\paragraph{Rule and {\sc [$\leq$l$\forall$]}.} We need to build $W_1 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to \sigma_2$ given $W_2 :: [\overline{a \mapsto \alpha}]\sigma_1 \to \sigma_2$ and $W_3 :: [\overline{a \mapsto \alpha}]Q_1$. The first step is to get $[\overline{a \mapsto \alpha}]\sigma_1$ from $\forall \overline{a}. Q_1 \Rightarrow \sigma_1$, to do that we need to make a type application and afterwards apply the witness for $Q_1 \Rightarrow \sigma_1$:
-$$\lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; x \; \alpha \; W_3 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to [\overline{a \mapsto \alpha}]\sigma_1$$
+\paragraph{Rule {\sc [$\leq$l$\forall$]}.} We need to build $W_1 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to \psi_2$ given $W_2 :: [\overline{a \mapsto \alpha}]\sigma_1 \to \psi_2$ and $W_3 :: [\overline{a \mapsto \alpha}]Q_1$. The first step is to get $[\overline{a \mapsto \alpha}]\sigma_1$ from $\forall \overline{a}. Q_1 \Rightarrow \sigma_1$, to do that we need to make a type application and afterwards apply the witness for $Q_1 \Rightarrow \sigma_1$:
+$$\lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; x \; \overline{\alpha} \; W_3 :: (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \to [\overline{a \mapsto \alpha}]\sigma_1$$
 The last step is then applying $W_2$ to convert it to our desired type:
-$$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; W_2 \; (x \; \alpha \; W_3)$$
+$$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; W_2 \; (x \; \overline{\alpha} \; W_3)$$
+
+\paragraph{Rule {\sc [$\leq$l$\forall$var]}.} This case is similar to the previous one, but now $W_2 :: [\overline{a \mapsto \alpha}]v \sim \psi_2$. Instead of using application, we use a cast:
+$$W_1 = \lambda (x :: \forall \overline{a}. Q_1 \Rightarrow \sigma_1). \; (x \; \overline{\alpha} \; W_3) \rhd W_2$$
 
 \paragraph{Rule {\sc [$\leq$r$\forall$]}.} This is the most complicated rule for which to generate evidence. As usual, we want to generate evidence $W_1 :: \sigma_1 \to (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)$. In order to do so, we can use the evidence generated by solving $\forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2)$. In GHC, this implication generates two pieces of information: evidence $W_2 :: \sigma_1 \to \sigma_2$, and a series of bindings which might use the data in $Q_2$ and which make $W_2$ correct. We shall denote those bindings by $\square$.
 
