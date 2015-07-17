@@ -46,15 +46,15 @@
 \begin{mdframed}
 \noindent \begin{tabular}{ll}
 Type variables & $\alpha$, $\beta$, $\gamma$ \\
-Type constuctors & $\mathsf{T}$ \\
+Type constuctors & $\mathsf{T}$, $\mathsf{S}$ \\
 Type families & $\mathsf{F}$ \\
-Type constructor or families & $\mathsf{D}$ \\
 Type classes & $\mathtt{C}$
 \end{tabular}
 
 \vspace{0.3cm}
 
 \noindent \begin{tabular}{lrcl}
+Family-free types & $\xi$ & $\coloncolonequals$ & $\alpha \alt a \alt \xi_1 \to \xi_2 \alt \mathsf{T} \; \overline{\xi}$ \\
 Monomorphic types & $\mu$ & $\coloncolonequals$ & $\alpha \alt a \alt \mu_1 \to \mu_2 \alt \mathsf{T} \; \overline{\mu} \alt \mathsf{F} \; \overline{\mu}$ \\
 Types without top-level $\forall$ & $\tau$ & $\coloncolonequals$ & $\alpha \alt a \alt \sigma_1 \to \sigma_2 \alt \mathsf{T} \; \overline{\sigma} \alt \mathsf{F} \; \overline{\mu}$ \\
 Polymorphic types & $\sigma$ & $\coloncolonequals$ & $\forall \overline{a}. Q \Rightarrow \sigma \alt \tau$ \\
@@ -69,31 +69,42 @@ Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \
 
 \section*{Changes to constraint solving}
 
-\subsection*{New rules for $\sim$}
-
+\begin{figure}
 $$
-\begin{array}{rcl}
-canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\mathsf{T} \; \overline{\sigma_2})\right] & = & \overline{\sigma_1 \sim \sigma_2} \\
-canon\left[\sigma \sim a\right] & = & a \sim \sigma \\
-canon\left[(\forall \overline{a}. Q \Rightarrow \sigma_1) \sim (\forall \overline{a}. Q \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q \supset \sigma_1 \sim \sigma_2) \\
-canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\mathsf{S} \; \overline{\sigma_2})\right] & = & \bot \\
-canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \bot \\
-canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \sim (\mathsf{T} \; \overline{\sigma_2})\right] & = & \bot \\
+\begin{array}{lrclr}
+\textsc{[$\sim$refl]} & canon\left[\sigma \sim \sigma\right] & = & \epsilon \\
+\textsc{[$\sim$orient]} & canon\left[\sigma_1 \sim \sigma_2\right] & = & \sigma_2 \sim \sigma_1
+& \textrm{where } \sigma_2 \prec \sigma_1 \\
+
+\textsc{[$\sim$tdec]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\mathsf{T} \; \overline{\sigma_2})\right] & = & \overline{\sigma_1 \sim \sigma_2} \\
+\textsc{[$\sim$faildec]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\mathsf{S} \; \overline{\sigma_2})\right] & = & \bot
+ & \textrm{where } \mathsf{T} \neq \mathsf{S} \\
+\textsc{[$\sim$occ]} & canon\left[tv \sim \xi \right] & = & \bot & \textrm{where } tv \in \xi, \xi \neq tv \\
+
+\textsc{[$\sim$$\forall$dec]} & canon\left[(\forall \overline{a}. Q \Rightarrow \sigma_1) \sim (\forall \overline{a}. Q \Rightarrow \sigma_2)\right] & = & \multicolumn{2}{l}{\forall \overline{a}. \, (Q \supset \sigma_1 \sim \sigma_2)} \\
+\textsc{[$\sim$$\forall$fail]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \sim (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \bot \\
 \end{array}
 $$
+\caption{Canonicalization rules for $\sim$}
+\label{fig:sim}
+\end{figure}
 
-\subsection*{Rules for $\leq$}
-
+\begin{figure}
 $$
 \begin{array}{lrcl}
 \textsc{[$\leq$refl]} & canon\left[\sigma \leq \sigma\right] & = & \sigma \sim \sigma \\
 \textsc{[$\leq$trivial]} & canon\left[(\forall a. a) \leq \sigma_2 \right] & = & \epsilon \\
-\textsc{[$\leq$lcon]} & canon\left[(\mathsf{D} \; \overline{\sigma_1}) \leq \sigma_2\right] & = & (\mathsf{D} \; \overline{\sigma_1}) \sim \sigma_2 \\
+\textsc{[$\leq$lcon]} & canon\left[(\mathsf{T} \; \overline{\sigma_1}) \leq \sigma_2\right] & = & (\mathsf{T} \; \overline{\sigma_1}) \sim \sigma_2 \\
 \textsc{[$\leq$l$\forall$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \sigma_2\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
-& & & \textrm{where } \sigma_2 \textrm{ is } \mathsf{D} \; \overline{\sigma} \textrm{ or a Skolem variable} \\
+& & & \textrm{where } \sigma_2 \textrm{ is } \mathsf{T} \; \overline{\sigma} \textrm{ or a Skolem variable} \\
 \textsc{[$\leq$r$\forall$]} & canon\left[\sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2) \\
 \end{array}
 $$
+\caption{Canonicalization rules for $\leq$}
+\label{fig:leq}
+\end{figure}
+
+A subset of the canonicalization rules is given in Figures \ref{fig:sim} and \ref{fig:leq}. The only missing ones are those related to flattening of constraints.
 
 \subsubsection*{Notes on the {\sc [$\leq$trivial]} rule}
 
@@ -490,7 +501,6 @@ f x = S (error x)
 If we apply {\sc [AppFunNonVar]} directly, we instantiate the type of $error :: \forall b. [Char] \to b$ to $[Char] \to \beta$.
 Since we are pushing down a unification variable $\alpha$ because of the previous application of {\sc [AppFunNonVar]} to $S :: \forall a. \, a \to S \; a$, we obtain a constraint $\beta \leq \alpha$. Since there are no more restrictions to either $\alpha$ or $\beta$, we are not stuck in solving.
 
-\newpage
 \section*{Examples}
 \subsection*{\tt runST e}
 $$(\$)^{\alpha \to \beta \to \gamma} \; runST^\alpha \; \left( e \; :: \; \forall s. ST \; s \; Int \right)^\beta$$
