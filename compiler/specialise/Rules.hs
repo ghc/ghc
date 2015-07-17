@@ -180,9 +180,15 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
     lhs_names = nameSetElems (extendNameSet (exprsOrphNames args) fn)
         -- TODO: copied from ruleLhsOrphNames
 
-    orph = case filter (nameIsLocalOrFrom this_mod) lhs_names of
-                        (n : _) -> NotOrphan (nameOccName n)
-                        []      -> IsOrphan
+        -- Since rules get eventually attached to one of the free names
+        -- from the definition when compiling the ABI hash, we should make
+        -- it deterministic. This chooses the one with minimal OccName
+        -- as opposed to uniq value.
+    local_lhs_names = filter (nameIsLocalOrFrom this_mod) lhs_names
+    anchor = minimum $ map nameOccName local_lhs_names
+    orph = case local_lhs_names of
+             (_ : _) -> NotOrphan anchor
+             []      -> IsOrphan
 
 --------------
 roughTopNames :: [CoreExpr] -> [Maybe Name]

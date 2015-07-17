@@ -236,10 +236,17 @@ mkLocalInstance dfun oflag tvs cls tys
     do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- cls_tvs `zip` arg_names
                                           , not (tv `elem` rtvs)]
 
+    -- Since instance declarations get eventually attached to one of the types
+    -- from the definition when compiling the ABI hash, we should make
+    -- it deterministic. This chooses the one with minimal OccName
+    -- as opposed to uniq value.
     choose_one :: [NameSet] -> IsOrphan
-    choose_one nss = case nameSetElems (unionNameSets nss) of
-                        []      -> IsOrphan
-                        (n : _) -> NotOrphan (nameOccName n)
+    choose_one nss = case local_names of
+                       []      -> IsOrphan
+                       (_ : _) -> NotOrphan anchor
+      where
+      local_names = nameSetElems (unionNameSets nss)
+      anchor = minimum $ map nameOccName local_names
 
 mkImportedInstance :: Name
                    -> [Maybe Name]
