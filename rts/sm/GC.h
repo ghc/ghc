@@ -16,6 +16,8 @@
 
 #include "BeginPrivate.h"
 
+#include "HeapAlloc.h"
+
 void GarbageCollect (rtsBool force_major_gc,
                      rtsBool do_heap_census,
                      nat gc_type, Capability *cap);

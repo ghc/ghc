@@ -7,14 +7,14 @@ outofmem-prep::
 
 outofmem::
 	@$(MAKE) outofmem-prep
-	@ulimit -v 10000000 2>/dev/null; ./outofmem || echo "exit($$?)"
+	@ulimit -m 10000000 2>/dev/null; ./outofmem || echo "exit($$?)"
 
 outofmem2-prep::
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -rtsopts --make -fforce-recomp outofmem2.hs -o outofmem2
 
 outofmem2::
 	@$(MAKE) outofmem2-prep
-	@ulimit -v 1000000 2>/dev/null; ./outofmem2 +RTS -M5m -RTS || echo "exit($$?)"
+	@ulimit -m 1000000 2>/dev/null; ./outofmem2 +RTS -M5m -RTS || echo "exit($$?)"
 
 T2615-prep:
 	$(RM) libfoo_T2615.so

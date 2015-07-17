@@ -2,6 +2,13 @@ test('testblockalloc',
      [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')], 
      compile_and_run, [''])
 
+test('testmblockalloc',
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')], 
+     compile_and_run, [''])
+# -I0 is important: the idle GC will run the memory leak detector,
+# which will crash because the mblocks we allocate are not in a state
+# the leak detector is expecting.
+
 
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.

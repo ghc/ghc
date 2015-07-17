@@ -13,6 +13,7 @@
 
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
+#include "sm/HeapAlloc.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -72,23 +73,67 @@ void osMemInit(void)
 
    -------------------------------------------------------------------------- */
 
-// A wrapper around mmap(), to abstract away from OS differences in
-// the mmap() interface.
+/*
+ A wrapper around mmap(), to abstract away from OS differences in
+ the mmap() interface.
+
+ It supports the following operations:
+ - reserve: find a new chunk of available address space, and make it so
+            that we own it (no other library will get it), but don't actually
+            allocate memory for it
+            the addr is a hint for where to place the memory (and most
+            of the time the OS happily ignores!)
+ - commit: given a chunk of address space that we know we own, make sure
+           there is some memory backing it
+           the addr is not a hint, it must point into previously reserved
+           address space, or bad things happen
+ - reserve&commit: do both at the same time
+
+ The naming is chosen from the Win32 API (VirtualAlloc) which does the
+ same thing and has done so forever, while support for this in Unix systems
+ has only been added recently and is hidden in the posix portability mess.
+ It is confusing because to get the reserve behavior we need MAP_NORESERVE
+ (which tells the kernel not to allocate backing space), but heh...
+*/
+enum
+{
+    MEM_RESERVE = 1,
+    MEM_COMMIT = 2,
+    MEM_RESERVE_AND_COMMIT = MEM_RESERVE | MEM_COMMIT
+};
 
 static void *
-my_mmap (void *addr, W_ size)
+my_mmap (void *addr, W_ size, int operation)
 {
     void *ret;
+    int prot, flags;
+
+    if (operation & MEM_COMMIT)
+        prot = PROT_READ | PROT_WRITE;
+    else
+        prot = PROT_NONE;
+    if (operation == MEM_RESERVE)
+        flags = MAP_NORESERVE;
+    else if (operation == MEM_COMMIT)
+        flags = MAP_FIXED;
+    else
+        flags = 0;
 
 #if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
     {
-        int fd = open("/dev/zero",O_RDONLY);
-        ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-        close(fd);
+        if (operation & MEM_RESERVE)
+        {
+            int fd = open("/dev/zero",O_RDONLY);
+            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, fd, 0);
+            close(fd);
+        }
+        else
+        {
+            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, -1, 0);
+        }
     }
 #elif hpux_HOST_OS
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
-               MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif darwin_HOST_OS
     // Without MAP_FIXED, Apple's mmap ignores addr.
     // With MAP_FIXED, it overwrites already mapped regions, whic
@@ -100,10 +145,16 @@ my_mmap (void *addr, W_ size)
 
     kern_return_t err = 0;
     ret = addr;
-    if(addr)    // try to allocate at address
-        err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
-    if(!addr || err)    // try to allocate anywhere
-        err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
+
+    if(operation & MEM_RESERVE)
+    {
+        if(addr)    // try to allocate at address
+            err = vm_allocate(mach_task_self(),(vm_address_t*) &ret,
+                              size, FALSE);
+        if(!addr || err)    // try to allocate anywhere
+            err = vm_allocate(mach_task_self(),(vm_address_t*) &ret,
+                              size, TRUE);
+    }
 
     if(err) {
         // don't know what the error codes mean exactly, assume it's
@@ -111,23 +162,24 @@ my_mmap (void *addr, W_ size)
         errorBelch("memory allocation failed (requested %" FMT_Word " bytes)",
                    size);
         stg_exit(EXIT_FAILURE);
-    } else {
+    }
+
+    if(operation & MEM_COMMIT) {
         vm_protect(mach_task_self(), (vm_address_t)ret, size, FALSE,
                    VM_PROT_READ|VM_PROT_WRITE);
     }
+
 #elif linux_HOST_OS
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
-               MAP_ANON | MAP_PRIVATE, -1, 0);
+    ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
     if (ret == (void *)-1 && errno == EPERM) {
         // Linux may return EPERM if it tried to give us
         // a chunk of address space below mmap_min_addr,
         // See Trac #7500.
-        if (addr != 0) {
+        if (addr != 0 && (operation & MEM_RESERVE)) {
             // Try again with no hint address.
             // It's not clear that this can ever actually help,
             // but since our alternative is to abort, we may as well try.
-            ret = mmap(0, size, PROT_READ | PROT_WRITE,
-                       MAP_ANON | MAP_PRIVATE, -1, 0);
+            ret = mmap(0, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
         }
         if (ret == (void *)-1 && errno == EPERM) {
             // Linux is not willing to give us any mapping,
@@ -137,8 +189,7 @@ my_mmap (void *addr, W_ size)
         }
     }
 #else
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
-               MAP_ANON | MAP_PRIVATE, -1, 0);
+    ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
 #endif
 
     if (ret == (void *)-1) {
@@ -168,7 +219,7 @@ gen_map_mblocks (W_ size)
     // Try to map a larger block, and take the aligned portion from
     // it (unmap the rest).
     size += MBLOCK_SIZE;
-    ret = my_mmap(0, size);
+    ret = my_mmap(0, size, MEM_RESERVE_AND_COMMIT);
 
     // unmap the slop bits around the chunk we allocated
     slop = (W_)ret & MBLOCK_MASK;
@@ -207,7 +258,7 @@ osGetMBlocks(nat n)
       // use gen_map_mblocks the first time.
       ret = gen_map_mblocks(size);
   } else {
-      ret = my_mmap(next_request, size);
+      ret = my_mmap(next_request, size, MEM_RESERVE_AND_COMMIT);
 
       if (((W_)ret & MBLOCK_MASK) != 0) {
           // misaligned block!
@@ -244,10 +295,11 @@ void osReleaseFreeMemory(void) {
 void osFreeAllMBlocks(void)
 {
     void *mblock;
+    void *state;
 
-    for (mblock = getFirstMBlock();
+    for (mblock = getFirstMBlock(&state);
          mblock != NULL;
-         mblock = getNextMBlock(mblock)) {
+         mblock = getNextMBlock(&state, mblock)) {
         munmap(mblock, MBLOCK_SIZE);
     }
 }
@@ -318,3 +370,103 @@ void setExecutable (void *p, W_ len, rtsBool exec)
         barf("setExecutable: failed to protect 0x%p\n", p);
     }
 }
+
+#ifdef USE_LARGE_ADDRESS_SPACE
+
+static void *
+osTryReserveHeapMemory (void *hint)
+{
+    void *base, *top;
+    void *start, *end;
+
+    /* We try to allocate MBLOCK_SPACE_SIZE + MBLOCK_SIZE,
+       because we need memory which is MBLOCK_SIZE aligned,
+       and then we discard what we don't need */
+
+    base = my_mmap(hint, MBLOCK_SPACE_SIZE + MBLOCK_SIZE, MEM_RESERVE);
+    top = (void*)((W_)base + MBLOCK_SPACE_SIZE + MBLOCK_SIZE);
+
+    if (((W_)base & MBLOCK_MASK) != 0) {
+        start = MBLOCK_ROUND_UP(base);
+        end = MBLOCK_ROUND_DOWN(top);
+        ASSERT(((W_)end - (W_)start) == MBLOCK_SPACE_SIZE);
+
+        if (munmap(base, (W_)start-(W_)base) < 0) {
+            sysErrorBelch("unable to release slop before heap");
+        }
+        if (munmap(end, (W_)top-(W_)end) < 0) {
+            sysErrorBelch("unable to release slop after heap");
+        }
+    } else {
+        start = base;
+    }
+
+    return start;
+}
+
+void *osReserveHeapMemory(void)
+{
+    int attempt;
+    void *at;
+
+    /* We want to ensure the heap starts at least 8 GB inside the address space,
+       to make sure that any dynamically loaded code will be close enough to the
+       original code so that short relocations will work. This is in particular
+       important on Darwin/Mach-O, because object files not compiled as shared
+       libraries are position independent but cannot be loaded about 4GB.
+
+       We do so with a hint to the mmap, and we verify the OS satisfied our
+       hint. We loop a few times in case there is already something allocated
+       there, but we bail if we cannot allocate at all.
+    */
+
+    attempt = 0;
+    do {
+        at = osTryReserveHeapMemory((void*)((W_)8 * (1 << 30) +
+                                            attempt * BLOCK_SIZE));
+    } while ((W_)at < ((W_)8 * (1 << 30)));
+
+    return at;
+}
+
+void osCommitMemory(void *at, W_ size)
+{
+    my_mmap(at, size, MEM_COMMIT);
+}
+
+void osDecommitMemory(void *at, W_ size)
+{
+    int r;
+
+    // First make the memory unaccessible (so that we get a segfault
+    // at the next attempt to touch it)
+    // We only do this in DEBUG because it forces the OS to remove
+    // all MMU entries for this page range, and there is no reason
+    // to do so unless there is memory pressure
+#ifdef DEBUG
+    r = mprotect(at, size, PROT_NONE);
+    if(r < 0)
+        sysErrorBelch("unable to make released memory unaccessible");
+#endif
+
+#ifdef MADV_FREE
+    // Try MADV_FREE first, FreeBSD has both and MADV_DONTNEED
+    // just swaps memory out
+    r = madvise(at, size, MADV_FREE);
+#else
+    r = madvise(at, size, MADV_DONTNEED);
+#endif
+    if(r < 0)
+        sysErrorBelch("unable to decommit memory");
+}
+
+void osReleaseHeapMemory(void)
+{
+    int r;
+
+    r = munmap((void*)mblock_address_space_begin, MBLOCK_SPACE_SIZE);
+    if(r < 0)
+        sysErrorBelch("unable to release address space");
+}
+
+#endif
