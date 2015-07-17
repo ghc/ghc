@@ -122,26 +122,26 @@ renameType (HsFunTy la lr) = HsFunTy <$> renameLType la <*> renameLType lr
 renameType (HsListTy lt) = HsListTy <$> renameLType lt
 renameType (HsPArrTy lt) = HsPArrTy <$> renameLType lt
 renameType (HsTupleTy srt lt) = HsTupleTy srt <$> mapM renameLType lt
-renameType (HsOpTy la lop lb) = HsOpTy
-    <$> renameLType la
-    <*> pure lop -- TODO.
-    <*> renameLType lb
+renameType (HsOpTy la lop lb) =
+    HsOpTy <$> renameLType la <*> renameLTyOp lop <*> renameLType lb
 renameType (HsParTy lt) = HsParTy <$> renameLType lt
 renameType (HsIParamTy ip lt) = HsIParamTy ip <$> renameLType lt
 renameType (HsEqTy la lb) = HsEqTy <$> renameLType la <*> renameLType lb
 renameType (HsKindSig lt lk) = HsKindSig <$> renameLType lt <*> pure lk
-renameType t@(HsQuasiQuoteTy _) = pure t -- TODO.
-renameType t@(HsSpliceTy _ _) = pure t -- TODO.
-renameType t@(HsDocTy _ _) = pure t -- TODO.
+renameType t@(HsQuasiQuoteTy _) = pure t
+renameType t@(HsSpliceTy _ _) = pure t
+renameType (HsDocTy lt doc) = HsDocTy <$> renameLType lt <*> pure doc
 renameType (HsBangTy bang lt) = HsBangTy bang <$> renameLType lt
-renameType t@(HsRecTy _) = pure t -- TODO.
+renameType t@(HsRecTy _) = pure t
 renameType t@(HsCoreTy _) = pure t
-renameType t@(HsExplicitListTy _ _) = pure t -- TODO.
-renameType t@(HsExplicitTupleTy _ _) = pure t -- TODO.
+renameType (HsExplicitListTy ph ltys) =
+    HsExplicitListTy ph <$> mapM renameLType ltys
+renameType (HsExplicitTupleTy phs ltys) =
+    HsExplicitTupleTy phs <$> mapM renameLType ltys
 renameType t@(HsTyLit _) = pure t
 renameType (HsWrapTy wrap t) = HsWrapTy wrap <$> renameType t
 renameType HsWildcardTy = pure HsWildcardTy
-renameType t@(HsNamedWildcardTy _) = pure t -- TODO.
+renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
 
 
 renameLType :: Ord name => LHsType name -> Rename name (LHsType name)
@@ -163,6 +163,10 @@ renameTyVarBndr (UserTyVar name) =
     UserTyVar <$> renameNameBndr name
 renameTyVarBndr (KindedTyVar name kinds) =
     KindedTyVar <$> located renameNameBndr name <*> pure kinds
+
+
+renameLTyOp :: Ord name => LHsTyOp name -> Rename name (LHsTyOp name)
+renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
 
 
 renameNameBndr :: Ord name => name -> Rename name name
