@@ -183,7 +183,7 @@
             has been fixed, so these programs will now terminate with
             an error. As a result of this change, however, GHC
             compiled programs now also specifically recognize ASCII
-            encodings, and can bypass iconv in these cases. This
+            encodings, and can function without iconv in these cases. This
             allows statically compiled programs to exist inside an
             initramfs, for example (issues #10298, #7695).
           </para>
