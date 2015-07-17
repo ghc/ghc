@@ -1,35 +1,33 @@
 
    ==============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 6.10.1
+    The (Interactive) Glasgow Haskell Compiler -- version 7.10.2
    ==============================================================
 
-The GHC Team is pleased to announce a new major release of GHC. There
-have been a number of significant changes since the last major release,
-including:
+The GHC Team is pleased to announce a new minor release of GHC. This is a
+bug-fix release and contains a number of important fixes,
 
- * Some new language features have been implemented:
-   * Record syntax: wild-card patterns, punning, and field disambiguation
-   * Generalised quasi-quotes
-   * Generalised list comprehensions
-   * View patterns
+ * Various typechecker issues have been fixed, including some bugs which allowed
+   the user to write unsafeCoerce
 
- * Type families have been completely re-implemented
+ * DWARF debug information is now more correct and supported on Windows
 
- * Now comes with Haddock 2, which supports all GHC extensions
+ * Portability issues resulting in crashes on SPARC, Linux/i386, ARM, AArch64,
+   and PowerPC have been fixed
 
- * Parallel garbage collection
+ * The event manager's multi-shot event registration functionality now works
+   correctly
 
- * Base provides extensible exceptions
+ * A bug where unaccounted for register aliasing could result in incorrect
+   floating-point results has been fixed
 
- * The GHC API is easier to use
+ * An infinite loop during program startup when iconv is unavailable hsa been
+   fixed
 
- * External core (output only) now works again
+A more thorough list of the changes in the release can be found in the release
+notes,
 
- * Data Parallel Haskell (DPH) comes as part of GHC
+  http://haskell.org/ghc/docs/7.10.2/html/users_guide/release-7-10-2.html
 
-The full release notes are here:
-
-  http://haskell.org/ghc/docs/6.10.1/html/users_guide/release-6-10-1.html
 
 How to get it
 ~~~~~~~~~~~~~
@@ -52,13 +50,12 @@ Background
 Haskell is a standard lazy functional programming language.
 
 GHC is a state-of-the-art programming suite for Haskell.  Included is
-an optimising compiler generating good code for a variety of
+an optimising compiler generating efficient code for a variety of
 platforms, together with an interactive system for convenient, quick
 development.  The distribution includes space and time profiling
 facilities, a large collection of libraries, and support for various
 language extensions, including concurrency, exceptions, and foreign
-language interfaces (C, whatever).  GHC is distributed under a
-BSD-style open source license.
+language interfaces. GHC is distributed under a BSD-style open source license.
 
 A wide variety of Haskell related resources (tutorials, libraries,
 specifications, documentation, compilers, interpreters, references,
@@ -107,13 +104,13 @@ Mailing lists
 We run mailing lists for GHC users and bug reports; to subscribe, use
 the web interfaces at
 
-    http://www.haskell.org/mailman/listinfo/glasgow-haskell-users
-    http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs
+    http://mail.haskell.org/cgi-bin/mailman/listinfo/glasgow-haskell-users
+    http://mail.haskell.org/cgi-bin/mailman/listinfo/ghc-tickets
 
 There are several other haskell and ghc-related mailing lists on
 www.haskell.org; for the full list, see
 
-    http://www.haskell.org/mailman/listinfo/
+    https://mail.haskell.org/cgi-bin/mailman/listinfo
 
 Some GHC developers hang out on #haskell on IRC, too:
 
