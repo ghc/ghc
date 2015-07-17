@@ -135,9 +135,9 @@ renameType (HsBangTy bang lt) = HsBangTy bang <$> renameLType lt
 renameType t@(HsRecTy _) = pure t
 renameType t@(HsCoreTy _) = pure t
 renameType (HsExplicitListTy ph ltys) =
-    HsExplicitListTy ph <$> mapM renameLType ltys
+    HsExplicitListTy ph <$> renameLTypes ltys
 renameType (HsExplicitTupleTy phs ltys) =
-    HsExplicitTupleTy phs <$> mapM renameLType ltys
+    HsExplicitTupleTy phs <$> renameLTypes ltys
 renameType t@(HsTyLit _) = pure t
 renameType (HsWrapTy wrap t) = HsWrapTy wrap <$> renameType t
 renameType HsWildcardTy = pure HsWildcardTy
@@ -148,14 +148,18 @@ renameLType :: Ord name => LHsType name -> Rename name (LHsType name)
 renameLType = located renameType
 
 
+renameLTypes :: Ord name => [LHsType name] -> Rename name [LHsType name]
+renameLTypes = mapM renameLType
+
+
+renameContext :: Ord name => HsContext name -> Rename name (HsContext name)
+renameContext = renameLTypes
+
+
 renameLTyVarBndrs :: Ord name => LHsTyVarBndrs name -> Rename name (LHsTyVarBndrs name)
 renameLTyVarBndrs lbndrs = do
     tys' <- mapM (located renameTyVarBndr) $ hsq_tvs lbndrs
     pure $ lbndrs { hsq_tvs = tys' }
-
-
-renameContext :: Ord name => HsContext name -> Rename name (HsContext name)
-renameContext = mapM $ located renameType
 
 
 renameTyVarBndr :: Ord name => HsTyVarBndr name -> Rename name (HsTyVarBndr name)
