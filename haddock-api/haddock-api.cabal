@@ -43,6 +43,7 @@ library
     , filepath
     , directory
     , containers
+    , transformers
     , deepseq
     , array
     , xhtml >= 3000.2 && < 3000.3
