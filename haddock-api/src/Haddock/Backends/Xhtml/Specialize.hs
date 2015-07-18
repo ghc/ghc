@@ -100,14 +100,14 @@ parseTupleArity ('(':commas) = do
 parseTupleArity _ = Nothing
 
 
-rename :: Ord name => HsType name -> HsType name
+rename :: NamedThing name => HsType name -> HsType name
 rename = fst . evalRWS undefined Map.empty . renameType -- TODO.
 
 
-type Rename name a = RWS (Set name) () (Map name name) a
+type Rename name a = RWS (Set OccName) () (Map Name name) a
 
 
-renameType :: Ord name => HsType name -> Rename name (HsType name)
+renameType :: NamedThing name => HsType name -> Rename name (HsType name)
 renameType (HsForAllTy ex mspan lbndrs lctx lt) = do
     lbndrs' <- renameLTyVarBndrs lbndrs
     HsForAllTy
@@ -144,52 +144,54 @@ renameType HsWildcardTy = pure HsWildcardTy
 renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
 
 
-renameLType :: Ord name => LHsType name -> Rename name (LHsType name)
+renameLType :: NamedThing name => LHsType name -> Rename name (LHsType name)
 renameLType = located renameType
 
 
-renameLTypes :: Ord name => [LHsType name] -> Rename name [LHsType name]
+renameLTypes :: NamedThing name => [LHsType name] -> Rename name [LHsType name]
 renameLTypes = mapM renameLType
 
 
-renameContext :: Ord name => HsContext name -> Rename name (HsContext name)
+renameContext :: NamedThing name => HsContext name
+              -> Rename name (HsContext name)
 renameContext = renameLTypes
 
 
-renameLTyVarBndrs :: Ord name => LHsTyVarBndrs name -> Rename name (LHsTyVarBndrs name)
+renameLTyVarBndrs :: NamedThing name => LHsTyVarBndrs name -> Rename name (LHsTyVarBndrs name)
 renameLTyVarBndrs lbndrs = do
     tys' <- mapM (located renameTyVarBndr) $ hsq_tvs lbndrs
     pure $ lbndrs { hsq_tvs = tys' }
 
 
-renameTyVarBndr :: Ord name => HsTyVarBndr name -> Rename name (HsTyVarBndr name)
+renameTyVarBndr :: NamedThing name => HsTyVarBndr name
+                -> Rename name (HsTyVarBndr name)
 renameTyVarBndr (UserTyVar name) =
     UserTyVar <$> renameNameBndr name
 renameTyVarBndr (KindedTyVar name kinds) =
     KindedTyVar <$> located renameNameBndr name <*> pure kinds
 
 
-renameLTyOp :: Ord name => LHsTyOp name -> Rename name (LHsTyOp name)
+renameLTyOp :: NamedThing name => LHsTyOp name -> Rename name (LHsTyOp name)
 renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
 
 
-renameNameBndr :: Ord name => name -> Rename name name
+renameNameBndr :: NamedThing name => name -> Rename name name
 renameNameBndr name = do
     fv <- ask
-    when (name `Set.member` fv) $
+    when (getOccName name `Set.member` fv) $
         freshName name
     renameName name
 
 
-renameName :: Ord name => name -> Rename name name
+renameName :: NamedThing name => name -> Rename name name
 renameName name = do
     rnmap <- get
-    pure $ case Map.lookup name rnmap of
+    pure $ case Map.lookup (getName name) rnmap of
         Just name' -> name'
         Nothing -> name
 
 
-freshName :: Ord name => name -> Rename name ()
+freshName :: NamedThing name => name -> Rename name ()
 freshName _ = pure () -- TODO.
 
 
