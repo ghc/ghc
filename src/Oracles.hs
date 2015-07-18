@@ -6,45 +6,25 @@ module Oracles (
 import Development.Shake.Config
 import Development.Shake.Util
 import qualified Data.HashMap.Strict as M
--- TODO: get rid of Bifunctor dependency
-import Data.Bifunctor
 import Base
 import Util
 import Config
+import Control.Monad.Extra
 import Oracles.Base
 import Oracles.PackageData
-import Control.Monad.Extra
 import Oracles.DependencyList
-
-defaultConfig, userConfig :: FilePath
-defaultConfig = cfgPath </> "default.config"
-userConfig    = cfgPath </> "user.config"
 
 -- Oracle for configuration files
 configOracle :: Rules ()
 configOracle = do
+    let configFile = cfgPath </> "system.config"
     cfg <- newCache $ \() -> do
-        unlessM (doesFileExist $ defaultConfig <.> "in") $
-            redError_ $ "\nDefault configuration file '"
-                      ++ (defaultConfig <.> "in")
+        unlessM (doesFileExist $ configFile <.> "in") $
+            redError_ $ "\nConfiguration file '" ++ (configFile <.> "in")
                       ++ "' is missing; unwilling to proceed."
-        need [defaultConfig]
-        putOracle $ "Reading " ++ unifyPath defaultConfig ++ "..."
-        cfgDefault <- liftIO $ readConfigFile defaultConfig
-        existsUser <- doesFileExist userConfig
-        cfgUser    <- if existsUser
-                      then do
-                          putOracle $ "Reading "
-                                    ++ unifyPath userConfig ++ "..."
-                          liftIO $ readConfigFile userConfig
-                      else do
-                          putColoured Red $
-                              "\nUser defined configuration file '"
-                              ++ userConfig ++ "' is missing; "
-                              ++ "proceeding with default configuration.\n"
-                          return M.empty
-        putColoured Green $ "Finished processing configuration files."
-        return $ cfgUser `M.union` cfgDefault
+        need [configFile]
+        putOracle $ "Reading " ++ unifyPath configFile ++ "..."
+        liftIO $ readConfigFile configFile
     addOracle $ \(ConfigKey key) -> M.lookup key <$> cfg ()
     return ()
 
@@ -58,6 +38,9 @@ packageDataOracle = do
     addOracle $ \(PackageDataKey (file, key)) ->
         M.lookup key <$> pkgData (unifyPath file)
     return ()
+
+bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+bimap f g (x, y) = (f x, g y)
 
 -- Oracle for 'path/dist/*.deps' files
 dependencyOracle :: Rules ()

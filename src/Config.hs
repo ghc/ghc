@@ -17,7 +17,7 @@ autoconfRules = do
 
 configureRules :: Rules ()
 configureRules = do
-    cfgPath </> "default.config" %> \out -> do
-        need [cfgPath </> "default.config.in", "configure"]
+    cfgPath </> "system.config" %> \out -> do
+        need [cfgPath </> "system.config.in", "configure"]
         putColoured White "Running configure..."
         cmd "bash configure" -- TODO: get rid of 'bash'

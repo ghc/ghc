@@ -5,8 +5,8 @@ module Oracles.Option (
 import Base
 import Oracles.Base
 
--- For each Option the files {default.config, user.config} contain
--- a line of the form 'target-os = mingw32'.
+-- For each Option the file default.config contains a line of the
+-- form 'target-os = mingw32'.
 -- (showArg TargetOs) is an action that consults the config files
 -- and returns "mingw32".
 --

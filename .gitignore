@@ -2,5 +2,5 @@
 *.hi
 _shake/
 _build/
-cfg/default.config
+cfg/system.config
 arg/*/*.txt
