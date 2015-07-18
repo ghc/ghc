@@ -19,6 +19,8 @@ import Control.Monad
 import Control.Monad.Trans.RWS
 
 import Data.Data
+import qualified Data.List as List
+import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -185,14 +187,35 @@ renameNameBndr name = do
 
 renameName :: NamedThing name => name -> Rename name name
 renameName name = do
-    rnmap <- get
-    pure $ case Map.lookup (getName name) rnmap of
+    env <- get
+    pure $ case Map.lookup (getName name) env of
         Just name' -> name'
         Nothing -> name
 
 
 freshName :: NamedThing name => name -> Rename name ()
-freshName _ = pure () -- TODO.
+freshName name = do
+    fv <- ask
+    env <- get
+    let taken = Set.union fv (Set.fromList . map getOccName . Map.keys $ env)
+    let name' = undefined $ findFreshName taken occ
+    put $ Map.insert (getName name) name' env
+  where
+    occ = getOccName name
+
+
+findFreshName :: Set OccName -> OccName -> OccName
+findFreshName taken =
+    fromJust . List.find isFresh . alternativeNames
+  where
+    isFresh = not . flip Set.member taken
+
+
+alternativeNames :: OccName -> [OccName]
+alternativeNames name =
+    [ mkVarOcc $ str ++ show i | i :: Int <- [0..] ]
+  where
+    str = occNameString name
 
 
 located :: Functor f => (a -> f b) -> Located a -> f (Located b)
