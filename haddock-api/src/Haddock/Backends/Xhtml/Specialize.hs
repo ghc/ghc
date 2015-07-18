@@ -102,14 +102,27 @@ parseTupleArity ('(':commas) = do
 parseTupleArity _ = Nothing
 
 
-rename :: NamedThing name => HsType name -> HsType name
+class NamedThing name => SetName name where
+
+    setName :: Name -> name -> name
+
+
+setInternalOccName :: SetName name => OccName -> name -> name
+setInternalOccName occ name =
+    setName nname' name
+  where
+    nname = getName name
+    nname' = mkInternalName (nameUnique nname) occ (nameSrcSpan nname)
+
+
+rename :: SetName name => HsType name -> HsType name
 rename = fst . evalRWS undefined Map.empty . renameType -- TODO.
 
 
 type Rename name a = RWS (Set OccName) () (Map Name name) a
 
 
-renameType :: NamedThing name => HsType name -> Rename name (HsType name)
+renameType :: SetName name => HsType name -> Rename name (HsType name)
 renameType (HsForAllTy ex mspan lbndrs lctx lt) = do
     lbndrs' <- renameLTyVarBndrs lbndrs
     HsForAllTy
@@ -146,26 +159,26 @@ renameType HsWildcardTy = pure HsWildcardTy
 renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
 
 
-renameLType :: NamedThing name => LHsType name -> Rename name (LHsType name)
+renameLType :: SetName name => LHsType name -> Rename name (LHsType name)
 renameLType = located renameType
 
 
-renameLTypes :: NamedThing name => [LHsType name] -> Rename name [LHsType name]
+renameLTypes :: SetName name => [LHsType name] -> Rename name [LHsType name]
 renameLTypes = mapM renameLType
 
 
-renameContext :: NamedThing name => HsContext name
+renameContext :: SetName name => HsContext name
               -> Rename name (HsContext name)
 renameContext = renameLTypes
 
 
-renameLTyVarBndrs :: NamedThing name => LHsTyVarBndrs name -> Rename name (LHsTyVarBndrs name)
+renameLTyVarBndrs :: SetName name => LHsTyVarBndrs name -> Rename name (LHsTyVarBndrs name)
 renameLTyVarBndrs lbndrs = do
     tys' <- mapM (located renameTyVarBndr) $ hsq_tvs lbndrs
     pure $ lbndrs { hsq_tvs = tys' }
 
 
-renameTyVarBndr :: NamedThing name => HsTyVarBndr name
+renameTyVarBndr :: SetName name => HsTyVarBndr name
                 -> Rename name (HsTyVarBndr name)
 renameTyVarBndr (UserTyVar name) =
     UserTyVar <$> renameNameBndr name
@@ -173,11 +186,11 @@ renameTyVarBndr (KindedTyVar name kinds) =
     KindedTyVar <$> located renameNameBndr name <*> pure kinds
 
 
-renameLTyOp :: NamedThing name => LHsTyOp name -> Rename name (LHsTyOp name)
+renameLTyOp :: SetName name => LHsTyOp name -> Rename name (LHsTyOp name)
 renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
 
 
-renameNameBndr :: NamedThing name => name -> Rename name name
+renameNameBndr :: SetName name => name -> Rename name name
 renameNameBndr name = do
     fv <- ask
     when (getOccName name `Set.member` fv) $
@@ -185,7 +198,7 @@ renameNameBndr name = do
     renameName name
 
 
-renameName :: NamedThing name => name -> Rename name name
+renameName :: SetName name => name -> Rename name name
 renameName name = do
     env <- get
     pure $ case Map.lookup (getName name) env of
@@ -193,15 +206,16 @@ renameName name = do
         Nothing -> name
 
 
-freshName :: NamedThing name => name -> Rename name ()
+freshName :: SetName name => name -> Rename name ()
 freshName name = do
     fv <- ask
     env <- get
     let taken = Set.union fv (Set.fromList . map getOccName . Map.keys $ env)
-    let name' = undefined $ findFreshName taken occ
-    put $ Map.insert (getName name) name' env
+    let name' = setInternalOccName (findFreshName taken occ) name
+    put $ Map.insert nname name' env
   where
-    occ = getOccName name
+    nname = getName name
+    occ = nameOccName nname
 
 
 findFreshName :: Set OccName -> OccName -> OccName
