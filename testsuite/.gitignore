@@ -55,8 +55,8 @@ tmp.d
 *.so
 *bindisttest_install___dir_bin_ghc.mk
 *bindisttest_install___dir_bin_ghc.exe.mk
-mk/ghcconfig*_bin_ghc-*.mk
-mk/ghcconfig*_bin_ghc-*.exe.mk
+mk/ghcconfig*_bin_ghc*.mk
+mk/ghcconfig*_bin_ghc*.exe.mk
 *.imports
 
 # -----------------------------------------------------------------------------
