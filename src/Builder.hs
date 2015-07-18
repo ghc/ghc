@@ -6,9 +6,10 @@ module Builder (
 
 import Base
 import Util
+import Data.List
 import Oracles.Base
 import Oracles.Flag
-import Oracles.Option
+import Oracles.Setting
 import GHC.Generics
 import Development.Shake.Classes
 

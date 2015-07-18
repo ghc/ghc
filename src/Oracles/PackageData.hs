@@ -8,6 +8,7 @@ module Oracles.PackageData (
 import Development.Shake.Classes
 import Base
 import Util
+import Data.List
 import Data.Maybe
 
 -- For each (PackageData path) the file 'path/package-data.mk' contains

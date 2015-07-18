@@ -15,10 +15,10 @@ module Way ( -- TODO: rename to "Way"?
 
 import Base
 import Util
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
-import Oracles.Option
+import Oracles.Setting
 import Development.Shake.Classes
+import Data.List hiding (delete)
+import Data.IntSet (IntSet, elems, member, delete, fromList)
 
 data WayUnit = Threaded
              | Debug
@@ -45,13 +45,13 @@ instance Read WayUnit where
 newtype Way = Way IntSet
 
 wayFromUnits :: [WayUnit] -> Way
-wayFromUnits = Way . IntSet.fromList . map fromEnum
+wayFromUnits = Way . fromList . map fromEnum
 
 wayToUnits :: Way -> [WayUnit]
-wayToUnits (Way set) = map toEnum . IntSet.elems $ set
+wayToUnits (Way set) = map toEnum . elems $ set
 
 wayUnit :: WayUnit -> Way -> Bool
-wayUnit unit (Way set) = fromEnum unit `IntSet.member` set
+wayUnit unit (Way set) = fromEnum unit `member` set
 
 instance Show Way where
     show way = if null tag then "v" else tag
@@ -117,9 +117,9 @@ libsuf way @ (Way set) =
     if (not . wayUnit Dynamic $ way)
     then return $ wayPrefix way ++ "a" -- e.g., p_a
     else do
-        extension <- showArg DynamicExtension  -- e.g., .dll or .so
-        version   <- showArg ProjectVersion    -- e.g., 7.11.20141222
-        let prefix = wayPrefix . Way . IntSet.delete (fromEnum Dynamic) $ set
+        extension <- setting DynamicExtension  -- e.g., .dll or .so
+        version   <- setting ProjectVersion    -- e.g., 7.11.20141222
+        let prefix = wayPrefix . Way . delete (fromEnum Dynamic) $ set
         -- e.g., p_ghc7.11.20141222.dll (the result)
         return $ prefix ++ "ghc" ++ version ++ extension
 

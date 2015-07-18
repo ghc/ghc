@@ -16,6 +16,7 @@ import Base
 import Builder
 import Package
 import Target
+import Data.List
 import Oracles.Base
 import Data.Monoid
 import Control.Monad.Reader hiding (liftIO)

@@ -7,14 +7,15 @@ import Base
 import Builder
 import Package
 import Util
-import Oracles.Base
-import Switches
 import Expression
+import Switches
+import Oracles.Base
 import Settings.User
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
 import Settings.TargetDirectory
+import Data.List
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do

@@ -13,6 +13,7 @@ import Control.Monad.Extra
 import Oracles.Base
 import Oracles.PackageData
 import Oracles.DependencyList
+import Data.List
 
 -- Oracle for configuration files
 configOracle :: Rules ()

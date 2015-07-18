@@ -6,7 +6,7 @@ module Base (
     module Control.Applicative,
     module Data.Function,
     module Data.Monoid,
-    module Data.List,
+    --module Data.List,
     Stage (..),
     Arg, ArgList,
     ShowArg (..), ShowArgs (..),
@@ -18,7 +18,6 @@ import Development.Shake.FilePath
 import Control.Applicative
 import Data.Function
 import Data.Monoid
-import Data.List
 import GHC.Generics
 import Development.Shake.Classes
 
