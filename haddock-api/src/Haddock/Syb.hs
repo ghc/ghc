@@ -2,7 +2,7 @@
 
 
 module Haddock.Syb
-    ( everything, everywhere
+    ( everything, everythingWithState, everywhere
     , mkT
     , combine
     ) where
@@ -19,6 +19,20 @@ import Control.Applicative
 everything :: (r -> r -> r) -> (forall a. Data a => a -> r)
            -> (forall a. Data a => a -> r)
 everything k f x = foldl k (f x) (gmapQ (everything k f) x)
+
+
+-- | Perform a query with state on each level of a tree.
+--
+-- This is the same as 'everything' but allows for stateful computations. In
+-- SYB it is called @everythingWithContext@ but I find this name somewhat
+-- nicer.
+everythingWithState :: s -> (r -> r -> r)
+                    -> (forall a. Data a => a -> s -> (r, s))
+                    -> (forall a. Data a => a -> r)
+everythingWithState s k f x =
+    let (r, s') = f x s
+    in foldl k r (gmapQ (everythingWithState s' k f) x)
+
 
 -- | Apply transformation on each level of a tree.
 --
