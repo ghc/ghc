@@ -2,9 +2,10 @@ module Settings.TargetDirectory (
     targetDirectory, targetPath
     ) where
 
-import Base
+import Stage
 import Package
 import Settings.User
+import Development.Shake.FilePath
 
 -- User can override the default target directory settings given below
 targetDirectory :: Stage -> Package -> FilePath

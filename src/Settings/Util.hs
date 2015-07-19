@@ -11,11 +11,12 @@ module Settings.Util (
     -- argPackageConstraints,
     ) where
 
-import Base
 import Util
+import Stage
 import Builder
 import Oracles.Base
 import Expression
+import Development.Shake
 
 -- A single argument.
 arg :: String -> Args

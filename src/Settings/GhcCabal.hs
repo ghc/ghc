@@ -3,12 +3,12 @@ module Settings.GhcCabal (
     ) where
 
 import Way
-import Base
+import Stage
 import Builder
 import Package
 import Util
-import Expression
 import Switches
+import Expression
 import Oracles.Base
 import Settings.User
 import Settings.Ways
@@ -16,6 +16,9 @@ import Settings.Util
 import Settings.Packages
 import Settings.TargetDirectory
 import Data.List
+import Control.Applicative
+import Development.Shake
+import Development.Shake.FilePath
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do

@@ -2,12 +2,12 @@ module Rules.Actions (
     build, buildWhen, run, verboseRun,
     ) where
 
-import Base
 import Util
 import Builder
 import Expression
 import Settings.Args
 import Oracles.ArgsHash
+import Development.Shake
 
 -- Build a given target using an appropriate builder. Force a rebuilt if the
 -- argument list has changed since the last built (that is, track changes in

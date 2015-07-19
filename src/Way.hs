@@ -13,9 +13,10 @@ module Way ( -- TODO: rename to "Way"?
     detectWay
     ) where
 
-import Base
 import Util
 import Oracles.Setting
+import Control.Applicative
+import Development.Shake
 import Development.Shake.Classes
 import Data.List hiding (delete)
 import Data.IntSet (IntSet, elems, member, delete, fromList)

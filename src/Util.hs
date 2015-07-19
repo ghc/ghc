@@ -7,11 +7,12 @@ module Util (
     putColoured, redError, redError_
     ) where
 
-import Base
 import Data.Char
-import System.Console.ANSI
-import System.IO
 import Control.Monad
+import System.IO
+import System.Console.ANSI
+import Development.Shake
+import Development.Shake.FilePath
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)

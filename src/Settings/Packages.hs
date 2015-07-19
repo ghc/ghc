@@ -3,12 +3,11 @@ module Settings.Packages (
     packages, knownPackages
     ) where
 
-import Base
 import Package
 import Switches
 import Expression
-import Settings.Default
 import Settings.User
+import Settings.Default
 
 -- Combining default list of packages with user modifications
 packages :: Packages

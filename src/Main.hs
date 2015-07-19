@@ -1,6 +1,6 @@
-import Base
 import Rules
 import Config
+import Development.Shake
 
 main = shakeArgs shakeOptions{shakeFiles="_build/"} $ do
     oracleRules     -- see module Rules.Oracles

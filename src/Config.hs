@@ -2,8 +2,9 @@ module Config (
     autoconfRules, configureRules, cfgPath
     ) where
 
-import Base
 import Util
+import Development.Shake
+import Development.Shake.FilePath
 
 cfgPath :: FilePath
 cfgPath = "shake" </> "cfg"

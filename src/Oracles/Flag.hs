@@ -3,9 +3,9 @@ module Oracles.Flag (
     test
     ) where
 
-import Base
 import Util
 import Oracles.Base
+import Development.Shake
 
 data Flag = LaxDeps
           | DynamicGhcPrograms

@@ -2,19 +2,20 @@
 
 module Oracles.DependencyList (
     DependencyList (..),
-    DependencyListKey (..)
+    DependencyListKey (..),
+    dependencyList
     ) where
 
-import Development.Shake.Classes
-import Base
 import Data.Maybe
+import Development.Shake
+import Development.Shake.Classes
 
 data DependencyList = DependencyList FilePath FilePath
 
 newtype DependencyListKey = DependencyListKey (FilePath, FilePath)
                         deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-instance ShowArgs DependencyList where
-    showArgs (DependencyList file obj) = do
+dependencyList :: DependencyList -> Action [FilePath]
+dependencyList (DependencyList file obj) = do
         res <- askOracle $ DependencyListKey (file, obj)
         return $ fromMaybe [] res

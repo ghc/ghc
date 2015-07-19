@@ -4,17 +4,19 @@ module Rules.Data (
     cabalArgs, ghcPkgArgs, buildPackageData
     ) where
 
-import Base
+import Util
 import Package
 import Builder
 import Switches
 import Expression
-import Control.Monad.Extra
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.TargetDirectory
 import Rules.Actions
-import Util
+import Control.Applicative
+import Control.Monad.Extra
+import Development.Shake
+import Development.Shake.FilePath
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: StagePackageTarget -> Rules ()

@@ -5,10 +5,10 @@ module Settings.User (
     buildHaddock, validating
     ) where
 
-import Base hiding (Args)
+import Stage
 import Package
-import Settings.Default
 import Expression
+import Settings.Default
 
 -- No user-specific settings by default
 -- TODO: rename to userArgs

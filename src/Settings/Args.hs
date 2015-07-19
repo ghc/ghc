@@ -2,10 +2,9 @@ module Settings.Args (
     args
     ) where
 
-import Base
+import Settings.User
 import Settings.GhcPkg
 import Settings.GhcCabal
-import Settings.User
 import Expression
 
 args :: Args

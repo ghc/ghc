@@ -12,14 +12,15 @@ module Expression (
     ) where
 
 import Way
-import Base
+import Stage
 import Builder
 import Package
 import Target
-import Data.List
 import Oracles.Base
+import Data.List
 import Data.Monoid
 import Control.Monad.Reader hiding (liftIO)
+import Development.Shake
 
 -- Expr a is a computation that produces a value of type Action a and can read
 -- parameters of the current build Target.

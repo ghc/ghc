@@ -2,9 +2,10 @@ module Rules.Oracles (
     oracleRules
     ) where
 
-import Base
 import Oracles
 import Oracles.ArgsHash
+import Data.Monoid
+import Development.Shake
 
 oracleRules :: Rules ()
 oracleRules =

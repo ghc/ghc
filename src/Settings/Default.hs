@@ -7,7 +7,7 @@ module Settings.Default (
     templateHaskell, terminfo, time, transformers, unix, win32, xhtml
     ) where
 
-import Base
+import Stage
 import Package
 
 -- Build results will be placed into a target directory with the following

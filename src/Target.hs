@@ -5,7 +5,7 @@ module Target (
     ) where
 
 import Way
-import Base
+import Stage
 import Package
 import Builder
 import GHC.Generics

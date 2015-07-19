@@ -9,7 +9,7 @@ module Switches (
     registerPackage
     ) where
 
-import Base
+import Stage
 import Expression
 
 -- Derived predicates

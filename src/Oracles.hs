@@ -3,17 +3,20 @@ module Oracles (
     configOracle, packageDataOracle, dependencyOracle
     ) where
 
-import Development.Shake.Config
-import Development.Shake.Util
-import qualified Data.HashMap.Strict as M
-import Base
 import Util
 import Config
-import Control.Monad.Extra
 import Oracles.Base
 import Oracles.PackageData
 import Oracles.DependencyList
 import Data.List
+import Data.Function
+import qualified Data.HashMap.Strict as M
+import Control.Applicative
+import Control.Monad.Extra
+import Development.Shake
+import Development.Shake.Util
+import Development.Shake.Config
+import Development.Shake.FilePath
 
 -- Oracle for configuration files
 configOracle :: Rules ()

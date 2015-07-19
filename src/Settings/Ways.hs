@@ -3,7 +3,7 @@ module Settings.Ways (
     ) where
 
 import Way
-import Base
+import Stage
 import Switches
 import Expression
 import Settings.User

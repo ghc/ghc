@@ -1,18 +1,19 @@
 module Oracles.Setting (
-    Setting (..), MultiSetting (..),
-    setting, multiSetting,
+    Setting (..), SettingMulti (..),
+    setting, settingMulti,
     windowsHost
     ) where
 
-import Base
+import Stage
 import Oracles.Base
+import Development.Shake
 
 -- Each Setting comes from the system.config file, e.g. 'target-os = mingw32'.
 -- setting TargetOs looks up the config file and returns "mingw32".
 --
--- MultiSetting is used for multiple string values separated by spaces, such
+-- SettingMulti is used for multiple string values separated by spaces, such
 -- as 'src-hc-args = -H32m -O'.
--- multiSetting SrcHcArgs therefore returns a list of strings ["-H32", "-O"].
+-- settingMulti SrcHcArgs therefore returns a list of strings ["-H32", "-O"].
 data Setting = TargetOs
              | TargetArch
              | TargetPlatformFull
@@ -21,7 +22,7 @@ data Setting = TargetOs
              | ProjectVersion
              | GhcSourcePath
 
-data MultiSetting = SrcHcArgs
+data SettingMulti = SrcHcArgs
                   | ConfCcArgs Stage
                   | ConfGccLinkerArgs Stage
                   | ConfLdLinkerArgs Stage
@@ -41,8 +42,8 @@ setting s = askConfig $ case s of
     ProjectVersion     -> "project-version"
     GhcSourcePath      -> "ghc-source-path"
 
-multiSetting :: MultiSetting -> Action [String]
-multiSetting s = fmap words $ askConfig $ case s of
+settingMulti :: SettingMulti -> Action [String]
+settingMulti s = fmap words $ askConfig $ case s of
     SrcHcArgs               -> "src-hc-args"
     ConfCcArgs        stage -> "conf-cc-args"         ++ showStage stage
     ConfCppArgs       stage -> "conf-cpp-args"        ++ showStage stage

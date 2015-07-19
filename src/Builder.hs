@@ -4,14 +4,16 @@ module Builder (
     Builder (..), builderKey, builderPath, needBuilder
     ) where
 
-import Base
 import Util
+import Stage
 import Data.List
 import Oracles.Base
 import Oracles.Flag
 import Oracles.Setting
 import GHC.Generics
+import Development.Shake
 import Development.Shake.Classes
+import Development.Shake.FilePath
 
 -- A Builder is an external command invoked in separate process using Shake.cmd
 --

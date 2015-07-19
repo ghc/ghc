@@ -2,13 +2,13 @@ module Settings.GhcPkg (
     ghcPkgArgs
     ) where
 
-import Base
 import Builder
 import Switches
 import Expression
 import Settings.Util
 import Settings.GhcCabal
 import Settings.TargetDirectory
+import Development.Shake.FilePath
 
 ghcPkgArgs :: Args
 ghcPkgArgs = do

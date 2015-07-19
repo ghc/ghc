@@ -5,8 +5,8 @@ module Oracles.Base (
     askConfigWithDefault, askConfig
     ) where
 
-import Base
 import Util
+import Development.Shake
 import Development.Shake.Classes
 
 newtype ConfigKey = ConfigKey String
