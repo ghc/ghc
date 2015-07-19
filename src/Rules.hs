@@ -1,10 +1,12 @@
 module Rules (
     generateTargets, packageRules, oracleRules,
     module Rules.Package,
+    module Rules.Config,
     ) where
 
 import Stage
 import Expression
+import Rules.Config
 import Rules.Package
 import Rules.Oracles
 import Settings.Packages

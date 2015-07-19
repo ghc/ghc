@@ -1,45 +1,43 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.PackageData (
-    PackageData (..), PackageDataMulti (..),
-    PackageDataKey (..),
-    pkgData, pkgDataMulti
+    PackageData (..), PackageDataList (..),
+    pkgData, pkgDataList, packageDataOracle
     ) where
 
 import Util
+import Oracles.Base
 import Data.List
 import Data.Maybe
-import Development.Shake
-import Development.Shake.Classes
-import Development.Shake.FilePath
+import Control.Applicative
+import qualified Data.HashMap.Strict as Map
 
 -- For each (PackageData path) the file 'path/package-data.mk' contains
 -- a line of the form 'path_VERSION = 1.2.3.4'.
 -- pkgData $ PackageData path is an action that consults the file and
 -- returns "1.2.3.4".
 --
--- PackageDataMulti is used for multiple string options separated by spaces,
+-- PackageDataList is used for multiple string options separated by spaces,
 -- such as 'path_MODULES = Data.Array Data.Array.Base ...'.
--- pkgMultiData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
-
+-- pkgListData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
 data PackageData = Version     FilePath
                  | PackageKey  FilePath
                  | Synopsis    FilePath
 
-data PackageDataMulti = Modules        FilePath
-                      | SrcDirs        FilePath
-                      | IncludeDirs    FilePath
-                      | Deps           FilePath
-                      | DepKeys        FilePath
-                      | DepNames       FilePath
-                      | CppArgs        FilePath
-                      | HsArgs         FilePath
-                      | CcArgs         FilePath
-                      | CSrcs          FilePath
-                      | DepIncludeDirs FilePath
+data PackageDataList = Modules        FilePath
+                     | SrcDirs        FilePath
+                     | IncludeDirs    FilePath
+                     | Deps           FilePath
+                     | DepKeys        FilePath
+                     | DepNames       FilePath
+                     | CppArgs        FilePath
+                     | HsArgs         FilePath
+                     | CcArgs         FilePath
+                     | CSrcs          FilePath
+                     | DepIncludeDirs FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
-                        deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 askPackageData :: FilePath -> String -> Action String
 askPackageData path key = do
@@ -61,8 +59,8 @@ pkgData packageData = do
     return $ fromMaybe
         (error $ "No key '" ++ key ++ "' in " ++ unifyPath pkgData ++ ".") res
 
-pkgDataMulti :: PackageDataMulti -> Action [String]
-pkgDataMulti packageData = do
+pkgDataList :: PackageDataList -> Action [String]
+pkgDataList packageData = do
     let (key, path, defaultValue) = case packageData of
            Modules        path -> ("MODULES"                       , path, "" )
            SrcDirs        path -> ("HS_SRC_DIRS"                   , path, ".")
@@ -84,3 +82,14 @@ pkgDataMulti packageData = do
                             ++ unifyPath pkgData ++ "."
         Just ""    -> defaultValue
         Just value -> value
+
+-- Oracle for 'package-data.mk' files
+packageDataOracle :: Rules ()
+packageDataOracle = do
+    pkgData <- newCache $ \file -> do
+        need [file]
+        putOracle $ "Reading " ++ file ++ "..."
+        liftIO $ readConfigFile file
+    addOracle $ \(PackageDataKey (file, key)) ->
+        Map.lookup key <$> pkgData (unifyPath file)
+    return ()

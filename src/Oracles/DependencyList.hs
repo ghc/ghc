@@ -1,21 +1,43 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.DependencyList (
-    DependencyList (..),
-    DependencyListKey (..),
-    dependencyList
+    dependencyList,
+    dependencyListOracle
     ) where
 
+import Util
+import Oracles.Base
+import Data.List
 import Data.Maybe
-import Development.Shake
-import Development.Shake.Classes
-
-data DependencyList = DependencyList FilePath FilePath
+import Data.Function
+import qualified Data.HashMap.Strict as Map
+import Control.Applicative
 
 newtype DependencyListKey = DependencyListKey (FilePath, FilePath)
-                        deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-dependencyList :: DependencyList -> Action [FilePath]
-dependencyList (DependencyList file obj) = do
-        res <- askOracle $ DependencyListKey (file, obj)
-        return $ fromMaybe [] res
+-- dependencyList depFile objFile is an action that looks up dependencies of an
+-- object file (objFile) in a generated dependecy file (depFile).
+dependencyList :: FilePath -> FilePath -> Action [FilePath]
+dependencyList depFile objFile = do
+    res <- askOracle $ DependencyListKey (depFile, objFile)
+    return $ fromMaybe [] res
+
+-- Oracle for 'path/dist/*.deps' files
+dependencyListOracle :: Rules ()
+dependencyListOracle = do
+    deps <- newCache $ \file -> do
+        need [file]
+        putOracle $ "Reading " ++ file ++ "..."
+        contents <- parseMakefile <$> (liftIO $ readFile file)
+        return $ Map.fromList
+               $ map (bimap unifyPath (map unifyPath))
+               $ map (bimap head concat . unzip)
+               $ groupBy ((==) `on` fst)
+               $ sortBy (compare `on` fst) contents
+    addOracle $ \(DependencyListKey (file, obj)) ->
+        Map.lookup (unifyPath obj) <$> deps (unifyPath file)
+    return ()
+
+bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+bimap f g (x, y) = (f x, g y)

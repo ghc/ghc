@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.ArgsHash (
-    ArgsHashKey (..), askArgsHash, argsHashOracle
+    askArgsHash, argsHashOracle
     ) where
 
 import Expression
@@ -11,8 +11,12 @@ import Development.Shake
 import Development.Shake.Classes
 
 newtype ArgsHashKey = ArgsHashKey FullTarget
-                      deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
+-- This is an action that given a full target determines the corresponding
+-- argument list and computes its hash. The resulting value is tracked in a
+-- Shake oracle, hence initiating rebuilts when the hash is changed (a hash
+-- change indicates changes in the build system).
 askArgsHash :: FullTarget -> Action Int
 askArgsHash = askOracle . ArgsHashKey
 

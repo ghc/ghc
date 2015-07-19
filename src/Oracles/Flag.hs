@@ -5,7 +5,6 @@ module Oracles.Flag (
 
 import Util
 import Oracles.Base
-import Development.Shake
 
 data Flag = LaxDeps
           | DynamicGhcPrograms

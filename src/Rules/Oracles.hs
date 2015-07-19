@@ -2,11 +2,12 @@ module Rules.Oracles (
     oracleRules
     ) where
 
-import Oracles
+import Oracles.Base
 import Oracles.ArgsHash
+import Oracles.PackageData
+import Oracles.DependencyList
 import Data.Monoid
-import Development.Shake
 
 oracleRules :: Rules ()
 oracleRules =
-    configOracle <> packageDataOracle <> dependencyOracle <> argsHashOracle
+    configOracle <> packageDataOracle <> dependencyListOracle <> argsHashOracle

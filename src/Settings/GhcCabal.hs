@@ -17,8 +17,6 @@ import Settings.Packages
 import Settings.TargetDirectory
 import Data.List
 import Control.Applicative
-import Development.Shake
-import Development.Shake.FilePath
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do
