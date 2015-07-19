@@ -193,9 +193,11 @@ renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
 renameNameBndr :: SetName name => name -> Rename name name
 renameNameBndr name = do
     fv <- ask
-    when (getOccName name `Set.member` fv) $
-        freshName name
-    renameName name
+    env <- get
+    case Map.lookup (getName name) env of
+        Just name' -> pure name'
+        Nothing | getOccName name `Set.member` fv -> freshName name
+        Nothing -> pure name
 
 
 renameName :: SetName name => name -> Rename name name
@@ -206,13 +208,14 @@ renameName name = do
         Nothing -> name
 
 
-freshName :: SetName name => name -> Rename name ()
+freshName :: SetName name => name -> Rename name name
 freshName name = do
     fv <- ask
     env <- get
     let taken = Set.union fv (Set.fromList . map getOccName . Map.keys $ env)
     let name' = setInternalOccName (findFreshName taken occ) name
     put $ Map.insert nname name' env
+    return name'
   where
     nname = getName name
     occ = nameOccName nname
