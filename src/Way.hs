@@ -18,8 +18,9 @@ import Oracles.Setting
 import Control.Applicative
 import Development.Shake
 import Development.Shake.Classes
-import Data.List hiding (delete)
-import Data.IntSet (IntSet, elems, member, delete, fromList)
+import Data.List
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as Set
 
 data WayUnit = Threaded
              | Debug
@@ -46,13 +47,13 @@ instance Read WayUnit where
 newtype Way = Way IntSet
 
 wayFromUnits :: [WayUnit] -> Way
-wayFromUnits = Way . fromList . map fromEnum
+wayFromUnits = Way . Set.fromList . map fromEnum
 
 wayToUnits :: Way -> [WayUnit]
-wayToUnits (Way set) = map toEnum . elems $ set
+wayToUnits (Way set) = map toEnum . Set.elems $ set
 
 wayUnit :: WayUnit -> Way -> Bool
-wayUnit unit (Way set) = fromEnum unit `member` set
+wayUnit unit (Way set) = fromEnum unit `Set.member` set
 
 instance Show Way where
     show way = if null tag then "v" else tag
@@ -120,7 +121,7 @@ libsuf way @ (Way set) =
     else do
         extension <- setting DynamicExtension  -- e.g., .dll or .so
         version   <- setting ProjectVersion    -- e.g., 7.11.20141222
-        let prefix = wayPrefix . Way . delete (fromEnum Dynamic) $ set
+        let prefix = wayPrefix . Way . Set.delete (fromEnum Dynamic) $ set
         -- e.g., p_ghc7.11.20141222.dll (the result)
         return $ prefix ++ "ghc" ++ version ++ extension
 
