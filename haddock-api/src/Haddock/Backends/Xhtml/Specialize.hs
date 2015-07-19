@@ -159,6 +159,21 @@ renameType HsWildcardTy = pure HsWildcardTy
 renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
 
 
+freeVariables :: forall name. (NamedThing name, Data (HsType name))
+              => HsType name -> Set OccName
+freeVariables =
+    everythingWithState Set.empty Set.union query
+  where
+    query term ctx = case cast term :: Maybe (HsType name) of
+        Just (HsForAllTy _ _ bndrs _ _) ->
+            (Set.empty, Set.union ctx (bndrsNames bndrs))
+        Just (HsTyVar name)
+            | getName name `Set.member` ctx -> (Set.empty, ctx)
+            | otherwise -> (Set.singleton $ getOccName name, ctx)
+        _ -> (Set.empty, ctx)
+    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc) . hsq_tvs
+
+
 renameLType :: SetName name => LHsType name -> Rename name (LHsType name)
 renameLType = located renameType
 
@@ -237,3 +252,8 @@ alternativeNames name =
 
 located :: Functor f => (a -> f b) -> Located a -> f (Located b)
 located f (L loc e) = L loc <$> f e
+
+
+tyVarName :: HsTyVarBndr name -> name
+tyVarName (UserTyVar name) = name
+tyVarName (KindedTyVar (L _ name) _) = name
