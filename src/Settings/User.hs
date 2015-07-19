@@ -2,7 +2,7 @@ module Settings.User (
     module Settings.Default,
     userArgs, userPackages, userWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
-    buildHaddock, validating
+    buildHaddock, validating, dynamicGhcPrograms, laxDependencies
     ) where
 
 import Stage
@@ -35,10 +35,18 @@ userTargetDirectory = defaultTargetDirectory
 integerLibrary :: Package
 integerLibrary = integerGmp2
 
--- User-defined predicates
--- TODO: migrate more predicates here from configuration files
+-- User-defined flags. Note the following type semantics:
+-- * Bool: a plain Boolean flag whose value is known at compile time
+-- * Action Bool: a flag whose value can depend on the build environment
+-- * Predicate: a flag depending on the build environment and the current target
+validating :: Bool
+validating = False
+
+dynamicGhcPrograms :: Bool
+dynamicGhcPrograms = False
+
+laxDependencies :: Bool
+laxDependencies = False
+
 buildHaddock :: Predicate
 buildHaddock = return True
-
-validating :: Predicate
-validating = return False

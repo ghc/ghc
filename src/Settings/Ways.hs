@@ -6,6 +6,7 @@ import Way
 import Stage
 import Switches
 import Expression
+import Oracles.Flag
 import Settings.User
 
 -- Combining default ways with user modifications

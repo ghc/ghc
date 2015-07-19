@@ -1,7 +1,8 @@
 module Oracles.Setting (
     Setting (..), SettingList (..),
     setting, settingList,
-    windowsHost
+    targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
+    targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter
     ) where
 
 import Stage
@@ -53,7 +54,42 @@ settingList key = fmap words $ askConfig $ case key of
     GmpIncludeDirs          -> "gmp-include-dirs"
     GmpLibDirs              -> "gmp-lib-dirs"
 
+matchSetting :: Setting -> [String] -> Action Bool
+matchSetting key values = do
+    value <- setting key
+    return $ value `elem` values
+
+targetPlatforms :: [String] -> Action Bool
+targetPlatforms = matchSetting TargetPlatformFull
+
+targetPlatform :: String -> Action Bool
+targetPlatform s = targetPlatforms [s]
+
+targetOss :: [String] -> Action Bool
+targetOss = matchSetting TargetOs
+
+targetOs :: String -> Action Bool
+targetOs s = targetOss [s]
+
+notTargetOs :: String -> Action Bool
+notTargetOs = fmap not . targetOs
+
+targetArchs :: [String] -> Action Bool
+targetArchs = matchSetting TargetArch
+
 windowsHost :: Action Bool
 windowsHost = do
     hostOsCpp <- setting HostOsCpp
     return $ hostOsCpp `elem` ["mingw32", "cygwin32"]
+
+notWindowsHost :: Action Bool
+notWindowsHost = fmap not windowsHost
+
+ghcWithInterpreter :: Action Bool
+ghcWithInterpreter = do
+    goodOs <- targetOss [ "mingw32", "cygwin32", "linux", "solaris2"
+                        , "freebsd", "dragonfly", "netbsd", "openbsd"
+                        , "darwin", "kfreebsdgnu" ]
+    goodArch <- targetArchs [ "i386", "x86_64", "powerpc", "sparc"
+                            , "sparc64", "arm" ]
+    return $ goodOs && goodArch

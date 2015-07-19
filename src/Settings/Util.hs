@@ -3,6 +3,7 @@ module Settings.Util (
     arg, argPath, argM,
     argConfig, argStagedConfig, argConfigList, argStagedConfigList,
     appendCcArgs,
+    needBuilder
     -- argBuilderPath, argStagedBuilderPath,
     -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
     -- argIncludeDirs, argDepIncludeDirs,
@@ -14,6 +15,7 @@ module Settings.Util (
 import Util
 import Stage
 import Builder
+import Settings.User
 import Oracles.Base
 import Expression
 
@@ -54,6 +56,20 @@ appendCcArgs xs = do
     mconcat [ builder (Gcc stage) ? append xs
             , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" xs
             , builder GhcCabal    ? appendSub "--gcc-options" xs ]
+
+-- Make sure a builder exists on the given path and rebuild it if out of date.
+-- If laxDependencies is true (Settings/User.hs) then we do not rebuild GHC
+-- even if it is out of date (can save a lot of build time when changing GHC).
+needBuilder :: Builder -> Action ()
+needBuilder ghc @ (Ghc stage) = do
+    path <- builderPath ghc
+    if laxDependencies then orderOnly [path] else need [path]
+
+needBuilder builder = do
+    path <- builderPath builder
+    need [path]
+
+
 
 -- packageData :: Arity -> String -> Args
 -- packageData arity key =

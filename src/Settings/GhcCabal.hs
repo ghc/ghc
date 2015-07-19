@@ -10,6 +10,8 @@ import Util
 import Switches
 import Expression
 import Oracles.Base
+import Oracles.Flag
+import Oracles.Setting
 import Settings.User
 import Settings.Ways
 import Settings.Util
@@ -30,7 +32,7 @@ cabalArgs = builder GhcCabal ? do
             , with $ GhcPkg stage
             , stage0 ? bootPackageDbArgs
             , libraryArgs
-            , configKeyNonEmpty "hscolour" ? with HsColour
+            , with HsColour
             , configureArgs
             , stage0 ? packageConstraints
             , with $ Gcc stage
@@ -42,13 +44,12 @@ cabalArgs = builder GhcCabal ? do
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 libraryArgs :: Args
 libraryArgs = do
-    ways            <- fromDiffExpr Settings.Ways.ways
-    ghcInterpreter  <- ghcWithInterpreter
-    dynamicPrograms <- dynamicGhcPrograms
+    ways           <- fromDiffExpr Settings.Ways.ways
+    ghcInterpreter <- lift $ ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
              else "--disable-library-vanilla"
-           , if vanilla `elem` ways && ghcInterpreter && not dynamicPrograms
+           , if vanilla `elem` ways && ghcInterpreter && not dynamicGhcPrograms
              then  "--enable-library-for-ghci"
              else "--disable-library-for-ghci"
            , if profiling `elem` ways
@@ -151,7 +152,7 @@ withBuilderKey builder = case builder of
 
 -- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
 with :: Builder -> Args
-with builder = do
+with builder = specified builder ? do
     path <- lift $ builderPath builder
     lift $ needBuilder builder
     append [withBuilderKey builder ++ path]

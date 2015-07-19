@@ -1,43 +1,56 @@
 module Oracles.Flag (
-    Flag (..),
-    test
+    Flag (..), flag,
+    supportsPackageKey, crossCompiling, gccIsClang, gccLt46,
+    platformSupportsSharedLibs
     ) where
 
 import Util
 import Oracles.Base
+import Oracles.Setting
+import Control.Monad
 
-data Flag = LaxDeps
-          | DynamicGhcPrograms
-          | GccIsClang
+data Flag = GccIsClang
           | GccLt46
           | CrossCompiling
-          | Validating
           | SupportsPackageKey
           | SolarisBrokenShld
           | SplitObjectsBroken
           | GhcUnregisterised
 
--- TODO: Give the warning *only once* per key
-test :: Flag -> Action Bool
-test flag = do
-    (key, defaultValue) <- return $ case flag of
-        LaxDeps            -> ("lax-dependencies"     , False)
-        DynamicGhcPrograms -> ("dynamic-ghc-programs" , False)
-        GccIsClang         -> ("gcc-is-clang"         , False)
-        GccLt46            -> ("gcc-lt-46"            , False)
-        CrossCompiling     -> ("cross-compiling"      , False)
-        Validating         -> ("validating"           , False)
-        SupportsPackageKey -> ("supports-package-key" , False)
-        SolarisBrokenShld  -> ("solaris-broken-shld"  , False)
-        SplitObjectsBroken -> ("split-objects-broken" , False)
-        GhcUnregisterised  -> ("ghc-unregisterised"   , False)
-    let defaultString = if defaultValue then "YES" else "NO"
-    value <- askConfigWithDefault key $ -- TODO: warn just once
-        do putColoured Red $ "\nFlag '"
-                ++ key
-                ++ "' not set in configuration files. "
-                ++ "Proceeding with default value '"
-                ++ defaultString
-                ++ "'.\n"
-           return defaultString
+flag :: Flag -> Action Bool
+flag f = do
+    key <- return $ case f of
+        GccIsClang         -> "gcc-is-clang"
+        GccLt46            -> "gcc-lt-46"
+        CrossCompiling     -> "cross-compiling"
+        SupportsPackageKey -> "supports-package-key"
+        SolarisBrokenShld  -> "solaris-broken-shld"
+        SplitObjectsBroken -> "split-objects-broken"
+        GhcUnregisterised  -> "ghc-unregisterised"
+    value <- askConfigWithDefault key . redError
+        $ "\nFlag '" ++ key ++ "' not set in configuration files."
+    unless (value == "YES" || value == "NO") . redError
+        $ "\nFlag '" ++ key ++ "' is set to '" ++ value
+        ++ "' instead of 'YES' or 'NO'."
     return $ value == "YES"
+
+supportsPackageKey :: Action Bool
+supportsPackageKey = flag SupportsPackageKey
+
+crossCompiling :: Action Bool
+crossCompiling = flag CrossCompiling
+
+gccIsClang :: Action Bool
+gccIsClang = flag GccIsClang
+
+gccLt46 :: Action Bool
+gccLt46 = flag GccLt46
+
+platformSupportsSharedLibs :: Action Bool
+platformSupportsSharedLibs = do
+    badPlatform   <- targetPlatforms [ "powerpc-unknown-linux"
+                                     , "x86_64-unknown-mingw32"
+                                     , "i386-unknown-mingw32" ]
+    solaris       <- targetPlatform    "i386-unknown-solaris2"
+    solarisBroken <- flag SolarisBrokenShld
+    return $ not (badPlatform || solaris && solarisBroken)

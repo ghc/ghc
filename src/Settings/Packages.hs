@@ -6,6 +6,7 @@ module Settings.Packages (
 import Package
 import Switches
 import Expression
+import Oracles.Setting
 import Settings.User
 import Settings.Default
 

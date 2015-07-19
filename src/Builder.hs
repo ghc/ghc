@@ -1,14 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Builder (
-    Builder (..), builderKey, builderPath, needBuilder
+    Builder (..), builderKey, builderPath, specified
     ) where
 
 import Util
 import Stage
 import Data.List
 import Oracles.Base
-import Oracles.Flag
 import Oracles.Setting
 import GHC.Generics
 
@@ -56,6 +55,9 @@ builderPath builder = do
                      ++ "' in configuration files."
     fixAbsolutePathOnWindows $ if null path then "" else path -<.> exe
 
+specified :: Builder -> Action Bool
+specified = fmap (not . null) . builderPath
+
 -- TODO: get rid of code duplication (windowsHost)
 -- On Windows: if the path starts with "/", prepend it with the correct path to
 -- the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe".
@@ -75,17 +77,6 @@ fixAbsolutePathOnWindows path = do
 -- to avoid needless recompilation when making changes to GHC's sources. In
 -- certain situations this can lead to build failures, in which case you
 -- should reset the flag (at least temporarily).
-
--- Make sure the builder exists on the given path and rebuild it if out of date
-needBuilder :: Builder -> Action ()
-needBuilder ghc @ (Ghc stage) = do
-    path    <- builderPath ghc
-    laxDeps <- test LaxDeps
-    if laxDeps then orderOnly [path] else need [path]
-
-needBuilder builder = do
-    path <- builderPath builder
-    need [path]
 
 -- Instances for storing in the Shake database
 instance Binary Builder

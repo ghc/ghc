@@ -4,11 +4,11 @@ module Expression (
     module Data.Monoid,
     module Control.Monad.Reader,
     Expr, DiffExpr, fromDiffExpr,
-    Predicate, Args, Ways, Packages,
+    Predicate, PredicateLike (..), applyPredicate, (??),
+    Args, Ways, Packages,
     append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretExpr,
-    applyPredicate, (?), (??), stage, package, builder, file, way,
-    configKeyValue, configKeyValues
+    stage, package, builder, file, way
     ) where
 
 import Way
@@ -72,10 +72,27 @@ applyPredicate predicate expr = do
     if bool then expr else return mempty
 
 -- A convenient operator for predicate application
-(?) :: Monoid a => Predicate -> Expr a -> Expr a
-(?) = applyPredicate
+class PredicateLike a where
+    (?)  :: Monoid m => a -> Expr m -> Expr m
+    notP :: a -> Predicate
 
 infixr 8 ?
+
+instance PredicateLike Predicate where
+    (?)  = applyPredicate
+    notP = liftM not
+
+instance PredicateLike Bool where
+    (?)  = applyPredicate . return
+    notP = return . not
+
+instance PredicateLike (Action Bool) where
+    (?)  = applyPredicate . lift
+    notP = lift . fmap not
+
+-- An equivalent of if-then-else for predicates
+(??) :: (PredicateLike a, Monoid m) => a -> (Expr m, Expr m) -> Expr m
+p ?? (t, f) = p ? t <> notP p ? f
 
 -- A monadic version of append
 appendM :: Monoid a => Action a -> DiffExpr a
@@ -126,10 +143,6 @@ fromDiffExpr = fmap (($ mempty) . fromDiff)
 interpret :: Monoid a => Target -> DiffExpr a -> Action a
 interpret target = interpretExpr target . fromDiffExpr
 
--- An equivalent of if-then-else for predicates
-(??) :: Monoid a => Predicate -> (Expr a, Expr a) -> Expr a
-p ?? (t, f) = p ? t <> (liftM not p) ? f
-
 -- Basic predicates (see Switches.hs for derived predicates)
 stage :: Stage -> Predicate
 stage s = liftM (s ==) (asks getStage)
@@ -145,11 +158,3 @@ file f = liftM (any (f ?==)) (asks getFiles)
 
 way :: Way -> Predicate
 way w = liftM (w ==) (asks getWay)
-
-configKeyValue :: String -> String -> Predicate
-configKeyValue key value = liftM (value ==) (lift $ askConfig key)
-
--- Check if there is at least one match
--- Example: configKeyValues "host-os-cpp" ["mingw32", "cygwin32"]
-configKeyValues :: String -> [String] -> Predicate
-configKeyValues key values = liftM (`elem` values) (lift $ askConfig key)

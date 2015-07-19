@@ -1,11 +1,12 @@
 module Rules.Actions (
-    build, buildWhen, run, verboseRun,
+    build, buildWhen, run, verboseRun
     ) where
 
 import Util
 import Builder
 import Expression
 import Settings.Args
+import Settings.Util
 import Oracles.ArgsHash
 import Development.Shake
 
@@ -15,8 +16,6 @@ import Development.Shake
 build :: FullTarget -> Action ()
 build target = do
     argList <- interpret target args
-    putColoured Green (show target)
-    putColoured Green (show argList)
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target
     run (getBuilder target) argList
