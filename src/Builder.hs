@@ -9,6 +9,7 @@ import Stage
 import Data.List
 import Oracles.Base
 import Oracles.Setting
+import Oracles.WindowsRoot
 import GHC.Generics
 
 -- A Builder is an external command invoked in separate process using Shake.cmd
@@ -58,7 +59,6 @@ builderPath builder = do
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
 
--- TODO: get rid of code duplication (windowsHost)
 -- On Windows: if the path starts with "/", prepend it with the correct path to
 -- the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe".
 fixAbsolutePathOnWindows :: FilePath -> Action FilePath
@@ -67,8 +67,8 @@ fixAbsolutePathOnWindows path = do
     -- Note, below is different from FilePath.isAbsolute:
     if (windows && "/" `isPrefixOf` path)
     then do
-        Stdout out <- quietly $ cmd ["cygpath", "-m", "/"]
-        return . unifyPath $ dropWhileEnd isSpace out ++ drop 1 path
+        root <- windowsRoot
+        return . unifyPath $ root ++ drop 1 path
     else
         return path
 

@@ -11,6 +11,7 @@ args :: Args
 args = defaultArgs <> userArgs
 
 -- TODO: add all other settings
+-- TODO: add src-hc-args = -H32m -O
 defaultArgs :: Args
 defaultArgs = mconcat
     [ cabalArgs

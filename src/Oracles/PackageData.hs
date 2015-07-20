@@ -39,6 +39,7 @@ data PackageDataList = Modules        FilePath
 newtype PackageDataKey = PackageDataKey (FilePath, String)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
+-- TODO: is this needed?
 askPackageData :: FilePath -> String -> Action String
 askPackageData path key = do
     let fullKey = replaceSeparators '_' $ path ++ "_" ++ key

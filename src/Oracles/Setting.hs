@@ -12,8 +12,8 @@ import Oracles.Base
 -- setting TargetOs looks up the config file and returns "mingw32".
 --
 -- SettingList is used for multiple string values separated by spaces, such
--- as 'src-hc-args = -H32m -O'.
--- settingList SrcHcArgs therefore returns a list of strings ["-H32", "-O"].
+-- as 'gmp-include-dirs = a b'.
+-- settingList GmpIncludeDirs therefore returns a list of strings ["a", "b"].
 data Setting = TargetOs
              | TargetArch
              | TargetPlatformFull
@@ -22,8 +22,7 @@ data Setting = TargetOs
              | ProjectVersion
              | GhcSourcePath
 
-data SettingList = SrcHcArgs
-                 | ConfCcArgs Stage
+data SettingList = ConfCcArgs Stage
                  | ConfGccLinkerArgs Stage
                  | ConfLdLinkerArgs Stage
                  | ConfCppArgs Stage
@@ -44,7 +43,6 @@ setting key = askConfig $ case key of
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of
-    SrcHcArgs               -> "src-hc-args"
     ConfCcArgs        stage -> "conf-cc-args-stage"         ++ show stage
     ConfCppArgs       stage -> "conf-cpp-args-stage"        ++ show stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-stage" ++ show stage
