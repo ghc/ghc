@@ -489,12 +489,14 @@ repForD (L loc (ForeignImport name typ _ (CImport (L _ cc) (L _ s) mch cis _)))
     conv_cimportspec (CFunction (StaticTarget _ _  _ False))
                             = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
+    -- these calling conventions do not support headers and the static keyword
+    raw_cconv = cc == PrimCallConv || cc == JavaScriptCallConv
     static = case cis of
-                 CFunction (StaticTarget _ _ _ _) -> "static "
+                 CFunction (StaticTarget _ _ _ _) | not raw_cconv -> "static "
                  _ -> ""
     chStr = case mch of
-            Nothing -> ""
-            Just (Header _ h) -> unpackFS h ++ " "
+            Just (Header _ h) | not raw_cconv -> unpackFS h ++ " "
+            _ -> ""
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
