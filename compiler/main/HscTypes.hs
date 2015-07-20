@@ -1080,23 +1080,24 @@ data ModGuts
                                          --   (produced by desugarer & consumed by vectoriser)
         mg_vect_info :: !VectInfo,       -- ^ Pool of vectorised declarations in the module
 
-        -- The next two fields are unusual, because they give instance
-        -- environments for *all* modules in the home package, including
-        -- this module, rather than for *just* this module.
-        -- Reason: when looking up an instance we don't want to have to
-        --        look at each module in the home package in turn
-        mg_inst_env     :: InstEnv,
-        -- ^ Class instance environment from /home-package/ modules (including
-        -- this one); c.f. 'tcg_inst_env'
-        mg_fam_inst_env :: FamInstEnv,
-        -- ^ Type-family instance environment for /home-package/ modules
-        -- (including this one); c.f. 'tcg_fam_inst_env'
-        mg_safe_haskell :: SafeHaskellMode,
-        -- ^ Safe Haskell mode
-        mg_trust_pkg    :: Bool,
-        -- ^ Do we need to trust our own package for Safe Haskell?
-        -- See Note [RnNames . Trust Own Package]
-        mg_dependent_files :: [FilePath] -- ^ dependencies from addDependentFile
+                        -- The next two fields are unusual, because they give instance
+                        -- environments for *all* modules in the home package, including
+                        -- this module, rather than for *just* this module.
+                        -- Reason: when looking up an instance we don't want to have to
+                        --         look at each module in the home package in turn
+        mg_inst_env     :: InstEnv,             -- ^ Class instance environment for
+                                                -- /home-package/ modules (including this
+                                                -- one); c.f. 'tcg_inst_env'
+        mg_fam_inst_env :: FamInstEnv,          -- ^ Type-family instance environment for
+                                                -- /home-package/ modules (including this
+                                                -- one); c.f. 'tcg_fam_inst_env'
+
+        mg_safe_haskell :: SafeHaskellMode,     -- ^ Safe Haskell mode
+        mg_trust_pkg    :: Bool,                -- ^ Do we need to trust our
+                                                -- own package for Safe Haskell?
+                                                -- See Note [RnNames . Trust Own Package]
+
+        mg_dependent_files :: [FilePath]        -- ^ Dependencies from addDependentFile
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -1104,7 +1105,6 @@ data ModGuts
 -- After simplification, the following fields change slightly:
 --      mg_rules        Orphan rules only (local ones now attached to binds)
 --      mg_binds        With rules attached
-
 
 ---------------------------------------------------------
 -- The Tidy pass forks the information about this module:
