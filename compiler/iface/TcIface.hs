@@ -165,13 +165,13 @@ typecheckIface iface
 ************************************************************************
 -}
 
-tcHiBootIface :: HscSource -> Module -> TcRn ModDetails
+tcHiBootIface :: HscSource -> Module -> TcRn SelfBootInfo
 -- Load the hi-boot iface for the module being compiled,
 -- if it indeed exists in the transitive closure of imports
--- Return the ModDetails, empty if no hi-boot iface
+-- Return the ModDetails; Nothing if no hi-boot iface
 tcHiBootIface hsc_src mod
   | HsBootFile <- hsc_src            -- Already compiling a hs-boot file
-  = return emptyModDetails
+  = return NoSelfBoot
   | otherwise
   = do  { traceIf (text "loadHiBootInterface" <+> ppr mod)
 
@@ -188,10 +188,10 @@ tcHiBootIface hsc_src mod
                 -- And that's fine, because if M's ModInfo is in the HPT, then
                 -- it's been compiled once, and we don't need to check the boot iface
           then do { hpt <- getHpt
-                  ; case lookupUFM hpt (moduleName mod) of
+                 ; case lookupUFM hpt (moduleName mod) of
                       Just info | mi_boot (hm_iface info)
-                                -> return (hm_details info)
-                      _ -> return emptyModDetails }
+                                -> return (mkSelfBootInfo (hm_details info))
+                      _ -> return NoSelfBoot }
           else do
 
         -- OK, so we're in one-shot mode.
@@ -203,8 +203,9 @@ tcHiBootIface hsc_src mod
                                 True    -- Hi-boot file
 
         ; case read_result of {
-                Succeeded (iface, _path) -> typecheckIface iface ;
-                Failed err               ->
+            Succeeded (iface, _path) -> do { tc_iface <- typecheckIface iface
+                                           ; return (mkSelfBootInfo tc_iface) } ;
+            Failed err               ->
 
         -- There was no hi-boot file. But if there is circularity in
         -- the module graph, there really should have been one.
@@ -215,7 +216,7 @@ tcHiBootIface hsc_src mod
         -- disappeared.
     do  { eps <- getEps
         ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
-            Nothing -> return emptyModDetails -- The typical case
+            Nothing -> return NoSelfBoot -- The typical case
 
             Just (_, False) -> failWithTc moduleLoop
                 -- Someone below us imported us!
@@ -233,6 +234,15 @@ tcHiBootIface hsc_src mod
 
     elaborate err = hang (ptext (sLit "Could not find hi-boot interface for") <+>
                           quotes (ppr mod) <> colon) 4 err
+
+
+mkSelfBootInfo :: ModDetails -> SelfBootInfo
+mkSelfBootInfo mds
+  = SelfBoot { sb_mds = mds
+             , sb_tcs = mkNameSet (map tyConName (typeEnvTyCons iface_env))
+             , sb_ids = mkNameSet (map idName (typeEnvIds iface_env)) }
+  where
+    iface_env = md_types mds
 
 {-
 ************************************************************************

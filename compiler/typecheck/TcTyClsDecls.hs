@@ -107,12 +107,11 @@ Thus, we take two passes over the resulting tycons, first checking for general
 validity and then checking for valid role annotations.
 -}
 
-tcTyAndClassDecls :: ModDetails
-                  -> [TyClGroup Name]   -- Mutually-recursive groups in dependency order
+tcTyAndClassDecls :: [TyClGroup Name]   -- Mutually-recursive groups in dependency order
                   -> TcM TcGblEnv       -- Input env extended by types and classes
                                         -- and their implicit Ids,DataCons
 -- Fails if there are any errors
-tcTyAndClassDecls boot_details tyclds_s
+tcTyAndClassDecls tyclds_s
   = checkNoErrs $       -- The code recovers internally, but if anything gave rise to
                         -- an error we'd better stop now, to avoid a cascade
     fold_env tyclds_s   -- Type check each group in dependency order folding the global env
@@ -120,13 +119,13 @@ tcTyAndClassDecls boot_details tyclds_s
     fold_env :: [TyClGroup Name] -> TcM TcGblEnv
     fold_env [] = getGblEnv
     fold_env (tyclds:tyclds_s)
-      = do { tcg_env <- tcTyClGroup boot_details tyclds
+      = do { tcg_env <- tcTyClGroup tyclds
            ; setGblEnv tcg_env $ fold_env tyclds_s }
              -- remaining groups are typecheck in the extended global env
 
-tcTyClGroup :: ModDetails -> TyClGroup Name -> TcM TcGblEnv
+tcTyClGroup :: TyClGroup Name -> TcM TcGblEnv
 -- Typecheck one strongly-connected component of type and class decls
-tcTyClGroup boot_details tyclds
+tcTyClGroup tyclds
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
@@ -138,8 +137,9 @@ tcTyClGroup boot_details tyclds
        ; let role_annots = extractRoleAnnots tyclds
              decls = group_tyclds tyclds
        ; tyclss <- fixM $ \ rec_tyclss -> do
-           { is_boot <- tcIsHsBootOrSig
-           ; let rec_flags = calcRecFlags boot_details is_boot
+           { is_boot   <- tcIsHsBootOrSig
+           ; self_boot <- tcSelfBootInfo
+           ; let rec_flags = calcRecFlags self_boot is_boot
                                           role_annots rec_tyclss
 
                  -- Populate environment with knot-tied ATyCon for TyCons

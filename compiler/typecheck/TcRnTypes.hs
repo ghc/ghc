@@ -36,6 +36,7 @@ module TcRnTypes(
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
         TcTyThing(..), PromotionErr(..),
+        SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory,
 
         -- Desugaring types
@@ -337,8 +338,6 @@ data TcGblEnv
           -- ^ What kind of module (regular Haskell, hs-boot, hsig)
         tcg_sig_of  :: Maybe Module,
           -- ^ Are we being compiled as a signature of an implementation?
-        tcg_mod_name :: Maybe (Located ModuleName),
-          -- ^ @Nothing@: \"module X where\" is omitted
         tcg_impl_rdr_env :: Maybe GlobalRdrEnv,
           -- ^ Environment used only during -sig-of for resolving top level
           -- bindings.  See Note [Signature parameters in TcGblEnv and DynFlags]
@@ -477,6 +476,9 @@ data TcGblEnv
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
                                              --  prog uses hpc instrumentation.
 
+        tcg_self_boot :: SelfBootInfo,       -- ^ Whether this module has a
+                                             -- corresponding hi-boot file
+
         tcg_main      :: Maybe Name,         -- ^ The Name of the main
                                              -- function, if this module is
                                              -- the main module.
@@ -559,6 +561,15 @@ data RecFieldEnv
         -- The FieldEnv deals *only* with constructors defined in *this*
         -- module.  For imported modules, we get the same info from the
         -- TypeEnv
+
+data SelfBootInfo
+  = NoSelfBoot    -- No corresponding hi-boot file
+  | SelfBoot
+       { sb_mds :: ModDetails   -- There was a hi-boot file,
+       , sb_tcs :: NameSet      -- defining these TyCons,
+       , sb_ids :: NameSet }    -- and these Ids
+  -- We need this info to compute a safe approximation to
+  -- recursive loops, to avoid infinite inlinings
 
 {-
 Note [Tracking unused binding and imports]

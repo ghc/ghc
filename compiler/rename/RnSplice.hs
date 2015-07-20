@@ -131,7 +131,7 @@ rn_bracket _ (DecBrL decls)
                           -- The emptyDUs is so that we just collect uses for this
                           -- group alone in the call to rnSrcDecls below
        ; (tcg_env, group') <- setGblEnv new_gbl_env $
-                              rnSrcDecls Nothing group
+                              rnSrcDecls group
 
               -- Discard the tcg_env; it contains only extra info about fixity
         ; traceRn (text "rn_bracket dec" <+> (ppr (tcg_dus tcg_env) $$
