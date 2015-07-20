@@ -301,6 +301,23 @@ instance NamedThing DocName where
   getName (Undocumented name) = name
 
 
+class NamedThing name => SetName name where
+
+    setName :: Name -> name -> name
+
+
+instance SetName Name where
+
+    setName name' _ = name'
+
+
+instance SetName DocName where
+
+    setName name' (Documented _ mdl) = Documented name' mdl
+    setName name' (Undocumented _) = Undocumented name'
+
+
+
 -----------------------------------------------------------------------------
 -- * Instances
 -----------------------------------------------------------------------------

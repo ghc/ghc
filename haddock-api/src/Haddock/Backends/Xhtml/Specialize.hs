@@ -11,6 +11,7 @@ module Haddock.Backends.Xhtml.Specialize
 
 
 import Haddock.Syb
+import Haddock.Types
 
 import GHC
 import Name
@@ -100,11 +101,6 @@ parseTupleArity ('(':commas) = do
     parseCommas ")" = Just 0
     parseCommas _ = Nothing
 parseTupleArity _ = Nothing
-
-
-class NamedThing name => SetName name where
-
-    setName :: Name -> name -> name
 
 
 setInternalOccName :: SetName name => OccName -> name -> name
