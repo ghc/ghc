@@ -229,17 +229,12 @@ place to add their superclasses is canonicalisation.  See Note [Add
 superclasses only during canonicalisation].  Here is what we do:
 
   Givens:   Add all their superclasses as Givens.
-            They may be needed to prove Wanteds
+            They may be needed to prove Wanteds.
 
-  Wanteds:  Do nothing.
-
-  Deriveds: Add all their superclasses as Derived.
+  Wanteds/Derived:
+            Add all their superclasses as Derived.
             The sole reason is to expose functional dependencies
             in superclasses or equality superclasses.
-
-            We only do this in the improvement phase, if solving has
-            not succeeded; see Note [The improvement story] in
-            TcInteract
 
 Examples of how adding superclasses as Derived is useful
 
@@ -259,6 +254,24 @@ Examples of how adding superclasses as Derived is useful
          [G] F a ~ b
          [D] F a ~ beta
     Now we we get [D] beta ~ b, and can solve that.
+
+    -- Example (tcfail138)
+      class L a b | a -> b
+      class (G a, L a b) => C a b
+
+      instance C a b' => G (Maybe a)
+      instance C a b  => C (Maybe a) a
+      instance L (Maybe a) a
+
+    When solving the superclasses of the (C (Maybe a) a) instance, we get
+      [G] C a b, and hance by superclasses, [G] G a, [G] L a b
+      [W] G (Maybe a)
+    Use the instance decl to get
+      [W] C a beta
+    Generate its derived superclass
+      [D] L a beta.  Now using fundeps, combine with [G] L a b to get
+      [D] beta ~ b
+    which is what we want.
 
 ---------- Historical note -----------
 Example of why adding superclass of a Wanted as a Given would
@@ -280,7 +293,7 @@ Then we'll use the instance decl to give
   [W] d4: Ord [a]
 
 ANd now we could bogusly solve d4 from d3.
-
+---------- End of historical note -----------
 
 Note [Add superclasses only during canonicalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
