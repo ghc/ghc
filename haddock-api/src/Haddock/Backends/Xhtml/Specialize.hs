@@ -7,6 +7,7 @@ module Haddock.Backends.Xhtml.Specialize
     ( specialize, specialize'
     , specializeTyVarBndrs
     , sugar, rename
+    , freeVariables
     ) where
 
 
@@ -111,8 +112,8 @@ setInternalOccName occ name =
     nname' = mkInternalName (nameUnique nname) occ (nameSrcSpan nname)
 
 
-rename :: SetName name => HsType name -> HsType name
-rename = fst . evalRWS undefined Map.empty . renameType -- TODO.
+rename :: SetName name => Set OccName -> HsType name -> HsType name
+rename fv typ = fst $ evalRWS (renameType typ) fv Map.empty
 
 
 type Rename name a = RWS (Set OccName) () (Map Name name) a
