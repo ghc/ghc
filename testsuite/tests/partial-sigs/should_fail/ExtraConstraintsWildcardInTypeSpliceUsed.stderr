@@ -1,0 +1,8 @@
+[1 of 2] Compiling ExtraConstraintsWildcardInTypeSplice ( ExtraConstraintsWildcardInTypeSplice.hs, ExtraConstraintsWildcardInTypeSplice.o )
+[2 of 2] Compiling ExtraConstraintsWildcardInTypeSpliceUsed ( ExtraConstraintsWildcardInTypeSpliceUsed.hs, ExtraConstraintsWildcardInTypeSpliceUsed.o )
+
+ExtraConstraintsWildcardInTypeSpliceUsed.hs:7:9: error:
+    Invalid partial type: _ => _
+    An extra-constraints wild card is not allowed in a type splice
+    In the spliced type _ => _
+    In the untyped splice: $metaType

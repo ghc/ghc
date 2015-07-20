@@ -1030,6 +1030,12 @@ cvtTypeKind ty_str ty
            LitT lit
              -> returnL (HsTyLit (cvtTyLit lit))
 
+           WildCardT Nothing
+             -> mk_apps mkAnonWildCardTy tys'
+
+           WildCardT (Just nm)
+             -> do { nm' <- tName nm; mk_apps (mkNamedWildCardTy nm') tys' }
+
            PromotedT nm -> do { nm' <- cName nm; mk_apps (HsTyVar nm') tys' }
                  -- Promoted data constructor; hence cName
 

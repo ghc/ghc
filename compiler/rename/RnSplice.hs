@@ -45,6 +45,7 @@ import Hooks
 import Var              ( Id )
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
+import RnTypes          ( collectWildCards )
 import Util
 
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
@@ -420,11 +421,70 @@ rnSpliceType splice k
     run_type_splice rn_splice
       = do { hs_ty2 <- runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
+                                 ; checkValidPartialTypeSplice doc hs_ty2
+                                    -- See Note [Partial Type Splices]
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
            ; return (HsParTy hs_ty3, fvs) }
               -- Wrap the result of the splice in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
+{-
+Note [Partial Type Splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Partial Type Signatures are partially supported in TH type splices: only
+anonymous wild cards are allowed.
+
+Normally, named wild cards are collected before renaming a (partial) type
+signature. However, TH type splices are run during renaming, i.e. after the
+initial traversal, leading to out of scope errors for named wild cards. We
+can't just extend the initial traversal to collect the named wild cards in TH
+type splices, as we'd need to expand them, which is supposed to happen only
+once, during renaming.
+
+Similarly, the extra-constraints wild card is handled right before renaming
+too, and is therefore also not supported in a TH type splice. Another reason
+to forbid extra-constraints wild cards in TH type splices is that a single
+signature can contain many TH type splices, whereas it mustn't contain more
+than one extra-constraints wild card. Enforcing would this be hard the way
+things are currently organised.
+
+Anonymous wild cards pose no problem, because they start out without names and
+are given names during renaming. These names are collected right after
+renaming. The names generated for anonymous wild cards in TH type splices will
+thus be collected as well.
+
+For more details about renaming wild cards, see rnLHsTypeWithWildCards.
+
+Note that partial type signatures are fully supported in TH declaration
+splices, e.g.:
+
+     [d| foo :: _ => _
+         foo x y = x == y |]
+
+This is because in this case, the partial type signature can be treated as a
+whole signature, instead of as an arbitray type.
+
+-}
+
+-- | Check that the type splice doesn't contain an extra-constraint wild card.
+-- See Note [Partial Type Splices]. Named wild cards aren't supported in type
+-- splices either, but they will be caught during renaming, as they won't be
+-- in scope.
+--
+-- Note that without this check, an error would still be reported, but it
+-- would tell the user an unexpected wild card was encountered. This message
+-- is confusing, as it doesn't mention the wild card was unexpected because it
+-- was an extra-constraints wild card. To avoid confusing, this function
+-- provides a specific error message for this case.
+checkValidPartialTypeSplice :: HsDocContext -> LHsType RdrName -> RnM ()
+checkValidPartialTypeSplice doc ty
+  | (L loc _extraWc : _, _) <- collectWildCards ty
+  = failAt loc $ hang (text "Invalid partial type:") 2 (ppr ty) $$
+    text "An extra-constraints wild card is not allowed in a type splice" $$
+    docOfHsDocContext doc
+  | otherwise
+  = return ()
 
 ----------------------
 -- | Rename a splice pattern. See Note [rnSplicePat]

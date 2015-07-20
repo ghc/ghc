@@ -130,7 +130,12 @@
                     Splices and quasi-quotes continue to only be supported by a
                     stage 2 compiler.
                </para>
-           </listitem>
+            </listitem>
+            <listitem>
+                <para>
+                    Partial type signatures can now be used in splices, see <xref linkend="pts-where"/>.
+                </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 

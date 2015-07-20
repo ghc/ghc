@@ -500,6 +500,7 @@ pprParendType PromotedConsT       = text "(':)"
 pprParendType StarT               = char '*'
 pprParendType ConstraintT         = text "Constraint"
 pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)
+pprParendType (WildCardT mbName)  = char '_' <> maybe empty ppr mbName
 pprParendType other               = parens (ppr other)
 
 instance Ppr Type where

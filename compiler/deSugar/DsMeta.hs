@@ -847,11 +847,26 @@ repLTy :: LHsType Name -> DsM (Core TH.TypeQ)
 repLTy (L _ ty) = repTy ty
 
 repTy :: HsType Name -> DsM (Core TH.TypeQ)
-repTy (HsForAllTy _ _ tvs ctxt ty)  =
+repTy (HsForAllTy _ extra tvs ctxt ty)  =
   addTyVarBinds tvs $ \bndrs -> do
-    ctxt1  <- repLContext ctxt
+    ctxt1  <- repLContext ctxt'
     ty1    <- repLTy ty
     repTForall bndrs ctxt1 ty1
+  where
+    -- If extra is not Nothing, an extra-constraints wild card was removed
+    -- (just) before renaming. It must be put back now, otherwise the
+    -- represented type won't include this extra-constraints wild card.
+    ctxt'
+      | Just loc <- extra
+      = let uniq = panic "addExtraCtsWC"
+             -- This unique will be discarded by repLContext, but is required
+             -- to make a Name
+            name = mkInternalName uniq (mkTyVarOcc "_") loc
+        in  (++ [L loc (HsWildCardTy (AnonWildCard name))]) `fmap` ctxt
+      | otherwise
+      = ctxt
+
+
 
 repTy (HsTyVar n)
   | isTvOcc occ   = do tv1 <- lookupOcc n
@@ -910,11 +925,10 @@ repTy (HsExplicitTupleTy _ tys) = do
 repTy (HsTyLit lit) = do
                         lit' <- repTyLit lit
                         repTLit lit'
-repTy (HsWildCardTy wc) = do
-                            let name = HsSyn.wildCardName wc
-                            putSrcSpanDs (nameSrcSpan name) $
-                              failWithDs $ text "Unexpected wild card:" <+>
-                                           quotes (ppr name)
+repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
+repTy (HsWildCardTy (NamedWildCard n)) = do
+                                           nwc <- lookupOcc n
+                                           repTNamedWildCard nwc
 
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
@@ -1909,6 +1923,13 @@ repTPromotedList (t:ts) = do  { tcon <- repPromotedConsTyCon
 
 repTLit :: Core TH.TyLitQ -> DsM (Core TH.TypeQ)
 repTLit (MkC lit) = rep2 litTName [lit]
+
+repTWildCard :: DsM (Core TH.TypeQ)
+repTWildCard = rep2 wildCardTName []
+
+repTNamedWildCard :: Core TH.Name -> DsM (Core TH.TypeQ)
+repTNamedWildCard (MkC s) = rep2 namedWildCardTName [s]
+
 
 --------- Type constructors --------------
 

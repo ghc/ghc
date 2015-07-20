@@ -9397,6 +9397,7 @@ Extra-constraints wildcards cannot be named.
 Partial type signatures are allowed for bindings, pattern and expression signatures.
 In all other contexts, e.g. type class or type family declarations, they are disallowed.
 In the following example a wildcard is used in each of the three possible contexts.
+Extra-constraints wildcards are not supported in pattern or expression signatures.
 </para>
 <programlisting>
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9404,6 +9405,43 @@ foo :: _
 foo (x :: _) = (x :: _)
 -- Inferred: forall w_. w_ -> w_
 </programlisting>
+
+
+<para>
+Partial type signatures can also be used in <xref linkend="template-haskell"/> splices.
+</para>
+
+<itemizedlist>
+  <listitem>Declaration splices: partial type signature are fully supported.
+<programlisting>
+{-# LANGUAGE TemplateHaskell, NamedWildCards #-}
+$( [d| foo :: _ => _a -> _a -> _
+       foo x y = x == y|] )
+</programlisting>
+  </listitem>
+  <listitem>Expression splices: anonymous and named wildcards can be used in expression signatures.
+  Extra-constraints wildcards are not supported, just like in regular expression signatures.
+<programlisting>
+{-# LANGUAGE TemplateHaskell, NamedWildCards #-}
+$( [e| foo = (Just True :: _m _) |] )
+</programlisting>
+  </listitem>
+  <listitem>Typed expression splices: the same wildcards as in (untyped) expression splices are supported.
+  </listitem>
+  <listitem>Pattern splices: Template Haskell doesn't support type signatures in pattern splices.
+  Consequently, partial type signatures are not supported either.
+  </listitem>
+  <listitem>Type splices: only anonymous wildcards are supported in type splices.
+  Named and extra-constraints wildcards are not.
+<programlisting>
+{-# LANGUAGE TemplateHaskell #-}
+foo :: $( [t| _ |] ) -> a
+foo x = x
+</programlisting>
+  </listitem>
+</itemizedlist>
+
+
 </sect2>
 </sect1>
 <!-- ==================== Deferring type errors =================  -->
@@ -9589,7 +9627,8 @@ Wiki page</ulink>.
                              the quotation has type <literal>Q Type</literal>.</para></listitem>
 		    <listitem><para> <literal>[p| ... |]</literal>, where the "..." is a pattern;
                              the quotation has type <literal>Q Pat</literal>.</para></listitem>
-		  </itemizedlist></para></listitem>
+		  </itemizedlist>
+		See <xref linkend="pts-where"/> for using partial type signatures in quotations.</para></listitem>
 
 	      <listitem>
 		<para>
