@@ -823,7 +823,8 @@ callishPrimOpSupported dflags op
                          || llvm      -> Left (MO_SubIntC    (wordWidth dflags))
                      | otherwise      -> Right genericIntSubCOp
 
-      WordMul2Op     | ncg && x86ish  -> Left (MO_U_Mul2     (wordWidth dflags))
+      WordMul2Op     | ncg && x86ish
+                         || llvm      -> Left (MO_U_Mul2     (wordWidth dflags))
                      | otherwise      -> Right genericWordMul2Op
 
       _ -> pprPanic "emitPrimOp: can't translate PrimOp " (ppr op)
