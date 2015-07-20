@@ -159,7 +159,7 @@ renameType HsWildcardTy = pure HsWildcardTy
 renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
 
 
-freeVariables :: forall name. (NamedThing name, Data (HsType name))
+freeVariables :: forall name. (NamedThing name, DataId name)
               => HsType name -> Set OccName
 freeVariables =
     everythingWithState Set.empty Set.union query
