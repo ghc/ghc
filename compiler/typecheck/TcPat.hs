@@ -8,11 +8,12 @@ TcPat: Typechecking patterns
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
-module TcPat ( tcLetPat, TcSigFun, TcPragFun
+module TcPat ( tcLetPat, TcSigFun
+             , TcPragEnv, lookupPragEnv, emptyPragEnv
              , TcSigInfo(..), TcPatSynInfo(..)
              , findScopedTyVars, isPartialSig
              , completeSigPolyId, completeSigPolyId_maybe
-             , LetBndrSpec(..), addInlinePrags, warnPrags
+             , LetBndrSpec(..), addInlinePrags
              , tcPat, tcPats, newNoSigLetBndr
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
@@ -28,6 +29,7 @@ import Id
 import Var
 import Name
 import NameSet
+import NameEnv
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
@@ -47,7 +49,9 @@ import SrcLoc
 import Util
 import Outputable
 import FastString
+import Maybes( orElse )
 import Control.Monad
+
 {-
 ************************************************************************
 *                                                                      *
@@ -119,7 +123,7 @@ data LetBndrSpec
   = LetLclBndr            -- The binder is just a local one;
                           -- an AbsBinds will provide the global version
 
-  | LetGblBndr TcPragFun  -- Generalisation plan is NoGen, so there isn't going
+  | LetGblBndr TcPragEnv  -- Generalisation plan is NoGen, so there isn't going
                           -- to be an AbsBinds; So we must bind the global version
                           -- of the binder right away.
                           -- Oh, and here is the inline-pragma information
@@ -132,8 +136,14 @@ inPatBind (PE { pe_ctxt = LetPat {} }) = True
 inPatBind (PE { pe_ctxt = LamPat {} }) = False
 
 ---------------
-type TcPragFun = Name -> [LSig Name]
+type TcPragEnv = NameEnv [LSig Name]
 type TcSigFun  = Name -> Maybe TcSigInfo
+
+emptyPragEnv :: TcPragEnv
+emptyPragEnv = emptyNameEnv
+
+lookupPragEnv :: TcPragEnv -> Name -> [LSig Name]
+lookupPragEnv prag_fn n = lookupNameEnv prag_fn n `orElse` []
 
 data TcSigInfo
   = TcSigInfo {
@@ -327,7 +337,7 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
   | LetGblBndr prags <- no_gen
   , Just sig <- lookup_sig bndr_name
   , Just poly_id <- sig_poly_id sig
-  = do { bndr_id <- addInlinePrags poly_id (prags bndr_name)
+  = do { bndr_id <- addInlinePrags poly_id (lookupPragEnv prags bndr_name)
        ; traceTc "tcPatBndr(gbl,sig)" (ppr bndr_id $$ ppr (idType bndr_id))
        ; co <- unifyPatType (idType bndr_id) pat_ty
        ; return (co, bndr_id) }
@@ -351,31 +361,35 @@ newNoSigLetBndr LetLclBndr name ty
   =do  { mono_name <- newLocalName name
        ; return (mkLocalId mono_name ty) }
 newNoSigLetBndr (LetGblBndr prags) name ty
-  = addInlinePrags (mkLocalId name ty) (prags name)
+  = addInlinePrags (mkLocalId name ty) (lookupPragEnv prags name)
 
 ----------
 addInlinePrags :: TcId -> [LSig Name] -> TcM TcId
 addInlinePrags poly_id prags
-  = do { traceTc "addInlinePrags" (ppr poly_id $$ ppr prags)
-       ; tc_inl inl_sigs }
+  | inl@(L _ prag) : inls <- inl_prags
+  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+       ; unless (null inls) (warn_multiple_inlines inl inls)
+       ; return (poly_id `setInlinePragma` prag) }
+  | otherwise
+  = return poly_id
   where
-    inl_sigs = filter isInlineLSig prags
-    tc_inl [] = return poly_id
-    tc_inl (L loc (InlineSig _ prag) : other_inls)
-       = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
-            ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
-            ; return (poly_id `setInlinePragma` prag) }
-    tc_inl _ = panic "tc_inl"
+    inl_prags = [L loc prag | L loc (InlineSig _ prag) <- prags]
 
-    warn_dup_inline = warnPrags poly_id inl_sigs $
-                      ptext (sLit "Duplicate INLINE pragmas for")
+    warn_multiple_inlines _ [] = return ()
 
-warnPrags :: Id -> [LSig Name] -> SDoc -> TcM ()
-warnPrags id bad_sigs herald
-  = addWarnTc (hang (herald <+> quotes (ppr id))
-                  2 (ppr_sigs bad_sigs))
-  where
-    ppr_sigs sigs = vcat (map (ppr . getLoc) sigs)
+    warn_multiple_inlines inl1@(L loc prag1) (inl2@(L _ prag2) : inls)
+       | inlinePragmaActivation prag1 == inlinePragmaActivation prag2
+       , isEmptyInlineSpec (inlinePragmaSpec prag1)
+       =    -- Tiresome: inl1 is put there by virtue of being in a hs-boot loop
+            -- and inl2 is a user NOINLINE pragma; we don't want to complain
+         warn_multiple_inlines inl2 inls
+       | otherwise
+       = setSrcSpan loc $
+         addWarnTc (hang (ptext (sLit "Multiple INLINE pragmas for") <+> ppr poly_id)
+                       2 (vcat (ptext (sLit "Ignoring all but the first")
+                                : map pp_inl (inl1:inl2:inls))))
+
+    pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
 
 {-
 Note [Typing patterns in pattern bindings]

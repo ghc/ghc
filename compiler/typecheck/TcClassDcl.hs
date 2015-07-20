@@ -19,7 +19,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import TcEnv
-import TcPat( addInlinePrags, completeSigPolyId )
+import TcPat( addInlinePrags, completeSigPolyId, lookupPragEnv, emptyPragEnv )
 import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
@@ -157,7 +157,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
         -- And since ds is big, it doesn't get inlined, so we don't get good
         -- default methods.  Better to make separate AbsBinds for each
         ; let (tyvars, _, _, op_items) = classBigSig clas
-              prag_fn     = mkPragFun sigs default_binds
+              prag_fn     = mkPragEnv sigs default_binds
               sig_fn      = mkHsSigFun sigs
               clas_tyvars = snd (tcSuperSkolTyVars tyvars)
               pred        = mkClassPred clas (mkTyVarTys clas_tyvars)
@@ -171,7 +171,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                        -- with redundant constraints; but not for DefMeth, where
                        -- the default method may well be 'error' or something
                     NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id))
-                                                     (prag_fn (idName sel_id))
+                                                     (lookupPragEnv prag_fn (idName sel_id))
                                              ; return emptyBag }
               tc_dm = tcDefMeth clas clas_tyvars this_dict
                                 default_binds sig_fn prag_fn
@@ -184,7 +184,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
 tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
-          -> HsSigFun -> PragFun -> Id -> Name -> Bool
+          -> HsSigFun -> TcPragEnv -> Id -> Name -> Bool
           -> TcM (LHsBinds TcId)
 -- Generate code for polymorphic default methods only (hence DefMeth)
 -- (Generic default methods have turned into instance decls by now.)
@@ -250,8 +250,8 @@ tcDefMeth clas tyvars this_dict binds_in
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
     sel_name = idName sel_id
-    prags    = prag_fn sel_name
-    no_prag_fn  _ = []          -- No pragmas for local_meth_id;
+    prags    = lookupPragEnv prag_fn sel_name
+    no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
 
 ---------------

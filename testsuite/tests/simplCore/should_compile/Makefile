@@ -126,3 +126,9 @@ T8221:
 T5996:
 	$(RM) -f T5996.o T5996.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5996.hs -ddump-simpl -dsuppress-uniques -dsuppress-all | grep y2
+
+T10083:
+	$(RM) -f T10083.o T10083.hi T10083.hi-boot T10083a.o T10083a.hi 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083.hs-boot
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083.hs

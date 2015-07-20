@@ -9,9 +9,10 @@
 
 module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  tcHsBootSigs, tcPolyCheck,
-                 PragFun, tcSpecPrags, tcSpecWrapper,
-                 tcVectDecls, 
-                 TcSigInfo(..), TcSigFun, mkPragFun,
+                 tcSpecPrags, tcSpecWrapper,
+                 tcVectDecls,
+                 TcSigInfo(..), TcSigFun,
+                 TcPragEnv, mkPragEnv,
                  instTcTySig, instTcTySigFromId, findScopedTyVars,
                  badBootDeclErr, mkExport ) where
 
@@ -292,6 +293,53 @@ and will give a 'wrongThingErr' as a result.  But the lookup of A won't fail.
 
 The _|_ (= panic "fakePatSynCon") works because the wrongThingErr call, in
 tcTyVar, doesn't look inside the TcTyThing.
+
+Note [Inlining and hs-boot files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this example (Trac #10083):
+
+    ---------- RSR.hs-boot ------------
+    module RSR where
+      data RSR
+      eqRSR :: RSR -> RSR -> Bool
+
+    ---------- SR.hs ------------
+    module SR where
+      import {-# SOURCE #-} RSR
+      data SR = MkSR RSR
+      eqSR (MkSR r1) (MkSR r2) = eqRSR r1 r2
+
+    ---------- RSR.hs ------------
+    module RSR where
+      import SR
+      data RSR = MkRSR SR -- deriving( Eq )
+      eqRSR (MkRSR s1) (MkRSR s2) = (eqSR s1 s2)
+      foo x y = not (eqRSR x y)
+
+When compiling RSR we get this code
+
+    RSR.eqRSR :: RSR -> RSR -> Bool
+    RSR.eqRSR = \ (ds1 :: RSR.RSR) (ds2 :: RSR.RSR) ->
+                case ds1 of _ { RSR.MkRSR s1 ->
+                case ds2 of _ { RSR.MkRSR s2 ->
+                SR.eqSR s1 s2 }}
+
+    RSR.foo :: RSR -> RSR -> Bool
+    RSR.foo = \ (x :: RSR) (y :: RSR) -> not (RSR.eqRSR x y)
+
+Now, when optimising foo:
+    Inline eqRSR (small, non-rec)
+    Inline eqSR  (small, non-rec)
+but the result of inlining eqSR from SR is another call to eqRSR, so
+everything repeats.  Neither eqSR nor eqRSR are (apparently) loop
+breakers.
+
+Solution: when compiling RSR, add a NOINLINE pragma to every function
+exported by the boot-file for RSR (if it exists).
+
+ALAS: doing so makes the boostrappted GHC itself slower by 8% overall
+      (on Trac #9872a-d, and T1969.  So I un-did this change, and
+      parked it for now.  Sigh.
 -}
 
 tcValBinds :: TopLevelFlag
@@ -305,7 +353,19 @@ tcValBinds top_lvl binds sigs thing_inside
                                          -- See Note [Placeholder PatSyn kinds]
                                 tcTySigs sigs
 
-        ; let prag_fn = mkPragFun sigs (foldr (unionBags . snd) emptyBag binds)
+        ; _self_boot <- tcSelfBootInfo
+        ; let prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
+
+-- -------  See Note [Inlining and hs-boot files] (change parked) --------
+--              prag_fn | isTopLevel top_lvl   -- See Note [Inlining and hs-boot files]
+--                      , SelfBoot { sb_ids = boot_id_names } <- self_boot
+--                      = foldNameSet add_no_inl prag_fn1 boot_id_names
+--                      | otherwise
+--                      = prag_fn1
+--              add_no_inl boot_id_name prag_fn
+--                = extendPragEnv prag_fn (boot_id_name, no_inl_sig boot_id_name)
+--              no_inl_sig name = L boot_loc (InlineSig (L boot_loc name) neverInlinePragma)
+--              boot_loc = mkGeneralSrcSpan (fsLit "The hs-boot file for this module")
 
                 -- Extend the envt right away with all the Ids
                 -- declared with complete type signatures
@@ -327,7 +387,7 @@ tcValBinds top_lvl binds sigs thing_inside
       = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
 ------------------------
-tcBindGroups :: TopLevelFlag -> TcSigFun -> PragFun
+tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds Name)] -> TcM thing
              -> TcM ([(RecFlag, LHsBinds TcId)], thing)
 -- Typecheck a whole lot of value bindings,
@@ -348,7 +408,7 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
 
 ------------------------
 tc_group :: forall thing.
-            TopLevelFlag -> TcSigFun -> PragFun
+            TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds Name) -> TcM thing
          -> TcM ([(RecFlag, LHsBinds TcId)], thing)
 
@@ -408,7 +468,7 @@ recursivePatSynErr binds
                             pprLoc loc
 
 tc_single :: forall thing.
-            TopLevelFlag -> TcSigFun -> PragFun
+            TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind Name -> TcM thing
           -> TcM (LHsBinds TcId, thing)
 tc_single _top_lvl sig_fn _prag_fn (L _ (PatSynBind psb@PSB{ psb_id = L _ name })) thing_inside
@@ -456,7 +516,7 @@ mkEdges sig_fn binds
                                      , bndr <- collectHsBindBinders bind ]
 
 ------------------------
-tcPolyBinds :: TopLevelFlag -> TcSigFun -> PragFun
+tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragEnv
             -> RecFlag         -- Whether the group is really recursive
             -> RecFlag         -- Whether it's recursive after breaking
                                -- dependencies based on type signatures
@@ -511,7 +571,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
 tcPolyNoGen     -- No generalisation whatsoever
   :: RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
-  -> PragFun -> TcSigFun
+  -> TcPragEnv -> TcSigFun
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
 
@@ -526,7 +586,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
       = do { mono_ty' <- zonkTcType (idType mono_id)
              -- Zonk, mainly to expose unboxed types to checkStrictBinds
            ; let mono_id' = setIdType mono_id mono_ty'
-           ; _specs <- tcSpecPrags mono_id' (prag_fn name)
+           ; _specs <- tcSpecPrags mono_id' (lookupPragEnv prag_fn name)
            ; return mono_id' }
            -- NB: tcPrags generates error messages for
            --     specialisation pragmas for non-overloaded sigs
@@ -536,7 +596,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 ------------------
 tcPolyCheck :: RecFlag       -- Whether it's recursive after breaking
                              -- dependencies based on type signatures
-            -> PragFun
+            -> TcPragEnv
             -> TcSigInfo
             -> LHsBind Name
             -> TcM (LHsBinds TcId, [TcId])
@@ -554,7 +614,7 @@ tcPolyCheck rec_tc prag_fn
     do { ev_vars <- newEvVars theta
        ; let ctxt      = FunSigCtxt name warn_redundant
              skol_info = SigSkol ctxt (mkPhiTy theta tau)
-             prag_sigs = prag_fn name
+             prag_sigs = lookupPragEnv prag_fn name
              tvs = map snd tvs_w_scoped
        ; (ev_binds, (binds', [mono_info]))
             <- setSrcSpan loc $
@@ -582,7 +642,7 @@ tcPolyCheck _rec_tc _prag_fn sig _bind
 tcPolyInfer
   :: RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
-  -> PragFun -> TcSigFun
+  -> TcPragEnv -> TcSigFun
   -> Bool         -- True <=> apply the monomorphism restriction
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
@@ -612,7 +672,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
          -- poly_ids are guaranteed zonked by mkExport
 
 --------------
-mkExport :: PragFun
+mkExport :: TcPragEnv
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
          -> TcM (ABExport Id)
@@ -668,7 +728,7 @@ mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
                       , abe_mono = mono_id
                       , abe_prags = SpecPrags spec_prags}) }
   where
-    prag_sigs = prag_fn poly_name
+    prag_sigs = lookupPragEnv prag_fn poly_name
     sig_ctxt  = InfSigCtxt poly_name
 
 mkInferredPolyId :: Name -> [TyVar] -> TcThetaType -> TcType -> TcM Id
@@ -864,9 +924,9 @@ The basic idea is this:
    f:: Num a => a -> b -> a
    {-# SPECIALISE foo :: Int -> b -> Int #-}
 
-We check that 
-   (forall a. Num a => a -> a) 
-      is more polymorphic than 
+We check that
+   (forall a. Num a => a -> a)
+      is more polymorphic than
    Int -> Int
 (for which we could use tcSubType, but see below), generating a HsWrapper
 to connect the two, something like
@@ -949,7 +1009,7 @@ Some wrinkles
           f_spec = <f rhs> Int dNumInt
 
           RULE: forall d. f Int d = f_spec
-      You can see this discarding happening in 
+      You can see this discarding happening in
 
 3. Note that the HsWrapper can transform *any* function with the right
    type prefix
@@ -959,31 +1019,31 @@ Some wrinkles
    well as the dict.  That's what goes on in TcInstDcls.mk_meth_spec_prags
 -}
 
-type PragFun = Name -> [LSig Name]
-
-mkPragFun :: [LSig Name] -> LHsBinds Name -> PragFun
-mkPragFun sigs binds = \n -> lookupNameEnv prag_env n `orElse` []
+mkPragEnv :: [LSig Name] -> LHsBinds Name -> TcPragEnv
+mkPragEnv sigs binds
+  = foldl extendPragEnv emptyNameEnv prs
   where
     prs = mapMaybe get_sig sigs
 
-    get_sig :: LSig Name -> Maybe (Located Name, LSig Name)
-    get_sig (L l (SpecSig nm ty inl)) = Just (nm, L l $ SpecSig  nm ty (add_arity nm inl))
-    get_sig (L l (InlineSig nm inl))  = Just (nm, L l $ InlineSig nm   (add_arity nm inl))
-    get_sig _                         = Nothing
+    get_sig :: LSig Name -> Maybe (Name, LSig Name)
+    get_sig (L l (SpecSig lnm@(L _ nm) ty inl)) = Just (nm, L l $ SpecSig   lnm ty (add_arity nm inl))
+    get_sig (L l (InlineSig lnm@(L _ nm) inl))  = Just (nm, L l $ InlineSig lnm    (add_arity nm inl))
+    get_sig _                                   = Nothing
 
-    add_arity (L _ n) inl_prag   -- Adjust inl_sat field to match visible arity of function
-      | Just ar <- lookupNameEnv ar_env n,
-        Inline <- inl_inline inl_prag     = inl_prag { inl_sat = Just ar }
+    add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
+      | Inline <- inl_inline inl_prag
         -- add arity only for real INLINE pragmas, not INLINABLE
-      | otherwise                         = inl_prag
-
-    prag_env :: NameEnv [LSig Name]
-    prag_env = foldl add emptyNameEnv prs
-    add env (L _ n,p) = extendNameEnv_Acc (:) singleton env n p
+      , Just ar <- lookupNameEnv ar_env n
+      = inl_prag { inl_sat = Just ar }
+      | otherwise
+      = inl_prag
 
     -- ar_env maps a local to the arity of its definition
     ar_env :: NameEnv Arity
     ar_env = foldrBag lhsBindArity emptyNameEnv binds
+
+extendPragEnv :: TcPragEnv -> (Name, LSig Name) -> TcPragEnv
+extendPragEnv prag_fn (n, sig) = extendNameEnv_Acc (:) singleton prag_fn n sig
 
 lhsBindArity :: LHsBind Name -> NameEnv Arity -> NameEnv Arity
 lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
@@ -1008,15 +1068,15 @@ tcSpecPrags poly_id prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s)
 
-    warn_discarded_sigs = warnPrags poly_id bad_sigs $
-                          ptext (sLit "Discarding unexpected pragmas for")
-
+    warn_discarded_sigs
+      = addWarnTc (hang (ptext (sLit "Discarding unexpected pragmas for") <+> ppr poly_id)
+                      2 (vcat (map (ppr . getLoc) bad_sigs)))
 
 --------------
 tcSpecPrag :: TcId -> Sig Name -> TcM [TcSpecPrag]
 tcSpecPrag poly_id prag@(SpecSig fun_name hs_tys inl)
 -- See Note [Handling SPECIALISE pragmas]
--- 
+--
 -- The Name fun_name in the SpecSig may not be the same as that of the poly_id
 -- Example: SPECIALISE for a class method: the Name in the SpecSig is
 --          for the selector Id, but the poly_id is something like $cop
@@ -1044,7 +1104,7 @@ tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- A simpler variant of tcSubType, used for SPECIALISE pragmas
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
-tcSpecWrapper ctxt poly_ty spec_ty 
+tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
                <- tcGen ctxt spec_ty $ \ _ spec_tau ->
                   do { (inst_wrap, tau) <- deeplyInstantiate orig poly_ty
@@ -1141,7 +1201,7 @@ tcVect (HsVect s name rhs)
          -- turn the vectorisation declaration into a single non-recursive binding
        ; let bind    = L loc $ mkTopFunBind name [mkSimpleMatch [] rhs]
              sigFun  = const Nothing
-             pragFun = mkPragFun [] (unitBag bind)
+             pragFun = emptyPragEnv
 
          -- perform type inference (including generalisation)
        ; (binds, [id'], _) <- tcPolyInfer False True sigFun pragFun NonRecursive [bind]
