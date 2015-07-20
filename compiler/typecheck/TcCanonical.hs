@@ -331,36 +331,40 @@ newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { let size = sizeTypes xis
-             loc' | isCTupleClass cls
-                  = loc   -- For tuple predicates, just take them apart, without
-                          -- adding their (large) size into the chain.  When we
-                          -- get down to a base predicate, we'll include its size.
-                          -- Trac #10335
-                  | otherwise
-                  = case ctLocOrigin loc of
-                       GivenOrigin InstSkol
-                         -> loc { ctl_origin = GivenOrigin (InstSC size) }
-                       GivenOrigin (InstSC n)
-                         -> loc { ctl_origin = GivenOrigin (InstSC (n `max` size)) }
-                       _ -> loc
-                    -- See Note [Solving superclass constraints] in TcInstDcls
-                    -- for explantation of loc'
-
-       ; given_evs <- newGivenEvVars loc' (mkEvScSelectors (EvId evar) cls xis)
+  = do { given_evs <- newGivenEvVars (mk_given_loc loc)
+                                     (mkEvScSelectors (EvId evar) cls xis)
        ; emitWorkNC given_evs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
   = return () -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
-  | otherwise -- Derived case, just add those SC that can lead to improvement.
+  | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement.
   = do { let sc_rec_theta = transSuperClasses cls xis
              impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
        ; emitNewDeriveds loc impr_theta }
 
+  where
+    size = sizeTypes xis
+    mk_given_loc loc
+       | isCTupleClass cls
+       = loc   -- For tuple predicates, just take them apart, without
+               -- adding their (large) size into the chain.  When we
+               -- get down to a base predicate, we'll include its size.
+               -- Trac #10335
+
+       | GivenOrigin skol_info <- ctLocOrigin loc
+         -- See Note [Solving superclass constraints] in TcInstDcls
+         -- for explantation of this transformation for givens
+       = case skol_info of
+            InstSkol -> loc { ctl_origin = GivenOrigin (InstSC size) }
+            InstSC n -> loc { ctl_origin = GivenOrigin (InstSC (n `max` size)) }
+            _        -> loc
+
+       | otherwise  -- Probably doesn't happen, since this function
+       = loc        -- is only used for Givens, but does no harm
 
 {-
 ************************************************************************
