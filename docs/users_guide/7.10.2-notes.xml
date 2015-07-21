@@ -33,6 +33,11 @@
        </listitem>
        <listitem>
           <para>
+            A variety of fixes of the new API annotations support.
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A bug which caused GHC to generate bad DWARF unwinding
             information has been fixed (issue #10236).
           </para>
