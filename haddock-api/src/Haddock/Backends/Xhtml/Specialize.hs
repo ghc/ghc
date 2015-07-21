@@ -16,6 +16,7 @@ import Haddock.Types
 
 import GHC
 import Name
+import FastString
 
 import Control.Monad
 import Control.Monad.Trans.RWS
@@ -104,6 +105,20 @@ parseTupleArity ('(':commas) = do
 parseTupleArity _ = Nothing
 
 
+type NameRep = FastString
+
+getNameRep :: NamedThing name => name -> NameRep
+getNameRep = occNameFS . getOccName
+
+nameRepString :: NameRep -> String
+nameRepString = unpackFS
+
+stringNameRep :: String -> NameRep
+stringNameRep = mkFastString
+
+setInternalNameRep :: SetName name => NameRep -> name -> name
+setInternalNameRep = setInternalOccName . mkVarOccFS
+
 setInternalOccName :: SetName name => OccName -> name -> name
 setInternalOccName occ name =
     setName nname' name
@@ -112,11 +127,11 @@ setInternalOccName occ name =
     nname' = mkInternalName (nameUnique nname) occ (nameSrcSpan nname)
 
 
-rename :: SetName name => Set OccName -> HsType name -> HsType name
+rename :: SetName name => Set NameRep -> HsType name -> HsType name
 rename fv typ = fst $ evalRWS (renameType typ) fv Map.empty
 
 
-type Rename name a = RWS (Set OccName) () (Map Name name) a
+type Rename name a = RWS (Set NameRep) () (Map Name name) a
 
 
 renameType :: SetName name => HsType name -> Rename name (HsType name)
@@ -157,7 +172,7 @@ renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
 
 
 freeVariables :: forall name. (NamedThing name, DataId name)
-              => HsType name -> Set OccName
+              => HsType name -> Set NameRep
 freeVariables =
     everythingWithState Set.empty Set.union query
   where
@@ -166,7 +181,7 @@ freeVariables =
             (Set.empty, Set.union ctx (bndrsNames bndrs))
         Just (HsTyVar name)
             | getName name `Set.member` ctx -> (Set.empty, ctx)
-            | otherwise -> (Set.singleton $ getOccName name, ctx)
+            | otherwise -> (Set.singleton $ getNameRep name, ctx)
         _ -> (Set.empty, ctx)
     bndrsNames = Set.fromList . map (getName . tyVarName . unLoc) . hsq_tvs
 
@@ -208,7 +223,7 @@ renameNameBndr name = do
     env <- get
     case Map.lookup (getName name) env of
         Just name' -> pure name'
-        Nothing | getOccName name `Set.member` fv -> freshName name
+        Nothing | getNameRep name `Set.member` fv -> freshName name
         Nothing -> pure name
 
 
@@ -224,35 +239,35 @@ freshName :: SetName name => name -> Rename name name
 freshName name = do
     fv <- ask
     env <- get
-    let taken = Set.union fv (Set.fromList . map getOccName . Map.keys $ env)
-    let name' = setInternalOccName (findFreshName taken occ) name
+    let taken = Set.union fv (Set.fromList . map getNameRep . Map.keys $ env)
+    let name' = setInternalNameRep (findFreshName taken occ) name
     put $ Map.insert nname name' env
     return name'
   where
     nname = getName name
-    occ = nameOccName nname
+    occ = getNameRep nname
 
 
-findFreshName :: Set OccName -> OccName -> OccName
+findFreshName :: Set NameRep -> NameRep -> NameRep
 findFreshName taken =
     fromJust . List.find isFresh . alternativeNames
   where
     isFresh = not . flip Set.member taken
 
 
-alternativeNames :: OccName -> [OccName]
+alternativeNames :: NameRep -> [NameRep]
 alternativeNames name
-    | [_] <- occNameString name = letterNames ++ alternativeNames' name
+    | [_] <- nameRepString name = letterNames ++ alternativeNames' name
   where
-    letterNames = map (mkVarOcc . pure) ['a'..'z']
+    letterNames = map (stringNameRep . pure) ['a'..'z']
 alternativeNames name = alternativeNames' name
 
 
-alternativeNames' :: OccName -> [OccName]
+alternativeNames' :: NameRep -> [NameRep]
 alternativeNames' name =
-    [ mkVarOcc $ str ++ show i | i :: Int <- [0..] ]
+    [ stringNameRep $ str ++ show i | i :: Int <- [0..] ]
   where
-    str = occNameString name
+    str = nameRepString name
 
 
 located :: Functor f => (a -> f b) -> Located a -> f (Located b)
