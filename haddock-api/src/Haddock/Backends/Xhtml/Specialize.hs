@@ -241,7 +241,15 @@ findFreshName taken =
 
 
 alternativeNames :: OccName -> [OccName]
-alternativeNames name =
+alternativeNames name
+    | [_] <- occNameString name = letterNames ++ alternativeNames' name
+  where
+    letterNames = map (mkVarOcc . pure) ['a'..'z']
+alternativeNames name = alternativeNames' name
+
+
+alternativeNames' :: OccName -> [OccName]
+alternativeNames' name =
     [ mkVarOcc $ str ++ show i | i :: Int <- [0..] ]
   where
     str = occNameString name
