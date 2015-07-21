@@ -140,9 +140,14 @@ fi
 
 if type gmake > /dev/null 2> /dev/null
 then
-    make="gmake -s"
+    make="gmake"
 else
-    make="make -s"
+    make="make"
+fi
+
+if [ $be_quiet -eq 1 ]; then
+    # See Note [Default build system verbosity].
+    make="$make -s"
 fi
 
 if [ $testsuite_only -eq 0 ]; then
@@ -169,7 +174,21 @@ thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 echo "Validating=YES"       >  mk/are-validating.mk
 echo "ValidateSpeed=$speed" >> mk/are-validating.mk
 echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
-echo "V=0"                  >> mk/are-validating.mk # Less gunk
+
+# Note [Default build system verbosity].
+#
+# From https://ghc.haskell.org/trac/ghc/wiki/Design/BuildSystem:
+#
+#   "The build system should clearly report what it's doing (and sometimes
+#   why), without being too verbose. It should emit actual command lines as
+#   much as possible, so that they can be inspected and cut & pasted."
+#
+# That should be the default. Only suppress commands, by setting V=0 and using
+# `make -s`, when user explicitly asks for it with `./validate --quiet`.
+if [ $be_quiet -eq 1 ]; then
+    # See Note [Default build system verbosity].
+    echo "V=0"                  >> mk/are-validating.mk # Less gunk
+fi
 
 if [ $speed != "FAST" ]; then
     # Build the "extra" packages (see ./packages), to enable more tests.
