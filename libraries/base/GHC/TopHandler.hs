@@ -180,7 +180,8 @@ disasterHandler exit _ =
     msgStr =
         "encountered an exception while trying to report an exception." ++
         "One possible reason for this is that we failed while trying to " ++
-        "encode an error message. Check that your locale configured properly."
+        "encode an error message. Check that your locale is configured " ++
+        "properly."
 
 {- Note [Disaster with iconv]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

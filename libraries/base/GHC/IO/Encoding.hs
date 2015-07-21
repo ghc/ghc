@@ -30,7 +30,6 @@ module GHC.IO.Encoding (
     ) where
 
 import GHC.Base
-import GHC.Foreign (charIsRepresentable)
 import GHC.IO.Exception
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Failure
@@ -255,18 +254,17 @@ mkTextEncoding' cfm enc =
     -- Unfortunately there is no good way to determine whether iconv is actually
     -- functional without telling it to do something.
     _ -> do res <- Iconv.mkIconvEncoding cfm enc
-            good <- charIsRepresentable res 'a'
             let isAscii = any (== enc) ansiEncNames
-            case good of
-              True -> return res
+            case res of
+              Just e -> return e
               -- At this point we know that we can't count on iconv to work
               -- (see, for instance, Trac #10298). However, we still want to do
-              --  what can to work with what we have. For instance, ASCII is
+              --  what we can to work with what we have. For instance, ASCII is
               -- easy. We match on ASCII encodings directly using several
               -- possible aliases (specified by RFC 1345 & Co) and for this use
-              -- the 'char8' encodeing
-              False
-                | isAscii   -> return char8
+              -- the 'ascii' encoding
+              Nothing
+                | isAscii   -> return (Latin1.mkAscii cfm)
                 | otherwise ->
                     unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
   where
