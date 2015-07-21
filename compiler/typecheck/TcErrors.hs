@@ -694,14 +694,15 @@ mkIrredErr ctxt cts
 ----------------
 mkHoleError :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
-  | isOutOfScopeCt ct
+  | isOutOfScopeCt ct  -- Out of scope variables, like 'a', where 'a' isn't bound
+                       -- Suggest possible in-scope variables in the message
   = do { dflags  <- getDynFlags
        ; rdr_env <- getGlobalRdrEnv
        ; mkLongErrAt (RealSrcSpan (tcl_loc lcl_env)) out_of_scope_msg
                      (unknownNameSuggestions dflags rdr_env
                                (tcl_rdr lcl_env) (mkRdrUnqual occ)) }
 
-  | otherwise
+  | otherwise  -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_doc, ct) <- relevantBindings False ctxt ct
                -- The 'False' means "don't filter the bindings"; see Trac #8191
        ; mkErrorMsgFromCt ctxt ct (hole_msg $$ binds_doc) }
