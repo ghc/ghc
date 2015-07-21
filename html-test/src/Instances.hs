@@ -43,13 +43,13 @@ instance Foo ((,,) a b) => Bar ((,,) a b) (a, b, a)
 
 class Baz a where
 
-	baz :: a -> (forall a. a -> a) -> (b, forall c. c -> a) -> (b, c)
-	baz' :: b -> (forall b. b -> a) -> (forall b. b -> a) -> [(b, a)]
-	baz'' :: b -> (forall b. (forall b. b -> a) -> c) -> (forall c. c -> b)
+    baz :: a -> (forall a. a -> a) -> (b, forall c. c -> a) -> (b, c)
+    baz' :: b -> (forall b. b -> a) -> (forall b. b -> a) -> [(b, a)]
+    baz'' :: b -> (forall b. (forall b. b -> a) -> c) -> (forall c. c -> b)
 
-	baz = undefined
-	baz' = undefined
-	baz'' = undefined
+    baz = undefined
+    baz' = undefined
+    baz'' = undefined
 
 
 instance Baz (a -> b)
