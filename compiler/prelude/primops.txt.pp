@@ -2457,7 +2457,7 @@ primop   AddrToAnyOp "addrToAny#" GenPrimOp
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    BCO# -> (# a #)
-   { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the vaule of
+   { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
      the BCO when evaluated. }
    with
    out_of_line = True
