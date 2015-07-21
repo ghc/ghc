@@ -1,0 +1,13 @@
+{-# LANGUAGE RoleAnnotations #-}
+module Set where
+
+type role Set nominal
+data Set a
+
+instance Show a => Show (Set a)
+
+size :: Set a -> Int
+member :: Ord a => a -> Set a -> Bool
+empty :: Set a
+insert :: Ord a => a -> Set a -> Set a
+delete :: Ord a => a -> Set a -> Set a
