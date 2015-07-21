@@ -32,7 +32,7 @@ import DynFlags
 #ifdef GHCI
 import Control.Monad
 
-import ExtsCompat46
+import GHC.Exts
 import GHC.IO ( IO(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 
@@ -95,7 +95,7 @@ newBreakArray dflags entries@(I# sz) = do
     BA array <- allocBA (entries * wORD_SIZE dflags)
     case breakOff of
         W# off -> do    -- Todo: there must be a better way to write zero as a Word!
-            let loop n | n ==# sz = return ()
+            let loop n | isTrue# (n ==# sz) = return ()
                        | otherwise = do
                              writeBA# array n off
                              loop (n +# 1#)

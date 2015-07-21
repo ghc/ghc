@@ -104,7 +104,7 @@ import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Foreign.C
-import ExtsCompat46
+import GHC.Exts
 import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.Data
@@ -454,10 +454,10 @@ hashStr  :: Ptr Word8 -> Int -> Int
  -- use the Addr to produce a hash value between 0 & m (inclusive)
 hashStr (Ptr a#) (I# len#) = loop 0# 0#
    where
-    loop h n | n ExtsCompat46.==# len# = I# h
-             | otherwise  = loop h2 (n ExtsCompat46.+# 1#)
+    loop h n | isTrue# (n ==# len#) = I# h
+             | otherwise  = loop h2 (n +# 1#)
           where !c = ord# (indexCharOffAddr# a# n)
-                !h2 = (c ExtsCompat46.+# (h ExtsCompat46.*# 128#)) `remInt#`
+                !h2 = (c +# (h *# 128#)) `remInt#`
                       hASH_TBL_SIZE#
 
 -- -----------------------------------------------------------------------------

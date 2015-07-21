@@ -502,7 +502,6 @@ compiler_stage2_dll0_MODULES = \
 	Encoding \
 	ErrUtils \
 	Exception \
-	ExtsCompat46 \
 	FamInstEnv \
 	FastFunctions \
 	FastMutInt \

@@ -31,7 +31,7 @@ module Encoding (
 import Foreign
 import Data.Char
 import Numeric
-import ExtsCompat46
+import GHC.Exts
 
 -- -----------------------------------------------------------------------------
 -- UTF-8
@@ -50,32 +50,32 @@ utf8DecodeChar# :: Addr# -> (# Char#, Int# #)
 utf8DecodeChar# a# =
   let !ch0 = word2Int# (indexWord8OffAddr# a# 0#) in
   case () of
-    _ | ch0 <=# 0x7F# -> (# chr# ch0, 1# #)
+    _ | isTrue# (ch0 <=# 0x7F#) -> (# chr# ch0, 1# #)
 
-      | ch0 >=# 0xC0# && ch0 <=# 0xDF# ->
+      | isTrue# ((ch0 >=# 0xC0#) `andI#` (ch0 <=# 0xDF#)) ->
         let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
-        if ch1 <# 0x80# || ch1 >=# 0xC0# then fail 1# else
+        if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
         (# chr# (((ch0 -# 0xC0#) `uncheckedIShiftL#` 6#) +#
                   (ch1 -# 0x80#)),
            2# #)
 
-      | ch0 >=# 0xE0# && ch0 <=# 0xEF# ->
+      | isTrue# ((ch0 >=# 0xE0#) `andI#` (ch0 <=# 0xEF#)) ->
         let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
-        if ch1 <# 0x80# || ch1 >=# 0xC0# then fail 1# else
+        if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
         let !ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
-        if ch2 <# 0x80# || ch2 >=# 0xC0# then fail 2# else
+        if isTrue# ((ch2 <# 0x80#) `orI#` (ch2 >=# 0xC0#)) then fail 2# else
         (# chr# (((ch0 -# 0xE0#) `uncheckedIShiftL#` 12#) +#
                  ((ch1 -# 0x80#) `uncheckedIShiftL#` 6#)  +#
                   (ch2 -# 0x80#)),
            3# #)
 
-     | ch0 >=# 0xF0# && ch0 <=# 0xF8# ->
+     | isTrue# ((ch0 >=# 0xF0#) `andI#` (ch0 <=# 0xF8#)) ->
         let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
-        if ch1 <# 0x80# || ch1 >=# 0xC0# then fail 1# else
+        if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
         let !ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
-        if ch2 <# 0x80# || ch2 >=# 0xC0# then fail 2# else
+        if isTrue# ((ch2 <# 0x80#) `orI#` (ch2 >=# 0xC0#)) then fail 2# else
         let !ch3 = word2Int# (indexWord8OffAddr# a# 3#) in
-        if ch3 <# 0x80# || ch3 >=# 0xC0# then fail 3# else
+        if isTrue# ((ch3 <# 0x80#) `orI#` (ch3 >=# 0xC0#)) then fail 3# else
         (# chr# (((ch0 -# 0xF0#) `uncheckedIShiftL#` 18#) +#
                  ((ch1 -# 0x80#) `uncheckedIShiftL#` 12#) +#
                  ((ch2 -# 0x80#) `uncheckedIShiftL#` 6#)  +#
