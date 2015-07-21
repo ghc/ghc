@@ -15,7 +15,8 @@ module Demand (
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
         getUsage, toCleanDmd,
         absDmd, topDmd, botDmd, seqDmd,
-        lubDmd, bothDmd, apply1Dmd, apply2Dmd,
+        lubDmd, bothDmd,
+        lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
         isTopDmd, isBotDmd, isAbsDmd, isSeqDmd,
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
         addCaseBndrDmd,
@@ -522,10 +523,11 @@ mkJointDmds ss as = zipWithEqual "mkJointDmds" mkJointDmd ss as
 absDmd :: JointDmd
 absDmd = mkJointDmd Lazy Abs
 
-apply1Dmd, apply2Dmd :: Demand
+lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd :: Demand
 -- C1(U), C1(C1(U)) respectively
-apply1Dmd = JD { strd = Lazy, absd = Use Many (UCall One Used) }
-apply2Dmd = JD { strd = Lazy, absd = Use Many (UCall One (UCall One Used)) }
+strictApply1Dmd = JD { strd = Str (SCall HeadStr), absd = Use Many (UCall One Used) }
+lazyApply1Dmd   = JD { strd = Lazy, absd = Use Many (UCall One Used) }
+lazyApply2Dmd   = JD { strd = Lazy, absd = Use Many (UCall One (UCall One Used)) }
 
 topDmd :: JointDmd
 topDmd = mkJointDmd Lazy useTop

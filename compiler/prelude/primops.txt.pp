@@ -1919,6 +1919,19 @@ primop  CasMutVarOp "casMutVar#" GenPrimOp
 section "Exceptions"
 ------------------------------------------------------------------------
 
+-- Note [Strictness for mask/unmask/catch]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Consider this example, which comes from GHC.IO.Handle.Internals:
+--    wantReadableHandle3 f ma b st
+--      = case ... of
+--          DEFAULT -> case ma of MVar a -> ...
+--          0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
+-- The outer case just decides whether to mask exceptions, but we don't want
+-- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
+--
+-- For catch, we know that the first branch will be evaluated, but not
+-- necessarily the second.  Hence strictApply1Dmd and lazyApply1Dmd
+
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
        -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
@@ -1928,7 +1941,8 @@ primop  CatchOp "catch#" GenPrimOp
         -- Catch is actually strict in its first argument
         -- but we don't want to tell the strictness
         -- analyser about that, so that exceptions stay inside it.
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -1965,7 +1979,8 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -1973,7 +1988,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1981,7 +1996,8 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2001,7 +2017,8 @@ primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2027,7 +2044,8 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2036,7 +2054,8 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
