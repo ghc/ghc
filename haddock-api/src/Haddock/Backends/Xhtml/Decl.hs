@@ -223,14 +223,13 @@ ppTyName :: Name -> Html
 ppTyName = ppName Prefix
 
 
-ppSimpleSig :: LinksInfo -> Splice -> Unicode -> Qualification
+ppSimpleSig :: LinksInfo -> Splice -> Unicode -> Qualification -> SrcSpan
             -> [DocName] -> HsType DocName
             -> Html
-ppSimpleSig links splice unicode qual names typ =
+ppSimpleSig links splice unicode qual loc names typ =
     topDeclElem' names $ ppTypeSig True occNames ppTyp unicode
   where
-    -- TODO: Use *helpful* source span.
-    topDeclElem' = topDeclElem links (UnhelpfulSpan undefined) splice
+    topDeclElem' = topDeclElem links loc splice
     ppTyp = ppType unicode qual typ
     occNames = map getOccName names
 
@@ -551,10 +550,10 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
               -> InstSpec DocName -> InstHead DocName
               -> [Html]
 ppInstanceSigs links splice unicode qual (InstSpec {..}) (InstHead {..}) = do
-    TypeSig lnames (L sspan typ) _ <- ispecSigs
+    TypeSig lnames (L loc typ) _ <- ispecSigs
     let names = map unLoc lnames
     let typ' = rename' . sugar $ specializeTyVarBndrs ispecTyVars ihdTypes typ
-    return $ ppSimpleSig links splice unicode qual names typ'
+    return $ ppSimpleSig links splice unicode qual loc names typ'
   where
     fv = foldr Set.union Set.empty . map freeVariables $ ihdTypes
     rename' = rename fv
