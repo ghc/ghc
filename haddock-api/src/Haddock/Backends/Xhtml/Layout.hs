@@ -207,11 +207,11 @@ subClsInstance :: String -- ^ Section unique id
                -> [Html] -- ^ Method contents (pretty-printed signatures)
                -> Html
 subClsInstance sid hdr mets =
-    hdrDiv <+> methodDiv
+    (hdrDiv << hdr) <+> (methodDiv << subBlock mets)
   where
     anchorId = makeAnchorId $ "i:" ++ sid
-    hdrDiv = thediv ! collapseControl anchorId False "instance" << hdr
-    methodDiv = thediv ! collapseSection anchorId False [] << subBlock mets
+    hdrDiv = thediv ! collapseControl anchorId False "instance"
+    methodDiv = thediv ! collapseSection anchorId False "methods"
 
 
 subMethods :: [Html] -> Html
