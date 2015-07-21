@@ -483,7 +483,7 @@ matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
 -- then (f args) matches the rule, and the corresponding
 -- rewritten RHS is rhs
 --
--- The bndrs and rhs is occurrence-analysed
+-- The returned expression is occurrence-analysed
 --
 --      Example
 --
@@ -505,8 +505,9 @@ matchRule dflags rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
   = case match_fn dflags rule_env fn args of
-        Just expr -> Just expr
         Nothing   -> Nothing
+        Just expr -> Just (occurAnalyseExpr expr)
+        -- We could do this when putting things into the rulebase, I guess
 
 matchRule _ in_scope is_active _ args rough_args
           (Rule { ru_act = act, ru_rough = tpl_tops
