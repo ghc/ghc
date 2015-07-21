@@ -20,17 +20,18 @@ Flags:
                     HTML generated here: testsuite/hpc_output/hpc_index.html
   --fast            Omit dyn way, omit binary distribution
   --slow            Build stage2 with -DDEBUG. Skips tests that call
-                    `compiler_stats_num_field`.
+                    compiler_stats_num_field.
                     2008-07-01: 14% slower than the default.
-  --dph:            Also build libraries/dph and run associated tests.
-  --quiet:          More pretty build log.
+  --dph             Also build libraries/dph and run associated tests.
+  --quiet           More pretty build log.
                     See Note [Default build system verbosity].
   --help            shows this usage help.
 
-  Set environment variable 'CPUS' to number of cores, to exploit
-  multiple cpu cores, e.g.
+  validate runs 'make -j\$THREADS', where by default THREADS is the number of
+  cpus your computer has +1. You can set the environment variable THREADS to
+  override this. For a sequential build you would for example use
 
-    CPUS=8 ./validate
+    THREADS=1 ./validate
 
 EOF
 }
@@ -121,8 +122,6 @@ detect_cpu_count () {
         # nothing helped
         CPUS="1"
     fi
-
-    echo "using ${CPUS} CPUs" >&2
 }
 
 detect_cpu_count
@@ -138,6 +137,8 @@ if [ "$THREADS" = "" ]; then
 else
     threads="$THREADS"
 fi
+
+echo "using THREADS=${threads}" >&2
 
 if type gmake > /dev/null 2> /dev/null
 then
