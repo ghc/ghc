@@ -1425,8 +1425,9 @@ extendInteractiveContext :: InteractiveContext
                          -> [TyThing]
                          -> [ClsInst] -> [FamInst]
                          -> Maybe [Type]
+                         -> FixityEnv
                          -> InteractiveContext
-extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
+extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults fix_env
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
                             -- a new mod_index (Trac #9426)
@@ -1434,7 +1435,9 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
                             , new_fam_insts ++ old_fam_insts )
-          , ic_default    = defaults }
+          , ic_default    = defaults
+          , ic_fix_env    = fix_env  -- # 10018
+          }
   where
     new_ids = [id | AnId id <- new_tythings]
     old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)

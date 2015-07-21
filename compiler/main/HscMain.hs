@@ -1467,6 +1467,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     -- been done. See the notes at the definition of InteractiveContext
     -- (ic_instances) for more details.
     let defaults = tcg_default tc_gblenv
+    let fix_env  = tcg_fix_env tc_gblenv
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
@@ -1520,7 +1521,8 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
 
         new_tythings = map AnId ext_ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) patsyns
         ictxt        = hsc_IC hsc_env
-        new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts fam_insts defaults
+        new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts
+                                                fam_insts defaults fix_env
     return (new_tythings, new_ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
