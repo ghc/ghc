@@ -23,6 +23,9 @@ bug-fix release and contains a number of important fixes,
  * An infinite loop during program startup when iconv is unavailable hsa been
    fixed
 
+ * The source location of the caller of a function is now available as an implicit
+   parameter to allow for better error reporting in the future
+
 A more thorough list of the changes in the release can be found in the release
 notes,
 

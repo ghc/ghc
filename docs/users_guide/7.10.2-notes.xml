@@ -16,6 +16,16 @@
     <itemizedlist>
        <listitem>
           <para>
+            The source location of a function's caller can now be made
+            available to the callee as an implicit parameter. This will
+            enable better location information in runtime errors (e.g. from
+            <literal>error</literal> and partial functions like
+            <literal>head</literal>). For more details see
+            <xref linkend="special-implicit-params"/>.
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A bug in the typechecker which could result in strange,
             inconsistent reduction of type families has been fixed
             (issue #10488).
@@ -246,6 +256,17 @@
                     any clients of the GHC API not using these new
                     features).
                </para>
+           </listitem>
+           <listitem>
+              <para>
+                The source location functionality above required an breaking change
+                to the GHC API. Namely, the <literal>SrcSpan</literal>s of
+                <literal>CtLoc</literal> and <literal>TcLclEnv</literal> are now
+                <literal>RealSrcSpan</literal>s. While usually API changes like this
+                are avoided in bugfix releases, it was decided that the benefits
+                offered by the source location functionality outweighed the cost of
+                a small change to this rarely-used interface.
+              </para>
            </listitem>
        </itemizedlist>
     </sect3>

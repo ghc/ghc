@@ -7681,7 +7681,8 @@ inner binding of <literal>?x</literal>, so <literal>(f 9)</literal> will return
 </para>
 </sect3>
 
-<sect3><title>Special implicit parameters</title>
+<sect3 id="special-implicit-params">
+<title>Special implicit parameters</title>
 <para>
 GHC treats implicit parameters of type <literal>GHC.Stack.CallStack</literal>
 specially, by resolving them to the current location in the program. Consider:
