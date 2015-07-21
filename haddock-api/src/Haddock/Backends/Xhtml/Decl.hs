@@ -223,6 +223,14 @@ ppTyName :: Name -> Html
 ppTyName = ppName Prefix
 
 
+ppSimpleSig :: Unicode -> Qualification -> [DocName] -> HsType DocName -> Html
+ppSimpleSig unicode qual names typ =
+    ppTypeSig True occNames ppTyp unicode
+  where
+    ppTyp = ppType unicode qual typ
+    occNames = map getOccName names
+
+
 --------------------------------------------------------------------------------
 -- * Type families
 --------------------------------------------------------------------------------
@@ -542,8 +550,7 @@ ppInstanceSigs links splice unicode qual (InstSpec {..}) (InstHead {..}) = do
     TypeSig lnames (L sspan typ) _ <- ispecSigs
     let names = map unLoc lnames
     let typ' = rename' . sugar $ specializeTyVarBndrs ispecTyVars ihdTypes typ
-    return $ ppFunSig False links sspan noDocForDecl names typ' []
-        splice unicode qual
+    return $ ppSimpleSig unicode qual names typ'
   where
     fv = foldr Set.union Set.empty . map freeVariables $ ihdTypes
     rename' = rename fv

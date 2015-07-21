@@ -211,7 +211,7 @@ subClsInstance sid hdr mets =
   where
     anchorId = makeAnchorId $ "i:" ++ sid
     hdrDiv = thediv ! collapseControl anchorId False "instance" << hdr
-    methodDiv = thediv ! collapseSection anchorId False [] << subMethods mets
+    methodDiv = thediv ! collapseSection anchorId False [] << subBlock mets
 
 
 subMethods :: [Html] -> Html
