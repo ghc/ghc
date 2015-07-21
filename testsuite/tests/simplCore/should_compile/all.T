@@ -106,8 +106,12 @@ test('T4918',
      run_command,
      ['$MAKE -s --no-print-directory T4918'])
 
+# This test flips too and fro about whether it passes
+# I'm not sure why it is so delicate, but it greps the
+# result of -ddump-simpl, which is never advertised to
+# be very stable
 test('T4945',
-     expect_broken(4945),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 
