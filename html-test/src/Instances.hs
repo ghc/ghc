@@ -56,3 +56,10 @@ instance Baz (a -> b)
 instance Baz [c]
 instance Baz (a, b, c)
 instance Baz (a, [b], b, a)
+
+
+data Quux a b c = Qx a | Qux a b | Quux a b c
+
+instance Foo (Quux a b)
+instance Bar (Quux a c) (Quux a b c)
+instance Baz (Quux a b c)
