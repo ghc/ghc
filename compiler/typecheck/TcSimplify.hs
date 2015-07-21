@@ -121,10 +121,28 @@ simpl_top wanteds
            ; meta_tvs' <- mapM defaultTyVar meta_tvs   -- Has unification side effects
            ; if meta_tvs' == meta_tvs   -- No defaulting took place;
                                         -- (defaulting returns fresh vars)
-             then try_class_defaulting wc
+             then try_instance_of_defaulting wc
              else do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
                             -- See Note [Must simplify after defaulting]
-                     ; try_class_defaulting wc_residual } }
+                     ; try_instance_of_defaulting wc_residual } }
+
+    try_instance_of_defaulting :: WantedConstraints -> TcS WantedConstraints
+    try_instance_of_defaulting wc
+      | isEmptyWC wc
+      = return wc
+      | otherwise
+      = do { let approx = bagToList (approximateWC_ wc)
+           ; something_happened <- foldlM (\something ct ->
+               case (isWantedCt ct, classifyPredType (ctPred ct)) of
+                 (True, InstanceOfPred lhs rhs)
+                   | Just v <- tcGetTyVar_maybe rhs
+                   -> do { unifyTyVar v lhs
+                         ; return True }
+                 _ -> return something) False approx
+           ; if something_happened
+             then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
+                     ; try_class_defaulting wc_residual }
+             else try_class_defaulting wc }
 
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc
