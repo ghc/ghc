@@ -26,9 +26,13 @@ class Foo f => Bar f a where
 
     bar :: f a -> f Bool -> a
     bar' :: f (f a) -> f (f (f b))
+    bar0, bar1 :: (f a, f a) -> (f b, f c)
 
     bar = undefined
     bar' = undefined
+    bar0 = undefined
+    bar1 = undefined
+
 
 instance Bar Maybe Bool
 instance Bar Maybe [a]
