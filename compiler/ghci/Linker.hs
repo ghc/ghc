@@ -662,7 +662,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
             adjust_linkable iface lnk
                 -- Signatures have no linkables! Don't return one.
-                | Just _ <- mi_sig_of iface = return Nothing
+                | mi_hsc_src iface == HsigFile = return Nothing
                 | Just new_osuf <- replace_osuf = do
                         new_uls <- mapM (adjust_ul new_osuf)
                                         (linkableUnlinked lnk)

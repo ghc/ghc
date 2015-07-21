@@ -67,7 +67,7 @@ module HscTypes (
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
-        emptyIfaceWarnCache,
+        emptyIfaceWarnCache, mi_boot,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -748,7 +748,7 @@ data ModIface
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
         mi_finsts     :: !WhetherHasFamInst,  -- ^ Whether this module has family instances
-        mi_boot       :: !IsBootInterface,    -- ^ Read from an hi-boot file?
+        mi_hsc_src    :: !HscSource,          -- ^ Boot? Signature?
 
         mi_deps     :: Dependencies,
                 -- ^ The dependencies of the module.  This is
@@ -846,11 +846,16 @@ data ModIface
                 -- See Note [RnNames . Trust Own Package]
      }
 
+-- | Old-style accessor for whether or not the ModIface came from an hs-boot
+-- file.
+mi_boot :: ModIface -> Bool
+mi_boot iface = mi_hsc_src iface == HsBootFile
+
 instance Binary ModIface where
    put_ bh (ModIface {
                  mi_module    = mod,
                  mi_sig_of    = sig_of,
-                 mi_boot      = is_boot,
+                 mi_hsc_src   = hsc_src,
                  mi_iface_hash= iface_hash,
                  mi_mod_hash  = mod_hash,
                  mi_flag_hash = flag_hash,
@@ -874,7 +879,7 @@ instance Binary ModIface where
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg }) = do
         put_ bh mod
-        put_ bh is_boot
+        put_ bh hsc_src
         put_ bh iface_hash
         put_ bh mod_hash
         put_ bh flag_hash
@@ -901,7 +906,7 @@ instance Binary ModIface where
 
    get bh = do
         mod_name    <- get bh
-        is_boot     <- get bh
+        hsc_src     <- get bh
         iface_hash  <- get bh
         mod_hash    <- get bh
         flag_hash   <- get bh
@@ -928,7 +933,7 @@ instance Binary ModIface where
         return (ModIface {
                  mi_module      = mod_name,
                  mi_sig_of      = sig_of,
-                 mi_boot        = is_boot,
+                 mi_hsc_src     = hsc_src,
                  mi_iface_hash  = iface_hash,
                  mi_mod_hash    = mod_hash,
                  mi_flag_hash   = flag_hash,
@@ -970,7 +975,7 @@ emptyModIface mod
                mi_flag_hash   = fingerprint0,
                mi_orphan      = False,
                mi_finsts      = False,
-               mi_boot        = False,
+               mi_hsc_src     = HsSrcFile,
                mi_deps        = noDependencies,
                mi_usages      = [],
                mi_exports     = [],
@@ -1048,7 +1053,7 @@ type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
 data ModGuts
   = ModGuts {
         mg_module    :: !Module,         -- ^ Module being compiled
-        mg_boot      :: IsBootInterface, -- ^ Whether it's an hs-boot module
+        mg_hsc_src   :: HscSource,       -- ^ Whether it's an hs-boot module
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise

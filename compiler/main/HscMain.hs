@@ -1622,7 +1622,7 @@ mkModGuts :: Module -> SafeHaskellMode -> CoreProgram -> ModGuts
 mkModGuts mod safe binds =
     ModGuts {
         mg_module       = mod,
-        mg_boot         = False,
+        mg_hsc_src      = HsSrcFile,
         mg_exports      = [],
         mg_deps         = noDependencies,
         mg_dir_imps     = emptyModuleEnv,

@@ -911,7 +911,7 @@ pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
  = vcat [ ptext (sLit "interface")
-                <+> ppr (mi_module iface) <+> pp_boot
+                <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
                 <+> (if mi_orphan iface then ptext (sLit "[orphan module]") else Outputable.empty)
                 <+> (if mi_finsts iface then ptext (sLit "[family instance module]") else Outputable.empty)
                 <+> (if mi_hpc    iface then ptext (sLit "[hpc]") else Outputable.empty)
@@ -940,8 +940,9 @@ pprModIface iface
         , pprTrustPkg (mi_trust_pkg iface)
         ]
   where
-    pp_boot | mi_boot iface = ptext (sLit "[boot]")
-            | otherwise     = Outputable.empty
+    pp_hsc_src HsBootFile = ptext (sLit "[boot]")
+    pp_hsc_src HsigFile = ptext (sLit "[hsig]")
+    pp_hsc_src HsSrcFile = Outputable.empty
 
 {-
 When printing export lists, we print like this:
