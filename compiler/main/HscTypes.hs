@@ -1436,7 +1436,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
                             , new_fam_insts ++ old_fam_insts )
           , ic_default    = defaults
-          , ic_fix_env    = fix_env  -- # 10018
+          , ic_fix_env    = fix_env  -- See Note [Fixity declarations in GHCi]
           }
   where
     new_ids = [id | AnId id <- new_tythings]
