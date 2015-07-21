@@ -262,9 +262,9 @@ mkTextEncoding' cfm enc =
               --  what we can to work with what we have. For instance, ASCII is
               -- easy. We match on ASCII encodings directly using several
               -- possible aliases (specified by RFC 1345 & Co) and for this use
-              -- the 'char8' encoding
+              -- the 'ascii' encoding
               Nothing
-                | isAscii   -> return char8
+                | isAscii   -> return (Latin1.mkAscii cfm)
                 | otherwise ->
                     unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
   where
