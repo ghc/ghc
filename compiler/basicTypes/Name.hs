@@ -60,6 +60,7 @@ module Name (
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName,
         isWiredInName, isBuiltInSyntax,
+        isHoleName,
         wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
@@ -211,6 +212,9 @@ isExternalName (Name {n_sort = WiredIn _ _ _}) = True
 isExternalName _                               = False
 
 isInternalName name = not (isExternalName name)
+
+isHoleName :: Name -> Bool
+isHoleName = isHoleModule . nameModule
 
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
 nameModule_maybe :: Name -> Maybe Module
