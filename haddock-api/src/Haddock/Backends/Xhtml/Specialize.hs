@@ -30,23 +30,31 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 
+-- | Instantiate all occurrences of given name with particular type.
 specialize :: (Eq name, Typeable name)
            => Data a
            => name -> HsType name -> a -> a
-specialize name details = everywhere (mkT $ specializeStep name details)
+specialize name details =
+    everywhere $ mkT step
+  where
+    step (HsTyVar name') | name == name' = details
+    step typ = typ
 
 
+-- | Instantiate all occurrences of given names with corresponding types.
+--
+-- It is just a convenience function wrapping 'specialize' that supports more
+-- that one specialization.
 specialize' :: (Eq name, Typeable name)
             => Data a
             => [(name, HsType name)] -> a -> a
 specialize' = flip $ foldr (uncurry specialize)
 
 
-specializeStep :: Eq name => name -> HsType name -> HsType name -> HsType name
-specializeStep name details (HsTyVar name') | name == name' = details
-specializeStep _ _ typ = typ
-
-
+-- | Instantiate given binders with corresponding types.
+--
+-- Again, it is just a convenience function around 'specialize'. Note that
+-- length of type list should be the same as the number of binders.
 specializeTyVarBndrs :: (Eq name, Typeable name, DataId name)
                      => LHsTyVarBndrs name -> [HsType name]
                      -> HsType name -> HsType name
@@ -58,6 +66,12 @@ specializeTyVarBndrs bndrs typs =
     bname (KindedTyVar (L _ name) _) = name
 
 
+-- | Make given type use tuple and list literals where appropriate.
+--
+-- After applying 'specialize' function some terms may not use idiomatic list
+-- and tuple literals resulting in types like @[] a@ or @(,,) a b c@. This
+-- can be fixed using 'sugar' function, that will turn such types into @[a]@
+-- and @(a, b, c)@.
 sugar :: forall name. (NamedThing name, DataId name)
       => HsType name -> HsType name
 sugar =
@@ -93,6 +107,19 @@ sugarTuples typ =
     aux _ _ = typ
 
 
+-- | Compute arity of given tuple operator.
+--
+-- >>> parseTupleArity "(,,)"
+-- Just 3
+--
+-- >>> parseTupleArity "(,,,,)"
+-- Just 5
+--
+-- >>> parseTupleArity "abc"
+-- Nothing
+--
+-- >>> parseTupleArity "()"
+-- Nothing
 parseTupleArity :: String -> Maybe Int
 parseTupleArity ('(':commas) = do
     n <- parseCommas commas
@@ -105,6 +132,17 @@ parseTupleArity ('(':commas) = do
 parseTupleArity _ = Nothing
 
 
+-- | Haskell AST type representation.
+--
+-- This type is used for renaming (more below), essentially the ambiguous (!)
+-- version of 'Name'. So, why is this 'FastString' instead of 'OccName'? Well,
+-- it was 'OccName' before, but turned out that 'OccName' sometimes also
+-- contains namespace information, differentiating visually same types.
+--
+-- And 'FastString' is used because it is /visual/ part of 'OccName' - it is
+-- not converted to 'String' or alike to avoid new allocations. Additionally,
+-- since it is stored mostly in 'Set', fast comparison of 'FastString' is also
+-- quite nice.
 type NameRep = FastString
 
 getNameRep :: NamedThing name => name -> NameRep
@@ -127,10 +165,39 @@ setInternalOccName occ name =
     nname' = mkInternalName (nameUnique nname) occ (nameSrcSpan nname)
 
 
+-- | Compute set of free variables of given type.
+freeVariables :: forall name. (NamedThing name, DataId name)
+              => HsType name -> Set NameRep
+freeVariables =
+    everythingWithState Set.empty Set.union query
+  where
+    query term ctx = case cast term :: Maybe (HsType name) of
+        Just (HsForAllTy _ _ bndrs _ _) ->
+            (Set.empty, Set.union ctx (bndrsNames bndrs))
+        Just (HsTyVar name)
+            | getName name `Set.member` ctx -> (Set.empty, ctx)
+            | otherwise -> (Set.singleton $ getNameRep name, ctx)
+        _ -> (Set.empty, ctx)
+    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc) . hsq_tvs
+
+
+-- | Make given type visually unambiguous.
+--
+-- After applying 'specialize' method, some free type variables may become
+-- visually ambiguous - for example, having @a -> b@ and specializing @a@ to
+-- @(a -> b)@ we get @(a -> b) -> b@ where first occurrence of @b@ refers to
+-- different type variable than latter one. Applying 'rename' function
+-- will fix that type to be visually unambiguous again (making it something
+-- like @(a -> c) -> b@).
 rename :: SetName name => Set NameRep -> HsType name -> HsType name
 rename fv typ = fst $ evalRWS (renameType typ) fv Map.empty
 
 
+-- | Renaming monad.
+--
+-- This is just a simple RWS instance, where /reader/ part consists of names
+-- that are initially taken and cannot change, /state/ part is just context
+-- with name bindings and /writer/ part is not used.
 type Rename name a = RWS (Set NameRep) () (Map Name name) a
 
 
@@ -169,21 +236,6 @@ renameType t@(HsTyLit _) = pure t
 renameType (HsWrapTy wrap t) = HsWrapTy wrap <$> renameType t
 renameType HsWildcardTy = pure HsWildcardTy
 renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
-
-
-freeVariables :: forall name. (NamedThing name, DataId name)
-              => HsType name -> Set NameRep
-freeVariables =
-    everythingWithState Set.empty Set.union query
-  where
-    query term ctx = case cast term :: Maybe (HsType name) of
-        Just (HsForAllTy _ _ bndrs _ _) ->
-            (Set.empty, Set.union ctx (bndrsNames bndrs))
-        Just (HsTyVar name)
-            | getName name `Set.member` ctx -> (Set.empty, ctx)
-            | otherwise -> (Set.singleton $ getNameRep name, ctx)
-        _ -> (Set.empty, ctx)
-    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc) . hsq_tvs
 
 
 renameLType :: SetName name => LHsType name -> Rename name (LHsType name)
@@ -235,6 +287,7 @@ renameName name = do
         Nothing -> name
 
 
+-- | Generate fresh occurrence name, put it into context and return.
 freshName :: SetName name => name -> Rename name name
 freshName name = do
     fv <- ask
