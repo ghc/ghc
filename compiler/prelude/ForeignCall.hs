@@ -239,7 +239,7 @@ instance Outputable Header where
 data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself
-    deriving (Data, Typeable)
+    deriving (Eq, Data, Typeable)
 
 instance Outputable CType where
     ppr (CType _ mh (_,ct)) = hDoc <+> ftext ct
