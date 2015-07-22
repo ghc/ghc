@@ -484,14 +484,18 @@ tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
         -- Check for missing fields
         ; checkMissingFields data_con rbinds
 
-        ; con_expr <- tcCheckId con_name res_ty
-        ; let arity = dataConSourceArity data_con
-              (arg_tys, _actual_res_ty) = tcSplitFunTysN res_ty arity
-              con_id = dataConWrapId data_con
+        -- Get type of the constructor
+        ; (con_expr, _, con_sigma) <- tcIdOcc (OccurrenceOf con_name) con_name
+        ; (wrap, con_rho) <- instFunTy con_sigma  -- Eagerly instantiate
 
-        -- ; co_res <- unifyType actual_res_ty res_ty
+        ; let arity = dataConSourceArity data_con
+              (arg_tys, actual_res_ty) = tcSplitFunTysN con_rho arity
+              con_id = dataConWrapId data_con
+        ; co_res <- unifyType actual_res_ty res_ty
         ; rbinds' <- tcRecordBinds data_con arg_tys rbinds
-        ; return $ RecordCon (L loc con_id) con_expr rbinds' }
+
+        ; let record_con = RecordCon (L loc con_id) (mkHsWrap wrap con_expr) rbinds'
+        ; return $ mkHsWrapCo co_res record_con }
 
 {-
 Note [Type of a record update]
