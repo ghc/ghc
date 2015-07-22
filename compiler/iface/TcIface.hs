@@ -736,7 +736,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
        }
   where
     vectVarMapping name
-      = do { vName <- lookupOrig mod (mkLocalisedOccName mod mkVectOcc name)
+      = do { vName <- lookupIfaceTop (mkLocalisedOccName mod mkVectOcc name)
            ; var   <- forkM (ptext (sLit "vect var")  <+> ppr name)  $
                         tcIfaceExtId name
            ; vVar  <- forkM (ptext (sLit "vect vVar [mod =") <+>
@@ -764,7 +764,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
           tcIfaceExtId name
 
     vectTyConVectMapping vars name
-      = do { vName  <- lookupOrig mod (mkLocalisedOccName mod mkVectTyConOcc name)
+      = do { vName  <- lookupIfaceTop (mkLocalisedOccName mod mkVectTyConOcc name)
            ; vectTyConMapping vars name vName
            }
 

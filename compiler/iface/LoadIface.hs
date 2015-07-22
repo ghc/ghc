@@ -585,20 +585,18 @@ loadDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
 loadDecls ignore_prags ver_decls
-   = do { mod <- getIfModule
-        ; thingss <- mapM (loadDecl ignore_prags mod) ver_decls
+   = do { thingss <- mapM (loadDecl ignore_prags) ver_decls
         ; return (concat thingss)
         }
 
 loadDecl :: Bool                    -- Don't load pragmas into the decl pool
-         -> Module
           -> (Fingerprint, IfaceDecl)
           -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
                                     -- TyThings are forkM'd thunks
-loadDecl ignore_prags mod (_version, decl)
+loadDecl ignore_prags (_version, decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
-          main_name      <- lookupOrig mod (ifName decl)
+          main_name      <- lookupIfaceTop (ifName decl)
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -671,7 +669,7 @@ loadDecl ignore_prags mod (_version, decl)
                            Nothing    ->
                              pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
 
-        ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclImplicitBndrs decl)
+        ; implicit_names <- mapM lookupIfaceTop (ifaceDeclImplicitBndrs decl)
 
 --         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
         ; return $ (main_name, thing) :
