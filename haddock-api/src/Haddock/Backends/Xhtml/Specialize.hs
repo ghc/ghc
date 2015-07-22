@@ -292,7 +292,7 @@ freshName :: SetName name => name -> Rename name name
 freshName name = do
     fv <- ask
     env <- get
-    let taken = Set.union fv (Set.fromList . map getNameRep . Map.keys $ env)
+    let taken = Set.union fv (Set.fromList . map getNameRep . Map.elems $ env)
     let name' = setInternalNameRep (findFreshName taken occ) name
     put $ Map.insert nname name' env
     return name'
