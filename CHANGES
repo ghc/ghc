@@ -1,3 +1,9 @@
+Changes in version 2.16.2
+
+ * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
+
+ * Fix expansion icon for user-collapsible sections (#412)
+
 Changes in version 2.16.1
 
  * Don't default to type constructors for out-of-scope names (#253 and
@@ -20,10 +26,6 @@ Changes in version 2.16.1
  * Fix cross-module instance locations (#383)
 
  * Fix alignment of Source link for instances in Firefox (#384)
-
- * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
-
- * Fix expansion icon for user-collapsible sections (#412)
 
 Changes in version 2.16.0
 
