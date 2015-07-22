@@ -320,7 +320,7 @@ findFreshName :: Set NameRep -> NameRep -> NameRep
 findFreshName taken =
     fromJust . List.find isFresh . alternativeNames
   where
-    isFresh = not . Set.member taken
+    isFresh = not . flip Set.member taken
 
 
 alternativeNames :: NameRep -> [NameRep]
