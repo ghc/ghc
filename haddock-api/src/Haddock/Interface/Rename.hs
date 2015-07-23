@@ -264,7 +264,10 @@ renameInstHead InstHead {..} = do
   kinds <- mapM renameType ihdKinds
   types <- mapM renameType ihdTypes
   itype <- case ihdInstType of
-    ClassInst cs -> ClassInst <$> mapM renameType cs
+    ClassInst ctx bndrs sigs -> ClassInst
+        <$> mapM renameType ctx
+        <*> renameLTyVarBndrs bndrs
+        <*> mapM renameSig sigs
     TypeInst  ts -> TypeInst  <$> traverse renameType ts
     DataInst  dd -> DataInst  <$> renameTyClD dd
   return InstHead

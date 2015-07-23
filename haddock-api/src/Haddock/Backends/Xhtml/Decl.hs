@@ -531,13 +531,13 @@ ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
            -> Html
 ppInstHead links splice unicode qual iid mspec ihead@(InstHead {..}) =
     case ihdInstType of
-        ClassInst cs | Just spec <- mspec ->
+        ClassInst cs _ _ | Just spec <- mspec ->
             subClsInstance (nameStr ++ "-" ++ show iid) hdr (mets spec ihead)
           where
             hdr = ppContextNoLocs cs unicode qual <+> typ
             mets = ppInstanceSigs links splice unicode qual
             nameStr = occNameString . nameOccName $ getName ihdClsName
-        ClassInst cs -> ppContextNoLocs cs unicode qual <+> typ
+        ClassInst cs _ _ -> ppContextNoLocs cs unicode qual <+> typ
         TypeInst rhs -> keyword "type" <+> typ
             <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
         DataInst dd -> keyword "data" <+> typ

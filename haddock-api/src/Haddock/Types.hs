@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -324,12 +324,19 @@ instance SetName DocName where
 
 -- | The three types of instances
 data InstType name
-  = ClassInst [HsType name]         -- ^ Context
+  = ClassInst
+      { clsiCtx :: [HsType name]
+      , clsiTyVars :: LHsTyVarBndrs name
+      , clsiSigs :: [Sig name]
+      }
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
 
 instance OutputableBndr a => Outputable (InstType a) where
-  ppr (ClassInst a) = text "ClassInst" <+> ppr a
+  ppr (ClassInst { .. }) = text "ClassInst"
+      <+> ppr clsiCtx
+      <+> ppr clsiTyVars
+      <+> ppr clsiSigs
   ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
   ppr (DataInst  a) = text "DataInst"  <+> ppr a
 

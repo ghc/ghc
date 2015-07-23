@@ -390,11 +390,15 @@ synifyKindSig :: Kind -> LHsKind Name
 synifyKindSig k = synifyType WithinType k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
-synifyInstHead (_, preds, cls, types) = InstHead
+synifyInstHead (tyvars, preds, cls, types) = InstHead
   { ihdClsName = getName cls
   , ihdKinds = map (unLoc . synifyType WithinType) ks
   , ihdTypes = map (unLoc . synifyType WithinType) ts
-  , ihdInstType = ClassInst $ map (unLoc . synifyType WithinType) preds
+  , ihdInstType = ClassInst
+      { clsiCtx = map (unLoc . synifyType WithinType) preds
+      , clsiTyVars = synifyTyVars tyvars
+      , clsiSigs = map (synifyIdSig WithinType) $ classMethods cls
+      }
   }
   where (ks,ts) = break (not . isKind) types
 
