@@ -136,8 +136,10 @@ simpl_top wanteds
                case (isWantedCt ct, classifyPredType (ctPred ct)) of
                  (True, InstanceOfPred lhs rhs)
                    | Just v <- tcGetTyVar_maybe rhs
-                   -> do { unifyTyVar v lhs
-                         ; return True }
+                   -> do { filled <- TcS.isFilledMetaTyVar v
+                         ; if filled
+                              then return False
+                              else unifyTyVar v lhs >> return True }
                  _ -> return something) False approx
            ; if something_happened
              then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
