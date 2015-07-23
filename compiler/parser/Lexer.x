@@ -1012,7 +1012,7 @@ withLexedDocType lexDocComment = do
   case prevChar buf ' ' of
     '|' -> lexDocComment input ITdocCommentNext False
     '^' -> lexDocComment input ITdocCommentPrev False
-    '$' -> lexDocComment input ITdocCommentNamed False
+    '$' -> lexDocComment input ITdocCommentNamed True
     '*' -> lexDocSection 1 input
     '#' -> lexDocComment input ITdocOptionsOld False
     _ -> panic "withLexedDocType: Bad doc type"
