@@ -5246,7 +5246,12 @@ The Paterson Conditions: for each class constraint <literal>(C t1 ... tn)</liter
 <orderedlist>
 <listitem><para>No type variable has more occurrences in the constraint than in the head</para></listitem>
 <listitem><para>The constraint has fewer constructors and variables (taken together
-      and counting repetitions) than the head</para></listitem>
+      and counting repetitions) than the head
+</para></listitem>
+<listitem><para>The constraint mentions no type functions.
+A type function application can in principle expand to a
+type of arbitrary size, and so are rejected out of hand
+</para></listitem>
 </orderedlist>
 </para></listitem>
 
