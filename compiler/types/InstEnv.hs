@@ -29,7 +29,7 @@ module InstEnv (
 
 #include "HsVersions.h"
 
-import CoreSyn (IsOrphan(..), isOrphan, notOrphan)
+import CoreSyn ( IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor )
 import Module
 import Class
 import Var
@@ -234,19 +234,9 @@ mkLocalInstance dfun oflag tvs cls tys
     mb_ns | null fds   = [choose_one arg_names]
           | otherwise  = map do_one fds
     do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- cls_tvs `zip` arg_names
-                                          , not (tv `elem` rtvs)]
+                                            , not (tv `elem` rtvs)]
 
-    -- Since instance declarations get eventually attached to one of the types
-    -- from the definition when compiling the ABI hash, we should make
-    -- it deterministic. This chooses the one with minimal OccName
-    -- as opposed to uniq value.
-    choose_one :: [NameSet] -> IsOrphan
-    choose_one nss = case local_names of
-                       []      -> IsOrphan
-                       (_ : _) -> NotOrphan anchor
-      where
-      local_names = nameSetElems (unionNameSets nss)
-      anchor = minimum $ map nameOccName local_names
+    choose_one nss = chooseOrphanAnchor (nameSetElems (unionNameSets nss))
 
 mkImportedInstance :: Name
                    -> [Maybe Name]

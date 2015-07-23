@@ -68,7 +68,7 @@ module CoreSyn (
         deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
 
         -- * Orphanhood
-        IsOrphan(..), isOrphan, notOrphan,
+        IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor,
 
         -- * Core rule data types
         CoreRule(..), RuleBase,
@@ -722,6 +722,21 @@ isOrphan _ = False
 notOrphan :: IsOrphan -> Bool
 notOrphan NotOrphan{} = True
 notOrphan _ = False
+
+chooseOrphanAnchor :: [Name] -> IsOrphan
+-- Something (rule, instance) is relate to all the Names in this
+-- list. Choose one of them to be an "anchor" for the orphan.  We make
+-- the choice deterministic to avoid gratuitious changes in the ABI
+-- hash (Trac #4012).  Specficially, use lexicographic comparison of
+-- OccName rather than comparing Uniques
+--
+-- NB: 'minimum' use Ord, and (Ord OccName) works lexicographically
+--
+chooseOrphanAnchor local_names
+  | null local_names = IsOrphan
+  | otherwise        = NotOrphan (minimum occs)
+  where
+    occs = map nameOccName local_names
 
 instance Binary IsOrphan where
     put_ bh IsOrphan = putByte bh 0
