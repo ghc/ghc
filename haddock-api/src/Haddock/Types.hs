@@ -352,12 +352,6 @@ data InstHead name = InstHead
     , ihdInstType :: InstType name
     }
 
--- | Instance details used for printing specialized method signatures.
-data InstSpec name = InstSpec
-    { ispecTyVars :: LHsTyVarBndrs name
-    , ispecSigs :: [Sig name]
-    }
-
 -----------------------------------------------------------------------------
 -- * Documentation comments
 -----------------------------------------------------------------------------

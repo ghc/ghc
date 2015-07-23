@@ -282,7 +282,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
-      = ppInstances links instances Nothing docname splice unicode qual
+      = ppInstances links instances docname splice unicode qual
 
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
@@ -506,38 +506,37 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instSpec = Just $ InstSpec { ispecSigs = sigs, ispecTyVars = ltyvars }
-    instancesBit = ppInstances links instances instSpec nm splice unicode qual
+    instancesBit = ppInstances links instances nm splice unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
 ppInstances :: LinksInfo
-            -> [DocInstance DocName] -> Maybe (InstSpec DocName) -> DocName
+            -> [DocInstance DocName] -> DocName
             -> Splice -> Unicode -> Qualification
             -> Html
-ppInstances links instances mspec baseName splice unicode qual
+ppInstances links instances baseName splice unicode qual
   = subInstances qual instName links True (zipWith instDecl [1..] instances)
   -- force Splice = True to use line URLs
   where
     instName = getOccString $ getName baseName
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
     instDecl iid (inst, maybeDoc,l) =
-        ((ppInstHead links splice unicode qual iid mspec inst, maybeDoc, []),l)
+        ((ppInstHead links splice unicode qual iid inst, maybeDoc, []),l)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
-           -> Int -> Maybe (InstSpec DocName) -> InstHead DocName
+           -> Int -> InstHead DocName
            -> Html
-ppInstHead links splice unicode qual iid mspec ihead@(InstHead {..}) =
+ppInstHead links splice unicode qual iid (InstHead {..}) =
     case ihdInstType of
-        ClassInst cs _ _ | Just spec <- mspec ->
-            subClsInstance (nameStr ++ "-" ++ show iid) hdr (mets spec ihead)
+        ClassInst { .. } ->
+            subClsInstance (nameStr ++ "-" ++ show iid) hdr mets
           where
-            hdr = ppContextNoLocs cs unicode qual <+> typ
+            hdr = ppContextNoLocs clsiCtx unicode qual <+> typ
             mets = ppInstanceSigs links splice unicode qual
+                clsiTyVars ihdTypes clsiSigs
             nameStr = occNameString . nameOccName $ getName ihdClsName
-        ClassInst cs _ _ -> ppContextNoLocs cs unicode qual <+> typ
         TypeInst rhs -> keyword "type" <+> typ
             <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
         DataInst dd -> keyword "data" <+> typ
@@ -547,15 +546,15 @@ ppInstHead links splice unicode qual iid mspec ihead@(InstHead {..}) =
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
-              -> InstSpec DocName -> InstHead DocName
+              -> LHsTyVarBndrs DocName -> [HsType DocName] -> [Sig DocName]
               -> [Html]
-ppInstanceSigs links splice unicode qual (InstSpec {..}) (InstHead {..}) = do
-    TypeSig lnames (L loc typ) _ <- ispecSigs
+ppInstanceSigs links splice unicode qual bndrs tys sigs = do
+    TypeSig lnames (L loc typ) _ <- sigs
     let names = map unLoc lnames
-    let typ' = rename' . sugar $ specializeTyVarBndrs ispecTyVars ihdTypes typ
+    let typ' = rename' . sugar $ specializeTyVarBndrs bndrs tys typ
     return $ ppSimpleSig links splice unicode qual loc names typ'
   where
-    fv = foldr Set.union Set.empty . map freeVariables $ ihdTypes
+    fv = foldr Set.union Set.empty . map freeVariables $ tys
     rename' = rename fv
 
 
@@ -628,7 +627,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
                                      (map unLoc (con_names (unLoc c)))) fixities
       ]
 
-    instancesBit = ppInstances links instances Nothing docname
+    instancesBit = ppInstances links instances docname
         splice unicode qual
 
 
