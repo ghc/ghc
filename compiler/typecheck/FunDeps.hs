@@ -225,11 +225,17 @@ checkClsFD :: FunDep TyVar -> [TyVar]             -- One functional dependency f
            -> ClsInst                             -- An instance template
            -> TyVarSet -> [Type] -> [Maybe Name]  -- Arguments of this (C tys) predicate
                                                   -- TyVarSet are extra tyvars that can be instantiated
-           -> [([TyVar], [Pair Type])]
+           -> [([TyVar], [Pair Type])]  -- Empty or singleton
 
 checkClsFD fd clas_tvs
            (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
            extra_qtvs tys_actual rough_tcs_actual
+
+-- Compare instance   {a,b}   C sx sp sy sq
+--         with       {c,d,e} C tx tp ty tq
+--         for fundep (x,y -> p,q)  from class  (C x p y q)
+-- If (sx,sy) unifies with (tx,ty), take the subst S
+-- 
 
 -- 'qtvs' are the quantified type variables, the ones which an be instantiated
 -- to make the types match.  For example, given
