@@ -132,3 +132,4 @@ test('T9032',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T9032'])
+test('T10668', normal, compile_fail, [''])
