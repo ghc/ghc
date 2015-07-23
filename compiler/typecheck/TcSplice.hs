@@ -91,7 +91,6 @@ import DsMonad
 import Serialized
 import ErrUtils
 import Util
-import Data.List        ( mapAccumL )
 import Unique
 import VarSet           ( isEmptyVarSet )
 import Data.Maybe
