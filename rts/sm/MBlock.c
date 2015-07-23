@@ -120,7 +120,7 @@ static void *getAllocatedMBlock(free_list **start_iter, W_ startingAt)
     return (void*)p;
 }
 
-void * getFirstMBlock(void **state)
+void * getFirstMBlock(void **state STG_UNUSED)
 {
     free_list *fake_state;
     free_list **casted_state;
@@ -134,7 +134,7 @@ void * getFirstMBlock(void **state)
     return getAllocatedMBlock(casted_state, mblock_address_space_begin);
 }
 
-void * getNextMBlock(void **state, void *mblock)
+void * getNextMBlock(void **state STG_UNUSED, void *mblock)
 {
     free_list *fake_state = free_list_head;
     free_list **casted_state;
@@ -442,7 +442,7 @@ void * mapEntryToMBlock(nat i)
     return (void *)((StgWord)i << MBLOCK_SHIFT);
 }
 
-void * getFirstMBlock(void **)
+void * getFirstMBlock(void **state STG_UNUSED)
 {
     nat i;
 
@@ -452,7 +452,7 @@ void * getFirstMBlock(void **)
     return NULL;
 }
 
-void * getNextMBlock(void **, void *mblock)
+void * getNextMBlock(void **state STG_UNUSED, void *mblock)
 {
     nat i;
 
@@ -464,7 +464,7 @@ void * getNextMBlock(void **, void *mblock)
 
 #elif SIZEOF_VOID_P == 8
 
-void * getNextMBlock(void **, void *p)
+void * getNextMBlock(void **state STG_UNUSED, void *p)
 {
     MBlockMap *map;
     nat off, j;
@@ -501,7 +501,7 @@ void * getNextMBlock(void **, void *p)
     return NULL;
 }
 
-void * getFirstMBlock(void **)
+void * getFirstMBlock(void **state STG_UNUSED)
 {
     MBlockMap *map = mblock_maps[0];
     nat line_no, off;
