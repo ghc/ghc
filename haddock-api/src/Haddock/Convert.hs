@@ -391,16 +391,18 @@ synifyKindSig k = synifyType WithinType k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
 synifyInstHead (tyvars, preds, cls, types) = InstHead
-  { ihdClsName = getName cls
-  , ihdKinds = map (unLoc . synifyType WithinType) ks
-  , ihdTypes = map (unLoc . synifyType WithinType) ts
-  , ihdInstType = ClassInst
-      { clsiCtx = map (unLoc . synifyType WithinType) preds
-      , clsiTyVars = synifyTyVars tyvars
-      , clsiSigs = map (synifyIdSig WithinType) $ classMethods cls
-      }
-  }
-  where (ks,ts) = break (not . isKind) types
+    { ihdClsName = getName cls
+    , ihdKinds = map (unLoc . synifyType WithinType) ks
+    , ihdTypes = map (unLoc . synifyType WithinType) ts
+    , ihdInstType = ClassInst
+        { clsiCtx = map (unLoc . synifyType WithinType) preds
+        , clsiTyVars = synifyTyVars tyvars
+        , clsiSigs = map synifyClsIdSig $ classMethods cls
+        }
+    }
+  where
+    (ks,ts) = break (not . isKind) types
+    synifyClsIdSig = synifyIdSig DeleteTopLevelQuantification
 
 -- Convert a family instance, this could be a type family or data family
 synifyFamInst :: FamInst -> Bool -> Either ErrMsg (InstHead Name)
