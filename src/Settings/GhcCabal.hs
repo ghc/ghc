@@ -3,7 +3,6 @@ module Settings.GhcCabal (
     ) where
 
 import Way
-import Stage
 import Builder
 import Package
 import Util
@@ -36,7 +35,7 @@ cabalArgs = builder GhcCabal ? do
             , configureArgs
             , stage0 ? packageConstraints
             , with $ Gcc stage
-            , notStage Stage0 ? with Ld
+            , notStage0 ? with Ld
             , with Ar
             , with Alex
             , with Happy ]
@@ -65,25 +64,25 @@ configureArgs = do
     let conf key = appendSubD $ "--configure-option=" ++ key
         cFlags   = mconcat [ ccArgs
                            , remove ["-Werror"]
-                           , argStagedConfig "conf-cc-args" ]
-        ldFlags  = ldArgs <> argStagedConfig "conf-gcc-linker-args"
-        cppFlags = cppArgs <> argStagedConfig "conf-cpp-args"
+                           , argSettingList $ ConfCcArgs stage ]
+        ldFlags  = ldArgs <> (argSettingList $ ConfGccLinkerArgs stage)
+        cppFlags = cppArgs <> (argSettingList $ ConfCppArgs stage)
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
         , conf "CPPFLAGS" cppFlags
         , appendSubD "--gcc-options" $ cFlags <> ldFlags
-        , conf "--with-iconv-includes"  $ argConfig "iconv-include-dirs"
-        , conf "--with-iconv-libraries" $ argConfig "iconv-lib-dirs"
-        , conf "--with-gmp-includes"    $ argConfig "gmp-include-dirs"
-        , conf "--with-gmp-libraries"   $ argConfig "gmp-lib-dirs"
+        , conf "--with-iconv-includes"  $ argSettingList IconvIncludeDirs
+        , conf "--with-iconv-libraries" $ argSettingList IconvLibDirs
+        , conf "--with-gmp-includes"    $ argSettingList GmpIncludeDirs
+        , conf "--with-gmp-libraries"   $ argSettingList GmpLibDirs
         -- TODO: why TargetPlatformFull and not host?
-        , crossCompiling ? (conf "--host" $ argConfig "target-platform-full")
+        , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
         , conf "--with-cc" . argM . builderPath $ Gcc stage ]
 
 bootPackageDbArgs :: Args
 bootPackageDbArgs = do
-    sourcePath <- lift $ askConfig "ghc-source-path"
+    sourcePath <- lift . setting $ GhcSourcePath
     arg $ "--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"
 
 -- This is a positional argument, hence:

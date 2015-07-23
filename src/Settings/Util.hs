@@ -1,7 +1,7 @@
 module Settings.Util (
     -- Primitive settings elements
     arg, argPath, argM,
-    argConfig, argStagedConfig, argConfigList, argStagedConfigList,
+    argSetting, argSettingList,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -13,11 +13,11 @@ module Settings.Util (
     ) where
 
 import Util
-import Stage
 import Builder
-import Settings.User
-import Oracles.Base
 import Expression
+import Oracles.Base
+import Oracles.Setting
+import Settings.User
 
 -- A single argument.
 arg :: String -> Args
@@ -30,24 +30,11 @@ argPath = append . return . unifyPath
 argM :: Action String -> Args
 argM = appendM . fmap return
 
-argConfig :: String -> Args
-argConfig = appendM . fmap return . askConfig
+argSetting :: Setting -> Args
+argSetting = argM . setting
 
-argConfigList :: String -> Args
-argConfigList = appendM . fmap words . askConfig
-
-stagedKey :: Stage -> String -> String
-stagedKey stage key = key ++ "-stage" ++ show stage
-
-argStagedConfig :: String -> Args
-argStagedConfig key = do
-    stage <- asks getStage
-    argConfig (stagedKey stage key)
-
-argStagedConfigList :: String -> Args
-argStagedConfigList key = do
-    stage <- asks getStage
-    argConfigList (stagedKey stage key)
+argSettingList :: SettingList -> Args
+argSettingList = appendM . settingList
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args

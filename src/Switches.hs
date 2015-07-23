@@ -1,5 +1,5 @@
 module Switches (
-    notStage, stage0, stage1, stage2,
+    stage0, stage1, stage2, notStage, notStage0,
     registerPackage, splitObjects
     ) where
 
@@ -9,9 +9,6 @@ import Oracles.Setting
 import Expression
 
 -- Derived predicates
-notStage :: Stage -> Predicate
-notStage = notP . stage
-
 stage0 :: Predicate
 stage0 = stage Stage0
 
@@ -20,6 +17,12 @@ stage1 = stage Stage1
 
 stage2 :: Predicate
 stage2 = stage Stage2
+
+notStage :: Stage -> Predicate
+notStage = notP . stage
+
+notStage0 :: Predicate
+notStage0 = notP stage0
 
 -- TODO: Actually, we don't register compiler in some circumstances -- fix.
 registerPackage :: Predicate
