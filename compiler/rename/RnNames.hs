@@ -1654,25 +1654,26 @@ badImportItemErrDataCon :: OccName
                         -> ImpDeclSpec
                         -> IE RdrName
                         -> SDoc
-badImportItemErrDataCon dataType is_boot decl_spec ie
+badImportItemErrDataCon dataType_occ is_boot decl_spec ie
   = vcat [ ptext (sLit "In module")
              <+> quotes (ppr (is_mod decl_spec))
              <+> source_import <> colon
          , nest 2 $ quotes datacon
              <+> ptext (sLit "is a data constructor of")
-             <+> quotes (ppr dataType)
+             <+> quotes dataType
          , ptext (sLit "To import it use")
          , nest 2 $ quotes (ptext (sLit "import"))
              <+> ppr (is_mod decl_spec)
-             <> parens_sp (ppr dataType <> parens_sp datacon)
+             <> parens_sp (dataType <> parens_sp datacon)
          , ptext (sLit "or")
          , nest 2 $ quotes (ptext (sLit "import"))
              <+> ppr (is_mod decl_spec)
-             <> parens_sp (ppr dataType <> ptext (sLit "(..)"))
+             <> parens_sp (dataType <> ptext (sLit "(..)"))
          ]
   where
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
+    dataType = parenSymOcc dataType_occ (ppr dataType_occ)
     source_import | is_boot       = ptext (sLit "(hi-boot interface)")
                   | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
