@@ -36,6 +36,16 @@
            </listitem>
             <listitem>
                 <para>
+                    The parser now supports Haddock comments on GADT data constructors. For example,
+                    <programlisting>
+                      data Expr a where
+                        -- | Just a normal sum
+                        Sum :: Int -> Int -> Expr Int
+                    </programlisting>
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     Implicit parameters of the new base type
                     <literal>GHC.Stack.CallStack</literal> are treated
                     specially, and automatically solved for the current source
