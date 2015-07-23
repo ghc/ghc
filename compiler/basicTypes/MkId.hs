@@ -1300,7 +1300,6 @@ Also see https://ghc.haskell.org/trac/ghc/wiki/OneShot.
 
 Note [magicDictId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The identifier `magicDict` is just a place-holder, which is used to
 implement a primitve that we cannot define in Haskell but we can write
 in Core.  It is declared with a place-holder type:
@@ -1334,13 +1333,12 @@ Next, we add a built-in Prelude rule (see prelude/PrelRules.hs),
 which will replace the RHS of this definition with the appropriate
 definition in Core.  The rewrite rule works as follows:
 
-magicDict@t (wrap@a@b f) x y
+  magicDict @t (wrap @a @b f) x y
 ---->
-f (x `cast` co a) y
+  f (x `cast` co a) y
 
 The `co` coercion is the newtype-coercion extracted from the type-class.
 The type class is obtain by looking at the type of wrap.
-
 
 
 -------------------------------------------------------------
