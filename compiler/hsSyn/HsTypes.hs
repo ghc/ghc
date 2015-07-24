@@ -54,8 +54,6 @@ module HsTypes (
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
         ignoreParens,
 
-        getDFunHsTypeKey,
-
         -- Printing
         pprParendHsType, pprHsForAll, pprHsForAllExtra,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
@@ -834,35 +832,6 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
 
 splitHsFunType other = ([], other)
 
--- Get some string from a type, to be used to construct a dictionary
--- function name (like getDFunTyKey in TcType, but for HsTypes)
-getDFunHsTypeKey :: HsType RdrName -> String
-getDFunHsTypeKey (HsForAllTy _ _ _ _ t) = getDFunHsTypeKey (unLoc t)
-getDFunHsTypeKey (HsTyVar tv)           = occNameString (rdrNameOcc tv)
-getDFunHsTypeKey (HsAppTy fun _)        = getDFunHsTypeKey (unLoc fun)
-getDFunHsTypeKey (HsFunTy {})           = occNameString (getOccName funTyCon)
-getDFunHsTypeKey (HsListTy _)           = occNameString (getOccName listTyCon)
-getDFunHsTypeKey (HsPArrTy _)           = occNameString (getOccName parrTyCon)
-getDFunHsTypeKey (HsTupleTy {})         = occNameString (getOccName unitTyCon)
-getDFunHsTypeKey (HsOpTy _ (_, op) _)   = occNameString (rdrNameOcc (unLoc op))
-getDFunHsTypeKey (HsParTy ty)           = getDFunHsTypeKey (unLoc ty)
-getDFunHsTypeKey (HsIParamTy {})        = occNameString (getOccName ipClassName)
-getDFunHsTypeKey (HsEqTy {})            = occNameString (getOccName eqTyCon)
-getDFunHsTypeKey (HsKindSig ty _)       = getDFunHsTypeKey (unLoc ty)
-getDFunHsTypeKey (HsSpliceTy {})        = "splice"
-getDFunHsTypeKey (HsDocTy ty _)         = getDFunHsTypeKey (unLoc ty)
-getDFunHsTypeKey (HsBangTy _ ty)        = getDFunHsTypeKey (unLoc ty)
-getDFunHsTypeKey (HsRecTy {})           = "record"
-getDFunHsTypeKey (HsCoreTy {})          = "core"
-getDFunHsTypeKey (HsExplicitListTy {})  = occNameString (getOccName listTyCon)
-getDFunHsTypeKey (HsExplicitTupleTy {}) = occNameString (getOccName unitTyCon)
-getDFunHsTypeKey (HsTyLit x)            = getDFunHsTyLitKey x
-getDFunHsTypeKey (HsWrapTy _ ty)        = getDFunHsTypeKey ty
-getDFunHsTypeKey (HsWildCardTy {})      = "wildcard"
-
-getDFunHsTyLitKey :: HsTyLit -> String
-getDFunHsTyLitKey (HsNumTy _ n) = show n
-getDFunHsTyLitKey (HsStrTy _ n) = show n
 
 ignoreParens :: LHsType name -> LHsType name
 ignoreParens (L _ (HsParTy ty)) = ignoreParens ty
