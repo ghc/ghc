@@ -24,8 +24,8 @@ cabalArgs = builder GhcCabal ? do
     stage <- asks getStage
     pkg   <- asks getPackage
     mconcat [ arg "configure"
-            , argPath $ pkgPath pkg
-            , argPath $ targetDirectory stage pkg
+            , arg $ pkgPath pkg
+            , arg $ targetDirectory stage pkg
             , dllArgs
             , with $ Ghc stage
             , with $ GhcPkg stage
@@ -83,7 +83,7 @@ configureArgs = do
 bootPackageDbArgs :: Args
 bootPackageDbArgs = do
     sourcePath <- lift . setting $ GhcSourcePath
-    arg $ "--package-db=" ++ sourcePath </> "libraries/bootstrapping.conf"
+    arg $ "--package-db=" ++ sourcePath -/- "libraries/bootstrapping.conf"
 
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;
@@ -95,7 +95,7 @@ packageConstraints :: Args
 packageConstraints = do
     pkgs <- fromDiffExpr packages
     constraints <- lift $ forM pkgs $ \pkg -> do
-        let cabal  = pkgPath pkg </> pkgCabal pkg
+        let cabal  = pkgPath pkg -/- pkgCabal pkg
             prefix = dropExtension (pkgCabal pkg) ++ " == "
         need [cabal]
         content <- lines <$> liftIO (readFile cabal)

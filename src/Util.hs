@@ -3,7 +3,7 @@ module Util (
     module System.Console.ANSI,
     module Development.Shake.FilePath,
     replaceIf, replaceEq, replaceSeparators,
-    unifyPath,
+    unifyPath, (-/-),
     chunksOfSize,
     putColoured, redError, redError_
     ) where
@@ -24,8 +24,15 @@ replaceEq from = replaceIf (== from)
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
 
+-- Normalise a path and convert all path separators to /, even on Windows.
 unifyPath :: FilePath -> FilePath
 unifyPath = toStandard . normaliseEx
+
+-- Combine paths using </> and apply unifyPath to the result
+(-/-) :: FilePath -> FilePath -> FilePath
+a -/- b = unifyPath $ a </> b
+
+infixr 5 -/-
 
 -- (chunksOfSize size ss) splits a list of strings 'ss' into chunks not
 -- exceeding the given 'size'.

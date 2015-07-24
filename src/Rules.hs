@@ -4,6 +4,7 @@ module Rules (
     module Rules.Config,
     ) where
 
+import Util
 import Stage
 import Expression
 import Rules.Config
@@ -12,7 +13,6 @@ import Rules.Oracles
 import Settings.Packages
 import Settings.TargetDirectory
 import Development.Shake
-import Development.Shake.FilePath
 
 -- generateTargets needs package-data.mk files of all target packages
 -- TODO: make interpretDiff total
@@ -21,7 +21,7 @@ generateTargets = action $
     forM_ [Stage0 ..] $ \stage -> do
         pkgs <- interpret (stageTarget stage) packages
         forM_ pkgs $ \pkg -> do
-            need [targetPath stage pkg </> "package-data.mk"]
+            need [targetPath stage pkg -/- "package-data.mk"]
 
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()

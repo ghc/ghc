@@ -24,23 +24,23 @@ buildPackageData target =
         pkg   = getPackage target
         path  = targetPath stage pkg
     in
-    (path </>) <$>
+    (path -/-) <$>
     [ "package-data.mk"
     , "haddock-prologue.txt"
     , "inplace-pkg-config"
     , "setup-config"
-    , "build" </> "autogen" </> "cabal_macros.h"
+    , "build" -/- "autogen" -/- "cabal_macros.h"
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
-    -- , "build" </> "autogen" </> ("Paths_" ++ name) <.> "hs"
+    -- , "build" -/- "autogen" -/- ("Paths_" ++ name) <.> "hs"
     ] &%> \files -> do
-        let configure = pkgPath pkg </> "configure"
+        let configure = pkgPath pkg -/- "configure"
         -- GhcCabal will run the configure script, so we depend on it
-        need [pkgPath pkg </> pkgCabal pkg]
+        need [pkgPath pkg -/- pkgCabal pkg]
         -- We still don't know who built the configure script from configure.ac
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
         build $ fullTarget target files GhcCabal
         buildWhen registerPackage $ fullTarget target files (GhcPkg stage)
-        postProcessPackageData $ path </> "package-data.mk"
+        postProcessPackageData $ path -/- "package-data.mk"
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'

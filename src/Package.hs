@@ -28,7 +28,7 @@ instance Ord Package where
 -- TODO: check if unifyPath is actually needed
 library :: String -> Package
 library name =
-    Package name (unifyPath $ "libraries" </> name) (name <.> "cabal")
+    Package name ("libraries" -/- name) (name <.> "cabal")
 
 topLevel :: String -> Package
 topLevel name = Package name name (name <.> "cabal")

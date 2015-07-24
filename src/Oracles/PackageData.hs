@@ -43,7 +43,7 @@ newtype PackageDataKey = PackageDataKey (FilePath, String)
 askPackageData :: FilePath -> String -> Action String
 askPackageData path key = do
     let fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        pkgData = path </> "package-data.mk"
+        pkgData = path -/- "package-data.mk"
     value <- askOracle $ PackageDataKey (pkgData, fullKey)
     return $ fromMaybe
         (error $ "No key '" ++ key ++ "' in " ++ pkgData ++ ".") value
@@ -55,10 +55,10 @@ pkgData packageData = do
            PackageKey  path -> ("PACKAGE_KEY" , path)
            Synopsis    path -> ("SYNOPSIS"    , path)
         fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        pkgData = path </> "package-data.mk"
+        pkgData = path -/- "package-data.mk"
     res <- askOracle $ PackageDataKey (pkgData, fullKey)
     return $ fromMaybe
-        (error $ "No key '" ++ key ++ "' in " ++ unifyPath pkgData ++ ".") res
+        (error $ "No key '" ++ key ++ "' in " ++ pkgData ++ ".") res
 
 pkgDataList :: PackageDataList -> Action [String]
 pkgDataList packageData = do
@@ -75,12 +75,11 @@ pkgDataList packageData = do
            CSrcs          path -> ("C_SRCS"                        , path, "" )
            DepIncludeDirs path -> ("DEP_INCLUDE_DIRS_SINGLE_QUOTED", path, "" )
         fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        pkgData = path </> "package-data.mk"
+        pkgData = path -/- "package-data.mk"
         unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
     res <- askOracle $ PackageDataKey (pkgData, fullKey)
     return $ map unquote $ words $ case res of
-        Nothing    -> error $ "No key '" ++ key ++ "' in "
-                            ++ unifyPath pkgData ++ "."
+        Nothing    -> error $ "No key '" ++ key ++ "' in " ++ pkgData ++ "."
         Just ""    -> defaultValue
         Just value -> value
 

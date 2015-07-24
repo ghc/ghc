@@ -5,7 +5,6 @@ module Oracles.Base (
     module Development.Shake.Util,
     module Development.Shake.Config,
     module Development.Shake.Classes,
-    module Development.Shake.FilePath,
     askConfigWithDefault, askConfig, configOracle,
     configPath,
     putOracle
@@ -18,11 +17,10 @@ import Development.Shake
 import Development.Shake.Util
 import Development.Shake.Config
 import Development.Shake.Classes
-import Development.Shake.FilePath
 import qualified Data.HashMap.Strict as Map
 
 configPath :: FilePath
-configPath = "shake" </> "cfg"
+configPath = "shake" -/- "cfg"
 
 newtype ConfigKey = ConfigKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -41,13 +39,13 @@ askConfig key = askConfigWithDefault key . redError
 -- Oracle for configuration files
 configOracle :: Rules ()
 configOracle = do
-    let configFile = configPath </> "system.config"
+    let configFile = configPath -/- "system.config"
     cfg <- newCache $ \() -> do
         unlessM (doesFileExist $ configFile <.> "in") $
             redError_ $ "\nConfiguration file '" ++ (configFile <.> "in")
                       ++ "' is missing; unwilling to proceed."
         need [configFile]
-        putOracle $ "Reading " ++ unifyPath configFile ++ "..."
+        putOracle $ "Reading " ++ configFile ++ "..."
         liftIO $ readConfigFile configFile
     addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
     return ()

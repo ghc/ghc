@@ -23,7 +23,7 @@ ghcMArgs = do
         hsArgs  <- askPkgDataList HsArgs
         hsSrcs  <- askHsSources
         ways    <- fromDiffExpr Settings.Ways.ways
-        let buildPath = unifyPath $ targetPath stage pkg </> "build"
+        let buildPath = targetPath stage pkg -/- "build"
         mconcat
             [ arg "-M"
             , packageGhcArgs
@@ -32,7 +32,7 @@ ghcMArgs = do
             , arg $ "-odir " ++ buildPath
             , arg $ "-stubdir " ++ buildPath
             , arg $ "-hidir " ++ buildPath
-            , arg $ "-dep-makefile " ++ buildPath </> "haskell.deps"
+            , arg $ "-dep-makefile " ++ buildPath -/- "haskell.deps"
             , append . map (\way -> "-dep-suffix " ++ wayPrefix way) $ ways
             , append hsArgs
             , append hsSrcs ]
@@ -61,33 +61,33 @@ includeGhcArgs = do
     pkg         <- asks getPackage
     srcDirs     <- askPkgDataList SrcDirs
     includeDirs <- askPkgDataList IncludeDirs
-    let buildPath   = unifyPath $ targetPath stage pkg </> "build"
-        autogenPath = unifyPath $ buildPath </> "autogen"
+    let buildPath   = targetPath stage pkg -/- "build"
+        autogenPath = buildPath -/- "autogen"
     mconcat
         [ arg "-i"
-        , append . map (\dir -> "-i" ++ pkgPath pkg </> dir) $ srcDirs
+        , append . map (\dir -> "-i" ++ pkgPath pkg -/- dir) $ srcDirs
         , arg $ "-i" ++ buildPath
         , arg $ "-i" ++ autogenPath
         , arg $ "-I" ++ buildPath
         , arg $ "-I" ++ autogenPath
-        , append . map (\dir -> "-I" ++ pkgPath pkg </> dir) $ includeDirs
+        , append . map (\dir -> "-I" ++ pkgPath pkg -/- dir) $ includeDirs
         , arg "-optP-include" -- TODO: Shall we also add -cpp?
-        , arg $ "-optP" ++ autogenPath </> "cabal_macros.h" ]
+        , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
 
 askHsSources :: Expr [FilePath]
 askHsSources = do
     stage   <- asks getStage
     pkg     <- asks getPackage
     srcDirs <- askPkgDataList SrcDirs
-    let autogenPath = unifyPath $ targetPath stage pkg </> "build/autogen"
-        dirs        = autogenPath : map (pkgPath pkg </>) srcDirs
+    let autogenPath = targetPath stage pkg -/- "build/autogen"
+        dirs        = autogenPath : map (pkgPath pkg -/-) srcDirs
     askModuleFiles dirs [".hs", ".lhs"]
 
 askModuleFiles :: [FilePath] -> [String] -> Expr [FilePath]
 askModuleFiles directories suffixes = do
     modules <- askPkgDataList Modules
     let modPaths = map (replaceEq '.' pathSeparator) modules
-    files <- lift $ forM [ dir </> modPath ++ suffix
+    files <- lift $ forM [ dir -/- modPath ++ suffix
                          | dir     <- directories
                          , modPath <- modPaths
                          , suffix  <- suffixes

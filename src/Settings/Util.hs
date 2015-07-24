@@ -1,6 +1,6 @@
 module Settings.Util (
     -- Primitive settings elements
-    arg, argPath, argM,
+    arg, argM,
     argSetting, argSettingList,
     askPkgData, askPkgDataList,
     appendCcArgs,
@@ -13,7 +13,6 @@ module Settings.Util (
     -- argPackageConstraints,
     ) where
 
-import Util
 import Builder
 import Expression
 import Oracles.Base
@@ -25,10 +24,6 @@ import Settings.TargetDirectory
 -- A single argument.
 arg :: String -> Args
 arg = append . return
-
--- A single path argument. The path gets unified.
-argPath :: String -> Args
-argPath = append . return . unifyPath
 
 argM :: Action String -> Args
 argM = appendM . fmap return
