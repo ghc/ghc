@@ -311,24 +311,28 @@ simplifyRule name lhs_wanted rhs_wanted
   = do {         -- We allow ourselves to unify environment
                  -- variables: runTcS runs with topTcLevel
           tc_lvl <- getTcLevel
-       ;  ((insoluble, lhs_extra), _) <- runTcS $
+
+                 -- Do not use <~ constraints in RULES,
+                 -- so we need to instantiate
+       ; let lhs_wanted_simple = wc_simple lhs_wanted
+       ; (lhs_wanted_inst, _) <- runTcS $
+           fmap andManyCts $ mapM instantiateWC (bagToList lhs_wanted_simple)
+       ; let same_type x y = ctPred x == ctPred y
+             none_with_same_type x = not (anyBag (same_type x) lhs_wanted_simple)
+             lhs_wanted_inst' = filterBag none_with_same_type lhs_wanted_inst
+
+       ; let new_lhs_wanted_simple = wc_simple lhs_wanted `unionBags` lhs_wanted_inst'
+             new_lhs_wanted = lhs_wanted { wc_simple = new_lhs_wanted_simple }
+
+       ;  (insoluble, _) <- runTcS $
              do { -- First solve the LHS and *then* solve the RHS
                   -- See Note [Solve order for RULES]
-                  lhs_resid <- solveWanteds lhs_wanted
-                ; let lhs_resid_simple = wc_simple lhs_resid
-                ; lhs_inst <- fmap andManyCts $
-                    mapM instantiateWC (bagToList lhs_resid_simple)
-                ; lhs_inst_resid <- solveWanteds lhs_resid { wc_simple = lhs_inst }
+                  lhs_resid <- solveWanteds new_lhs_wanted
                 ; rhs_resid <- solveWanteds rhs_wanted
-                ; return (insolubleWC tc_lvl lhs_inst_resid || insolubleWC tc_lvl rhs_resid, lhs_inst) }
+                ; return (insolubleWC tc_lvl lhs_resid || insolubleWC tc_lvl rhs_resid) }
 
-       ; zonked_simple <- zonkSimples (wc_simple lhs_wanted)
-       ; zonked_extra <- zonkSimples lhs_extra
-         -- Remove those extra constraints which were already in the initial set
-       ; let same_type x y = ctPred x == ctPred y
-             none_with_same_type x = not (anyBag (same_type x) zonked_simple)
-             zonked_lhs = zonked_simple `unionBags` filterBag none_with_same_type zonked_extra
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs
+       ; zonked_lhs_simples <- zonkSimples new_lhs_wanted_simple
+       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_simples
              quantify_me  -- Note [RULE quantification over equalities]
                | insoluble = quantify_insol
                | otherwise = quantify_normal
@@ -341,13 +345,14 @@ simplifyRule name lhs_wanted rhs_wanted
                | InstanceOfPred _ _ <- classifyPredType (ctPred ct)
                = False
                | otherwise
-               = True
+               = not $ null (tyVarsOfType (ctPred ct))
 
        ; traceTc "simplifyRule" $
          vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
               , text "lhs_wantd" <+> ppr lhs_wanted
+              , text "lhs_inst"  <+> ppr lhs_wanted_inst
               , text "rhs_wantd" <+> ppr rhs_wanted
-              , text "zonked_lhs" <+> ppr zonked_lhs
+              , text "zonked_lhs" <+> ppr zonked_lhs_simples
               , text "q_cts"      <+> ppr q_cts
               , text "non_q_cts"  <+> ppr non_q_cts ]
 

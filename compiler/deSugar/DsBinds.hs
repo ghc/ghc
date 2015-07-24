@@ -631,9 +631,6 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
    split_lets e
-     | Let (NonRec d (Var r)) _body <- e
-     , isDictId d, isDictId r
-     = ([], e)
      | Let (NonRec d r) body <- e
      , isDictId d
      , (bs, body') <- split_lets body
