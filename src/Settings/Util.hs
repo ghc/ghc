@@ -2,7 +2,7 @@ module Settings.Util (
     -- Primitive settings elements
     arg, argM,
     argSetting, argSettingList,
-    askPkgData, askPkgDataList,
+    getPkgData, getPkgDataList,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -34,15 +34,15 @@ argSetting = argM . setting
 argSettingList :: SettingList -> Args
 argSettingList = appendM . settingList
 
-askPkgData :: (FilePath -> PackageData) -> Expr String
-askPkgData key = do
+getPkgData :: (FilePath -> PackageData) -> Expr String
+getPkgData key = do
     stage <- asks getStage
     pkg   <- asks getPackage
     let path = targetPath stage pkg
     lift . pkgData . key $ path
 
-askPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
-askPkgDataList key = do
+getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
+getPkgDataList key = do
     stage <- asks getStage
     pkg   <- asks getPackage
     let path = targetPath stage pkg

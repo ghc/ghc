@@ -19,9 +19,9 @@ ghcMArgs = do
     stage <- asks getStage
     builder (GhcM stage) ? do
         pkg     <- asks getPackage
-        cppArgs <- askPkgDataList CppArgs
-        hsArgs  <- askPkgDataList HsArgs
-        hsSrcs  <- askHsSources
+        cppArgs <- getPkgDataList CppArgs
+        hsArgs  <- getPkgDataList HsArgs
+        hsSrcs  <- getHsSources
         ways    <- fromDiffExpr Settings.Ways.ways
         let buildPath = targetPath stage pkg -/- "build"
         mconcat
@@ -41,9 +41,9 @@ packageGhcArgs :: Args
 packageGhcArgs = do
     stage              <- asks getStage
     supportsPackageKey <- lift . flag $ SupportsPackageKey
-    pkgKey             <- askPkgData     PackageKey
-    pkgDepKeys         <- askPkgDataList DepKeys
-    pkgDeps            <- askPkgDataList Deps
+    pkgKey             <- getPkgData     PackageKey
+    pkgDepKeys         <- getPkgDataList DepKeys
+    pkgDeps            <- getPkgDataList Deps
     mconcat
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
@@ -59,8 +59,8 @@ includeGhcArgs :: Args
 includeGhcArgs = do
     stage       <- asks getStage
     pkg         <- asks getPackage
-    srcDirs     <- askPkgDataList SrcDirs
-    includeDirs <- askPkgDataList IncludeDirs
+    srcDirs     <- getPkgDataList SrcDirs
+    includeDirs <- getPkgDataList IncludeDirs
     let buildPath   = targetPath stage pkg -/- "build"
         autogenPath = buildPath -/- "autogen"
     mconcat
@@ -74,18 +74,18 @@ includeGhcArgs = do
         , arg "-optP-include" -- TODO: Shall we also add -cpp?
         , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
 
-askHsSources :: Expr [FilePath]
-askHsSources = do
+getHsSources :: Expr [FilePath]
+getHsSources = do
     stage   <- asks getStage
     pkg     <- asks getPackage
-    srcDirs <- askPkgDataList SrcDirs
+    srcDirs <- getPkgDataList SrcDirs
     let autogenPath = targetPath stage pkg -/- "build/autogen"
         dirs        = autogenPath : map (pkgPath pkg -/-) srcDirs
-    askModuleFiles dirs [".hs", ".lhs"]
+    getModuleFiles dirs [".hs", ".lhs"]
 
-askModuleFiles :: [FilePath] -> [String] -> Expr [FilePath]
-askModuleFiles directories suffixes = do
-    modules <- askPkgDataList Modules
+getModuleFiles :: [FilePath] -> [String] -> Expr [FilePath]
+getModuleFiles directories suffixes = do
+    modules <- getPkgDataList Modules
     let modPaths = map (replaceEq '.' pathSeparator) modules
     files <- lift $ forM [ dir -/- modPath ++ suffix
                          | dir     <- directories
