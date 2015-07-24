@@ -6,7 +6,6 @@ import Util
 import Data.Function
 import GHC.Generics
 import Development.Shake.Classes
-import Development.Shake.FilePath
 
 -- pkgPath is the path to the source code relative to the root
 data Package = Package

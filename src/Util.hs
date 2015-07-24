@@ -1,6 +1,7 @@
 module Util (
     module Data.Char,
     module System.Console.ANSI,
+    module Development.Shake.FilePath,
     replaceIf, replaceEq, replaceSeparators,
     unifyPath,
     chunksOfSize,

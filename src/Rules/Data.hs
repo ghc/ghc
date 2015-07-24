@@ -16,7 +16,6 @@ import Rules.Actions
 import Control.Applicative
 import Control.Monad.Extra
 import Development.Shake
-import Development.Shake.FilePath
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: StagePackageTarget -> Rules ()

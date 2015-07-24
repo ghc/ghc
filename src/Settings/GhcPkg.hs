@@ -12,8 +12,8 @@ import Development.Shake.FilePath
 
 ghcPkgArgs :: Args
 ghcPkgArgs = do
-    pkg <- asks getPackage
     stage <- asks getStage
+    pkg   <- asks getPackage
     builder (GhcPkg stage) ? mconcat
         [ arg "update"
         , arg "--force"
