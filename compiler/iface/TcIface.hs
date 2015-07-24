@@ -49,7 +49,8 @@ import DataCon
 import PrelNames
 import TysWiredIn
 import TysPrim          ( superKindTyConName )
-import BasicTypes       ( strongLoopBreaker, Arity, TupleSort(..), Boxity(..) )
+import BasicTypes       ( strongLoopBreaker, Arity, TupleSort(..)
+                        , Boxity(..), pprRuleName )
 import Literal
 import qualified Var
 import VarEnv
@@ -638,7 +639,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                         ifRuleAuto = auto, ifRuleOrph = orph })
   = do  { ~(bndrs', args', rhs') <-
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
-                forkM (ptext (sLit "Rule") <+> ftext name) $
+                forkM (ptext (sLit "Rule") <+> pprRuleName name) $
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
                 do { args' <- mapM tcIfaceExpr args
                    ; rhs'  <- tcIfaceExpr rhs

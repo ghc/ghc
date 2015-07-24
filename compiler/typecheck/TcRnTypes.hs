@@ -2128,7 +2128,7 @@ pprSkolInfo (InstSC n)        = ptext (sLit "the instance declaration") <> ifPpr
 pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
 pprSkolInfo FamInstSkol       = ptext (sLit "a family instance declaration")
 pprSkolInfo BracketSkol       = ptext (sLit "a Template Haskell bracket")
-pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> pprRuleName name
 pprSkolInfo ArrowSkol         = ptext (sLit "an arrow form")
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , ptext (sLit "in") <+> pprMatchContext mc ]

@@ -839,7 +839,7 @@ pprIfaceConDecl ss gadt_style mk_user_con_res_ty
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                    ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs })
-    = sep [hsep [doubleQuotes (ftext name), ppr act,
+    = sep [hsep [pprRuleName name, ppr act,
                  ptext (sLit "forall") <+> pprIfaceBndrs bndrs],
            nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
                         ptext (sLit "=") <+> ppr rhs])
