@@ -296,9 +296,10 @@ rebindTyVarBndr (KindedTyVar name kinds) =
 rebindName :: SetName name => name -> Rebind name name
 rebindName name = do
     RenameEnv { .. } <- get
+    taken <- takenNames
     case Map.lookup (getName name) rneCtx of
         Just name' -> pure name'
-        Nothing | getNameRep name `Set.member` rneFV -> freshName name
+        Nothing | getNameRep name `Set.member` taken -> freshName name
         Nothing -> reuseName name
 
 
@@ -306,12 +307,11 @@ rebindName name = do
 freshName :: SetName name => name -> Rebind name name
 freshName name = do
     env@RenameEnv { .. } <- get
-    let taken = Set.union rneFV (elems' rneCtx)
+    taken <- takenNames
     let name' = setInternalNameRep (findFreshName taken rep) name
     put $ env { rneCtx = Map.insert nname name' rneCtx }
     return name'
   where
-    elems' = Set.fromList . map getNameRep . Map.elems
     nname = getName name
     rep = getNameRep nname
 
@@ -321,6 +321,14 @@ reuseName name = do
     env@RenameEnv { .. } <- get
     put $ env { rneCtx = Map.insert (getName name) name rneCtx }
     return name
+
+
+takenNames :: NamedThing name => Rebind name (Set NameRep)
+takenNames = do
+    RenameEnv { .. } <- get
+    return $ Set.union rneFV (ctxElems rneCtx)
+  where
+    ctxElems = Set.fromList . map getNameRep . Map.elems
 
 
 findFreshName :: Set NameRep -> NameRep -> NameRep
