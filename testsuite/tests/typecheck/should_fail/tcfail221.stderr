@@ -1,6 +1,6 @@
-[1 of 1] Compiling ShouldFail[sig of Prelude] ( tcfail221.hsig, nothing )
+[1 of 1] Compiling ShouldFail[boot] ( tcfail221.hs-boot, tcfail221.o )
 
-tcfail221.hsig:2:10:
+tcfail221.hs-boot:2:10: error:
     Duplicate instance declarations:
-      instance Show Int -- Defined at tcfail221.hsig:2:10
-      instance Show Int -- Defined at tcfail221.hsig:3:10
+      instance Show Int -- Defined at tcfail221.hs-boot:2:10
+      instance Show Int -- Defined at tcfail221.hs-boot:3:10

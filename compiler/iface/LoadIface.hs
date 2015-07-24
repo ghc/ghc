@@ -896,7 +896,7 @@ pprModIface iface
         ]
   where
     pp_hsc_src HsBootFile = ptext (sLit "[boot]")
-    pp_hsc_src HsigFile = ptext (sLit "[hsig]")
+    pp_hsc_src HsBootMerge = ptext (sLit "[merge]")
     pp_hsc_src HsSrcFile = Outputable.empty
 
 {-

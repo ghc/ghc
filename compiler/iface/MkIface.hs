@@ -15,6 +15,7 @@ module MkIface (
                         -- including computing version information
 
         mkIfaceTc,
+        mkIfaceDirect,
 
         writeIfaceFile, -- Write the interface file
 
@@ -159,6 +160,35 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                    this_mod hsc_src used_names used_th deps rdr_env fix_env
                    warns hpc_info dir_imp_mods self_trust dependent_files
                    safe_mode mod_details
+
+-- | Make an interface from a manually constructed 'ModIface'.  We use
+-- this when we are merging 'ModIface's.  We assume that the 'ModIface'
+-- has accurate entries but not accurate fingerprint information (so,
+-- like @intermediate_iface@ in 'mkIface_'.)
+mkIfaceDirect :: HscEnv
+              -> Maybe Fingerprint
+              -> ModIface
+              -> IO (ModIface, Bool)
+mkIfaceDirect hsc_env maybe_old_fingerprint iface0 = do
+    -- Sort some things to make sure we're deterministic
+    let intermediate_iface = iface0 {
+            mi_exports   = mkIfaceExports (mi_exports iface0),
+            mi_insts     = sortBy cmp_inst     (mi_insts iface0),
+            mi_fam_insts = sortBy cmp_fam_inst (mi_fam_insts iface0),
+            mi_rules     = sortBy cmp_rule     (mi_rules iface0)
+        }
+        dflags = hsc_dflags hsc_env
+    (final_iface, no_change_at_all)
+          <- {-# SCC "versioninfo" #-}
+                   addFingerprints hsc_env maybe_old_fingerprint
+                                   intermediate_iface
+                                   (map snd (mi_decls iface0))
+
+    -- Debug printing
+    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
+                  (pprModIface final_iface)
+
+    return (final_iface, no_change_at_all)
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -357,11 +387,6 @@ mkIface_ hsc_env maybe_old_fingerprint
 
         return (errs_and_warns, Just (final_iface, no_change_at_all))
   where
-     cmp_rule     = comparing ifRuleName
-     -- Compare these lexicographically by OccName, *not* by unique,
-     -- because the latter is not stable across compilations:
-     cmp_inst     = comparing (nameOccName . ifDFun)
-     cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
 
      dflags = hsc_dflags hsc_env
 
@@ -379,8 +404,6 @@ mkIface_ hsc_env maybe_old_fingerprint
      deliberatelyOmitted :: String -> a
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
-     ifFamInstTcName = ifFamInstFam
-
      flattenVectInfo (VectInfo { vectInfoVar            = vVar
                                , vectInfoTyCon          = vTyCon
                                , vectInfoParallelVars     = vParallelVars
@@ -393,6 +416,16 @@ mkIface_ hsc_env maybe_old_fingerprint
        , ifaceVectInfoParallelVars   = [Var.varName v | v <- varSetElems vParallelVars]
        , ifaceVectInfoParallelTyCons = nameSetElems vParallelTyCons
        }
+
+cmp_rule :: IfaceRule -> IfaceRule -> Ordering
+cmp_rule     = comparing ifRuleName
+-- Compare these lexicographically by OccName, *not* by unique,
+-- because the latter is not stable across compilations:
+cmp_inst :: IfaceClsInst -> IfaceClsInst -> Ordering
+cmp_inst     = comparing (nameOccName . ifDFun)
+
+cmp_fam_inst :: IfaceFamInst -> IfaceFamInst -> Ordering
+cmp_fam_inst = comparing (nameOccName . ifFamInstFam)
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()

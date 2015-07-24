@@ -609,7 +609,7 @@ getInteractivePrintName :: TcRn Name
 getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
 
 tcIsHsBootOrSig :: TcRn Bool
-tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }
+tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
 
 tcSelfBootInfo :: TcRn SelfBootInfo
 tcSelfBootInfo = do { env <- getGblEnv; return (tcg_self_boot env) }

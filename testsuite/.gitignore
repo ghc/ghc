@@ -613,6 +613,7 @@ mk/ghcconfig*_bin_ghc*.exe.mk
 /tests/driver/recomp014/A.hs
 /tests/driver/recomp014/A1.hs
 /tests/driver/recomp014/B.hsig
+/tests/driver/recomp014/B.hs-boot
 /tests/driver/recomp014/C.hs
 /tests/driver/recomp014/recomp014
 /tests/driver/rtsOpts

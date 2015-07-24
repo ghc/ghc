@@ -21,7 +21,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
-import HscTypes( isHsBootOrSig )
+import HscTypes( isHsBoot )
 import TcRnMonad
 import TcEnv
 import TcUnify
@@ -184,7 +184,7 @@ tcRecSelBinds (ValBindsOut binds sigs)
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings (tcValBinds TopLevel binds sigs getGblEnv)
        ; let tcg_env'
-              | isHsBootOrSig (tcg_src tcg_env) = tcg_env
+              | isHsBoot (tcg_src tcg_env) = tcg_env
               | otherwise = tcg_env { tcg_binds = foldr (unionBags . snd)
                                                         (tcg_binds tcg_env)
                                                         rec_sel_binds }

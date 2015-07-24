@@ -199,9 +199,9 @@ processDeps dflags _ _ _ _ (CyclicSCC nodes)
     throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
+  | Just src_file <- msHsFilePath node
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
-              src_file  = msHsFilePath node
               obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
@@ -235,6 +235,10 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
         ; do_imps True  (ms_srcimps node)
         ; do_imps False (ms_imps node)
         }
+
+  | otherwise
+  = ASSERT( ms_hsc_src node == HsBootMerge )
+    panic "HsBootMerge not supported in DriverMkDepend yet"
 
 
 findDependency  :: HscEnv

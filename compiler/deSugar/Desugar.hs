@@ -106,7 +106,7 @@ deSugar hsc_env
               hpcInfo    = emptyHpcInfo other_hpc_info
 
         ; (binds_cvr, ds_hpc_info, modBreaks)
-                         <- if not (isHsBootOrSig hsc_src)
+                         <- if not (isHsBoot hsc_src)
                               then addTicksToBinds dflags mod mod_loc export_set
                                           (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, emptyModBreaks)

@@ -11,4 +11,4 @@ clean:
 
 sigof04:
 	'$(GHC_PKG)' field containers key | sed 's/^.*: *//' > containers
-	! '$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP)  -c Sig.hsig -sig-of "Sig is `cat containers`:Data.Map.Strict"
+	! '$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP)  -c Sig.hs-boot -sig-of "Sig is `cat containers`:Data.Map.Strict"

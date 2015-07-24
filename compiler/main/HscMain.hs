@@ -41,6 +41,7 @@ module HscMain
     , hscCompileCore
 
     , genericHscCompileGetFrontendResult
+    , genericHscMergeRequirement
 
     , genModDetails
     , hscSimpleIface
@@ -94,12 +95,12 @@ import CoreTidy         ( tidyExpr )
 import Type             ( Type, Kind )
 import CoreLint         ( lintInteractiveExpr )
 import VarEnv           ( emptyTidyEnv )
-import Panic
 import ConLike
 
 import GHC.Exts
 #endif
 
+import Panic
 import Module
 import Packages
 import RdrName
@@ -113,7 +114,8 @@ import TcRnDriver
 import TcIface          ( typecheckIface )
 import TcRnMonad
 import IfaceEnv         ( initNameCache )
-import LoadIface        ( ifaceStats, initExternalPackageState )
+import LoadIface        ( ifaceStats, initExternalPackageState
+                        , findAndReadIface )
 import PrelInfo
 import MkIface
 import Desugar
@@ -140,6 +142,7 @@ import InstEnv
 import FamInstEnv
 import Fingerprint      ( Fingerprint )
 import Hooks
+import Maybes
 
 import DynFlags
 import ErrUtils
@@ -158,7 +161,6 @@ import Util
 
 import Data.List
 import Control.Monad
-import Data.Maybe
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
@@ -511,6 +513,45 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
 
+-- | Analogous to 'genericHscCompileGetFrontendResult', this function
+-- calls 'hscMergeFrontEnd' if recompilation is necessary.  It does
+-- not write out the resulting 'ModIface' (see 'compileOne').
+-- TODO: maybe fold this 'genericHscCompileGetFrontendResult' into
+-- some higher-order function
+genericHscMergeRequirement ::
+                     Maybe Messager
+                  -> HscEnv
+                  -> ModSummary
+                  -> Maybe ModIface  -- Old interface, if available
+                  -> (Int,Int)       -- (i,n) = module i of n (for msgs)
+                  -> IO (Either ModIface (ModIface, Maybe Fingerprint))
+genericHscMergeRequirement mHscMessage
+  hsc_env mod_summary mb_old_iface mod_index = do
+    let msg what = case mHscMessage of
+                   Just hscMessage ->
+                    hscMessage hsc_env mod_index what mod_summary
+                   Nothing -> return ()
+
+        skip iface = do
+            msg UpToDate
+            return (Left iface)
+
+        -- TODO: hook this
+        compile mb_old_hash reason = do
+            msg reason
+            r <- hscMergeFrontEnd hsc_env mod_summary
+            return $ Right (r, mb_old_hash)
+
+    (recomp_reqd, mb_checked_iface)
+                <- {-# SCC "checkOldIface" #-}
+                   checkOldIface hsc_env mod_summary
+                                SourceUnmodified mb_old_iface
+    case mb_checked_iface of
+        Just iface | not (recompileRequired recomp_reqd) -> skip iface
+        _ -> compile (fmap mi_iface_hash mb_checked_iface) recomp_reqd
+
+-- | This function runs 'genericHscFrontend' if recompilation is necessary.
+-- It does not write out the results of typechecking (see 'compileOne').
 genericHscCompileGetFrontendResult ::
                      Bool -- always do basic recompilation check?
                   -> Maybe TcGblEnv
@@ -635,18 +676,16 @@ hscCompileOneShot' hsc_env mod_summary src_changed
                     return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
-                    t | isHsBootOrSig t ->
+                    HsBootFile ->
                         do (iface, changed, _) <- hscSimpleIface' tc_result mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
-                           return (case t of
-                                    HsBootFile -> HscUpdateBoot
-                                    HsigFile -> HscUpdateSig
-                                    HsSrcFile -> panic "hscCompileOneShot Src")
-                    _ ->
+                           return HscUpdateBoot
+                    HsSrcFile ->
                         do guts <- hscSimplify' guts0
                            (iface, changed, _details, cgguts) <- hscNormalIface' guts mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return $ HscRecomp cgguts mod_summary
+                    HsBootMerge -> panic "hscCompileOneShot HsBootMerge"
 
         -- XXX This is always False, because in one-shot mode the
         -- concept of stability does not exist.  The driver never
@@ -727,8 +766,46 @@ batchMsg hsc_env mod_index recomp mod_summary =
 -- FrontEnds
 --------------------------------------------------------------
 
+-- | Given an 'HsBootMerge' 'ModSummary', merges all @hs-boot@ files
+-- under this module name into a composite, publically visible 'ModIface'.
+hscMergeFrontEnd :: HscEnv -> ModSummary -> IO ModIface
+hscMergeFrontEnd hsc_env mod_summary = do
+    MASSERT( ms_hsc_src mod_summary == HsBootMerge )
+    let dflags = hsc_dflags hsc_env
+    -- TODO: actually merge in signatures from external packages.
+    -- Grovel in HPT if necessary
+    -- TODO: replace with 'computeInterface'
+    let hpt = hsc_HPT hsc_env
+    -- TODO multiple mods
+    let name = moduleName (ms_mod mod_summary)
+        mod = mkModule (thisPackage dflags) name
+        is_boot = True
+    iface0 <- case lookupHptByModule hpt mod of
+        Just hm -> return (hm_iface hm)
+        Nothing -> do
+            mb_iface0 <- initIfaceCheck hsc_env
+                    $ findAndReadIface (text "merge-requirements")
+                                       mod is_boot
+            case mb_iface0 of
+                Succeeded (i, _) -> return i
+                Failed err -> liftIO $ throwGhcExceptionIO
+                                (ProgramError (showSDoc dflags err))
+    let iface = iface0 {
+                    mi_hsc_src = HsBootMerge,
+                    -- TODO: mkDependencies doublecheck
+                    mi_deps = (mi_deps iface0) {
+                        dep_mods = (name, is_boot)
+                                 : dep_mods (mi_deps iface0)
+                      }
+                    }
+    return iface
+
+-- | Given a 'ModSummary', parses and typechecks it, returning the
+-- 'TcGblEnv' resulting from type-checking.
 hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
 hscFileFrontEnd mod_summary = do
+    MASSERT( ms_hsc_src mod_summary == HsBootFile ||
+             ms_hsc_src mod_summary == HsSrcFile )
     hpm <- hscParse' mod_summary
     hsc_env <- getHscEnv
     tcg_env <- tcRnModule' hsc_env mod_summary False hpm

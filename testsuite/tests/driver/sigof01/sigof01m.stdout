@@ -1,6 +1,7 @@
-[1 of 3] Compiling A                ( A.hs, tmp_sigof01m/A.o )
-[2 of 3] Compiling B[sig of A]      ( B.hsig, nothing )
-[3 of 3] Compiling Main             ( Main.hs, tmp_sigof01m/Main.o )
+[1 of 4] Compiling A                ( A.hs, tmp_sigof01m/A.o )
+[2 of 4] Compiling B[boot]          ( B.hs-boot, tmp_sigof01m/B.o-boot )
+[3 of 4] Compiling B[merge]         ( B.hi, tmp_sigof01m/B.o )
+[4 of 4] Compiling Main             ( Main.hs, tmp_sigof01m/Main.o )
 Linking tmp_sigof01m/Main ...
 False
 T

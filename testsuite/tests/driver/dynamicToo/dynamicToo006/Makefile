@@ -11,8 +11,10 @@ dynamicToo006:
                                -sig-of A=base:Prelude \
                                --make B
 	$(call checkExists,A.o)
+	$(call checkExists,A.o-boot)
 	$(call checkExists,B.o)
 	$(call checkExists,A.hi)
+	$(call checkExists,A.hi-boot)
 	$(call checkExists,B.hi)
 	$(call checkExists,A.dyn_o)
 	$(call checkExists,B.dyn_o)

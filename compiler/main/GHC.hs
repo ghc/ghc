@@ -989,7 +989,7 @@ compileCore simplify fn = do
    _ <- load LoadAllTargets
    -- Then find dependencies
    modGraph <- depanal [] True
-   case find ((== fn) . msHsFilePath) modGraph of
+   case find ((== Just fn) . msHsFilePath) modGraph of
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
