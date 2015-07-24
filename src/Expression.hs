@@ -6,7 +6,8 @@ module Expression (
     Expr, DiffExpr, fromDiffExpr,
     Predicate, PredicateLike (..), applyPredicate, (??),
     Args, Ways, Packages,
-    append, appendM, remove, appendSub, appendSubD, filterSub, removeSub,
+    apply, append, appendM, remove,
+    appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretExpr,
     stage, package, builder, file, way
     ) where
@@ -57,15 +58,19 @@ type Packages  = DiffExpr [Package]
 type Ways      = DiffExpr [Way]
 
 -- Basic operations on expressions:
--- 1) append something to an expression
+-- 1) transform an expression by applying a given function
+apply :: (a -> a) -> DiffExpr a
+apply = return . Diff
+
+-- 2) append something to an expression
 append :: Monoid a => a -> DiffExpr a
-append x = return . Diff $ (<> x)
+append x = apply (<> x)
 
--- 2) remove given elements from a list expression
+-- 3) remove given elements from a list expression
 remove :: Eq a => [a] -> DiffExpr [a]
-remove xs = return . Diff $ filter (`notElem` xs)
+remove xs = apply . filter $ (`notElem` xs)
 
--- 3) apply a predicate to an expression
+-- 4) apply a predicate to an expression
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
 applyPredicate predicate expr = do
     bool <- predicate
@@ -105,7 +110,7 @@ appendM mx = lift mx >>= append
 appendSub :: String -> [String] -> Args
 appendSub prefix xs
     | xs' == [] = mempty
-    | otherwise = return . Diff $ go False
+    | otherwise = apply . go $ False
   where
     xs' = filter (/= "") xs
     go True  []     = []
@@ -120,7 +125,7 @@ appendSubD :: String -> Args -> Args
 appendSubD prefix diffExpr = fromDiffExpr diffExpr >>= appendSub prefix
 
 filterSub :: String -> (String -> Bool) -> Args
-filterSub prefix p = return . Diff $ map filterSubstr
+filterSub prefix p = apply . map $ filterSubstr
   where
     filterSubstr s
         | prefix `isPrefixOf` s = unwords . filter p . words $ s
