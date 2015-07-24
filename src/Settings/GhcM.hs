@@ -16,13 +16,13 @@ import Development.Shake
 
 ghcMArgs :: Args
 ghcMArgs = do
-    stage <- asks getStage
+    stage <- getStage
     builder (GhcM stage) ? do
-        pkg     <- asks getPackage
+        pkg     <- getPackage
         cppArgs <- getPkgDataList CppArgs
         hsArgs  <- getPkgDataList HsArgs
         hsSrcs  <- getHsSources
-        ways    <- fromDiffExpr Settings.Ways.ways
+        ways    <- getWays
         let buildPath = targetPath stage pkg -/- "build"
         mconcat
             [ arg "-M"
@@ -39,9 +39,9 @@ ghcMArgs = do
 
 packageGhcArgs :: Args
 packageGhcArgs = do
-    stage              <- asks getStage
-    supportsPackageKey <- lift . flag $ SupportsPackageKey
-    pkgKey             <- getPkgData     PackageKey
+    stage              <- getStage
+    supportsPackageKey <- getFlag SupportsPackageKey
+    pkgKey             <- getPkgData PackageKey
     pkgDepKeys         <- getPkgDataList DepKeys
     pkgDeps            <- getPkgDataList Deps
     mconcat
@@ -57,8 +57,8 @@ packageGhcArgs = do
 
 includeGhcArgs :: Args
 includeGhcArgs = do
-    stage       <- asks getStage
-    pkg         <- asks getPackage
+    stage       <- getStage
+    pkg         <- getPackage
     srcDirs     <- getPkgDataList SrcDirs
     includeDirs <- getPkgDataList IncludeDirs
     let buildPath   = targetPath stage pkg -/- "build"
@@ -76,8 +76,8 @@ includeGhcArgs = do
 
 getHsSources :: Expr [FilePath]
 getHsSources = do
-    stage   <- asks getStage
-    pkg     <- asks getPackage
+    stage   <- getStage
+    pkg     <- getPackage
     srcDirs <- getPkgDataList SrcDirs
     let autogenPath = targetPath stage pkg -/- "build/autogen"
         dirs        = autogenPath : map (pkgPath pkg -/-) srcDirs

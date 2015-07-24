@@ -9,6 +9,7 @@ import Package
 import Builder
 import Switches
 import Expression
+import qualified Target
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Settings.TargetDirectory
@@ -20,8 +21,8 @@ import Development.Shake
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: StagePackageTarget -> Rules ()
 buildPackageData target =
-    let stage = getStage target
-        pkg   = getPackage target
+    let stage = Target.stage target
+        pkg   = Target.package target
         path  = targetPath stage pkg
     in
     (path -/-) <$>

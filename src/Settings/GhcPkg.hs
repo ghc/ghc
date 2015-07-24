@@ -12,8 +12,8 @@ import Settings.TargetDirectory
 
 ghcPkgArgs :: Args
 ghcPkgArgs = do
-    stage <- asks getStage
-    pkg   <- asks getPackage
+    stage <- getStage
+    pkg   <- getPackage
     builder (GhcPkg stage) ? mconcat
         [ arg "update"
         , arg "--force"

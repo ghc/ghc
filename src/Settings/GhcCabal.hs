@@ -21,8 +21,8 @@ import Control.Applicative
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do
-    stage <- asks getStage
-    pkg   <- asks getPackage
+    stage <- getStage
+    pkg   <- getPackage
     mconcat [ arg "configure"
             , arg $ pkgPath pkg
             , arg $ targetDirectory stage pkg
@@ -43,7 +43,7 @@ cabalArgs = builder GhcCabal ? do
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 libraryArgs :: Args
 libraryArgs = do
-    ways           <- fromDiffExpr Settings.Ways.ways
+    ways           <- getWays
     ghcInterpreter <- lift $ ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
@@ -60,7 +60,7 @@ libraryArgs = do
 
 configureArgs :: Args
 configureArgs = do
-    stage <- asks getStage
+    stage <- getStage
     let conf key = appendSubD $ "--configure-option=" ++ key
         cFlags   = mconcat [ ccArgs
                            , remove ["-Werror"]
@@ -82,7 +82,7 @@ configureArgs = do
 
 bootPackageDbArgs :: Args
 bootPackageDbArgs = do
-    sourcePath <- lift . setting $ GhcSourcePath
+    sourcePath <- getSetting GhcSourcePath
     arg $ "--package-db=" ++ sourcePath -/- "libraries/bootstrapping.conf"
 
 -- This is a positional argument, hence:
@@ -93,7 +93,7 @@ dllArgs = arg ""
 
 packageConstraints :: Args
 packageConstraints = do
-    pkgs <- fromDiffExpr packages
+    pkgs <- getPackages
     constraints <- lift $ forM pkgs $ \pkg -> do
         let cabal  = pkgPath pkg -/- pkgCabal pkg
             prefix = dropExtension (pkgCabal pkg) ++ " == "

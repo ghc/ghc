@@ -1,6 +1,6 @@
 module Settings.Packages (
     module Settings.Default,
-    packages, knownPackages
+    packages, getPackages, knownPackages
     ) where
 
 import Package
@@ -13,6 +13,9 @@ import Settings.Default
 -- Combining default list of packages with user modifications
 packages :: Packages
 packages = defaultPackages <> userPackages
+
+getPackages :: Expr [Package]
+getPackages = fromDiffExpr packages
 
 -- These are the packages we build by default
 defaultPackages :: Packages

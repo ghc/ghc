@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, TypeSynonymInstances #-}
 module Target (
     Target (..), StageTarget (..), StagePackageTarget (..), FullTarget (..),
-    stageTarget, stagePackageTarget, fullTarget, fullTargetWithWay
+    stageTarget, stagePackageTarget, fullTarget, fullTarwithWay
     ) where
 
 import Way
@@ -16,39 +16,40 @@ import Development.Shake.Classes
 -- be built and the Way they are to be built.
 data Target = Target
      {
-        getStage   :: Stage,
-        getPackage :: Package,
-        getFiles   :: [FilePath],
-        getBuilder :: Builder,
-        getWay     :: Way
+        stage   :: Stage,
+        package :: Package,
+        files   :: [FilePath],
+        builder :: Builder,
+        way     :: Way
      }
      deriving (Eq, Generic)
 
--- StageTarget is a Target whose field getStage is already assigned
+-- StageTarget is a partially constructed Target. Only stage is guaranteed to
+-- be assigned.
 type StageTarget = Target
 
 stageTarget :: Stage -> StageTarget
-stageTarget stage = Target
+stageTarget s = Target
     {
-        getStage   = stage,
-        getPackage = error "stageTarget: Package not set",
-        getFiles   = error "stageTarget: Files not set",
-        getBuilder = error "stageTarget: Builder not set",
-        getWay     = vanilla -- most targets are built only one way (vanilla)
+        stage   = s,
+        package = error "stageTarget: Package not set",
+        files   = error "stageTarget: Files not set",
+        builder = error "stageTarget: Builder not set",
+        way     = vanilla
     }
 
--- StagePackageTarget is a Target whose fields getStage and getPackage are
--- already assigned
+-- StagePackageTarget is a partially constructed Target. Only stage and package
+-- are guaranteed to be assigned.
 type StagePackageTarget = Target
 
 stagePackageTarget :: Stage -> Package -> StagePackageTarget
-stagePackageTarget stage package = Target
+stagePackageTarget s p = Target
     {
-        getStage   = stage,
-        getPackage = package,
-        getFiles   = error "stagePackageTarget: Files not set",
-        getBuilder = error "stagePackageTarget: Builder not set",
-        getWay     = vanilla
+        stage   = s,
+        package = p,
+        files   = error "stagePackageTarget: Files not set",
+        builder = error "stagePackageTarget: Builder not set",
+        way     = vanilla
     }
 
 -- FullTarget is a Target whose fields are all assigned
@@ -56,29 +57,29 @@ type FullTarget = Target
 
 -- Most targets are built only one way, vanilla, hence we set it by default.
 fullTarget :: StagePackageTarget -> [FilePath] -> Builder -> FullTarget
-fullTarget target files builder = target
+fullTarget target fs b = target
     {
-        getFiles   = files,
-        getBuilder = builder,
-        getWay     = vanilla
+        files   = fs,
+        builder = b,
+        way     = vanilla
     }
 
--- Use this function to be explicit about build the way.
-fullTargetWithWay :: StagePackageTarget -> [FilePath] -> Builder -> Way -> FullTarget
-fullTargetWithWay target files builder way = target
+-- Use this function to be explicit about the build way.
+fullTarwithWay :: StagePackageTarget -> [FilePath] -> Builder -> Way -> FullTarget
+fullTarwithWay target fs b w = target
     {
-        getFiles   = files,
-        getBuilder = builder,
-        getWay     = way
+        files   = fs,
+        builder = b,
+        way     = w
     }
 
 -- Shows a (full) target as "package:file@stage (builder, way)"
 instance Show FullTarget where
-    show target = show (getPackage target)
-                  ++ ":" ++ show (getFiles target)
-                  ++ "@" ++ show (getStage target)
-                  ++ " (" ++ show (getBuilder target)
-                  ++ ", " ++ show (getWay target) ++ ")"
+    show target = show (package target)
+                  ++ ":" ++ show (files target)
+                  ++ "@" ++ show (stage target)
+                  ++ " (" ++ show (builder target)
+                  ++ ", " ++ show (way target) ++ ")"
 
 -- Instances for storing in the Shake database
 instance Binary FullTarget

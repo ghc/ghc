@@ -9,6 +9,7 @@ module Expression (
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretExpr,
+    getStage, getPackage, getBuilder, getFiles, getWay,
     stage, package, builder, file, way
     ) where
 
@@ -16,7 +17,9 @@ import Way
 import Stage
 import Builder
 import Package
-import Target
+import Target (Target)
+import Target hiding (Target(..))
+import qualified Target
 import Oracles.Base
 import Data.List
 import Data.Monoid
@@ -148,18 +151,34 @@ fromDiffExpr = fmap (($ mempty) . fromDiff)
 interpret :: Monoid a => Target -> DiffExpr a -> Action a
 interpret target = interpretExpr target . fromDiffExpr
 
+-- Convenient getters for target parameters
+getStage :: Expr Stage
+getStage = asks Target.stage
+
+getPackage :: Expr Package
+getPackage = asks Target.package
+
+getBuilder :: Expr Builder
+getBuilder = asks Target.builder
+
+getFiles :: Expr [FilePath]
+getFiles = asks Target.files
+
+getWay :: Expr Way
+getWay = asks Target.way
+
 -- Basic predicates (see Switches.hs for derived predicates)
 stage :: Stage -> Predicate
-stage s = liftM (s ==) (asks getStage)
+stage s = liftM (s ==) getStage
 
 package :: Package -> Predicate
-package p = liftM (p ==) (asks getPackage)
+package p = liftM (p ==) getPackage
 
 builder :: Builder -> Predicate
-builder b = liftM (b ==) (asks getBuilder)
+builder b = liftM (b ==) getBuilder
 
 file :: FilePattern -> Predicate
-file f = liftM (any (f ?==)) (asks getFiles)
+file f = liftM (any (f ?==)) getFiles
 
 way :: Way -> Predicate
-way w = liftM (w ==) (asks getWay)
+way w = liftM (w ==) getWay

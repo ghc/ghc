@@ -1,5 +1,5 @@
 module Settings.Ways (
-    ways
+    ways, getWays
     ) where
 
 import Way
@@ -12,6 +12,9 @@ import Settings.User
 -- Combining default ways with user modifications
 ways :: Ways
 ways = defaultWays <> userWays
+
+getWays :: Expr [Way]
+getWays = fromDiffExpr ways
 
 -- These are default ways
 defaultWays :: Ways

@@ -5,6 +5,7 @@ module Rules.Actions (
 import Util
 import Builder
 import Expression
+import qualified Target
 import Settings.Args
 import Settings.Util
 import Oracles.ArgsHash
@@ -18,7 +19,7 @@ build target = do
     argList <- interpret target args
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target
-    run (getBuilder target) argList
+    run (Target.builder target) argList
 
 buildWhen :: Predicate -> FullTarget -> Action ()
 buildWhen predicate target = do

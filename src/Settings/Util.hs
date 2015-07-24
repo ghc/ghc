@@ -2,6 +2,7 @@ module Settings.Util (
     -- Primitive settings elements
     arg, argM,
     argSetting, argSettingList,
+    getFlag, getSetting, getSettingList,
     getPkgData, getPkgDataList,
     appendCcArgs,
     needBuilder
@@ -16,6 +17,7 @@ module Settings.Util (
 import Builder
 import Expression
 import Oracles.Base
+import Oracles.Flag
 import Oracles.Setting
 import Oracles.PackageData
 import Settings.User
@@ -34,24 +36,31 @@ argSetting = argM . setting
 argSettingList :: SettingList -> Args
 argSettingList = appendM . settingList
 
+getFlag :: Flag -> Expr Bool
+getFlag = lift . flag
+
+getSetting :: Setting -> Expr String
+getSetting = lift . setting
+
+getSettingList :: SettingList -> Expr [String]
+getSettingList = lift . settingList
+
 getPkgData :: (FilePath -> PackageData) -> Expr String
 getPkgData key = do
-    stage <- asks getStage
-    pkg   <- asks getPackage
-    let path = targetPath stage pkg
-    lift . pkgData . key $ path
+    stage <- getStage
+    pkg   <- getPackage
+    lift . pkgData . key $ targetPath stage pkg
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
 getPkgDataList key = do
-    stage <- asks getStage
-    pkg   <- asks getPackage
-    let path = targetPath stage pkg
-    lift . pkgDataList . key $ path
+    stage <- getStage
+    pkg   <- getPackage
+    lift . pkgDataList . key $ targetPath stage pkg
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args
 appendCcArgs xs = do
-    stage <- asks getStage
+    stage <- getStage
     mconcat [ builder (Gcc stage) ? append xs
             , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" xs
             , builder GhcCabal    ? appendSub "--gcc-options" xs ]

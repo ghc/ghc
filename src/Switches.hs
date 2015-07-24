@@ -4,9 +4,10 @@ module Switches (
     ) where
 
 import Stage
+import Expression
+import Settings.Util
 import Oracles.Flag
 import Oracles.Setting
-import Expression
 
 -- Derived predicates
 stage0 :: Predicate
@@ -30,11 +31,11 @@ registerPackage = return True
 
 splitObjects :: Predicate
 splitObjects = do
-    stage       <- asks getStage
-    notBroken   <- notP . flag $ SplitObjectsBroken
-    notGhcUnreg <- notP . flag $ GhcUnregisterised
-    goodArch    <- lift $ targetArchs [ "i386", "x86_64", "powerpc", "sparc" ]
-    goodOs      <- lift $ targetOss   [ "mingw32", "cygwin32", "linux"
-                                      , "darwin", "solaris2", "freebsd"
-                                      , "dragonfly", "netbsd", "openbsd"]
-    return $ notBroken && notGhcUnreg && stage == Stage1 && goodArch && goodOs
+    stage    <- getStage -- We don't split bootstrap (stage 0) packages
+    broken   <- getFlag SplitObjectsBroken
+    ghcUnreg <- getFlag GhcUnregisterised
+    goodArch <- lift $ targetArchs [ "i386", "x86_64", "powerpc", "sparc" ]
+    goodOs   <- lift $ targetOss   [ "mingw32", "cygwin32", "linux"
+                                   , "darwin", "solaris2", "freebsd"
+                                   , "dragonfly", "netbsd", "openbsd"]
+    return $ not broken && not ghcUnreg && stage == Stage1 && goodArch && goodOs
