@@ -5,19 +5,15 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Avail (
-    Avails, AvailFlds, AvailFld, AvailFields, AvailField,
+    Avails,
     AvailInfo(..),
     availsToNameSet,
     availsToNameSetWithSelectors,
     availsToNameEnv,
     availName, availNames, availNonFldNames,
     availNamesWithSelectors,
-    availFlds, availOverloadedFlds,
-    stableAvailCmp, stableAvailFieldsCmp,
-    availFieldsLabels,
-    availFieldsNames, availFieldsNamesWithSelectors,
-    fieldLabelsToAvailFields,
-    pprAvailField
+    availFlds,
+    stableAvailCmp
   ) where
 
 import Name
@@ -38,12 +34,14 @@ import Data.Function
 data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
                | AvailTC Name
                          [Name]
-                         AvailFields
+                         [FieldLabel]
                                  -- ^ A type or class in scope. Parameters:
                                  --
                                  --  1) The name of the type or class
-                                 --  2) The available pieces of type or class.
-                                 --  3) The record fields of the type.
+                                 --  2) The available pieces of type or class,
+                                 --     excluding field selectors.
+                                 --  3) The record fields of the type
+                                 --     (see Note [Representing fields in AvailInfo]).
                                  --
                                  -- The AvailTC Invariant:
                                  --   * If the type or class is itself
@@ -57,13 +55,6 @@ data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
 -- | A collection of 'AvailInfo' - several things that are \"available\"
 type Avails = [AvailInfo]
 
--- | Record fields in an 'AvailInfo'
--- See Note [Representing fields in AvailInfo]
-type AvailFlds name = [AvailFld name]
-type AvailFld name  = (name, Maybe FieldLabelString)
-type AvailFields    = AvailFlds Name
-type AvailField     = AvailFld Name
-
 {-
 Note [Representing fields in AvailInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -74,11 +65,11 @@ datatype like
 
 gives rise to the AvailInfo
 
-  AvailTC T [T, MkT] [(foo, Nothing)],
+  AvailTC T [T, MkT] [FieldLabel "foo" False foo],
 
 whereas if -XDuplicateRecordFields is enabled it gives
 
-  AvailTC T [T, MkT] [($sel:foo:MkT, Just "foo")]
+  AvailTC T [T, MkT] [FieldLabel "foo" True $sel:foo:MkT]
 
 since the label does not match the selector name.
 
@@ -93,7 +84,19 @@ multiple distinct fields with the same label. For example,
 gives rise to
 
   AvailTC F [F, MkFInt, MkFBool]
-    [($sel:foo:MkFInt, Just "foo"), ($sel:foo:MkFBool, Just "foo")].
+    [FieldLabel "foo" True $sel:foo:MkFInt, FieldLabel "foo" True $sel:foo:MkFBool].
+
+Moreover, note that the flIsOverloaded flag need not be the same for
+all the elements of the list.  In the example above, this occurs if
+the two data instances are defined in different modules, one with
+`-XDuplicateRecordFields` enabled and one with it disabled.  Thus it
+is possible to have
+
+  AvailTC F [F, MkFInt, MkFBool]
+    [FieldLabel "foo" True $sel:foo:MkFInt, FieldLabel "foo" False foo].
+
+AMG TODO: but if we do this with two identically-named things,
+something must go wrong on re-export?
 -}
 
 -- | Compare lexicographically
@@ -103,11 +106,8 @@ stableAvailCmp (Avail {})         (AvailTC {})   = LT
 stableAvailCmp (AvailTC n ns nfs) (AvailTC m ms mfs) =
     (n `stableNameCmp` m) `thenCmp`
     (cmpList stableNameCmp ns ms) `thenCmp`
-    (stableAvailFieldsCmp nfs mfs)
+    (cmpList (stableNameCmp `on` flSelector) nfs mfs)
 stableAvailCmp (AvailTC {})       (Avail {})     = GT
-
-stableAvailFieldsCmp :: AvailFields -> AvailFields -> Ordering
-stableAvailFieldsCmp = cmpList (stableNameCmp `on` fst)
 
 -- -----------------------------------------------------------------------------
 -- Operations on AvailInfo
@@ -131,15 +131,15 @@ availName :: AvailInfo -> Name
 availName (Avail n)       = n
 availName (AvailTC n _ _) = n
 
--- | All names made available by the availability information (excluding selectors)
+-- | All names made available by the availability information (excluding overloaded selectors)
 availNames :: AvailInfo -> [Name]
 availNames (Avail n)         = [n]
-availNames (AvailTC _ ns fs) = ns ++ availFieldsNames fs
+availNames (AvailTC _ ns fs) = ns ++ [ flSelector f | f <- fs, not (flIsOverloaded f) ]
 
--- | All names made available by the availability information (including selectors)
+-- | All names made available by the availability information (including overloaded selectors)
 availNamesWithSelectors :: AvailInfo -> [Name]
 availNamesWithSelectors (Avail n)         = [n]
-availNamesWithSelectors (AvailTC _ ns fs) = ns ++ availFieldsNamesWithSelectors fs
+availNamesWithSelectors (AvailTC _ ns fs) = ns ++ map flSelector fs
 
 -- | Names for non-fields made available by the availability information
 availNonFldNames :: AvailInfo -> [Name]
@@ -147,37 +147,9 @@ availNonFldNames (Avail n)        = [n]
 availNonFldNames (AvailTC _ ns _) = ns
 
 -- | Fields made available by the availability information
-availFlds :: AvailInfo -> AvailFields
+availFlds :: AvailInfo -> [FieldLabel]
 availFlds (AvailTC _ _ fs) = fs
 availFlds _                = []
-
--- | Overloaded fields made available by the availability information
-availOverloadedFlds :: AvailInfo -> [(FieldLabelString, Name)]
-availOverloadedFlds avail = [ (lbl, sel) | (sel, Just lbl) <- availFlds avail ]
-
--- -----------------------------------------------------------------------------
--- Operations on AvailFields
-
-availFieldsLabels :: AvailFields -> [FieldLabelString]
-availFieldsLabels = map help
-  where
-    help (_,   Just lbl) = lbl
-    help (sel, Nothing)  = occNameFS $ nameOccName sel
-
-availFieldsNames :: AvailFlds name -> [name]
-availFieldsNames fs = [ n | (n, Nothing) <- fs ]
-
-availFieldsNamesWithSelectors :: AvailFlds name -> [name]
-availFieldsNamesWithSelectors = map fst
-
-fieldLabelToAvailField :: FieldLabel -> AvailField
-fieldLabelToAvailField fl = (flSelector fl, mb_lbl)
-  where
-    mb_lbl | flIsOverloaded fl = Just (flLabel fl)
-           | otherwise         = Nothing
-
-fieldLabelsToAvailFields :: [FieldLabel] -> AvailFields
-fieldLabelsToAvailFields = map fieldLabelToAvailField
 
 
 -- -----------------------------------------------------------------------------
@@ -188,11 +160,7 @@ instance Outputable AvailInfo where
 
 pprAvail :: AvailInfo -> SDoc
 pprAvail (Avail n)         = ppr n
-pprAvail (AvailTC n ns fs) = ppr n <> braces (hsep (punctuate comma (map ppr ns ++ map pprAvailField fs)))
-
-pprAvailField :: Outputable name => AvailFld name -> SDoc
-pprAvailField (n, Nothing)  = ppr n
-pprAvailField (_, Just lbl) = ppr lbl
+pprAvail (AvailTC n ns fs) = ppr n <> braces (hsep (punctuate comma (map ppr ns ++ map (ppr . flLabel) fs)))
 
 instance Binary AvailInfo where
     put_ bh (Avail aa) = do

@@ -75,6 +75,7 @@ import Name
 
 import FastString
 import Outputable
+import Binary
 
 import Data.Data
 
@@ -100,11 +101,22 @@ data FieldLbl a = FieldLabel {
                                           --   in the defining module for this datatype?
       flSelector     :: a                 -- ^ Record selector function
     }
-  deriving (Functor, Foldable, Traversable, Typeable)
+  deriving (Eq, Functor, Foldable, Traversable, Typeable)
 deriving instance Data a => Data (FieldLbl a)
 
 instance Outputable a => Outputable (FieldLbl a) where
     ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))
+
+instance Binary a => Binary (FieldLbl a) where
+    put_ bh (FieldLabel aa ab ac) = do
+        put_ bh aa
+        put_ bh ab
+        put_ bh ac
+    get bh = do
+        ab <- get bh
+        ac <- get bh
+        ad <- get bh
+        return (FieldLabel ab ac ad)
 
 
 -- | Record selector OccNames are built from the underlying field name

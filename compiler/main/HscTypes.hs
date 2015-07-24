@@ -1813,7 +1813,7 @@ tyThingAvailInfo (ATyCon t)
                                  ++ map getName (classATs c))
                              []
              where n = getName c
-        Nothing -> AvailTC n (n : map getName dcs) (fieldLabelsToAvailFields flds)
+        Nothing -> AvailTC n (n : map getName dcs) flds
              where n    = getName t
                    dcs  = tyConDataCons t
                    flds = tyConFieldLabels t

@@ -1117,8 +1117,7 @@ mkIfaceExports exports
        | otherwise = AvailTC n (sortBy stableNameCmp (m:ms)) (sort_flds fs)
        -- Maintain the AvailTC Invariant
 
-    sort_flds :: AvailFields -> AvailFields
-    sort_flds = sortBy (stableNameCmp `on` fst)
+    sort_flds = sortBy (stableNameCmp `on` flSelector)
 
 {-
 Note [Orignal module]

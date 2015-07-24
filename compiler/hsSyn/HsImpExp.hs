@@ -14,7 +14,7 @@ import Module           ( ModuleName )
 import HsDoc            ( HsDocString )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
 import BasicTypes       ( SourceText )
-import Avail
+import FieldLabel       ( FieldLbl(..) )
 
 import Outputable
 import FastString
@@ -154,7 +154,7 @@ data IE name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | IEThingWith (Located name) [Located name] (AvailFlds name)
+  | IEThingWith (Located name) [Located name] [Located (FieldLbl name)]
                  -- ^ Class/Type plus some methods/constructors
                  -- and record fields; see Note [IEThingWith]
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
@@ -184,8 +184,8 @@ A definition like
 
 gives rise to
 
-    IEThingWith T [MkT] [("x", Nothing)]           (without DuplicateRecordFields)
-    IEThingWith T [MkT] [("x", Just $sel:x:MkT)]   (with    DuplicateRecordFields)
+    IEThingWith T [MkT] [FieldLabel "x" False x)]           (without DuplicateRecordFields)
+    IEThingWith T [MkT] [FieldLabel "x" True $sel:x:MkT)]   (with    DuplicateRecordFields)
 
 See Note [Representing fields in AvailInfo] in Avail for more details.
 -}
@@ -197,6 +197,8 @@ ieName (IEThingWith (L _ n) _ _) = n
 ieName (IEThingAll  (L _ n))     = n
 ieName _ = panic "ieName failed pattern match!"
 
+{-
+-- AMG TODO get rid of?
 ieNames :: IE a -> [a]
 ieNames (IEVar       (L _ n)      ) = [n]
 ieNames (IEThingAbs  (L _ n)      ) = [n]
@@ -206,6 +208,7 @@ ieNames (IEModuleContents _       ) = []
 ieNames (IEGroup          _ _     ) = []
 ieNames (IEDoc            _       ) = []
 ieNames (IEDocNamed       _       ) = []
+-}
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
@@ -221,7 +224,7 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEThingWith thing withs flds)
         = pprImpExp (unLoc thing) <> parens (fsep (punctuate comma
                                             (map pprImpExp (map unLoc withs) ++
-                                                map pprAvailField flds)))
+                                                map (ppr . flLabel . unLoc) flds)))
     ppr (IEModuleContents mod')
         = ptext (sLit "module") <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")

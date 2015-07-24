@@ -577,13 +577,16 @@ gresFromAvail prov_fn avail
           Just is -> GRE { gre_name = n, gre_par = mkParent n avail
                          , gre_lcl = False, gre_imp = [is] }
 
-    mk_fld_gre (n, mb_lbl)
+    mk_fld_gre (FieldLabel lbl is_overloaded n)
       = case prov_fn n of  -- Nothing => bound locally
                            -- Just is => imported from 'is'
           Nothing -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl
                          , gre_lcl = True, gre_imp = [] }
           Just is -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl
                          , gre_lcl = False, gre_imp = [is] }
+      where
+        mb_lbl | is_overloaded = Just lbl
+               | otherwise     = Nothing
 
 
 greQualModName :: GlobalRdrElt -> ModuleName
@@ -641,7 +644,8 @@ availFromGRE gre
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> Avail   me
-      FldParent p mb_lbl          -> AvailTC p [] [(me, mb_lbl)]
+      FldParent p Nothing         -> AvailTC p [] [FieldLabel (occNameFS $ nameOccName me) False me]
+      FldParent p (Just lbl)      -> AvailTC p [] [FieldLabel lbl True me]
   where
     me = gre_name gre
 
