@@ -1919,18 +1919,34 @@ primop  CasMutVarOp "casMutVar#" GenPrimOp
 section "Exceptions"
 ------------------------------------------------------------------------
 
--- Note [Strictness for mask/unmask/catch]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Consider this example, which comes from GHC.IO.Handle.Internals:
---    wantReadableHandle3 f ma b st
---      = case ... of
---          DEFAULT -> case ma of MVar a -> ...
---          0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
--- The outer case just decides whether to mask exceptions, but we don't want
--- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
---
--- For catch, we know that the first branch will be evaluated, but not
--- necessarily the second.  Hence strictApply1Dmd and lazyApply1Dmd
+{- Note [Strictness for mask/unmask/catch]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this example, which comes from GHC.IO.Handle.Internals:
+   wantReadableHandle3 f ma b st
+     = case ... of
+         DEFAULT -> case ma of MVar a -> ...
+         0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
+The outer case just decides whether to mask exceptions, but we don't want
+thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
+
+For catch, we know that the first branch will be evaluated, but not
+necessarily the second.  Hence strictApply1Dmd and lazyApply1Dmd
+
+Howver, consider
+    catch# (\st -> case x of ...) (..handler..) st
+We'll see that the entire thing is strict in 'x', so 'x' may be evaluated
+before the catch#.  So fi evaluting 'x' causes a divide-by-zero exception,
+it won't be caught.  This seems acceptable:
+  - x might be evaluated somewhere else outside the catch# anyway
+  - It's an imprecise eception anyway.  Synchronous exceptions (in the
+    IO monad) will never move in this way.
+There was originally a comment
+  "Catch is actually strict in its first argument
+   but we don't want to tell the strictness
+   analyser about that, so that exceptions stay inside it."
+but tracing it back through the commit logs did not give any
+rationale.  And making catch# lazy has performance costs for everyone.
+-}
 
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
@@ -1938,9 +1954,6 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-        -- Catch is actually strict in its first argument
-        -- but we don't want to tell the strictness
-        -- analyser about that, so that exceptions stay inside it.
    strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
