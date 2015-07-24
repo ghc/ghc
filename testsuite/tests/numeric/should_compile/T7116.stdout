@@ -2,6 +2,7 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 22, types: 14, coercions: 0}
 
+-- RHS size: {terms: 8, types: 3, coercions: 0}
 dl :: Double -> Double
 [GblId,
  Arity=1,
@@ -15,6 +16,7 @@ dl :: Double -> Double
 dl =
   \ (x :: Double) -> case x of _ [Occ=Dead] { D# y -> D# (+## y y) }
 
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 dr :: Double -> Double
 [GblId,
  Arity=1,
@@ -27,6 +29,7 @@ dr :: Double -> Double
                  case x of _ [Occ=Dead] { D# x1 -> D# (+## x1 x1) }}]
 dr = dl
 
+-- RHS size: {terms: 8, types: 3, coercions: 0}
 fl :: Float -> Float
 [GblId,
  Arity=1,
@@ -41,6 +44,7 @@ fl =
   \ (x :: Float) ->
     case x of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }
 
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 fr :: Float -> Float
 [GblId,
  Arity=1,

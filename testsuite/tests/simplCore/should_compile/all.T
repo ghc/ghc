@@ -106,6 +106,10 @@ test('T4918',
      run_command,
      ['$MAKE -s --no-print-directory T4918'])
 
+# This test flips too and fro about whether it passes
+# I'm not sure why it is so delicate, but it greps the
+# result of -ddump-simpl, which is never advertised to
+# be very stable
 test('T4945',
      expect_broken(4945),
      run_command,
@@ -214,3 +218,8 @@ test('T10176', only_ways(['optasm']), compile, [''])
 test('T10180', only_ways(['optasm']), compile, [''])
 test('T10602', only_ways(['optasm']), multimod_compile, ['T10602','-v0'])
 test('T10627', only_ways(['optasm']), compile, [''])
+test('T10181', [expect_broken(10181), only_ways(['optasm'])], compile, [''])
+test('T10083',
+     expect_broken(10083),
+     run_command,
+     ['$MAKE -s --no-print-directory T10083'])

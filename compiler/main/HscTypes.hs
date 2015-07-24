@@ -10,7 +10,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
-        FinderCache, FindResult(..),
+        FinderCache, FindResult(..), FoundHs(..), FindExactResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
@@ -67,7 +67,7 @@ module HscTypes (
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
-        emptyIfaceWarnCache,
+        emptyIfaceWarnCache, mi_boot,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -674,15 +674,30 @@ prepareAnnotations hsc_env mb_guts = do
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
--- Although the @FinderCache@ range is 'FindResult' for convenience,
--- in fact it will only ever contain 'Found' or 'NotFound' entries.
---
-type FinderCache = ModuleEnv FindResult
+type FinderCache = ModuleEnv FindExactResult
+
+-- | The result of search for an exact 'Module'.
+data FindExactResult
+    = FoundExact ModLocation Module
+        -- ^ The module/signature was found
+    | NoPackageExact PackageKey
+    | NotFoundExact
+        { fer_paths     :: [FilePath]
+        , fer_pkg       :: Maybe PackageKey
+        }
+
+-- | A found module or signature; e.g. anything with an interface file
+data FoundHs = FoundHs { fr_loc :: ModLocation
+                       , fr_mod :: Module
+                       -- , fr_origin :: ModuleOrigin
+                       }
 
 -- | The result of searching for an imported module.
 data FindResult
-  = Found ModLocation Module
+  = FoundModule FoundHs
         -- ^ The module was found
+  | FoundSigs [FoundHs] Module
+        -- ^ Signatures were found, with some backing implementation
   | NoPackage PackageKey
         -- ^ The requested package was not found
   | FoundMultiple [(Module, ModuleOrigin)]
@@ -733,7 +748,7 @@ data ModIface
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
         mi_finsts     :: !WhetherHasFamInst,  -- ^ Whether this module has family instances
-        mi_boot       :: !IsBootInterface,    -- ^ Read from an hi-boot file?
+        mi_hsc_src    :: !HscSource,          -- ^ Boot? Signature?
 
         mi_deps     :: Dependencies,
                 -- ^ The dependencies of the module.  This is
@@ -831,11 +846,16 @@ data ModIface
                 -- See Note [RnNames . Trust Own Package]
      }
 
+-- | Old-style accessor for whether or not the ModIface came from an hs-boot
+-- file.
+mi_boot :: ModIface -> Bool
+mi_boot iface = mi_hsc_src iface == HsBootFile
+
 instance Binary ModIface where
    put_ bh (ModIface {
                  mi_module    = mod,
                  mi_sig_of    = sig_of,
-                 mi_boot      = is_boot,
+                 mi_hsc_src   = hsc_src,
                  mi_iface_hash= iface_hash,
                  mi_mod_hash  = mod_hash,
                  mi_flag_hash = flag_hash,
@@ -859,7 +879,7 @@ instance Binary ModIface where
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg }) = do
         put_ bh mod
-        put_ bh is_boot
+        put_ bh hsc_src
         put_ bh iface_hash
         put_ bh mod_hash
         put_ bh flag_hash
@@ -886,7 +906,7 @@ instance Binary ModIface where
 
    get bh = do
         mod_name    <- get bh
-        is_boot     <- get bh
+        hsc_src     <- get bh
         iface_hash  <- get bh
         mod_hash    <- get bh
         flag_hash   <- get bh
@@ -913,7 +933,7 @@ instance Binary ModIface where
         return (ModIface {
                  mi_module      = mod_name,
                  mi_sig_of      = sig_of,
-                 mi_boot        = is_boot,
+                 mi_hsc_src     = hsc_src,
                  mi_iface_hash  = iface_hash,
                  mi_mod_hash    = mod_hash,
                  mi_flag_hash   = flag_hash,
@@ -955,7 +975,7 @@ emptyModIface mod
                mi_flag_hash   = fingerprint0,
                mi_orphan      = False,
                mi_finsts      = False,
-               mi_boot        = False,
+               mi_hsc_src     = HsSrcFile,
                mi_deps        = noDependencies,
                mi_usages      = [],
                mi_exports     = [],
@@ -1033,7 +1053,7 @@ type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
 data ModGuts
   = ModGuts {
         mg_module    :: !Module,         -- ^ Module being compiled
-        mg_boot      :: IsBootInterface, -- ^ Whether it's an hs-boot module
+        mg_hsc_src   :: HscSource,       -- ^ Whether it's an hs-boot module
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise
@@ -1065,23 +1085,24 @@ data ModGuts
                                          --   (produced by desugarer & consumed by vectoriser)
         mg_vect_info :: !VectInfo,       -- ^ Pool of vectorised declarations in the module
 
-        -- The next two fields are unusual, because they give instance
-        -- environments for *all* modules in the home package, including
-        -- this module, rather than for *just* this module.
-        -- Reason: when looking up an instance we don't want to have to
-        --        look at each module in the home package in turn
-        mg_inst_env     :: InstEnv,
-        -- ^ Class instance environment from /home-package/ modules (including
-        -- this one); c.f. 'tcg_inst_env'
-        mg_fam_inst_env :: FamInstEnv,
-        -- ^ Type-family instance environment for /home-package/ modules
-        -- (including this one); c.f. 'tcg_fam_inst_env'
-        mg_safe_haskell :: SafeHaskellMode,
-        -- ^ Safe Haskell mode
-        mg_trust_pkg    :: Bool,
-        -- ^ Do we need to trust our own package for Safe Haskell?
-        -- See Note [RnNames . Trust Own Package]
-        mg_dependent_files :: [FilePath] -- ^ dependencies from addDependentFile
+                        -- The next two fields are unusual, because they give instance
+                        -- environments for *all* modules in the home package, including
+                        -- this module, rather than for *just* this module.
+                        -- Reason: when looking up an instance we don't want to have to
+                        --         look at each module in the home package in turn
+        mg_inst_env     :: InstEnv,             -- ^ Class instance environment for
+                                                -- /home-package/ modules (including this
+                                                -- one); c.f. 'tcg_inst_env'
+        mg_fam_inst_env :: FamInstEnv,          -- ^ Type-family instance environment for
+                                                -- /home-package/ modules (including this
+                                                -- one); c.f. 'tcg_fam_inst_env'
+
+        mg_safe_haskell :: SafeHaskellMode,     -- ^ Safe Haskell mode
+        mg_trust_pkg    :: Bool,                -- ^ Do we need to trust our
+                                                -- own package for Safe Haskell?
+                                                -- See Note [RnNames . Trust Own Package]
+
+        mg_dependent_files :: [FilePath]        -- ^ Dependencies from addDependentFile
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -1089,7 +1110,6 @@ data ModGuts
 -- After simplification, the following fields change slightly:
 --      mg_rules        Orphan rules only (local ones now attached to binds)
 --      mg_binds        With rules attached
-
 
 ---------------------------------------------------------
 -- The Tidy pass forks the information about this module:
@@ -1405,8 +1425,9 @@ extendInteractiveContext :: InteractiveContext
                          -> [TyThing]
                          -> [ClsInst] -> [FamInst]
                          -> Maybe [Type]
+                         -> FixityEnv
                          -> InteractiveContext
-extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
+extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults fix_env
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
                             -- a new mod_index (Trac #9426)
@@ -1414,7 +1435,9 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
                             , new_fam_insts ++ old_fam_insts )
-          , ic_default    = defaults }
+          , ic_default    = defaults
+          , ic_fix_env    = fix_env  -- See Note [Fixity declarations in GHCi]
+          }
   where
     new_ids = [id | AnId id <- new_tythings]
     old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
@@ -2070,6 +2093,15 @@ type IsBootInterface = Bool
 -- Invariant: the dependencies of a module @M@ never includes @M@.
 --
 -- Invariant: none of the lists contain duplicates.
+--
+-- NB: While this contains information about all modules and packages below
+-- this one in the the import *hierarchy*, this may not accurately reflect
+-- the full runtime dependencies of the module.  This is because this module may
+-- have imported a boot module, in which case we'll only have recorded the
+-- dependencies from the hs-boot file, not the actual hs file. (This is
+-- unavoidable: usually, the actual hs file will have been compiled *after*
+-- we wrote this interface file.)  See #936, and also @getLinkDeps@ in
+-- @compiler/ghci/Linker.hs@ for code which cares about this distinction.
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ All home-package modules transitively below this one

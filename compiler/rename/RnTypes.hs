@@ -13,7 +13,7 @@ module RnTypes (
         rnHsKind, rnLHsKind, rnLHsMaybeKind,
         rnHsSigType, rnLHsInstType, rnConDeclFields,
         newTyVarNameRn, rnLHsTypeWithWildCards,
-        rnHsSigTypeWithWildCards,
+        rnHsSigTypeWithWildCards, collectWildCards,
 
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -543,7 +543,17 @@ dataKindsErr is_type thing
 -- cards to bind.
 rnHsSigTypeWithWildCards :: SDoc -> LHsType RdrName
                          -> RnM (LHsType Name, FreeVars, [Name])
-rnHsSigTypeWithWildCards doc_str = rnLHsTypeWithWildCards (TypeSigCtx doc_str)
+rnHsSigTypeWithWildCards doc_str ty
+  = rnLHsTypeWithWildCards (TypeSigCtx doc_str) ty'
+  where
+    ty' = extractExtraCtsWc `fmap` flattenTopLevelLHsForAllTy ty
+    -- When there is a wild card at the end of the context, remove it and add
+    -- its location as the extra-constraints wild card in the HsForAllTy.
+    extractExtraCtsWc (HsForAllTy flag _ bndrs (L l ctxt) ty)
+      | Just (ctxt', ct) <- snocView ctxt
+      , L lx (HsWildCardTy (AnonWildCard _)) <- ignoreParens ct
+      = HsForAllTy flag (Just lx) bndrs (L l ctxt') ty
+    extractExtraCtsWc ty = ty
 
 -- | Variant of @rnLHsType@ that supports wild cards. The third element of the
 -- tuple consists of the freshly generated names of the anonymous wild cards
@@ -552,31 +562,19 @@ rnHsSigTypeWithWildCards doc_str = rnLHsTypeWithWildCards (TypeSigCtx doc_str)
 rnLHsTypeWithWildCards  :: HsDocContext -> LHsType RdrName
                         -> RnM (LHsType Name, FreeVars, [Name])
 rnLHsTypeWithWildCards doc ty
-  = do { -- When there is a wild card at the end of the context, remove it and
-         -- add its location as the extra-constraints wild card in the
-         -- HsForAllTy.
-         let ty' = extractExtraCtsWc `fmap` flattenTopLevelLHsForAllTy ty
-
-       ; checkValidPartialType doc ty'
-
+  = do { checkValidPartialType doc ty
        ; rdr_env <- getLocalRdrEnv
        -- Filter out named wildcards that are already in scope
-       ; let (_, wcs) = collectWildCards ty'
+       ; let (_, wcs) = collectWildCards ty
              nwcs = [L loc n | L loc (NamedWildCard n) <- wcs
                              , not (elemLocalRdrEnv n rdr_env) ]
        ; bindLocatedLocalsRn nwcs $ \nwcs' -> do {
-         (ty'', fvs) <- rnLHsType doc ty'
+         (ty', fvs) <- rnLHsType doc ty
        -- Add the anonymous wildcards that have been given names during
        -- renaming
-       ; let (_, wcs') = collectWildCards ty''
+       ; let (_, wcs') = collectWildCards ty'
              awcs      = filter (isAnonWildCard . unLoc) wcs'
-       ; return (ty'', fvs, nwcs' ++ map (HsSyn.wildCardName . unLoc) awcs) } }
-  where
-    extractExtraCtsWc (HsForAllTy flag _ bndrs (L l ctxt) ty)
-      | Just (ctxt', ct) <- snocView ctxt
-      , L lx (HsWildCardTy (AnonWildCard _)) <- ignoreParens ct
-      = HsForAllTy flag (Just lx) bndrs (L l ctxt') ty
-    extractExtraCtsWc ty = ty
+       ; return (ty', fvs, nwcs' ++ map (HsSyn.wildCardName . unLoc) awcs) } }
 
 -- | Extract all wild cards from a type. The named and anonymous
 -- extra-constraints wild cards are returned separately to be able to give
@@ -585,7 +583,7 @@ collectWildCards
   :: Eq name => LHsType name
   -> ([Located (HsWildCardInfo name)],  -- extra-constraints wild cards
       [Located (HsWildCardInfo name)])  -- wild cards
-collectWildCards lty = (nubBy sameWildCard extra, nubBy sameWildCard wcs)
+collectWildCards lty = (extra, nubBy sameNamedWildCard wcs)
   where
     (extra, wcs) = go lty
     go (L loc ty) = case ty of
@@ -649,10 +647,21 @@ checkValidPartialType doc lty
            -- If there was a valid extra-constraints wild card, it should have
            -- already been removed and its location should be stored in the
            -- HsForAllTy
-           (if isJust extra
-            then text "Only a single extra-constraints wild card is allowed"
-            else fcat [ text "An extra-constraints wild card must occur"
-                      , text "at the end of the constraints" ]) $$
+           (case extra of
+             Just _ ->
+               -- We're in a top-level context with an extracted
+               -- extra-constraints wild card.
+               text "Only a single extra-constraints wild card is allowed"
+             _ | TypeSigCtx _ <- doc ->
+               -- We're in a top-level context, but the extra-constraints wild
+               -- card didn't occur at the end.
+               fcat [ text "An extra-constraints wild card must occur"
+                    , text "at the end of the constraints" ]
+             _ ->
+               -- We're not in a top-level context, so no extra-constraints
+               -- wild cards are supported.
+               fcat [ text "An extra-constraints wild card is only allowed"
+                    , text "in the top-level context" ]) $$
            docOfHsDocContext doc
 
        ; whenNonEmpty isAnonWildCard inCtxt $ \(L loc _) ->

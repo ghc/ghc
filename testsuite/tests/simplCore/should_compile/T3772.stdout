@@ -3,6 +3,7 @@
 Result size of Tidy Core = {terms: 26, types: 11, coercions: 0}
 
 Rec {
+-- RHS size: {terms: 10, types: 2, coercions: 0}
 $wxs :: Int# -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
 $wxs =
@@ -13,6 +14,7 @@ $wxs =
     }
 end Rec }
 
+-- RHS size: {terms: 14, types: 5, coercions: 0}
 foo [InlPrag=NOINLINE] :: Int -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
 foo =

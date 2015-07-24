@@ -168,7 +168,7 @@ deSugar hsc_env
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
-                mg_boot         = hsc_src == HsBootFile,
+                mg_hsc_src      = hsc_src,
                 mg_exports      = exports,
                 mg_deps         = deps,
                 mg_used_names   = used_names,

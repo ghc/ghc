@@ -1,0 +1,9 @@
+
+tcfail223.hs:10:10: error:
+    Could not deduce (Class1 a)
+      arising from the superclasses of an instance declaration
+    from the context: Class3 a
+      bound by the instance declaration at tcfail223.hs:10:10-29
+    Possible fix:
+      add (Class1 a) to the context of the instance declaration
+    In the instance declaration for ‘Class2 a’

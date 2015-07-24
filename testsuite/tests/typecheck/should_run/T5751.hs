@@ -25,7 +25,7 @@ main =
 class (Widgets x) => MonadRender x
 class (XMLGenerator m)  => Widgets m
 -- instance Widgets (IdentityT IO) -- if you uncomment this, it will work
-instance MonadRender m => Widgets m
+instance (XMLGenerator m, MonadRender m) => Widgets m
 instance MonadRender (IdentityT IO)
 
 web :: ( MonadIO m

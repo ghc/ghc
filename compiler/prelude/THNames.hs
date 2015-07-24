@@ -33,7 +33,8 @@ templateHaskellNames = [
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
-    floatPrimLName, doublePrimLName, rationalLName,
+    floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
+    charPrimLName,
     -- Pat
     litPName, varPName, tupPName, unboxedTupPName,
     conPName, tildePName, bangPName, infixPName,
@@ -82,6 +83,7 @@ templateHaskellNames = [
     forallTName, varTName, conTName, appTName, equalityTName,
     tupleTName, unboxedTupleTName, arrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
+    wildCardTName, namedWildCardTName,
     -- TyLit
     numTyLitName, strTyLitName,
     -- TyVarBndr
@@ -188,7 +190,8 @@ unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
 -------------------- TH.Lib -----------------------
 -- data Lit = ...
 charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
-    floatPrimLName, doublePrimLName, rationalLName :: Name
+    floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
+    charPrimLName :: Name
 charLName       = libFun (fsLit "charL")       charLIdKey
 stringLName     = libFun (fsLit "stringL")     stringLIdKey
 integerLName    = libFun (fsLit "integerL")    integerLIdKey
@@ -197,6 +200,8 @@ wordPrimLName   = libFun (fsLit "wordPrimL")   wordPrimLIdKey
 floatPrimLName  = libFun (fsLit "floatPrimL")  floatPrimLIdKey
 doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
 rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
+stringPrimLName = libFun (fsLit "stringPrimL") stringPrimLIdKey
+charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
 
 -- data Pat = ...
 litPName, varPName, tupPName, unboxedTupPName, conPName, infixPName, tildePName, bangPName,
@@ -355,7 +360,8 @@ varStrictTypeName = libFun  (fsLit "varStrictType") varStrictTKey
 forallTName, varTName, conTName, tupleTName, unboxedTupleTName, arrowTName,
     listTName, appTName, sigTName, equalityTName, litTName,
     promotedTName, promotedTupleTName,
-    promotedNilTName, promotedConsTName :: Name
+    promotedNilTName, promotedConsTName,
+    wildCardTName, namedWildCardTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
 varTName            = libFun (fsLit "varT")           varTIdKey
 conTName            = libFun (fsLit "conT")           conTIdKey
@@ -371,6 +377,9 @@ promotedTName       = libFun (fsLit "promotedT")      promotedTIdKey
 promotedTupleTName  = libFun (fsLit "promotedTupleT") promotedTupleTIdKey
 promotedNilTName    = libFun (fsLit "promotedNilT")   promotedNilTIdKey
 promotedConsTName   = libFun (fsLit "promotedConsT")  promotedConsTIdKey
+wildCardTName       = libFun (fsLit "wildCardT")      wildCardTIdKey
+namedWildCardTName  = libFun (fsLit "namedWildCardT") namedWildCardTIdKey
+
 
 -- data TyLit = ...
 numTyLitName, strTyLitName :: Name
@@ -556,7 +565,8 @@ unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 212
 
 -- data Lit = ...
 charLIdKey, stringLIdKey, integerLIdKey, intPrimLIdKey, wordPrimLIdKey,
-    floatPrimLIdKey, doublePrimLIdKey, rationalLIdKey :: Unique
+    floatPrimLIdKey, doublePrimLIdKey, rationalLIdKey, stringPrimLIdKey,
+    charPrimLIdKey:: Unique
 charLIdKey        = mkPreludeMiscIdUnique 220
 stringLIdKey      = mkPreludeMiscIdUnique 221
 integerLIdKey     = mkPreludeMiscIdUnique 222
@@ -565,9 +575,11 @@ wordPrimLIdKey    = mkPreludeMiscIdUnique 224
 floatPrimLIdKey   = mkPreludeMiscIdUnique 225
 doublePrimLIdKey  = mkPreludeMiscIdUnique 226
 rationalLIdKey    = mkPreludeMiscIdUnique 227
+stringPrimLIdKey  = mkPreludeMiscIdUnique 228
+charPrimLIdKey    = mkPreludeMiscIdUnique 229
 
 liftStringIdKey :: Unique
-liftStringIdKey     = mkPreludeMiscIdUnique 228
+liftStringIdKey     = mkPreludeMiscIdUnique 230
 
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
@@ -722,7 +734,8 @@ varStrictTKey     = mkPreludeMiscIdUnique 375
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,
     listTIdKey, appTIdKey, sigTIdKey, equalityTIdKey, litTIdKey,
     promotedTIdKey, promotedTupleTIdKey,
-    promotedNilTIdKey, promotedConsTIdKey :: Unique
+    promotedNilTIdKey, promotedConsTIdKey,
+    wildCardTIdKey, namedWildCardTIdKey :: Unique
 forallTIdKey        = mkPreludeMiscIdUnique 380
 varTIdKey           = mkPreludeMiscIdUnique 381
 conTIdKey           = mkPreludeMiscIdUnique 382
@@ -738,35 +751,37 @@ promotedTIdKey      = mkPreludeMiscIdUnique 391
 promotedTupleTIdKey = mkPreludeMiscIdUnique 392
 promotedNilTIdKey   = mkPreludeMiscIdUnique 393
 promotedConsTIdKey  = mkPreludeMiscIdUnique 394
+wildCardTIdKey      = mkPreludeMiscIdUnique 395
+namedWildCardTIdKey = mkPreludeMiscIdUnique 396
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique
-numTyLitIdKey = mkPreludeMiscIdUnique 395
-strTyLitIdKey = mkPreludeMiscIdUnique 396
+numTyLitIdKey = mkPreludeMiscIdUnique 400
+strTyLitIdKey = mkPreludeMiscIdUnique 401
 
 -- data TyVarBndr = ...
 plainTVIdKey, kindedTVIdKey :: Unique
-plainTVIdKey       = mkPreludeMiscIdUnique 397
-kindedTVIdKey      = mkPreludeMiscIdUnique 398
+plainTVIdKey       = mkPreludeMiscIdUnique 402
+kindedTVIdKey      = mkPreludeMiscIdUnique 403
 
 -- data Role = ...
 nominalRIdKey, representationalRIdKey, phantomRIdKey, inferRIdKey :: Unique
-nominalRIdKey          = mkPreludeMiscIdUnique 400
-representationalRIdKey = mkPreludeMiscIdUnique 401
-phantomRIdKey          = mkPreludeMiscIdUnique 402
-inferRIdKey            = mkPreludeMiscIdUnique 403
+nominalRIdKey          = mkPreludeMiscIdUnique 404
+representationalRIdKey = mkPreludeMiscIdUnique 405
+phantomRIdKey          = mkPreludeMiscIdUnique 406
+inferRIdKey            = mkPreludeMiscIdUnique 407
 
 -- data Kind = ...
 varKIdKey, conKIdKey, tupleKIdKey, arrowKIdKey, listKIdKey, appKIdKey,
   starKIdKey, constraintKIdKey :: Unique
-varKIdKey         = mkPreludeMiscIdUnique 404
-conKIdKey         = mkPreludeMiscIdUnique 405
-tupleKIdKey       = mkPreludeMiscIdUnique 406
-arrowKIdKey       = mkPreludeMiscIdUnique 407
-listKIdKey        = mkPreludeMiscIdUnique 408
-appKIdKey         = mkPreludeMiscIdUnique 409
-starKIdKey        = mkPreludeMiscIdUnique 410
-constraintKIdKey  = mkPreludeMiscIdUnique 411
+varKIdKey         = mkPreludeMiscIdUnique 408
+conKIdKey         = mkPreludeMiscIdUnique 409
+tupleKIdKey       = mkPreludeMiscIdUnique 410
+arrowKIdKey       = mkPreludeMiscIdUnique 411
+listKIdKey        = mkPreludeMiscIdUnique 412
+appKIdKey         = mkPreludeMiscIdUnique 413
+starKIdKey        = mkPreludeMiscIdUnique 414
+constraintKIdKey  = mkPreludeMiscIdUnique 415
 
 -- data Callconv = ...
 cCallIdKey, stdCallIdKey, cApiCallIdKey, primCallIdKey,

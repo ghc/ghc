@@ -292,21 +292,22 @@ fixupPackageId ipinfos (InstalledPackageId ipi)
 -- On Windows we need to split the ghc package into 2 pieces, or the
 -- DLL that it makes contains too many symbols (#5987). There are
 -- therefore 2 libraries, not just the 1 that Cabal assumes.
-mangleLbi :: FilePath -> FilePath -> LocalBuildInfo -> LocalBuildInfo
-mangleLbi "compiler" "stage2" lbi
+mangleIPI :: FilePath -> FilePath -> LocalBuildInfo
+          -> Installed.InstalledPackageInfo -> Installed.InstalledPackageInfo
+mangleIPI "compiler" "stage2" lbi ipi
  | isWindows =
-    let ccs' = [ (cn, updateComponentLocalBuildInfo clbi, cns)
-               | (cn, clbi, cns) <- componentsConfigs lbi ]
-        updateComponentLocalBuildInfo clbi@(LibComponentLocalBuildInfo {})
-            = let cls' = concat [ [ LibraryName n, LibraryName (n ++ "-0") ]
-                                | LibraryName n <- componentLibraries clbi ]
-              in clbi { componentLibraries = cls' }
-        updateComponentLocalBuildInfo clbi = clbi
-    in lbi { componentsConfigs = ccs' }
+    -- Cabal currently only ever installs ONE Haskell library, c.f.
+    -- the code in Cabal.Distribution.Simple.Register.  If it
+    -- ever starts installing more we'll have to find the
+    -- library that's too big and split that.
+    let [old_hslib] = Installed.hsLibraries ipi
+    in ipi {
+        Installed.hsLibraries = [old_hslib, old_hslib ++ "-0"]
+    }
     where isWindows = case hostPlatform lbi of
                       Platform _ Windows -> True
                       _                  -> False
-mangleLbi _ _ lbi = lbi
+mangleIPI _ _ _ ipi = ipi
 
 generate :: FilePath -> FilePath -> String -> [String] -> IO ()
 generate directory distdir dll0Modules config_args
@@ -318,9 +319,8 @@ generate directory distdir dll0Modules config_args
       withArgs (["configure", "--distdir", distdir] ++ config_args)
                runDefaultMain
 
-      lbi0 <- getPersistBuildConfig distdir
-      let lbi = mangleLbi directory distdir lbi0
-          pd0 = localPkgDescr lbi
+      lbi <- getPersistBuildConfig distdir
+      let pd0 = localPkgDescr lbi
 
       writePersistBuildConfig distdir lbi
 
@@ -345,7 +345,7 @@ generate directory distdir dll0Modules config_args
              let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                         pd ipid lib lbi clbi
-                 final_ipi = installedPkgInfo {
+                 final_ipi = mangleIPI directory distdir lbi $ installedPkgInfo {
                                  Installed.installedPackageId = ipid,
                                  Installed.haddockHTMLs = []
                              }
@@ -405,9 +405,7 @@ generate directory distdir dll0Modules config_args
           dep_ipids = map (display . Installed.installedPackageId) dep_direct
           depLibNames
             | packageKeySupported comp
-                = map (\p -> packageKeyLibraryName
-                                (Installed.sourcePackageId p)
-                                (Installed.packageKey p)) dep_direct
+                = map (display . Installed.libraryName) dep_direct
             | otherwise = deps
           depNames = map (display . packageName) dep_ids
 
@@ -415,9 +413,7 @@ generate directory distdir dll0Modules config_args
           transitiveDeps = map display transitive_dep_ids
           transitiveDepLibNames
             | packageKeySupported comp
-                = map (\p -> packageKeyLibraryName
-                                (Installed.sourcePackageId p)
-                                (Installed.packageKey p)) dep_pkgs
+                = map (display . Installed.libraryName) dep_pkgs
             | otherwise = transitiveDeps
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
@@ -437,9 +433,10 @@ generate directory distdir dll0Modules config_args
           otherMods = map display (otherModules bi)
           allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
-                variablePrefix ++ "_PACKAGE_KEY = " ++ display (pkgKey lbi),
+                -- TODO: move inside withLibLBI
+                variablePrefix ++ "_PACKAGE_KEY = " ++ display (localPackageKey lbi),
                 -- copied from mkComponentsLocalBuildInfo
-                variablePrefix ++ "_LIB_NAME = " ++ packageKeyLibraryName (package pd) (pkgKey lbi),
+                variablePrefix ++ "_LIB_NAME = " ++ display (localLibraryName lbi),
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,

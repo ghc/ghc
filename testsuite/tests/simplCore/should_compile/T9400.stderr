@@ -2,6 +2,7 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 23, types: 16, coercions: 0}
 
+-- RHS size: {terms: 22, types: 14, coercions: 0}
 main :: IO ()
 [GblId, Str=DmdType]
 main =

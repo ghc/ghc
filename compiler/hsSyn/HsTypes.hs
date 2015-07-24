@@ -37,7 +37,8 @@ module HsTypes (
         rdrNameFieldOcc, selectorFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
-        wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
+        wildCardName, sameWildCard, sameNamedWildCard,
+        isAnonWildCard, isNamedWildCard,
 
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
@@ -732,6 +733,12 @@ sameWildCard :: Eq name
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
 sameWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
 sameWildCard _ _ = False
+
+sameNamedWildCard :: Eq name
+                  => Located (HsWildCardInfo name)
+                  -> Located (HsWildCardInfo name) -> Bool
+sameNamedWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
+sameNamedWildCard _ _ = False
 
 splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)

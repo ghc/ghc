@@ -59,6 +59,7 @@ import Util
 import Maybes
 import MonadUtils
 
+import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
 
@@ -488,12 +489,14 @@ repForD (L loc (ForeignImport name typ _ (CImport (L _ cc) (L _ s) mch cis _)))
     conv_cimportspec (CFunction (StaticTarget _ _  _ False))
                             = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
+    -- these calling conventions do not support headers and the static keyword
+    raw_cconv = cc == PrimCallConv || cc == JavaScriptCallConv
     static = case cis of
-                 CFunction (StaticTarget _ _ _ _) -> "static "
+                 CFunction (StaticTarget _ _ _ _) | not raw_cconv -> "static "
                  _ -> ""
     chStr = case mch of
-            Nothing -> ""
-            Just (Header _ h) -> unpackFS h ++ " "
+            Just (Header _ h) | not raw_cconv -> unpackFS h ++ " "
+            _ -> ""
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
@@ -846,11 +849,26 @@ repLTy :: LHsType Name -> DsM (Core TH.TypeQ)
 repLTy (L _ ty) = repTy ty
 
 repTy :: HsType Name -> DsM (Core TH.TypeQ)
-repTy (HsForAllTy _ _ tvs ctxt ty)  =
+repTy (HsForAllTy _ extra tvs ctxt ty)  =
   addTyVarBinds tvs $ \bndrs -> do
-    ctxt1  <- repLContext ctxt
+    ctxt1  <- repLContext ctxt'
     ty1    <- repLTy ty
     repTForall bndrs ctxt1 ty1
+  where
+    -- If extra is not Nothing, an extra-constraints wild card was removed
+    -- (just) before renaming. It must be put back now, otherwise the
+    -- represented type won't include this extra-constraints wild card.
+    ctxt'
+      | Just loc <- extra
+      = let uniq = panic "addExtraCtsWC"
+             -- This unique will be discarded by repLContext, but is required
+             -- to make a Name
+            name = mkInternalName uniq (mkTyVarOcc "_") loc
+        in  (++ [L loc (HsWildCardTy (AnonWildCard name))]) `fmap` ctxt
+      | otherwise
+      = ctxt
+
+
 
 repTy (HsTyVar n)
   | isTvOcc occ   = do tv1 <- lookupOcc n
@@ -909,11 +927,10 @@ repTy (HsExplicitTupleTy _ tys) = do
 repTy (HsTyLit lit) = do
                         lit' <- repTyLit lit
                         repTLit lit'
-repTy (HsWildCardTy wc) = do
-                            let name = HsSyn.wildCardName wc
-                            putSrcSpanDs (nameSrcSpan name) $
-                              failWithDs $ text "Unexpected wild card:" <+>
-                                           quotes (ppr name)
+repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
+repTy (HsWildCardTy (NamedWildCard n)) = do
+                                           nwc <- lookupOcc n
+                                           repTNamedWildCard nwc
 
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
@@ -1923,6 +1940,13 @@ repTPromotedList (t:ts) = do  { tcon <- repPromotedConsTyCon
 repTLit :: Core TH.TyLitQ -> DsM (Core TH.TypeQ)
 repTLit (MkC lit) = rep2 litTName [lit]
 
+repTWildCard :: DsM (Core TH.TypeQ)
+repTWildCard = rep2 wildCardTName []
+
+repTNamedWildCard :: Core TH.Name -> DsM (Core TH.TypeQ)
+repTNamedWildCard (MkC s) = rep2 namedWildCardTName [s]
+
+
 --------- Type constructors --------------
 
 repNamedTyCon :: Core TH.Name -> DsM (Core TH.TypeQ)
@@ -1998,6 +2022,13 @@ repKConstraint = rep2 constraintKName []
 --              Literals
 
 repLiteral :: HsLit -> DsM (Core TH.Lit)
+repLiteral (HsStringPrim _ bs)
+  = do dflags   <- getDynFlags
+       word8_ty <- lookupType word8TyConName
+       let w8s = unpack bs
+           w8s_expr = map (\w8 -> mkCoreConApps word8DataCon
+                                  [mkWordLit dflags (toInteger w8)]) w8s
+       rep2 stringPrimLName [mkListExpr word8_ty w8s_expr]
 repLiteral lit
   = do lit' <- case lit of
                    HsIntPrim _ i    -> mk_integer i
@@ -2005,6 +2036,7 @@ repLiteral lit
                    HsInt _ i        -> mk_integer i
                    HsFloatPrim r    -> mk_rational r
                    HsDoublePrim r   -> mk_rational r
+                   HsCharPrim _ c   -> mk_char c
                    _ -> return lit
        lit_expr <- dsLit lit'
        case mb_lit_name of
@@ -2019,6 +2051,7 @@ repLiteral lit
                  HsFloatPrim _    -> Just floatPrimLName
                  HsDoublePrim _   -> Just doublePrimLName
                  HsChar _ _       -> Just charLName
+                 HsCharPrim _ _   -> Just charPrimLName
                  HsString _ _     -> Just stringLName
                  HsRat _ _        -> Just rationalLName
                  _                -> Nothing
@@ -2031,6 +2064,9 @@ mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit
 mk_string s = return $ HsString "" s
+
+mk_char :: Char -> DsM HsLit
+mk_char c = return $ HsChar "" c
 
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})

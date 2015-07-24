@@ -973,7 +973,7 @@ rqpart cmp x (y:ys) rle rgt r =
 #endif /* USE_REPORT_PRELUDE */
 
 -- | Sort a list by comparing the results of a key function applied to each
--- element.  @sortOn f@ is equivalent to @sortBy . comparing f@, but has the
+-- element.  @sortOn f@ is equivalent to @sortBy (comparing f)@, but has the
 -- performance advantage of only evaluating @f@ once for each element in the
 -- input list.  This is called the decorate-sort-undecorate paradigm, or
 -- Schwartzian transform.

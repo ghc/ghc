@@ -1870,10 +1870,10 @@ gadt_constrlist :: { Located ([AddAnn]
         | {- empty -}                            { noLoc ([],[]) }
 
 gadt_constrs :: { Located [LConDecl RdrName] }
-        : gadt_constr ';' gadt_constrs
+        : gadt_constr_with_doc ';' gadt_constrs
                   {% addAnnotation (gl $1) AnnSemi (gl $2)
                      >> return (L (comb2 $1 $3) ($1 : unLoc $3)) }
-        | gadt_constr                   { L (gl $1) [$1] }
+        | gadt_constr_with_doc          { L (gl $1) [$1] }
         | {- empty -}                   { noLoc [] }
 
 -- We allow the following forms:
@@ -1882,11 +1882,18 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 --      D { x,y :: a } :: T a
 --      forall a. Eq a => D { x,y :: a } :: T a
 
+gadt_constr_with_doc :: { LConDecl RdrName }
+gadt_constr_with_doc
+        : maybe_docnext ';' gadt_constr
+                {% return $ addConDoc $3 $1 }
+        | gadt_constr
+                {% return $1 }
+
 gadt_constr :: { LConDecl RdrName }
                    -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
                 {% do { (anns,gadtDecl) <- mkGadtDecl (unLoc $1) $3
-                      ; ams (sLL $1 $> $ gadtDecl)
+                      ; ams (sLL $1 $> gadtDecl)
                             (mj AnnDcolon $2:anns) } }
 
                 -- Deprecated syntax for GADT record declarations

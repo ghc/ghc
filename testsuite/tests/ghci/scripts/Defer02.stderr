@@ -128,7 +128,7 @@
     In an equation for ‘b’: b x = x == x
 (deferred type error)
 
-<interactive>:8:11: error:
+<interactive>:7:11: error:
     Couldn't match type ‘Bool’ with ‘Int’
     Expected type: C Int
       Actual type: C Bool
@@ -175,7 +175,7 @@
     In an equation for ‘j’: j = myOp 23
 (deferred type error)
 
-<interactive>:14:8: error:
+<interactive>:13:8: error:
     Couldn't match expected type ‘Bool’ with actual type ‘Int’
     In the first argument of ‘print’, namely ‘(k 2)’
     In the expression: print (k 2)

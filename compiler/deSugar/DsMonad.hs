@@ -185,7 +185,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
                  else do {
                ; result <- liftIO $ findImportedModule hsc_env modname Nothing
                ; case result of
-                   Found _ mod -> loadModule err mod
+                   FoundModule h -> loadModule err (fr_mod h)
                    _           -> pprPgmError "Unable to use Data Parallel Haskell (DPH):" err
                } }
 

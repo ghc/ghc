@@ -473,16 +473,25 @@ noExistentials = []
 
 cvtForD :: Foreign -> CvtM (ForeignDecl RdrName)
 cvtForD (ImportF callconv safety from nm ty)
+  -- the prim and javascript calling conventions do not support headers
+  -- and are inserted verbatim, analogous to mkImport in RdrHsSyn
+  | callconv == TH.Prim || callconv == TH.JavaScript
+  = mk_imp (CImport (noLoc (cvt_conv callconv)) (noLoc safety') Nothing
+                    (CFunction (StaticTarget from (mkFastString from) Nothing
+                                             True))
+                    (noLoc from))
   | Just impspec <- parseCImport (noLoc (cvt_conv callconv)) (noLoc safety')
                                  (mkFastString (TH.nameBase nm))
                                  from (noLoc from)
-  = do { nm' <- vNameL nm
-       ; ty' <- cvtType ty
-       ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
-       }
+  = mk_imp impspec
   | otherwise
   = failWith $ text (show from) <+> ptext (sLit "is not a valid ccall impent")
   where
+    mk_imp impspec
+      = do { nm' <- vNameL nm
+           ; ty' <- cvtType ty
+           ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
+           }
     safety' = case safety of
                      Unsafe     -> PlayRisky
                      Safe       -> PlaySafe
@@ -889,6 +898,7 @@ cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim (show w) w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar (show c) c }
+cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim (show c) c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
                             ; return $ HsString s s' }
@@ -1038,6 +1048,12 @@ cvtTypeKind ty_str ty
 
            LitT lit
              -> returnL (HsTyLit (cvtTyLit lit))
+
+           WildCardT Nothing
+             -> mk_apps mkAnonWildCardTy tys'
+
+           WildCardT (Just nm)
+             -> do { nm' <- tName nm; mk_apps (mkNamedWildCardTy nm') tys' }
 
            PromotedT nm -> do { nm' <- cName nm; mk_apps (HsTyVar nm') tys' }
                  -- Promoted data constructor; hence cName

@@ -444,7 +444,7 @@ ifeq "$$(BUILD_EXTRA_PKGS)" "YES"
 PACKAGES_STAGE2 += $1
 endif
 else
-PACKAGES_STAGE2 += $1
+$$(error Unknown package tag: $2)
 endif
 endef
 $(eval $(call foreachLibrary,addExtraPackage))

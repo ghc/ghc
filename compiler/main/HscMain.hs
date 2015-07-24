@@ -1520,8 +1520,28 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
 
         new_tythings = map AnId ext_ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) patsyns
         ictxt        = hsc_IC hsc_env
-        new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts fam_insts defaults
+        -- See Note [Fixity declarations in GHCi]
+        fix_env      = tcg_fix_env tc_gblenv
+        new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts
+                                                fam_insts defaults fix_env
     return (new_tythings, new_ictxt)
+
+
+{-
+  Note [Fixity declarations in GHCi]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  To support fixity declarations on types defined within GHCi (as requested
+  in #10018) we record the fixity environment in InteractiveContext.
+  When we want to evaluate something TcRnDriver.runTcInteractive pulls out this
+  fixity environment and uses it to initialize the global typechecker environment.
+  After the typechecker has finished its business, an updated fixity environment
+  (reflecting whatever fixity declarations were present in the statements we
+  passed it) will be returned from hscParsedStmt. This is passed to
+  updateFixityEnv, which will stuff it back into InteractiveContext, to be
+  used in evaluating the next statement.
+
+-}
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
 hscImport hsc_env str = runInteractiveHsc hsc_env $ do
@@ -1622,7 +1642,7 @@ mkModGuts :: Module -> SafeHaskellMode -> CoreProgram -> ModGuts
 mkModGuts mod safe binds =
     ModGuts {
         mg_module       = mod,
-        mg_boot         = False,
+        mg_hsc_src      = HsSrcFile,
         mg_exports      = [],
         mg_deps         = noDependencies,
         mg_dir_imps     = emptyModuleEnv,

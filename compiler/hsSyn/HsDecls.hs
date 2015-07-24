@@ -981,16 +981,17 @@ pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
 
 pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = PrefixCon arg_tys
-                    , con_res = ResTyGADT _ res_ty })
-  = ppr_con_names cons <+> dcolon <+>
+                    , con_res = ResTyGADT _ res_ty, con_doc = doc })
+  = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon <+>
     sep [pprHsForAll expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
   where
     mk_fun_ty a b = noLoc (HsFunTy a b)
 
 pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = RecCon fields
-                    , con_res = ResTyGADT _ res_ty })
-  = sep [ppr_con_names cons <+> dcolon <+> pprHsForAll expl tvs cxt,
+                    , con_res = ResTyGADT _ res_ty, con_doc = doc })
+  = sep [ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
+         <+> pprHsForAll expl tvs cxt,
          pprConDeclFields (unLoc fields) <+> arrow <+> ppr res_ty]
 
 pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {} })

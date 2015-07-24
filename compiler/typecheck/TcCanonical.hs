@@ -229,17 +229,12 @@ place to add their superclasses is canonicalisation.  See Note [Add
 superclasses only during canonicalisation].  Here is what we do:
 
   Givens:   Add all their superclasses as Givens.
-            They may be needed to prove Wanteds
+            They may be needed to prove Wanteds.
 
-  Wanteds:  Do nothing.
-
-  Deriveds: Add all their superclasses as Derived.
+  Wanteds/Derived:
+            Add all their superclasses as Derived.
             The sole reason is to expose functional dependencies
             in superclasses or equality superclasses.
-
-            We only do this in the improvement phase, if solving has
-            not succeeded; see Note [The improvement story] in
-            TcInteract
 
 Examples of how adding superclasses as Derived is useful
 
@@ -259,6 +254,24 @@ Examples of how adding superclasses as Derived is useful
          [G] F a ~ b
          [D] F a ~ beta
     Now we we get [D] beta ~ b, and can solve that.
+
+    -- Example (tcfail138)
+      class L a b | a -> b
+      class (G a, L a b) => C a b
+
+      instance C a b' => G (Maybe a)
+      instance C a b  => C (Maybe a) a
+      instance L (Maybe a) a
+
+    When solving the superclasses of the (C (Maybe a) a) instance, we get
+      [G] C a b, and hance by superclasses, [G] G a, [G] L a b
+      [W] G (Maybe a)
+    Use the instance decl to get
+      [W] C a beta
+    Generate its derived superclass
+      [D] L a beta.  Now using fundeps, combine with [G] L a b to get
+      [D] beta ~ b
+    which is what we want.
 
 ---------- Historical note -----------
 Example of why adding superclass of a Wanted as a Given would
@@ -280,7 +293,7 @@ Then we'll use the instance decl to give
   [W] d4: Ord [a]
 
 ANd now we could bogusly solve d4 from d3.
-
+---------- End of historical note -----------
 
 Note [Add superclasses only during canonicalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -318,36 +331,40 @@ newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored flavor cls xis
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { let size = sizeTypes xis
-             loc' | isCTupleClass cls
-                  = loc   -- For tuple predicates, just take them apart, without
-                          -- adding their (large) size into the chain.  When we
-                          -- get down to a base predicate, we'll include its size.
-                          -- Trac #10335
-                  | otherwise
-                  = case ctLocOrigin loc of
-                       GivenOrigin InstSkol
-                         -> loc { ctl_origin = GivenOrigin (InstSC size) }
-                       GivenOrigin (InstSC n)
-                         -> loc { ctl_origin = GivenOrigin (InstSC (n `max` size)) }
-                       _ -> loc
-                    -- See Note [Solving superclass constraints] in TcInstDcls
-                    -- for explantation of loc'
-
-       ; given_evs <- newGivenEvVars loc' (mkEvScSelectors (EvId evar) cls xis)
+  = do { given_evs <- newGivenEvVars (mk_given_loc loc)
+                                     (mkEvScSelectors (EvId evar) cls xis)
        ; emitWorkNC given_evs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
   = return () -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
-  | otherwise -- Derived case, just add those SC that can lead to improvement.
+  | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement.
   = do { let sc_rec_theta = transSuperClasses cls xis
              impr_theta   = filter isImprovementPred sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
        ; emitNewDeriveds loc impr_theta }
 
+  where
+    size = sizeTypes xis
+    mk_given_loc loc
+       | isCTupleClass cls
+       = loc   -- For tuple predicates, just take them apart, without
+               -- adding their (large) size into the chain.  When we
+               -- get down to a base predicate, we'll include its size.
+               -- Trac #10335
+
+       | GivenOrigin skol_info <- ctLocOrigin loc
+         -- See Note [Solving superclass constraints] in TcInstDcls
+         -- for explantation of this transformation for givens
+       = case skol_info of
+            InstSkol -> loc { ctl_origin = GivenOrigin (InstSC size) }
+            InstSC n -> loc { ctl_origin = GivenOrigin (InstSC (n `max` size)) }
+            _        -> loc
+
+       | otherwise  -- Probably doesn't happen, since this function
+       = loc        -- is only used for Givens, but does no harm
 
 {-
 ************************************************************************

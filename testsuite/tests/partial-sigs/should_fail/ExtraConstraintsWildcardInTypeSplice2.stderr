@@ -1,0 +1,4 @@
+
+ExtraConstraintsWildcardInTypeSplice2.hs:6:12: error:
+    Unexpected wild card: ‘_’
+    In the type signature for ‘show'’: show' :: (_) => a -> String

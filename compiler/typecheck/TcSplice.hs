@@ -91,7 +91,6 @@ import DsMonad
 import Serialized
 import ErrUtils
 import Util
-import Data.List        ( mapAccumL )
 import Unique
 import VarSet           ( isEmptyVarSet )
 import Data.Maybe
@@ -1136,16 +1135,12 @@ reifyTyCon tc
 reifyDataCon :: [Type] -> DataCon -> TcM TH.Con
 -- For GADTs etc, see Note [Reifying data constructors]
 reifyDataCon tys dc
-  = do { let (tvs, theta, arg_tys, _) = dataConSig dc
-             subst             = mkTopTvSubst (tvs `zip` tys)   -- Dicard ex_tvs
-             (subst', ex_tvs') = mapAccumL substTyVarBndr subst (dropList tys tvs)
-             theta'   = substTheta subst' theta
-             arg_tys' = substTys subst' arg_tys
+  = do { let (ex_tvs, theta, arg_tys) = dataConInstSig dc tys
              stricts  = map reifyStrict (dataConSrcBangs dc)
              fields   = dataConFieldLabels dc
              name     = reifyName dc
 
-       ; r_arg_tys <- reifyTypes arg_tys'
+       ; r_arg_tys <- reifyTypes arg_tys
 
        ; let main_con | not (null fields)
                       = TH.RecC name (zip3 (map (reifyName . flSelector) fields) stricts r_arg_tys)
@@ -1158,12 +1153,12 @@ reifyDataCon tys dc
              [s1,   s2]   = stricts
 
        ; ASSERT( length arg_tys == length stricts )
-         if null ex_tvs' && null theta then
+         if null ex_tvs && null theta then
              return main_con
          else do
-         { cxt <- reifyCxt theta'
-         ; ex_tvs'' <- reifyTyVars ex_tvs'
-         ; return (TH.ForallC ex_tvs'' cxt main_con) } }
+         { cxt <- reifyCxt theta
+         ; ex_tvs' <- reifyTyVars ex_tvs
+         ; return (TH.ForallC ex_tvs' cxt main_con) } }
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Info

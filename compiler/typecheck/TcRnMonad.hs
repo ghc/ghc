@@ -121,7 +121,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_mod            = mod,
                 tcg_src            = hsc_src,
                 tcg_sig_of         = getSigOf dflags (moduleName mod),
-                tcg_mod_name       = Nothing,
                 tcg_impl_rdr_env   = Nothing,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
@@ -164,6 +163,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_doc_hdr        = Nothing,
                 tcg_hpc            = False,
                 tcg_main           = Nothing,
+                tcg_self_boot      = NoSelfBoot,
                 tcg_safeInfer      = infer_var,
                 tcg_dependent_files = dependent_files_var,
                 tcg_tc_plugins     = [],
@@ -612,6 +612,9 @@ getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC h
 
 tcIsHsBootOrSig :: TcRn Bool
 tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }
+
+tcSelfBootInfo :: TcRn SelfBootInfo
+tcSelfBootInfo = do { env <- getGblEnv; return (tcg_self_boot env) }
 
 getGlobalRdrEnv :: TcRn GlobalRdrEnv
 getGlobalRdrEnv = do { env <- getGblEnv; return (tcg_rdr_env env) }

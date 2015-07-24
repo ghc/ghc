@@ -2,12 +2,8 @@
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              ScopedTypeVariables, Rank2Types #-}
 
-#if __GLASGOW_HASKELL__ >= 707
 {-# LANGUAGE RoleAnnotations #-}
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
-#else
-{-# OPTIONS_GHC -w #-} -- -fno-warn-inline-rule-shadowing doesn't exist
-#endif
 
 #if MIN_VERSION_base(4,8,0)
 #define HAS_NATURAL
@@ -178,9 +174,7 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 707
 type role TExp nominal   -- See Note [Role of TExp]
-#endif
 newtype TExp a = TExp { unType :: Exp }
 
 unTypeQ :: Q (TExp a) -> Q Exp
@@ -1230,6 +1224,7 @@ data Lit = CharL Char
          | FloatPrimL Rational
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
+         | CharPrimL Char
     deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
@@ -1480,6 +1475,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | StarT                         -- ^ @*@
           | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
+          | WildCardT (Maybe Name)        -- ^ @_, _a, etc.@
       deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@

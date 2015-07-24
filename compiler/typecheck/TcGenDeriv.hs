@@ -1672,12 +1672,20 @@ deepSubtypesContaining tv
 foldDataConArgs :: FFoldType a -> DataCon -> [a]
 -- Fold over the arguments of the datacon
 foldDataConArgs ft con
-  = map (functorLikeTraverse tv ft) (dataConOrigArgTys con)
+  = map foldArg (dataConOrigArgTys con)
   where
-    Just tv = getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
-        -- Argument to derive for, 'a in the above description
-        -- The validity and kind checks have ensured that
-        -- the Just will match and a::*
+    foldArg
+      = case getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con))) of
+             Just tv -> functorLikeTraverse tv ft
+             Nothing -> const (ft_triv ft)
+    -- If we are deriving Foldable for a GADT, there is a chance that the last
+    -- type variable in the data type isn't actually a type variable at all.
+    -- (for example, this can happen if the last type variable is refined to
+    -- be a concrete type such as Int). If the last type variable is refined
+    -- to be a specific type, then getTyVar_maybe will return Nothing.
+    -- See Note [DeriveFoldable with ExistentialQuantification]
+    --
+    -- The kind checks have ensured the last type parameter is of kind *.
 
 -- Make a HsLam using a fresh variable from a State monad
 mkSimpleLam :: (LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName))
@@ -1746,6 +1754,24 @@ The cases are:
 
 Note that the arguments to the real foldr function are the wrong way around,
 since (f :: a -> b -> b), while (foldr f :: b -> t a -> b).
+
+Foldable instances differ from Functor and Traversable instances in that
+Foldable instances can be derived for data types in which the last type
+variable is existentially quantified. In particular, if the last type variable
+is refined to a more specific type in a GADT:
+
+  data GADT a where
+      G :: a ~ Int => a -> G Int
+
+then the deriving machinery does not attempt to check that the type a contains
+Int, since it is not syntactically equal to a type variable. That is, the
+derived Foldable instance for GADT is:
+
+  instance Foldable GADT where
+      foldr _ z (GADT _) = z
+
+See Note [DeriveFoldable with ExistentialQuantification].
+
 -}
 
 gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
@@ -2304,4 +2330,80 @@ OccName we generate for the new binding.
 In the past we used mkDerivedRdrName name occ_fun, which made an original name
 But:  (a) that does not work well for standalone-deriving either
       (b) an unqualified name is just fine, provided it can't clash with user code
+
+Note [DeriveFoldable with ExistentialQuantification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Functor and Traversable instances can only be derived for data types whose
+last type parameter is truly universally polymorphic. For example:
+
+  data T a b where
+    T1 ::                 b   -> T a b   -- YES, b is unconstrained
+    T2 :: Ord b   =>      b   -> T a b   -- NO, b is constrained by (Ord b)
+    T3 :: b ~ Int =>      b   -> T a b   -- NO, b is constrained by (b ~ Int)
+    T4 ::                 Int -> T a Int -- NO, this is just like T3
+    T5 :: Ord a   => a -> b   -> T a b   -- YES, b is unconstrained, even
+                                         -- though a is existential
+    T6 ::                 Int -> T Int b -- YES, b is unconstrained
+
+For Foldable instances, however, we can completely lift the constraint that
+the last type parameter be truly universally polymorphic. This means that T
+(as defined above) can have a derived Foldable instance:
+
+  instance Foldable (T a) where
+    foldr f z (T1 b)   = f b z
+    foldr f z (T2 b)   = f b z
+    foldr f z (T3 b)   = f b z
+    foldr f z (T4 b)   = z
+    foldr f z (T5 a b) = f b z
+    foldr f z (T6 a)   = z
+
+    foldMap f (T1 b)   = f b
+    foldMap f (T2 b)   = f b
+    foldMap f (T3 b)   = f b
+    foldMap f (T4 b)   = mempty
+    foldMap f (T5 a b) = f b
+    foldMap f (T6 a)   = mempty
+
+In a Foldable instance, it is safe to fold over an occurrence of the last type
+parameter that is not truly universally polymorphic. However, there is a bit
+of subtlety in determining what is actually an occurrence of a type parameter.
+T3 and T4, as defined above, provide one example:
+
+  data T a b where
+    ...
+    T3 :: b ~ Int => b   -> T a b
+    T4 ::            Int -> T a Int
+    ...
+
+  instance Foldable (T a) where
+    ...
+    foldr f z (T3 b) = f b z
+    foldr f z (T4 b) = z
+    ...
+    foldMap f (T3 b) = f b
+    foldMap f (T4 b) = mempty
+    ...
+
+Notice that the argument of T3 is folded over, whereas the argument of T4 is
+not. This is because we only fold over constructor arguments that
+syntactically mention the universally quantified type parameter of that
+particular data constructor. See foldDataConArgs for how this is implemented.
+
+As another example, consider the following data type. The argument of each
+constructor has the same type as the last type parameter:
+
+  data E a where
+    E1 :: (a ~ Int) => a   -> E a
+    E2 ::              Int -> E Int
+    E3 :: (a ~ Int) => a   -> E Int
+    E4 :: (a ~ Int) => Int -> E a
+
+Only E1's argument is an occurrence of a universally quantified type variable
+that is syntactically equivalent to the last type parameter, so only E1's
+argument will be be folded over in a derived Foldable instance.
+
+See Trac #10447 for the original discussion on this feature. Also see
+https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor
+for a more in-depth explanation.
+
 -}

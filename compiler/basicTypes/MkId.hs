@@ -1086,7 +1086,6 @@ seqId = pcMiscPrelId seqName ty info
 
     ty  = mkForAllTys [alphaTyVar,betaTyVar]
                       (mkFunTy alphaTy (mkFunTy betaTy betaTy))
-              -- NB argBetaTyVar; see Note [seqId magic]
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
@@ -1102,8 +1101,15 @@ seqId = pcMiscPrelId seqName ty info
 match_seq_of_cast :: RuleFun
     -- See Note [Built-in RULES for seq]
 match_seq_of_cast _ _ _ [Type _, Type res_ty, Cast scrut co]
-  = Just (Var seqId `mkApps` [Type (pFst (coercionKind co)), Type res_ty,
-                              scrut])
+  = Just (fun `App` scrut)
+  where
+    fun      = Lam x $ Lam y $
+               Case (Var x) x res_ty [(DEFAULT,[],Var y)]
+               -- Generate a Case directly, not a call to seq, which
+               -- might be ill-kinded if res_ty is unboxed
+    [x,y]    = mkTemplateLocals [scrut_ty, res_ty]
+    scrut_ty = pFst (coercionKind co)
+
 match_seq_of_cast _ _ _ _ = Nothing
 
 ------------------------------------------------
@@ -1184,9 +1190,12 @@ Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
 'GHC.Prim.seq' is special in several ways.
 
-a) Its second arg can have an unboxed type
+a) In source Haskell its second arg can have an unboxed type
       x `seq` (v +# w)
-   Hence its second type variable has ArgKind
+   But see Note [Typing rule for seq] in TcExpr, which
+   explains why we give seq itself an ordinary type
+         seq :: forall a b. a -> b -> b
+   and treat it as a language construct from a typing point of view.
 
 b) Its fixity is set in LoadIface.ghcPrimIface
 
@@ -1194,8 +1203,6 @@ c) It has quite a bit of desugaring magic.
    See DsUtils.hs Note [Desugaring seq (1)] and (2) and (3)
 
 d) There is some special rule handing: Note [User-defined RULES for seq]
-
-e) See Note [Typing rule for seq] in TcExpr.
 
 Note [User-defined RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1293,7 +1300,6 @@ Also see https://ghc.haskell.org/trac/ghc/wiki/OneShot.
 
 Note [magicDictId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The identifier `magicDict` is just a place-holder, which is used to
 implement a primitve that we cannot define in Haskell but we can write
 in Core.  It is declared with a place-holder type:
@@ -1327,13 +1333,12 @@ Next, we add a built-in Prelude rule (see prelude/PrelRules.hs),
 which will replace the RHS of this definition with the appropriate
 definition in Core.  The rewrite rule works as follows:
 
-magicDict@t (wrap@a@b f) x y
+  magicDict @t (wrap @a @b f) x y
 ---->
-f (x `cast` co a) y
+  f (x `cast` co a) y
 
 The `co` coercion is the newtype-coercion extracted from the type-class.
 The type class is obtain by looking at the type of wrap.
-
 
 
 -------------------------------------------------------------

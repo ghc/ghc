@@ -284,18 +284,15 @@ Note [Typing rule for seq]
 We want to allow
        x `seq` (# p,q #)
 which suggests this type for seq:
-   seq :: forall (a:*) (b:??). a -> b -> b,
-with (b:??) meaning that be can be instantiated with an unboxed tuple.
-But that's ill-kinded!  Function arguments can't be unboxed tuples.
-And indeed, you could not expect to do this with a partially-applied
-'seq'; it's only going to work when it's fully applied.  so it turns
-into
+   seq :: forall (a:*) (b:Open). a -> b -> b,
+with (b:Open) meaning that be can be instantiated with an unboxed
+tuple.  The trouble is that this might accept a partially-applied
+'seq', and I'm just not certain that would work.  I'm only sure it's
+only going to work when it's fully applied, so it turns into
     case x of _ -> (# p,q #)
 
-For a while I slid by by giving 'seq' an ill-kinded type, but then
-the simplifier eta-reduced an application of seq and Lint blew up
-with a kind error.  It seems more uniform to treat 'seq' as it it
-was a language construct.
+So it seems more uniform to treat 'seq' as it it was a language
+construct.
 
 See Note [seqId magic] in MkId, and
 -}
@@ -1183,6 +1180,7 @@ tcSeq :: SrcSpan -> Name -> LHsExpr Name -> LHsExpr Name
       -> TcRhoType -> TcM (HsExpr TcId)
 -- (seq e1 e2) :: res_ty
 -- We need a special typing rule because res_ty can be unboxed
+-- See Note [Typing rule for seq]
 tcSeq loc fun_name arg1 arg2 res_ty
   = do  { fun <- tcLookupId fun_name
         ; (arg1', arg1_ty) <- tcInfer (tcMonoExpr arg1)

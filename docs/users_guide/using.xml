@@ -896,7 +896,7 @@ ghc -c Foo.hs
 
 
       <varlistentry>
-        <term><option>--fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax</option>
+        <term><option>-fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax</option>
           <indexterm><primary><option>-fprint-explicit-foralls</option></primary></indexterm>
           <indexterm><primary><option>-fprint-explicit-kinds</option></primary></indexterm>
           <indexterm><primary><option>-fprint-unicode-syntax</option></primary></indexterm>
@@ -956,6 +956,46 @@ ghci> :t (>>)
 (>>) :: &forall; (m :: * &rarr; *) a b. Monad m &rArr; m a &rarr; m b &rarr; m b
 </screen>
          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-fprint-expanded-synonyms</option>
+          <indexterm><primary><option>-fprint-expanded-synonyms</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            When enabled, GHC also prints type-synonym-expanded types in type
+            errors.
+
+            For example, with this type synonyms:
+
+<screen>
+type Foo = Int
+type Bar = Bool
+type MyBarST s = ST s Bar
+</screen>
+
+          This error message:
+
+<screen>
+Couldn't match type 'Int' with 'Bool'
+Expected type: ST s Foo
+  Actual type: MyBarST s
+</screen>
+
+          Becomes this:
+
+<screen>
+Couldn't match type 'Int' with 'Bool'
+Expected type: ST s Foo
+  Actual type: MyBarST s
+Type synonyms expanded:
+Expected type: ST s Int
+  Actual type: ST s Bool
+</screen>
+          </para>
         </listitem>
       </varlistentry>
 

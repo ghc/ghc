@@ -282,7 +282,7 @@ basicKnownKeyNames
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
-        word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+        word16TyConName, word32TyConName, word64TyConName,
 
         -- Others
         otherwiseIdName, inlineIdName,
@@ -1117,8 +1117,7 @@ int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
 int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
 
 -- Word module
-word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name
-word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
+word16TyConName, word32TyConName, word64TyConName :: Name
 word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
 word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
 word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
@@ -1567,7 +1566,8 @@ typeRepTyConKey = mkPreludeTyConUnique 183
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
-    ioDataConKey, integerDataConKey, eqBoxDataConKey, coercibleDataConKey :: Unique
+    word8DataConKey, ioDataConKey, integerDataConKey, eqBoxDataConKey,
+    coercibleDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
 doubleDataConKey                        = mkPreludeDataConUnique  3
@@ -1577,6 +1577,7 @@ intDataConKey                           = mkPreludeDataConUnique  6
 integerSDataConKey                      = mkPreludeDataConUnique  7
 nilDataConKey                           = mkPreludeDataConUnique 11
 ratioDataConKey                         = mkPreludeDataConUnique 12
+word8DataConKey                         = mkPreludeDataConUnique 13
 stableNameDataConKey                    = mkPreludeDataConUnique 14
 trueDataConKey                          = mkPreludeDataConUnique 15
 wordDataConKey                          = mkPreludeDataConUnique 16

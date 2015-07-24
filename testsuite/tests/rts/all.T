@@ -2,6 +2,13 @@ test('testblockalloc',
      [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')], 
      compile_and_run, [''])
 
+test('testmblockalloc',
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')], 
+     compile_and_run, [''])
+# -I0 is important: the idle GC will run the memory leak detector,
+# which will crash because the mblocks we allocate are not in a state
+# the leak detector is expecting.
+
 
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
@@ -217,6 +224,7 @@ test('ffishutdown', [ ignore_output, only_ways(['threaded1','threaded2']) ], com
 
 test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
                             'T7919A.dyn_o','T7919A.dyn_hi']),
+               expect_broken_for(7919, ['optasm','dyn','optllvm']),
                when(fast(),skip) ],
              compile_and_run, [config.ghc_th_way_flags])
 

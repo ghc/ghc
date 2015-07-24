@@ -1,1 +1,1 @@
-data R = A | ... 	-- Defined at <interactive>:4:10
+data R = A | ... 	-- Defined at <interactive>:3:10

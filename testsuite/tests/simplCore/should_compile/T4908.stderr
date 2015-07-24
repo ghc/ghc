@@ -3,6 +3,7 @@
 Result size of Tidy Core = {terms: 54, types: 38, coercions: 0}
 
 Rec {
+-- RHS size: {terms: 19, types: 5, coercions: 0}
 T4908.f_$s$wf [Occ=LoopBreaker] :: Int# -> Int -> Int# -> Bool
 [GblId, Arity=3, Caf=NoCafRefs, Str=DmdType <S,1*U><L,A><L,U>]
 T4908.f_$s$wf =
@@ -17,6 +18,7 @@ T4908.f_$s$wf =
     }
 end Rec }
 
+-- RHS size: {terms: 24, types: 13, coercions: 0}
 T4908.$wf [InlPrag=[0]] :: Int# -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
@@ -39,6 +41,7 @@ T4908.$wf =
       0# -> True
     }
 
+-- RHS size: {terms: 8, types: 6, coercions: 0}
 f [InlPrag=INLINE[0]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,

@@ -186,7 +186,7 @@ compileOne' m_tc_result mHscMessage
    case e of
        Left iface ->
            do details <- genModDetails hsc_env iface
-              MASSERT(isJust maybe_old_linkable)
+              MASSERT(isJust maybe_old_linkable || isNoLink (ghcLink dflags))
               return (HomeModInfo{ hm_details  = details,
                                    hm_iface    = iface,
                                    hm_linkable = maybe_old_linkable })
@@ -251,7 +251,18 @@ compileOne' m_tc_result mHscMessage
                        do (iface, changed, details) <-
                                     hscSimpleIface hsc_env tc_result mb_old_hash
                           hscWriteIface dflags iface changed summary
-                          compileEmptyStub dflags hsc_env basename location
+
+                          -- #10660: Use the pipeline instead of calling
+                          -- compileEmptyStub directly, so -dynamic-too gets
+                          -- handled properly
+                          let mod_name = ms_mod_name summary
+                          _ <- runPipeline StopLn hsc_env
+                                            (output_fn,
+                                             Just (HscOut src_flavour mod_name HscUpdateSig))
+                                            (Just basename)
+                                            Persistent
+                                            (Just location)
+                                            Nothing
 
                           -- Same as Hs
                           o_time <- getModificationUTCTime object_filename
