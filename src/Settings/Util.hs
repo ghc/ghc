@@ -2,6 +2,7 @@ module Settings.Util (
     -- Primitive settings elements
     arg, argPath, argM,
     argSetting, argSettingList,
+    askPkgData, askPkgDataList,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -17,7 +18,9 @@ import Builder
 import Expression
 import Oracles.Base
 import Oracles.Setting
+import Oracles.PackageData
 import Settings.User
+import Settings.TargetDirectory
 
 -- A single argument.
 arg :: String -> Args
@@ -35,6 +38,20 @@ argSetting = argM . setting
 
 argSettingList :: SettingList -> Args
 argSettingList = appendM . settingList
+
+askPkgData :: (FilePath -> PackageData) -> Expr String
+askPkgData key = do
+    stage <- asks getStage
+    pkg   <- asks getPackage
+    let path = targetPath stage pkg
+    lift . pkgData . key $ path
+
+askPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
+askPkgDataList key = do
+    stage <- asks getStage
+    pkg   <- asks getPackage
+    let path = targetPath stage pkg
+    lift . pkgDataList . key $ path
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args

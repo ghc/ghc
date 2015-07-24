@@ -3,6 +3,7 @@ module Settings.Args (
     ) where
 
 import Settings.User
+import Settings.GhcM
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Expression
@@ -16,4 +17,5 @@ defaultArgs :: Args
 defaultArgs = mconcat
     [ cabalArgs
     , ghcPkgArgs
+    , ghcMArgs
     , customPackageArgs ]
