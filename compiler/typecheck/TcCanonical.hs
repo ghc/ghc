@@ -1673,7 +1673,12 @@ canInstanceOf ev
        ; return (fmap mk_ct mb) }
 
 can_instance_of :: Ct -> TcS (StopOrContinue Ct)
-can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
+can_instance_of ct
+  = do { inst_always <- tcInstantiateAlways
+       ; can_instance_of_ inst_always ct }
+
+can_instance_of_ :: Bool -> Ct -> TcS (StopOrContinue Ct)
+can_instance_of_ inst_always (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
     -- case InstanceOf sigma sigma, for the exact same sigma
   | lhs `eqType` rhs
   = can_instance_to_eq ev lhs rhs
@@ -1687,7 +1692,7 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
       _ -> stopWith ev "Given/Derived instanceOf instantiation"
     -- case InstanceOf (forall qvars. Q => ty) sigma
     -- where sigma is T ... or a Skolem tyvar
-  | is_forall lhs, is_tyapp_or_skolem rhs
+  | is_forall lhs, is_tyapp_or_skolem rhs || inst_always
   = can_instance_inst ev lhs rhs
     -- case InstanceOf (T ...) sigma --> T ... ~ sigma
     -- case InstanceOf var sigma --> var ~ sigma, var immutable
@@ -1711,7 +1716,7 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
       | otherwise
       = False
 
-can_instance_of _ = panic "can_instance_of in a non instanceOf constraint"
+can_instance_of_ _ _ = panic "can_instance_of in a non instanceOf constraint"
 
 can_instance_to_eq :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
 can_instance_to_eq ev lhs rhs

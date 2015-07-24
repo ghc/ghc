@@ -133,18 +133,27 @@ simpl_top wanteds
       | otherwise
       = do { let approx = bagToList (approximateWC_ wc)
            ; something_happened <- foldlM (\something ct ->
-               case (isWantedCt ct, classifyPredType (ctPred ct)) of
+               TcS.zonkTcType (ctPred ct) >>= \zonk_pred ->
+               case (isWantedCt ct, classifyPredType zonk_pred) of
                  (True, InstanceOfPred lhs rhs)
-                   | Just v <- tcGetTyVar_maybe rhs
-                   -> do { filled <- TcS.isFilledMetaTyVar v
-                         ; if filled
-                              then return False
-                              else unifyTyVar v lhs >> return True }
+                   -> do { r <- do_instance_of_defaulting lhs rhs
+                         ; return (r || something) }
                  _ -> return something) False approx
            ; if something_happened
-             then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
+             then do { traceTcS "instance_of_defaulting" (ppr approx)
+                     ; wc_residual <- nestTcSInstantiateAlways (solveWantedsAndDrop wc)
                      ; try_class_defaulting wc_residual }
              else try_class_defaulting wc }
+
+    do_instance_of_defaulting :: TcType -> TcType -> TcS Bool
+    do_instance_of_defaulting lhs rhs
+      | Just v <- tcGetTyVar_maybe rhs
+      = do { filled <- TcS.isFilledMetaTyVar v
+           ; if filled
+                then return False
+                else unifyTyVar v lhs >> return True }
+      | otherwise
+      = return True
 
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc

@@ -39,7 +39,7 @@
 \begin{itemize}
 \item The kind of $\leq$ is $* \to * \to Constraint$.
 \item The evidence for $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
-\item The canonical forms are $\sigma \leq \alpha$, where $\alpha$ is not a Skolem.
+\item The canonical forms are $\sigma \leq \alpha$, where $\alpha$ is not a Skolem, or involve a top-level type family application in either side.
 \item In Haskell code, $\sigma_1 \leq \sigma_2$ is written as {\tt sigma1 <$\sim$ sigma2}.
 \end{itemize}
 
@@ -61,7 +61,7 @@ Types without top-level $\forall$ & $\tau$ & $\coloncolonequals$ & $\alpha \alt 
 Polymorphic types & $\sigma$ & $\coloncolonequals$ & $\forall \overline{a}. Q \Rightarrow \sigma \alt \tau$ \\
 Constraints & $Q$ & $\coloncolonequals$ & $\epsilon \alt Q_1 \wedge Q_2 \alt \sigma_1 \sim \sigma_2 \alt \sigma_1 \leq \sigma_2 \alt \mathtt{C} \; \overline{\mu}$ \\
 Implications & $I$ & $\coloncolonequals$ & $\epsilon \alt I_1 \wedge I_2 \alt Q \alt \forall \overline{a}. \, (Q \supset I)$ \\
-Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \mathsf{F} \; \overline{\mu} \sim \sigma \alt \sigma \leq \alpha \alt \mathtt{C} \; \overline{\mu}$
+Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \mathsf{F} \; \overline{\mu} \sim \sigma \alt \sigma \leq \alpha \alt \sigma \leq \mathsf{F} \; \overline{\mu} \alt \mathsf{F} \; \overline{\mu} \leq \tau \alt \mathtt{C} \; \overline{\mu}$
 \end{tabular}
 \end{mdframed}
 \caption{Grammar}
@@ -144,7 +144,7 @@ When type checking the second branch, we generate a constraint of the form $\for
 
 The rule {\sc [$\leq$l$\forall$var]} is also key in being able to type check the {\tt g = mempty} example above. Without it, we would rewrite $(\forall\, a.\, \textit{Monoid} \; a \Rightarrow a) \leq b$ to $\textit{Monoid} \; \alpha \wedge \alpha \leq b$. But this disallows progress, we want $\alpha \sim b$ instead.
 
-\item Note that these rules along with the generation and propagation ones ensure that no constraint of the form $\alpha \leq \sigma$, with $\alpha$ a unification variable, is even produced.
+\item Note that these rules along with the generation and propagation ones ensure that no constraint of the form $\alpha \leq \sigma$, with $\alpha$ a unification variable, is ever produced.
 \end{itemize}
 
 \subsubsection*{Design choice: rules for $\to$}
@@ -219,29 +219,46 @@ Using the rule of always instantiating, the result of $\gamma \sim \mathsf{F} \;
 For example, in the previous case we want to apply the axiom $\forall e. \mathtt{Eq} \; e \Rightarrow \mathtt{Eq} \; [e]$, and thus we need to instantiate $a$. We return as residual constraints $\mathtt{Eq} \; \xi \wedge \mathtt{Eq} \; \alpha \sim \mathtt{Eq} \; \mathrm{[}\xi\mathrm{]}$, and the solver takes care of the rest, that is, $\forall a. \mathrm{[}a\mathrm{]} \leq \mathrm{[}\xi\mathrm{]}$.
 \end{enumerate}
 
-\subsection*{Generalization}
+\subsection*{Generalization and defaulting}
 
-One nasty side-effect of this approach to impredicativity is that the solver may produce non-Haskell 2010 types. For example, when type checking {\tt singleton id}, where $singleton :: \forall a. \, a \to [a]$ and $id :: \forall a. \, a \to a$, the result would be $\forall a. (forall b. b -> b) \leq a \Rightarrow [a]$. In short, we want to get rid of the $\leq$ constraints once a binding has been found to type check. This process is part of a larger one which in GHC is known as approximation.
+One nasty side-effect of this approach to impredicativity is that the solver may produce non-Haskell 2010 types. For example, when inferring the type of {\tt singleton id}, where $singleton :: \forall a. \, a \to [a]$ and $id :: \forall a. \, a \to a$, the result would be $\forall a. (\forall b. b \to b) \leq a \Rightarrow [a]$. In short, we want to get rid of the $\leq$ constraints once a binding has been found to type check. This process is part of a larger one which in GHC is known as \emph{approximation}.
+
+Another related problem is that at the end of type checking (\emph{not} inference) some $\leq$ constraints are left over. For example, take the following code:
+\begin{verbatim}
+type family F a
+
+f :: a -> F a
+f x = undefined
+\end{verbatim}
+The only constraint that is generated is $\forall b. b \leq \mathsf{F} \; a$, a canonical constraint that we cannot canonicalize further. Another example is given by:
+\begin{verbatim}
+unsafeCoerce :: a -> b  -- from libraries
+
+data T a = T1
+
+g :: Bool
+g = unsafeCoerce T1
+\end{verbatim}
+The following constraint is generated to relate the type of the constructor {\tt T1} with its use as argument to {\tt unsafeCoerce}: $\forall a. T \; a \leq \alpha$, where $\alpha$ is a new type variable coming from instantiating the type of {\tt unsafeCoerce}. No more constraints are set on $\alpha$, and thus that constraint remains at the end of the solving process. Our aim, though, is to make the set of residual constraints empty, for the check to be valid. For that, we hook in the \emph{defaulting} mechanism of GHC.
 
 \vspace{0.2cm}
 
 \noindent There are two main procedures to move to types without $\leq$ constraints:
 \begin{itemize}
-\item \emph{Convert all $\leq$ constraints into type equality}. In the previous case, the type of {\tt singleton id} is $\forall a. \, a \sim (\forall b. \, b \to b) \Rightarrow [a]$, or equivalently, $[\forall b. \, b \to b]$.
-\item \emph{Generate a type with the less possible polymorphism}, by moving quantifiers out of the $\leq$ constraints to top-level. In this case, the type given to {\tt singleton id} is $\forall b. \, [b \to b]$.
+\item \emph{Convert $\leq$ constraints into type equality}. In the previous case, the type of {\tt singleton id} is $\forall a. \, a \sim (\forall b. \, b \to b) \Rightarrow [a]$, or equivalently, $[\forall b. \, b \to b]$.
+\item \emph{Generate a type with the less possible polymorphism} by instantiation, which moves quantifiers out of the $\leq$ constraints to top-level. In this case, the type given to {\tt singleton id} is $\forall b. \, [b \to b]$.
 \end{itemize}
-We prefer the second option, since it leads to types which are more similar to those already inferred by GHC. Note that this approximation only applies to unannotated top-level bindings: the user can always ask to give $[\forall a. \, a \to a]$ as a type for {\tt singleton id} via an annotation.
-
-\vspace{0.2cm}
-
-\noindent The conversion works by applying repeatedly the following rules to the residual constraints:
+These procedures correspond to the following rules. The right-hand sides are always either variables or type family applications, since they are the only canonical $\leq$ constraints left after the solving phase.
 $$
 \begin{array}{lrcl}
-\textsc{[$\leq$gen1]} & (\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \sigma_2 & \leadsto & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \wedge [\overline{a \mapsto \alpha}]Q_1 \\
-\textsc{[$\leq$gen2]} & \sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2) & \leadsto & \sigma_1 \sim (\forall \overline{a}. Q_2 \Rightarrow \sigma_2) \\
+\textsc{[$\leq$GDeq]} & (\forall \overline{a}. Q \Rightarrow \sigma) \leq \mu & \leadsto & (\forall \overline{a}. Q \Rightarrow \sigma) \sim \mu \\
+\textsc{[$\leq$GDinst]} & (\forall \overline{a}. Q \Rightarrow \sigma) \leq \mu & \leadsto & [\overline{a \mapsto \alpha}]\sigma \sim \mu \wedge [\overline{a \mapsto \alpha}]Q
 \end{array}
 $$
-Note that the first rule is a variation of {\sc [$\leq$gen2]} without any restriction on the shape of the left-hand side. This corresponds to generating the less amount of polymorphism.
+
+In the case of $\mu$ being a type family, the right choice is to use rule {\sc [$\leq$GDinst]} because GHC mandates that type families rewrite to monomorphic types. In our example, if leads to $\beta \sim \mathsf{F} \; a$, which we can discharge by unification. Had we used {\sc [$\leq$GDeq]}, we would have obtained $\forall b. b \sim \mathsf{F} \; a$.
+
+In the case of $\mu$ being a type variable, we have already discussed the implications of the choice of {\sc [$\leq$GDeq]} or {\sc [$\leq$GDinst]}. We prefer the second option for inference, since it leads to types which are more similar to those already inferred by GHC. Note that this approximation only applies to unannotated top-level bindings: the user can always ask to give $[\forall a. \, a \to a]$ as a type for {\tt singleton id} via an annotation. For defaulting, we prefer {\sc [$\leq$GDeq]}, since it allows us to retain most polymorphism with the given type signature.
 
 \section*{Constraint generation}
 
@@ -363,7 +380,7 @@ With this change, our initial example leads to an error ({\tt f cannot be applie
 f :: (forall a. a -> a) -> (Int, Bool)
 f = \x. -> (x 1, x True)
 \end{verbatim}
-\item Propagating information from known types of functions to arguments. Without this propagation, given the previous definition of {\tt f}, then {\tt f (\\x -> x)} would not typecheck, but {\tt f id} would.
+\item Propagating information from known types of functions to arguments. Without this propagation, given the previous definition of {\tt f}, then {\tt f ($\backslash$x -> x)} would not typecheck, but {\tt f id} would.
 \end{itemize}
 
 \
@@ -518,6 +535,7 @@ f x = S (error x)
 If we apply {\sc [AppFunNonVar]} directly, we instantiate the type of $error :: \forall b. [Char] \to b$ to $[Char] \to \beta$.
 Since we are pushing down a unification variable $\alpha$ because of the previous application of {\sc [AppFunNonVar]} to $S :: \forall a. \, a \to S \; a$, we obtain a constraint $\beta \leq \alpha$. Since there are no more restrictions to either $\alpha$ or $\beta$, we are not stuck in solving.
 
+%\newpage
 \section*{Examples}
 \subsection*{\tt runST e}
 $$(\$)^{\alpha \to \beta \to \gamma} \; runST^\alpha \; \left( e \; :: \; \forall s. ST \; s \; Int \right)^\beta$$
