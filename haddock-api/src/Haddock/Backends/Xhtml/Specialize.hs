@@ -299,7 +299,7 @@ rebindName name = do
     case Map.lookup (getName name) rneCtx of
         Just name' -> pure name'
         Nothing | getNameRep name `Set.member` rneFV -> freshName name
-        Nothing -> pure name
+        Nothing -> reuseName name
 
 
 -- | Generate fresh occurrence name, put it into context and return.
@@ -314,6 +314,13 @@ freshName name = do
     elems' = Set.fromList . map getNameRep . Map.elems
     nname = getName name
     rep = getNameRep nname
+
+
+reuseName :: SetName name => name -> Rebind name name
+reuseName name = do
+    env@RenameEnv { .. } <- get
+    put $ env { rneCtx = Map.insert (getName name) name rneCtx }
+    return name
 
 
 findFreshName :: Set NameRep -> NameRep -> NameRep
