@@ -36,7 +36,7 @@ import FastString
 
 import Pair             ( Pair(..) )
 import Data.List        ( nubBy )
-import Data.Maybe       ( isJust )
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -214,35 +214,33 @@ improveFromInstEnv inst_env mk_loc pred
                 -- symmetrically, so it's ok to trim the rough_tcs,
                 -- rather than trimming each inst_tcs in turn
     , ispec <- instances
-    , (meta_tvs, eqs) <- checkClsFD fd cls_tvs ispec
-                                    emptyVarSet tys trimmed_tcs -- NB: orientation
+    , (meta_tvs, eqs) <- improveClsFD cls_tvs fd ispec
+                                      tys trimmed_tcs -- NB: orientation
     , let p_inst = mkClassPred cls (is_tys ispec)
     ]
 improveFromInstEnv _ _ _ = []
 
 
-checkClsFD :: FunDep TyVar -> [TyVar]             -- One functional dependency from the class
-           -> ClsInst                             -- An instance template
-           -> TyVarSet -> [Type] -> [Maybe Name]  -- Arguments of this (C tys) predicate
-                                                  -- TyVarSet are extra tyvars that can be instantiated
-           -> [([TyVar], [Pair Type])]  -- Empty or singleton
+improveClsFD :: [TyVar] -> FunDep TyVar   -- One functional dependency from the class
+             -> ClsInst                   -- An instance template
+             -> [Type] -> [Maybe Name]    -- Arguments of this (C tys) predicate
+             -> [([TyVar], [Pair Type])]  -- Empty or singleton
 
-checkClsFD fd clas_tvs
-           (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
-           extra_qtvs tys_actual rough_tcs_actual
+improveClsFD clas_tvs fd
+             (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
+             tys_actual rough_tcs_actual
 
--- Compare instance   {a,b}   C sx sp sy sq
---         with       {c,d,e} C tx tp ty tq
+-- Compare instance      {a,b}    C sx sp sy sq
+--         with wanted     [W] C tx tp ty tq
 --         for fundep (x,y -> p,q)  from class  (C x p y q)
 -- If (sx,sy) unifies with (tx,ty), take the subst S
--- 
 
 -- 'qtvs' are the quantified type variables, the ones which an be instantiated
 -- to make the types match.  For example, given
 --      class C a b | a->b where ...
 --      instance C (Maybe x) (Tree x) where ..
 --
--- and an Inst of form (C (Maybe t1) t2),
+-- and a wanted constraint of form (C (Maybe t1) t2),
 -- then we will call checkClsFD with
 --
 --      is_qtvs = {x}, is_tys = [Maybe x,  Tree x]
@@ -250,14 +248,6 @@ checkClsFD fd clas_tvs
 --
 -- We can instantiate x to t1, and then we want to force
 --      (Tree x) [t1/x]  ~   t2
---
--- This function is also used when matching two Insts (rather than an Inst
--- against an instance decl. In that case, qtvs is empty, and we are doing
--- an equality check
---
--- This function is also used by InstEnv.badFunDeps, which needs to *unify*
--- For the one-sided matching case, the qtvs are just from the template,
--- so we get matching
 
   | instanceCantMatch rough_tcs_inst rough_tcs_actual
   = []          -- Filter out ones that can't possibly match,
@@ -267,9 +257,9 @@ checkClsFD fd clas_tvs
              length tys_inst == length clas_tvs
             , ppr tys_inst <+> ppr tys_actual )
 
-    case tcUnifyTys bind_fn ltys1 ltys2 of
+    case tcMatchTys qtv_set ltys1 ltys2 of
         Nothing  -> []
-        Just subst | isJust (tcUnifyTys bind_fn rtys1' rtys2')
+        Just subst | isJust (tcMatchTysX qtv_set subst rtys1 rtys2)
                         -- Don't include any equations that already hold.
                         -- Reason: then we know if any actual improvement has happened,
                         --         in which case we need to iterate the solver
@@ -297,9 +287,8 @@ checkClsFD fd clas_tvs
                         -- work of the ls1/ls2 unification leaving a smaller unification problem
                   where
                     rtys1' = map (substTy subst) rtys1
-                    rtys2' = map (substTy subst) rtys2
 
-                    fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' rtys2'
+                    fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' rtys2
                         -- Don't discard anything!
                         -- We could discard equal types but it's an overkill to call
                         -- eqType again, since we know for sure that /at least one/
@@ -325,10 +314,6 @@ checkClsFD fd clas_tvs
                         --          Trac #6015, #6068
   where
     qtv_set = mkVarSet qtvs
-    bind_fn tv | tv `elemVarSet` qtv_set    = BindMe
-               | tv `elemVarSet` extra_qtvs = BindMe
-               | otherwise                  = Skolem
-
     (ltys1, rtys1) = instFD fd clas_tvs tys_inst
     (ltys2, rtys2) = instFD fd clas_tvs tys_actual
 
@@ -569,35 +554,59 @@ The instance decls don't overlap, because the third parameter keeps
 them separate.  But we want to make sure that given any constraint
         D s1 s2 s3
 if s1 matches
+
+Note [Bogus consistency check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In checkFunDeps we check that a new ClsInst is consistent with all the
+ClsInsts in the environment.
+
+The bogus aspect is discussed in Trac #10675. Currenty it if the two
+types are *contradicatory*, using (isNothing . tcUnifyTys).  But all
+the papers say we should check if the two types are *equal* thus
+   not (substTys subst rtys1 `eqTypes` substTys subst rtys2)
+For now I'm leaving the bogus form because that's the way it has
+been for years.
 -}
 
-checkFunDeps :: InstEnvs -> ClsInst
-             -> Maybe [ClsInst] -- Nothing  <=> ok
-                                -- Just dfs <=> conflict with dfs
+checkFunDeps :: InstEnvs -> ClsInst -> [ClsInst]
+-- The Consistency Check.
 -- Check whether adding DFunId would break functional-dependency constraints
 -- Used only for instance decls defined in the module being compiled
-checkFunDeps inst_envs ispec
-  | null bad_fundeps = Nothing
-  | otherwise        = Just bad_fundeps
-  where
-    (ins_tvs, clas, ins_tys) = instanceHead ispec
-    ins_tv_set   = mkVarSet ins_tvs
-    cls_inst_env = classInstances inst_envs clas
-    bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys
-
-badFunDeps :: [ClsInst] -> Class
-           -> TyVarSet -> [Type]        -- Proposed new instance type
-           -> [ClsInst]
-badFunDeps cls_insts clas ins_tv_set ins_tys
+-- Returns a list of the ClsInst in InstEnvs that are inconsistent
+-- with the proposed new ClsInst
+checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
+                                , is_tys = tys1, is_tcs = rough_tcs1 })
+  | null fds
+  = []
+  | otherwise
   = nubBy eq_inst $
-    [ ispec | fd <- fds,        -- fds is often empty, so do this first!
-              let trimmed_tcs = trimRoughMatchTcs clas_tvs fd rough_tcs,
-              ispec <- cls_insts,
-              notNull (checkClsFD fd clas_tvs ispec ins_tv_set ins_tys trimmed_tcs)
-    ]
+    [ ispec | ispec <- cls_insts
+            , fd    <- fds
+            , is_inconsistent fd ispec ]
   where
-    (clas_tvs, fds) = classTvsFds clas
-    rough_tcs = roughMatchTcs ins_tys
+    cls_insts      = classInstances inst_envs cls
+    (cls_tvs, fds) = classTvsFds cls
+    qtv_set1       = mkVarSet qtvs1
+
+    is_inconsistent fd (ClsInst { is_tvs = qtvs2, is_tys = tys2, is_tcs = rough_tcs2 })
+      | instanceCantMatch trimmed_tcs rough_tcs2
+      = False
+      | otherwise
+      = case tcUnifyTys bind_fn ltys1 ltys2 of
+          Nothing    -> False
+          Just subst -> isNothing $   -- Bogus legacy test (Trac #10675)
+                                      -- See Note [Bogus consistency check]
+                        tcUnifyTys bind_fn (substTys subst rtys1) (substTys subst rtys2)
+
+      where
+        trimmed_tcs    = trimRoughMatchTcs cls_tvs fd rough_tcs1
+        (ltys1, rtys1) = instFD fd cls_tvs tys1
+        (ltys2, rtys2) = instFD fd cls_tvs tys2
+        qtv_set2       = mkVarSet qtvs2
+        bind_fn tv | tv `elemVarSet` qtv_set1 = BindMe
+                   | tv `elemVarSet` qtv_set2 = BindMe
+                   | otherwise                = Skolem
+
     eq_inst i1 i2 = instanceDFunId i1 == instanceDFunId i2
         -- An single instance may appear twice in the un-nubbed conflict list
         -- because it may conflict with more than one fundep.  E.g.
@@ -613,6 +622,8 @@ trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [Maybe Name] -> [Maybe Name]
 -- we want to match only on the type ta; so our
 -- rough-match thing must similarly be filtered.
 -- Hence, we Nothing-ise the tb and tc types right here
+--
+-- Result list is same length as input list, just with more Nothings
 trimRoughMatchTcs clas_tvs (ltvs, _) mb_tcs
   = zipWith select clas_tvs mb_tcs
   where
