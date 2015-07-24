@@ -267,8 +267,12 @@ instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
 -- possibly be instantiated to actual, nor vice versa;
 -- False is non-committal
-instanceCantMatch (Just t : ts) (Just a : as) = t/=a || instanceCantMatch ts as
-instanceCantMatch _             _             =  False  -- Safe
+instanceCantMatch (mt : ts) (ma : as) = itemCantMatch mt ma || instanceCantMatch ts as
+instanceCantMatch _         _         =  False  -- Safe
+
+itemCantMatch :: Maybe Name -> Maybe Name -> Bool
+itemCantMatch (Just t) (Just a) = t /= a
+itemCantMatch _        _        = False
 
 {-
 Note [When exactly is an instance decl an orphan?]
