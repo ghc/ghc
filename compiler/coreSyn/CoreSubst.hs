@@ -866,7 +866,11 @@ simpleOptExpr expr
         -- three passes instead of two (occ-anal, and go)
 
 simpleOptExprWith :: Subst -> InExpr -> OutExpr
-simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
+-- Make two passes of simplification
+simpleOptExprWith subst = simpleOptExprWith_ subst . simpleOptExprWith_ subst
+
+simpleOptExprWith_ :: Subst -> InExpr -> OutExpr
+simpleOptExprWith_ subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
 
 ----------------------
 simpleOptPgm :: DynFlags -> Module
@@ -910,11 +914,7 @@ simple_opt_expr subst expr
     go (Coercion co)    = Coercion (optCoercion (getCvSubst subst) co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      | isReflCo co' = go e
-                        | otherwise    = Cast (go e) co'
-                        where
-                          co' = optCoercion (getCvSubst subst) co
-
+    go (Cast e co)      = simple_cast subst (Cast e co)
     go (Let bind body) = case simple_opt_bind subst bind of
                            (subst', Nothing)   -> simple_opt_expr subst' body
                            (subst', Just bind) -> Let bind (simple_opt_expr subst' body)
@@ -978,6 +978,11 @@ simple_app subst (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
   | t `tickishScopesLike` SoftScope
   = mkTick t $ simple_app subst e as
+simple_app subst (Cast e co) as
+  = case simple_cast subst (Cast e co) of
+      -- Could not optimize further
+      e'@(Cast _ _) -> foldl App e' as
+      e'            -> simple_app subst e' as
 simple_app subst e as
   = foldl App (simple_opt_expr subst e) as
 
@@ -998,10 +1003,12 @@ simple_opt_bind' subst (Rec prs)
            Nothing     -> (subst,  (b2,r2):prs)
        where
          b2 = add_info subst b b'
-         r2 = simple_opt_expr subst r
+              -- Make two passes of simplification
+         r2 = simple_opt_expr subst (simple_opt_expr subst r)
 
 simple_opt_bind' subst (NonRec b r)
-  = simple_opt_out_bind subst (b, simple_opt_expr subst r)
+    -- Make two passes of simplification
+  = simple_opt_out_bind subst (b, simple_opt_expr subst (simple_opt_expr subst r))
 
 ----------------------
 simple_opt_out_bind :: Subst -> (InVar, OutExpr) -> (Subst, Maybe CoreBind)
@@ -1013,6 +1020,19 @@ simple_opt_out_bind subst (b, r')
   where
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
+
+----------------------
+simple_cast :: Subst -> InExpr -> CoreExpr
+simple_cast subst (Cast e e_co)
+  = go e e_co
+  where
+    go (Cast e e_co) co = go e (mkTransCo e_co co)
+    go e co | isReflCo co' = simple_opt_expr subst e
+            | otherwise    = Cast (simple_opt_expr subst e) co'
+            where co' = optCoercion (getCvSubst subst) co
+
+simple_cast subst e
+  = simple_opt_expr subst e
 
 ----------------------
 maybe_substitute :: Subst -> InVar -> OutExpr -> Maybe Subst
