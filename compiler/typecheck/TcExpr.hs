@@ -1348,35 +1348,56 @@ getFixedTyVars upd_fld_occs tvs1 cons
 {-
 Note [Disambiguating record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the -XDuplicateRecordFields extension is used, the renamer may not
-be able to determine exactly which fields are being updated. Consider:
+
+When the -XDuplicateRecordFields extension is used, and the renamer
+encounters a record update that it cannot immediately disambiguate
+(because it involves fields that belong to multiple datatypes), it
+will defer resolution of the ambiguity to the typechecker.  In this
+case, the `hsRecUpdFieldSel` field of the `HsRecUpdField` stores a
+list of candidate selectors.
+
+Consider the following definitions:
 
         data S = MkS { foo :: Int }
         data T = MkT { foo :: Int, bar :: Int }
-        data U = MkU { bar :: Int }
+        data U = MkU { bar :: Int, baz :: Int }
+
+When the renamer sees an update of `foo`, it will not know which
+parent datatype is in use.  The `disambiguateRecordBinds` function
+tries to determine the parent in three ways:
+
+1. Check for types that have all the fields being updated. For example:
 
         f x = x { foo = 3, bar = 2 }
+
+   Here `f` must be updating `T` because neither `S` nor `U` have
+   both fields. This may also discover that no possible type exists.
+   For example the following will be rejected:
+
+        f' x = x { foo = 3, baz = 3 }
+
+2. Use the type being pushed in, if it is already a TyConApp. The
+   following are valid updates to `T`:
 
         g :: T -> T
         g x = x { foo = 3 }
 
-        h x = (x :: T) { foo = 3 }
-
-In this situation, the renamer sees an update of `foo` but doesn't
-know which parent datatype is in use. In this case, the
-`hsRecFieldSel` field of the `HsRecField` stores a list of candidate
-selectors. The disambiguateRecordBinds function tries to determine the
-parent in three ways:
-
-1. Check for types that have all the fields being updated. In the
-   example, `f` must be updating `T` because neither `S` nor `U` have
-   both fields. This may also discover that no suitable type exists.
-
-2. Use the type being pushed in, if it is already a TyConApp. Thus `g`
-   is obviously an update to `T`.
+        g' x = x { foo = 3 } :: T
 
 3. Use the type signature of the record expression, if it exists and
-   is a TyConApp. Thus `h` is an update to `T`.
+   is a TyConApp. Thus this is valid update to `T`:
+
+        h x = (x :: T) { foo = 3 }
+
+Note that we do not look up the types of variables being updated, and
+no constraint-solving is performed, so for example the following will
+be rejected as ambiguous:
+
+     let r :: T
+         r = blah
+     in r { foo = 3 }
+
+     \r. (r { foo = 3 },  r :: T )
 
 We could add further tests, of a more heuristic nature. For example,
 rather than looking for an explicit signature, we could try to infer
