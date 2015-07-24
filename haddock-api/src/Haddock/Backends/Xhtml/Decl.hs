@@ -282,7 +282,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
-      = ppInstances links instances docname splice unicode qual
+      = ppInstances links OriginFamily instances docname splice unicode qual
 
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
@@ -506,37 +506,41 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instancesBit = ppInstances links instances nm splice unicode qual
+    instancesBit = ppInstances links OriginClass instances nm
+        splice unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
+data InstOrigin = OriginClass | OriginData | OriginFamily
+
+
 ppInstances :: LinksInfo
-            -> [DocInstance DocName] -> DocName
+            -> InstOrigin -> [DocInstance DocName] -> DocName
             -> Splice -> Unicode -> Qualification
             -> Html
-ppInstances links instances baseName splice unicode qual
+ppInstances links origin instances baseName splice unicode qual
   = subInstances qual instName links True (zipWith instDecl [1..] instances)
   -- force Splice = True to use line URLs
   where
     instName = getOccString $ getName baseName
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
-    instDecl iid (inst, maybeDoc,l) =
-        ((ppInstHead links splice unicode qual iid inst, maybeDoc, []),l)
+    instDecl no (inst, maybeDoc,l) =
+        ((ppInstHead links splice unicode qual origin no inst, maybeDoc, []),l)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
-           -> Int -> InstHead DocName
+           -> InstOrigin -> Int -> InstHead DocName
            -> Html
-ppInstHead links splice unicode qual iid (InstHead {..}) =
+ppInstHead links splice unicode qual origin no (InstHead {..}) =
     case ihdInstType of
         ClassInst { .. } ->
-            subClsInstance (nameStr ++ "-" ++ show iid) hdr mets
+            subClsInstance iid hdr mets
           where
             hdr = ppContextNoLocs clsiCtx unicode qual <+> typ
             mets = ppInstanceSigs links splice unicode qual
                 clsiTyVars ihdTypes clsiSigs
-            nameStr = occNameString . nameOccName $ getName ihdClsName
+            iid = instanceId origin no ihdClsName
         TypeInst rhs -> keyword "type" <+> typ
             <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
         DataInst dd -> keyword "data" <+> typ
@@ -560,6 +564,15 @@ ppInstanceSigs links splice unicode qual bndrs tys sigs = do
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
+
+
+instanceId :: InstOrigin -> Int -> DocName -> String
+instanceId orgin no name =
+    qual orgin ++ ":" ++ (occNameString . getOccName) name ++ "-" ++ show no
+  where
+    qual OriginClass = "ic"
+    qual OriginData = "id"
+    qual OriginFamily = "if"
 
 
 -------------------------------------------------------------------------------
@@ -627,7 +640,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
                                      (map unLoc (con_names (unLoc c)))) fixities
       ]
 
-    instancesBit = ppInstances links instances docname
+    instancesBit = ppInstances links OriginData instances docname
         splice unicode qual
 
 
