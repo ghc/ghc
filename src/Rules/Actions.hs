@@ -16,6 +16,7 @@ import Development.Shake
 -- the build system).
 build :: FullTarget -> Action ()
 build target = do
+    need $ Target.dependencies target
     argList <- interpret target args
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target

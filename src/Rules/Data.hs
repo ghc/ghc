@@ -15,9 +15,11 @@ import Development.Shake
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: StagePackageTarget -> Rules ()
 buildPackageData target =
-    let stage = Target.stage target
-        pkg   = Target.package target
-        path  = targetPath stage pkg
+    let stage     = Target.stage target
+        pkg       = Target.package target
+        path      = targetPath stage pkg
+        cabal     = pkgPath pkg -/- pkgCabal pkg
+        configure = pkgPath pkg -/- "configure"
     in
     (path -/-) <$>
     [ "package-data.mk"
@@ -28,13 +30,12 @@ buildPackageData target =
     -- TODO: Is this needed? Also check out Paths_cpsa.hs.
     -- , "build" -/- "autogen" -/- ("Paths_" ++ name) <.> "hs"
     ] &%> \files -> do
-        let configure = pkgPath pkg -/- "configure"
-        -- GhcCabal will run the configure script, so we depend on it
-        need [pkgPath pkg -/- pkgCabal pkg]
+        -- GhcCabal may run the configure script, so we depend on it
         -- We still don't know who built the configure script from configure.ac
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
-        build $ fullTarget target files GhcCabal
-        buildWhen registerPackage $ fullTarget target files (GhcPkg stage)
+        build $ fullTarget target [cabal] GhcCabal files
+        buildWhen registerPackage $
+            fullTarget target [cabal] (GhcPkg stage) files
         postProcessPackageData $ path -/- "package-data.mk"
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:

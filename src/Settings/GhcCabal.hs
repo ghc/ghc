@@ -88,6 +88,7 @@ bootPackageDbArgs = do
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;
 -- * otherwise, we must collapse it into one space-separated string.
+-- TODO: should be non-empty for compiler
 dllArgs :: Args
 dllArgs = arg ""
 

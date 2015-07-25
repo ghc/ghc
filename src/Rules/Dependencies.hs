@@ -6,6 +6,7 @@ import Package
 import Expression
 import qualified Target
 import Oracles.PackageData
+import Settings.Util
 import Settings.TargetDirectory
 import Rules.Actions
 import Development.Shake
@@ -17,13 +18,16 @@ buildPackageDependencies target =
         path      = targetPath stage pkg
         buildPath = path -/- "build"
     in do
-        (buildPath -/- "haskell.deps") %> \file ->
-            build $ fullTarget target [file] (GhcM stage)
+        (buildPath -/- "haskell.deps") %> \file -> do
+            srcs <- interpretExpr target getHsSources
+            build $ fullTarget target srcs (GhcM stage) [file]
 
         (buildPath -/- "c.deps") %> \file -> do
             srcs <- pkgDataList $ CSrcs path
-            deps <- fmap concat $ forM srcs $ \src -> do
-                build $ fullTarget target [pkgPath pkg -/- src] (GccM stage)
-                liftIO $ readFile (buildPath -/- takeFileName src <.> "deps")
-            writeFileChanged file deps
-            liftIO $ removeFiles path ["*.c.deps"]
+            deps <- forM srcs $ \src -> do
+                let srcFile = pkgPath pkg -/- src
+                    depFile = buildPath -/- takeFileName src <.> "deps"
+                build $ fullTarget target [srcFile] (GccM stage) [depFile]
+                liftIO . readFile $ depFile
+            writeFileChanged file (concat deps)
+            liftIO $ removeFiles buildPath ["*.c.deps"]

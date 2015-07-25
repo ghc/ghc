@@ -11,6 +11,7 @@ gccMArgs :: Args
 gccMArgs = stagedBuilder GccM ? do
     path   <- getTargetPath
     file   <- getFile
+    src    <- getDependency
     ccArgs <- getPkgDataList CcArgs
     mconcat
         [ arg "-E"
@@ -18,10 +19,10 @@ gccMArgs = stagedBuilder GccM ? do
         , append ccArgs -- TODO: remove? any other flags?
         , includeGccArgs
         , arg "-MF"
-        , arg $ path -/- "build" -/- takeFileName file <.> "deps"
+        , arg file
         , arg "-x"
         , arg "c"
-        , arg file ]
+        , arg src ]
 
 includeGccArgs :: Args
 includeGccArgs = do

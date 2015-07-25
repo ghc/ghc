@@ -9,7 +9,8 @@ module Expression (
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretExpr,
-    getStage, getPackage, getBuilder, getFiles, getFile, getWay,
+    getStage, getPackage, getBuilder, getFiles, getFile,
+    getDependencies, getDependency, getWay,
     stage, package, builder, stagedBuilder, file, way
     ) where
 
@@ -172,6 +173,18 @@ getFile = do
     case files of
         [file] -> return file
         _      -> error $ "Exactly one file expected in target " ++ show target
+
+getDependencies :: Expr [FilePath]
+getDependencies = asks Target.dependencies
+
+getDependency :: Expr FilePath
+getDependency = do
+    target <- ask
+    deps   <- getDependencies
+    case deps of
+        [dep] -> return dep
+        _     -> error $ "Exactly one dependency expected in target "
+                       ++ show target
 
 getWay :: Expr Way
 getWay = asks Target.way

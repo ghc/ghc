@@ -10,7 +10,6 @@ import Oracles.Flag
 import Oracles.PackageData
 import Settings.Util
 import Settings.Ways
-import Development.Shake
 
 ghcMArgs :: Args
 ghcMArgs = stagedBuilder GhcM ? do
@@ -69,21 +68,3 @@ includeGhcArgs = do
         , append . map (\dir -> "-I" ++ pkgPath -/- dir) $ incDirs
         , arg "-optP-include" -- TODO: Shall we also add -cpp?
         , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
-
-getHsSources :: Expr [FilePath]
-getHsSources = do
-    path    <- getTargetPath
-    pkgPath <- getPackagePath
-    srcDirs <- getPkgDataList SrcDirs
-    let paths = (path -/- "build/autogen") : map (pkgPath -/-) srcDirs
-    getSourceFiles paths [".hs", ".lhs"]
-
--- Find all source files in specified paths and with given extensions
-getSourceFiles :: [FilePath] -> [String] -> Expr [FilePath]
-getSourceFiles paths exts = do
-    modules <- getPkgDataList Modules
-    let modPaths   = map (replaceEq '.' '/') modules
-        candidates = [ p -/- m ++ e | p <- paths, m <- modPaths, e <- exts ]
-    files <- lift $ filterM (doesDirectoryExist . takeDirectory) candidates
-    result <- lift $ getDirectoryFiles "" files
-    return $ map unifyPath result

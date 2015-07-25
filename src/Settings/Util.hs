@@ -5,6 +5,7 @@ module Settings.Util (
     getFlag, getSetting, getSettingList,
     getPkgData, getPkgDataList,
     getPackagePath, getTargetPath, getTargetDirectory,
+    getHsSources, getSourceFiles,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -15,6 +16,7 @@ module Settings.Util (
     -- argPackageConstraints,
     ) where
 
+import Util
 import Builder
 import Package
 import Expression
@@ -67,6 +69,25 @@ getTargetPath = liftM2 targetPath getStage getPackage
 
 getTargetDirectory :: Expr FilePath
 getTargetDirectory = liftM2 targetDirectory getStage getPackage
+
+-- Find all Haskell source files for the current target
+getHsSources :: Expr [FilePath]
+getHsSources = do
+    path    <- getTargetPath
+    pkgPath <- getPackagePath
+    srcDirs <- getPkgDataList SrcDirs
+    let paths = (path -/- "build/autogen") : map (pkgPath -/-) srcDirs
+    getSourceFiles paths [".hs", ".lhs"]
+
+-- Find all source files in specified paths and with given extensions
+getSourceFiles :: [FilePath] -> [String] -> Expr [FilePath]
+getSourceFiles paths exts = do
+    modules <- getPkgDataList Modules
+    let modPaths   = map (replaceEq '.' '/') modules
+        candidates = [ p -/- m ++ e | p <- paths, m <- modPaths, e <- exts ]
+    files <- lift $ filterM (doesDirectoryExist . takeDirectory) candidates
+    result <- lift $ getDirectoryFiles "" files
+    return $ map unifyPath result
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args
