@@ -29,11 +29,11 @@ ghcMArgs = do
             , packageGhcArgs
             , includeGhcArgs
             , append . map ("-optP" ++) $ cppArgs
-            , arg $ "-odir " ++ buildPath
-            , arg $ "-stubdir " ++ buildPath
-            , arg $ "-hidir " ++ buildPath
-            , arg $ "-dep-makefile " ++ buildPath -/- "haskell.deps"
-            , append . map (\way -> "-dep-suffix " ++ wayPrefix way) $ ways
+            , arg "-odir"        , arg buildPath
+            , arg "-stubdir"     , arg buildPath
+            , arg "-hidir"       , arg buildPath
+            , arg "-dep-makefile", arg $ buildPath -/- "haskell.deps"
+            , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
             , append hsArgs
             , append hsSrcs ]
 
@@ -57,10 +57,10 @@ packageGhcArgs = do
 
 includeGhcArgs :: Args
 includeGhcArgs = do
-    stage       <- getStage
-    pkg         <- getPackage
-    srcDirs     <- getPkgDataList SrcDirs
-    includeDirs <- getPkgDataList IncludeDirs
+    stage   <- getStage
+    pkg     <- getPackage
+    srcDirs <- getPkgDataList SrcDirs
+    incDirs <- getPkgDataList IncludeDirs
     let buildPath   = targetPath stage pkg -/- "build"
         autogenPath = buildPath -/- "autogen"
     mconcat
@@ -70,7 +70,7 @@ includeGhcArgs = do
         , arg $ "-i" ++ autogenPath
         , arg $ "-I" ++ buildPath
         , arg $ "-I" ++ autogenPath
-        , append . map (\dir -> "-I" ++ pkgPath pkg -/- dir) $ includeDirs
+        , append . map (\dir -> "-I" ++ pkgPath pkg -/- dir) $ incDirs
         , arg "-optP-include" -- TODO: Shall we also add -cpp?
         , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
 
@@ -79,80 +79,16 @@ getHsSources = do
     stage   <- getStage
     pkg     <- getPackage
     srcDirs <- getPkgDataList SrcDirs
-    let autogenPath = targetPath stage pkg -/- "build/autogen"
-        dirs        = autogenPath : map (pkgPath pkg -/-) srcDirs
-    getModuleFiles dirs [".hs", ".lhs"]
+    let autogen = targetPath stage pkg -/- "build/autogen"
+        paths   = autogen : map (pkgPath pkg -/-) srcDirs
+    getSourceFiles paths [".hs", ".lhs"]
 
-getModuleFiles :: [FilePath] -> [String] -> Expr [FilePath]
-getModuleFiles directories suffixes = do
+-- Find all source files in specified paths and with given extensions
+getSourceFiles :: [FilePath] -> [String] -> Expr [FilePath]
+getSourceFiles paths exts = do
     modules <- getPkgDataList Modules
-    let modPaths = map (replaceEq '.' pathSeparator) modules
-    files <- lift $ forM [ dir -/- modPath ++ suffix
-                         | dir     <- directories
-                         , modPath <- modPaths
-                         , suffix  <- suffixes
-                         ] $ \file -> do
-                             let dir = takeDirectory file
-                             dirExists <- doesDirectoryExist dir
-                             return [ unifyPath file | dirExists ]
-    result <- lift $ getDirectoryFiles "" (concat files)
+    let modPaths   = map (replaceEq '.' '/') modules
+        candidates = [ p -/- m ++ e | p <- paths, m <- modPaths, e <- exts ]
+    files <- lift $ filterM (doesDirectoryExist . takeDirectory) candidates
+    result <- lift $ getDirectoryFiles "" files
     return $ map unifyPath result
-
-
--- $1_$2_$3_ALL_CC_OPTS = \
--- $$(WAY_$3_CC_OPTS) \
--- $$($1_$2_DIST_GCC_CC_OPTS) \
--- $$($1_$2_$3_CC_OPTS) \
--- $$($$(basename $$<)_CC_OPTS) \
--- $$($1_$2_EXTRA_CC_OPTS) \
--- $$(EXTRA_CC_OPTS)
---
--- $1_$2_DIST_CC_OPTS = \
--- $$(SRC_CC_OPTS) \
--- $$($1_CC_OPTS) \
--- -I$1/$2/build/autogen \
--- $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
--- $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
--- $$($1_$2_CC_OPTS) \
--- $$($1_$2_CPP_OPTS) \
--- $$($1_$2_CC_INC_FLAGS) \
--- $$($1_$2_DEP_CC_OPTS) \
--- $$(SRC_CC_WARNING_OPTS)
-
--- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
--- gccArgs :: FilePath -> Package -> TodoItem -> Args
--- gccArgs sourceFile (Package _ path _ _) (stage, dist, settings) =
---     let pathDist = path </> dist
---         buildDir = pathDist </> "build"
---         depFile  = buildDir </> takeFileName sourceFile <.> "deps"
---     in args [ args ["-E", "-MM"] -- TODO: add a Cpp Builder instead
---             , args $ CcArgs pathDist
---             , commonCcArgs          -- TODO: remove?
---             , customCcArgs settings -- TODO: Replace by customCppArgs?
---             , commonCcWarninigArgs  -- TODO: remove?
---             , includeGccArgs path dist
---             , args ["-MF", unifyPath depFile]
---             , args ["-x", "c"]
---             , arg $ unifyPath sourceFile ]
-
--- buildRule :: Package -> TodoItem -> Rules ()
--- buildRule pkg @ (Package name path _ _) todo @ (stage, dist, settings) = do
---     let pathDist = path </> dist
---         buildDir = pathDist </> "build"
-
---     (buildDir </> "haskell.deps") %> \_ -> do
---         run (Ghc stage) $ ghcArgs pkg todo
---         -- Finally, record the argument list
---         need [argListPath argListDir pkg stage]
-
---     (buildDir </> "c.deps") %> \out -> do
---         srcs <- args $ CSrcs pathDist
---         deps <- fmap concat $ forM srcs $ \src -> do
---             let srcPath = path </> src
---                 depFile = buildDir </> takeFileName src <.> "deps"
---             run (Gcc stage) $ gccArgs srcPath pkg todo
---             liftIO $ readFile depFile
---         writeFileChanged out deps
---         liftIO $ removeFiles buildDir ["*.c.deps"]
---         -- Finally, record the argument list
---         need [argListPath argListDir pkg stage]

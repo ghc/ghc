@@ -61,9 +61,10 @@ getPkgDataList key = do
 appendCcArgs :: [String] -> Args
 appendCcArgs xs = do
     stage <- getStage
-    mconcat [ builder (Gcc stage) ? append xs
-            , builder GhcCabal    ? appendSub "--configure-option=CFLAGS" xs
-            , builder GhcCabal    ? appendSub "--gcc-options" xs ]
+    mconcat [ builder (Gcc stage)  ? append xs
+            , builder (GccM stage) ? append xs
+            , builder GhcCabal     ? appendSub "--configure-option=CFLAGS" xs
+            , builder GhcCabal     ? appendSub "--gcc-options" xs ]
 
 -- Make sure a builder exists on the given path and rebuild it if out of date.
 -- If laxDependencies is true (Settings/User.hs) then we do not rebuild GHC
@@ -76,58 +77,6 @@ needBuilder ghc @ (Ghc stage) = do
 needBuilder builder = do
     path <- builderPath builder
     need [path]
-
-
-
--- packageData :: Arity -> String -> Args
--- packageData arity key =
---     return $ EnvironmentParameter $ PackageData arity key Nothing Nothing
-
--- -- Accessing key value pairs from package-data.mk files
--- argPackageKey :: Args
--- argPackageKey = packageData Single "PACKAGE_KEY"
-
--- argPackageDeps :: Args
--- argPackageDeps = packageData Multiple "DEPS"
-
--- argPackageDepKeys :: Args
--- argPackageDepKeys = packageData Multiple "DEP_KEYS"
-
--- argSrcDirs :: Args
--- argSrcDirs = packageData Multiple "HS_SRC_DIRS"
-
--- argIncludeDirs :: Args
--- argIncludeDirs = packageData Multiple "INCLUDE_DIRS"
-
--- argDepIncludeDirs :: Args
--- argDepIncludeDirs = packageData Multiple "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
-
--- argPackageConstraints :: Packages -> Args
--- argPackageConstraints = return . EnvironmentParameter . PackageConstraints
-
--- -- Concatenate arguments: arg1 ++ arg2 ++ ...
--- argConcat :: Args -> Args
--- argConcat = return . Fold Concat
-
--- -- </>-concatenate arguments: arg1 </> arg2 </> ...
--- argConcatPath :: Args -> Args
--- argConcatPath = return . Fold ConcatPath
-
--- -- Concatene arguments (space separated): arg1 ++ " " ++ arg2 ++ ...
--- argConcatSpace :: Args -> Args
--- argConcatSpace = return . Fold ConcatSpace
-
--- -- An ordered list of pairs of arguments: prefix |> arg1, prefix |> arg2, ...
--- argPairs :: String -> Args -> Args
--- argPairs prefix settings = settings >>= (arg prefix |>) . return
-
--- -- An ordered list of prefixed arguments: prefix ++ arg1, prefix ++ arg2, ...
--- argPrefix :: String -> Args -> Args
--- argPrefix prefix = fmap (Fold Concat . (arg prefix |>) . return)
-
--- -- An ordered list of prefixed arguments: prefix </> arg1, prefix </> arg2, ...
--- argPrefixPath :: String -> Args -> Args
--- argPrefixPath prefix = fmap (Fold ConcatPath . (arg prefix |>) . return)
 
 -- TODO: do '-ticky' in all debug ways?
 -- wayHcArgs :: Way -> Args

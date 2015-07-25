@@ -4,6 +4,7 @@ module Settings.Args (
 
 import Settings.User
 import Settings.GhcM
+import Settings.GccM
 import Settings.GhcPkg
 import Settings.GhcCabal
 import Expression
@@ -18,4 +19,5 @@ defaultArgs = mconcat
     [ cabalArgs
     , ghcPkgArgs
     , ghcMArgs
+    , gccMArgs
     , customPackageArgs ]

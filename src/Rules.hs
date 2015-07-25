@@ -21,7 +21,8 @@ generateTargets = action $
     forM_ [Stage0 ..] $ \stage -> do
         pkgs <- interpret (stageTarget stage) packages
         forM_ pkgs $ \pkg -> do
-            need [targetPath stage pkg -/- "package-data.mk"]
+            need [targetPath stage pkg -/- "build/haskell.deps"]
+            need [targetPath stage pkg -/- "build/c.deps"]
 
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()

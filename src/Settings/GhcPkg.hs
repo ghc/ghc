@@ -1,6 +1,4 @@
-module Settings.GhcPkg (
-    ghcPkgArgs
-    ) where
+module Settings.GhcPkg (ghcPkgArgs) where
 
 import Util
 import Builder

@@ -17,7 +17,7 @@ userArgs = mempty
 
 -- Control which packages get to be built
 userPackages :: Packages
-userPackages = mempty
+userPackages = remove [compiler] -- TODO: fix compiler
 
 -- Add new user-defined packages
 userKnownPackages :: [Package]

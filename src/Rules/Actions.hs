@@ -47,12 +47,10 @@ interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
     Ar       -> prefixAndSuffix 2 1 ss
     Ld       -> prefixAndSuffix 4 0 ss
-    Gcc _    -> if head ss == "-MM"
-                then prefixAndSuffix 1 1 ss
-                else prefixAndSuffix 0 4 ss
-    Ghc _    -> if head ss == "-M"
-                then prefixAndSuffix 1 1 ss
-                else prefixAndSuffix 0 4 ss
+    Gcc _    -> prefixAndSuffix 0 4 ss
+    GccM _   -> prefixAndSuffix 0 1 ss
+    Ghc _    -> prefixAndSuffix 0 4 ss
+    GhcM _   -> prefixAndSuffix 1 1 ss
     GhcPkg _ -> prefixAndSuffix 3 0 ss
     GhcCabal -> prefixAndSuffix 3 0 ss
     _        -> ss

@@ -1,8 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-
-module Rules.Data (
-    cabalArgs, ghcPkgArgs, buildPackageData
-    ) where
+module Rules.Data (buildPackageData) where
 
 import Util
 import Package
@@ -10,8 +6,6 @@ import Builder
 import Switches
 import Expression
 import qualified Target
-import Settings.GhcPkg
-import Settings.GhcCabal
 import Settings.TargetDirectory
 import Rules.Actions
 import Control.Applicative

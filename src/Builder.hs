@@ -29,6 +29,7 @@ data Builder = Ar
              | Gcc Stage
              | Ghc Stage
              | GhcM Stage
+             | GccM Stage
              | GhcPkg Stage
              deriving (Show, Eq, Generic)
 
@@ -51,6 +52,7 @@ builderKey builder = case builder of
     GhcPkg _      -> "ghc-pkg"
     -- GhcM is currently a synonym for Ghc (to be called with -M flag)
     GhcM stage    -> builderKey $ Ghc stage
+    GccM stage    -> builderKey $ Gcc stage
 
 builderPath :: Builder -> Action String
 builderPath builder = do
