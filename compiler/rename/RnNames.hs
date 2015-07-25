@@ -1788,11 +1788,11 @@ missingImportListItem ie
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"),
-          nest 2 (vcat (map ppr txt)) ]
+          nest 2 (vcat (map (ppr . snd . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
                                 <+> ptext (sLit "is deprecated:"),
-          nest 2 (vcat (map ppr txt)) ]
+          nest 2 (vcat (map (ppr . snd . unLoc) txt)) ]
 
 packageImportErr :: SDoc
 packageImportErr
