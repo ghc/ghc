@@ -280,8 +280,13 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
       | otherwise = pkgSrcMap
 
     -- TODO: Get these from the interface files as with srcMap
-    srcLMap' = maybe Map.empty (\path -> Map.singleton pkgKey path) srcLEntity
-    sourceUrls' = (srcBase, srcModule', pkgSrcMap', srcLMap')
+    pkgSrcLMap'
+      | Flag_HyperlinkedSource `elem` flags =
+          Map.singleton pkgKey hypSrcModuleLineUrlFormat
+      | Just path <- srcLEntity = Map.singleton pkgKey path
+      | otherwise = Map.empty
+
+    sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags flags
