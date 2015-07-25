@@ -1,3 +1,6 @@
+{-# LANGUAGE RecordWildCards #-}
+
+
 module Haddock.Backends.Hyperlinker.Renderer (render) where
 
 
@@ -78,10 +81,11 @@ header mcss mjs =
 
 
 tokenGroup :: SrcMap -> TokenGroup -> Html
-tokenGroup _ (GrpNormal tok) =
-    tokenSpan tok ! attrs
+tokenGroup _ (GrpNormal tok@(Token { .. }))
+    | tkType == TkSpace = renderSpace (posRow . spStart $ tkSpan) tkValue
+    | otherwise = tokenSpan tok ! attrs
   where
-    attrs = [ multiclass . tokenStyle . tkType $ tok ]
+    attrs = [ multiclass . tokenStyle $ tkType ]
 tokenGroup srcs (GrpRich det tokens) =
     externalAnchor det . internalAnchor det . hyperlink srcs det $ content
   where
@@ -167,3 +171,19 @@ externalModHyperlink (_, srcs) name content = case Map.lookup name srcs of
     Just (SrcExternal path) -> Html.anchor content !
         [ Html.href $ path </> hypSrcModuleUrl' name ]
     Nothing -> content
+
+
+renderSpace :: Int -> String -> Html
+renderSpace _ [] = Html.noHtml
+renderSpace line ('\n':rest) = mconcat
+    [ Html.thespan . Html.toHtml $ "\n"
+    , lineAnchor (line + 1)
+    , renderSpace (line + 1) rest
+    ]
+renderSpace line space =
+    let (hspace, rest) = span (/= '\n') space
+    in (Html.thespan . Html.toHtml) hspace <> renderSpace line rest
+
+
+lineAnchor :: Int -> Html
+lineAnchor line = Html.anchor Html.noHtml ! [ Html.name $ hypSrcLineUrl line ]
