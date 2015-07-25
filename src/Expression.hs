@@ -9,8 +9,8 @@ module Expression (
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretExpr,
-    getStage, getPackage, getBuilder, getFiles, getWay,
-    stage, package, builder, file, way
+    getStage, getPackage, getBuilder, getFiles, getFile, getWay,
+    stage, package, builder, stagedBuilder, file, way
     ) where
 
 import Way
@@ -164,6 +164,15 @@ getBuilder = asks Target.builder
 getFiles :: Expr [FilePath]
 getFiles = asks Target.files
 
+-- Run getFiles and check that it contains a single file only
+getFile :: Expr FilePath
+getFile = do
+    target <- ask
+    files  <- getFiles
+    case files of
+        [file] -> return file
+        _      -> error $ "Exactly one file expected in target " ++ show target
+
 getWay :: Expr Way
 getWay = asks Target.way
 
@@ -174,8 +183,16 @@ stage s = liftM (s ==) getStage
 package :: Package -> Predicate
 package p = liftM (p ==) getPackage
 
+-- For unstaged builders, e.g. GhcCabal
 builder :: Builder -> Predicate
 builder b = liftM (b ==) getBuilder
+
+-- For staged builders, e.g. Ghc Stage
+stagedBuilder :: (Stage -> Builder) -> Predicate
+stagedBuilder sb = do
+    stage <- getStage
+    builder <- getBuilder
+    return $ builder == sb stage
 
 file :: FilePattern -> Predicate
 file f = liftM (any (f ?==)) getFiles

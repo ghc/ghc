@@ -3,9 +3,10 @@ module Settings.GhcCabal (
     ) where
 
 import Way
+import Util
+import Stage
 import Builder
 import Package
-import Util
 import Switches
 import Expression
 import Oracles.Base
@@ -15,26 +16,25 @@ import Settings.User
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
-import Settings.TargetDirectory
 import Data.List
 import Control.Applicative
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do
-    stage <- getStage
-    pkg   <- getPackage
+    path <- getPackagePath
+    dir  <- getTargetDirectory
     mconcat [ arg "configure"
-            , arg $ pkgPath pkg
-            , arg $ targetDirectory stage pkg
+            , arg path
+            , arg dir
             , dllArgs
-            , with $ Ghc stage
-            , with $ GhcPkg stage
+            , withStaged Ghc
+            , withStaged GhcPkg
             , stage0 ? bootPackageDbArgs
             , libraryArgs
             , with HsColour
             , configureArgs
             , stage0 ? packageConstraints
-            , with $ Gcc stage
+            , withStaged Gcc
             , notStage0 ? with Ld
             , with Ar
             , with Alex
@@ -43,12 +43,12 @@ cabalArgs = builder GhcCabal ? do
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 libraryArgs :: Args
 libraryArgs = do
-    ways           <- getWays
-    ghcInterpreter <- lift $ ghcWithInterpreter
+    ways   <- getWays
+    ghcInt <- lift $ ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
              else "--disable-library-vanilla"
-           , if vanilla `elem` ways && ghcInterpreter && not dynamicGhcPrograms
+           , if vanilla `elem` ways && ghcInt && not dynamicGhcPrograms
              then  "--enable-library-for-ghci"
              else "--disable-library-for-ghci"
            , if profiling `elem` ways
@@ -82,8 +82,8 @@ configureArgs = do
 
 bootPackageDbArgs :: Args
 bootPackageDbArgs = do
-    sourcePath <- getSetting GhcSourcePath
-    arg $ "--package-db=" ++ sourcePath -/- "libraries/bootstrapping.conf"
+    path <- getSetting GhcSourcePath
+    arg $ "--package-db=" ++ path -/- "libraries/bootstrapping.conf"
 
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;
@@ -110,7 +110,7 @@ packageConstraints = do
 -- TODO: put all validating options together in one file
 ccArgs :: Args
 ccArgs = validating ? do
-    let gccGe46 = liftM not gccLt46
+    let gccGe46 = notP gccLt46
     mconcat [ arg "-Werror"
             , arg "-Wall"
             , gccIsClang ??
@@ -155,3 +155,8 @@ with builder = specified builder ? do
     path <- lift $ builderPath builder
     lift $ needBuilder builder
     append [withBuilderKey builder ++ path]
+
+withStaged :: (Stage -> Builder) -> Args
+withStaged sb = do
+    stage <- getStage
+    with $ sb stage

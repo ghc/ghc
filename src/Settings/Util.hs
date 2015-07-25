@@ -4,6 +4,7 @@ module Settings.Util (
     argSetting, argSettingList,
     getFlag, getSetting, getSettingList,
     getPkgData, getPkgDataList,
+    getPackagePath, getTargetPath, getTargetDirectory,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -15,6 +16,7 @@ module Settings.Util (
     ) where
 
 import Builder
+import Package
 import Expression
 import Oracles.Base
 import Oracles.Flag
@@ -56,6 +58,15 @@ getPkgDataList key = do
     stage <- getStage
     pkg   <- getPackage
     lift . pkgDataList . key $ targetPath stage pkg
+
+getPackagePath :: Expr FilePath
+getPackagePath = liftM pkgPath getPackage
+
+getTargetPath :: Expr FilePath
+getTargetPath = liftM2 targetPath getStage getPackage
+
+getTargetDirectory :: Expr FilePath
+getTargetDirectory = liftM2 targetDirectory getStage getPackage
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args

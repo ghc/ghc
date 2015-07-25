@@ -4,38 +4,34 @@ import Way
 import Util
 import Stage
 import Builder
-import Package
 import Switches
 import Expression
 import Oracles.Flag
 import Oracles.PackageData
 import Settings.Util
 import Settings.Ways
-import Settings.TargetDirectory
 import Development.Shake
 
 ghcMArgs :: Args
-ghcMArgs = do
-    stage <- getStage
-    builder (GhcM stage) ? do
-        pkg     <- getPackage
-        cppArgs <- getPkgDataList CppArgs
-        hsArgs  <- getPkgDataList HsArgs
-        hsSrcs  <- getHsSources
-        ways    <- getWays
-        let buildPath = targetPath stage pkg -/- "build"
-        mconcat
-            [ arg "-M"
-            , packageGhcArgs
-            , includeGhcArgs
-            , append . map ("-optP" ++) $ cppArgs
-            , arg "-odir"        , arg buildPath
-            , arg "-stubdir"     , arg buildPath
-            , arg "-hidir"       , arg buildPath
-            , arg "-dep-makefile", arg $ buildPath -/- "haskell.deps"
-            , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
-            , append hsArgs
-            , append hsSrcs ]
+ghcMArgs = stagedBuilder GhcM ? do
+    ways    <- getWays
+    hsSrcs  <- getHsSources
+    hsArgs  <- getPkgDataList HsArgs
+    cppArgs <- getPkgDataList CppArgs
+    path    <- getTargetPath
+    let buildPath = path -/- "build"
+    mconcat
+        [ arg "-M"
+        , packageGhcArgs
+        , includeGhcArgs
+        , append . map ("-optP" ++) $ cppArgs
+        , arg "-odir"        , arg buildPath
+        , arg "-stubdir"     , arg buildPath
+        , arg "-hidir"       , arg buildPath
+        , arg "-dep-makefile", arg $ buildPath -/- "haskell.deps"
+        , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
+        , append hsArgs
+        , append hsSrcs ]
 
 packageGhcArgs :: Args
 packageGhcArgs = do
@@ -57,30 +53,29 @@ packageGhcArgs = do
 
 includeGhcArgs :: Args
 includeGhcArgs = do
-    stage   <- getStage
-    pkg     <- getPackage
+    path    <- getTargetPath
+    pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
     incDirs <- getPkgDataList IncludeDirs
-    let buildPath   = targetPath stage pkg -/- "build"
+    let buildPath   = path -/- "build"
         autogenPath = buildPath -/- "autogen"
     mconcat
         [ arg "-i"
-        , append . map (\dir -> "-i" ++ pkgPath pkg -/- dir) $ srcDirs
+        , append . map (\dir -> "-i" ++ pkgPath -/- dir) $ srcDirs
         , arg $ "-i" ++ buildPath
         , arg $ "-i" ++ autogenPath
         , arg $ "-I" ++ buildPath
         , arg $ "-I" ++ autogenPath
-        , append . map (\dir -> "-I" ++ pkgPath pkg -/- dir) $ incDirs
+        , append . map (\dir -> "-I" ++ pkgPath -/- dir) $ incDirs
         , arg "-optP-include" -- TODO: Shall we also add -cpp?
         , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
 
 getHsSources :: Expr [FilePath]
 getHsSources = do
-    stage   <- getStage
-    pkg     <- getPackage
+    path    <- getTargetPath
+    pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
-    let autogen = targetPath stage pkg -/- "build/autogen"
-        paths   = autogen : map (pkgPath pkg -/-) srcDirs
+    let paths = (path -/- "build/autogen") : map (pkgPath -/-) srcDirs
     getSourceFiles paths [".hs", ".lhs"]
 
 -- Find all source files in specified paths and with given extensions

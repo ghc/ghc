@@ -26,8 +26,8 @@ import qualified System.Directory as S
 --pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
 --pathArgs key path as = map (\a -> key ++ unifyPath (path </> a)) <$> args as
 
-prefixedPath :: String -> [Settings] -> Settings
-prefixedPath prefix = argPrefix prefix . argConcatPath . sconcat
+-- prefixedPath :: String -> [Settings] -> Settings
+-- prefixedPath prefix = argPrefix prefix . argConcatPath . sconcat
 
 --includeGccArgs :: FilePath -> FilePath -> Args
 --includeGccArgs path dist =
@@ -38,34 +38,34 @@ prefixedPath prefix = argPrefix prefix . argConcatPath . sconcat
 --            , pathArgs "-I" path $ DepIncludeDirs pathDist ]
 
 
-includeGccSettings :: Settings
-includeGccSettings = mconcat
-    [ prefixedPath "-I" [argBuildPath, argBuildDir, arg "build", arg "autogen"]
-    , argPrefix "-I" $ argPaths ...
-    , prefixedPath "-I" [argBuildPath, argIncludeDirs ] -- wrong
-    , prefixedPath "-I" [argBuildPath, argDepIncludeDirs ]]
+-- includeGccSettings :: Settings
+-- includeGccSettings = mconcat
+--     [ prefixedPath "-I" [argBuildPath, argBuildDir, arg "build", arg "autogen"]
+--     , argPrefix "-I" $ argPaths ...
+--     , prefixedPath "-I" [argBuildPath, argIncludeDirs ] -- wrong
+--     , prefixedPath "-I" [argBuildPath, argDepIncludeDirs ]]
 
-includeGhcSettings :: Settings
-includeGhcSettings =
-    let buildDir = argBuildPath `fence` argSrcDirs
-    in arg "-i" `fence`
-       mconcat
-       [ argPathList "-i" [argBuildPath, argSrcDirs]
-       , argPath "-i" buildDir
-       , argPath "-I" buildDir
-       , argPathList "-i" [buildDir, arg "autogen"]
-       , argPathList "-I" [buildDir, arg "autogen"]
-       , argPathList "-I" [argBuildPath, argIncludeDirs]
-       , arg "-optP-include" -- TODO: Shall we also add -cpp?
-       , argPathList "-optP" [buildDir, arg "autogen/cabal_macros.h"] ]
+-- includeGhcSettings :: Settings
+-- includeGhcSettings =
+--     let buildDir = argBuildPath `fence` argSrcDirs
+--     in arg "-i" `fence`
+--        mconcat
+--        [ argPathList "-i" [argBuildPath, argSrcDirs]
+--        , argPath "-i" buildDir
+--        , argPath "-I" buildDir
+--        , argPathList "-i" [buildDir, arg "autogen"]
+--        , argPathList "-I" [buildDir, arg "autogen"]
+--        , argPathList "-I" [argBuildPath, argIncludeDirs]
+--        , arg "-optP-include" -- TODO: Shall we also add -cpp?
+--        , argPathList "-optP" [buildDir, arg "autogen/cabal_macros.h"] ]
 
 
-pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
-pkgHsSources path dist = do
-    let pathDist = path </> dist
-        autogen = pathDist </> "build/autogen"
-    dirs <- map (path </>) <$> args (SrcDirs pathDist)
-    findModuleFiles pathDist (autogen:dirs) [".hs", ".lhs"]
+-- pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
+-- pkgHsSources path dist = do
+--     let pathDist = path </> dist
+--         autogen = pathDist </> "build/autogen"
+--     dirs <- map (path </>) <$> args (SrcDirs pathDist)
+--     findModuleFiles pathDist (autogen:dirs) [".hs", ".lhs"]
 
 -- TODO: look for non-{hs,c} objects too
 
@@ -101,19 +101,19 @@ pkgLibHsObjects path dist stage way = do
          findModuleFiles pathDist [buildDir] [suffix]
     else do return depObjs
 
-findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
-findModuleFiles pathDist directories suffixes = do
-    modPaths <- map (replaceEq '.' pathSeparator) <$> args (Modules pathDist)
-    fileList <- forM [ dir </> modPath ++ suffix
-                     | dir     <- directories
-                     , modPath <- modPaths
-                     , suffix  <- suffixes
-                     ] $ \file -> do
-                         let dir = takeDirectory file
-                         dirExists <- liftIO $ S.doesDirectoryExist dir
-                         when dirExists $ return $ unifyPath file
-    files <- getDirectoryFiles "" fileList
-    return $ map unifyPath files
+-- findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
+-- findModuleFiles pathDist directories suffixes = do
+--     modPaths <- map (replaceEq '.' pathSeparator) <$> args (Modules pathDist)
+--     fileList <- forM [ dir </> modPath ++ suffix
+--                      | dir     <- directories
+--                      , modPath <- modPaths
+--                      , suffix  <- suffixes
+--                      ] $ \file -> do
+--                          let dir = takeDirectory file
+--                          dirExists <- liftIO $ S.doesDirectoryExist dir
+--                          when dirExists $ return $ unifyPath file
+--     files <- getDirectoryFiles "" fileList
+--     return $ map unifyPath files
 
 -- The argument list has a limited size on Windows. Since Windows 7 the limit
 -- is 32768 (theoretically). In practice we use 31000 to leave some breathing
@@ -128,29 +128,29 @@ argSizeLimit = do
 
 -- List of source files, which need to be tracked by the build system
 -- to make sure the argument lists have not changed.
-sourceDependecies :: [FilePath]
-sourceDependecies = [ "shake/src/Package/Base.hs"
-                    , "shake/src/Oracles/Base.hs"
-                    , "shake/src/Oracles/Flag.hs"
-                    , "shake/src/Oracles/Option.hs"
-                    , "shake/src/Oracles/Builder.hs"
-                    , "shake/src/Oracles/PackageData.hs"
-                    , "shake/src/Ways.hs"
-                    , "shake/src/Util.hs"
-                    , "shake/src/Oracles.hs" ]
+-- sourceDependecies :: [FilePath]
+-- sourceDependecies = [ "shake/src/Package/Base.hs"
+--                     , "shake/src/Oracles/Base.hs"
+--                     , "shake/src/Oracles/Flag.hs"
+--                     , "shake/src/Oracles/Option.hs"
+--                     , "shake/src/Oracles/Builder.hs"
+--                     , "shake/src/Oracles/PackageData.hs"
+--                     , "shake/src/Ways.hs"
+--                     , "shake/src/Util.hs"
+--                     , "shake/src/Oracles.hs" ]
 
--- Convert Builder's argument list to a printable String
-argListWithComment :: String -> Builder -> Args -> Action String
-argListWithComment comment builder args = do
-    args' <- args
-    return $ show builder ++ " arguments"
-           ++ (if null comment then "" else " (" ++ comment ++ ")")
-           ++ ":\n" ++ concatMap (\s -> "    " ++ s ++ "\n") args'
+-- -- Convert Builder's argument list to a printable String
+-- argListWithComment :: String -> Builder -> Args -> Action String
+-- argListWithComment comment builder args = do
+--     args' <- args
+--     return $ show builder ++ " arguments"
+--            ++ (if null comment then "" else " (" ++ comment ++ ")")
+--            ++ ":\n" ++ concatMap (\s -> "    " ++ s ++ "\n") args'
 
-argList :: Builder -> Args -> Action String
-argList = argListWithComment ""
+-- argList :: Builder -> Args -> Action String
+-- argList = argListWithComment ""
 
--- Path to argument list for a given Package/Stage combination
-argListPath :: FilePath -> Package -> Stage -> FilePath
-argListPath dir (Package name _ _ _) stage =
-    dir </> takeBaseName name ++ " (stage " ++ show stage ++ ")" <.> "txt"
+-- -- Path to argument list for a given Package/Stage combination
+-- argListPath :: FilePath -> Package -> Stage -> FilePath
+-- argListPath dir (Package name _ _ _) stage =
+--     dir </> takeBaseName name ++ " (stage " ++ show stage ++ ")" <.> "txt"
