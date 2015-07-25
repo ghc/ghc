@@ -1,0 +1,4 @@
+1. Rebuild only when argument list has changed
+2. Rebuild only when package-data.mk contents has changed
+
+* Add to Settings/GhcPkg.hs: package deepseq ? arg "--force"
