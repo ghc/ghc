@@ -835,7 +835,7 @@ eqBigNatWord bn w# = isTrue# (eqBigNatWord# bn w#)
 
 eqBigNatWord# :: BigNat -> GmpLimb# -> Int#
 eqBigNatWord# bn w#
-    = sizeofBigNat# bn ==# 1# `andI#` (bigNatToWord bn `eqWord#` w#)
+    = (sizeofBigNat# bn ==# 1#) `andI#` (bigNatToWord bn `eqWord#` w#)
 
 
 -- | Same as @'indexBigNat#' bn 0\#@
