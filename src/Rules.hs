@@ -1,7 +1,7 @@
 module Rules (
     generateTargets, packageRules, oracleRules,
-    module Rules.Package,
     module Rules.Config,
+    module Rules.Package,
     ) where
 
 import Util
@@ -17,12 +17,13 @@ import Development.Shake
 -- generateTargets needs package-data.mk files of all target packages
 -- TODO: make interpretDiff total
 generateTargets :: Rules ()
-generateTargets = action $
-    forM_ [Stage0 ..] $ \stage -> do
+generateTargets = action $ do
+    targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
         pkgs <- interpret (stageTarget stage) packages
-        forM_ pkgs $ \pkg -> do
-            need [targetPath stage pkg -/- "build/haskell.deps"]
-            need [targetPath stage pkg -/- "build/c.deps"]
+        fmap concat . forM pkgs $ \pkg -> return
+            [ targetPath stage pkg -/- "build/haskell.deps"
+            , targetPath stage pkg -/- "build/c.deps" ]
+    need targets
 
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()
