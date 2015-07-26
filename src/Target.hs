@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, TypeSynonymInstances #-}
 module Target (
     Target (..), StageTarget (..), StagePackageTarget (..), FullTarget (..),
-    stageTarget, stagePackageTarget, fullTarget, fullTargetWithWay
+    stageTarget, stagePackageTarget, fullTarget, fullTargetWithWay,
     ) where
 
 import Way
@@ -72,7 +72,8 @@ fullTarget target deps b fs = target
     }
 
 -- Use this function to be explicit about the build way.
-fullTargetWithWay :: StagePackageTarget -> [FilePath] -> Builder -> Way -> [FilePath] -> FullTarget
+fullTargetWithWay :: StagePackageTarget -> [FilePath] -> Builder -> Way
+                  -> [FilePath] -> FullTarget
 fullTargetWithWay target deps b w fs = target
     {
         dependencies = deps,
