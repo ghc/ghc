@@ -149,6 +149,7 @@ customPackageArgs = do
         , package compiler ?
           builder GhcCabal ?
           mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show (succ stage)
+                  , arg $ "--flags=stage" ++ show (succ stage)
                   , arg "--disable-library-for-ghci"
                   , targetOs "openbsd" ? arg "--ld-options=-E"
                   , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
@@ -157,7 +158,8 @@ customPackageArgs = do
                   , (threaded `elem` rtsWays) ?
                     notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
                   , ghcWithNativeCodeGen ? arg "--flags=ncg"
-                  , ghcWithInterpreter ? arg "--flags=ghci"
+                  , ghcWithInterpreter ?
+                    notStage0 ? arg "--flags=ghci"
                   , ghcWithInterpreter ?
                     ghcEnableTablesNextToCode ?
                     notP (flag GhcUnregisterised) ?
