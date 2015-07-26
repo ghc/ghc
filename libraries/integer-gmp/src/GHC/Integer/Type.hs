@@ -460,23 +460,23 @@ sqrInteger (Jn# bn) = Jp# (sqrBigNat bn)
 
 -- | Construct 'Integer' from the product of two 'Int#'s
 timesInt2Integer :: Int# -> Int# -> Integer
-timesInt2Integer x# y# = case (# x# >=# 0#, y# >=# 0# #) of
-    (# 0#, 0# #) -> case timesWord2# (int2Word# (negateInt# x#))
+timesInt2Integer x# y# = case (# isTrue# (x# >=# 0#), isTrue# (y# >=# 0#) #) of
+    (# False, False #) -> case timesWord2# (int2Word# (negateInt# x#))
                                      (int2Word# (negateInt# y#)) of
         (# 0##,l #) -> inline wordToInteger l
         (# h  ,l #) -> Jp# (wordToBigNat2 h l)
 
-    (#  _, 0# #) -> case timesWord2# (int2Word# x#)
+    (#  True, False #) -> case timesWord2# (int2Word# x#)
                                      (int2Word# (negateInt# y#)) of
         (# 0##,l #) -> wordToNegInteger l
         (# h  ,l #) -> Jn# (wordToBigNat2 h l)
 
-    (# 0#,  _ #) -> case timesWord2# (int2Word# (negateInt# x#))
+    (# False,  True #) -> case timesWord2# (int2Word# (negateInt# x#))
                                      (int2Word# y#) of
         (# 0##,l #) -> wordToNegInteger l
         (# h  ,l #) -> Jn# (wordToBigNat2 h l)
 
-    (#  _,  _ #) -> case timesWord2# (int2Word# x#)
+    (#  True,  True #) -> case timesWord2# (int2Word# x#)
                                      (int2Word# y#) of
         (# 0##,l #) -> inline wordToInteger l
         (# h  ,l #) -> Jp# (wordToBigNat2 h l)
@@ -1104,9 +1104,9 @@ orBigNat x@(BN# x#) y@(BN# y#)
     ior' a# na# b# nb# = do -- na >= nb
         mbn@(MBN# mba#) <- newBigNat# na#
         _ <- liftIO (c_mpn_ior_n mba# a# b# nb#)
-        _ <- case na# ==# nb# of
-            0# -> svoid (copyWordArray# a# nb# mba# nb# (na# -# nb#))
-            _  -> return ()
+        _ <- case isTrue# (na# ==# nb#) of
+            False -> svoid (copyWordArray# a# nb# mba# nb# (na# -# nb#))
+            True  -> return ()
         unsafeFreezeBigNat# mbn
 
     nx# = sizeofBigNat# x
@@ -1123,10 +1123,10 @@ xorBigNat x@(BN# x#) y@(BN# y#)
     xor' a# na# b# nb# = do -- na >= nb
         mbn@(MBN# mba#) <- newBigNat# na#
         _ <- liftIO (c_mpn_xor_n mba# a# b# nb#)
-        case na# ==# nb# of
-            0# -> do _ <- svoid (copyWordArray# a# nb# mba# nb# (na# -# nb#))
-                     unsafeFreezeBigNat# mbn
-            _  -> unsafeRenormFreezeBigNat# mbn
+        case isTrue# (na# ==# nb#) of
+            False -> do _ <- svoid (copyWordArray# a# nb# mba# nb# (na# -# nb#))
+                        unsafeFreezeBigNat# mbn
+            True  -> unsafeRenormFreezeBigNat# mbn
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
@@ -1139,9 +1139,9 @@ andnBigNat x@(BN# x#) y@(BN# y#)
   | True = runS $ do
       mbn@(MBN# mba#) <- newBigNat# nx#
       _ <- liftIO (c_mpn_andn_n mba# x# y# n#)
-      _ <- case nx# ==# n# of
-            0# -> svoid (copyWordArray# x# n# mba# n# (nx# -# n#))
-            _  -> return ()
+      _ <- case isTrue# (nx# ==# n#) of
+            False -> svoid (copyWordArray# x# n# mba# n# (nx# -# n#))
+            True  -> return ()
       unsafeRenormFreezeBigNat# mbn
   where
     n# | isTrue# (nx# <# ny#) = nx#
@@ -1249,9 +1249,9 @@ gcdBigNat x@(BN# x#) y@(BN# y#)
         mbn@(MBN# mba#) <- newBigNat# nb#
         I# rn'# <- liftIO (c_mpn_gcd# mba# a# na# b# nb#)
         let rn# = narrowGmpSize# rn'#
-        case rn# ==# nb# of
-            0# -> unsafeShrinkFreezeBigNat# mbn rn#
-            _  -> unsafeFreezeBigNat# mbn
+        case isTrue# (rn# ==# nb#) of
+            False -> unsafeShrinkFreezeBigNat# mbn rn#
+            True  -> unsafeFreezeBigNat# mbn
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
@@ -1284,9 +1284,9 @@ gcdExtSBigNat x y = case runS go of (g,s) -> (# g, s #)
             sn#  = absI# ssn#
         s' <- unsafeShrinkFreezeBigNat# s sn#
         g' <- unsafeRenormFreezeBigNat# g
-        case ssn# >=# 0# of
-            0# -> return ( g', NegBN s' )
-            _  -> return ( g', PosBN s' )
+        case isTrue# (ssn# >=# 0#) of
+            False -> return ( g', NegBN s' )
+            True  -> return ( g', PosBN s' )
 
     !(BN# x#) = absSBigNat x
     !(BN# y#) = absSBigNat y
@@ -1351,9 +1351,9 @@ powModSBigNat b e m@(BN# m#) = runS $ do
     r@(MBN# r#) <- newBigNat# mn#
     I# rn_# <- liftIO (integer_gmp_powm# r# b# bn# e# en# m# mn#)
     let rn# = narrowGmpSize# rn_#
-    case rn# ==# mn# of
-        0# -> unsafeShrinkFreezeBigNat# r rn#
-        _  -> unsafeFreezeBigNat# r
+    case isTrue# (rn# ==# mn#) of
+        False -> unsafeShrinkFreezeBigNat# r rn#
+        True  -> unsafeFreezeBigNat# r
   where
     !(BN# b#) = absSBigNat b
     !(BN# e#) = absSBigNat e
@@ -1413,9 +1413,9 @@ recipModSBigNat x m@(BN# m#) = runS $ do
     r@(MBN# r#) <- newBigNat# mn#
     I# rn_# <- liftIO (integer_gmp_invert# r# x# xn# m# mn#)
     let rn# = narrowGmpSize# rn_#
-    case rn# ==# mn# of
-        0# -> unsafeShrinkFreezeBigNat# r rn#
-        _  -> unsafeFreezeBigNat# r
+    case isTrue# (rn# ==# mn#) of
+        False -> unsafeShrinkFreezeBigNat# r rn#
+        True  -> unsafeFreezeBigNat# r
   where
     !(BN# x#) = absSBigNat x
     xn# = ssizeofSBigNat# x
@@ -1850,9 +1850,9 @@ isValidBigNat# :: BigNat -> Int#
 isValidBigNat# (BN# ba#)
   = (szq# ># 0#) `andI#` (szr# ==# 0#) `andI#` isNorm#
   where
-    isNorm# = case szq# ># 1# of
-                1# -> (indexWordArray# ba# (szq# -# 1#)) `neWord#` 0##
-                _  -> 1#
+    isNorm#
+      | isTrue# (szq# ># 1#) = (indexWordArray# ba# (szq# -# 1#)) `neWord#` 0##
+      | True                 = 1#
 
     sz# = sizeofByteArray# ba#
 
