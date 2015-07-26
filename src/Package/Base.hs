@@ -126,31 +126,3 @@ argSizeLimit = do
              then 31000
              else 4194304 -- Cabal needs a bit more than 2MB!
 
--- List of source files, which need to be tracked by the build system
--- to make sure the argument lists have not changed.
--- sourceDependecies :: [FilePath]
--- sourceDependecies = [ "shake/src/Package/Base.hs"
---                     , "shake/src/Oracles/Base.hs"
---                     , "shake/src/Oracles/Flag.hs"
---                     , "shake/src/Oracles/Option.hs"
---                     , "shake/src/Oracles/Builder.hs"
---                     , "shake/src/Oracles/PackageData.hs"
---                     , "shake/src/Ways.hs"
---                     , "shake/src/Util.hs"
---                     , "shake/src/Oracles.hs" ]
-
--- -- Convert Builder's argument list to a printable String
--- argListWithComment :: String -> Builder -> Args -> Action String
--- argListWithComment comment builder args = do
---     args' <- args
---     return $ show builder ++ " arguments"
---            ++ (if null comment then "" else " (" ++ comment ++ ")")
---            ++ ":\n" ++ concatMap (\s -> "    " ++ s ++ "\n") args'
-
--- argList :: Builder -> Args -> Action String
--- argList = argListWithComment ""
-
--- -- Path to argument list for a given Package/Stage combination
--- argListPath :: FilePath -> Package -> Stage -> FilePath
--- argListPath dir (Package name _ _ _) stage =
---     dir </> takeBaseName name ++ " (stage " ++ show stage ++ ")" <.> "txt"

@@ -6,6 +6,7 @@ module Switches (
 import Stage
 import Expression
 import Settings.Util
+import Settings.Default
 import Oracles.Flag
 import Oracles.Setting
 
@@ -32,10 +33,12 @@ registerPackage = return True
 splitObjects :: Predicate
 splitObjects = do
     stage    <- getStage -- We don't split bootstrap (stage 0) packages
+    package  <- getPackage -- We don't split compiler
     broken   <- getFlag SplitObjectsBroken
     ghcUnreg <- getFlag GhcUnregisterised
     goodArch <- lift $ targetArchs [ "i386", "x86_64", "powerpc", "sparc" ]
     goodOs   <- lift $ targetOss   [ "mingw32", "cygwin32", "linux"
                                    , "darwin", "solaris2", "freebsd"
                                    , "dragonfly", "netbsd", "openbsd"]
-    return $ not broken && not ghcUnreg && stage == Stage1 && goodArch && goodOs
+    return $ stage == Stage1 && package /= compiler && not broken
+           && not ghcUnreg && goodArch && goodOs

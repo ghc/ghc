@@ -122,21 +122,53 @@ ccArgs = validating ? do
 ldArgs :: Args
 ldArgs = mempty
 
+ghcIncludeDirs :: [FilePath]
+ghcIncludeDirs = [ "includes", "includes/dist"
+                 , "includes/dist-derivedconstants/header"
+                 , "includes/dist-ghcconstants/header" ]
+
 cppArgs :: Args
-cppArgs = mempty
+cppArgs = append . map ("-I" ++ ) $ ghcIncludeDirs
 
 customPackageArgs :: Args
-customPackageArgs = mconcat
-    [ package integerGmp2 ?
-      mconcat [ windowsHost ? builder GhcCabal ?
-                arg "--configure-option=--with-intree-gmp"
-              , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
+customPackageArgs = do
+    stage   <- getStage
+    rtsWays <- getRtsWays
+    mconcat
+        [ package integerGmp2 ?
+          mconcat [ windowsHost ? builder GhcCabal ?
+                    arg "--configure-option=--with-intree-gmp"
+                  , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
 
-    , package base ?
-      builder GhcCabal ? arg ("--flags=" ++ pkgName integerLibrary)
+        , package base ?
+          builder GhcCabal ? arg ("--flags=" ++ pkgName integerLibrary)
 
-    , package ghcPrim ?
-      builder GhcCabal ? arg "--flag=include-ghc-prim" ]
+        , package ghcPrim ?
+          builder GhcCabal ? arg "--flag=include-ghc-prim"
+
+        , package compiler ?
+          builder GhcCabal ?
+          mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show (succ stage)
+                  , arg "--disable-library-for-ghci"
+                  , targetOs "openbsd" ? arg "--ld-options=-E"
+                  , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
+                  , notP ghcWithSMP ? arg "--ghc-option=-DNOSMP"
+                  , notP ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
+                  , (threaded `elem` rtsWays) ?
+                    notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
+                  , ghcWithNativeCodeGen ? arg "--flags=ncg"
+                  , ghcWithInterpreter ? arg "--flags=ghci"
+                  , ghcWithInterpreter ?
+                    ghcEnableTablesNextToCode ?
+                    notP (flag GhcUnregisterised) ?
+                    notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
+                  , ghcWithInterpreter ?
+                    ghciWithDebugger ?
+                    notStage0 ? arg "--ghc-option=-DDEBUGGER"
+                  , ghcProfiled ?
+                    notStage0 ? arg "--ghc-pkg-option=--force"
+                  ]
+        ]
 
 withBuilderKey :: Builder -> String
 withBuilderKey builder = case builder of

@@ -32,7 +32,7 @@ unifyPath = toStandard . normaliseEx
 (-/-) :: FilePath -> FilePath -> FilePath
 a -/- b = unifyPath $ a </> b
 
-infixr 5 -/-
+infixr 6 -/-
 
 -- (chunksOfSize size ss) splits a list of strings 'ss' into chunks not
 -- exceeding the given 'size'.

@@ -2,7 +2,8 @@ module Oracles.Setting (
     Setting (..), SettingList (..),
     setting, settingList,
     targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
-    targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter
+    targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter,
+    ghcEnableTablesNextToCode
     ) where
 
 import Stage
@@ -91,3 +92,6 @@ ghcWithInterpreter = do
     goodArch <- targetArchs [ "i386", "x86_64", "powerpc", "sparc"
                             , "sparc64", "arm" ]
     return $ goodOs && goodArch
+
+ghcEnableTablesNextToCode :: Action Bool
+ghcEnableTablesNextToCode = targetArchs ["ia64", "powerpc64"]

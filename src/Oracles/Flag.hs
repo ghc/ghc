@@ -1,7 +1,7 @@
 module Oracles.Flag (
     Flag (..), flag,
     supportsPackageKey, crossCompiling, gccIsClang, gccLt46,
-    platformSupportsSharedLibs
+    platformSupportsSharedLibs, ghcWithSMP, ghcWithNativeCodeGen
     ) where
 
 import Util
@@ -54,3 +54,16 @@ platformSupportsSharedLibs = do
     solaris       <- targetPlatform    "i386-unknown-solaris2"
     solarisBroken <- flag SolarisBrokenShld
     return $ not (badPlatform || solaris && solarisBroken)
+
+ghcWithSMP :: Action Bool
+ghcWithSMP = do
+    goodArch <- targetArchs ["i386", "x86_64", "sparc", "powerpc", "arm"]
+    ghcUnreg <- flag GhcUnregisterised
+    return $ goodArch && not ghcUnreg
+
+ghcWithNativeCodeGen :: Action Bool
+ghcWithNativeCodeGen = do
+    goodArch <- targetArchs ["i386", "x86_64", "sparc", "powerpc"]
+    badOs    <- targetOss ["ios", "aix"]
+    ghcUnreg <- flag GhcUnregisterised
+    return $ goodArch && not badOs && not ghcUnreg

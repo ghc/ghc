@@ -30,7 +30,10 @@ ghcMArgs = stagedBuilder GhcM ? do
         , arg "-dep-makefile", arg $ buildPath -/- "haskell.deps"
         , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
         , append hsArgs
+        , arg "-no-user-package-db" -- TODO: is this needed?
+        , arg "-rtsopts"            -- TODO: is this needed?
         , append hsSrcs ]
+
 
 packageGhcArgs :: Args
 packageGhcArgs = do
@@ -56,6 +59,7 @@ includeGhcArgs = do
     pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
     incDirs <- getPkgDataList IncludeDirs
+    cppArgs <- getPkgDataList CppArgs
     let buildPath   = path -/- "build"
         autogenPath = buildPath -/- "autogen"
     mconcat
@@ -66,5 +70,5 @@ includeGhcArgs = do
         , arg $ "-I" ++ buildPath
         , arg $ "-I" ++ autogenPath
         , append . map (\dir -> "-I" ++ pkgPath -/- dir) $ incDirs
-        , arg "-optP-include" -- TODO: Shall we also add -cpp?
-        , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
+        , arg "-optP-include", arg $ "-optP" ++ autogenPath -/- "cabal_macros.h"
+        , append . map ("-optP" ++) $ cppArgs ]

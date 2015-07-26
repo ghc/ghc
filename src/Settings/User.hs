@@ -1,8 +1,9 @@
 module Settings.User (
     module Settings.Default,
-    userArgs, userPackages, userWays, userTargetDirectory,
+    userArgs, userPackages, userWays, userRtsWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
-    buildHaddock, validating, dynamicGhcPrograms, laxDependencies
+    buildHaddock, validating, ghciWithDebugger, ghcProfiled,
+    dynamicGhcPrograms, laxDependencies
     ) where
 
 import Stage
@@ -17,7 +18,7 @@ userArgs = mempty
 
 -- Control which packages get to be built
 userPackages :: Packages
-userPackages = remove [compiler] -- TODO: fix compiler
+userPackages = mempty
 
 -- Add new user-defined packages
 userKnownPackages :: [Package]
@@ -26,6 +27,9 @@ userKnownPackages = []
 -- Control which ways are built
 userWays :: Ways
 userWays = mempty
+
+userRtsWays :: Ways
+userRtsWays = mempty
 
 -- Control where build results go (see Settings.Default for an example)
 userTargetDirectory :: Stage -> Package -> FilePath
@@ -45,8 +49,15 @@ validating = False
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False
 
+ghciWithDebugger :: Bool
+ghciWithDebugger = False
+
+ghcProfiled :: Bool
+ghcProfiled = False
+
 laxDependencies :: Bool
 laxDependencies = False
 
 buildHaddock :: Predicate
 buildHaddock = return True
+
