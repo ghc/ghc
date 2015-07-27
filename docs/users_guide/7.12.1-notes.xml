@@ -234,6 +234,22 @@
                     call.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    A new function, <literal>interruptible</literal>, was added
+                    to <literal>GHC.IO</literal> allowing an
+                    <literal>IO</literal> action to be run such that it can be
+                    interrupted by an asynchronous exception, even if exceptions
+                    are masked (except if masked with
+                    <literal>interruptibleMask</literal>).
+                </para>
+                <para>
+                    This was introduced to fix the behavior of
+                    <literal>allowInterrupt</literal>, which would previously
+                    incorrectly allow exceptions in uninterruptible regions
+                    (see Trac #9516).
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

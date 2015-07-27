@@ -45,6 +45,9 @@
   * Exported `GiveGCStats`, `DoCostCentres`, `DoHeapProfile`, `DoTrace`,
     `RtsTime`, and `RtsNat` from `GHC.RTS.Flags`
 
+  * New function `GHC.IO.interruptible` used to correctly implement
+    `Control.Exception.allowInterrupt` (#9516)
+
 ## 4.8.1.0  *TBA*
 
   * Bundled with GHC 7.10.2
