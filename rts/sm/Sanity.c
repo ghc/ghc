@@ -637,8 +637,7 @@ checkStaticObjects ( StgClosure* static_objects )
   StgClosure *p = static_objects;
   StgInfoTable *info;
 
-  while (p != END_OF_STATIC_OBJECT_LIST) {
-    p = UNTAG_STATIC_LIST_PTR(p);
+  while (p != END_OF_STATIC_LIST) {
     checkClosure(p);
     info = get_itbl(p);
     switch (info->type) {

@@ -271,8 +271,7 @@ void checkUnload (StgClosure *static_objects)
 
   addrs = allocHashTable();
 
-  for (p = static_objects; p != END_OF_STATIC_OBJECT_LIST; p = link) {
-      p = UNTAG_STATIC_LIST_PTR(p);
+  for (p = static_objects; p != END_OF_STATIC_LIST; p = link) {
       checkAddress(addrs, p);
       info = get_itbl(p);
       link = *STATIC_LINK(info, p);
@@ -280,9 +279,8 @@ void checkUnload (StgClosure *static_objects)
 
   // CAFs on revertible_caf_list are not on static_objects
   for (p = (StgClosure*)revertible_caf_list;
-       p != END_OF_CAF_LIST;
+       p != END_OF_STATIC_LIST;
        p = ((StgIndStatic *)p)->static_link) {
-      p = UNTAG_STATIC_LIST_PTR(p);
       checkAddress(addrs, p);
   }
 
