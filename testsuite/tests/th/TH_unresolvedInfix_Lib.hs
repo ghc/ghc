@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeOperators #-}
+
 module TH_unresolvedInfix_Lib where
 
 import Language.Haskell.TH
@@ -72,3 +74,21 @@ p14 = mkQQ ( (parensP (p ^+? p)) ^*? (parensP (p ^+? p)) )
 p15 = mkQQ ( parensP ((p ^+? p) ^*? (p ^+? p)) )
 -------------- Dropping constructors
 p16 = mkQQ ( p ^*? (tupP [p ^+? p]) )
+
+--------------------------------------------------------------------------------
+--                                  Types                                     --
+--------------------------------------------------------------------------------
+
+infixl 6 +
+infixl 7 *
+data (+) a b = Plus a b
+data (*) a b = Times a b
+
+int = conT (mkName "Int")
+tyPlus = mkName "+"
+tyTimes = mkName "*"
+
+a $+? b = uInfixT a tyPlus b
+a $*? b = uInfixT a tyTimes b
+a $+! b = infixT a tyPlus b
+a $*! b = infixT a tyTimes b

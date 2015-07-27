@@ -518,6 +518,20 @@ varT = return . VarT
 conT :: Name -> TypeQ
 conT = return . ConT
 
+infixT :: TypeQ -> Name -> TypeQ -> TypeQ
+infixT t1 n t2 = do t1' <- t1
+                    t2' <- t2
+                    return (InfixT t1' n t2')
+
+uInfixT :: TypeQ -> Name -> TypeQ -> TypeQ
+uInfixT t1 n t2 = do t1' <- t1
+                     t2' <- t2
+                     return (UInfixT t1' n t2')
+
+parensT :: TypeQ -> TypeQ
+parensT t = do t' <- t
+               return (ParensT t')
+
 appT :: TypeQ -> TypeQ -> TypeQ
 appT t1 t2 = do
            t1' <- t1

@@ -105,8 +105,9 @@ module Language.Haskell.TH(
     bindS, letS, noBindS, parS,
 
     -- *** Types
-        forallT, varT, conT, appT, arrowT, equalityT, listT, tupleT, sigT, litT,
-    promotedT, promotedTupleT, promotedNilT, promotedConsT,
+        forallT, varT, conT, appT, arrowT, infixT, uInfixT, parensT, equalityT,
+        listT, tupleT, sigT, litT, promotedT, promotedTupleT, promotedNilT,
+        promotedConsT,
     -- **** Type literals
     numTyLit, strTyLit,
     -- **** Strictness
