@@ -288,7 +288,7 @@ basicKnownKeyNames
         otherwiseIdName, inlineIdName,
         eqStringName, assertName, breakpointName, breakpointCondName,
         breakpointAutoName,  opaqueTyConName,
-        assertErrorName, runSTRepName,
+        assertErrorName,
         printName, fstName, sndName,
 
         -- Integer
@@ -1132,10 +1132,6 @@ stablePtrTyConName, newStablePtrName :: Name
 stablePtrTyConName    = tcQual   gHC_STABLE (fsLit "StablePtr")    stablePtrTyConKey
 newStablePtrName      = varQual  gHC_STABLE (fsLit "newStablePtr") newStablePtrIdKey
 
--- PrelST module
-runSTRepName :: Name
-runSTRepName       = varQual gHC_ST  (fsLit "runSTRep") runSTRepIdKey
-
 -- Recursive-do notation
 monadFixClassName, mfixName :: Name
 monadFixClassName  = clsQual mONAD_FIX (fsLit "MonadFix") monadFixClassKey
@@ -1665,7 +1661,7 @@ typeErrorIdKey                = mkPreludeMiscIdUnique 22
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
-    fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey, runSTRepIdKey :: Unique
+    fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
 unsafeCoerceIdKey             = mkPreludeMiscIdUnique 30
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
@@ -1681,7 +1677,6 @@ fstIdKey                      = mkPreludeMiscIdUnique 41
 sndIdKey                      = mkPreludeMiscIdUnique 42
 otherwiseIdKey                = mkPreludeMiscIdUnique 43
 assertIdKey                   = mkPreludeMiscIdUnique 44
-runSTRepIdKey                 = mkPreludeMiscIdUnique 45
 
 mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     integerToWordIdKey, integerToIntIdKey,
