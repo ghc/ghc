@@ -438,10 +438,10 @@ cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
 cvt_arg (NotStrict, ty) = cvtType ty
 cvt_arg (IsStrict,  ty)
   = do { ty' <- cvtType ty
-       ; returnL $ HsBangTy (HsSrcBang Nothing Nothing     True) ty' }
+       ; returnL $ HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcStrict) ty' }
 cvt_arg (Unpacked,  ty)
   = do { ty' <- cvtType ty
-       ; returnL $ HsBangTy (HsSrcBang Nothing (Just True) True) ty' }
+       ; returnL $ HsBangTy (HsSrcBang Nothing SrcUnpack   SrcStrict) ty' }
 
 cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)

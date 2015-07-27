@@ -1371,7 +1371,7 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
       = do { addErrTc (badFieldCon (RealDataCon data_con) field_lbl)
            ; return Nothing }
 
-checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
+checkMissingFields ::  DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
   | null field_labels   -- Not declared as a record;
                         -- But C{} is still valid if no strict fields
@@ -1408,7 +1408,7 @@ checkMissingFields data_con rbinds
                           field_labels
                           field_strs
 
-    field_strs = dataConSrcBangs data_con
+    field_strs = dataConImplBangs data_con
 
 {-
 ************************************************************************

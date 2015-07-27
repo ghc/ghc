@@ -1566,18 +1566,21 @@ sigtypes1 :: { (OrdList (LHsType RdrName)) }      -- Always HsForAllTys
 -- Types
 
 strict_mark :: { Located ([AddAnn],HsBang) }
-        : '!'                        { sL1 $1 ([mj AnnBang $1]
-                                              ,HsSrcBang Nothing                       Nothing      True) }
-        | '{-# UNPACK' '#-}'         { sLL $1 $> ([mo $1,mc $2]
-                                              ,HsSrcBang (Just $ getUNPACK_PRAGs $1)   (Just True)  False) }
-        | '{-# NOUNPACK' '#-}'       { sLL $1 $> ([mo $1,mc $2]
-                                              ,HsSrcBang (Just $ getNOUNPACK_PRAGs $1) (Just False) False) }
-        | '{-# UNPACK' '#-}' '!'     { sLL $1 $> ([mo $1,mc $2,mj AnnBang $3]
-                                              ,HsSrcBang (Just $ getUNPACK_PRAGs $1)   (Just True)  True) }
-        | '{-# NOUNPACK' '#-}' '!'   { sLL $1 $> ([mo $1,mc $2,mj AnnBang $3]
-                                              ,HsSrcBang (Just $ getNOUNPACK_PRAGs $1) (Just False) True) }
-        -- Although UNPACK with no '!' is illegal, we get a
-        -- better error message if we parse it here
+        : strictness { sL1 $1 (let (a, str) = unLoc $1 in (a, HsSrcBang Nothing NoSrcUnpack str)) }
+        | unpackedness { sL1 $1 (let (a, prag, unpk) = unLoc $1 in (a, HsSrcBang prag unpk NoSrcStrictness)) }
+        | unpackedness strictness { sLL $1 $> (let { (a, prag, unpk) = unLoc $1
+                                                   ; (a', str) = unLoc $2 }
+                                                in (a ++ a', HsSrcBang prag unpk str)) }
+        -- Although UNPACK with no '!' without StrictData and UNPACK with '~' are illegal,
+        -- we get a better error message if we parse them here
+
+strictness :: { Located ([AddAnn], SrcStrictness) }
+        : '!' { sL1 $1 ([mj AnnBang $1], SrcStrict) }
+        | '~' { sL1 $1 ([mj AnnTilde $1], SrcLazy) }
+
+unpackedness :: { Located ([AddAnn], Maybe SourceText, SrcUnpackedness) }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], Just $ getUNPACK_PRAGs $1, SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], Just $ getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }
@@ -1626,47 +1629,39 @@ ctypedoc :: { LHsType RdrName }
 -- to permit an individual equational constraint without parenthesis.
 -- Thus for some reason we allow    f :: a~b => blah
 -- but not                          f :: ?x::Int => blah
+-- See Note [Parsing ~]
 context :: { LHsContext RdrName }
-        : btype '~'      btype          {% do { (anns,ctx) <- checkContext
-                                                 (sLL $1 $> $ HsEqTy $1 $3)
-                                              ; ams ctx (mj AnnTilde $2:anns) } }
-        | btype                         {% do { (anns,ctx) <- checkContext $1
-                                              ; if null (unLoc ctx)
-                                                 then addAnnotation (gl $1) AnnUnit (gl $1)
-                                                 else return ()
-                                              ; ams ctx anns
-                                              } }
-
+        :  btype                        {% do { (anns,ctx) <- checkContext (splitTilde $1)
+                                                ; if null (unLoc ctx)
+                                                   then addAnnotation (gl $1) AnnUnit (gl $1)
+                                                   else return ()
+                                                ; ams ctx anns
+                                                } }
+-- See Note [Parsing ~]
 type :: { LHsType RdrName }
-        : btype                         { $1 }
+        : btype                         { splitTilde $1 }
         | btype qtyconop type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype '->'     ctype          {% ams $1 [mj AnnRarrow $2]
-                                        >> ams (sLL $1 $> $ HsFunTy $1 $3)
+                                        >> ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
                                                [mj AnnRarrow $2] }
-        | btype '~'      btype          {% ams (sLL $1 $> $ HsEqTy $1 $3)
-                                               [mj AnnTilde $2] }
-                                        -- see Note [Promotion]
         | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
                                                 [mj AnnSimpleQuote $2] }
         | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
                                                 [mj AnnSimpleQuote $2] }
-
+-- See Note [Parsing ~]
 typedoc :: { LHsType RdrName }
-        : btype                          { $1 }
-        | btype docprev                  { sLL $1 $> $ HsDocTy $1 $2 }
+        : btype                          { splitTilde $1 }
+        | btype docprev                  { sLL $1 $> $ HsDocTy (splitTilde $1) $2 }
         | btype qtyconop type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype qtyconop type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
         | btype tyvarop  type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
-        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy $1 $3)
+        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
                                                 [mj AnnRarrow $2] }
-        | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $ HsFunTy (L (comb2 $1 $2)
+        | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $ HsFunTy (L (comb2 (splitTilde $1) $2)
                                                             (HsDocTy $1 $2)) $4)
                                                 [mj AnnRarrow $3] }
-        | btype '~'      btype           {% ams (sLL $1 $> $ HsEqTy $1 $3)
-                                                [mj AnnTilde $2] }
-                                        -- see Note [Promotion]
         | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
                                                 [mj AnnSimpleQuote $2] }
         | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
@@ -1790,6 +1785,23 @@ fd :: { Located (FunDep (Located RdrName)) }
 varids0 :: { Located [Located RdrName] }
         : {- empty -}                   { noLoc [] }
         | varids0 tyvar                 { sLL $1 $> ($2 : unLoc $1) }
+
+{-
+Note [Parsing ~]
+~~~~~~~~~~~~~~~~
+
+Due to parsing conflicts between lazyness annotations in data type
+declarations (see strict_mark) and equality types ~'s are always
+parsed as lazyness annotations, and turned into HsEqTy's in the
+correct places using RdrHsSyn.splitTilde.
+
+Since strict_mark is parsed as part of atype which is part of type,
+typedoc and context (where HsEqTy previously appeared) it made most
+sense and was simplest to parse ~ as part of strict_mark and later
+turn them into HsEqTy's.
+
+-}
+
 
 -----------------------------------------------------------------------------
 -- Kinds

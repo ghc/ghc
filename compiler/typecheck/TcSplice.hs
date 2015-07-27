@@ -1490,12 +1490,13 @@ reifyFixity name
       conv_dir BasicTypes.InfixN = TH.InfixN
 
 reifyStrict :: DataCon.HsSrcBang -> TH.Strict
-reifyStrict HsNoBang                       = TH.NotStrict
-reifyStrict (HsSrcBang _ _ False)          = TH.NotStrict
-reifyStrict (HsSrcBang _ (Just True) True) = TH.Unpacked
-reifyStrict (HsSrcBang _ _     True)       = TH.IsStrict
-reifyStrict HsStrict                       = TH.IsStrict
-reifyStrict (HsUnpack {})                  = TH.Unpacked
+reifyStrict HsLazy                                  = TH.NotStrict
+reifyStrict (HsSrcBang _ _         SrcLazy)         = TH.NotStrict
+reifyStrict (HsSrcBang _ _         NoSrcStrictness) = TH.NotStrict
+reifyStrict (HsSrcBang _ SrcUnpack SrcStrict)       = TH.Unpacked
+reifyStrict (HsSrcBang _ _         SrcStrict)       = TH.IsStrict
+reifyStrict HsStrict                                = TH.IsStrict
+reifyStrict (HsUnpack {})                           = TH.Unpacked
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

@@ -1114,7 +1114,7 @@ on <literal>MkT</literal>. But the same pattern match also <emphasis>provides</e
 </para>
 <para>
 Exactly the same reasoning applies to <literal>ExNumPat</literal>:
-matching against <literal>ExNumPat</literal> <emphasis>requires</emphasis> 
+matching against <literal>ExNumPat</literal> <emphasis>requires</emphasis>
 the constraints <literal>(Num a, Eq a)</literal>, and <emphasis>provides</emphasis>
 the constraint <literal>(Show b)</literal>.
 </para>
@@ -4707,7 +4707,7 @@ class type variable (in this case <literal>a</literal>).
 </para>
 <para>
 GHC lifts this restriction with language extension <option>-XConstrainedClassMethods</option>.
-The restriction is a pretty stupid one in the first place, 
+The restriction is a pretty stupid one in the first place,
 so <option>-XConstrainedClassMethods</option> is implied by <option>-XMultiParamTypeClasses</option>.
 </para>
 </sect3>
@@ -5235,7 +5235,7 @@ termination: see <xref linkend="instance-termination"/>.
 <para>
 Regardless of <option>-XFlexibleInstances</option> and <option>-XFlexibleContexts</option>,
 instance declarations must conform to some rules that ensure that instance resolution
-will terminate.  The restrictions can be lifted with <option>-XUndecidableInstances</option> 
+will terminate.  The restrictions can be lifted with <option>-XUndecidableInstances</option>
 (see <xref linkend="undecidable-instances"/>).
 </para>
 <para>
@@ -6908,8 +6908,8 @@ T :: (k -> *) -> k -> *
 </para></listitem>
 
 <listitem><para>
-GHC does not usually print explicit <literal>forall</literal>s, including kind <literal>forall</literal>s. 
-You can make GHC show them explicitly with <option>-fprint-explicit-foralls</option> 
+GHC does not usually print explicit <literal>forall</literal>s, including kind <literal>forall</literal>s.
+You can make GHC show them explicitly with <option>-fprint-explicit-foralls</option>
 (see <xref linkend="options-help"/>):
 <programlisting>
 ghci> :set -XPolyKinds
@@ -6981,7 +6981,7 @@ very convenient, and it is not clear what the syntax for explicit quantification
 Generally speaking, when <option>-XPolyKinds</option> is on, GHC tries to infer the most
 general kind for a declaration.  For example:
 <programlisting>
-data T f a = MkT (f a)   -- GHC infers:  
+data T f a = MkT (f a)   -- GHC infers:
                          -- T :: forall k. (k->*) -> k -> *
 </programlisting>
 In this case the definition has a right-hand side to inform kind inference.
@@ -6990,9 +6990,9 @@ But that is not always the case.  Consider
 type family F a
 </programlisting>
 Type family declarations have no right-hand side, but GHC must still infer a kind
-for <literal>F</literal>.  Since there are no constraints, it could infer 
-<literal>F :: forall k1 k2. k1 -> k2</literal>, but that seems <emphasis>too</emphasis> 
-polymorphic.  So GHC defaults those entirely-unconstrained kind variables to <literal>*</literal> and 
+for <literal>F</literal>.  Since there are no constraints, it could infer
+<literal>F :: forall k1 k2. k1 -> k2</literal>, but that seems <emphasis>too</emphasis>
+polymorphic.  So GHC defaults those entirely-unconstrained kind variables to <literal>*</literal> and
 we get <literal>F :: * -> *</literal>.  You can still declare <literal>F</literal> to be
 kind-polymorphic using kind signatures:
 <programlisting>
@@ -7014,23 +7014,23 @@ by the class method signatures.
 </para></listitem>
 <listitem><para>
 <emphasis>When there is no right hand side, GHC defaults argument and result kinds to <literal>*</literal>,
-except when directed otherwise by a kind signature</emphasis>.  
+except when directed otherwise by a kind signature</emphasis>.
 Examples: data and type family declarations.
 </para></listitem>
 </itemizedlist>
-This rule has occasionally-surprising consequences 
+This rule has occasionally-surprising consequences
 (see <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10132">Trac 10132</ulink>).
 <programlisting>
 class C a where    -- Class declarations are generalised
                    -- so C :: forall k. k -> Constraint
-  data D1 a        -- No right hand side for these two family 
+  data D1 a        -- No right hand side for these two family
   type F1 a        -- declarations, but the class forces (a :: k)
                    -- so   D1, F1 :: forall k. k -> *
 
 data D2 a   -- No right-hand side so D2 :: * -> *
 type F2 a   -- No right-hand side so F2 :: * -> *
 </programlisting>
-The kind-polymorphism from the class declaration makes <literal>D1</literal> 
+The kind-polymorphism from the class declaration makes <literal>D1</literal>
 kind-polymorphic, but not so <literal>D2</literal>; and similarly <literal>F1</literal>, <literal>F1</literal>.
 </para>
 </sect2>
@@ -8500,7 +8500,7 @@ for rank-2 types.
 <title>Impredicative polymorphism
 </title>
 <para>In general, GHC will only instantiate a polymorphic function at
-a monomorphic type (one with no foralls). For example, 
+a monomorphic type (one with no foralls). For example,
 <programlisting>
 runST :: (forall s. ST s a) -> a
 id :: forall b. b -> b
@@ -13303,10 +13303,48 @@ Here are some examples:</para>
 
 </sect1>
 
+<sect1 id="strict-haskell">
+  <title>Strict Haskell</title>
+  <indexterm><primary>strict haskell</primary></indexterm>
+
+  <para>High-performance Haskell code (e.g. numeric code) can
+  sometimes be littered with bang patterns, making it harder to
+  read. The reason is that lazy evaluation isn't the right default in
+  this particular code but the programmer has no way to say that
+  except by repeatedly adding bang patterns. Below
+  <option>-XStrictData</option> is detailed that allows the programmer
+  to switch the default behavior on a per-module basis.</para>
+
+  <sect2 id="strict-data">
+    <title>Strict-by-default data types</title>
+
+    <para>Informally the <literal>StrictData</literal> language
+    extension switches data type declarations to be strict by default
+    allowing fields to be lazy by adding a <literal>~</literal> in
+    front of the field.</para>
+
+    <para>When the user writes</para>
+
+    <programlisting>
+      data T = C a
+      data T' = C' ~a
+    </programlisting>
+
+    <para>we interpret it as if she had written</para>
+
+    <programlisting>
+      data T = C !a
+      data T' = C' a
+    </programlisting>
+
+    <para>The extension only affects definitions in this module.</para>
+  </sect2>
+
+</sect1>
+
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->
-

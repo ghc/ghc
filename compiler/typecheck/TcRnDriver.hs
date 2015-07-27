@@ -838,8 +838,8 @@ checkBootDeclM :: Bool  -- ^ True <=> an hs-boot file (could also be a sig)
                -> TyThing -> TyThing -> TcM ()
 checkBootDeclM is_boot boot_thing real_thing
   = whenIsJust (checkBootDecl boot_thing real_thing) $ \ err ->
-    addErrAt (nameSrcSpan (getName boot_thing))
-             (bootMisMatch is_boot err real_thing boot_thing)
+       addErrAt (nameSrcSpan (getName boot_thing))
+                (bootMisMatch is_boot err real_thing boot_thing)
 
 -- | Compares the two things for equivalence between boot-file and normal
 -- code. Returns @Nothing@ on success or @Just "some helpful info for user"@
@@ -1017,8 +1017,7 @@ checkBootTyCon tc1 tc2
          check (dataConIsInfix c1 == dataConIsInfix c2)
                (text "The fixities of" <+> pname1 <+>
                 text "differ") `andThenCheck`
-         check (eqListBy eqHsBang
-                         (dataConSrcBangs c1) (dataConSrcBangs c2))
+         check (eqListBy eqHsBang (dataConImplBangs c1) (dataConImplBangs c2))
                (text "The strictness annotations for" <+> pname1 <+>
                 text "differ") `andThenCheck`
          check (dataConFieldLabels c1 == dataConFieldLabels c2)
