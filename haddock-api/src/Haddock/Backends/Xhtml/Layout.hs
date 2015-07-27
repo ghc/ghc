@@ -127,14 +127,12 @@ divSubDecls cssClass captionName = maybe noHtml wrap
 
 subDlist :: Qualification -> [SubDecl] -> Maybe Html
 subDlist _ [] = Nothing
-subDlist qual decls = Just $ dlist << map subEntry decls +++ clearDiv
+subDlist qual decls = Just $ ulist << map subEntry decls
   where
     subEntry (decl, mdoc, subs) =
-      dterm ! [theclass "src"] << decl
-      +++
-      docElement ddef << (fmap (docToHtml Nothing qual) mdoc +++ subs)
-
-    clearDiv = thediv ! [ theclass "clear" ] << noHtml
+      li <<
+        (define ! [theclass "src"] << decl +++
+         docElement thediv << (fmap (docToHtml Nothing qual) mdoc +++ subs))
 
 
 subTable :: Qualification -> [SubDecl] -> Maybe Html
