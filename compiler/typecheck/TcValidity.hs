@@ -1029,6 +1029,7 @@ checkInstTermination tys theta
    check pred
      = case classifyPredType pred of
          EqPred {}    -> return ()  -- See Trac #4200.
+         InstanceOfPred {} -> return ()
          IrredPred {} -> check2 pred (sizeType pred)
          ClassPred cls tys
            | isIPClass cls
