@@ -769,9 +769,11 @@ ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 
 
 ppBang :: HsBang -> Html
-ppBang HsNoBang = noHtml
-ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
-                             -- so we just show the strictness annotation
+ppBang HsStrict                  = toHtml "!"
+ppBang (HsUnpack {})             = toHtml "!"
+ppBang (HsSrcBang _ _ SrcStrict) = toHtml "!"
+ppBang (HsSrcBang _ _ SrcLazy)   = toHtml "~"
+ppBang _                         = noHtml
 
 
 tupleParens :: HsTupleSort -> [Html] -> Html
