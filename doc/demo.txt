@@ -2,3 +2,8 @@
 2. Rebuild only when package-data.mk contents has changed
 
 * Add to Settings/GhcPkg.hs: package deepseq ? arg "--force"
+
+3. Reduce complexity when searching for source files by 40x:
+
+* compiler, was: 25 dirs (24 source dirs + autogen) x 406 modules x 2 extensions = 20300 candidates
+* compiler, now: 25 dirs x 20 module-dirs = 500 candidates
