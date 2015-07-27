@@ -14,7 +14,6 @@ module TcSMonad (
     -- The TcS monad
     TcS, runTcS, runTcSWithEvBinds,
     failTcS, tryTcS, nestTcS, nestImplicTcS, recoverTcS,
-    nestTcSInstantiateAlways, tcInstantiateAlways,
 
     runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq, splitInst,
     deferTcSForAllInstanceOf,
@@ -2101,9 +2100,7 @@ data TcSEnv
 
       -- The main work-list and the flattening worklist
       -- See Note [Work list priorities] and
-      tcs_worklist  :: IORef WorkList, -- Current worklist
-
-      tcs_instantiate :: Bool
+      tcs_worklist  :: IORef WorkList -- Current worklist
     }
 
 ---------------
@@ -2208,8 +2205,7 @@ runTcSWithEvBinds ev_binds_var tcs
                           , tcs_unified   = unified_var
                           , tcs_count     = step_count
                           , tcs_inerts    = inert_var
-                          , tcs_worklist  = wl_var
-                          , tcs_instantiate = False }
+                          , tcs_worklist  = wl_var }
 
              -- Run the computation
        ; res <- unTcS tcs env
@@ -2252,8 +2248,7 @@ nestImplicTcS :: EvBindsVar -> TcLevel -> TcS a -> TcS a
 nestImplicTcS ref inner_tclvl (TcS thing_inside)
   = TcS $ \ TcSEnv { tcs_unified = unified_var
                    , tcs_inerts = old_inert_var
-                   , tcs_count = count
-                   , tcs_instantiate = inst_always } ->
+                   , tcs_count = count } ->
     do { inerts <- TcM.readTcRef old_inert_var
        ; let nest_inert = inerts { inert_flat_cache = emptyFunEqs }
                                    -- See Note [Do not inherit the flat cache]
@@ -2263,8 +2258,7 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                                , tcs_unified     = unified_var
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = new_wl_var
-                               , tcs_instantiate = inst_always }
+                               , tcs_worklist    = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
 
@@ -2295,28 +2289,17 @@ recoverTcS (TcS recovery_code) (TcS thing_inside)
     TcM.recoverM (recovery_code env) (thing_inside env)
 
 nestTcS :: TcS a -> TcS a
-nestTcS s = do { inst_always <- tcInstantiateAlways
-               ; nestTcS_ inst_always s }
-
-nestTcSInstantiateAlways :: TcS a -> TcS a
-nestTcSInstantiateAlways = nestTcS_ True
-
-tcInstantiateAlways :: TcS Bool
-tcInstantiateAlways = TcS (return . tcs_instantiate)
-
-nestTcS_ :: Bool -> TcS a -> TcS a
 -- Use the current untouchables, augmenting the current
 -- evidence bindings, and solved dictionaries
 -- But have no effect on the InertCans, or on the inert_flat_cache
 --  (the latter because the thing inside a nestTcS does unflattening)
-nestTcS_ instantiate_always (TcS thing_inside)
+nestTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
     do { inerts <- TcM.readTcRef inerts_var
        ; new_inert_var <- TcM.newTcRef inerts
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = new_wl_var
-                            , tcs_instantiate = instantiate_always }
+                            , tcs_worklist = new_wl_var }
 
        ; res <- thing_inside nest_env
 

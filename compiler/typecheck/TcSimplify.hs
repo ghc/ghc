@@ -140,8 +140,7 @@ simpl_top wanteds
                          ; return (r || something) }
                  _ -> return something) False approx
            ; if something_happened
-             then do { traceTcS "instance_of_defaulting" (ppr approx)
-                     ; wc_residual <- nestTcSInstantiateAlways (solveWantedsAndDrop wc)
+             then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
                      ; try_class_defaulting wc_residual }
              else try_class_defaulting wc }
 
@@ -153,7 +152,7 @@ simpl_top wanteds
                 then return False
                 else unifyTyVar v lhs >> return True }
       | otherwise
-      = return True
+      = return False
 
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc
