@@ -50,7 +50,7 @@ interestingInfo builder ss = case builder of
     Gcc _    -> prefixAndSuffix 0 4 ss
     GccM _   -> prefixAndSuffix 0 1 ss
     Ghc _    -> prefixAndSuffix 0 4 ss
-    GhcM _   -> prefixAndSuffix 1 1 ss
+    --GhcM _   -> prefixAndSuffix 1 1 ss
     GhcPkg _ -> prefixAndSuffix 3 0 ss
     GhcCabal -> prefixAndSuffix 3 0 ss
     _        -> ss

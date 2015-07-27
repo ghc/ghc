@@ -38,6 +38,3 @@ dependencyListOracle = do
     addOracle $ \(DependencyListKey (file, obj)) ->
         Map.lookup (unifyPath obj) <$> deps (unifyPath file)
     return ()
-
-bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
-bimap f g (x, y) = (f x, g y)

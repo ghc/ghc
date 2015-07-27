@@ -23,52 +23,6 @@ import Oracles
 import Settings
 import qualified System.Directory as S
 
---pathArgs :: ShowArgs a => String -> FilePath -> a -> Args
---pathArgs key path as = map (\a -> key ++ unifyPath (path </> a)) <$> args as
-
--- prefixedPath :: String -> [Settings] -> Settings
--- prefixedPath prefix = argPrefix prefix . argConcatPath . sconcat
-
---includeGccArgs :: FilePath -> FilePath -> Args
---includeGccArgs path dist =
---    let pathDist = path </> dist
---        autogen  = pathDist </> "build/autogen"
---    in args [ arg $ "-I" ++ unifyPath autogen
---            , pathArgs "-I" path $ IncludeDirs pathDist
---            , pathArgs "-I" path $ DepIncludeDirs pathDist ]
-
-
--- includeGccSettings :: Settings
--- includeGccSettings = mconcat
---     [ prefixedPath "-I" [argBuildPath, argBuildDir, arg "build", arg "autogen"]
---     , argPrefix "-I" $ argPaths ...
---     , prefixedPath "-I" [argBuildPath, argIncludeDirs ] -- wrong
---     , prefixedPath "-I" [argBuildPath, argDepIncludeDirs ]]
-
--- includeGhcSettings :: Settings
--- includeGhcSettings =
---     let buildDir = argBuildPath `fence` argSrcDirs
---     in arg "-i" `fence`
---        mconcat
---        [ argPathList "-i" [argBuildPath, argSrcDirs]
---        , argPath "-i" buildDir
---        , argPath "-I" buildDir
---        , argPathList "-i" [buildDir, arg "autogen"]
---        , argPathList "-I" [buildDir, arg "autogen"]
---        , argPathList "-I" [argBuildPath, argIncludeDirs]
---        , arg "-optP-include" -- TODO: Shall we also add -cpp?
---        , argPathList "-optP" [buildDir, arg "autogen/cabal_macros.h"] ]
-
-
--- pkgHsSources :: FilePath -> FilePath -> Action [FilePath]
--- pkgHsSources path dist = do
---     let pathDist = path </> dist
---         autogen = pathDist </> "build/autogen"
---     dirs <- map (path </>) <$> args (SrcDirs pathDist)
---     findModuleFiles pathDist (autogen:dirs) [".hs", ".lhs"]
-
--- TODO: look for non-{hs,c} objects too
-
 -- Find Haskell objects we depend on (we don't want to depend on split objects)
 pkgDepHsObjects :: FilePath -> FilePath -> Way -> Action [FilePath]
 pkgDepHsObjects path dist way = do
@@ -100,20 +54,6 @@ pkgLibHsObjects path dist stage way = do
          let suffix = "_" ++ osuf way ++ "_split/*." ++ osuf way
          findModuleFiles pathDist [buildDir] [suffix]
     else do return depObjs
-
--- findModuleFiles :: FilePath -> [FilePath] -> [String] -> Action [FilePath]
--- findModuleFiles pathDist directories suffixes = do
---     modPaths <- map (replaceEq '.' pathSeparator) <$> args (Modules pathDist)
---     fileList <- forM [ dir </> modPath ++ suffix
---                      | dir     <- directories
---                      , modPath <- modPaths
---                      , suffix  <- suffixes
---                      ] $ \file -> do
---                          let dir = takeDirectory file
---                          dirExists <- liftIO $ S.doesDirectoryExist dir
---                          when dirExists $ return $ unifyPath file
---     files <- getDirectoryFiles "" fileList
---     return $ map unifyPath files
 
 -- The argument list has a limited size on Windows. Since Windows 7 the limit
 -- is 32768 (theoretically). In practice we use 31000 to leave some breathing

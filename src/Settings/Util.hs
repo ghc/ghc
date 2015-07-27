@@ -26,6 +26,8 @@ import Oracles.Setting
 import Oracles.PackageData
 import Settings.User
 import Settings.TargetDirectory
+import Data.List
+import Data.Function
 
 -- A single argument.
 arg :: String -> Args
@@ -76,8 +78,34 @@ getHsSources = do
     path    <- getTargetPath
     pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
-    let paths = (path -/- "build/autogen") : map (pkgPath -/-) srcDirs
-    getSourceFiles paths [".hs", ".lhs"]
+    modules <- getPkgDataList Modules
+    let buildPath   = path -/- "build"
+        autogenPath = buildPath -/- "autogen"
+        dirs        = autogenPath : map (pkgPath -/-) srcDirs
+        decodedMods = sort $ map decodeModule modules
+        modDirFiles = map (bimap head sort . unzip)
+                    $ groupBy ((==) `on` fst) decodedMods
+
+    result <- lift . fmap concat . forM dirs $ \dir -> do
+        todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
+        forM todo $ \(mDir, mFiles) -> do
+            let files = [ dir -/- mDir -/- mFile <.> "*hs" | mFile <- mFiles ]
+            found <- fmap (map unifyPath) $ getDirectoryFiles "" files
+            return (found, (mDir, map takeBaseName found))
+
+    let foundSources = concatMap fst result
+        foundMods    = [ (d, f) | (d, fs) <- map snd result, f <- fs ]
+        leftMods     = decodedMods \\ sort foundMods
+        genSources   = map (\(d, f) -> buildPath -/- d -/- f <.> "hs") leftMods
+
+    return $ foundSources ++ genSources
+
+-- Given a module name extract the directory and file names, e.g.:
+-- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
+decodeModule :: String -> (FilePath, FilePath)
+decodeModule = splitFileName . replaceEq '.' '/'
+
+    -- getSourceFiles paths [".hs", ".lhs"]
 
 -- Find all source files in specified paths and with given extensions
 getSourceFiles :: [FilePath] -> [String] -> Expr [FilePath]

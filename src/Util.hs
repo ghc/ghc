@@ -5,7 +5,8 @@ module Util (
     replaceIf, replaceEq, replaceSeparators,
     unifyPath, (-/-),
     chunksOfSize,
-    putColoured, redError, redError_
+    putColoured, redError, redError_,
+    bimap
     ) where
 
 import Data.Char
@@ -65,3 +66,7 @@ redError msg = do
 
 redError_ :: String -> Action ()
 redError_ = void . redError
+
+-- Depending on Data.Bifunctor only for this function seems an overkill
+bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+bimap f g (x, y) = (f x, g y)
