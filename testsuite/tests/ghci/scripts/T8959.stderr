@@ -3,7 +3,7 @@
     Arrow command found where an expression was expected:
       () >- () -< () >>- () -<< ()
 
-<interactive>:7:15:
+<interactive>:6:15:
     Couldn't match expected type ‘()’ with actual type ‘Bool’
     In the pattern: True
     In a stmt of a pattern guard for
@@ -15,7 +15,7 @@
     Arrow command found where an expression was expected:
       () ↣ () ↢ () ⤜ () ⤛ ()
 
-<interactive>:14:15:
+<interactive>:13:15:
     Couldn't match expected type ‘()’ with actual type ‘Bool’
     In the pattern: True
     In a stmt of a pattern guard for
@@ -27,7 +27,7 @@
     Arrow command found where an expression was expected:
       () >- () -< () >>- () -<< ()
 
-<interactive>:21:15:
+<interactive>:20:15:
     Couldn't match expected type ‘()’ with actual type ‘Bool’
     In the pattern: True
     In a stmt of a pattern guard for

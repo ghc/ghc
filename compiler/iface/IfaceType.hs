@@ -15,6 +15,10 @@ module IfaceType (
         IfaceTyLit(..), IfaceTcArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr, IfaceTvBndr, IfaceIdBndr,
 
+        -- Equality testing
+        IfRnEnv2, emptyIfRnEnv2, eqIfaceType, eqIfaceTypes,
+        eqIfaceTcArgs, eqIfaceTvBndrs, eqIfaceCoercion,
+
         -- Conversion from Type -> IfaceType
         toIfaceType, toIfaceTypes, toIfaceKind, toIfaceTyVar,
         toIfaceContext, toIfaceBndr, toIfaceIdBndr,
@@ -50,7 +54,6 @@ import TcType
 import DynFlags
 import TypeRep
 import Unique( hasKey )
-import Util ( filterOut, zipWithEqual )
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import Id
@@ -65,6 +68,8 @@ import Binary
 import Outputable
 import FastString
 import UniqSet
+import UniqFM
+import Util
 import Data.Maybe( fromMaybe )
 
 {-
@@ -120,6 +125,7 @@ type IfaceContext = [IfacePredType]
 data IfaceTyLit
   = IfaceNumTyLit Integer
   | IfaceStrTyLit FastString
+  deriving (Eq)
 
 -- See Note [Suppressing kinds]
 -- We use a new list type (rather than [(IfaceType,Bool)], because
@@ -137,12 +143,14 @@ data IfaceTcArgs
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
                              , ifaceTyConInfo :: IfaceTyConInfo }
+    deriving (Eq)
 
 data IfaceTyConInfo   -- Used to guide pretty-printing
                       -- and to disambiguate D from 'D (they share a name)
   = NoIfaceTyConInfo
   | IfacePromotedDataCon
   | IfacePromotedTyCon
+    deriving (Eq)
 
 data IfaceCoercion
   = IfaceReflCo      Role IfaceType
@@ -265,6 +273,136 @@ substIfaceTyVar :: IfaceTySubst -> IfLclName -> IfaceType
 substIfaceTyVar env tv
   | Just ty <- lookupFsEnv env tv = ty
   | otherwise                     = IfaceTyVar tv
+
+{-
+************************************************************************
+*                                                                      *
+                Equality over IfaceTypes
+*                                                                      *
+************************************************************************
+-}
+
+-- Like an RnEnv2, but mapping from FastString to deBruijn index
+-- DeBruijn; see eqTypeX
+type BoundVar = Int
+data IfRnEnv2
+  = IRV2 { ifenvL :: UniqFM BoundVar -- from FastString
+         , ifenvR :: UniqFM BoundVar
+         , ifenv_next :: BoundVar
+         }
+
+emptyIfRnEnv2 :: IfRnEnv2
+emptyIfRnEnv2 = IRV2 { ifenvL = emptyUFM
+                     , ifenvR = emptyUFM
+                     , ifenv_next = 0 }
+
+rnIfOccL :: IfRnEnv2 -> IfLclName -> Maybe BoundVar
+rnIfOccL env = lookupUFM (ifenvL env)
+
+rnIfOccR :: IfRnEnv2 -> IfLclName -> Maybe BoundVar
+rnIfOccR env = lookupUFM (ifenvR env)
+
+extendIfRnEnv2 :: IfRnEnv2 -> IfLclName -> IfLclName -> IfRnEnv2
+extendIfRnEnv2 IRV2 { ifenvL = lenv
+                    , ifenvR = renv
+                    , ifenv_next = n } tv1 tv2
+             = IRV2 { ifenvL = addToUFM lenv tv1 n
+                    , ifenvR = addToUFM renv tv2 n
+                    , ifenv_next = n + 1
+                    }
+
+eqIfaceType :: IfRnEnv2 -> IfaceType -> IfaceType -> Bool
+eqIfaceType env (IfaceTyVar tv1) (IfaceTyVar tv2) =
+    case (rnIfOccL env tv1, rnIfOccR env tv2) of
+        (Just v1, Just v2) -> v1 == v2
+        (Nothing, Nothing) -> tv1 == tv2
+        _ -> False
+eqIfaceType _   (IfaceLitTy l1) (IfaceLitTy l2) = l1 == l2
+eqIfaceType env (IfaceAppTy t11 t12) (IfaceAppTy t21 t22)
+    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
+eqIfaceType env (IfaceFunTy t11 t12) (IfaceFunTy t21 t22)
+    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
+eqIfaceType env (IfaceDFunTy t11 t12) (IfaceDFunTy t21 t22)
+    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
+eqIfaceType env (IfaceForAllTy (tv1, k1) t1) (IfaceForAllTy (tv2, k2) t2)
+    = eqIfaceType env k1 k2 && eqIfaceType (extendIfRnEnv2 env tv1 tv2) t1 t2
+eqIfaceType env (IfaceTyConApp tc1 tys1) (IfaceTyConApp tc2 tys2)
+    = tc1 == tc2 && eqIfaceTcArgs env tys1 tys2
+eqIfaceType env (IfaceTupleTy s1 tc1 tys1) (IfaceTupleTy s2 tc2 tys2)
+    = s1 == s2 && tc1 == tc2 && eqIfaceTcArgs env tys1 tys2
+eqIfaceType _ _ _ = False
+
+eqIfaceTypes :: IfRnEnv2 -> [IfaceType] -> [IfaceType] -> Bool
+eqIfaceTypes env tys1 tys2 = and (zipWith (eqIfaceType env) tys1 tys2)
+
+eqIfaceTcArgs :: IfRnEnv2 -> IfaceTcArgs -> IfaceTcArgs -> Bool
+eqIfaceTcArgs _ ITC_Nil ITC_Nil = True
+eqIfaceTcArgs env (ITC_Type ty1 tys1) (ITC_Type ty2 tys2)
+    = eqIfaceType env ty1 ty2 && eqIfaceTcArgs env tys1 tys2
+eqIfaceTcArgs env (ITC_Kind ty1 tys1) (ITC_Kind ty2 tys2)
+    = eqIfaceType env ty1 ty2 && eqIfaceTcArgs env tys1 tys2
+eqIfaceTcArgs _ _ _ = False
+
+-- | Similar to 'eqTyVarBndrs', checks that tyvar lists
+-- are the same length and have matching kinds; if so, extend the
+-- 'IfRnEnv2'.  Returns 'Nothing' if they don't match.
+eqIfaceTvBndrs :: IfRnEnv2 -> [IfaceTvBndr] -> [IfaceTvBndr] -> Maybe IfRnEnv2
+eqIfaceTvBndrs env [] [] = Just env
+eqIfaceTvBndrs env ((tv1, k1):tvs1) ((tv2, k2):tvs2)
+  | eqIfaceType env k1 k2
+  = eqIfaceTvBndrs (extendIfRnEnv2 env tv1 tv2) tvs1 tvs2
+eqIfaceTvBndrs _ _ _ = Nothing
+
+-- coreEqCoercion2
+eqIfaceCoercion :: IfRnEnv2 -> IfaceCoercion -> IfaceCoercion -> Bool
+eqIfaceCoercion env (IfaceReflCo eq1 ty1) (IfaceReflCo eq2 ty2)
+    = eq1 == eq2 && eqIfaceType env ty1 ty2
+eqIfaceCoercion env (IfaceFunCo eq1 co11 co12) (IfaceFunCo eq2 co21 co22)
+  = eq1 == eq2 && eqIfaceCoercion env co11 co21
+               && eqIfaceCoercion env co12 co22
+eqIfaceCoercion env (IfaceTyConAppCo eq1 tc1 cos1) (IfaceTyConAppCo eq2 tc2 cos2)
+  = eq1 == eq2 && tc1 == tc2 && all2 (eqIfaceCoercion env) cos1 cos2
+eqIfaceCoercion env (IfaceAppCo co11 co12) (IfaceAppCo co21 co22)
+  = eqIfaceCoercion env co11 co21 && eqIfaceCoercion env co12 co22
+
+eqIfaceCoercion env (IfaceForAllCo (v1,k1) co1) (IfaceForAllCo (v2,k2) co2)
+  = eqIfaceType env k1 k2 &&
+    eqIfaceCoercion (extendIfRnEnv2 env v1 v2) co1 co2
+
+eqIfaceCoercion env (IfaceCoVarCo cv1) (IfaceCoVarCo cv2)
+  = rnIfOccL env cv1 == rnIfOccR env cv2
+
+eqIfaceCoercion env (IfaceAxiomInstCo con1 ind1 cos1)
+                    (IfaceAxiomInstCo con2 ind2 cos2)
+  = con1 == con2
+    && ind1 == ind2
+    && all2 (eqIfaceCoercion env) cos1 cos2
+
+-- the provenance string is just a note, so don't use in comparisons
+eqIfaceCoercion env (IfaceUnivCo _ r1 ty11 ty12) (IfaceUnivCo _ r2 ty21 ty22)
+  = r1 == r2 && eqIfaceType env ty11 ty21 && eqIfaceType env ty12 ty22
+
+eqIfaceCoercion env (IfaceSymCo co1) (IfaceSymCo co2)
+  = eqIfaceCoercion env co1 co2
+
+eqIfaceCoercion env (IfaceTransCo co11 co12) (IfaceTransCo co21 co22)
+  = eqIfaceCoercion env co11 co21 && eqIfaceCoercion env co12 co22
+
+eqIfaceCoercion env (IfaceNthCo d1 co1) (IfaceNthCo d2 co2)
+  = d1 == d2 && eqIfaceCoercion env co1 co2
+eqIfaceCoercion env (IfaceLRCo d1 co1) (IfaceLRCo d2 co2)
+  = d1 == d2 && eqIfaceCoercion env co1 co2
+
+eqIfaceCoercion env (IfaceInstCo co1 ty1) (IfaceInstCo co2 ty2)
+  = eqIfaceCoercion env co1 co2 && eqIfaceType env ty1 ty2
+
+eqIfaceCoercion env (IfaceSubCo co1) (IfaceSubCo co2)
+  = eqIfaceCoercion env co1 co2
+
+eqIfaceCoercion env (IfaceAxiomRuleCo a1 ts1 cs1) (IfaceAxiomRuleCo a2 ts2 cs2)
+  = a1 == a2 && all2 (eqIfaceType env) ts1 ts2 && all2 (eqIfaceCoercion env) cs1 cs2
+
+eqIfaceCoercion _ _ _ = False
 
 {-
 ************************************************************************

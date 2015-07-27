@@ -1,0 +1,5 @@
+char8 tests
+Latin1.ascii tests
+Latin1.latin1_checked tests
+mkTextEncoding ASCII tests
+mkTextEncoding LATIN1 tests

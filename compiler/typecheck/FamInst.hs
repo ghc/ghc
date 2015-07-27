@@ -32,6 +32,7 @@ import Maybes
 import TcMType
 import TcType
 import Name
+import Panic
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -134,7 +135,8 @@ checkFamInstConsistency famInstMods directlyImpMods
                -- all directly imported modules must already have been loaded.
                modIface mod =
                  case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of
-                   Nothing    -> panic "FamInst.checkFamInstConsistency"
+                   Nothing    -> panicDoc "FamInst.checkFamInstConsistency"
+                                          (ppr mod $$ pprHPT hpt)
                    Just iface -> iface
 
              ; hmiModule     = mi_module . hm_iface

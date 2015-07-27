@@ -6,7 +6,7 @@ module Unify (
         -- Matching of types:
         --      the "tc" prefix indicates that matching always
         --      respects newtypes (rather than looking through them)
-        tcMatchTy, tcMatchTys, tcMatchTyX,
+        tcMatchTy, tcMatchTys, tcMatchTyX, tcMatchTysX,
         ruleMatchTyX, tcMatchPreds,
         MatchResult, MatchResult'(..),
 
@@ -103,17 +103,11 @@ tcMatchTy :: TyVarSet           -- Template tyvars
           -> Type               -- Target
           -> Maybe (MatchResult l)  -- One-shot; in principle the template
                                 -- variables could be free in the target
-
 tcMatchTy tmpls leqs ty1 ty2
-  = case match menv initial ty1 ty2 of
-        Just env -> Just $ mrMapSubst (TvSubst in_scope) env
-        Nothing  -> Nothing
+  = tcMatchTyX tmpls init_subst leqs ty1 ty2
   where
-    menv     = ME { me_tmpls = tmpls
-                  , me_env = mkRnEnv2 in_scope
-                  , me_lazy_eqs = leqs }
-    in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
-    initial  = MatchResult emptyTvSubstEnv emptyBag
+    init_subst = mkTvSubst in_scope emptyTvSubstEnv
+    in_scope   = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
         -- We're assuming that all the interesting
         -- tyvars in ty1 are in tmpls
 
@@ -123,21 +117,12 @@ tcMatchTys :: TyVarSet          -- Template tyvars
            -> [Type]            -- Target
            -> Maybe (MatchResult l) -- One-shot; in principle the template
                                 -- variables could be free in the target
-
 tcMatchTys tmpls leqs tys1 tys2
-  = case match_tys menv initial tys1 tys2 of
-        Just env -> Just $ mrMapSubst (TvSubst in_scope) env
-        Nothing  -> Nothing
+  = tcMatchTysX tmpls init_subst leqs tys1 tys2
   where
-    menv     = ME { me_tmpls = tmpls
-                  , me_env = mkRnEnv2 in_scope
-                  , me_lazy_eqs = leqs }
-    in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
-    initial  = MatchResult emptyTvSubstEnv emptyBag
-        -- We're assuming that all the interesting
-        -- tyvars in tys1 are in tmpls
+    init_subst = mkTvSubst in_scope emptyTvSubstEnv
+    in_scope   = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
 
--- This is similar, but extends a substitution
 tcMatchTyX :: TyVarSet          -- Template tyvars
            -> TvSubst           -- Substitution to extend
            -> LazyEqs l         -- Lazy equalities
@@ -146,6 +131,23 @@ tcMatchTyX :: TyVarSet          -- Template tyvars
            -> Maybe (MatchResult l)
 tcMatchTyX tmpls (TvSubst in_scope subst_env) leqs ty1 ty2
   = case match menv initial ty1 ty2 of
+        Just env -> Just $ mrMapSubst (TvSubst in_scope) env
+        Nothing  -> Nothing
+  where
+    menv = ME { me_tmpls = tmpls
+              , me_env = mkRnEnv2 in_scope
+              , me_lazy_eqs = leqs }
+    initial = MatchResult subst_env leqs
+
+tcMatchTysX :: TyVarSet          -- Template tyvars
+            -> TvSubst           -- Substitution to extend
+            -> LazyEqs l         -- Lazy equalities
+            -> [Type]            -- Template
+            -> [Type]            -- Target
+            -> Maybe (MatchResult l) -- One-shot; in principle the template
+                                     -- variables could be free in the target
+tcMatchTysX tmpls (TvSubst in_scope subst_env) leqs tys1 tys2
+  = case match_tys menv initial tys1 tys2 of
         Just env -> Just $ mrMapSubst (TvSubst in_scope) env
         Nothing  -> Nothing
   where

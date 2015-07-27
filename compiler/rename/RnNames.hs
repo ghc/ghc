@@ -229,11 +229,15 @@ rnImportDecl this_mod
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $
                            addWarn (missingImportListWarn imp_mod_name)
 
-    iface <- loadSrcInterface doc imp_mod_name want_boot (fmap snd mb_pkg)
+    ifaces <- loadSrcInterface doc imp_mod_name want_boot (fmap snd mb_pkg)
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) do
+    WARN( not want_boot && any mi_boot ifaces, ppr imp_mod_name ) do
+
+    -- Another sanity check: we should not get multiple interfaces
+    -- if we're looking for an hi-boot file
+    WARN( want_boot && length ifaces /= 1, ppr imp_mod_name ) do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -244,7 +248,7 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
+    warnIf (want_boot && any (not.mi_boot) ifaces && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
@@ -257,7 +261,7 @@ rnImportDecl this_mod
                                   is_dloc = loc, is_as = qual_mod_name }
 
     -- filter the imports according to the import declaration
-    (new_imp_details, gres) <- filterImports iface imp_spec imp_details
+    (new_imp_details, gres) <- filterImports ifaces imp_spec imp_details
 
     let gbl_env = mkGlobalRdrEnv gres
 
@@ -272,13 +276,17 @@ rnImportDecl this_mod
                     || (implicit && safeImplicitImpsReq dflags)
 
     let imports
-          = (calculateAvails dflags iface mod_safe' want_boot) {
+          = foldr plusImportAvails emptyImportAvails (map
+             (\iface ->
+              (calculateAvails dflags iface mod_safe' want_boot) {
                 imp_mods = unitModuleEnv (mi_module iface)
-                            [(qual_mod_name, import_all, loc, mod_safe')] }
+                            [(qual_mod_name, import_all, loc, mod_safe')] })
+             ifaces)
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
-       case (mi_warns iface) of
+      forM_ ifaces $ \iface ->
+       case mi_warns iface of
           WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
           _           -> return ()
      )
@@ -286,7 +294,7 @@ rnImportDecl this_mod
     let new_imp_decl = L loc (decl { ideclSafe = mod_safe'
                                    , ideclHiding = new_imp_details })
 
-    return (new_imp_decl, gbl_env, imports, mi_hpc iface)
+    return (new_imp_decl, gbl_env, imports, any mi_hpc ifaces)
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -654,18 +662,18 @@ although we never look up data constructors.
 -}
 
 filterImports
-    :: ModIface
+    :: [ModIface]
     -> ImpDeclSpec                     -- The span for the entire import decl
     -> Maybe (Bool, Located [LIE RdrName])    -- Import spec; True => hiding
     -> RnM (Maybe (Bool, Located [LIE Name]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
-  = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
+  = return (Nothing, gresFromAvails (Just imp_spec) (concatMap mi_exports iface))
   where
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
 
-filterImports iface decl_spec (Just (want_hiding, L l import_items))
+filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
   = do  -- check for errors, convert RdrNames to Names
         items1 <- mapM lookup_lie import_items
 
@@ -684,7 +692,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
         return (Just (want_hiding, L l (map fst items2)), gres)
   where
-    all_avails = mi_exports iface
+    all_avails = concatMap mi_exports ifaces
 
         -- See Note [Dealing with imports]
     imp_occ_env :: OccEnv (Name,        -- the name
@@ -733,7 +741,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
               Succeeded a -> return (Just a)
 
             lookup_err_msg err = case err of
-              BadImport -> badImportItemErr iface decl_spec ieRdr all_avails
+              BadImport -> badImportItemErr (any mi_boot ifaces) decl_spec
+                                            ieRdr all_avails
               IllegalImport -> illegalImportItemErr
               QualImportError rdr -> qualImportItemErr rdr
 
@@ -1572,13 +1581,13 @@ printMinimalImports imports_w_usage
       = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
                             , ideclPkgQual = mb_pkg } = decl
-           ; iface <- loadSrcInterface doc mod_name is_boot (fmap snd mb_pkg)
-           ; let lies = map (L l) (concatMap (to_ie iface) used)
+           ; ifaces <- loadSrcInterface doc mod_name is_boot (fmap snd mb_pkg)
+           ; let lies = map (L l) (concatMap (to_ie ifaces) used)
            ; return (L l (decl { ideclHiding = Just (False, L l lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
-    to_ie :: ModIface -> AvailInfo -> [IE Name]
+    to_ie :: [ModIface] -> AvailInfo -> [IE Name]
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
@@ -1586,8 +1595,9 @@ printMinimalImports imports_w_usage
        = [IEVar (noLoc n)]
     to_ie _ (AvailTC n [m])
        | n==m = [IEThingAbs (noLoc n)]
-    to_ie iface (AvailTC n ns)
-      = case [xs |  AvailTC x xs <- mi_exports iface
+    to_ie ifaces (AvailTC n ns)
+      = case [xs | iface <- ifaces
+                 , AvailTC x xs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
@@ -1631,43 +1641,52 @@ qualImportItemErr rdr
   = hang (ptext (sLit "Illegal qualified name in import item:"))
        2 (ppr rdr)
 
-badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
-badImportItemErrStd iface decl_spec ie
+badImportItemErrStd :: IsBootInterface -> ImpDeclSpec -> IE RdrName -> SDoc
+badImportItemErrStd is_boot decl_spec ie
   = sep [ptext (sLit "Module"), quotes (ppr (is_mod decl_spec)), source_import,
          ptext (sLit "does not export"), quotes (ppr ie)]
   where
-    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
+    source_import | is_boot       = ptext (sLit "(hi-boot interface)")
                   | otherwise     = Outputable.empty
 
-badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
-badImportItemErrDataCon dataType iface decl_spec ie
+badImportItemErrDataCon :: OccName
+                        -> IsBootInterface
+                        -> ImpDeclSpec
+                        -> IE RdrName
+                        -> SDoc
+badImportItemErrDataCon dataType_occ is_boot decl_spec ie
   = vcat [ ptext (sLit "In module")
              <+> quotes (ppr (is_mod decl_spec))
              <+> source_import <> colon
          , nest 2 $ quotes datacon
              <+> ptext (sLit "is a data constructor of")
-             <+> quotes (ppr dataType)
+             <+> quotes dataType
          , ptext (sLit "To import it use")
          , nest 2 $ quotes (ptext (sLit "import"))
              <+> ppr (is_mod decl_spec)
-             <> parens_sp (ppr dataType <> parens_sp datacon)
+             <> parens_sp (dataType <> parens_sp datacon)
          , ptext (sLit "or")
          , nest 2 $ quotes (ptext (sLit "import"))
              <+> ppr (is_mod decl_spec)
-             <> parens_sp (ppr dataType <> ptext (sLit "(..)"))
+             <> parens_sp (dataType <> ptext (sLit "(..)"))
          ]
   where
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
-    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
+    dataType = parenSymOcc dataType_occ (ppr dataType_occ)
+    source_import | is_boot       = ptext (sLit "(hi-boot interface)")
                   | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
-badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> [AvailInfo] -> SDoc
-badImportItemErr iface decl_spec ie avails
+badImportItemErr :: IsBootInterface
+                 -> ImpDeclSpec
+                 -> IE RdrName
+                 -> [AvailInfo]
+                 -> SDoc
+badImportItemErr is_boot decl_spec ie avails
   = case find checkIfDataCon avails of
-      Just con -> badImportItemErrDataCon (availOccName con) iface decl_spec ie
-      Nothing  -> badImportItemErrStd iface decl_spec ie
+     Just con -> badImportItemErrDataCon (availOccName con) is_boot decl_spec ie
+     Nothing  -> badImportItemErrStd is_boot decl_spec ie
   where
     checkIfDataCon (AvailTC _ ns) =
       case find (\n -> importedFS == nameOccNameFS n) ns of
@@ -1769,11 +1788,11 @@ missingImportListItem ie
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"),
-          nest 2 (vcat (map ppr txt)) ]
+          nest 2 (vcat (map (ppr . snd . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
                                 <+> ptext (sLit "is deprecated:"),
-          nest 2 (vcat (map ppr txt)) ]
+          nest 2 (vcat (map (ppr . snd . unLoc) txt)) ]
 
 packageImportErr :: SDoc
 packageImportErr

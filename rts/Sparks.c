@@ -14,6 +14,7 @@
 #include "Trace.h"
 #include "Prelude.h"
 #include "Sparks.h"
+#include "sm/HeapAlloc.h"
 
 #if defined(THREADED_RTS)
 

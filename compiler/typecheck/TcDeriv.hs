@@ -1219,13 +1219,15 @@ sideConditions mtheta cls
                                            cond_args cls)
   | cls_key == functorClassKey     = Just (checkFlag Opt_DeriveFunctor `andCond`
                                            cond_vanilla `andCond`
-                                           cond_functorOK True)
+                                           cond_functorOK True False)
   | cls_key == foldableClassKey    = Just (checkFlag Opt_DeriveFoldable `andCond`
                                            cond_vanilla `andCond`
-                                           cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
+                                           cond_functorOK False True)
+                                           -- Functor/Fold/Trav works ok
+                                           -- for rank-n types
   | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
                                            cond_vanilla `andCond`
-                                           cond_functorOK False)
+                                           cond_functorOK False False)
   | cls_key == genClassKey         = Just (checkFlag Opt_DeriveGeneric `andCond`
                                            cond_vanilla `andCond`
                                            cond_RepresentableOk)
@@ -1346,14 +1348,14 @@ cond_isProduct (_, rep_tc, _)
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
 
-cond_functorOK :: Bool -> Condition
+cond_functorOK :: Bool -> Bool -> Condition
 -- OK for Functor/Foldable/Traversable class
 -- Currently: (a) at least one argument
 --            (b) don't use argument contravariantly
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
-cond_functorOK allowFunctions (_, rep_tc, _)
+cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
   | null tc_tvs
   = NotValid (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
               <+> ptext (sLit "must have some type parameters"))
@@ -1375,6 +1377,9 @@ cond_functorOK allowFunctions (_, rep_tc, _)
 
     check_universal :: DataCon -> Validity
     check_universal con
+      | allowExQuantifiedLastTyVar
+      = IsValid -- See Note [DeriveFoldable with ExistentialQuantification]
+                -- in TcGenDeriv
       | Just tv <- getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
       , tv `elem` dataConUnivTyVars con
       , not (tv `elemVarSet` tyVarsOfTypes (dataConTheta con))
@@ -1442,7 +1447,7 @@ badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
 {-
 Note [Check that the type variable is truly universal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For Functor, Foldable, Traversable, we must check that the *last argument*
+For Functor and Traversable instances, we must check that the *last argument*
 of the type constructor is used truly universally quantified.  Example
 
    data T a b where
@@ -1460,6 +1465,20 @@ Eg. for T1-T3 we can write
      fmap f (T1 a b) = T1 a (f b)
      fmap f (T2 b c) = T2 (f b) c
      fmap f (T3 x)   = T3 (f x)
+
+We need not perform these checks for Foldable instances, however, since
+functions in Foldable can only consume existentially quantified type variables,
+rather than produce them (as is the case in Functor and Traversable functions.)
+As a result, T can have a derived Foldable instance:
+
+    foldr f z (T1 a b) = f b z
+    foldr f z (T2 b c) = f b z
+    foldr f z (T3 x)   = f x z
+    foldr f z (T4 x)   = f x z
+    foldr f z (T5 x)   = f x z
+    foldr _ z T6       = z
+
+See Note [DeriveFoldable with ExistentialQuantification] in TcGenDeriv.
 
 
 Note [Superclasses of derived instance]

@@ -1,12 +1,12 @@
 
-<interactive>:3:10: warning:
+<interactive>:2:10: warning:
     Found hole: _ :: IO ()
     In the second argument of ‘(<$>)’, namely ‘_’
     In the first argument of ‘ghciStepIO :: IO a -> IO a’, namely
       ‘Just <$> _’
     In a stmt of an interactive GHCi command:
       it <- ghciStepIO :: IO a -> IO a (Just <$> _)
-*** Exception: <interactive>:3:10: error:
+*** Exception: <interactive>:2:10: error:
     Found hole: _ :: IO ()
     In the second argument of ‘(<$>)’, namely ‘_’
     In the first argument of ‘ghciStepIO :: IO a -> IO a’, namely

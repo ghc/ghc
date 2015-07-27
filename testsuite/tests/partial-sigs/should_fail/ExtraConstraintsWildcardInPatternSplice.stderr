@@ -1,0 +1,4 @@
+
+ExtraConstraintsWildcardInPatternSplice.hs:5:8: error:
+    Type signatures in patterns not (yet) handled by Template Haskell
+      x :: _

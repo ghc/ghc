@@ -10,10 +10,12 @@ Printing of Core syntax
 module PprCore (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
+        pprCoreBindingWithSize, pprCoreBindingsWithSize,
         pprRules
     ) where
 
 import CoreSyn
+import CoreStats (exprStats)
 import Literal( pprLiteral )
 import Name( pprInfixName, pprPrefixName )
 import Var
@@ -46,11 +48,17 @@ pprCoreBinding  :: OutputableBndr b => Bind b  -> SDoc
 pprCoreExpr     :: OutputableBndr b => Expr b  -> SDoc
 pprParendExpr   :: OutputableBndr b => Expr b  -> SDoc
 
-pprCoreBindings = pprTopBinds
-pprCoreBinding  = pprTopBind
+pprCoreBindings = pprTopBinds noAnn
+pprCoreBinding  = pprTopBind noAnn
+
+pprCoreBindingsWithSize :: [CoreBind] -> SDoc
+pprCoreBindingWithSize  :: CoreBind  -> SDoc
+
+pprCoreBindingsWithSize = pprTopBinds sizeAnn
+pprCoreBindingWithSize = pprTopBind sizeAnn
 
 instance OutputableBndr b => Outputable (Bind b) where
-    ppr bind = ppr_bind bind
+    ppr bind = ppr_bind noAnn bind
 
 instance OutputableBndr b => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
@@ -63,32 +71,47 @@ instance OutputableBndr b => Outputable (Expr b) where
 ************************************************************************
 -}
 
-pprTopBinds :: OutputableBndr a => [Bind a] -> SDoc
-pprTopBinds binds = vcat (map pprTopBind binds)
+-- | A function to produce an annotation for a given right-hand-side
+type Annotation b = Expr b -> SDoc
 
-pprTopBind :: OutputableBndr a => Bind a -> SDoc
-pprTopBind (NonRec binder expr)
- = ppr_binding (binder,expr) $$ blankLine
+-- | Annotate with the size of the right-hand-side
+sizeAnn :: CoreExpr -> SDoc
+sizeAnn e = ptext (sLit "-- RHS size:") <+> ppr (exprStats e)
 
-pprTopBind (Rec [])
+-- | No annotation
+noAnn :: Expr b -> SDoc
+noAnn _ = empty
+
+pprTopBinds :: OutputableBndr a
+            => Annotation a -- ^ generate an annotation to place before the
+                            -- binding
+            -> [Bind a]     -- ^ bindings to show
+            -> SDoc         -- ^ the pretty result
+pprTopBinds ann binds = vcat (map (pprTopBind ann) binds)
+
+pprTopBind :: OutputableBndr a => Annotation a -> Bind a -> SDoc
+pprTopBind ann (NonRec binder expr)
+ = ppr_binding ann (binder,expr) $$ blankLine
+
+pprTopBind _ (Rec [])
   = ptext (sLit "Rec { }")
-pprTopBind (Rec (b:bs))
+pprTopBind ann (Rec (b:bs))
   = vcat [ptext (sLit "Rec {"),
-          ppr_binding b,
-          vcat [blankLine $$ ppr_binding b | b <- bs],
+          ppr_binding ann b,
+          vcat [blankLine $$ ppr_binding ann b | b <- bs],
           ptext (sLit "end Rec }"),
           blankLine]
 
-ppr_bind :: OutputableBndr b => Bind b -> SDoc
+ppr_bind :: OutputableBndr b => Annotation b -> Bind b -> SDoc
 
-ppr_bind (NonRec val_bdr expr) = ppr_binding (val_bdr, expr)
-ppr_bind (Rec binds)           = vcat (map pp binds)
-                               where
-                                 pp bind = ppr_binding bind <> semi
+ppr_bind ann (NonRec val_bdr expr) = ppr_binding ann (val_bdr, expr)
+ppr_bind ann (Rec binds)           = vcat (map pp binds)
+                                    where
+                                      pp bind = ppr_binding ann bind <> semi
 
-ppr_binding :: OutputableBndr b => (b, Expr b) -> SDoc
-ppr_binding (val_bdr, expr)
-  = pprBndr LetBind val_bdr $$
+ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
+ppr_binding ann (val_bdr, expr)
+  = ann expr $$ pprBndr LetBind val_bdr $$
     hang (ppr val_bdr <+> equals) 2 (pprCoreExpr expr)
 
 pprParendExpr expr = ppr_expr parens expr
@@ -96,6 +119,12 @@ pprCoreExpr   expr = ppr_expr noParens expr
 
 noParens :: SDoc -> SDoc
 noParens pp = pp
+
+pprOptCo :: Coercion -> SDoc
+pprOptCo co = sdocWithDynFlags $ \dflags ->
+              if gopt Opt_SuppressCoercions dflags
+              then ptext (sLit "...")
+              else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
@@ -107,16 +136,7 @@ ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO") <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co)
-  = add_par $
-    sep [pprParendExpr expr,
-         ptext (sLit "`cast`") <+> pprCo co]
-  where
-    pprCo co = sdocWithDynFlags $ \dflags ->
-               if gopt Opt_SuppressCoercions dflags
-               then ptext (sLit "...")
-               else parens $
-                        sep [ppr co, dcolon <+> ppr (coercionType co)]
-
+  = add_par $ sep [pprParendExpr expr, ptext (sLit "`cast`") <+> pprOptCo co]
 
 ppr_expr add_par expr@(Lam _ _)
   = let
@@ -210,7 +230,7 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 -- General case (recursive case, too)
 ppr_expr add_par (Let bind expr)
   = add_par $
-    sep [hang (ptext keyword) 2 (ppr_bind bind <+> ptext (sLit "} in")),
+    sep [hang (ptext keyword) 2 (ppr_bind noAnn bind <+> ptext (sLit "} in")),
          pprCoreExpr expr]
   where
     keyword = case bind of
@@ -248,7 +268,7 @@ pprArg (Type ty)
    if gopt Opt_SuppressTypeApplications dflags
    then empty
    else ptext (sLit "@") <+> pprParendType ty
-pprArg (Coercion co) = ptext (sLit "@~") <+> pprParendCo co
+pprArg (Coercion co) = ptext (sLit "@~") <+> pprOptCo co
 pprArg expr          = pprParendExpr expr
 
 {-
@@ -338,9 +358,8 @@ pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressIdInfo dflags
-    then empty
-    else info `seq` doc -- The seq is useful for poking on black holes
+    ppUnless (gopt Opt_SuppressIdInfo dflags) $
+    info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
@@ -368,9 +387,7 @@ pprIdBndrInfo info
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo id info
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressIdInfo dflags
-    then empty
-    else
+    ppUnless (gopt Opt_SuppressIdInfo dflags) $
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,        ptext (sLit "Arity=") <> int arity)
@@ -455,7 +472,9 @@ instance Outputable Unfolding where
                 , ptext (sLit "WorkFree=")   <> ppr wf
                 , ptext (sLit "Expandable=") <> ppr exp
                 , ptext (sLit "Guidance=")   <> ppr g ]
-      pp_tmpl = ptext (sLit "Tmpl=") <+> ppr rhs
+      pp_tmpl = sdocWithDynFlags $ \dflags ->
+                ppUnless (gopt Opt_SuppressUnfoldings dflags) $
+                ptext (sLit "Tmpl=") <+> ppr rhs
       pp_rhs | isStableSource src = pp_tmpl
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic

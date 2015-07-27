@@ -1535,49 +1535,6 @@ Then it is solvable, but its very hard to detect this on the spot.
 It's exactly the same with implicit parameters, except that the
 "aggressive" approach would be much easier to implement.
 
-Note [When improvement happens during solving]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During solving we maintain at "model" in the InertCans
-Improvement for functional dependencies or type-function injectivity
-means emitting a Derived equality constraint by interacting the work
-item with an inert item, or with the top-level instances.  e.g.
-
-       class C a b | a -> b
-       [W] C a b, [W] C a c  ==>  [D] b ~ c
-
-We fire the fundep improvement if the "work item" is Given or Derived,
-but not Wanted.  Reason:
-
- * Given: we want to spot Given/Given inconsistencies because that means
-          unreachable code.  See typecheck/should_fail/FDsFromGivens
-
- * Derived: during the improvement phase (i.e. when handling Derived
-            constraints) we also do improvement for functional dependencies. e.g.
-            And similarly wrt top-level instances.
-
- * Wanted: spotting fundep improvements is somewhat inefficient, and
-           and if we can solve without improvement so much the better.
-           So we don't bother to do this when solving Wanteds, instead
-           leaving it for the try_improvement loop
-
-Example (tcfail138)
-    class L a b | a -> b
-    class (G a, L a b) => C a b
-
-    instance C a b' => G (Maybe a)
-    instance C a b  => C (Maybe a) a
-    instance L (Maybe a) a
-
-When solving the superclasses of the (C (Maybe a) a) instance, we get
-  [G] C a b, and hance by superclasses, [G] G a, [G] L a b
-  [W] G (Maybe a)
-Use the instance decl to get
-  [W] C a beta
-
-During improvement (see Note [The improvement story]) we generate the superclasses
-of (C a beta): [D] L a beta.  Now using fundeps, combine with [G] L a b to get
-[D] beta ~ b, which is what we want.
-
 
 Note [Weird fundeps]
 ~~~~~~~~~~~~~~~~~~~~

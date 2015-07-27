@@ -124,6 +124,7 @@ Library
         cbits/genSym.c
 
     hs-source-dirs:
+        backpack
         basicTypes
         cmm
         codeGen
@@ -259,6 +260,8 @@ Library
         CoreTidy
         CoreUnfold
         CoreUtils
+        CoreSeq
+        CoreStats
         MkCore
         PprCore
         Check
@@ -498,6 +501,7 @@ Library
         Vectorise
         Hoopl.Dataflow
         Hoopl
+        ShPackageKey
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 

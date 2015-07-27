@@ -224,6 +224,7 @@ pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)
                                     (double (fromRational x) <> text "##")
 pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
+pprLit _ (CharPrimL c)   = text (show c) <> char '#'
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $
@@ -499,6 +500,7 @@ pprParendType PromotedConsT       = text "(':)"
 pprParendType StarT               = char '*'
 pprParendType ConstraintT         = text "Constraint"
 pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)
+pprParendType (WildCardT mbName)  = char '_' <> maybe empty ppr mbName
 pprParendType other               = parens (ppr other)
 
 instance Ppr Type where

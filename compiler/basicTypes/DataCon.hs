@@ -19,7 +19,7 @@ module DataCon (
         buildAlgTyCon,
 
         -- ** Type deconstruction
-        dataConRepType, dataConSig, dataConFullSig,
+        dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTyCon,
         dataConOrigTyCon, dataConUserType,
         dataConUnivTyVars, dataConExTyVars, dataConAllTyVars,
@@ -73,6 +73,7 @@ import qualified Data.Typeable
 import Data.Maybe
 import Data.Char
 import Data.Word
+import Data.List( mapAccumL )
 
 {-
 Data constructor representation
@@ -857,6 +858,25 @@ dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs,
                     dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ theta, arg_tys, res_ty)
 
+dataConInstSig
+  :: DataCon
+  -> [Type]    -- Instantiate the *universal* tyvars with these types
+  -> ([TyVar], ThetaType, [Type])  -- Return instantiated existentials
+                                   -- theta and arg tys
+-- ^ Instantantiate the universal tyvars of a data con,
+--   returning the instantiated existentials, constraints, and args
+dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
+                       , dcEqSpec = eq_spec, dcOtherTheta  = theta
+                       , dcOrigArgTys = arg_tys })
+               univ_tys
+  = (ex_tvs'
+    , substTheta subst (eqSpecPreds eq_spec ++ theta)
+    , substTys   subst arg_tys)
+  where
+    univ_subst = zipTopTvSubst univ_tvs univ_tys
+    (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst ex_tvs
+
+
 -- | The \"full signature\" of the 'DataCon' returns, in order:
 --
 -- 1) The result of 'dataConUnivTyVars'
@@ -990,16 +1010,11 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 -- NB: look at *all* equality constraints, not only those
 --     in dataConEqSpec; see Trac #5168
 dataConCannotMatch tys con
-  | null theta        = False   -- Common
+  | null inst_theta   = False   -- Common
   | all isTyVarTy tys = False   -- Also common
-  | otherwise
-  = typesCantMatch [(Type.substTy subst ty1, Type.substTy subst ty2)
-                   | (ty1, ty2) <- concatMap predEqs theta ]
+  | otherwise         = typesCantMatch (concatMap predEqs inst_theta)
   where
-    dc_tvs  = dataConUnivTyVars con
-    theta   = dataConTheta con
-    subst   = ASSERT2( length dc_tvs == length tys, ppr con $$ ppr dc_tvs $$ ppr tys )
-              zipTopTvSubst dc_tvs tys
+    (_, inst_theta, _) = dataConInstSig con tys
 
     -- TODO: could gather equalities from superclasses too
     predEqs pred = case classifyPredType pred of

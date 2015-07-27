@@ -635,7 +635,9 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
 
        ; return ( True
                 , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
-                , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (Var arg)
+                , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
+                                -- varToCoreExpr important here: arg can be a coercion
+                                -- Lacking this caused Trac #10658
                 , arg_ty1 ) }
 
   | otherwise   -- The general case

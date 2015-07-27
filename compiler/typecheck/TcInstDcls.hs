@@ -18,7 +18,7 @@ import TcTyClsDecls
 import TcClassDcl( tcClassDecl2,
                    HsSigFun, lookupHsSig, mkHsSigFun,
                    findMethodBind, instantiateMethod )
-import TcPat      ( addInlinePrags, completeSigPolyId )
+import TcPat      ( addInlinePrags, completeSigPolyId, lookupPragEnv, emptyPragEnv )
 import TcRnMonad
 import TcValidity
 import TcMType
@@ -1244,7 +1244,7 @@ tcMethods :: DFunId -> Class
           -> [TcTyVar] -> [EvVar]
           -> [TcType]
           -> TcEvBinds
-          -> ([Located TcSpecPrag], PragFun)
+          -> ([Located TcSpecPrag], TcPragEnv)
           -> [(Id, DefMeth)]
           -> InstBindings Name
           -> TcM ([Id], LHsBinds Id, Bag Implication)
@@ -1363,7 +1363,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 tcMethodBody :: Class -> [TcTyVar] -> [EvVar] -> [TcType]
              -> TcEvBinds -> Bool
              -> HsSigFun
-             -> ([LTcSpecPrag], PragFun)
+             -> ([LTcSpecPrag], TcPragEnv)
              -> Id -> LHsBind Name -> SrcSpan
              -> TcM (TcId, LHsBind Id, Maybe Implication)
 tcMethodBody clas tyvars dfun_ev_vars inst_tys
@@ -1377,7 +1377,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                  mkMethIds sig_fn clas tyvars dfun_ev_vars
                            inst_tys sel_id
 
-       ; let prags         = prag_fn (idName sel_id)
+       ; let prags         = lookupPragEnv prag_fn (idName sel_id)
              -- A method always has a complete type signature, hence
              -- it is safe to call completeSigPolyId
              local_meth_id = completeSigPolyId local_meth_sig
@@ -1414,7 +1414,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
       | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing
       | otherwise  = thing
 
-    no_prag_fn  _ = []          -- No pragmas for local_meth_id;
+    no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
 
 
@@ -1739,12 +1739,12 @@ Note that
 -}
 
 tcSpecInstPrags :: DFunId -> InstBindings Name
-                -> TcM ([Located TcSpecPrag], PragFun)
+                -> TcM ([Located TcSpecPrag], TcPragEnv)
 tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
   = do { spec_inst_prags <- mapM (wrapLocM (tcSpecInst dfun_id)) $
                             filter isSpecInstLSig uprags
              -- The filter removes the pragmas for methods
-       ; return (spec_inst_prags, mkPragFun uprags binds) }
+       ; return (spec_inst_prags, mkPragEnv uprags binds) }
 
 ------------------------------
 tcSpecInst :: Id -> Sig Name -> TcM TcSpecPrag

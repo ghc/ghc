@@ -1,6 +1,16 @@
 test('AnnotatedConstraint', normal, compile_fail, [''])
 test('AnnotatedConstraintNotForgotten', normal, compile_fail, [''])
 test('Defaulting1MROff', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInExpressionSignature', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInPatternSignature', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInPatternSplice', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInTypeSpliceUsed',
+     [req_interp, when(compiler_profiled(), skip),
+      extra_clean(['ExtraConstraintsWildcardInTypeSplice.o', 'ExtraConstraintsWildcardInTypeSplice.hi'])],
+     multimod_compile_fail, ['ExtraConstraintsWildcardInTypeSpliceUsed', ''])
+test('ExtraConstraintsWildcardInTypeSplice2',
+     [req_interp, when(compiler_profiled(), skip)],
+     compile_fail, [''])
 test('ExtraConstraintsWildcardNotEnabled', normal, compile_fail, [''])
 test('ExtraConstraintsWildcardNotLast', normal, compile_fail, [''])
 test('ExtraConstraintsWildcardNotPresent', normal, compile_fail, [''])
@@ -8,6 +18,7 @@ test('ExtraConstraintsWildcardTwice', normal, compile_fail, [''])
 test('Forall1Bad', normal, compile_fail, [''])
 test('InstantiatedNamedWildcardsInConstraints', normal, compile_fail, [''])
 test('NamedExtraConstraintsWildcard', normal, compile_fail, [''])
+test('NamedWildcardInTypeSplice', normal, compile_fail, [''])
 test('NamedWildcardsEnabled', normal, compile_fail, [''])
 test('NamedWildcardsNotEnabled', normal, compile_fail, [''])
 test('NamedWildcardsNotInMonotype', normal, compile_fail, [''])
@@ -42,7 +53,6 @@ test('WildcardInPatSynSig', normal, compile_fail, [''])
 test('WildcardInNewtype', normal, compile_fail, [''])
 test('WildcardInStandaloneDeriving', normal, compile_fail, [''])
 test('WildcardInstantiations', normal, compile_fail, [''])
-test('WildcardInTypeBrackets', req_interp, compile_fail, [''])
 test('WildcardInTypeFamilyInstanceLHS', normal, compile_fail, [''])
 test('WildcardInTypeFamilyInstanceRHS', normal, compile_fail, [''])
 test('WildcardInTypeSynonymLHS', normal, compile_fail, [''])

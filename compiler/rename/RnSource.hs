@@ -43,7 +43,6 @@ import DynFlags
 import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
-import Util             ( mapSnd )
 
 import Control.Monad
 import Data.List( partition, sortBy )
@@ -71,21 +70,21 @@ Checks the @(..)@ etc constraints in the export list.
 
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
-rnSrcDecls :: Maybe FreeVars -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
-rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
-                                       hs_splcds  = splice_decls,
-                                       hs_tyclds  = tycl_decls,
-                                       hs_instds  = inst_decls,
-                                       hs_derivds = deriv_decls,
-                                       hs_fixds   = fix_decls,
-                                       hs_warnds  = warn_decls,
-                                       hs_annds   = ann_decls,
-                                       hs_fords   = foreign_decls,
-                                       hs_defds   = default_decls,
-                                       hs_ruleds  = rule_decls,
-                                       hs_vects   = vect_decls,
-                                       hs_docs    = docs })
+rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
+                            hs_splcds  = splice_decls,
+                            hs_tyclds  = tycl_decls,
+                            hs_instds  = inst_decls,
+                            hs_derivds = deriv_decls,
+                            hs_fixds   = fix_decls,
+                            hs_warnds  = warn_decls,
+                            hs_annds   = ann_decls,
+                            hs_fords   = foreign_decls,
+                            hs_defds   = default_decls,
+                            hs_ruleds  = rule_decls,
+                            hs_vects   = vect_decls,
+                            hs_docs    = docs })
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
    --     FastStrings to FixItems.
@@ -147,7 +146,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn (text "Start rnTyClDecls") ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls extra_deps tycl_decls ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
@@ -930,7 +929,7 @@ doing dependency analysis when compiling A.hs
 To handle this problem, we add a dependency
   - from every local declaration
   - to everything that comes from this module's .hs-boot file.
-In this case, we'll add and edges
+In this case, we'll ad and edges
   - from A2 to A1 (but that edge is there already)
   - from A1 to A1 (which is new)
 
@@ -949,26 +948,35 @@ See also Note [Grouping of type and class declarations] in TcTyClsDecls.
 -}
 
 
-rnTyClDecls :: Maybe FreeVars -> [TyClGroup RdrName]
+rnTyClDecls :: [TyClGroup RdrName]
             -> RnM ([TyClGroup Name], FreeVars)
 -- Rename the declarations and do depedency analysis on them
-rnTyClDecls extra_deps tycl_ds
-  = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
+rnTyClDecls tycl_ds
+  = do { ds_w_fvs       <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
        ; let decl_names = mkNameSet (map (tcdName . unLoc . fst) ds_w_fvs)
        ; role_annot_env <- rnRoleAnnots decl_names (concatMap group_roles tycl_ds)
-       ; this_mod  <- getModule
-       ; let add_boot_deps :: FreeVars -> FreeVars
+       ; tcg_env        <- getGblEnv
+       ; let this_mod  = tcg_mod tcg_env
+             boot_info = tcg_self_boot tcg_env
+
+             add_boot_deps :: [(LTyClDecl Name, FreeVars)] -> [(LTyClDecl Name, FreeVars)]
              -- See Note [Extra dependencies from .hs-boot files]
-             add_boot_deps fvs
-               | Just extra <- extra_deps
-               , has_local_imports fvs = fvs `plusFV` extra
-               | otherwise             = fvs
+             add_boot_deps ds_w_fvs
+               = case boot_info of
+                     SelfBoot { sb_tcs = tcs } | not (isEmptyNameSet tcs)
+                        -> map (add_one tcs) ds_w_fvs
+                     _  -> ds_w_fvs
+
+             add_one :: NameSet -> (LTyClDecl Name, FreeVars) -> (LTyClDecl Name, FreeVars)
+             add_one tcs pr@(decl,fvs)
+                | has_local_imports fvs = (decl, fvs `plusFV` tcs)
+                | otherwise             = pr
 
              has_local_imports fvs
                  = foldNameSet ((||) . nameIsHomePackageImport this_mod)
                                False fvs
 
-             ds_w_fvs' = mapSnd add_boot_deps ds_w_fvs
+             ds_w_fvs' = add_boot_deps ds_w_fvs
 
              sccs :: [SCC (LTyClDecl Name)]
              sccs = depAnalTyClDecls ds_w_fvs'

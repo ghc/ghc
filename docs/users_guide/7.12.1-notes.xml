@@ -36,6 +36,16 @@
            </listitem>
             <listitem>
                 <para>
+                    The parser now supports Haddock comments on GADT data constructors. For example,
+                    <programlisting>
+                      data Expr a where
+                        -- | Just a normal sum
+                        Sum :: Int -> Int -> Expr Int
+                    </programlisting>
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     Implicit parameters of the new base type
                     <literal>GHC.Stack.CallStack</literal> are treated
                     specially, and automatically solved for the current source
@@ -85,6 +95,14 @@
                     This is similar to using <option>-ddump-to-file</option> with <option>-ddump-splices</option> but it always generates a file instead of being coupled to <option>-ddump-to-file</option> and only outputs code that does not exist in the .hs file and a comment for the splice location in the original file.
                 </para>
            </listitem>
+           <listitem>
+               <para>
+                   Added the option <option>-fprint-expanded-types</option>.
+
+                   When enabled, GHC also prints type-synonym-expanded types in
+                   type errors.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -122,7 +140,12 @@
                     Splices and quasi-quotes continue to only be supported by a
                     stage 2 compiler.
                </para>
-           </listitem>
+            </listitem>
+            <listitem>
+                <para>
+                    Partial type signatures can now be used in splices, see <xref linkend="pts-where"/>.
+                </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 

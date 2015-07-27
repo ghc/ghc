@@ -165,7 +165,7 @@ test('tc161', normal, compile, [''])
 test('tc162', normal, compile, [''])
 test('tc163', normal, compile, [''])
 test('tc164', normal, compile, [''])
-test('tc165', normal, compile, [''])
+test('tc165', expect_broken_for(10181, ['optasm', 'optllvm']), compile, [''])
 test('tc166', normal, compile, [''])
 test('tc167', normal, compile_fail, [''])
 test('tc168', normal, compile_fail, [''])
@@ -283,7 +283,7 @@ test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']),
      multimod_compile, ['T2433', '-v0'])
 test('T2494', normal, compile_fail, [''])
 test('T2494-2', normal, compile, [''])
-test('T2497', normal, compile, [''])
+test('T2497', expect_broken_for(10657, ['optasm', 'optllvm']), compile, [''])
 
 
 # Omitting temporarily
@@ -466,4 +466,5 @@ test('T10428', normal, compile, [''])
 test('RepArrow', normal, compile, [''])
 test('T10562', normal, compile, [''])
 test('T10564', normal, compile, [''])
+test('T10632', normal, compile, [''])
 test('T10642', normal, compile, [''])

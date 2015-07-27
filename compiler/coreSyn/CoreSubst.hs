@@ -41,6 +41,7 @@ module CoreSubst (
 
 import CoreSyn
 import CoreFVs
+import CoreSeq
 import CoreUtils
 import Literal  ( Literal(MachStr) )
 import qualified Data.ByteString as BS

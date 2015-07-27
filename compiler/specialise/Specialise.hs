@@ -584,8 +584,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
              -- Specialise imported functions
        ; hpt_rules <- getRuleBase
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
-
-       ; (new_rules, spec_binds) <- specImports dflags this_mod emptyVarSet
+       ; (new_rules, spec_binds) <- specImports dflags this_mod top_env emptyVarSet
                                                 rule_base (ud_calls uds)
 
              -- Don't forget to wrap the specialized bindings with bindings
@@ -606,13 +605,13 @@ specProgram guts@(ModGuts { mg_module = this_mod
         -- accidentally re-use a unique that's already in use
         -- Easiest thing is to do it all at once, as if all the top-level
         -- decls were mutually recursive
-    top_subst = SE { se_subst = CoreSubst.mkEmptySubst $ mkInScopeSet $ mkVarSet $
-                                bindersOfBinds binds
-                   , se_interesting = emptyVarSet }
+    top_env = SE { se_subst = CoreSubst.mkEmptySubst $ mkInScopeSet $ mkVarSet $
+                              bindersOfBinds binds
+                 , se_interesting = emptyVarSet }
 
     go []           = return ([], emptyUDs)
     go (bind:binds) = do (binds', uds) <- go binds
-                         (bind', uds') <- specBind top_subst bind uds
+                         (bind', uds') <- specBind top_env bind uds
                          return (bind' ++ binds', uds')
 
 {-
@@ -639,6 +638,7 @@ See Trac #10491
 -- | Specialise a set of calls to imported bindings
 specImports :: DynFlags
             -> Module
+            -> SpecEnv          -- Passed in so that all top-level Ids are in scope
             -> VarSet           -- Don't specialise these ones
                                 -- See Note [Avoiding recursive specialisation]
             -> RuleBase         -- Rules from this module and the home package
@@ -647,7 +647,7 @@ specImports :: DynFlags
             -> CoreM ( [CoreRule]   -- New rules
                      , [CoreBind] ) -- Specialised bindings
                                     -- See Note [Wrapping bindings returned by specImports]
-specImports dflags this_mod done rule_base cds
+specImports dflags this_mod top_env done rule_base cds
   -- See Note [Disabling cross-module specialisation]
   | not $ gopt Opt_CrossModuleSpecialise dflags =
     return ([], [])
@@ -660,20 +660,21 @@ specImports dflags this_mod done rule_base cds
     go :: RuleBase -> [CallInfoSet] -> CoreM ([CoreRule], [CoreBind])
     go _ [] = return ([], [])
     go rb (CIS fn calls_for_fn : other_calls)
-      = do { (rules1, spec_binds1) <- specImport dflags this_mod done rb fn $
+      = do { (rules1, spec_binds1) <- specImport dflags this_mod top_env done rb fn $
                                       Map.toList calls_for_fn
            ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
            ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
 specImport :: DynFlags
            -> Module
+           -> SpecEnv               -- Passed in so that all top-level Ids are in scope
            -> VarSet                -- Don't specialise these
                                     -- See Note [Avoiding recursive specialisation]
            -> RuleBase              -- Rules from this module
            -> Id -> [CallInfo]      -- Imported function and calls for it
            -> CoreM ( [CoreRule]    -- New rules
                     , [CoreBind] )  -- Specialised bindings
-specImport dflags this_mod done rb fn calls_for_fn
+specImport dflags this_mod top_env done rb fn calls_for_fn
   | fn `elemVarSet` done
   = return ([], [])     -- No warning.  This actually happens all the time
                         -- when specialising a recursive function, because
@@ -694,16 +695,17 @@ specImport dflags this_mod done rb fn calls_for_fn
        ; let full_rb = unionRuleBase rb (eps_rule_base eps)
              rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
 
-       ; (rules1, spec_pairs, uds) <- runSpecM dflags this_mod $
-              specCalls (Just this_mod) emptySpecEnv rules_for_fn calls_for_fn fn rhs
+       ; (rules1, spec_pairs, uds) <- -- pprTrace "specImport1" (vcat [ppr fn, ppr calls_for_fn, ppr rhs]) $
+                                      runSpecM dflags this_mod $
+              specCalls (Just this_mod) top_env rules_for_fn calls_for_fn fn rhs
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
              -- we rely on a global GlomBinds to sort that out later
              -- See Note [Glom the bindings if imported functions are specialised]
 
               -- Now specialise any cascaded calls
-       ; (rules2, spec_binds2) <- -- pprTrace "specImport" (ppr fn $$ ppr uds $$ ppr rhs) $
-                                  specImports dflags this_mod (extendVarSet done fn)
+       ; (rules2, spec_binds2) <- -- pprTrace "specImport 2" (ppr fn $$ ppr rules1 $$ ppr spec_binds1) $
+                                  specImports dflags this_mod top_env (extendVarSet done fn)
                                                      (extendRuleBaseList rb rules1)
                                                      (ud_calls uds)
 
@@ -806,9 +808,6 @@ data SpecEnv
              -- and hence may be worth specialising against
              -- See Note [Interesting dictionary arguments]
      }
-
-emptySpecEnv :: SpecEnv
-emptySpecEnv = SE { se_subst = CoreSubst.emptySubst, se_interesting = emptyVarSet}
 
 specVar :: SpecEnv -> Id -> CoreExpr
 specVar env v = CoreSubst.lookupIdSubst (text "specVar") (se_subst env) v

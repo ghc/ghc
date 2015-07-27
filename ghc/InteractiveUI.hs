@@ -424,7 +424,10 @@ interactiveUI config srcs maybe_exprs = do
                    stop               = default_stop,
                    editor             = default_editor,
                    options            = [],
-                   line_number        = 1,
+                   -- We initialize line number as 0, not 1, because we use
+                   -- current line number while reporting errors which is
+                   -- incremented after reading a line.
+                   line_number        = 0,
                    break_ctr          = 0,
                    breaks             = [],
                    tickarrays         = emptyModuleEnv,
@@ -536,7 +539,7 @@ runGHCi paths maybe_exprs = do
   let show_prompt = verbosity dflags > 0 || is_tty
 
   -- reset line number
-  modifyGHCiState $ \st -> st{line_number=1}
+  modifyGHCiState $ \st -> st{line_number=0}
 
   case maybe_exprs of
         Nothing ->
@@ -745,7 +748,7 @@ runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
     case b of
       Nothing -> return Nothing
       Just success -> do
-        when (not success) $ maybe (return ()) lift sourceErrorHandler
+        unless success $ maybe (return ()) lift sourceErrorHandler
         unmask $ runCommands' eh sourceErrorHandler gCmd
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).

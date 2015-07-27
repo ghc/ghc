@@ -151,7 +151,10 @@ newImplicitBinder base_name mk_sys_occ
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
 ifaceExportNames exports = return exports
 
-lookupOrig :: Module -> OccName ->  TcRnIf a b Name
+-- | Look up the 'Name' for a given 'Module' and 'OccName'.
+-- Consider alternately using 'lookupIfaceTop' if you're in the 'IfL' monad
+-- and 'Module' is simply that of the 'ModIface' you are typechecking.
+lookupOrig :: Module -> OccName -> TcRnIf a b Name
 lookupOrig mod occ
   = do  {       -- First ensure that mod and occ are evaluated
                 -- If not, chaos can ensue:

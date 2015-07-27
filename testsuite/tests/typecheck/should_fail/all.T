@@ -246,6 +246,7 @@ test('tcfail219', normal, multimod_compile_fail, ['tcfail219.hsig', '-sig-of "Sh
 test('tcfail220', normal, multimod_compile_fail, ['tcfail220.hsig', '-sig-of "ShouldFail is base:Prelude"'])
 test('tcfail221', normal, multimod_compile_fail, ['tcfail221.hsig', '-sig-of "ShouldFail is base:Prelude"'])
 test('tcfail222', normal, multimod_compile_fail, ['tcfail222.hsig', '-sig-of "ShouldFail is base:Data.STRef"'])
+test('tcfail223', normal, compile_fail, [''])
 
 test('SilentParametersOverlapping', normal, compile, [''])
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])
@@ -368,3 +369,8 @@ test('T10351', normal, compile_fail, [''])
 test('T10534', extra_clean(['T10534a.hi', 'T10534a.o']),
      multimod_compile_fail, ['T10534', '-v0'])
 test('T10495', normal, compile_fail, [''])
+
+test('ExpandSynsFail1', normal, compile_fail, ['-fprint-expanded-synonyms'])
+test('ExpandSynsFail2', normal, compile_fail, ['-fprint-expanded-synonyms'])
+test('ExpandSynsFail3', normal, compile_fail, ['-fprint-expanded-synonyms'])
+test('ExpandSynsFail4', normal, compile_fail, ['-fprint-expanded-synonyms'])

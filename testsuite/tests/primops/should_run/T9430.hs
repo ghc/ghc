@@ -73,3 +73,21 @@ main = do
       checkW (1, minBound + 1) plusWord2# maxBound 2
     check "plusWord2# 2 maxBound" $
       checkW (1, minBound + 1) plusWord2# 2 maxBound
+
+    check "timesWord2# maxBound 0" $ checkW (0, 0) timesWord2# maxBound 0
+    check "timesWord2# 0 maxBound" $ checkW (0, 0) timesWord2# 0 maxBound
+    check "timesWord2# maxBound 1" $ checkW (0, maxBound) timesWord2# maxBound 1
+    check "timesWord2# 1 maxBound" $ checkW (0, maxBound) timesWord2# 1 maxBound
+    -- Overflows
+    check "timesWord2# " $ checkW (1, 0) timesWord2# (2 ^ 63) 2
+    check "timesWord2# " $ checkW (2, 0) timesWord2# (2 ^ 63) (2 ^ 2)
+    check "timesWord2# " $ checkW (4, 0) timesWord2# (2 ^ 63) (2 ^ 3)
+    check "timesWord2# " $ checkW (8, 0) timesWord2# (2 ^ 63) (2 ^ 4)
+    check "timesWord2# maxBound 2" $
+      checkW (1, maxBound - 1) timesWord2# maxBound 2
+    check "timesWord2# 2 maxBound" $
+      checkW (1, maxBound - 1) timesWord2# 2 maxBound
+    check "timesWord2# maxBound 3" $
+      checkW (2, maxBound - 2) timesWord2# maxBound 3
+    check "timesWord2# 3 maxBound" $
+      checkW (2, maxBound - 2) timesWord2# 3 maxBound

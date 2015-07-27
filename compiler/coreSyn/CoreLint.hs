@@ -25,6 +25,7 @@ module CoreLint (
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import CoreStats   ( coreBindsStats )
 import CoreMonad
 import Bag
 import Literal
@@ -209,7 +210,7 @@ dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
     dump_doc  = vcat [ nest 2 extra_info
                      , size_doc
                      , blankLine
-                     , pprCoreBindings binds
+                     , pprCoreBindingsWithSize binds
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , ptext (sLit "------ Local rules for imported ids --------")

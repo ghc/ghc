@@ -256,6 +256,38 @@ genCall t@(PrimTarget op) [] args
                 `appOL` stmts4 `snocOL` call
     return (stmts, top1 ++ top2)
 
+-- We handle MO_U_Mul2 by simply using a 'mul' instruction, but with operands
+-- twice the width (we first zero-extend them), e.g., on 64-bit arch we will
+-- generate 'mul' on 128-bit operands. Then we only need some plumbing to
+-- extract the two 64-bit values out of 128-bit result.
+genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = do
+    let width = widthToLlvmInt w
+        bitWidth = widthInBits w
+        width2x = LMInt (bitWidth * 2)
+    -- First zero-extend the operands ('mul' instruction requires the operands
+    -- and the result to be of the same type). Note that we don't use 'castVars'
+    -- because it tries to do LM_Sext.
+    (lhsVar, stmts1, decls1) <- exprToVar lhs
+    (rhsVar, stmts2, decls2) <- exprToVar rhs
+    (lhsExt, stmt3) <- doExpr width2x $ Cast LM_Zext lhsVar width2x
+    (rhsExt, stmt4) <- doExpr width2x $ Cast LM_Zext rhsVar width2x
+    -- Do the actual multiplication (note that the result is also 2x width).
+    (retV, stmt5) <- doExpr width2x $ LlvmOp LM_MO_Mul lhsExt rhsExt
+    -- Extract the lower bits of the result into retL.
+    (retL, stmt6) <- doExpr width $ Cast LM_Trunc retV width
+    -- Now we right-shift the higher bits by width.
+    let widthLlvmLit = LMLitVar $ LMIntLit (fromIntegral bitWidth) width
+    (retShifted, stmt7) <- doExpr width2x $ LlvmOp LM_MO_LShr retV widthLlvmLit
+    -- And extract them into retH.
+    (retH, stmt8) <- doExpr width $ Cast LM_Trunc retShifted width
+    dstRegL <- getCmmReg (CmmLocal dstL)
+    dstRegH <- getCmmReg (CmmLocal dstH)
+    let storeL = Store retL dstRegL
+        storeH = Store retH dstRegH
+        stmts = stmts1 `appOL` stmts2 `appOL`
+           toOL [ stmt3 , stmt4, stmt5, stmt6, stmt7, stmt8, storeL, storeH ]
+    return (stmts, decls1 ++ decls2)
+
 -- Handle the MO_{Add,Sub}IntC separately. LLVM versions return a record from
 -- which we need to extract the actual values.
 genCall t@(PrimTarget (MO_AddIntC w)) [dstV, dstO] [lhs, rhs] =
@@ -621,6 +653,8 @@ cmmPrimOpFunctions mop = do
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
+    -- We support MO_U_Mul2 through ordinary LLVM mul instruction, see the
+    -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported

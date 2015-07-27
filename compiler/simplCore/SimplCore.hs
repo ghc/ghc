@@ -19,8 +19,8 @@ import Rules            ( mkRuleBase, unionRuleBase,
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize,
-                          mkTicks, stripTicksTop )
+import CoreStats        ( coreBindsSize, coreBindsStats, exprSize )
+import CoreUtils        ( mkTicks, stripTicksTop )
 import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
 import Simplify         ( simplTopBinds, simplExpr, simplRule )

@@ -53,7 +53,7 @@ test('rn037', normal, compile, [''])
 
 test('rn039', normal, compile, [''])
 test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
-test('rn041', normal, compile, [''])
+test('rn041', expect_broken_for(10181, ['optasm', 'optllvm']), compile, [''])
 test('rn042',
      extra_clean(['Rn042_A.hi', 'Rn042_A.o']),
      multimod_compile,

@@ -1672,7 +1672,7 @@ scavenge_capability_mut_lists (Capability *cap)
 static void
 scavenge_static(void)
 {
-  StgClosure* p;
+  StgClosure *flagged_p, *p;
   const StgInfoTable *info;
 
   debugTrace(DEBUG_gc, "scavenging static objects");
@@ -1690,10 +1690,11 @@ scavenge_static(void)
      * be more stuff on this list after each evacuation...
      * (static_objects is a global)
      */
-    p = gct->static_objects;
-    if (p == END_OF_STATIC_LIST) {
+    flagged_p = gct->static_objects;
+    if (flagged_p == END_OF_STATIC_OBJECT_LIST) {
           break;
     }
+    p = UNTAG_STATIC_LIST_PTR(flagged_p);
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
@@ -1708,7 +1709,7 @@ scavenge_static(void)
      */
     gct->static_objects = *STATIC_LINK(info,p);
     *STATIC_LINK(info,p) = gct->scavenged_static_objects;
-    gct->scavenged_static_objects = p;
+    gct->scavenged_static_objects = flagged_p;
 
     switch (info -> type) {
 
@@ -2066,7 +2067,7 @@ loop:
     work_to_do = rtsFalse;
 
     // scavenge static objects
-    if (major_gc && gct->static_objects != END_OF_STATIC_LIST) {
+    if (major_gc && gct->static_objects != END_OF_STATIC_OBJECT_LIST) {
         IF_DEBUG(sanity, checkStaticObjects(gct->static_objects));
         scavenge_static();
     }

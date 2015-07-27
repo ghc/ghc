@@ -174,7 +174,8 @@ test('conc033', normal, compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 test('conc034', [
-                 omit_ways(['ghci']), 
+                 normal,
+                 omit_ways(['ghci']),
                  extra_run_opts('+RTS -C0 -RTS')],
 		compile_and_run, [''])
 

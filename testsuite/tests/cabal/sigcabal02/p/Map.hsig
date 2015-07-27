@@ -1,0 +1,18 @@
+{-# LANGUAGE RoleAnnotations #-}
+module Map where
+
+import Set
+
+type role Map nominal representational
+data Map k a
+
+instance (Show k, Show a) => Show (Map k a)
+
+size :: Map k a -> Int
+lookup :: Ord k => k -> Map k a -> Maybe a
+empty :: Map k a
+insert :: Ord k => k -> a -> Map k a -> Map k a
+delete :: Ord k => k -> Map k a -> Map k a
+
+keysSet :: Map k a -> Set k
+fromSet :: (k -> a) -> Set k -> Map k a

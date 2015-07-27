@@ -8,6 +8,7 @@
 
 #include "Rts.h"
 #include "sm/OSMem.h"
+#include "sm/HeapAlloc.h"
 #include "RtsUtils.h"
 
 #if HAVE_WINDOWS_H
@@ -28,7 +29,11 @@ typedef struct block_rec_ {
 
 /* allocs are kept in ascending order, and are the memory regions as
    returned by the OS as we need to have matching VirtualAlloc and
-   VirtualFree calls. */
+   VirtualFree calls.
+
+   If USE_LARGE_ADDRESS_SPACE is defined, this list will contain only
+   one element.
+*/
 static alloc_rec* allocs = NULL;
 
 /* free_blocks are kept in ascending order, and adjacent blocks are merged */
@@ -207,12 +212,9 @@ osGetMBlocks(nat n) {
     return ret;
 }
 
-void osFreeMBlocks(char *addr, nat n)
+static void decommitBlocks(char *addr, W_ nBytes)
 {
     alloc_rec *p;
-    W_ nBytes = (W_)n * MBLOCK_SIZE;
-
-    insertFree(addr, nBytes);
 
     p = allocs;
     while ((p != NULL) && (addr >= (p->base + p->size))) {
@@ -241,6 +243,14 @@ void osFreeMBlocks(char *addr, nat n)
             p = p->next;
         }
     }
+}
+
+void osFreeMBlocks(char *addr, nat n)
+{
+    W_ nBytes = (W_)n * MBLOCK_SIZE;
+
+    insertFree(addr, nBytes);
+    decommitBlocks(addr, nBytes);
 }
 
 void osReleaseFreeMemory(void)
@@ -414,3 +424,60 @@ void setExecutable (void *p, W_ len, rtsBool exec)
         stg_exit(EXIT_FAILURE);
     }
 }
+
+#ifdef USE_LARGE_ADDRESS_SPACE
+
+static void* heap_base = NULL;
+
+void *osReserveHeapMemory (void)
+{
+    void *start;
+
+    heap_base = VirtualAlloc(NULL, MBLOCK_SPACE_SIZE + MBLOCK_SIZE,
+                              MEM_RESERVE, PAGE_READWRITE);
+    if (heap_base == NULL) {
+        if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
+            errorBelch("out of memory");
+        } else {
+            sysErrorBelch(
+                "osReserveHeapMemory: VirtualAlloc MEM_RESERVE %llu bytes failed",
+                MBLOCK_SPACE_SIZE + MBLOCK_SIZE);
+        }
+        stg_exit(EXIT_FAILURE);
+    }
+
+    // VirtualFree MEM_RELEASE must always match a
+    // previous MEM_RESERVE call, in address and size
+    // so we necessarily leak some address space here,
+    // before and after the aligned area
+    // It is not a huge problem because we never commit
+    // that memory
+    start = MBLOCK_ROUND_UP(heap_base);
+
+    return start;
+}
+
+void osCommitMemory (void *at, W_ size)
+{
+    void *temp;
+    temp = VirtualAlloc(at, size, MEM_COMMIT, PAGE_READWRITE);
+    if (temp == NULL) {
+        sysErrorBelch("osCommitMemory: VirtualAlloc MEM_COMMIT failed");
+        stg_exit(EXIT_FAILURE);
+    }
+}
+
+void osDecommitMemory (void *at, W_ size)
+{
+    if (!VirtualFree(at, size, MEM_DECOMMIT)) {
+        sysErrorBelch("osDecommitMemory: VirtualFree MEM_DECOMMIT failed");
+        stg_exit(EXIT_FAILURE);
+    }
+}
+
+void osReleaseHeapMemory (void)
+{
+    VirtualFree(heap_base, 0, MEM_RELEASE);
+}
+
+#endif
