@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module Simplify ( simplTopBinds, simplExpr, simplRule ) where
+module Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
 
@@ -2956,22 +2956,28 @@ addBndrRules env in_id out_id
   | null old_rules
   = return (env, out_id)
   | otherwise
-  = do { new_rules <- mapM (simplRule env (Just (idName out_id))) old_rules
+  = do { new_rules <- simplRules env (Just (idName out_id)) old_rules
        ; let final_id  = out_id `setIdSpecialisation` mkSpecInfo new_rules
        ; return (modifyInScope env final_id, final_id) }
   where
     old_rules = specInfoRules (idSpecialisation in_id)
 
-simplRule :: SimplEnv -> Maybe Name -> CoreRule -> SimplM CoreRule
-simplRule _   _         rule@(BuiltinRule {}) = return rule
-simplRule env mb_new_nm rule@(Rule { ru_bndrs = bndrs, ru_args = args
-                                   , ru_fn = fn_name, ru_rhs = rhs
-                                   , ru_act = act })
-  = do { (env, bndrs') <- simplBinders env bndrs
-       ; let rule_env = updMode (updModeForStableUnfoldings act) env
-       ; args' <- mapM (simplExpr rule_env) args
-       ; rhs'  <- simplExpr rule_env rhs
-       ; return (rule { ru_bndrs = bndrs'
-                      , ru_fn    = mb_new_nm `orElse` fn_name
-                      , ru_args  = args'
-                      , ru_rhs   = rhs' }) }
+simplRules :: SimplEnv -> Maybe Name -> [CoreRule] -> SimplM [CoreRule]
+simplRules env mb_new_nm rules
+  = mapM simpl_rule rules
+  where
+    simpl_rule rule@(BuiltinRule {})
+      = return rule
+
+    simpl_rule rule@(Rule { ru_bndrs = bndrs, ru_args = args
+                          , ru_fn = fn_name, ru_rhs = rhs
+                          , ru_act = act })
+      = do { (env, bndrs') <- simplBinders env bndrs
+           ; let lhs_env = updMode updModeForRuleLHS env
+                 rhs_env = updMode (updModeForStableUnfoldings act) env
+           ; args' <- mapM (simplExpr lhs_env) args
+           ; rhs'  <- simplExpr rhs_env rhs
+           ; return (rule { ru_bndrs = bndrs'
+                          , ru_fn    = mb_new_nm `orElse` fn_name
+                          , ru_args  = args'
+                          , ru_rhs   = rhs' }) }

@@ -23,7 +23,7 @@ import CoreStats        ( coreBindsSize, coreBindsStats, exprSize )
 import CoreUtils        ( mkTicks, stripTicksTop )
 import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
-import Simplify         ( simplTopBinds, simplExpr, simplRule )
+import Simplify         ( simplTopBinds, simplExpr, simplRules )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
@@ -659,7 +659,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
-                  ; rules1 <- mapM (simplRule env1 Nothing) rules
+                  ; rules1 <- simplRules env1 Nothing rules
 
                   ; return (getFloatBinds env1, rules1) } ;
 
