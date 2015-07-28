@@ -90,6 +90,6 @@ packageDataOracle = do
         need [file]
         putOracle $ "Reading " ++ file ++ "..."
         liftIO $ readConfigFile file
-    addOracle $ \(PackageDataKey (file, key)) -> do
+    addOracle $ \(PackageDataKey (file, key)) ->
         Map.lookup key <$> pkgData (unifyPath file)
     return ()
