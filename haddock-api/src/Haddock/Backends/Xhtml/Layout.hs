@@ -206,12 +206,29 @@ subClsInstance :: String -- ^ Section unique id
                -> Html -- ^ Header contents (instance name and type)
                -> [Html] -- ^ Method contents (pretty-printed signatures)
                -> Html
-subClsInstance sid hdr mets =
-    (hdrDiv << hdr) <+> (methodDiv << subBlock mets)
+subClsInstance iid hdr mets = subInstHead iid hdr <+> subInstMethods iid mets
+
+
+subInstHead :: String -- ^ Instance unique id (for anchor generation)
+            -> Html -- ^ Header content (instance name and type)
+            -> Html
+subInstHead iid hdr =
+    expander << hdr
   where
-    anchorId = makeAnchorId $ "i:" ++ sid
-    hdrDiv = thediv ! collapseControl anchorId False "instance"
-    methodDiv = thediv ! collapseSection anchorId False "methods"
+    expander = thediv ! collapseControl (instAnchorId iid) False "instance"
+
+
+subInstMethods :: String -- ^ Instance unique id (for anchor generation)
+               -> [Html] -- ^ Method contents (pretty-printed signatures)
+               -> Html
+subInstMethods iid mets =
+    section << subBlock mets
+  where
+    section = thediv ! collapseSection (instAnchorId iid) False "methods"
+
+
+instAnchorId :: String -> String
+instAnchorId iid = makeAnchorId $ "i:" ++ iid
 
 
 subMethods :: [Html] -> Html
