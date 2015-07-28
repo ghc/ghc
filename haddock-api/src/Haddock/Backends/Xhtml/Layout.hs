@@ -214,7 +214,7 @@ subInstMethods :: String -- ^ Instance unique id (for anchor generation)
                -> [Html] -- ^ Method contents (pretty-printed signatures)
                -> Html
 subInstMethods iid mets =
-    section << subBlock mets
+    section << subMethods mets
   where
     section = thediv ! collapseSection (instAnchorId iid) False "methods"
 
