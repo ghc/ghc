@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   subConstructors,
   subEquations,
   subFields,
-  subInstances, subClsInstance, subInstHead, subInstMethods,
+  subInstances, subInstHead, subInstMethods,
   subMethods,
   subMinimal,
 
@@ -200,15 +200,7 @@ subInstances qual nm lnks splice = maybe noHtml wrap . instTable
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
 
-
--- | Generate class instance div with specialized methods.
-subClsInstance :: String -- ^ Section unique id
-               -> Html -- ^ Header contents (instance name and type)
-               -> [Html] -- ^ Method contents (pretty-printed signatures)
-               -> Html
-subClsInstance iid hdr mets = subInstHead iid hdr <+> subInstMethods iid mets
-
-
+ 
 subInstHead :: String -- ^ Instance unique id (for anchor generation)
             -> Html -- ^ Header content (instance name and type)
             -> Html
