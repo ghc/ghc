@@ -324,6 +324,38 @@ evacuate_large(StgPtr p)
 }
 
 /* ----------------------------------------------------------------------------
+   Evacuate static objects
+
+   When a static object is visited for the first time in this GC, it
+   is chained on to the gct->static_objects list.
+
+   evacuate_static_object (link_field, q)
+     - link_field must be STATIC_LINK(q)
+   ------------------------------------------------------------------------- */
+
+STATIC_INLINE void
+evacuate_static_object (StgClosure **link_field, StgClosure *q)
+{
+    StgWord link = (StgWord)*link_field;
+
+    // See Note [STATIC_LINK fields] for how the link field bits work
+    if ((((StgWord)(link)&STATIC_BITS) | prev_static_flag) != 3) {
+        StgWord new_list_head = (StgWord)q | static_flag;
+#ifndef THREADED_RTS
+        *link_field = gct->static_objects;
+        gct->static_objects = (StgClosure *)new_list_head;
+#else
+        StgWord prev;
+        prev = cas((StgVolatilePtr)link_field, link,
+                   (StgWord)gct->static_objects);
+        if (prev == link) {
+            gct->static_objects = (StgClosure *)new_list_head;
+        }
+#endif
+    }
+}
+
+/* ----------------------------------------------------------------------------
    Evacuate
 
    This is called (eventually) for every live object in the system.
@@ -392,38 +424,13 @@ loop:
 
       case THUNK_STATIC:
           if (info->srt_bitmap != 0) {
-              if (*THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
-#ifndef THREADED_RTS
-                  *THUNK_STATIC_LINK((StgClosure *)q) = gct->static_objects;
-                  gct->static_objects = (StgClosure *)q;
-#else
-                  StgPtr link;
-                  link = (StgPtr)cas((StgPtr)THUNK_STATIC_LINK((StgClosure *)q),
-                                     (StgWord)NULL,
-                                     (StgWord)gct->static_objects);
-                  if (link == NULL) {
-                      gct->static_objects = (StgClosure *)q;
-                  }
-#endif
-              }
+              evacuate_static_object(THUNK_STATIC_LINK((StgClosure *)q), q);
           }
           return;
 
       case FUN_STATIC:
-          if (info->srt_bitmap != 0 &&
-              *FUN_STATIC_LINK((StgClosure *)q) == NULL) {
-#ifndef THREADED_RTS
-              *FUN_STATIC_LINK((StgClosure *)q) = gct->static_objects;
-              gct->static_objects = (StgClosure *)q;
-#else
-              StgPtr link;
-              link = (StgPtr)cas((StgPtr)FUN_STATIC_LINK((StgClosure *)q),
-                                 (StgWord)NULL,
-                                 (StgWord)gct->static_objects);
-              if (link == NULL) {
-                  gct->static_objects = (StgClosure *)q;
-              }
-#endif
+          if (info->srt_bitmap != 0) {
+              evacuate_static_object(FUN_STATIC_LINK((StgClosure *)q), q);
           }
           return;
 
@@ -432,39 +439,11 @@ loop:
            * on the CAF list, so don't do anything with it here (we'll
            * scavenge it later).
            */
-          if (*IND_STATIC_LINK((StgClosure *)q) == NULL) {
-#ifndef THREADED_RTS
-                  *IND_STATIC_LINK((StgClosure *)q) = gct->static_objects;
-                  gct->static_objects = (StgClosure *)q;
-#else
-                  StgPtr link;
-                  link = (StgPtr)cas((StgPtr)IND_STATIC_LINK((StgClosure *)q),
-                                     (StgWord)NULL,
-                                     (StgWord)gct->static_objects);
-                  if (link == NULL) {
-                      gct->static_objects = (StgClosure *)q;
-                  }
-#endif
-          }
+          evacuate_static_object(IND_STATIC_LINK((StgClosure *)q), q);
           return;
 
       case CONSTR_STATIC:
-          if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
-#ifndef THREADED_RTS
-              *STATIC_LINK(info,(StgClosure *)q) = gct->static_objects;
-              gct->static_objects = (StgClosure *)q;
-#else
-              StgPtr link;
-              link = (StgPtr)cas((StgPtr)STATIC_LINK(info,(StgClosure *)q),
-                                 (StgWord)NULL,
-                                 (StgWord)gct->static_objects);
-              if (link == NULL) {
-                  gct->static_objects = (StgClosure *)q;
-              }
-#endif
-          }
-          /* I am assuming that static_objects pointers are not
-           * written to other objects, and thus, no need to retag. */
+          evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
           return;
 
       case CONSTR_NOCAF_STATIC:
