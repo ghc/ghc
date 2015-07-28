@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   subConstructors,
   subEquations,
   subFields,
-  subInstances, subClsInstance,
+  subInstances, subClsInstance, subInstHead, subInstMethods,
   subMethods,
   subMinimal,
 

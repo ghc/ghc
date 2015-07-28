@@ -525,26 +525,39 @@ ppInstances links origin instances baseName splice unicode qual
   where
     instName = getOccString $ getName baseName
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
-    instDecl no (inst, maybeDoc,l) =
-        ((ppInstHead links splice unicode qual origin no inst, maybeDoc, []),l)
+    instDecl no (inst, mdoc, loc) =
+        ((ppInstHead links splice unicode qual mdoc origin no inst), loc)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
-           -> InstOrigin -> Int -> InstHead DocName
-           -> Html
-ppInstHead links splice unicode qual origin no (InstHead {..}) =
+           -> Maybe (MDoc DocName) -> InstOrigin -> Int -> InstHead DocName
+           -> SubDecl
+ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
     case ihdInstType of
         ClassInst { .. } ->
-            subClsInstance iid hdr mets
+            ( subInstHead iid $ ppContextNoLocs clsiCtx unicode qual <+> typ
+            , mdoc
+            , [subInstMethods iid sigs]
+            )
           where
-            hdr = ppContextNoLocs clsiCtx unicode qual <+> typ
-            mets = ppInstanceSigs links splice unicode qual
-                clsiTyVars ihdTypes clsiSigs
             iid = instanceId origin no ihdClsName
-        TypeInst rhs -> keyword "type" <+> typ
-            <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
-        DataInst dd -> keyword "data" <+> typ
-            <+> ppShortDataDecl False True dd unicode qual
+            sigs = ppInstanceSigs links splice unicode qual
+                clsiTyVars ihdTypes clsiSigs
+        TypeInst rhs ->
+            (ptype, mdoc, [])
+          where
+            ptype = mconcat
+                [ keyword "type"
+                , typ
+                , maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
+                ]
+        DataInst dd ->
+            (pdata, mdoc, [])
+          where
+            pdata = mconcat
+                [ keyword "data" <+> typ
+                , ppShortDataDecl False True dd unicode qual
+                ]
   where
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
 
