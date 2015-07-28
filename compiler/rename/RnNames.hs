@@ -45,6 +45,7 @@ import FastStringEnv
 import ListSetOps
 
 import Control.Monad
+import Data.Either      ( partitionEithers )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
@@ -878,13 +879,14 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
                                        -- See the AvailTC Invariant in Avail.hs
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
-               subs = map NonFldChild subnames ++ map availFieldToChild subflds
+               subs = map Left subnames ++ map Right subflds
                cs   = rdr_ns ++ availFieldsRdrNames rdr_fs
-               mb_children = lookupChildren subs cs
+               mb_children = lookupChildren (either (occNameFS . nameOccName) flLabel) subs cs
 
            (childnames, childflds) <- if any isNothing mb_children
               then failLookupWith BadImport
-              else return (childrenNamesFlds (catMaybes mb_children))
+                   -- AMG TODO this is hideous:
+              else return (partitionEithers (concatMap (\ (L l e) -> map (either (Left . L l) (Right . L l)) e) (catMaybes mb_children)))
 
            case mb_parent of
              -- non-associated ty/cls
@@ -1023,43 +1025,20 @@ just a single name.
 AMG TODO: figure out how this works and document it or simplify it!
 -}
 
--- | Represents the name of a child in an export item,
--- e.g. the x in import M (T(x)).
-data ChildName = NonFldChild Name  -- ^ Not a field
-               | FldChild Name     -- ^ A non-overloaded field
-               | OverloadedFldChild FieldLabelString [Name]
-                 -- ^ One or more overloaded fields with a common label
-                 -- See Note [ChildNames for overloaded record fields]
 
-availFieldToChild :: FieldLabel -> ChildName
-availFieldToChild fl
-  | flIsOverloaded fl = OverloadedFldChild (flLabel fl) [flSelector fl]
-  | otherwise         = FldChild (flSelector fl)
-
-childOccName :: ChildName -> OccName
-childOccName (NonFldChild n)            = nameOccName n
-childOccName (FldChild n)               = nameOccName n
-childOccName (OverloadedFldChild lbl _) = mkVarOccFS lbl
-
-
-mkChildEnv :: [GlobalRdrElt] -> NameEnv [ChildName]
+mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
 mkChildEnv gres = foldr add emptyNameEnv gres
   where
-    add gre env = case greChild gre of
-        Just c  -> extendNameEnv_Acc (:) singleton env (par_is (gre_par gre)) c
-        Nothing -> env
-    greChild gre = case gre_par gre of
-        FldParent _ (Just lbl) -> Just (OverloadedFldChild lbl [n])
-        FldParent _ Nothing    -> Just (FldChild n)
-        ParentIs _             -> Just (NonFldChild n)
-        NoParent               -> Nothing
-      where n = gre_name gre
+    add gre env = case gre_par gre of
+        FldParent p _  -> extendNameEnv_Acc (:) singleton env p gre
+        ParentIs  p    -> extendNameEnv_Acc (:) singleton env p gre
+        NoParent       -> env
 
-findChildren :: NameEnv [ChildName] -> Name -> [ChildName]
+findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
-lookupChildren :: [ChildName] -> [Located RdrName]
-               -> [Maybe (Located ChildName)]
+lookupChildren :: (a -> FastString) -> [a] -> [Located RdrName]
+               -> [Maybe (Located [a])]
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
@@ -1067,7 +1046,7 @@ lookupChildren :: [ChildName] -> [Located RdrName]
 -- will correctly find AssocTy among the all_kids of Cls, even though
 -- the RdrName for AssocTy may have a (bogus) DataName namespace
 -- (Really the rdr_items should be FastStrings in the first place.)
-lookupChildren all_kids rdr_items
+lookupChildren f all_kids rdr_items
   -- = map (lookupFsEnv kid_env . occNameFS . rdrNameOcc) rdr_items
   = map doOne rdr_items
   where
@@ -1075,29 +1054,9 @@ lookupChildren all_kids rdr_items
       Just n -> Just (L l n)
       Nothing -> Nothing
 
-    kid_env = extendFsEnvList_C plusChildName emptyFsEnv
-                      [(occNameFS (childOccName n), n) | n <- all_kids]
-
-    plusChildName (OverloadedFldChild lbl xs) (OverloadedFldChild _ ys)
-      = OverloadedFldChild lbl (xs ++ ys)
-    plusChildName (OverloadedFldChild lbl xs) (FldChild n)
-      = OverloadedFldChild lbl (n:xs)
-    plusChildName (FldChild n) (OverloadedFldChild lbl xs)
-      = OverloadedFldChild lbl (n:xs)
-    plusChildName (FldChild m) (FldChild n)
-      = OverloadedFldChild (occNameFS (nameOccName m)) [m, n]
-    plusChildName _ y = y -- This can happen if we have both
-                          -- Example{tc} and Example{d} in all_kids;
-                          -- take the second because it will be the
-                          -- data constructor (AvailTC invariant)
-
-
-childrenNamesFlds :: [Located ChildName] -> ([Located Name], [Located FieldLabel])
-childrenNamesFlds xs = mconcat (map bisect xs)
-  where
-    bisect (L l (NonFldChild n))             = ([L l n], [])
-    bisect (L l (FldChild n))                = ([], [L l (FieldLabel (occNameFS (nameOccName n)) False n)])
-    bisect (L l (OverloadedFldChild lbl ns)) = ([], map (L l . FieldLabel lbl True) ns)
+    -- AMG TODO explain why we can have duplicates here
+    kid_env = extendFsEnvList_C (++) emptyFsEnv
+                      [(f x, [x]) | x <- all_kids]
 
 
 -- | Combines 'AvailInfo's from the same family
@@ -1244,7 +1203,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)
 
     -- Maps a parent to its in-scope children
-    kids_env :: NameEnv [ChildName]
+    kids_env :: NameEnv [GlobalRdrElt]
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
     imported_modules = [ qual_name
@@ -1318,9 +1277,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie ie@(IEThingAll (L l rdr))
         = do name <- lookupGlobalOccRn rdr
-             let kids          = findChildren kids_env name
-                 (names, flds) = childrenNamesFlds $ map noLoc kids
-             addUsedKids rdr kids
+             let kids = findChildren kids_env name
+             addUsedGREs kids
              warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null kids) $
                   if isTyConName name
@@ -1330,7 +1288,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        addErr (exportItemErr ie)
 
              return ( IEThingAll (L l name)
-                    , AvailTC name (name:map unLoc names) (map unLoc flds) )
+                    , foldr (plusAvail . availFromGRE) (AvailTC name [name] []) kids )
 
     lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds)
         = do name <- lookupGlobalOccRn rdr
@@ -1338,17 +1296,29 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                 then return ( IEThingWith (L l name) [] []
                             , AvailTC name [name] [] )
                 else do
-             let cs       = sub_rdrs ++ availFieldsRdrNames sub_flds
-                 mb_names = lookupChildren (findChildren kids_env name) cs
-             if any isNothing mb_names
+             let cs      = sub_rdrs ++ availFieldsRdrNames sub_flds
+                 mb_gres = lookupChildren (occNameFS . greOccName) (findChildren kids_env name) cs
+             if any isNothing mb_gres
                 then do addErr (exportItemErr ie)
                         return ( IEThingWith (L l name) [] []
                                , AvailTC name [name] [] )
-                else do let names = catMaybes mb_names
-                            (non_flds, flds) = childrenNamesFlds names
-                        addUsedKids rdr (map unLoc names)
+                else do let lgress = catMaybes mb_gres
+                            gres   = concat $ map unLoc lgress
+                            non_flds = [ L l (gre_name gre) | L l gres <- lgress
+                                       , gre <- gres
+                                       , not (isRecFldGRE gre)
+                                       ]
+                            flds     = [ L l (FieldLabel lbl is_overloaded (gre_name gre))
+                                       | L l gres <- lgress
+                                       , gre <- gres
+                                       , FldParent _ mb_lbl <- [gre_par gre]
+                                       , let (lbl, is_overloaded) = case mb_lbl of
+                                                                      Nothing -> (occNameFS (nameOccName (gre_name gre)), False)
+                                                                      Just x  -> (x, True)
+                                       ]
+                        addUsedGREs gres
                         return ( IEThingWith (L l name) non_flds flds
-                               , AvailTC name (name:map unLoc non_flds) (map unLoc flds))
+                               , foldr (plusAvail . availFromGRE) (AvailTC name [name] []) gres )
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
@@ -1361,10 +1331,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_doc_ie (IEDocNamed str)  = return (IEDocNamed str)
     lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
 
+{-
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
     addUsedKids _ _ = return () -- AMG TODO
-{-
     addUsedKids parent_rdr kid_names
        = addUsedRdrNames $ map (mk_kid_rdr . childOccName) kid_names
        where
@@ -1511,13 +1481,9 @@ reportUnusedNames _export_decls gbl_env
     gre_is_used :: NameSet -> GlobalRdrElt -> Bool
     gre_is_used used_names (GRE {gre_name = name})
         = name `elemNameSet` used_names
-          || any used_child (findChildren kids_env name)
+          || any (\ gre -> gre_name gre `elemNameSet` used_names) (findChildren kids_env name)
                 -- A use of C implies a use of T,
                 -- if C was brought into scope by T(..) or T(C)
-      where
-        used_child (NonFldChild n)           = n `elemNameSet` used_names
-        used_child (FldChild n)              = n `elemNameSet` used_names
-        used_child (OverloadedFldChild _ ns) = any (`elemNameSet` used_names) ns
 
     -- Filter out the ones that are
     --  (a) defined in this module, and
