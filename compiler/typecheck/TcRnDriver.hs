@@ -1180,8 +1180,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
             ; fo_gres = fi_gres `unionBags` foe_gres
             ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre)
                                 emptyFVs fo_gres
-            ; fo_rdr_names :: [RdrName]
-            ; fo_rdr_names = foldrBag gre_to_rdr_name [] fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders val_binds)
                           `minusNameSet` getTypeSigNames val_binds
@@ -1199,17 +1197,10 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                                  , tcg_dus     = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
-        addUsedRdrNames fo_rdr_names ;
+        addUsedGREs (bagToList fo_gres) ;
         return (tcg_env', tcl_env)
     }}}}}}
-  where
-    gre_to_rdr_name :: GlobalRdrElt -> [RdrName] -> [RdrName]
-        -- For *imported* newtype data constructors, we want to
-        -- make sure that at least one of the imports for them is used
-        -- See Note [Newtype constructor usage in foreign declarations]
-    gre_to_rdr_name gre rdrs
-      | isLocalGRE gre = rdrs
-      | otherwise      = greUsedRdrName gre : rdrs
+
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup Name]

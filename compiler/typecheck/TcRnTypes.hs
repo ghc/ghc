@@ -140,7 +140,6 @@ import ListSetOps
 import FastString
 import GHC.Fingerprint
 
-import Data.Set (Set)
 import Control.Monad (ap, liftM)
 
 #ifdef GHCI
@@ -384,8 +383,7 @@ data TcGblEnv
           -- here about transative trusted packaage requirements.
 
         tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
-        tcg_used_rdrnames :: TcRef (Set RdrName),
-        tcg_used_selectors :: TcRef NameSet,
+        tcg_used_gres :: TcRef [GlobalRdrElt],
           -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,

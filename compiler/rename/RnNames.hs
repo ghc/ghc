@@ -49,7 +49,6 @@ import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy )
-import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
 
@@ -1276,8 +1275,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; warnIf (warnDodgyExports && exportValid && null names)
                       (nullModuleExport mod)
 
-             ; addUsedRdrNames (concat [ [mkRdrQual mod occ, mkRdrUnqual occ]
-                                       | occ <- map nameOccName names ])
+             ; addUsedGREs gres
                         -- The qualified and unqualified version of all of
                         -- these names are, in effect, used by this export
 
@@ -1365,12 +1363,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
+    addUsedKids _ _ = return () -- AMG TODO
+{-
     addUsedKids parent_rdr kid_names
        = addUsedRdrNames $ map (mk_kid_rdr . childOccName) kid_names
        where
          mk_kid_rdr = case isQual_maybe parent_rdr of
                          Nothing           -> mkRdrUnqual
                          Just (modName, _) -> mkRdrQual modName
+-}
 
 isDoc :: IE RdrName -> Bool
 isDoc (IEDoc _)      = True
@@ -1483,7 +1484,7 @@ reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
   = do  { traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
-        ; sel_uses <- readMutVar (tcg_used_selectors gbl_env)
+        ; sel_uses <- return emptyNameSet -- AMG TODO readMutVar (tcg_used_selectors gbl_env)
         ; warnUnusedImportDecls gbl_env
         ; warnUnusedTopBinds $ filterOut (used_as_selector sel_uses)
                                          unused_locals }
@@ -1551,8 +1552,7 @@ type ImportDeclUsage
 
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
-  = do { uses <- fmap Set.elems $ readMutVar (tcg_used_rdrnames gbl_env)
-       ; sel_uses <- readMutVar (tcg_used_selectors gbl_env)
+  = do { uses <- readMutVar (tcg_used_gres gbl_env)
        ; let user_imports = filterOut (ideclImplicit . unLoc) (tcg_rn_imports gbl_env)
                             -- This whole function deals only with *user* imports
                             -- both for warning about unnecessary ones, and for
@@ -1561,10 +1561,9 @@ warnUnusedImportDecls gbl_env
              fld_env = mkFieldEnv rdr_env
 
        ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports rdr_env uses sel_uses fld_env
+             usage = findImportUsage user_imports rdr_env uses fld_env
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
-                       , ptext (sLit "Selector uses:") <+> ppr (nameSetElems sel_uses)
                        , ptext (sLit "Import usage") <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport fld_env) usage
@@ -1598,19 +1597,16 @@ type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 
 findImportUsage :: [LImportDecl Name]
                 -> GlobalRdrEnv
-                -> [RdrName]
-                -> NameSet
+                -> [GlobalRdrElt]
                 -> NameEnv (FieldLabelString, Name)
                 -> [ImportDeclUsage]
 
-findImportUsage imports rdr_env rdrs sel_names fld_env
+findImportUsage imports rdr_env used_gres fld_env
   = map unused_decl imports
   where
     import_usage :: ImportMap
     import_usage
-      = foldr (extendImportMap fld_env rdr_env . Right)
-       (foldr (extendImportMap fld_env rdr_env . Left) Map.empty rdrs)
-       (nameSetElems sel_names)
+      = foldr (extendImportMap fld_env rdr_env) Map.empty used_gres
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, nameSetElems unused_imps)
@@ -1652,22 +1648,13 @@ findImportUsage imports rdr_env rdrs sel_names fld_env
 
 extendImportMap :: NameEnv (FieldLabelString, Name)
                 -> GlobalRdrEnv
-                -> Either RdrName Name
+                -> GlobalRdrElt
                 -> ImportMap -> ImportMap
--- For a used RdrName, find all the import decls that brought
+-- For a used GlobalRdrElt, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-extendImportMap fld_env rdr_env rdr_or_sel imp_map
-  | Left rdr <- rdr_or_sel
-  , [gre] <- lookupGRE_RdrName rdr rdr_env
-  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
-  , not lcl
-  = add_imp gre (bestImport imps) imp_map
-
-  | Right sel <- rdr_or_sel
-  , Just (lbl, _) <- lookupNameEnv fld_env sel
-  , [gre] <- lookupGRE_Field_Name rdr_env sel lbl
-  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
+extendImportMap _fld_env _rdr_env gre imp_map
+  | GRE { gre_lcl = lcl, gre_imp = imps } <- gre
   , not lcl
   = add_imp gre (bestImport imps) imp_map
 

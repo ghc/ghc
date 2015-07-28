@@ -25,7 +25,7 @@ module RnEnv (
         lookupSubBndrGREs, lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreAvailRn,
-        getLookupOccRn, addUsedRdrNames,
+        getLookupOccRn, addUsedGREs,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalNames, bindLocalNamesFV,
@@ -75,7 +75,6 @@ import DynFlags
 import FastString
 import Control.Monad
 import Data.List
-import qualified Data.Set as Set
 import ListSetOps       ( minusList )
 import Constants        ( mAX_TUPLE_SIZE )
 
@@ -479,11 +478,7 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-            [gre] | isOverloadedRecFldGRE gre ->
-                     do { addUsedSelector (gre_name gre)
-                        ; return (gre_name gre) }
-                  | otherwise ->
-                     do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
+            [gre] -> do { addUsedGRE warnIfDeprec gre
                           -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
             []    -> do { ns <- lookupQualifiedNameGHCi rdr_name
@@ -495,11 +490,6 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
                         ; return (mkUnboundName rdr_name) } } }
             gres  -> do { addNameClashErrRn rdr_name gres
                         ; return (gre_name (head gres)) } }
-  where
-    -- Note [Usage for sub-bndrs]
-    used_rdr_name gre
-      | isQual rdr_name = rdr_name
-      | otherwise       = greUsedRdrName gre
 
 lookupSubBndrGREs :: GlobalRdrEnv -> Maybe Name -> RdrName -> [GlobalRdrElt]
 -- If parent = Nothing, just do a normal lookup
@@ -631,7 +621,7 @@ mean looking up the OccName in every name-space, just in case, and that
 seems a bit brutal.  So it's just done here on lookup.  But we might
 need to revisit that choice.
 
-Note [Usage for sub-bndrs]
+Note [Usage for sub-bndrs] AMG TODO update note
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you have this
    import qualified M( C( f ) )
@@ -868,13 +858,13 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
         ; case lookupGRE_RdrName rdr_name env of
                 []    -> return Nothing
                 [gre] | isOverloadedRecFldGRE gre
-                         -> do { addUsedRdrName True gre rdr_name
+                         -> do { addUsedGRE True gre
                                ; return (Just (Right [FieldOcc rdr_name $ gre_name gre])) }
                       | otherwise
-                         -> do { addUsedRdrName True gre rdr_name
+                         -> do { addUsedGRE True gre
                                ; return (Just (Left (gre_name gre))) }
                 gres  | all isRecFldGRE gres && overload_ok
-                         -> do { mapM_ (\ gre -> addUsedRdrName True gre rdr_name) gres
+                         -> do { mapM_ (addUsedGRE True) gres
                                ; return (Just (Right (map (FieldOcc rdr_name . gre_name) gres))) }
                 gres     -> do { addNameClashErrRn rdr_name gres
                                ; return (Just (Left (gre_name (head gres)))) } }
@@ -895,7 +885,7 @@ lookupGreRn_maybe rdr_name
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName rdr_name env of
             []    -> return Nothing
-            [gre] -> do { addUsedRdrName True gre rdr_name
+            [gre] -> do { addUsedGRE True gre
                         ; return (Just gre) }
             gres  -> do { addNameClashErrRn rdr_name gres
                         ; traceRn (text "name clash" <+> (ppr rdr_name $$ ppr gres $$ ppr env))
@@ -911,7 +901,7 @@ lookupGreRn2_maybe rdr_name
         ; case lookupGRE_RdrName rdr_name env of
             []    -> do { _ <- unboundName WL_Global rdr_name
                         ; return Nothing }
-            [gre] -> do { addUsedRdrName True gre rdr_name
+            [gre] -> do { addUsedGRE True gre
                         ; return (Just gre) }
             gres  -> do { addNameClashErrRn rdr_name gres
                         ; traceRn (text "name clash" <+> (ppr rdr_name $$ ppr gres $$ ppr env))
@@ -953,34 +943,25 @@ Note [Handling of deprecations]
      - the things exported by a module export 'module M'
 -}
 
-addUsedSelector :: Name -> RnM ()
--- Record usage of record selectors by DuplicateRecordFields
-addUsedSelector n = do { env <- getGblEnv
-                       ; updMutVar (tcg_used_selectors env)
-                                   (\s -> extendNameSet s n) }
-
-addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
+addUsedGRE :: Bool -> GlobalRdrElt -> RnM ()
 -- Record usage of imported RdrNames
-addUsedRdrName warn_if_deprec gre rdr
+-- AMG TODO
+addUsedGRE warn_if_deprec gre
   = do { unless (isLocalGRE gre) $
          do { env <- getGblEnv
             ; traceRn (text "addUsedRdrName 1" <+> ppr gre)
-            ; updMutVar (tcg_used_rdrnames env)
-                        (\s -> Set.insert rdr s) }
+            ; updMutVar (tcg_used_gres env) (gre :) }
 
        ; when warn_if_deprec $
          warnIfDeprecated gre }
 
-addUsedRdrNames :: [RdrName] -> RnM ()
--- Record used sub-binders
--- We don't check for imported-ness here, because it's inconvenient
--- and not stritly necessary.
+addUsedGREs :: [GlobalRdrElt] -> RnM ()
+-- Record used imported sub-binders
 -- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
-addUsedRdrNames rdrs
+addUsedGREs gres
   = do { env <- getGblEnv
-       ; traceRn (text "addUsedRdrName 2" <+> ppr rdrs)
-       ; updMutVar (tcg_used_rdrnames env)
-                   (\s -> foldr Set.insert s rdrs) }
+       ; traceRn (text "addUsedRdrName 2" <+> ppr gres)
+       ; updMutVar (tcg_used_gres env) (filter (not . isLocalGRE) gres ++) }
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
 warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })

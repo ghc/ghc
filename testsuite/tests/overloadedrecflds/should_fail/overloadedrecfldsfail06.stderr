@@ -14,5 +14,14 @@ overloadedrecfldsfail06.hs:7:1: warning:
     The import of ‘Unused(unused), V(x), U(y), MkV, Unused’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
+overloadedrecfldsfail06.hs:8:1: warning:
+    The qualified import of ‘OverloadedRecFldsFail06_A’ is redundant
+      except perhaps to import instances from ‘OverloadedRecFldsFail06_A’
+    To import instances alone, use: import OverloadedRecFldsFail06_A()
+
+overloadedrecfldsfail06.hs:9:1: warning:
+    The qualified import of ‘V(y)’
+    from module ‘OverloadedRecFldsFail06_A’ is redundant
+
 <no location info>: error: 
 Failing due to -Werror.
