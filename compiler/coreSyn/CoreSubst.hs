@@ -888,7 +888,7 @@ simpleOptPgm dflags this_mod binds rules vects
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
 
     do_one (subst, binds') bind
-      = case simple_opt_bind subst bind of
+      = case simple_opt_bind_pgm subst bind of
           (subst', Nothing)    -> (subst', binds')
           (subst', Just bind') -> (subst', bind':binds')
 
@@ -988,11 +988,16 @@ simple_app subst e as
   = foldl App (simple_opt_expr subst e) as
 
 ----------------------
-simple_opt_bind,simple_opt_bind' :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
+simple_opt_bind,simple_opt_bind',simple_opt_bind_pgm
+  :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
 simple_opt_bind s b               -- Can add trace stuff here
   = simple_opt_bind' s b
 
-simple_opt_bind' subst (Rec prs)
+simple_opt_bind' = simple_opt_bind'' False
+simple_opt_bind_pgm = simple_opt_bind'' True
+
+simple_opt_bind'' :: Bool -> Subst -> CoreBind -> (Subst, Maybe CoreBind)
+simple_opt_bind'' two_passes subst (Rec prs)
   = (subst'', res_bind)
   where
     res_bind            = Just (Rec (reverse rev_prs'))
@@ -1004,11 +1009,13 @@ simple_opt_bind' subst (Rec prs)
            Nothing     -> (subst,  (b2,r2):prs)
        where
          b2 = add_info subst b b'
-              -- Make two passes of simplification
-         r2 = simple_opt_expr subst (simple_opt_expr subst r)
+         r2 = if two_passes
+                 then simple_opt_expr subst (simple_opt_expr subst r)
+                 else simple_opt_expr subst r
 
-simple_opt_bind' subst (NonRec b r)
-    -- Make two passes of simplification
+simple_opt_bind'' False subst (NonRec b r)
+  = simple_opt_out_bind subst (b, simple_opt_expr subst r)
+simple_opt_bind'' True subst (NonRec b r)  -- Two passes
   = simple_opt_out_bind subst (b, simple_opt_expr subst (simple_opt_expr subst r))
 
 ----------------------
