@@ -88,6 +88,8 @@ specializeSig bndrs typs (TypeSig lnames (L loc typ) prn) =
 specializeSig _ _ sig = sig
 
 
+-- | Make all details of instance head (signatures, associated types)
+-- specialized to that particular instance type.
 specializeInstHead :: (Eq name, Typeable name, DataId name, SetName name)
                    => InstHead name -> InstHead name
 specializeInstHead ihd@InstHead { ihdInstType = clsi@ClassInst { .. }, .. } =
