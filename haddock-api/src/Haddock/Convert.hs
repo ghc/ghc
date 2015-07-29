@@ -400,7 +400,7 @@ synifyInstHead (_, preds, cls, types) = InstHead
         , clsiSigs = map synifyClsIdSig $ classMethods cls
         , clsiAssocTys = do
             (Right (FamDecl fam)) <- map (synifyTyCon Nothing) $ classATs cls
-            pure fam
+            pure $ mkPseudoFamilyDecl fam
         }
     }
   where

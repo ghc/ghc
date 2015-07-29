@@ -268,7 +268,7 @@ renameInstHead InstHead {..} = do
         <$> mapM renameType clsiCtx
         <*> renameLTyVarBndrs clsiTyVars
         <*> mapM renameSig clsiSigs
-        <*> mapM renameFamilyDecl clsiAssocTys
+        <*> mapM renamePseudoFamilyDecl clsiAssocTys
     TypeInst  ts -> TypeInst  <$> traverse renameType ts
     DataInst  dd -> DataInst  <$> renameTyClD dd
   return InstHead
@@ -351,6 +351,16 @@ renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
     tckind'  <- renameMaybeLKind tckind
     return (FamilyDecl { fdInfo = info', fdLName = lname'
                        , fdTyVars = ltyvars', fdKindSig = tckind' })
+
+
+renamePseudoFamilyDecl :: PseudoFamilyDecl Name
+                       -> RnM (PseudoFamilyDecl DocName)
+renamePseudoFamilyDecl (PseudoFamilyDecl { .. }) =  PseudoFamilyDecl
+    <$> renameFamilyInfo pfdInfo
+    <*> renameL pfdLName
+    <*> mapM renameLType pfdTyVars
+    <*> renameMaybeLKind pfdKindSig
+
 
 renameFamilyInfo :: FamilyInfo Name -> RnM (FamilyInfo DocName)
 renameFamilyInfo DataFamily     = return DataFamily

@@ -328,7 +328,7 @@ data InstType name
       { clsiCtx :: [HsType name]
       , clsiTyVars :: LHsTyVarBndrs name
       , clsiSigs :: [Sig name]
-      , clsiAssocTys :: [FamilyDecl name]
+      , clsiAssocTys :: [PseudoFamilyDecl name]
       }
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
