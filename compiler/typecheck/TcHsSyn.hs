@@ -480,12 +480,15 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                           , abs_ev_binds = new_ev_binds
                           , abs_exports = new_exports, abs_binds = new_val_bind }) }
   where
-    zonkExport env (ABE{ abe_wrap = wrap, abe_poly = poly_id
+    zonkExport env (ABE{ abe_wrap = wrap, abe_inst_wrap = inst_wrap
+                       , abe_poly = poly_id
                        , abe_mono = mono_id, abe_prags = prags })
         = do new_poly_id <- zonkIdBndr env poly_id
              (_, new_wrap) <- zonkCoFn env wrap
+             (_, new_inst_wrap) <- zonkCoFn env inst_wrap
              new_prags <- zonkSpecPrags env prags
-             return (ABE{ abe_wrap = new_wrap, abe_poly = new_poly_id
+             return (ABE{ abe_wrap = new_wrap, abe_inst_wrap = new_inst_wrap
+                        , abe_poly = new_poly_id
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 

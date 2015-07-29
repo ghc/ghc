@@ -895,7 +895,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 | otherwise
                 = SpecPrags spec_inst_prags
 
-             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id
+             export = ABE { abe_wrap = idHsWrapper, abe_inst_wrap = idHsWrapper
+                          , abe_poly = dfun_id
                           , abe_mono = self_dict, abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
              main_bind = AbsBinds { abs_tvs = inst_tyvars
@@ -1007,7 +1008,9 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_t
            ; sc_top_name <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; let sc_top_ty = mkForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
                  sc_top_id = mkLocalId sc_top_name sc_top_ty HasSigId
-                 export = ABE { abe_wrap = idHsWrapper, abe_poly = sc_top_id
+                 export = ABE { abe_wrap = idHsWrapper
+                              , abe_inst_wrap = idHsWrapper
+                              , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
                               , abe_prags = SpecPrags [] }
                  local_ev_binds = TcEvBinds (ic_binds sc_implic)
@@ -1336,7 +1339,8 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                         -- method to this version. Note [INLINE and default methods]
 
 
-                 export = ABE { abe_wrap = hs_wrap, abe_poly = meth_id1
+                 export = ABE { abe_wrap = hs_wrap, abe_inst_wrap = idHsWrapper
+                              , abe_poly = meth_id1
                               , abe_mono = local_meth_id
                               , abe_prags = mk_meth_spec_prags meth_id1 spec_inst_prags [] }
                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
@@ -1392,10 +1396,11 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                               (L bind_loc lm_bind)
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
-              export = ABE { abe_poly  = global_meth_id
-                           , abe_mono  = local_meth_id
-                           , abe_wrap  = hs_wrap
-                           , abe_prags = specs }
+              export = ABE { abe_poly      = global_meth_id
+                           , abe_mono      = local_meth_id
+                           , abe_wrap      = hs_wrap
+                           , abe_inst_wrap = idHsWrapper
+                           , abe_prags     = specs }
 
               local_ev_binds = TcEvBinds (ic_binds meth_implic)
               full_bind = AbsBinds { abs_tvs      = tyvars

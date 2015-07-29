@@ -13,7 +13,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  tcVectDecls,
                  TcSigInfo(..), TcSigFun, mkPragFun,
                  instTcTySig, instTcTySigFromId, findScopedTyVars,
-                 badBootDeclErr, mkExport ) where
+                 badBootDeclErr ) where
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
@@ -30,7 +30,7 @@ import TcHsType
 import TcPat
 import TcMType
 import ConLike
-import Inst( topInstantiate )
+import Inst( topInstantiate, deeplyInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import Type( pprSigmaTypeExtraCts, tidyOpenTypes )
@@ -565,10 +565,11 @@ tcPolyCheck rec_tc prag_fn
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; let (_, _, mono_id) = mono_info
-             export = ABE { abe_wrap = idHsWrapper
-                          , abe_poly = poly_id
-                          , abe_mono = mono_id
-                          , abe_prags = SpecPrags spec_prags }
+             export = ABE { abe_wrap      = idHsWrapper
+                          , abe_inst_wrap = idHsWrapper
+                          , abe_poly      = poly_id
+                          , abe_mono      = mono_id
+                          , abe_prags     = SpecPrags spec_prags }
              abs_bind = L loc $ AbsBinds
                         { abs_tvs = tvs
                         , abs_ev_vars = ev_vars, abs_ev_binds = [ev_binds]
@@ -579,6 +580,61 @@ tcPolyCheck _rec_tc _prag_fn sig _bind
   = pprPanic "tcPolyCheck" (ppr sig)
 
 ------------------
+{-
+Note [Instantiate when inferring a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f = (*)
+As there is no incentive to instantiate the RHS, tcMonoBinds will
+produce a type of forall a. Num a => a -> a -> a for `f`. This will then go
+through simplifyInfer and such, remaining unchanged.
+
+There are three problems with this:
+ 1) Even though `f` does not have a type signature, its type variable `a`
+    is considered "specified" (see Note [Visible type application] in TcExpr),
+    allowing it to participate in visible type application. Yet, when
+    `f` is exported, it will be exported with an *inferred* type variable,
+    preventing importing modules from using visible type application with
+    `f`.
+
+ 2) If the definition were `g _ = (*)`, we get a very unusual type of
+    `forall {a}. a -> forall b. Num b => b -> b -> b` for `g`. This is
+    surely confusing for users.
+
+ 3) The monomorphism restriction can't work. The MR is dealt with in
+    simplifyInfer, and simplifyInfer has no way of instantiating. This
+    could perhaps be worked around, but it may be hard to know even
+    when instantiation should happen.
+
+There is an easy solution to all three problems: instantiate (deeply) when
+inferring a type. So that's what we do. Note that this decision is
+user-facing.
+
+Here are the details:
+ * tcMonoBinds produces the "monomorphic" ids to be put in the AbsBinds.
+   It is inconvenient to instantiate in this function or below. So the
+   monomorphic ids will be uninstantiated (and hence actually polymorphic,
+   but that doesn't ruin anyone's day).
+
+ * In the same captureConstraints as the tcMonoBinds, we instantiate all
+   the types of the monomorphic ids. Instantiating will produce constraints
+   to solve and instantiated types. These constraints and the instantiated
+   types go into simplifyInfer. HsWrappers are produced that go from
+   the "mono" types to the instantiated ones.
+
+ * simplifyInfer does its magic, figuring out how to regeneralize.
+
+ * mkExport then does the impedence matching and needs to connect the
+   monomorphic ids to the polymorphic types as decided by simplifyInfer.
+   Because the instantiation happens before simplifyInfer, we also pass in
+   the HsWrappers obtained via instantiating so that mkExport can connect
+   all the pieces.
+
+ * We produce an AbsBinds with the right (instantiated and then, perhaps,
+   regeneralized) polytypes and the not-yet-instantiated "monomorphic" ids,
+   using the built HsWrappers to connect. Done!
+-}
+
 tcPolyInfer
   :: RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
@@ -587,18 +643,28 @@ tcPolyInfer
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
 tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
-  = do { ((binds', mono_infos), tclvl, wanted)
+  = do { ((binds', mono_infos, wrappers, insted_tys), tclvl, wanted)
              <- pushLevelAndCaptureConstraints  $
-                tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
+             do { (binds', mono_infos)
+                    <- tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
+                  -- See Note [Instantiate when inferring a type]
+                ; mono_tys <- mapM (zonkTcType . idType . thirdOf3) mono_infos
+                    -- NB: zonk to uncover any foralls
+                ; (wrappers, insted_tys)
+                         -- TODO (RAE): Fix origin
+                    <- mapAndUnzipM (deeplyInstantiate AppOrigin) mono_tys
+                ; return (binds', mono_infos, wrappers, insted_tys) }
 
-       ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
+       ; let name_taus = [(name, tau) | ((name, _, _), tau)
+                                          <- zip mono_infos insted_tys]
        ; traceTc "simplifyInfer call" (ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, _mr_bites, ev_binds)
                  <- simplifyInfer tclvl mono name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $
-                    mapM (mkExport prag_fn qtvs inferred_theta) mono_infos
+                    zipWith3M (mkExport prag_fn qtvs inferred_theta)
+                              mono_infos wrappers insted_tys
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
@@ -615,8 +681,11 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 mkExport :: PragFun
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
+         -> HsWrapper -- the instantiation wrapper;
+                      -- see Note [Instantiate when inferring a type]
+         -> TcTauType -- the instantiated type
          -> TcM (ABExport Id)
--- Only called for generalisation plan IferGen, not by CheckGen or NoGen
+-- Only called for generalisation plan InferGen, not by CheckGen or NoGen
 --
 -- mkExport generates exports with
 --      zonked type variables,
@@ -630,16 +699,17 @@ mkExport :: PragFun
 -- Pre-condition: the qtvs and theta are already zonked
 
 mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
-  = do  { mono_ty <- zonkTcType (idType mono_id)
+         inst_wrap inst_ty
+  = do  { inst_ty <- zonkTcType inst_ty
 
         ; (poly_id, inferred) <- case mb_sig of
-              Nothing  -> do { poly_id <- mkInferredPolyId poly_name qtvs inferred_theta mono_ty
+              Nothing  -> do { poly_id <- mkInferredPolyId poly_name qtvs inferred_theta inst_ty
                              ; return (poly_id, True) }
               Just sig | Just poly_id <- completeSigPolyId_maybe sig
                        -> return (poly_id, False)
                        | otherwise
                        -> do { final_theta <- completeTheta inferred_theta sig
-                             ; poly_id <- mkInferredPolyId poly_name qtvs final_theta mono_ty
+                             ; poly_id <- mkInferredPolyId poly_name qtvs final_theta inst_ty
                              ; return (poly_id, True) }
 
         -- NB: poly_id has a zonked type
@@ -647,7 +717,7 @@ mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
         ; spec_prags <- tcSpecPrags poly_id prag_sigs
                 -- tcPrags requires a zonked poly_id
 
-        ; let sel_poly_ty = mkSigmaTy qtvs inferred_theta mono_ty
+        ; let sel_poly_ty = mkSigmaTy qtvs inferred_theta inst_ty
         ; traceTc "mkExport: check sig"
                   (vcat [ ppr poly_name, ppr sel_poly_ty, ppr (idType poly_id) ])
 
@@ -663,10 +733,11 @@ mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
                             tcSubType_NC sig_ctxt sel_poly_ty (idType poly_id)
         ; ev_binds <- simplifyTop wanted
 
-        ; return (ABE { abe_wrap = mkWpLet (EvBinds ev_binds) <.> wrap
-                      , abe_poly = poly_id
-                      , abe_mono = mono_id
-                      , abe_prags = SpecPrags spec_prags}) }
+        ; return (ABE { abe_wrap      = mkWpLet (EvBinds ev_binds) <.> wrap
+                      , abe_inst_wrap = inst_wrap
+                      , abe_poly      = poly_id
+                      , abe_mono      = mono_id
+                      , abe_prags     = SpecPrags spec_prags}) }
   where
     prag_sigs = prag_fn poly_name
     sig_ctxt  = InfSigCtxt poly_name
@@ -823,7 +894,7 @@ We can get these by "impedance matching":
 
 Suppose the shared quantified tyvars are qtvs and constraints theta.
 Then we want to check that
-   f's polytype  is more polymorphic than   forall qtvs. theta => f_mono_ty
+     forall qtvs. theta => f_mono_ty   is more polymorphic than   f's polytype
 and the proof is the impedance matcher.
 
 Notice that the impedance matcher may do defaulting.  See Trac #7173.

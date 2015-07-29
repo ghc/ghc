@@ -137,17 +137,20 @@ dsHsBind (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty
 dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = [export]
                    , abs_ev_binds = ev_binds, abs_binds = binds })
-  | ABE { abe_wrap = wrap, abe_poly = global
+  | ABE { abe_inst_wrap = inst_wrap, abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
+    -- See Note [AbsBinds wrappers] in HsBinds
   = do  { dflags <- getDynFlags
         ; bind_prs <- ds_lhs_binds binds
         ; let core_bind = Rec (fromOL bind_prs)
         ; ds_binds <- dsTcEvBinds_s ev_binds
+        ; inner_rhs <- dsHsWrapper inst_wrap $
+                       mkCoreLets ds_binds $
+                       Let core_bind $
+                       Var local
         ; rhs <- dsHsWrapper wrap $  -- Usually the identity
-                            mkLams tyvars $ mkLams dicts $
-                            mkCoreLets ds_binds $
-                            Let core_bind $
-                            Var local
+                 mkLams tyvars $ mkLams dicts $
+                 inner_rhs
 
         ; (spec_binds, rules) <- dsSpecs rhs prags
 
@@ -178,13 +181,17 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 
         ; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
 
-        ; let mk_bind (ABE { abe_wrap = wrap, abe_poly = global
+        ; let mk_bind (ABE { abe_inst_wrap = inst_wrap, abe_wrap = wrap
+                           , abe_poly = global
                            , abe_mono = local, abe_prags = spec_prags })
+                         -- See Note [AbsBinds wrappers] in HsBinds
                 = do { tup_id  <- newSysLocalDs tup_ty
+                     ; inner_rhs <- dsHsWrapper inst_wrap $
+                                    mkTupleSelector locals local tup_id $
+                                    mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
                      ; rhs <- dsHsWrapper wrap $
-                                 mkLams tyvars $ mkLams dicts $
-                                 mkTupleSelector locals local tup_id $
-                                 mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
+                              mkLams tyvars $ mkLams dicts $
+                              inner_rhs
                      ; let rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
                      ; let global' = (global `setInlinePragma` defaultInlinePragma)
@@ -266,8 +273,8 @@ dictArity :: [Var] -> Arity
 dictArity dicts = count isId dicts
 
 {-
-[Desugaring AbsBinds]
-~~~~~~~~~~~~~~~~~~~~~
+Note [Desugaring AbsBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the general AbsBinds case we desugar the binding to this:
 
        tup a (d:Num a) = let fm = ...gm...

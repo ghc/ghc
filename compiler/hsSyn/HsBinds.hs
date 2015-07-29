@@ -237,11 +237,13 @@ deriving instance (DataId idL, DataId idR)
         -- See Note [AbsBinds]
 
 data ABExport id
-  = ABE { abe_poly  :: id           -- ^ Any INLINE pragmas is attached to this Id
-        , abe_mono  :: id
-        , abe_wrap  :: HsWrapper    -- ^ See Note [AbsBinds wrappers]
-             -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
-        , abe_prags :: TcSpecPrags  -- ^ SPECIALISE pragmas
+  = ABE { abe_poly      :: id    -- ^ Any INLINE pragmas is attached to this Id
+        , abe_mono      :: id
+        , abe_inst_wrap :: HsWrapper
+             -- ^ Shape: abe_mono ~ abe_insted
+        , abe_wrap      :: HsWrapper    -- ^ See Note [AbsBinds wrappers]
+             -- Shape: (forall abs_tvs. abs_ev_vars => abe_insted) ~ abe_poly
+        , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
   } deriving (Data, Typeable)
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
@@ -337,6 +339,24 @@ The abe_wrap field deals with impedance-matching between
     (/\a b. case tup a b of { (f,g) -> f })
 and the thing we really want, which may have fewer type
 variables.  The action happens in TcBinds.mkExport.
+
+For abe_inst_wrap, consider this:
+  x = (*)
+The abe_mono type will be  forall a. Num a => a -> a -> a
+because no instantiation happens during typechecking. Before inferring
+a final type, we must instantiate this. See Note [Instantiate when inferring
+a type] in TcBinds. The abe_inst_wrap takes the uninstantiated abe_mono type
+to a proper instantiated type.
+
+It's conceivable that we could combine the two wrappers, but note that there
+is a gap: neither wrapper tacks on the tvs and dicts from the outer AbsBinds.
+These bits are added manually in desugaring. (See DsBinds.dsHsBind.) A problem
+that would arise in combining them is that zonking becomes more challenging:
+we want to zonk the tvs and dicts in the AbsBinds, but then we end up re-zonking
+when we zonk the ABExport. And -- worse -- the combined wrapper would have
+the tvs and dicts in binding positions, so they would shadow the original
+tvs and dicts. This is all resolvable with some plumbing, but it seems simpler
+just to keep the two wrappers distinct.
 
 Note [Bind free vars]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -510,10 +530,12 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
     , ifPprDebug (ptext (sLit "Evidence:") <+> ppr ev_binds) ]
 
 instance (OutputableBndr id) => Outputable (ABExport id) where
-  ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
+  ppr (ABE { abe_wrap = wrap, abe_inst_wrap = inst_wrap
+           , abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> ptext (sLit "<=") <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
-           , nest 2 (ppr wrap)]
+           , nest 2 (ppr wrap)
+           , nest 2 (ppr inst_wrap)]
 
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL idR) where
   ppr (PSB{ psb_id = L _ psyn, psb_args = details, psb_def = pat, psb_dir = dir })
@@ -625,7 +647,7 @@ data Sig name
       --          'ApiAnnotation.AnnComma'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-    TypeSig 
+    TypeSig
        [Located name]         -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsType name)         -- RHS of the signature
        (PostRn name [Name])   -- Wildcards (both named and anonymous) of the RHS
