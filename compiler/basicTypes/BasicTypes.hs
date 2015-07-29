@@ -1091,7 +1091,7 @@ competesWith AlwaysActive      _                = True
 
 competesWith (ActiveBefore {}) AlwaysActive      = True
 competesWith (ActiveBefore {}) (ActiveBefore {}) = True
-competesWith (ActiveBefore a)  (ActiveAfter b)   = a > b
+competesWith (ActiveBefore a)  (ActiveAfter b)   = a < b
 
 competesWith (ActiveAfter {})  AlwaysActive      = False
 competesWith (ActiveAfter {})  (ActiveBefore {}) = False
@@ -1104,6 +1104,7 @@ See Note [Rules and inlining/other rules] in Desugar.
 
 We say that act1 "competes with" act2 iff
    act1 is active in the phase when act2 *becomes* active
+NB: remember that phases count *down*: 2, 1, 0!
 
 It's too conservative to ensure that the two are never simultaneously
 active.  For example, a rule might be always active, and an inlining
