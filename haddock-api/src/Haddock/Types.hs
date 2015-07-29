@@ -341,6 +341,37 @@ instance OutputableBndr a => Outputable (InstType a) where
   ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
   ppr (DataInst  a) = text "DataInst"  <+> ppr a
 
+
+-- | Almost the same as 'FamilyDecl' except for type binders.
+--
+-- In order to perform type specialization for class instances, we need to
+-- substitute class variables to appropriate type. However, type variables in
+-- associated type are specified using 'LHsTyVarBndrs' instead of 'HsType'.
+-- This makes type substitution impossible and to overcome this issue,
+-- 'PseudoFamilyDecl' type is introduced.
+data PseudoFamilyDecl name = PseudoFamilyDecl
+    { pfdInfo :: FamilyInfo name
+    , pfdLName :: Located name
+    , pfdTyVars :: [LHsType name]
+    , pfdKindSig :: Maybe (LHsKind name)
+    }
+
+
+mkPseudoFamilyDecl :: FamilyDecl name -> PseudoFamilyDecl name
+mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
+    { pfdInfo = fdInfo
+    , pfdLName = fdLName
+    , pfdTyVars = [ L loc (mkType bndr) | L loc bndr <- hsq_tvs fdTyVars ]
+    , pfdKindSig = fdKindSig
+    }
+  where
+    mkType (KindedTyVar (L loc name) lkind) =
+        HsKindSig tvar lkind
+      where
+        tvar = L loc (HsTyVar name)
+    mkType (UserTyVar name) = HsTyVar name
+
+
 -- | An instance head that may have documentation and a source location.
 type DocInstance name = (InstHead name, Maybe (MDoc name), Located name)
 
