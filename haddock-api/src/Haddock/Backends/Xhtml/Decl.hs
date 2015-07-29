@@ -265,6 +265,14 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
     ppFamilyKind unicode qual mkind
 
 
+ppPseudoFamilyHeader :: Unicode -> Qualification -> PseudoFamilyDecl DocName
+                     -> Html
+ppPseudoFamilyHeader unicode qual (PseudoFamilyDecl { .. }) =
+    ppFamilyInfo True pfdInfo <+>
+    ppAppNameTypes (unLoc pfdLName) [] (map unLoc pfdTyVars) unicode qual <+>
+    ppFamilyKind unicode qual pfdKindSig
+
+
 ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocName] ->
            [(DocName, Fixity)] -> SrcSpan -> Documentation DocName ->
            FamilyDecl DocName -> Splice -> Unicode -> Qualification -> Html
@@ -299,7 +307,11 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
 ppPseudoFamilyDecl :: LinksInfo -> Splice -> Unicode -> Qualification
                    -> PseudoFamilyDecl DocName
                    -> Html
-ppPseudoFamilyDecl = undefined
+ppPseudoFamilyDecl links splice unicode qual
+                   decl@(PseudoFamilyDecl { pfdLName = L loc name, .. }) =
+    wrapper $ ppPseudoFamilyHeader unicode qual decl
+  where
+    wrapper = topDeclElem links loc splice [name]
 
 
 --------------------------------------------------------------------------------
