@@ -37,19 +37,21 @@ import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE )
 import PprCore          ( pprRules )
-import Type             ( Type )
+import Type             ( Type, substTy, mkTvSubst )
 import TcType           ( tcSplitTyConApp_maybe )
+import TysPrim          ( anyTypeOfKind )
 import Coercion
 import CoreTidy         ( tidyRules )
 import Id
 import IdInfo           ( SpecInfo( SpecInfo ) )
+import Var
 import VarEnv
 import VarSet
 import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
 import NameSet
 import NameEnv
 import Unify            ( ruleMatchTyX, MatchEnv(..) )
-import BasicTypes       ( Activation, CompilerPhase, isActive )
+import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
 import StaticFlags      ( opt_PprStyle_Debug )
 import DynFlags         ( DynFlags )
 import Outputable
@@ -442,8 +444,8 @@ isMoreSpecific :: CoreRule -> CoreRule -> Bool
 isMoreSpecific (BuiltinRule {}) _                = False
 isMoreSpecific (Rule {})        (BuiltinRule {}) = True
 isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
-               (Rule { ru_bndrs = bndrs2, ru_args = args2 })
-  = isJust (matchN (in_scope, id_unfolding_fun) bndrs2 args2 args1)
+               (Rule { ru_bndrs = bndrs2, ru_args = args2, ru_name = rule_name2 })
+  = isJust (matchN (in_scope, id_unfolding_fun) rule_name2 bndrs2 args2 args1)
   where
    id_unfolding_fun _ = NoUnfolding     -- Don't expand in templates
    in_scope = mkInScopeSet (mkVarSet bndrs1)
@@ -507,13 +509,12 @@ matchRule dflags rule_env _is_active fn args _rough_args
         -- We could do this when putting things into the rulebase, I guess
 
 matchRule _ in_scope is_active _ args rough_args
-          (Rule { ru_act = act, ru_rough = tpl_tops
-                , ru_bndrs = tpl_vars, ru_args = tpl_args
-                , ru_rhs = rhs })
+          (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
+                , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
-  = case matchN in_scope tpl_vars tpl_args args of
+  = case matchN in_scope rule_name tpl_vars tpl_args args of
         Nothing                        -> Nothing
         Just (bind_wrapper, tpl_vals) -> Just (bind_wrapper $
                                                rule_fn `mkApps` tpl_vals)
@@ -523,8 +524,7 @@ matchRule _ in_scope is_active _ args rough_args
 
 ---------------------------------------
 matchN  :: InScopeEnv
-        -> [Var]                -- ^ Match template type variables
-        -> [CoreExpr]           -- ^ Match template
+        -> RuleName -> [Var] -> [CoreExpr]
         -> [CoreExpr]           -- ^ Target; can have more elements than the template
         -> Maybe (BindWrapper,  -- Floated bindings; see Note [Matching lets]
                   [CoreExpr])
@@ -532,15 +532,15 @@ matchN  :: InScopeEnv
 -- the entire result and what should be substituted for each template variable.
 -- Fail if there are two few actual arguments from the target to match the template
 
-matchN (in_scope, id_unf) tmpl_vars tmpl_es target_es
+matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
   = do  { subst <- go init_menv emptyRuleSubst tmpl_es target_es
-        ; return (rs_binds subst,
-                  map (lookup_tmpl subst) tmpl_vars') }
+        ; let (_, matched_es) = mapAccumL lookup_tmpl subst tmpl_vars
+        ; return (rs_binds subst, matched_es) }
   where
-    (init_rn_env, tmpl_vars') = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
-        -- See Note [Template binders]
+    init_rn_env = mkRnEnv2 (extendInScopeSetList in_scope tmpl_vars)
+                  -- See Note [Template binders]
 
-    init_menv = RV { rv_tmpls = mkVarSet tmpl_vars', rv_lcl = init_rn_env
+    init_menv = RV { rv_tmpls = mkVarSet tmpl_vars, rv_lcl = init_rn_env
                    , rv_fltR = mkEmptySubst (rnInScopeSet init_rn_env)
                    , rv_unf = id_unf }
 
@@ -549,46 +549,82 @@ matchN (in_scope, id_unf) tmpl_vars tmpl_es target_es
     go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e
                                      ; go menv subst1 ts es }
 
-    lookup_tmpl :: RuleSubst -> Var -> CoreExpr
-    lookup_tmpl (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst }) tmpl_var'
-        | isId tmpl_var' = case lookupVarEnv id_subst tmpl_var' of
-                             Just e -> e
-                             _      -> unbound tmpl_var'
-        | otherwise      = case lookupVarEnv tv_subst tmpl_var' of
-                             Just ty -> Type ty
-                             Nothing -> unbound tmpl_var'
+    lookup_tmpl :: RuleSubst -> Var -> (RuleSubst, CoreExpr)
+    lookup_tmpl rs@(RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst }) tmpl_var
+        | isId tmpl_var
+        = case lookupVarEnv id_subst tmpl_var of
+             Just e -> (rs, e)
+             _      -> unbound tmpl_var
+        | otherwise
+        = case lookupVarEnv tv_subst tmpl_var of
+             Just ty -> (rs, Type ty)
+             Nothing -> (rs { rs_tv_subst = extendVarEnv tv_subst tmpl_var fake_ty }, Type fake_ty)
+             -- See Note [Unbound template type variables]
+        where
+          fake_ty = anyTypeOfKind kind
+          kind = Type.substTy (mkTvSubst in_scope tv_subst) (tyVarKind tmpl_var)
 
-    unbound var = pprPanic "Template variable unbound in rewrite rule"
-                        (ppr var $$ ppr tmpl_vars $$ ppr tmpl_vars' $$ ppr tmpl_es $$ ppr target_es)
+    unbound var = pprPanic "Template variable unbound in rewrite rule" $
+                  vcat [ ptext (sLit "Variable:") <+> ppr var
+                       , ptext (sLit "Rule") <+> pprRuleName rule_name
+                       , ptext (sLit "Rule bndrs:") <+> ppr tmpl_vars
+                       , ptext (sLit "LHS args:") <+> ppr tmpl_es
+                       , ptext (sLit "Actual args:") <+> ppr target_es ]
 
-{-
+{- Note [Unbound template type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type synonyms with phantom args can give rise to unbound template type
+variables.  Consider this (Trac #10689, simplCore/should_compile/T10689):
+
+    type Foo a b = b
+
+    f :: Eq a => a -> Bool
+    f x = x==x
+
+    {-# RULES "foo" forall (x :: Foo a Char). f x = True #-}
+    finkle = f 'c'
+
+The rule looks like
+   foall (a::*) (d::Eq Char) (x :: Foo a Char).
+         f (Foo a Char) d x = True
+
+Matching the rule won't bind 'a', and legitimately so.  We fudge by
+pretending that 'a' is bound to (Any :: *).
+
 Note [Template binders]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following match:
+Consider the following match (example 1):
         Template:  forall x.  f x
-        Target:     f (x+1)
-This should succeed, because the template variable 'x' has
-nothing to do with the 'x' in the target.
+        Target:               f (x+1)
+This should succeed, because the template variable 'x' has nothing to
+do with the 'x' in the target.
 
-On reflection, this case probably does just work, but this might not
+Likewise this one (example 2):
         Template:  forall x. f (\x.x)
-        Target:    f (\y.y)
-Here we want to clone when we find the \x, but to know that x must be in scope
+        Target:              f (\y.y)
 
-To achive this, we use rnBndrL to rename the template variables if
-necessary; the renamed ones are the tmpl_vars'
+We achieve this simply by:
+  * Adding forall'd template binders to the in-scope set
+
+This works even if the template binder are already in scope
+(in the target) because
+
+  * The RuleSubst rs_tv_subst, rs_id_subst maps LHS template vars to
+    the target world.  It is not applied recursively.
+
+  * Having the template vars in the in-scope set ensures that in
+    example 2 above, the (\x.x) is cloned to (\x'. x').
+
+In the past we used rnBndrL to clone the template variables if
+they were already in scope.  But (a) that's not necessary and (b)
+it complicate the fancy footwork for Note [Unbound template type variables]
 
 
 ************************************************************************
 *                                                                      *
                    The main matcher
 *                                                                      *
-************************************************************************
-
-        ---------------------------------------------
-                The inner workings of matching
-        ---------------------------------------------
--}
+********************************************************************* -}
 
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.

@@ -223,3 +223,5 @@ test('T10083',
      expect_broken(10083),
      run_command,
      ['$MAKE -s --no-print-directory T10083'])
+test('T10689', normal, compile, [''])
+test('T10689a', normal, compile, [''])
