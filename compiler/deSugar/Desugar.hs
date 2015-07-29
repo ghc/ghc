@@ -404,7 +404,8 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
                             2 (ptext (sLit "because") <+> quotes (ppr lhs_id)
                                <+> ptext (sLit "might inline first"))
                      , ptext (sLit "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for")
-                       <+> quotes (ppr lhs_id) ])
+                       <+> quotes (ppr lhs_id)
+                     , ifPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
