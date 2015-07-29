@@ -1278,18 +1278,27 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie ie@(IEThingAll (L l rdr))
         = do name <- lookupGlobalOccRn rdr
-             let kids = findChildren kids_env name
-             addUsedGREs kids
+             let gres = findChildren kids_env name
+             addUsedGREs gres
              warnDodgyExports <- woptM Opt_WarnDodgyExports
-             when (null kids) $
+             when (null gres) $
                   if isTyConName name
                   then when warnDodgyExports $ addWarn (dodgyExportWarn name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
 
+             -- AMG TODO tidy up the following
+             let non_flds = [ gre_name gre | gre <- gres, not (isRecFldGRE gre) ]
+                 flds     = [ FieldLabel lbl is_overloaded (gre_name gre) | gre <- gres
+                            , FldParent _ mb_lbl <- [gre_par gre]
+                            , let (lbl, is_overloaded) = case mb_lbl of
+                                                           Nothing -> (occNameFS (nameOccName (gre_name gre)), False)
+                                                           Just x  -> (x, True)
+                            ]
+
              return ( IEThingAll (L l name)
-                    , foldr (plusAvail . availFromGRE) (AvailTC name [name] []) kids )
+                    , AvailTC name (name:non_flds) flds )
 
     lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds)
         = do name <- lookupGlobalOccRn rdr
@@ -1319,7 +1328,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                        ]
                         addUsedGREs gres
                         return ( IEThingWith (L l name) non_flds flds
-                               , foldr (plusAvail . availFromGRE) (AvailTC name [name] []) gres )
+                               , AvailTC name (name:map unLoc non_flds) (map unLoc flds) )
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
