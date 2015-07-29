@@ -4,8 +4,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
-module Haddock.Backends.Xhtml.Specialize
-    ( specializePseudoFamilyDecl, specializeSig
+module Haddock.Interface.Specialize
+    ( specializeInstHead
     ) where
 
 
@@ -86,6 +86,20 @@ specializeSig bndrs typs (TypeSig lnames (L loc typ) prn) =
     typ' = rename fv . sugar $ specializeTyVarBndrs bndrs typs typ
     fv = foldr Set.union Set.empty . map freeVariables $ typs
 specializeSig _ _ sig = sig
+
+
+specializeInstHead :: (Eq name, Typeable name, DataId name, SetName name)
+                   => InstHead name -> InstHead name
+specializeInstHead ihd@InstHead { ihdInstType = clsi@ClassInst { .. }, .. } =
+    ihd { ihdInstType = instType' }
+  where
+    instType' = clsi
+        { clsiSigs = map specializeSig' clsiSigs
+        , clsiAssocTys = map specializeFamilyDecl' clsiAssocTys
+        }
+    specializeSig' = specializeSig clsiTyVars ihdTypes
+    specializeFamilyDecl' = specializePseudoFamilyDecl clsiTyVars ihdTypes
+specializeInstHead ihd = ihd
 
 
 -- | Make given type use tuple and list literals where appropriate.

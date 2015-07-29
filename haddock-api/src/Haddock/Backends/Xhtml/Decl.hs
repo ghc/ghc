@@ -22,7 +22,6 @@ module Haddock.Backends.Xhtml.Decl (
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
-import Haddock.Backends.Xhtml.Specialize
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
@@ -563,10 +562,8 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
             )
           where
             iid = instanceId origin no ihdClsName
-            sigs = ppInstanceSigs links splice unicode qual
-                clsiTyVars ihdTypes clsiSigs
-            ats = ppInstanceAssocTys links splice unicode qual
-                clsiTyVars ihdTypes clsiAssocTys
+            sigs = ppInstanceSigs links splice unicode qual clsiSigs
+            ats = ppInstanceAssocTys links splice unicode qual clsiAssocTys
         TypeInst rhs ->
             (ptype, mdoc, [])
           where
@@ -587,20 +584,19 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
 
 
 ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification
-                   -> LHsTyVarBndrs DocName -> [HsType DocName]
                    -> [PseudoFamilyDecl DocName]
                    -> [Html]
-ppInstanceAssocTys links splice unicode qual bndrs tys =
-    map ppFamilyDecl' . map (specializePseudoFamilyDecl bndrs tys)
+ppInstanceAssocTys links splice unicode qual =
+    map ppFamilyDecl'
   where
     ppFamilyDecl' = ppPseudoFamilyDecl links splice unicode qual
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
-              -> LHsTyVarBndrs DocName -> [HsType DocName] -> [Sig DocName]
+              -> [Sig DocName]
               -> [Html]
-ppInstanceSigs links splice unicode qual bndrs tys sigs = do
-    TypeSig lnames (L loc typ) _ <- map (specializeSig bndrs tys) sigs
+ppInstanceSigs links splice unicode qual sigs = do
+    TypeSig lnames (L loc typ) _ <- sigs
     let names = map unLoc lnames
     return $ ppSimpleSig links splice unicode qual loc names typ
 

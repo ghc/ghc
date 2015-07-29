@@ -69,6 +69,7 @@ library
     Haddock.Interface.AttachInstances
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
+    Haddock.Interface.Specialize
     Haddock.Parser
     Haddock.Utils
     Haddock.Backends.Xhtml
@@ -76,7 +77,6 @@ library
     Haddock.Backends.Xhtml.DocMarkup
     Haddock.Backends.Xhtml.Layout
     Haddock.Backends.Xhtml.Names
-    Haddock.Backends.Xhtml.Specialize
     Haddock.Backends.Xhtml.Themes
     Haddock.Backends.Xhtml.Types
     Haddock.Backends.Xhtml.Utils

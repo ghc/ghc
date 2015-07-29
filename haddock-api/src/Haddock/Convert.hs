@@ -25,7 +25,6 @@ import Data.Either (lefts, rights)
 import Data.List( partition )
 import DataCon
 import FamInstEnv
-import Haddock.Types
 import HsSyn
 import Kind ( splitKindFunTys, synTyConResKind, isKind )
 import Name
@@ -40,6 +39,9 @@ import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
 import Unique ( getUnique )
 import Var
+
+import Haddock.Types
+import Haddock.Interface.Specialize
 
 
 
@@ -390,7 +392,7 @@ synifyKindSig :: Kind -> LHsKind Name
 synifyKindSig k = synifyType WithinType k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
-synifyInstHead (_, preds, cls, types) = InstHead
+synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
     { ihdClsName = getName cls
     , ihdKinds = map (unLoc . synifyType WithinType) ks
     , ihdTypes = map (unLoc . synifyType WithinType) ts
