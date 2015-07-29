@@ -29,3 +29,4 @@ test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
 # T9208 fails (and should do so) if you have assertion checking on in the compiler
 # Hence the above expect_broken.  See comments in the Trac ticket
 
+test('T10694', only_ways(['normal']), run_command, ['$MAKE -s --no-print-directory T10694'])

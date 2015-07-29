@@ -1080,8 +1080,8 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     fam_envs      = ae_fam_envs env
 
     do_con_arg env (id, str)
-       |  ae_virgin env || isStrictDmd (idDemandInfo id)  -- c.f. extendSigsWithLam
-          || (is_var_scrut && isMarkedStrict str)         -- See Note [CPR in a product case alternative]
+       | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
+       , ae_virgin env || (is_var_scrut && is_strict)  -- See Note [CPR in a product case alternative]
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
        = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
        | otherwise
@@ -1190,15 +1190,18 @@ binders the CPR property.  Specifically
    But then we don't want box it up again when returning it!  We want
    'f2' to have the CPR property, so we give 'x' the CPR property.
 
-   It's a bit delicate because if this case is scrutinising something other
+ * It's a bit delicate because if this case is scrutinising something other
    than an argument the original function, we really don't have the unboxed
    version available.  E.g
       g v = case foo v of
               MkT x y | y>0       -> ...
                       | otherwise -> x
-   Here we don't have the unboxed 'x' available.  Hence the is_var_scrut
-   test when making use of the strictness annoatation.  Slight ad-hoc,
-   but nothing terrible happens if we get it wrong.
+   Here we don't have the unboxed 'x' available.  Hence the
+   is_var_scrut test when making use of the strictness annoatation.
+   Slightly ad-hoc, because even if the scrutinee *is* a variable it
+   might not be a onre of the arguments to the original function, or a
+   sub-component thereof.  But it's simple, and nothing terrible
+   happens if we get it wrong.  e.g. Trac #10694.
 
 Note [Add demands for strict constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1263,14 +1266,14 @@ assuming h is strict:
           C -> x+1
 
 If we notice that 'x' is used strictly, we can give it the CPR
-property; and hence f1 gets the CPR property too.  It's ok to give it
-the CPR property because by the time 'x' is returned (case A above),
-it'll have been evaluated (by the wrapper of 'h' in the example), and
-so the unboxed version will be available.
+property; and hence f1 gets the CPR property too.  It's sound (doesn't
+change strictness) to give it the CPR property because by the time 'x'
+is returned (case A above), it'll have been evaluated (by the wrapper
+of 'h' in the example).
 
 Moreover, if f itself is strict in x, then we'll pass x unboxed to
 f1, and so the boxed version *won't* be available; in that case it's
-more important to give 'x' the CPR property.
+very helpful to give 'x' the CPR property.
 
 Note that
 
@@ -1278,19 +1281,13 @@ Note that
     has product type, else we may get over-optimistic CPR results
     (e.g. from \x -> x!).
 
-  * This works for both lambda and case-alternative binders. For
-    case binders consider
-        g (Left x) = case h x of
-                       A -> x
-                       B -> ...
-                       C -> x+1
-    Since 'h' evaluates x, we'll have it available unboxed even
-    though in this case it won't be passed in unboxed.
+  * See Note [CPR examples]
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
-Here are some examples, in stranal/should_compile/T10482a.
-The main point: all of these functions can have the CPR property
+Here are some examples (stranal/should_compile/T10482a) of the
+usefulness of Note [CPR in a product case alternative].  The main
+point: all of these functions can have the CPR property.
 
     ------- f1 -----------
     -- x is used strictly by h, so it'll be available

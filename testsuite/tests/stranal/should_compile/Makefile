@@ -13,3 +13,7 @@ T10482:
 T10482a:
 	$(RM) -f T10482a.o T10482a.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T10482a.hs | grep 'wf.*Int'
+
+T10694:
+	$(RM) -f T10694.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T10694.hs | grep 'DmdType '
