@@ -689,7 +689,7 @@ instance  Enum Integer  where
 "enumDeltaToInteger1"   [1] enumDeltaToInteger1FB (:) []  = enumDeltaToInteger1
  #-}
 
-{-
+{- Note [Enum Integer rules for literal 1]
 The "1" rules above specialise for the common case where delta = 1,
 so that we can avoid the delta>=0 test in enumDeltaToIntegerFB.
 Then enumDeltaToInteger1FB is nice and small and can be inlined,
