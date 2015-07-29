@@ -1708,7 +1708,7 @@ can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
   = can_instance_inst ev lhs rhs
     -- case InstanceOf (T ...) sigma --> T ... ~ sigma
     -- case InstanceOf var sigma --> var ~ sigma, var immutable
-  | is_tyapp_or_skolem lhs
+  | not (is_forall lhs)  -- is_tyapp_or_skolem lhs
   = can_instance_to_eq ev lhs rhs
     -- already canonical
   | otherwise = continueWith (CIrredEvCan { cc_ev = ev })
