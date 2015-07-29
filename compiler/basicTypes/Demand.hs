@@ -1162,8 +1162,8 @@ nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
 
 cprProdDmdType :: Arity -> DmdType
-cprProdDmdType _arity
-  = DmdType emptyDmdEnv [] (Dunno RetProd)
+cprProdDmdType arity
+  = DmdType emptyDmdEnv [] (vanillaCprProdRes arity)
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
