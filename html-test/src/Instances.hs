@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Instances where
@@ -63,3 +64,30 @@ data Quux a b c = Qx a | Qux a b | Quux a b c
 instance Foo (Quux a b)
 instance Bar (Quux a c) (Quux a b c)
 instance Baz (Quux a b c)
+
+
+class Norf a b where
+
+    type Plugh a c b
+    data Thud a c
+
+    norf :: Plugh a c b -> a -> (a -> c) -> b
+
+    norf = undefined
+
+
+instance Norf Int Bool where
+
+    type Plugh Int [a] Bool = a
+    type Plugh Int (a, b) Bool = (a, [b])
+
+    data Thud Int (Quux a [a] c) = Thuud a | Thuuud Int Int
+    data Thud Int [a] = Thuuuud Bool
+
+
+instance Norf [a] [b] where
+
+    type Plugh [a] (Maybe a) [b] = a
+    type Plugh [a] [b] [b] = Quux a b (a, b)
+
+    data Thud [a] (a, a, a) = Thd a
