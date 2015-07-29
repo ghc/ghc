@@ -239,28 +239,31 @@ ppSimpleSig links splice unicode qual loc names typ =
 --------------------------------------------------------------------------------
 
 
+ppFamilyInfo :: Bool -> FamilyInfo DocName -> Html
+ppFamilyInfo assoc OpenTypeFamily
+    | assoc = keyword "type"
+    | otherwise = keyword "type family"
+ppFamilyInfo assoc DataFamily
+    | assoc = keyword "data"
+    | otherwise = keyword "data family"
+ppFamilyInfo _ (ClosedTypeFamily _) = keyword "type family"
+
+
+ppFamilyKind :: Unicode -> Qualification -> Maybe (LHsKind DocName) -> Html
+ppFamilyKind unicode qual (Just kind) =
+    dcolon unicode <+> ppLKind unicode qual kind
+ppFamilyKind _ _ Nothing = noHtml
+
+
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName
               -> Unicode -> Qualification -> Html
 ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
                                                , fdKindSig = mkind })
               unicode qual =
-  (case info of
-     OpenTypeFamily
-       | associated -> keyword "type"
-       | otherwise  -> keyword "type family"
-     DataFamily
-       | associated -> keyword "data"
-       | otherwise  -> keyword "data family"
-     ClosedTypeFamily _
-                    -> keyword "type family"
-  ) <+>
+    ppFamilyInfo associated info <+>
+    ppFamDeclBinderWithVars summary d <+>
+    ppFamilyKind unicode qual mkind
 
-  ppFamDeclBinderWithVars summary d <+>
-
-  (case mkind of
-    Just kind -> dcolon unicode  <+> ppLKind unicode qual kind
-    Nothing   -> noHtml
-  )
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocName] ->
            [(DocName, Fixity)] -> SrcSpan -> Documentation DocName ->
