@@ -1366,7 +1366,7 @@ instantiateWC :: Ct -> TcS Cts
 instantiateWC ct
   | isWantedCt ct, InstanceOfPred lhs rhs <- classifyPredType (ctPred ct)
   = do { let loc = ctLoc ct
-       ; (_qvars, q, ty) <- splitInst lhs
+       ; (_qvars, q, ty) <- deeplySplitInst lhs
        ; new_ev_qs <- mapM (newWantedEvVarNC loc) q
        ; let eq = mkTcEqPred ty rhs
        ; new_ev_ty <- newWantedEvVarNC loc eq

@@ -317,10 +317,10 @@ simplifyRule name lhs_wanted rhs_wanted
        ; let lhs_wanted_simple = wc_simple lhs_wanted
        ; (lhs_wanted_inst, _) <- runTcS $
            fmap andManyCts $ mapM instantiateWC (bagToList lhs_wanted_simple)
-       ; let same_type x y = ctPred x == ctPred y
-             none_with_same_type x = not (anyBag (same_type x) lhs_wanted_simple)
-             lhs_wanted_inst' = filterBag none_with_same_type lhs_wanted_inst
-
+       ; let lhs_wanted_inst' = remove_duplicates lhs_wanted_simple lhs_wanted_inst
+                 -- Build new WantedConstraints by adding the new instantiated
+                 -- We need to be careful not to duplicate constraints,
+                 -- because it would lead to too many forall's
        ; let new_lhs_wanted_simple = wc_simple lhs_wanted `unionBags` lhs_wanted_inst'
              new_lhs_wanted = lhs_wanted { wc_simple = new_lhs_wanted_simple }
 
@@ -331,8 +331,15 @@ simplifyRule name lhs_wanted rhs_wanted
                 ; rhs_resid <- solveWanteds rhs_wanted
                 ; return (insolubleWC tc_lvl lhs_resid || insolubleWC tc_lvl rhs_resid) }
 
-       ; zonked_lhs_simples <- zonkSimples new_lhs_wanted_simple
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_simples
+       ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
+       ; zonked_lhs_inst    <- zonkSimples lhs_wanted_inst'
+                  -- We need to remove duplicates once again,
+                  -- because we might get new duplicated constraints
+                  -- from unification of variables
+       ; let zonked_lhs = zonked_lhs_simples `unionBags`
+                            remove_duplicates zonked_lhs_simples zonked_lhs_inst
+
+       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs
              quantify_me  -- Note [RULE quantification over equalities]
                | insoluble = quantify_insol
                | otherwise = quantify_normal
@@ -358,3 +365,10 @@ simplifyRule name lhs_wanted rhs_wanted
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_simple = non_q_cts }) }
+
+remove_duplicates :: Cts -> Cts -> Cts
+remove_duplicates main new
+  = filterBag none_with_same_type new
+  where
+    same_type x y = ctPred x == ctPred y
+    none_with_same_type x = not (anyBag (same_type x) main)

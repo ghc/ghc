@@ -15,8 +15,8 @@ module TcSMonad (
     TcS, runTcS, runTcSWithEvBinds,
     failTcS, tryTcS, nestTcS, nestImplicTcS, recoverTcS,
 
-    runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq, splitInst,
-    deferTcSForAllInstanceOf,
+    runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq,
+    splitInst, deeplySplitInst, deferTcSForAllInstanceOf,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -2930,7 +2930,18 @@ splitInst :: Type -> TcS ([TyVar], ThetaType, Type)
 splitInst sigma
   = do { let (qvars, q, ty) = tcSplitSigmaTy sigma
          -- instantiate variables for q and ty
-         ; (subst, inst_vars) <- wrapTcS $ TcM.tcInstTyVars qvars
-         ; let q_subst  = map (Type.substTy subst) q
-               ty_subst = Type.substTy subst ty
-         ; return (inst_vars, q_subst, ty_subst) }
+       ; (subst, inst_vars) <- wrapTcS $ TcM.tcInstTyVars qvars
+       ; let q_subst  = map (Type.substTy subst) q
+             ty_subst = Type.substTy subst ty
+       ; return (inst_vars, q_subst, ty_subst) }
+
+-- Split a sigma type and instantiate its variables, deeply
+deeplySplitInst :: Type -> TcS ([TyVar], ThetaType, Type)
+deeplySplitInst sigma
+  = do { (qvars, q, ty) <- splitInst sigma
+       ; case (qvars, q) of
+           ([], [])
+             -> return (qvars, q, ty)
+           (_, _)
+             -> do { (qvars', q', ty') <- deeplySplitInst ty
+                   ; return ( qvars ++ qvars', q ++ q', ty') } }
