@@ -537,12 +537,14 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
         ClassInst { .. } ->
             ( subInstHead iid $ ppContextNoLocs clsiCtx unicode qual <+> typ
             , mdoc
-            , [subInstMethods iid sigs]
+            , [subInstDetails iid ats sigs]
             )
           where
             iid = instanceId origin no ihdClsName
             sigs = ppInstanceSigs links splice unicode qual
                 clsiTyVars ihdTypes clsiSigs
+            ats = ppInstanceAssocTys links splice unicode qual
+                clsiAssocTys
         TypeInst rhs ->
             (ptype, mdoc, [])
           where
@@ -560,6 +562,15 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
                 ]
   where
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
+
+
+ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification
+                   -> [FamilyDecl DocName]
+                   -> [Html]
+ppInstanceAssocTys links splice unicode qual =
+    map ppTyFam'
+  where
+    ppTyFam' fam = ppTyFamHeader False True fam unicode qual
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification

@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   subConstructors,
   subEquations,
   subFields,
-  subInstances, subInstHead, subInstMethods,
+  subInstances, subInstHead, subInstDetails,
   subMethods,
   subMinimal,
 
@@ -210,13 +210,14 @@ subInstHead iid hdr =
     expander = thediv ! collapseControl (instAnchorId iid) False "instance"
 
 
-subInstMethods :: String -- ^ Instance unique id (for anchor generation)
+subInstDetails :: String -- ^ Instance unique id (for anchor generation)
+               -> [Html] -- ^ Associated type contents
                -> [Html] -- ^ Method contents (pretty-printed signatures)
                -> Html
-subInstMethods iid mets =
-    section << subMethods mets
+subInstDetails iid ats mets =
+    section << (subAssociatedTypes ats <+> subMethods mets)
   where
-    section = thediv ! collapseSection (instAnchorId iid) False "methods"
+    section = thediv ! collapseSection (instAnchorId iid) False "inst-details"
 
 
 instAnchorId :: String -> String
