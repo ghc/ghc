@@ -7,6 +7,7 @@
 module Haddock.Backends.Xhtml.Specialize
     ( specialize, specialize'
     , specializeTyVarBndrs
+    , specializePseudoFamilyDecl
     , sugar, rename
     , freeVariables
     ) where
@@ -58,14 +59,25 @@ specialize' = flip $ foldr (uncurry specialize)
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
 specializeTyVarBndrs :: (Eq name, Typeable name, DataId name)
+                     => Data a
                      => LHsTyVarBndrs name -> [HsType name]
-                     -> HsType name -> HsType name
+                     -> a -> a
 specializeTyVarBndrs bndrs typs =
     specialize' $ zip bndrs' typs
   where
     bndrs' = map (bname . unLoc) . hsq_tvs $ bndrs
     bname (UserTyVar name) = name
     bname (KindedTyVar (L _ name) _) = name
+
+
+specializePseudoFamilyDecl :: (Eq name, Typeable name, DataId name)
+                           => LHsTyVarBndrs name -> [HsType name]
+                           -> PseudoFamilyDecl name
+                           -> PseudoFamilyDecl name
+specializePseudoFamilyDecl bndrs typs decl =
+    decl { pfdTyVars = map specializeTyVars (pfdTyVars decl) }
+  where
+    specializeTyVars = specializeTyVarBndrs bndrs typs
 
 
 -- | Make given type use tuple and list literals where appropriate.

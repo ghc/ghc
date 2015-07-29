@@ -567,7 +567,7 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
             sigs = ppInstanceSigs links splice unicode qual
                 clsiTyVars ihdTypes clsiSigs
             ats = ppInstanceAssocTys links splice unicode qual
-                clsiAssocTys
+                clsiTyVars ihdTypes clsiAssocTys
         TypeInst rhs ->
             (ptype, mdoc, [])
           where
@@ -588,10 +588,11 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
 
 
 ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification
+                   -> LHsTyVarBndrs DocName -> [HsType DocName]
                    -> [PseudoFamilyDecl DocName]
                    -> [Html]
-ppInstanceAssocTys links splice unicode qual =
-    map ppFamilyDecl'
+ppInstanceAssocTys links splice unicode qual bndrs tys =
+    map ppFamilyDecl' . map (specializePseudoFamilyDecl bndrs tys)
   where
     ppFamilyDecl' = ppPseudoFamilyDecl links splice unicode qual
 
