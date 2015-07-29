@@ -444,7 +444,7 @@ tcExpr (HsCase scrut matches) exp_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          (scrut', scrut_ty) <- tcInferSigma scrut
+          (scrut', scrut_ty) <- tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
         ; (wrap, matches') <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
