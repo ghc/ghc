@@ -302,6 +302,15 @@ ppAssocType summ links doc (L loc decl) fixities splice unicode qual =
    ppTyFam summ True links [] fixities loc (fst doc) decl splice unicode qual
 
 
+ppSimpleAssocTy :: LinksInfo -> Splice -> Unicode -> Qualification
+              -> FamilyDecl DocName
+              -> Html
+ppSimpleAssocTy links splice unicode qual decl =
+    ppAssocType False links noDocForDecl ldecl [] splice unicode qual
+  where
+    ldecl = L (getLoc $ fdLName decl) decl
+
+
 --------------------------------------------------------------------------------
 -- * TyClDecl helpers
 --------------------------------------------------------------------------------
@@ -568,9 +577,9 @@ ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification
                    -> [FamilyDecl DocName]
                    -> [Html]
 ppInstanceAssocTys links splice unicode qual =
-    map ppTyFam'
+    map ppSimpleAssocTy'
   where
-    ppTyFam' fam = ppTyFamHeader False True fam unicode qual
+    ppSimpleAssocTy' = ppSimpleAssocTy links splice unicode qual
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
