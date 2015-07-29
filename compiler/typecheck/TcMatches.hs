@@ -186,14 +186,15 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 tcMatches ctxt pat_tys rhs_ty group@(MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
-    do  { rhs_ty' <-
+    do  { (matches', wrap, rhs_ty') <-
              if isSingletonMatchGroup group
-                  -- no need to monomorphise the RHS if there's only one
-             then return rhs_ty
-                  -- TODO (RAE): Document this behavior.
-             else tauTvsForReturnTvs rhs_ty
-        ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty') matches
-        ; wrap <- tcSubTypeHR rhs_ty' rhs_ty
+             then do { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
+                     ; return (matches', idHsWrapper, rhs_ty) }
+             else do { rhs_ty' <- tauTvsForReturnTvs rhs_ty
+                      -- TODO (RAE): Document this behavior.
+                     ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty') matches
+                     ; wrap <- tcSubTypeHR rhs_ty' rhs_ty
+                     ; return (matches', wrap, rhs_ty') }
         ; return (wrap, MG { mg_alts = matches'
                            , mg_arg_tys = pat_tys
                            , mg_res_ty = rhs_ty'
