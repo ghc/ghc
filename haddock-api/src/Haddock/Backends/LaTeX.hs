@@ -562,7 +562,7 @@ ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
 
 ppInstHead :: Bool -> InstHead DocName -> LaTeX
 ppInstHead unicode (InstHead {..}) = case ihdInstType of
-    ClassInst ctx _ _ -> ppContextNoLocs ctx unicode <+> typ
+    ClassInst ctx _ _ _ -> ppContextNoLocs ctx unicode <+> typ
     TypeInst rhs -> keyword "type" <+> typ <+> tibody rhs
     DataInst _ -> error "data instances not supported by --latex yet"
   where

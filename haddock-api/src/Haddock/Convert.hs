@@ -398,6 +398,9 @@ synifyInstHead (_, preds, cls, types) = InstHead
         { clsiCtx = map (unLoc . synifyType WithinType) preds
         , clsiTyVars = synifyTyVars $ classTyVars cls
         , clsiSigs = map synifyClsIdSig $ classMethods cls
+        , clsiAssocTys = do
+            (Right (FamDecl fam)) <- map (synifyTyCon Nothing) $ classATs cls
+            pure fam
         }
     }
   where
