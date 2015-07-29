@@ -1291,7 +1291,7 @@ tcSeq loc fun_name args res_ty
               -> do { ty_arg1 <- tcHsTypeApp hs_ty_arg1 liftedTypeKind
                     ; return (ty_arg1, args1) }
 
-            _ -> do { arg_ty1 <- newReturnTyVarTy liftedTypeKind
+            _ -> do { arg_ty1 <- newFlexiTyVarTy liftedTypeKind
                     ; return (arg_ty1, args) }
 
         ; (arg1, arg2) <- case args1 of
