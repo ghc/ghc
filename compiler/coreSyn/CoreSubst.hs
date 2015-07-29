@@ -866,9 +866,13 @@ simpleOptExpr expr
         -- It's a bit painful to call exprFreeVars, because it makes
         -- three passes instead of two (occ-anal, and go)
 
+simplePassesOfSimplification :: Int
+simplePassesOfSimplification = 3
+
 simpleOptExprWith :: Subst -> InExpr -> OutExpr
--- Make two passes of simplification
-simpleOptExprWith subst = simpleOptExprWith_ subst . simpleOptExprWith_ subst
+-- Make three passes of simplification
+simpleOptExprWith subst expr
+  = iterate (simpleOptExprWith_ subst) expr !! simplePassesOfSimplification
 
 simpleOptExprWith_ :: Subst -> InExpr -> OutExpr
 simpleOptExprWith_ subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
@@ -993,11 +997,11 @@ simple_opt_bind,simple_opt_bind',simple_opt_bind_pgm
 simple_opt_bind s b               -- Can add trace stuff here
   = simple_opt_bind' s b
 
-simple_opt_bind' = simple_opt_bind'' False
-simple_opt_bind_pgm = simple_opt_bind'' True
+simple_opt_bind'    = simple_opt_bind'' 1
+simple_opt_bind_pgm = simple_opt_bind'' simplePassesOfSimplification
 
-simple_opt_bind'' :: Bool -> Subst -> CoreBind -> (Subst, Maybe CoreBind)
-simple_opt_bind'' two_passes subst (Rec prs)
+simple_opt_bind'' :: Int -> Subst -> CoreBind -> (Subst, Maybe CoreBind)
+simple_opt_bind'' simpl_passes subst (Rec prs)
   = (subst'', res_bind)
   where
     res_bind            = Just (Rec (reverse rev_prs'))
@@ -1009,14 +1013,10 @@ simple_opt_bind'' two_passes subst (Rec prs)
            Nothing     -> (subst,  (b2,r2):prs)
        where
          b2 = add_info subst b b'
-         r2 = if two_passes
-                 then simple_opt_expr subst (simple_opt_expr subst r)
-                 else simple_opt_expr subst r
+         r2 = iterate (simple_opt_expr subst) r !! simpl_passes
 
-simple_opt_bind'' False subst (NonRec b r)
-  = simple_opt_out_bind subst (b, simple_opt_expr subst r)
-simple_opt_bind'' True subst (NonRec b r)  -- Two passes
-  = simple_opt_out_bind subst (b, simple_opt_expr subst (simple_opt_expr subst r))
+simple_opt_bind'' simpl_passes subst (NonRec b r)
+  = simple_opt_out_bind subst (b, iterate (simple_opt_expr subst) r !! simpl_passes)
 
 ----------------------
 simple_opt_out_bind :: Subst -> (InVar, OutExpr) -> (Subst, Maybe CoreBind)

@@ -631,6 +631,14 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
    split_lets e
+     -- <~ constraints sometimes lead to dictionaries
+     -- of the form $dict1 = $dict2.
+     -- Those dictionaries shall not be removed,
+     -- otherwise the code will be deemed wrong.
+     | Let (NonRec d r) _body <- e
+     , isDictId d
+     , Var _ <- r
+     = ([], e)
      | Let (NonRec d r) body <- e
      , isDictId d
      , (bs, body') <- split_lets body
