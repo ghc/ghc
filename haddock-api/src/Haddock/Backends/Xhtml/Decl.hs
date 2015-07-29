@@ -31,7 +31,6 @@ import Haddock.Doc (combineDocumentation)
 
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
@@ -601,13 +600,9 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
               -> LHsTyVarBndrs DocName -> [HsType DocName] -> [Sig DocName]
               -> [Html]
 ppInstanceSigs links splice unicode qual bndrs tys sigs = do
-    TypeSig lnames (L loc typ) _ <- sigs
+    TypeSig lnames (L loc typ) _ <- map (specializeSig bndrs tys) sigs
     let names = map unLoc lnames
-    let typ' = rename' . sugar $ specializeTyVarBndrs bndrs tys typ
-    return $ ppSimpleSig links splice unicode qual loc names typ'
-  where
-    fv = foldr Set.union Set.empty . map freeVariables $ tys
-    rename' = rename fv
+    return $ ppSimpleSig links splice unicode qual loc names typ
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2

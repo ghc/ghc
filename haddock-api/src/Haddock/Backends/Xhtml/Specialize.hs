@@ -5,11 +5,7 @@
 
 
 module Haddock.Backends.Xhtml.Specialize
-    ( specialize, specialize'
-    , specializeTyVarBndrs
-    , specializePseudoFamilyDecl
-    , sugar, rename
-    , freeVariables
+    ( specializePseudoFamilyDecl, specializeSig
     ) where
 
 
@@ -78,6 +74,18 @@ specializePseudoFamilyDecl bndrs typs decl =
     decl { pfdTyVars = map specializeTyVars (pfdTyVars decl) }
   where
     specializeTyVars = specializeTyVarBndrs bndrs typs
+
+
+specializeSig :: (Eq name, Typeable name, DataId name, SetName name)
+              => LHsTyVarBndrs name -> [HsType name]
+              -> Sig name
+              -> Sig name
+specializeSig bndrs typs (TypeSig lnames (L loc typ) prn) =
+    TypeSig lnames (L loc typ') prn
+  where
+    typ' = rename fv . sugar $ specializeTyVarBndrs bndrs typs typ
+    fv = foldr Set.union Set.empty . map freeVariables $ typs
+specializeSig _ _ sig = sig
 
 
 -- | Make given type use tuple and list literals where appropriate.
