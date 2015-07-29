@@ -798,7 +798,7 @@ dsHsWrapper (WpFun c1 c2 t1 _) e = do { x <- newSysLocalDs t1
                                       ; e2 <- dsHsWrapper c2 (e `mkCoreAppDs` e1)
                                       ; return (Lam x e2) }
 dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
-                                  dsTcCoercion co (mkCast e)
+                                  dsTcCoercion co (mkCastDs e)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
@@ -839,7 +839,7 @@ dsEvTerm (EvId v) = return (Var v)
 
 dsEvTerm (EvCast tm co)
   = do { tm' <- dsEvTerm tm
-       ; dsTcCoercion co $ mkCast tm' }
+       ; dsTcCoercion co $ mkCastDs tm' }
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
@@ -920,7 +920,7 @@ dsEvTypeable ev =
                 $ mkLams [mkWildValBinder proxyT] (Var repName)
 
      -- package up the method as `Typeable` dictionary
-     return $ mkCast method $ mkSymCo $ getTypeableCo tyCl ty
+     return $ mkCastDs method $ mkSymCo $ getTypeableCo tyCl ty
 
   where
   -- co: method -> Typeable k t
@@ -933,7 +933,7 @@ dsEvTypeable ev =
   getRep tc (ev,t) =
     do typeableExpr <- dsEvTerm ev
        let co     = getTypeableCo tc t
-           method = mkCast typeableExpr co
+           method = mkCastDs typeableExpr co
            proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
        return (mkApps method [proxy])
 
@@ -1042,7 +1042,7 @@ dsEvCallStack cs = do
                   -- so we use unwrapIP to strip the dictionary wrapper
                   -- See Note [Overview of implicit CallStacks]
                   let ip_co = unwrapIP (exprType tmExpr)
-                  return (pushCS nameExpr locExpr (mkCast tmExpr ip_co))
+                  return (pushCS nameExpr locExpr (mkCastDs tmExpr ip_co))
   case cs of
     EvCsTop name loc tm -> mkPush name loc tm
     EvCsPushCall name loc tm -> mkPush (occNameFS $ getOccName name) loc tm

@@ -198,9 +198,12 @@ applyTypeToArgs e op_ty args
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
 mkCast :: CoreExpr -> Coercion -> CoreExpr
-mkCast e co | ASSERT2( coercionRole co == Representational
-                     , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast") <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
-              isReflCo co = e
+mkCast e co
+  | ASSERT2( coercionRole co == Representational
+           , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast")
+             <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
+    isReflCo co
+  = e
 
 mkCast (Coercion e_co) co
   | isCoVarType (pSnd (coercionKind co))
@@ -223,11 +226,11 @@ mkCast (Tick t expr) co
 
 mkCast expr co
   = let Pair from_ty _to_ty = coercionKind co in
---    if to_ty `eqType` from_ty
---    then expr
---    else
-        WARN(not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionType co))
-         (Cast expr co)
+    WARN( not (from_ty `eqType` exprType expr),
+          text "Trying to coerce" <+> text "(" <> ppr expr
+          $$ text "::" <+> ppr (exprType expr) <> text ")"
+          $$ ppr co $$ ppr (coercionType co) )
+    (Cast expr co)
 
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
