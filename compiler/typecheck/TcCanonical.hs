@@ -1693,7 +1693,11 @@ can_instance_of :: Ct -> TcS (StopOrContinue Ct)
 can_instance_of (CInstanceOfCan { cc_ev = ev, cc_lhs = lhs, cc_rhs = rhs })
     -- case InstanceOf sigma sigma, for the exact same sigma
   | lhs `eqType` rhs
-  = can_instance_to_eq ev lhs rhs
+  = case ev of
+      CtWanted { ctev_evar = evar } ->
+        do { setWantedEvBind evar (mkInstanceOfRefl lhs)
+           ; stopWith ev "can_instance_of/REFL" }
+      _ -> stopWith ev "Given/Derived instanceOf instantiation"
     -- case InstanceOf ty (forall qvars. Q => ty)
   | is_forall rhs
   = case ev of

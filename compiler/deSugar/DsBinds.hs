@@ -1195,6 +1195,8 @@ applyInstanceOf id e
   = pprPanic "The impossible happened" (ppr id)
 
 dsEvInstanceOf :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
+dsEvInstanceOf EvInstanceOfRefl e
+  = return e
 dsEvInstanceOf (EvInstanceOfEq co) e
   = do { dsTcCoercion co $ \c ->
            case coercionKind c of

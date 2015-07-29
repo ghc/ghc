@@ -1328,6 +1328,8 @@ zonkEvBind env (EvBind { eb_lhs = var, eb_rhs = term, eb_is_given = is_given })
       ; return (EvBind { eb_lhs = var', eb_rhs = term', eb_is_given = is_given }) }
 
 zonkEvInstanceOf :: ZonkEnv -> EvInstanceOf -> TcM EvInstanceOf
+zonkEvInstanceOf _ EvInstanceOfRefl
+  = return EvInstanceOfRefl
 zonkEvInstanceOf env (EvInstanceOfEq co)
   = do { co' <- zonkTcCoToCo env co
        ; return (EvInstanceOfEq co') }

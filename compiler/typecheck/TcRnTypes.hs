@@ -1166,12 +1166,11 @@ data Ct
     }
 
   | CInstanceOfCan {  -- Canonical instance constraints
-       -- InstanceOf constraints are written  s1 <= s2
+       -- InstanceOf constraints are written  s1 <~ s2
        -- pronounced "s1 is more polymorphic than s2"
        --         of "s2 is an instance of s1"
-       -- A /canonical/ InstanceOf constraint has a tyvar the LHS or RHS
-       --    * tyvar <= sigma
-       --    * sigma <= tyvar
+       -- A /canonical/ InstanceOf constraint has a tyvar the LHS
+       --    * sigma <~ tyvar
        --
        -- For now at least, they are always Wanted, never Given/Derived
       cc_ev     :: CtEvidence,
