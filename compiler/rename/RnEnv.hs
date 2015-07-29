@@ -937,19 +937,18 @@ Note [Handling of deprecations]
   even use a deprecated thing in the defn of a non-deprecated thing,
   when changing a module's interface.
 
-* addUsedRdrNames: we do not report deprecations for sub-binders:
+* addUsedGREs: we do not report deprecations for sub-binders:
      - the ".." completion for records
      - the ".." in an export item 'T(..)'
      - the things exported by a module export 'module M'
 -}
 
 addUsedGRE :: Bool -> GlobalRdrElt -> RnM ()
--- Record usage of imported RdrNames
--- AMG TODO
+-- ^ Record usage of imported GlobalRdrElts
 addUsedGRE warn_if_deprec gre
   = do { unless (isLocalGRE gre) $
          do { env <- getGblEnv
-            ; traceRn (text "addUsedRdrName 1" <+> ppr gre)
+            ; traceRn (text "addUsedGRE 1" <+> ppr gre)
             ; updMutVar (tcg_used_gres env) (gre :) }
 
        ; when warn_if_deprec $
@@ -960,7 +959,7 @@ addUsedGREs :: [GlobalRdrElt] -> RnM ()
 -- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
 addUsedGREs gres
   = do { env <- getGblEnv
-       ; traceRn (text "addUsedRdrName 2" <+> ppr gres)
+       ; traceRn (text "addUsedGREs 2" <+> ppr gres)
        ; updMutVar (tcg_used_gres env) (filter (not . isLocalGRE) gres ++) }
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()

@@ -51,7 +51,7 @@ module RdrName (
 
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
-        greUsedRdrName, greRdrNames, greSrcSpan, greQualModName,
+        greRdrNames, greSrcSpan, greQualModName,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
@@ -598,24 +598,11 @@ greQualModName gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
  | (is:_) <- iss                          = is_as (is_decl is)
  | otherwise                              = pprPanic "greQualModName" (ppr gre)
 
-greUsedRdrName :: GlobalRdrElt -> RdrName
--- For imported things, return a RdrName to add to the
--- used-RdrName set, which is used to generate
--- unused-import-decl warnings
--- Return an Unqual if possible, otherwise any Qual
-greUsedRdrName gre@GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
-  | lcl                               = Unqual occ
-  | not (all (is_qual . is_decl) iss) = Unqual occ
-  | (is:_) <- iss                     = Qual (is_as (is_decl is)) occ
-  | otherwise                         = pprPanic "greRdrName" (ppr name)
-  where
-    occ = greOccName gre
-
 greRdrNames :: GlobalRdrElt -> [RdrName]
-greRdrNames GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
+greRdrNames gre@GRE{ gre_lcl = lcl, gre_imp = iss }
   = (if lcl then [unqual] else []) ++ concatMap do_spec (map is_decl iss)
   where
-    occ    = nameOccName name
+    occ    = greOccName gre
     unqual = Unqual occ
     do_spec decl_spec
         | is_qual decl_spec = [qual]
@@ -696,7 +683,7 @@ lookupGRE_Name env name
   = [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name),
             gre_name gre == name ]
 
-lookupGRE_Field_Name :: GlobalRdrEnv -> Name -> FastString -> [GlobalRdrElt]
+lookupGRE_Field_Name :: GlobalRdrEnv -> Name -> FieldLabelString -> [GlobalRdrElt]
 -- Used when looking up record fields, where the selector name and
 -- field label are different: the GlobalRdrEnv is keyed on the label
 lookupGRE_Field_Name env sel_name lbl

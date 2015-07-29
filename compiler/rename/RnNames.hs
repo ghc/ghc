@@ -1008,8 +1008,8 @@ gresFromIE decl_spec (L loc ie, avail)
 
 
 {-
-Note [ChildNames for overloaded record fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Duplicate selectors in export lists]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the module
 
     {-# LANGUAGE DuplicateRecordFields #-}
@@ -1023,6 +1023,7 @@ reason, an OverloadedFldChild contains a list of selector names, not
 just a single name.
 
 AMG TODO: figure out how this works and document it or simplify it!
+AMG TODO: is the above example actually a test case?
 -}
 
 
@@ -1054,7 +1055,7 @@ lookupChildren f all_kids rdr_items
       Just n -> Just (L l n)
       Nothing -> Nothing
 
-    -- AMG TODO explain why we can have duplicates here
+    -- See Note [Duplicate selectors in export lists]
     kid_env = extendFsEnvList_C (++) emptyFsEnv
                       [(f x, [x]) | x <- all_kids]
 
@@ -1331,17 +1332,6 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_doc_ie (IEDocNamed str)  = return (IEDocNamed str)
     lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
 
-{-
-    -- In an export item M.T(A,B,C), we want to treat the uses of
-    -- A,B,C as if they were M.A, M.B, M.C
-    addUsedKids _ _ = return () -- AMG TODO
-    addUsedKids parent_rdr kid_names
-       = addUsedRdrNames $ map (mk_kid_rdr . childOccName) kid_names
-       where
-         mk_kid_rdr = case isQual_maybe parent_rdr of
-                         Nothing           -> mkRdrUnqual
-                         Just (modName, _) -> mkRdrQual modName
--}
 
 isDoc :: IE RdrName -> Bool
 isDoc (IEDoc _)      = True
@@ -1454,10 +1444,8 @@ reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
   = do  { traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
-        ; sel_uses <- return emptyNameSet -- AMG TODO readMutVar (tcg_used_selectors gbl_env)
         ; warnUnusedImportDecls gbl_env
-        ; warnUnusedTopBinds $ filterOut (used_as_selector sel_uses)
-                                         unused_locals }
+        ; warnUnusedTopBinds   unused_locals }
   where
     used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
@@ -1494,10 +1482,6 @@ reportUnusedNames _export_decls gbl_env
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
 
-    -- Remove uses of record selectors recorded in the typechecker
-    used_as_selector :: NameSet -> GlobalRdrElt -> Bool
-    used_as_selector sel_uses gre
-      = isRecFldGRE gre && gre_name gre `elemNameSet` sel_uses
 
 {-
 *********************************************************
@@ -1527,7 +1511,7 @@ warnUnusedImportDecls gbl_env
              fld_env = mkFieldEnv rdr_env
 
        ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports rdr_env uses fld_env
+             usage = findImportUsage user_imports uses
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
                        , ptext (sLit "Import usage") <+> ppr usage])
@@ -1562,17 +1546,14 @@ not normalised).
 type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 
 findImportUsage :: [LImportDecl Name]
-                -> GlobalRdrEnv
                 -> [GlobalRdrElt]
-                -> NameEnv (FieldLabelString, Name)
                 -> [ImportDeclUsage]
 
-findImportUsage imports rdr_env used_gres fld_env
+findImportUsage imports used_gres
   = map unused_decl imports
   where
     import_usage :: ImportMap
-    import_usage
-      = foldr (extendImportMap fld_env rdr_env) Map.empty used_gres
+    import_usage = foldr extendImportMap Map.empty used_gres
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, nameSetElems unused_imps)
@@ -1612,20 +1593,14 @@ findImportUsage imports rdr_env used_gres fld_env
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
-extendImportMap :: NameEnv (FieldLabelString, Name)
-                -> GlobalRdrEnv
-                -> GlobalRdrElt
+extendImportMap :: GlobalRdrElt
                 -> ImportMap -> ImportMap
 -- For a used GlobalRdrElt, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-extendImportMap _fld_env _rdr_env gre imp_map
-  | GRE { gre_lcl = lcl, gre_imp = imps } <- gre
-  , not lcl
-  = add_imp gre (bestImport imps) imp_map
-
-  | otherwise
-  = imp_map
+extendImportMap gre@GRE { gre_lcl = lcl, gre_imp = imps } imp_map
+  | not lcl   = add_imp gre (bestImport imps) imp_map
+  | otherwise = imp_map
   where
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map
