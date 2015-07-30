@@ -1035,9 +1035,11 @@ simple_cast subst (Cast e e_co)
   = go e e_co
   where
     go (Cast e e_co) co = go e (mkTransCo e_co co)
-    go e co | isReflCo co' = simple_opt_expr subst e
-            | otherwise    = Cast (simple_opt_expr subst e) co'
-            where co' = optCoercion (getCvSubst subst) co
+    go e co = case simple_opt_expr subst e of
+                e'@(Cast _ _)     -> go e' co
+                e' | isReflCo co' -> e'
+                   | otherwise    -> Cast e' co'
+                   where co' = optCoercion (getCvSubst subst) co
 
 simple_cast subst e
   = simple_opt_expr subst e
