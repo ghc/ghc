@@ -1033,8 +1033,11 @@ mkPragEnv sigs binds
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
       | Inline <- inl_inline inl_prag
         -- add arity only for real INLINE pragmas, not INLINABLE
-      , Just ar <- lookupNameEnv ar_env n
-      = inl_prag { inl_sat = Just ar }
+      = case lookupNameEnv ar_env n of
+          Just ar -> inl_prag { inl_sat = Just ar }
+          Nothing -> WARN( True, ptext (sLit "mkPragEnv no arity") <+> ppr n )
+                     -- There really should be a binding for every INLINE pragma
+                     inl_prag
       | otherwise
       = inl_prag
 

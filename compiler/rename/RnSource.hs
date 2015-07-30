@@ -36,7 +36,7 @@ import NameEnv
 import Avail
 import Outputable
 import Bag
-import BasicTypes       ( RuleName )
+import BasicTypes       ( RuleName, pprRuleName )
 import FastString
 import SrcLoc
 import DynFlags
@@ -45,7 +45,7 @@ import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 
 import Control.Monad
-import Data.List( partition, sortBy )
+import Data.List( sortBy )
 import Maybes( orElse, mapMaybe )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
@@ -472,42 +472,26 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                              , inst_fvs) ;
            Just (inst_tyvars, _, L _ cls,_) ->
 
-    do { let (spec_inst_prags, other_sigs) = partition isSpecInstLSig uprags
-             ktv_names = hsLKiTyVarNames inst_tyvars
-
-       -- Rename the associated types, and type signatures
-       -- Both need to have the instance type variables in scope
-       ; traceRn (text "rnSrcInstDecl"  <+> ppr inst_ty' $$ ppr inst_tyvars $$ ppr ktv_names)
-       ; ((ats', adts', other_sigs'), more_fvs)
-             <- extendTyVarEnvFVRn ktv_names $
-                do { (ats',  at_fvs)  <- rnATInstDecls rnTyFamInstDecl cls inst_tyvars ats
-                   ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls inst_tyvars adts
-                   ; (other_sigs', sig_fvs) <- renameSigs (InstDeclCtxt cls) other_sigs
-                   ; return ( (ats', adts', other_sigs')
-                            , at_fvs `plusFV` adt_fvs `plusFV` sig_fvs) }
+    do { let ktv_names = hsLKiTyVarNames inst_tyvars
 
         -- Rename the bindings
         -- The typechecker (not the renamer) checks that all
         -- the bindings are for the right class
         -- (Slightly strangely) when scoped type variables are on, the
         -- forall-d tyvars scope over the method bindings too
-       ; (mbinds', meth_fvs) <- extendTyVarEnvForMethodBinds ktv_names $
-                                rnMethodBinds cls (mkSigTvFn other_sigs')
-                                                  mbinds
+       ; (mbinds', uprags', meth_fvs) <- rnMethodBinds False cls ktv_names mbinds uprags
 
-        -- Rename the SPECIALISE instance pramas
-        -- Annoyingly the type variables are not in scope here,
-        -- so that      instance Eq a => Eq (T a) where
-        --                      {-# SPECIALISE instance Eq a => Eq (T [a]) #-}
-        -- works OK. That's why we did the partition game above
-        --
-       ; (spec_inst_prags', spec_inst_fvs)
-             <- renameSigs (InstDeclCtxt cls) spec_inst_prags
+       -- Rename the associated types, and type signatures
+       -- Both need to have the instance type variables in scope
+       ; traceRn (text "rnSrcInstDecl"  <+> ppr inst_ty' $$ ppr inst_tyvars $$ ppr ktv_names)
+       ; ((ats', adts'), more_fvs)
+             <- extendTyVarEnvFVRn ktv_names $
+                do { (ats',  at_fvs)  <- rnATInstDecls rnTyFamInstDecl cls inst_tyvars ats
+                   ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls inst_tyvars adts
+                   ; return ( (ats', adts'), at_fvs `plusFV` adt_fvs) }
 
-       ; let uprags' = spec_inst_prags' ++ other_sigs'
-             all_fvs = meth_fvs `plusFV` more_fvs
-                          `plusFV` spec_inst_fvs
-                          `plusFV` inst_fvs
+       ; let all_fvs = meth_fvs `plusFV` more_fvs
+                                `plusFV` inst_fvs
        ; return (ClsInstDecl { cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
                              , cid_overlap_mode = oflag
@@ -677,18 +661,6 @@ can all be in scope (Trac #5862):
 Here 'k' is in scope in the kind signature, just like 'x'.
 -}
 
-extendTyVarEnvForMethodBinds :: [Name]
-                             -> RnM (LHsBinds Name, FreeVars)
-                             -> RnM (LHsBinds Name, FreeVars)
--- For the method bindings in class and instance decls, we extend
--- the type variable environment iff -XScopedTypeVariables
-
-extendTyVarEnvForMethodBinds ktv_names thing_inside
-  = do  { scoped_tvs <- xoptM Opt_ScopedTypeVariables
-        ; if scoped_tvs then
-                extendTyVarEnvFVRn ktv_names thing_inside
-          else
-                thing_inside }
 
 {-
 *********************************************************
@@ -789,7 +761,7 @@ checkValidRule rule_name ids lhs' fv_lhs'
 
 validRuleLhs :: [Name] -> LHsExpr Name -> Maybe (HsExpr Name)
 -- Nothing => OK
--- Just e  => Not ok, and e is the offending expression
+-- Just e  => Not ok, and e is the offending sub-expression
 validRuleLhs foralls lhs
   = checkl lhs
   where
@@ -826,11 +798,15 @@ badRuleVar name var
 
 badRuleLhsErr :: FastString -> LHsExpr Name -> HsExpr Name -> SDoc
 badRuleLhsErr name lhs bad_e
-  = sep [ptext (sLit "Rule") <+> ftext name <> colon,
-         nest 4 (vcat [ptext (sLit "Illegal expression:") <+> ppr bad_e,
+  = sep [ptext (sLit "Rule") <+> pprRuleName name <> colon,
+         nest 4 (vcat [err,
                        ptext (sLit "in left-hand side:") <+> ppr lhs])]
     $$
     ptext (sLit "LHS must be of form (f e1 .. en) where f is not forall'd")
+  where
+    err = case bad_e of
+            HsUnboundVar occ -> ptext (sLit "Not in scope:") <+> ppr occ
+            _ -> ptext (sLit "Illegal expression:") <+> ppr bad_e
 
 {-
 *********************************************************
@@ -1048,18 +1024,16 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
                         -- kind signatures on the tyvars
 
         -- Tyvars scope over superclass context and method signatures
-        ; ((tyvars', context', fds', ats', sigs'), stuff_fvs)
+        ; ((tyvars', context', fds', ats'), stuff_fvs)
             <- bindHsTyVars cls_doc Nothing kvs tyvars $ \ tyvars' -> do
                   -- Checks for distinct tyvars
              { (context', cxt_fvs) <- rnContext cls_doc context
              ; fds'  <- rnFds fds
                          -- The fundeps have no free variables
-             ; (ats',   fv_ats) <- rnATDecls cls' ats
-             ; (sigs', sig_fvs) <- renameSigs (ClsDeclCtxt cls') sigs
+             ; (ats', fv_ats) <- rnATDecls cls' ats
              ; let fvs = cxt_fvs     `plusFV`
-                         sig_fvs     `plusFV`
                          fv_ats
-             ; return ((tyvars', context', fds', ats', sigs'), fvs) }
+             ; return ((tyvars', context', fds', ats'), fvs) }
 
         ; (at_defs', fv_at_defs) <- rnList (rnTyFamDefltEqn cls') at_defs
 
@@ -1083,12 +1057,11 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
         --        op {| a*b |} (a*b)   = ...
         -- we want to name both "x" tyvars with the same unique, so that they are
         -- easy to group together in the typechecker.
-        ; (mbinds', meth_fvs)
-            <- extendTyVarEnvForMethodBinds (hsLKiTyVarNames tyvars') $
+        ; (mbinds', sigs', meth_fvs)
+            <- rnMethodBinds True cls' (hsLKiTyVarNames tyvars') mbinds sigs
                 -- No need to check for duplicate method signatures
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
-                 rnMethodBinds cls' (mkSigTvFn sigs') mbinds
 
   -- Haddock docs
         ; docs' <- mapM (wrapLocM rnDocDecl) docs

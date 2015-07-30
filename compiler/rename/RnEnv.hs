@@ -1082,7 +1082,8 @@ data HsSigCtxt
                              -- See Note [Signatures for top level things]
   | LocalBindCtxt NameSet    -- In a local binding, binding these names
   | ClsDeclCtxt   Name       -- Class decl for this class
-  | InstDeclCtxt  Name       -- Intsance decl for this class
+  | InstDeclCtxt  NameSet    -- Instance decl whose user-written method
+                             -- bindings are for these methods
   | HsBootCtxt               -- Top level of a hs-boot file
   | RoleAnnotCtxt NameSet    -- A role annotation, with the names of all types
                              -- in the group
@@ -1130,7 +1131,7 @@ lookupBindGroupOcc ctxt what rdr_name
       RoleAnnotCtxt ns -> lookup_top (`elemNameSet` ns)
       LocalBindCtxt ns -> lookup_group ns
       ClsDeclCtxt  cls -> lookup_cls_op cls
-      InstDeclCtxt cls -> lookup_cls_op cls
+      InstDeclCtxt ns  -> lookup_top (`elemNameSet` ns)
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv

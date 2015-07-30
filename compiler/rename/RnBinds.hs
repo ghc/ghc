@@ -45,6 +45,7 @@ import ListSetOps       ( findDupsEq )
 import BasicTypes       ( RecFlag(..) )
 import Digraph          ( SCC(..) )
 import Bag
+import Util
 import Outputable
 import FastString
 import Data.List        ( partition, sort )
@@ -702,13 +703,17 @@ in many ways the @op@ in an instance decl is just like an occurrence, not
 a binder.
 -}
 
-rnMethodBinds :: Name                   -- Class name
-              -> (Name -> [Name])       -- Signature tyvar function
-              -> LHsBinds RdrName
-              -> RnM (LHsBinds Name, FreeVars)
-
-rnMethodBinds cls sig_fn binds
-  = do { checkDupRdrNames meth_names
+rnMethodBinds :: Bool                   -- True <=> is a class declaration
+              -> Name                   -- Class name
+              -> [Name]                 -- Type variables from the class/instance header
+              -> LHsBinds RdrName       -- Binds
+              -> [LSig RdrName]         -- and signatures/pragmas
+              -> RnM (LHsBinds Name, [LSig Name], FreeVars)
+-- Used for
+--   * the default method bindings in a class decl
+--   * the method bindings in an instance decl
+rnMethodBinds is_cls_decl cls ktv_names binds sigs
+  = do { checkDupRdrNames (collectMethodBinders binds)
              -- Check that the same method is not given twice in the
              -- same instance decl      instance C T where
              --                       f x = ...
@@ -719,49 +724,70 @@ rnMethodBinds cls sig_fn binds
              -- points to the class declaration; and we use rnMethodBinds
              -- for instance decls too
 
-       ; foldlM do_one (emptyBag, emptyFVs) (bagToList binds) }
+       -- Rename the bindings LHSs
+       ; binds' <- foldrBagM (rnMethodBindLHS is_cls_decl cls) emptyBag binds
+
+       -- Rename the pragmas and signatures
+       -- Annoyingly the type variables *are* in scope for signatures, but
+       -- *are not* in scope in the SPECIALISE instance pramas; e.g.
+       --    instance Eq a => Eq (T a) where
+       --       (==) :: a -> a -> a
+       --       {-# SPECIALISE instance Eq a => Eq (T [a]) #-}
+       ; let (spec_inst_prags, other_sigs) = partition isSpecInstLSig sigs
+             bound_nms = mkNameSet (collectHsBindsBinders binds')
+             sig_ctxt | is_cls_decl = ClsDeclCtxt cls
+                      | otherwise   = InstDeclCtxt bound_nms
+       ; (spec_inst_prags', sip_fvs) <- renameSigs sig_ctxt spec_inst_prags
+       ; (other_sigs',      sig_fvs) <- extendTyVarEnvFVRn ktv_names $
+                                        renameSigs sig_ctxt other_sigs
+
+       -- Rename the bindings RHSs.  Again there's an issue about whether the
+       -- type variables from the class/instance head are in scope.
+       -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
+       ; scoped_tvs  <- xoptM Opt_ScopedTypeVariables
+       ; (binds'', bind_fvs) <- maybe_extend_tyvar_env scoped_tvs $
+              do { binds_w_dus <- mapBagM (rnLBind (mkSigTvFn other_sigs')) binds'
+                 ; let bind_fvs = foldrBag (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
+                                           emptyFVs binds_w_dus
+                 ; return (mapBag fstOf3 binds_w_dus, bind_fvs) }
+
+       ; return ( binds'', spec_inst_prags' ++ other_sigs'
+                , sig_fvs `plusFV` sip_fvs `plusFV` bind_fvs) }
   where
-    meth_names  = collectMethodBinders binds
-    do_one (binds,fvs) bind
-       = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn bind
-            ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
+    -- For the method bindings in class and instance decls, we extend
+    -- the type variable environment iff -XScopedTypeVariables
+    maybe_extend_tyvar_env scoped_tvs thing_inside
+       | scoped_tvs = extendTyVarEnvFVRn ktv_names thing_inside
+       | otherwise  = thing_inside
 
-rnMethodBind :: Name
-              -> (Name -> [Name])
-              -> LHsBindLR RdrName RdrName
-              -> RnM (Bag (LHsBindLR Name Name), FreeVars)
-rnMethodBind cls sig_fn
-             (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix
-                                  , fun_matches = MG { mg_alts = matches
-                                                     , mg_origin = origin } }))
+rnMethodBindLHS :: Bool -> Name
+                -> LHsBindLR RdrName RdrName
+                -> LHsBindsLR Name RdrName
+                -> RnM (LHsBindsLR Name RdrName)
+rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
   = setSrcSpan loc $ do
-    sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
-    let plain_name = unLoc sel_name
-        -- We use the selector name as the binder
+    do { sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
+                     -- We use the selector name as the binder
+       ; let bind' = bind { fun_id = sel_name
+                          , bind_fvs = placeHolderNamesTc }
 
-    (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
-                          mapFvRn (rnMatch (FunRhs plain_name is_infix) rnLExpr)
-                                           matches
-    let new_group = mkMatchGroupName origin new_matches
+       ; return (L loc bind' `consBag` rest ) }
 
-    when is_infix $ checkPrecMatch plain_name new_group
-    return (unitBag (L loc (bind { fun_id      = sel_name
-                                 , fun_matches = new_group
-                                 , bind_fvs    = fvs })),
-             fvs `addOneFV` plain_name)
-        -- The 'fvs' field isn't used for method binds
-
--- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind _ _ (L loc bind@(PatBind {})) = do
-    addErrAt loc (methodBindErr bind)
-    return (emptyBag, emptyFVs)
-
--- Associated pattern synonyms are not implemented yet
-rnMethodBind _ _ (L loc bind@(PatSynBind {})) = do
-    addErrAt loc $ methodPatSynErr bind
-    return (emptyBag, emptyFVs)
-
-rnMethodBind _ _ b = pprPanic "rnMethodBind" (ppr b)
+-- Report error for all other forms of bindings
+-- This is why we use a fold rather than map
+rnMethodBindLHS is_cls_decl _ (L loc bind) rest
+  = do { addErrAt loc $
+         vcat [ what <+> ptext (sLit "not allowed in") <+> decl_sort
+              , nest 2 (ppr bind) ]
+       ; return rest }
+  where
+    decl_sort | is_cls_decl = ptext (sLit "class declaration:")
+              | otherwise   = ptext (sLit "instance declaration:")
+    what = case bind of
+              PatBind {}    -> ptext (sLit "Pattern bindings (except simple variables)")
+              PatSynBind {} -> ptext (sLit "Pattern synonyms")
+                               -- Associated pattern synonyms are not implemented yet
+              _ -> pprPanic "rnMethodBind" (ppr bind)
 
 {-
 ************************************************************************
@@ -1092,16 +1118,6 @@ defaultSigErr :: Sig RdrName -> SDoc
 defaultSigErr sig = vcat [ hang (ptext (sLit "Unexpected default signature:"))
                               2 (ppr sig)
                          , ptext (sLit "Use DefaultSignatures to enable default signatures") ]
-
-methodBindErr :: HsBindLR RdrName RdrName -> SDoc
-methodBindErr mbind
- =  hang (ptext (sLit "Pattern bindings (except simple variables) not allowed in instance declarations"))
-       2 (ppr mbind)
-
-methodPatSynErr :: HsBindLR RdrName RdrName -> SDoc
-methodPatSynErr mbind
- =  hang (ptext (sLit "Pattern synonyms not allowed in class/instance declarations"))
-       2 (ppr mbind)
 
 bindsInHsBootFile :: LHsBindsLR Name RdrName -> SDoc
 bindsInHsBootFile mbinds
