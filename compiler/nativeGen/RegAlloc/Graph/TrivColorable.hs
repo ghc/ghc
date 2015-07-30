@@ -75,7 +75,7 @@ Therefore the UniqFM is made non-abstract and we use custom fold.
 
 MS 2010/04
 When converting UniqFM to use Data.IntMap, the fold cannot use UniqFM internal
-representation any more. But it is imperative that the assSqueeze stops
+representation any more. But it is imperative that the accSqueeze stops
 the folding if the count gets greater or equal to maxCount. We thus convert
 UniqFM to a (lazy) list, do the fold and stops if necessary, which was
 the most efficient variant tried. Benchmark compiling 10-times SHA1.hs follows.
