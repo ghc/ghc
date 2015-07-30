@@ -605,7 +605,7 @@ we keep?  More subtle than you might think!
             the Ord dictionary.
 
   * Finally, when there is still a choice, use IRKeep rather than
-    IRReplace, to avoid unnecesary munging of the inert set.
+    IRReplace, to avoid unnecessary munging of the inert set.
 
 Doing the depth-check for implicit parameters, rather than making the work item
 always overrride, is important.  Consider

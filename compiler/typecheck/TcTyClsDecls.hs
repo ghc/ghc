@@ -578,7 +578,7 @@ Then:
     the *global* env to get the TyCon. But we must be careful not to
     force the TyCon or we'll get a loop.
 
-This fancy footwork (with two bindings for T) is only necesary for the
+This fancy footwork (with two bindings for T) is only necessary for the
 TyCons or Classes of this recursive group.  Earlier, finished groups,
 live in the global env only.
 
