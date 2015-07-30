@@ -4428,7 +4428,7 @@ while (threads_exist) {
   do {
     // enter object on top of stack
     // if the top object is a BCO, we must enter it
-    // otherwise appply any heuristic we wish.
+    // otherwise apply any heuristic we wish.
     if (thread->stack[thread->sp]->info.type == BCO) {
 	status = runHugs(thread,&smInfo);
     } else {

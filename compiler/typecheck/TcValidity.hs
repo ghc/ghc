@@ -168,7 +168,7 @@ Only a *class* predicate can give rise to ambiguity
 An *implicit parameter* cannot.  For example:
         foo :: (?x :: [a]) => Int
         foo = length ?x
-is fine.  The call site will suppply a particular 'x'
+is fine.  The call site will supply a particular 'x'
 
 Furthermore, the type variables fixed by an implicit parameter
 propagate to the others.  E.g.

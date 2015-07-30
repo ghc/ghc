@@ -1267,7 +1267,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                body
                (SyntaxExpr idR)   -- The return operator, used only for MonadComp
                                   -- For ListComp, PArrComp, we use the baked-in 'return'
-                                  -- For DoExpr, MDoExpr, we don't appply a 'return' at all
+                                  -- For DoExpr, MDoExpr, we don't apply a 'return' at all
                                   -- See Note [Monad Comprehensions]
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
 

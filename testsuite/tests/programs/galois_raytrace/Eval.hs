@@ -325,7 +325,7 @@ mainEval prog = do { stk <- eval (State emptyEnv [] prog)
                              }
 -}
 
-done = "Items still on stack at (successfull) termination of program"
+done = "Items still on stack at (successful) termination of program"
 
 ------------------------------------------------------------------------------
 -- testing
