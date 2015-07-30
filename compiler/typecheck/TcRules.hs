@@ -74,14 +74,9 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
             <- tcExtendTyVarEnv tv_bndrs  $
                tcExtendIdEnv    id_bndrs' $
                do { -- See Note [Solve order for RULES]
-                  ; lhs_ty <- newFlexiTyVarTy openTypeKind
-                  ; (lhs', lhs_wanted) <- captureConstraints (tcPolyMonoExpr lhs lhs_ty)
-                  ; rule_ty <- newFlexiTyVarTy openTypeKind
+                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
                   ; (rhs', rhs_wanted) <- captureConstraints (tcPolyMonoExpr rhs rule_ty)
-                    -- Add the constraint that InstanceOf lhs_ty rule_ty
-                  ; inst_w <- newWanted AnnOrigin (mkTcInstanceOfPred lhs_ty rule_ty)
-                  ; let rhs_wanted' = mkSimpleWC [inst_w] `andWC` rhs_wanted
-                  ; return (lhs', lhs_wanted, rhs', rhs_wanted', rule_ty) }
+                  ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
        ; (lhs_evs, other_lhs_wanted) <- simplifyRule (snd $ unLoc name)
                                                      (bndr_wanted `andWC` lhs_wanted)
@@ -312,34 +307,15 @@ simplifyRule name lhs_wanted rhs_wanted
                  -- variables: runTcS runs with topTcLevel
           tc_lvl <- getTcLevel
 
-                 -- Do not use <~ constraints in RULES,
-                 -- so we need to instantiate
-       ; let lhs_wanted_simple = wc_simple lhs_wanted
-       ; (lhs_wanted_inst, _) <- runTcS $
-           fmap andManyCts $ mapM instantiateWC (bagToList lhs_wanted_simple)
-       ; let lhs_wanted_inst' = remove_duplicates lhs_wanted_simple lhs_wanted_inst
-                 -- Build new WantedConstraints by adding the new instantiated
-                 -- We need to be careful not to duplicate constraints,
-                 -- because it would lead to too many forall's
-       ; let new_lhs_wanted_simple = wc_simple lhs_wanted `unionBags` lhs_wanted_inst'
-             new_lhs_wanted = lhs_wanted { wc_simple = new_lhs_wanted_simple }
-
        ;  (insoluble, _) <- runTcS $
              do { -- First solve the LHS and *then* solve the RHS
                   -- See Note [Solve order for RULES]
-                  lhs_resid <- solveWanteds new_lhs_wanted
+                  lhs_resid <- solveWanteds lhs_wanted
                 ; rhs_resid <- solveWanteds rhs_wanted
                 ; return (insolubleWC tc_lvl lhs_resid || insolubleWC tc_lvl rhs_resid) }
 
        ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
-       ; zonked_lhs_inst    <- zonkSimples lhs_wanted_inst'
-                  -- We need to remove duplicates once again,
-                  -- because we might get new duplicated constraints
-                  -- from unification of variables
-       ; let zonked_lhs = zonked_lhs_simples `unionBags`
-                            remove_duplicates zonked_lhs_simples zonked_lhs_inst
-
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs
+       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_simples
              quantify_me  -- Note [RULE quantification over equalities]
                | insoluble = quantify_insol
                | otherwise = quantify_normal
@@ -357,7 +333,6 @@ simplifyRule name lhs_wanted rhs_wanted
        ; traceTc "simplifyRule" $
          vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
               , text "lhs_wantd" <+> ppr lhs_wanted
-              , text "lhs_inst"  <+> ppr lhs_wanted_inst
               , text "rhs_wantd" <+> ppr rhs_wanted
               , text "zonked_lhs" <+> ppr zonked_lhs_simples
               , text "q_cts"      <+> ppr q_cts
@@ -365,10 +340,3 @@ simplifyRule name lhs_wanted rhs_wanted
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_simple = non_q_cts }) }
-
-remove_duplicates :: Cts -> Cts -> Cts
-remove_duplicates main new
-  = filterBag none_with_same_type new
-  where
-    same_type x y = ctPred x == ctPred y
-    none_with_same_type x = not (anyBag (same_type x) main)
