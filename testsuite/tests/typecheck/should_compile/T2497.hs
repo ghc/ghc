@@ -15,7 +15,7 @@ foo x = x
 
 eq,beq :: Eq a => a -> a -> Bool
 {-# NOINLINE [0] eq #-}
--- The pragma and [~1] in the RULE are to prevent an infinite loo
+-- The pragma and [~1] in the RULE are to prevent an infinite loop
 -- in the simplifier, where the RULE fires infinitely in its
 -- own RHS
 eq = (==)    -- Used
