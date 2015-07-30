@@ -1180,10 +1180,13 @@ cases, standalone deriving can still be used.
 -- the data constructors - but we need to be careful to fall back to the
 -- family tycon (with indexes) in error messages.
 
-data DerivStatus = CanDerive
+data DerivStatus = CanDerive                 -- Standard class, can derive
                  | DerivableClassError SDoc  -- Standard class, but can't do it
                  | DerivableViaInstance      -- See Note [Deriving any class]
                  | NonDerivableClass SDoc    -- Non-standard class
+
+-- A "standard" class is one defined in the Haskell report which GHC knows how
+-- to generate code for, such as Eq, Ord, Ix, etc.
 
 checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType]
                     -> TyCon -> [Type] -- tycon and its parameters
@@ -1203,7 +1206,9 @@ classArgsErr :: Class -> [Type] -> SDoc
 classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
 
 nonStdErr :: Class -> SDoc
-nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
+nonStdErr cls =
+      quotes (ppr cls)
+  <+> ptext (sLit "is not a standard derivable class (Eq, Show, etc.)")
 
 sideConditions :: DerivContext -> Class -> Maybe Condition
 sideConditions mtheta cls
@@ -1547,15 +1552,18 @@ mkNewTypeEqn dflags overlap_mode tvs
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
       -- Error with standard class
       DerivableClassError msg
-        | might_derive_via_coercible -> bale_out (msg $$ suggest_nd)
+        | might_derive_via_coercible -> bale_out (msg $$ suggest_gnd)
         | otherwise                  -> bale_out msg
+
       -- Must use newtype deriving or DeriveAnyClass
       NonDerivableClass _msg
         -- Too hard, even with newtype deriving
         | newtype_deriving           -> bale_out cant_derive_err
         -- Try newtype deriving!
-        | might_derive_via_coercible -> bale_out (non_std $$ suggest_nd)
-        | otherwise                  -> bale_out non_std
+        -- Here we suggest GeneralizedNewtypeDeriving even in cases where it may
+        -- not be applicable. See Trac #9600.
+        | otherwise                  -> bale_out (non_std $$ suggest_gnd)
+
       -- CanDerive/DerivableViaInstance
       _ -> do when (newtype_deriving && deriveAnyClass) $
                 addWarnTc (sep [ ptext (sLit "Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled")
@@ -1569,8 +1577,8 @@ mkNewTypeEqn dflags overlap_mode tvs
         bale_out    = bale_out' newtype_deriving
         bale_out' b = failWithTc . derivingThingErr b cls cls_tys inst_ty
 
-        non_std    = nonStdErr cls
-        suggest_nd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
+        non_std     = nonStdErr cls
+        suggest_gnd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
 
         -- Here is the plan for newtype derivings.  We see
         --        newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
@@ -2146,7 +2154,7 @@ derivingThingErr newtype_deriving clas tys ty why
           $$ nest 2 extra) <> colon,
          nest 2 why]
   where
-    extra | newtype_deriving = ptext (sLit "(even with cunning newtype deriving)")
+    extra | newtype_deriving = ptext (sLit "(even with cunning GeneralizedNewtypeDeriving)")
           | otherwise        = Outputable.empty
     pred = mkClassPred clas (tys ++ [ty])
 
