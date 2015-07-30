@@ -280,12 +280,12 @@ atomic_inc(StgVolatilePtr p, StgWord incr)
     );
     return r + incr;
 #else
-    StgWord old, new;
+    StgWord old, new_;
     do {
         old = *p;
-        new = old + incr;
-    } while (cas(p, old, new) != old);
-    return new;
+        new_ = old + incr;
+    } while (cas(p, old, new_) != old);
+    return new_;
 #endif
 }
 
@@ -301,12 +301,12 @@ atomic_dec(StgVolatilePtr p)
     );
     return r-1;
 #else
-    StgWord old, new;
+    StgWord old, new_;
     do {
         old = *p;
-        new = old - 1;
-    } while (cas(p, old, new) != old);
-    return new;
+        new_ = old - 1;
+    } while (cas(p, old, new_) != old);
+    return new_;
 #endif
 }
 
