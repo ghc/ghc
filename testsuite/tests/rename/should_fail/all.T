@@ -135,4 +135,4 @@ test('T9032',
      ['$MAKE -s --no-print-directory T9032'])
 test('T10618', normal, compile_fail, [''])
 test('T10668', normal, compile_fail, [''])
-test('T5001', normal, compile_fail, [''])
+test('T5001b', normal, compile_fail, [''])
