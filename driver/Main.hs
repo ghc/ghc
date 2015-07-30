@@ -20,7 +20,7 @@ expandResponse :: [String] -> IO [String]
 expandResponse = fmap concat . mapM expand
   where
     expand :: String -> IO [String]
-    expand ('@':f) = readFileExc f >>= return . filter (not . null) . words
+    expand ('@':f) = readFileExc f >>= return . filter (not . null) . lines
     expand x = return [x]
 
     readFileExc f =
