@@ -728,8 +728,8 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        ; binds' <- foldrBagM (rnMethodBindLHS is_cls_decl cls) emptyBag binds
 
        -- Rename the pragmas and signatures
-       -- Annoyingly the type variables *are* in scope for signatures, but
-       -- *are not* in scope in the SPECIALISE instance pramas; e.g.
+       -- Annoyingly the type variables /are/ in scope for signatures, but
+       -- /are not/ in scope in the SPECIALISE instance pramas; e.g.
        --    instance Eq a => Eq (T a) where
        --       (==) :: a -> a -> a
        --       {-# SPECIALISE instance Eq a => Eq (T [a]) #-}
