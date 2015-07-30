@@ -101,6 +101,12 @@ AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
         EnableBootstrapWithDevelSnaphost=NO
 )
 
+AC_ARG_ENABLE(tarballs-autodownload,
+[AC_HELP_STRING([--enable-tarballs-autodownload],
+                [Automatically download Windows distribution binaries if needed.])],
+        TarballsAutodownload=YES,
+        TarballsAutodownload=NO
+)
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
@@ -267,12 +273,49 @@ AC_SUBST(WithHc)
 FP_INTREE_GHC_PWD
 FP_FIND_ROOT
 
+function fail() {
+    echo >&2
+    echo "$1" >&2
+    exit 1
+}
+
+function set_up_tarballs() {
+    local tarball_repo_url="$1"
+    local tarball_dir="$2"
+
+    if ! test -d "${tarball_dir}"
+    then
+        local git_cmd="git clone ${tarball_repo_url} ${tarball_dir}"
+        if test "$TarballsAutodownload" = "NO"
+        then
+            echo >&2
+            echo "ERROR: Windows tarball binary distributions not found." >&2
+            echo "Please rerun configure with --enable-tarballs-autodownload, or clone the repository manually:" >&2
+            echo "  $git_cmd" >&2
+            exit 1
+        fi
+        AC_MSG_NOTICE([Downloading Windows tarball distributions to ${tarball_dir}...])
+        $git_cmd || {
+            rm -f "${tarball_dir}"
+            fail "ERROR: Git clone failed."
+        }
+    else
+        AC_MSG_NOTICE([Using Windows tarball distributions found in ${tarball_dir}...])
+    fi
+}
+
 if test "$HostOS" = "mingw32"
 then
     test -d inplace || mkdir inplace
 
+    # NB. For now just run git clone on the tarball repo
+    ghc_tarball_repo='git://git.haskell.org/ghc-tarballs.git'
+    ghc_tarball_dir='ghc-tarballs'
+    set_up_tarballs "${ghc_tarball_repo}" "${ghc_tarball_dir}"
+
     if test "$HostArch" = "i386"
     then
+
         # NB. If you update the tarballs to a new version of gcc, don't
         # forget to tweak the paths in driver/gcc/gcc.c.
         if ! test -d inplace/mingw ||

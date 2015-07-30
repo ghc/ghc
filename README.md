@@ -28,11 +28,6 @@ There are two ways to get a source tree:
 
         $ git clone --recursive git://git.haskell.org/ghc.git
 
-  On Windows, you need an extra repository containing some build tools:
-
-        $ cd ghc/
-        $ git clone git://git.haskell.org/ghc-tarballs.git
-
   Note: cloning GHC from Github requires a special setup. See [Getting a GHC
   repository from Github] [7].
 
@@ -65,6 +60,11 @@ dblatex.
     $ ./configure
     $ make         # can also say 'make -jX' for X number of jobs
     $ make install
+
+  On Windows, you need an extra repository containing some build tools.
+  These can be downloaded for you by configure. This only needs to be done once by running:
+
+    $ ./configure --enable-tarballs-autodownload
 
 (NB: **Do you have multiple cores? Be sure to tell that to `make`!** This can
 save you hours of build time depending on your system configuration, and is
