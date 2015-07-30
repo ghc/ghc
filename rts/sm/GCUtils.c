@@ -138,9 +138,11 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
     ASSERT(bd->gen == ws->gen);
     ASSERT(bd->u.scan == bd->free);
 
-    if (bd->start + bd->blocks * BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
+    if (bd->blocks == 1 &&
+        bd->start + BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
     {
-        // a partially full block: put it on the part_list list.
+        // A partially full block: put it on the part_list list.
+        // Only for single objects - see Note [big objects]
         bd->link = ws->part_list;
         ws->part_list = bd;
         ws->n_part_blocks += bd->blocks;
@@ -157,6 +159,35 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
 }
+
+/* Note [big objects]
+
+   We can get an ordinary object (CONSTR, FUN, THUNK etc.) that is
+   larger than a block (see #7919).  Let's call these "big objects".
+   These objects don't behave like large objects - they live in
+   ordinary heap space (not the large_objects list), and are copied by
+   evacuate().
+
+   Clearly to copy one of these objects we need a block group, not an
+   ordinary block, so when alloc_todo_block() will correctly allocate a
+   block group.
+
+   The question is what to do with the space that is left at the end
+   of the block group after copying the big object into it.  We could
+   continue to copy more objects into that space, but unfortunately
+   the rest of the GC is not set up to handle objects that start in
+   the second or later blocks of a group.  We just about manage this
+   in the nursery (see scheduleHandleHeapOverflow()) so evacuate() can
+   handle this, but other parts of the GC can't.  We could probably
+   fix this, but it's a rare case, so for now we ensure that we never
+   copy objects into the second and subsequent blocks of a block
+   group.
+
+   To ensure this:
+    - alloc_todo_block() sets todo_lim to be exactly the size of the
+      large object
+    - push_scanned_block doesn't put these blocks on the part_list
+*/
 
 StgPtr
 todo_block_full (nat size, gen_workspace *ws)
@@ -193,17 +224,7 @@ todo_block_full (nat size, gen_workspace *ws)
 
     // We can extend the limit for the current block if there's enough
     // room for the current object, *and* we're not into the second or
-    // subsequent block of a large block.  The second condition occurs
-    // when we evacuate an object that is larger than a block.  In
-    // that case, alloc_todo_block() sets todo_lim to be exactly the
-    // size of the large object, and we don't evacuate any more
-    // objects into this block.  The reason is that the rest of the GC
-    // is not set up to handle objects that start in the second or
-    // later blocks of a group.  We just about manage this in the
-    // nursery (see scheduleHandleHeapOverflow()) so evacuate() can
-    // handle this, but other parts of the GC can't.  We could
-    // probably fix this, but it's a rare case anyway.
-    //
+    // subsequent block of a large block (see Note [big objects]).
     can_extend =
         ws->todo_free + size <= bd->start + bd->blocks * BLOCK_SIZE_W
         && ws->todo_free < ws->todo_bd->start + BLOCK_SIZE_W;
@@ -316,6 +337,7 @@ alloc_todo_block (gen_workspace *ws, nat size)
     ws->todo_free = bd->free;
     ws->todo_lim  = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
                             bd->free + stg_max(WORK_UNIT_WORDS,size));
+                     // See Note [big objects]
 
     debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d",
                bd->free, ws->gen->no);
