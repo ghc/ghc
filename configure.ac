@@ -273,13 +273,13 @@ AC_SUBST(WithHc)
 FP_INTREE_GHC_PWD
 FP_FIND_ROOT
 
-function fail() {
+fail() {
     echo >&2
     echo "$1" >&2
     exit 1
 }
 
-function set_up_tarballs() {
+set_up_tarballs() {
     local tarball_repo_url="$1"
     local tarball_dir="$2"
 
