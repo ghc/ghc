@@ -39,7 +39,6 @@ import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
 import GHC.Exts
-import Unique
 import Name
 import BooleanFormula
 
@@ -609,8 +608,8 @@ instanceId :: InstOrigin -> Int -> InstHead DocName -> String
 instanceId orgin no ihd = concat
     [ qual orgin
     , ":" ++ (occNameString . getOccName . ihdClsName) ihd
-    , "-" ++ show (instHeadId ihd)
-    , "-" ++ show no
+    , ":" ++ show (instHeadId ihd)
+    , ":" ++ show no
     ]
   where
     qual OriginClass = "ic"
@@ -626,16 +625,27 @@ instanceId orgin no ihd = concat
 -- refactoring, for now we just generate naive hash for given instance.
 --
 -- Hashing is very, very trivial and turns a list of 'DocName' to 'Int'. Idea
--- for such simple hash function is stolen from
+-- for such simple hash function (djb2) is stolen from
 -- <http://stackoverflow.com/questions/9262879/create-a-unique-integer-for-each-string here>.
+--
+-- Hashing is performed on string representation of `Name`. Why string instead
+-- of 'Unique' of that 'Name'? That would be much faster and nicer, yes.
+-- However, 'Unique' is not very deterministic, so running it on different
+-- configurations would yield different HTML documents. This is not very bad,
+-- as nobody cares about these identifiers but it would require us to strip
+-- section anchors in testing framework and that is not only inconvenient but
+-- also makes testing less viable. And it is only temporary solution so we can
+-- live with it.
 instHeadId :: InstHead DocName -> Int
 instHeadId (InstHead { .. }) =
     djb2 . map key $ [ihdClsName] ++ names ihdTypes ++ names ihdKinds
   where
     names = everything (++) $
         maybeToList . (cast :: forall a. Data a => a -> Maybe DocName)
-    djb2 = foldl (\h c -> h * 33 `xor` c) 5381
-    key = getKey . nameUnique . getName
+    key = djb2 . occNameString . nameOccName . getName
+
+    djb2 :: Enum a => [a] -> Int
+    djb2 = foldl (\h c -> h * 33 `xor` fromEnum c) 5381
 
 
 -------------------------------------------------------------------------------
