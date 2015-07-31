@@ -1,5 +1,6 @@
 {-# LANGUAGE TransformListComp #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE Rank2Types #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Html.Decl
@@ -26,8 +27,11 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
+import Haddock.Syb
 import Haddock.Doc (combineDocumentation)
 
+import           Data.Bits
+import           Data.Data (Data, cast)
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -35,6 +39,7 @@ import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
 import GHC.Exts
+import Unique
 import Name
 import BooleanFormula
 
@@ -553,7 +558,7 @@ ppInstances links origin instances baseName splice unicode qual
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
            -> Maybe (MDoc DocName) -> InstOrigin -> Int -> InstHead DocName
            -> SubDecl
-ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
+ppInstHead links splice unicode qual mdoc origin no ihd@(InstHead {..}) =
     case ihdInstType of
         ClassInst { .. } ->
             ( subInstHead iid $ ppContextNoLocs clsiCtx unicode qual <+> typ
@@ -561,7 +566,7 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
             , [subInstDetails iid ats sigs]
             )
           where
-            iid = instanceId origin no ihdClsName
+            iid = instanceId origin no ihd
             sigs = ppInstanceSigs links splice unicode qual clsiSigs
             ats = ppInstanceAssocTys links splice unicode qual clsiAssocTys
         TypeInst rhs ->
@@ -600,13 +605,37 @@ lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
 
 
-instanceId :: InstOrigin -> Int -> DocName -> String
-instanceId orgin no name =
-    qual orgin ++ ":" ++ (occNameString . getOccName) name ++ "-" ++ show no
+instanceId :: InstOrigin -> Int -> InstHead DocName -> String
+instanceId orgin no ihd = concat
+    [ qual orgin
+    , ":" ++ (occNameString . getOccName . ihdClsName) ihd
+    , "-" ++ show (instHeadId ihd)
+    , "-" ++ show no
+    ]
   where
     qual OriginClass = "ic"
     qual OriginData = "id"
     qual OriginFamily = "if"
+
+
+-- | Compute unique identifier for given instance.
+--
+-- This is rather poor way of doing it. Ideally, we would like to have
+-- everything wrapped in a stateful monad that allows us to generate unique
+-- identifiers as needed. Since introducing such monad would require major
+-- refactoring, for now we just generate naive hash for given instance.
+--
+-- Hashing is very, very trivial and turns a list of 'DocName' to 'Int'. Idea
+-- for such simple hash function is stolen from
+-- <http://stackoverflow.com/questions/9262879/create-a-unique-integer-for-each-string here>.
+instHeadId :: InstHead DocName -> Int
+instHeadId (InstHead { .. }) =
+    djb2 . map key $ [ihdClsName] ++ names ihdTypes ++ names ihdKinds
+  where
+    names = everything (++) $
+        maybeToList . (cast :: forall a. Data a => a -> Maybe DocName)
+    djb2 = foldl (\h c -> h * 33 `xor` c) 5381
+    key = getKey . nameUnique . getName
 
 
 -------------------------------------------------------------------------------
