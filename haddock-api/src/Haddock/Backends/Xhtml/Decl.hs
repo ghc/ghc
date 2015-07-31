@@ -567,18 +567,13 @@ ppInstHead links splice unicode qual mdoc origin no (InstHead {..}) =
         TypeInst rhs ->
             (ptype, mdoc, [])
           where
-            ptype = mconcat
-                [ keyword "type"
-                , typ
-                , maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
-                ]
+            ptype = keyword "type" <+> typ <+> prhs
+            prhs = maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
         DataInst dd ->
             (pdata, mdoc, [])
           where
-            pdata = mconcat
-                [ keyword "data" <+> typ
-                , ppShortDataDecl False True dd unicode qual
-                ]
+            pdata = keyword "data" <+> typ <+> pdecl
+            pdecl = ppShortDataDecl False True dd unicode qual
   where
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
 
