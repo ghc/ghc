@@ -5,7 +5,7 @@ module Settings.Util (
     getFlag, getSetting, getSettingList,
     getPkgData, getPkgDataList,
     getPackagePath, getTargetPath, getTargetDirectory,
-    getHsSources, getSourceFiles,
+    getHsSources,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -78,44 +78,50 @@ getHsSources = do
     path    <- getTargetPath
     pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
+
+    let buildPath = path -/- "build"
+        dirs      = (buildPath -/- "autogen") : map (pkgPath -/-) srcDirs
+
+    (foundSources, missingSources) <- findModuleFiles dirs "*hs"
+
+    -- Generated source files will live in buildPath and have extension "hs"
+    let generatedSources = map (\f -> buildPath -/- f <.> "hs") missingSources
+
+    return $ foundSources ++ generatedSources
+
+-- Given a module name extract the directory and file names, e.g.:
+-- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
+decodeModule :: String -> (FilePath, String)
+decodeModule = splitFileName . replaceEq '.' '/'
+
+-- findModuleFiles scans a list of given directories and finds files matching a
+-- given extension pattern (e.g., "*hs") that correspond to modules of the
+-- currently built package. Missing module files are returned in a separate
+-- list. The returned pair contains the following:
+-- * a list of found module files, with paths being relative to one of given
+--   directories, e.g. "codeGen/CodeGen/Platform.hs" for the compiler package.
+-- * a list of module files that have not been found, with paths being relative
+--   to the module directory, e.g. "CodeGen/Platform", and with no extension.
+findModuleFiles :: [FilePath] -> FilePattern -> Expr ([FilePath], [FilePath])
+findModuleFiles dirs ext = do
     modules <- getPkgDataList Modules
-    let buildPath   = path -/- "build"
-        autogenPath = buildPath -/- "autogen"
-        dirs        = autogenPath : map (pkgPath -/-) srcDirs
-        decodedMods = sort $ map decodeModule modules
+    let decodedMods = sort . map decodeModule $ modules
         modDirFiles = map (bimap head sort . unzip)
-                    $ groupBy ((==) `on` fst) decodedMods
+                    . groupBy ((==) `on` fst) $ decodedMods
 
     result <- lift . fmap concat . forM dirs $ \dir -> do
         todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
         forM todo $ \(mDir, mFiles) -> do
-            let files = [ dir -/- mDir -/- mFile <.> "*hs" | mFile <- mFiles ]
+            let files = [ dir -/- mDir -/- mFile <.> ext | mFile <- mFiles ]
             found <- fmap (map unifyPath) $ getDirectoryFiles "" files
             return (found, (mDir, map takeBaseName found))
 
-    let foundSources = concatMap fst result
+    let foundFiles   = concatMap fst result
         foundMods    = [ (d, f) | (d, fs) <- map snd result, f <- fs ]
-        leftMods     = decodedMods \\ sort foundMods
-        genSources   = map (\(d, f) -> buildPath -/- d -/- f <.> "hs") leftMods
+        missingMods  = decodedMods `minusOrd` sort foundMods
+        missingFiles = map (uncurry (-/-)) missingMods
 
-    return $ foundSources ++ genSources
-
--- Given a module name extract the directory and file names, e.g.:
--- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
-decodeModule :: String -> (FilePath, FilePath)
-decodeModule = splitFileName . replaceEq '.' '/'
-
-    -- getSourceFiles paths [".hs", ".lhs"]
-
--- Find all source files in specified paths and with given extensions
-getSourceFiles :: [FilePath] -> [String] -> Expr [FilePath]
-getSourceFiles paths exts = do
-    modules <- getPkgDataList Modules
-    let modPaths   = map (replaceEq '.' '/') modules
-        candidates = [ p -/- m ++ e | p <- paths, m <- modPaths, e <- exts ]
-    files <- lift $ filterM (doesDirectoryExist . takeDirectory) candidates
-    result <- lift $ getDirectoryFiles "" files
-    return $ map unifyPath result
+    return (foundFiles, missingFiles)
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args
