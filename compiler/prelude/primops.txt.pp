@@ -1960,7 +1960,8 @@ primop  CatchOp "catch#" GenPrimOp
    has_side_effects = True
 
 primop  RaiseOp "raise#" GenPrimOp
-   a -> b
+   b -> o
+      -- NB: the type variable "o" is "a", but with OpenKind
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
