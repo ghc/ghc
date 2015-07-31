@@ -31,10 +31,12 @@ import Haddock.Syb
 import Haddock.Doc (combineDocumentation)
 
 import           Data.Bits
+import           Data.Char
 import           Data.Data (Data, cast)
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
+import           Data.Word
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
@@ -636,16 +638,16 @@ instanceId orgin no ihd = concat
 -- section anchors in testing framework and that is not only inconvenient but
 -- also makes testing less viable. And it is only temporary solution so we can
 -- live with it.
-instHeadId :: InstHead DocName -> Int
+instHeadId :: InstHead DocName -> Word64
 instHeadId (InstHead { .. }) =
-    djb2 . map key $ [ihdClsName] ++ names ihdTypes ++ names ihdKinds
+    djb2 id . map key $ [ihdClsName] ++ names ihdTypes ++ names ihdKinds
   where
     names = everything (++) $
         maybeToList . (cast :: forall a. Data a => a -> Maybe DocName)
-    key = djb2 . occNameString . nameOccName . getName
+    key = djb2 (fromIntegral . ord) . occNameString . nameOccName . getName
 
-    djb2 :: Enum a => [a] -> Int
-    djb2 = foldl (\h c -> h * 33 `xor` fromEnum c) 5381
+    djb2 :: (a -> Word64) -> [a] -> Word64
+    djb2 conv = foldl (\h c -> h * 33 `xor` conv c) 5381
 
 
 -------------------------------------------------------------------------------
