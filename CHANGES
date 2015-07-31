@@ -4,6 +4,8 @@ Changes in version 2.16.2
 
  * Fix expansion icon for user-collapsible sections (#412)
 
+ * Break up response file arguments on newlines
+
 Changes in version 2.16.1
 
  * Don't default to type constructors for out-of-scope names (#253 and
