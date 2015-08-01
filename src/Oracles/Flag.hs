@@ -4,6 +4,7 @@ module Oracles.Flag (
     platformSupportsSharedLibs, ghcWithSMP, ghcWithNativeCodeGen
     ) where
 
+import Base
 import Util
 import Oracles.Base
 import Oracles.Setting

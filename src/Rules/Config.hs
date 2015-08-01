@@ -1,9 +1,7 @@
-module Rules.Config (
-    configRules
-    ) where
+module Rules.Config (configRules) where
 
+import Base
 import Util
-import Oracles.Base
 
 configRules :: Rules ()
 configRules = do

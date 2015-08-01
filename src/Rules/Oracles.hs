@@ -2,6 +2,7 @@ module Rules.Oracles (
     oracleRules
     ) where
 
+import Base
 import Oracles.Base
 import Oracles.ArgsHash
 import Oracles.PackageData

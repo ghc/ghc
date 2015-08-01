@@ -4,6 +4,7 @@ module Oracles.WindowsRoot (
     windowsRoot, windowsRootOracle
     ) where
 
+import Base
 import Util
 import Oracles.Base
 import Data.List

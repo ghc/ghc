@@ -16,11 +16,11 @@ module Settings.Util (
     -- argPackageConstraints,
     ) where
 
+import Base
 import Util
 import Builder
 import Package
 import Expression
-import Oracles.Base
 import Oracles.Flag
 import Oracles.Setting
 import Oracles.PackageData

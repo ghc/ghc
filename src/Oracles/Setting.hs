@@ -6,6 +6,7 @@ module Oracles.Setting (
     ghcEnableTablesNextToCode
     ) where
 
+import Base
 import Stage
 import Oracles.Base
 

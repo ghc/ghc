@@ -2,6 +2,7 @@ module Rules.Actions (
     build, buildWithResources, run, verboseRun
     ) where
 
+import Base
 import Util
 import Builder
 import Expression
@@ -9,7 +10,6 @@ import qualified Target
 import Settings.Args
 import Settings.Util
 import Oracles.ArgsHash
-import Development.Shake
 
 -- Build a given target using an appropriate builder and acquiring necessary
 -- resources. Force a rebuilt if the argument list has changed since the last

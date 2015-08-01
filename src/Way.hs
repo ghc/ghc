@@ -13,13 +13,12 @@ module Way ( -- TODO: rename to "Way"?
     detectWay
     ) where
 
+import Base
 import Util
 import Oracles.Setting
-import Control.Applicative
-import Development.Shake
-import Development.Shake.Classes
 import Data.List
 import Data.IntSet (IntSet)
+import Control.Applicative
 import qualified Data.IntSet as Set
 
 data WayUnit = Threaded

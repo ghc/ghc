@@ -1,5 +1,6 @@
 module Rules.Data (buildPackageData) where
 
+import Base
 import Util
 import Package
 import Builder
@@ -10,7 +11,6 @@ import Settings.TargetDirectory
 import Rules.Actions
 import Control.Applicative
 import Control.Monad.Extra
-import Development.Shake
 
 -- TODO: Add ordering between packages? (see ghc.mk)
 -- Build package-data.mk by using GhcCabal to process pkgCabal file

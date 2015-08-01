@@ -1,7 +1,6 @@
 module Util (
     module Data.Char,
     module System.Console.ANSI,
-    module Development.Shake.FilePath,
     replaceIf, replaceEq, replaceSeparators,
     unifyPath, (-/-),
     chunksOfSize,
@@ -9,12 +8,11 @@ module Util (
     bimap, minusOrd, intersectOrd
     ) where
 
+import Base
 import Data.Char
 import Control.Monad
 import System.IO
 import System.Console.ANSI
-import Development.Shake
-import Development.Shake.FilePath
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)

@@ -1,26 +1,15 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.Base (
-    module Development.Shake,
-    module Development.Shake.Util,
-    module Development.Shake.Config,
-    module Development.Shake.Classes,
     askConfigWithDefault, askConfig, configOracle,
-    configPath,
     putOracle
     ) where
 
+import Base
 import Util
 import Control.Applicative
 import Control.Monad.Extra
-import Development.Shake
-import Development.Shake.Util
-import Development.Shake.Config
-import Development.Shake.Classes
 import qualified Data.HashMap.Strict as Map
-
-configPath :: FilePath
-configPath = "shake" -/- "cfg"
 
 newtype ConfigKey = ConfigKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

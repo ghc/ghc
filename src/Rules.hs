@@ -4,6 +4,7 @@ module Rules (
     module Rules.Package,
     ) where
 
+import Base
 import Util
 import Stage
 import Expression
@@ -12,7 +13,6 @@ import Rules.Package
 import Rules.Oracles
 import Settings.Packages
 import Settings.TargetDirectory
-import Development.Shake
 
 -- generateTargets needs package-data.mk files of all target packages
 -- TODO: make interpretDiff total

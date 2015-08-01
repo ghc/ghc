@@ -3,13 +3,13 @@ module Settings.GhcCabal (
     ) where
 
 import Way
+import Base
 import Util
 import Stage
 import Builder
 import Package
 import Switches
 import Expression
-import Oracles.Base
 import Oracles.Flag
 import Oracles.Setting
 import Settings.User

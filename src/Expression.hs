@@ -15,13 +15,13 @@ module Expression (
     ) where
 
 import Way
+import Base
 import Stage
 import Builder
 import Package
 import Target (Target)
 import Target hiding (Target(..))
 import qualified Target
-import Oracles.Base
 import Data.List
 import Data.Monoid
 import Control.Monad.Reader hiding (liftIO)

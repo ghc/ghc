@@ -1,5 +1,6 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
+import Base
 import Util
 import Builder
 import Package
@@ -9,7 +10,6 @@ import Oracles.PackageData
 import Settings.Util
 import Settings.TargetDirectory
 import Rules.Actions
-import Development.Shake
 
 buildPackageDependencies :: StagePackageTarget -> Rules ()
 buildPackageDependencies target =

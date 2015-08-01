@@ -4,11 +4,10 @@ module Oracles.ArgsHash (
     askArgsHash, argsHashOracle
     ) where
 
+import Base
 import Expression
 import Settings.Args
 import Control.Applicative
-import Development.Shake
-import Development.Shake.Classes
 
 newtype ArgsHashKey = ArgsHashKey FullTarget
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

@@ -4,6 +4,7 @@ module Builder (
     Builder (..), builderKey, builderPath, specified
     ) where
 
+import Base
 import Util
 import Stage
 import Data.List

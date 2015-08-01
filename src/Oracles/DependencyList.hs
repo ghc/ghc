@@ -5,6 +5,7 @@ module Oracles.DependencyList (
     dependencyListOracle
     ) where
 
+import Base
 import Util
 import Oracles.Base
 import Data.List

@@ -4,8 +4,8 @@ module Stage (
     Stage (..)
     ) where
 
+import Base
 import GHC.Generics
-import Development.Shake.Classes
 
 data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum, Generic)
 

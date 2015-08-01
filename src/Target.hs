@@ -5,11 +5,11 @@ module Target (
     ) where
 
 import Way
+import Base
 import Stage
 import Package
 import Builder
 import GHC.Generics
-import Development.Shake.Classes
 
 -- Target captures all parameters relevant to the current build target:
 -- * Stage and Package being built,
